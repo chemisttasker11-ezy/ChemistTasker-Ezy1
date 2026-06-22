@@ -22,6 +22,7 @@ urlpatterns = [
     path('login/', CustomLoginView.as_view(), name='custom_token_obtain_pair'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('mobile/app-config/', MobileAppConfigView.as_view(), name='mobile-app-config'),
     path('me/', CurrentUserView.as_view(), name='me'),
     path('ws-ticket/', WsTicketView.as_view(), name='ws-ticket'),
     path('password-reset-confirm/',PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm_api'),

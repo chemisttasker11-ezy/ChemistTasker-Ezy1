@@ -54,6 +54,19 @@ OTP_MAX_FAILED_ATTEMPTS = 5
 OTP_LOCKOUT_MINUTES = 15
 
 
+class MobileAppConfigView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        payload = {
+            "latest_version": (getattr(settings, "MOBILE_LATEST_VERSION", "") or "").strip(),
+            "minimum_supported_version": (getattr(settings, "MOBILE_MINIMUM_SUPPORTED_VERSION", "") or "").strip(),
+            "android_store_url": (getattr(settings, "MOBILE_ANDROID_STORE_URL", "") or "").strip(),
+            "ios_store_url": (getattr(settings, "MOBILE_IOS_STORE_URL", "") or "").strip(),
+        }
+        return Response(payload)
+
+
 def _hash_otp(raw_otp: str) -> str:
     return make_password(raw_otp)
 

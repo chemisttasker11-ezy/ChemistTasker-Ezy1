@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AppState, Linking, Platform, StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { PaperProvider } from 'react-native-paper';
+import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import crashlytics from '@react-native-firebase/crashlytics';
+import * as Updates from 'expo-updates';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
@@ -13,6 +14,7 @@ import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
+import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
 
 const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
 
@@ -71,6 +73,142 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     }
     return this.props.children;
   }
+}
+
+function UpdatePrompt() {
+  const [mode, setMode] = useState<'none' | 'store-required' | 'store-optional' | 'ota'>('none');
+  const [visible, setVisible] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [storeUrl, setStoreUrl] = useState('');
+  const dismissedForSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || __DEV__) {
+      return;
+    }
+
+    let active = true;
+
+    const checkForUpdate = async () => {
+      try {
+        const installedVersion = getInstalledAppVersion();
+        const appConfig = await fetchMobileAppConfig();
+        const nextDecision = decideAppUpdate(appConfig, installedVersion);
+
+        if (!active) return;
+
+        if (nextDecision.type === 'store-required') {
+          setMode('store-required');
+          setStoreUrl(nextDecision.storeUrl);
+          setVisible(true);
+          return;
+        }
+
+        if (!Updates.isEnabled || dismissedForSessionRef.current) {
+          if (nextDecision.type === 'store-optional' && !dismissedForSessionRef.current) {
+            setMode('store-optional');
+            setStoreUrl(nextDecision.storeUrl);
+            setVisible(true);
+            return;
+          }
+        } else {
+          const result = await Updates.checkForUpdateAsync();
+          if (result.isAvailable) {
+            setMode('ota');
+            setStoreUrl('');
+            setVisible(true);
+            return;
+          }
+        }
+
+        if (nextDecision.type === 'store-optional' && !dismissedForSessionRef.current) {
+          setMode('store-optional');
+          setStoreUrl(nextDecision.storeUrl);
+          setVisible(true);
+          return;
+        }
+
+        setVisible(false);
+        setMode('none');
+      } catch (error) {
+        console.warn('Failed to check for app updates', error);
+      }
+    };
+
+    void checkForUpdate();
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void checkForUpdate();
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  const applyUpdate = async () => {
+    if (mode === 'store-required' || mode === 'store-optional') {
+      if (!storeUrl) return;
+      const canOpen = await Linking.canOpenURL(storeUrl);
+      if (canOpen) {
+        await Linking.openURL(storeUrl);
+      }
+      return;
+    }
+
+    setIsApplying(true);
+    try {
+      await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    } catch (error) {
+      console.warn('Failed to apply OTA update', error);
+      setIsApplying(false);
+    }
+  };
+
+  if (Platform.OS === 'web' || !visible) {
+    return null;
+  }
+
+  return (
+    <Portal>
+      <Dialog
+        dismissable={mode !== 'store-required' && !isApplying}
+        visible={visible}
+        onDismiss={() => mode !== 'store-required' && !isApplying && setVisible(false)}
+      >
+        <Dialog.Title>{mode === 'store-required' ? 'Update required' : 'Update available'}</Dialog.Title>
+        <Dialog.Content>
+          <Text>
+            {mode === 'store-required'
+              ? 'A newer version of the app is required to continue. Press Update to open the latest store version.'
+              : mode === 'store-optional'
+                ? 'A newer app build is available in the store. Press Update to install the latest version.'
+                : 'A new update is available. Press Update to get the latest version.'}
+          </Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          {mode !== 'store-required' ? (
+            <Button
+              disabled={isApplying}
+              onPress={() => {
+                dismissedForSessionRef.current = true;
+                setVisible(false);
+              }}
+            >
+              Later
+            </Button>
+          ) : null}
+          <Button loading={isApplying && mode === 'ota'} mode="contained" onPress={applyUpdate}>
+            Update
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
 }
 
 function AuthGate() {
@@ -228,6 +366,7 @@ export default function RootLayout() {
                 <AuthProvider>
                   <WorkspaceProvider>
                     <AuthGate />
+                    <UpdatePrompt />
                     <OfflineBanner />
                     <Stack
                       screenOptions={{

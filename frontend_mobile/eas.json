@@ -5,19 +5,23 @@
   },
   "build": {
     "development": {
+      "channel": "development",
       "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
+      "channel": "preview",
       "distribution": "internal"
     },
     "production": {
+      "channel": "production",
       "autoIncrement": true,
       "env": {
         "NODE_ENV": "production"
       }
     },
     "production-apk": {
+      "channel": "production",
       "autoIncrement": true,
       "env": {
         "NODE_ENV": "production"

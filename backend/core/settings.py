@@ -502,6 +502,17 @@ MOBILEMESSAGE_USERNAME = env('MOBILEMESSAGE_USERNAME')
 MOBILEMESSAGE_PASSWORD = env('MOBILEMESSAGE_PASSWORD')
 MOBILEMESSAGE_SENDER = env('MOBILEMESSAGE_SENDER')
 
+MOBILE_LATEST_VERSION = env("MOBILE_LATEST_VERSION", default="1.0.8")
+MOBILE_MINIMUM_SUPPORTED_VERSION = env("MOBILE_MINIMUM_SUPPORTED_VERSION", default="1.0.8")
+MOBILE_ANDROID_STORE_URL = env(
+    "MOBILE_ANDROID_STORE_URL",
+    default="https://play.google.com/store/apps/details?id=com.chemisttasker.app",
+)
+MOBILE_IOS_STORE_URL = env(
+    "MOBILE_IOS_STORE_URL",
+    default="https://apps.apple.com/app/chemisttasker/id6759088580",
+)
+
 # Stripe Settings
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
