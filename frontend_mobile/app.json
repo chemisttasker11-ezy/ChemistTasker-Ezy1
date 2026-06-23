@@ -8,9 +8,7 @@
     "scheme": "frontendmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "runtimeVersion": {
-      "policy": "fingerprint"
-    },
+    "runtimeVersion": "1.0.8",
     "updates": {
       "url": "https://u.expo.dev/75fa2fa5-e9ed-47af-a012-86967b951c5b",
       "checkAutomatically": "ON_LOAD",
