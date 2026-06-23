@@ -544,7 +544,7 @@ export default function PharmacyForm({
     const title = useMemo(() => (mode === 'edit' ? 'Edit Pharmacy' : 'Add Pharmacy'), [mode]);
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -141,7 +141,7 @@ export default function OwnerSubscriptionSeatsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={styles.loadingText}>Loading subscription...</Text>
@@ -151,7 +151,7 @@ export default function OwnerSubscriptionSeatsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         {error ? <HelperText type="error">{error}</HelperText> : null}
 

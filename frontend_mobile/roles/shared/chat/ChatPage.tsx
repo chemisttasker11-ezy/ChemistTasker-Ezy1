@@ -179,7 +179,7 @@ export default function ChatPage() {
   }, [rooms, reload]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />

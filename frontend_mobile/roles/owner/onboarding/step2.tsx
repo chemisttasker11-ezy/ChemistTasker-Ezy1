@@ -53,7 +53,7 @@ export default function OwnerOnboardingStep2() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}

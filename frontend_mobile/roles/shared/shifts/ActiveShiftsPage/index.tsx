@@ -777,7 +777,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
     if (shifts.length === 0) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <View style={styles.emptyContainer}>
                     <Text style={styles.emptyText}>No active shifts found.</Text>
                 </View>
@@ -786,7 +786,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <ScrollView contentContainerStyle={styles.content}>
                 <Text style={styles.title}>{title}</Text>
                 {orderedShifts.map((shift, idx) => {

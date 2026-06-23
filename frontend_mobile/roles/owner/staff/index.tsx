@@ -82,7 +82,7 @@ export default function ManageStaffScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.centered} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.centered} edges={['left', 'right']}>
                 <ActivityIndicator size="large" />
                 <Text style={styles.helperText}>Loading staff...</Text>
             </SafeAreaView>
@@ -90,7 +90,7 @@ export default function ManageStaffScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <View style={styles.header}>
                 <Text variant="headlineSmall" style={styles.title}>Manage Staff</Text>
                 <Text variant="bodyMedium" style={styles.subtitle}>

@@ -197,8 +197,8 @@ export default function PharmacistMessageDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      <View style={styles.container}>
         <Stack.Screen options={{
           headerShown: true,
           title: (name as string) || 'Chat',
@@ -230,7 +230,7 @@ export default function PharmacistMessageDetailScreen() {
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 44 : insets.top}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 44 : 0}
         >
           <Surface style={styles.inputContainer} elevation={4}>
             <TextInput

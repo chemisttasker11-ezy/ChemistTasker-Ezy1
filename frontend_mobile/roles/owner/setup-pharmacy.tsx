@@ -59,7 +59,7 @@ export default function OwnerSetupPharmacyScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centered} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.centered} edges={['left', 'right']}>
         <ActivityIndicator />
       </SafeAreaView>
     );
@@ -67,14 +67,14 @@ export default function OwnerSetupPharmacyScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.centered} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.centered} edges={['left', 'right']}>
         <HelperText type="error" visible>{error}</HelperText>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <PharmacyForm
         key={formKey}
         mode="create"

@@ -111,7 +111,7 @@ export default function ShiftApplicationsScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#1976d2" />
                     <Text style={styles.loadingText}>Loading applications...</Text>
@@ -121,7 +121,7 @@ export default function ShiftApplicationsScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <View style={styles.header}>
                 <Text variant="headlineSmall" style={styles.title}>
                     Applications ({applications.length})

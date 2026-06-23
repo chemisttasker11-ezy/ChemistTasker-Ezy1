@@ -257,7 +257,7 @@ export default function InvoiceDetail({ basePath }: Props) {
 
   if (!invoice) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.header}>
           <IconButton icon="arrow-left" onPress={() => router.back()} />
           <Text variant="titleMedium" style={styles.headerTitle}>
@@ -273,7 +273,7 @@ export default function InvoiceDetail({ basePath }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <IconButton icon="arrow-left" onPress={() => router.back()} />
         <Text variant="titleLarge" style={styles.headerTitle}>

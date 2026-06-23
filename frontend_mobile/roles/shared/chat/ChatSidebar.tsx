@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 24,
+    paddingTop: 0,
   },
   section: { paddingVertical: 6 },
   sectionTitle: { fontWeight: '700', color: '#6B7280' },

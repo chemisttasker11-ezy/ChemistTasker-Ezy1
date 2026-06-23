@@ -469,7 +469,7 @@ export default function TalentBoard({
   const showPitchButton = !publicMode && !hidePitchButton && canPitch;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <AvailabilitySidebar candidate={selectedCalendarCandidate} onClose={() => setSelectedCalendarCandidate(null)} canRequestBooking={canRequestBooking} onRequestBooking={handleRequestBooking} currentUserId={user?.id ?? null} />
       <FiltersSidebar
         visible={isSidebarOpen}

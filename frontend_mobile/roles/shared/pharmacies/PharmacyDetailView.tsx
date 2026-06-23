@@ -54,7 +54,7 @@ export default function PharmacyDetailView({
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <View style={styles.automationSection}>
                 <View style={styles.automationHeader}>
                     <View style={styles.automationCopy}>

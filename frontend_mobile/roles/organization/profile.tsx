@@ -119,7 +119,7 @@ export default function OrganizationProfileScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView style={styles.scrollView}>
         <Card style={styles.heroCard} mode="contained">
           <LinearGradient

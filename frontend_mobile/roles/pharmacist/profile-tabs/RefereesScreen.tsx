@@ -98,7 +98,7 @@ export default function PharmacistRefereesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
           <Text>Loading referees...</Text>
         </View>
@@ -107,7 +107,7 @@ export default function PharmacistRefereesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Referees</Text>
 

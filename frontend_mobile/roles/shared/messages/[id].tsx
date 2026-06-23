@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -546,7 +546,7 @@ const pinnedMessage = useMemo(() => {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <View style={styles.container}>
             <Stack.Screen options={{
                 headerShown: true,

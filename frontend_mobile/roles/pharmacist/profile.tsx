@@ -213,7 +213,7 @@ export default function PharmacistProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.headerTitle}>Profile</Text>

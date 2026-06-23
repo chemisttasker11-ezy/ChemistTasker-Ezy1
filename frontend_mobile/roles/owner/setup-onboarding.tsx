@@ -35,7 +35,7 @@ export default function OwnerSetupOnboardingScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centered} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.centered} edges={['left', 'right']}>
         <ActivityIndicator />
       </SafeAreaView>
     );
@@ -43,7 +43,7 @@ export default function OwnerSetupOnboardingScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.centered} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.centered} edges={['left', 'right']}>
         <HelperText type="error" visible>{error}</HelperText>
       </SafeAreaView>
     );

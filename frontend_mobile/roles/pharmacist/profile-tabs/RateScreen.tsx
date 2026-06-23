@@ -88,7 +88,7 @@ export default function PharmacistRateScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
           <Text>Loading rates...</Text>
         </View>
@@ -97,7 +97,7 @@ export default function PharmacistRateScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Rate</Text>
         <TextInput mode="outlined" label="Weekday" value={rates.weekday || ''} onChangeText={(v) => setField('weekday', v)} left={<TextInput.Affix text="$" />} />

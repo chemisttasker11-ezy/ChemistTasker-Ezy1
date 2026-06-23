@@ -31,7 +31,7 @@ export default function ShiftBoardTabsPage() {
     const ShiftsView = effectiveWorkspace === 'internal' ? CommunityShiftsView : PublicShiftsView;
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             {/* Tabs */}
             <View style={styles.tabsContainer}>
                 <SegmentedButtons

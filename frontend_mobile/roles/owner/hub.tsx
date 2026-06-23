@@ -5,7 +5,7 @@ import { Text, Card, IconButton } from 'react-native-paper';
 
 export default function OwnerHubScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <Text variant="headlineMedium" style={styles.title}>Pharmacy Hub</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>Manage communications and updates for your pharmacies.</Text>

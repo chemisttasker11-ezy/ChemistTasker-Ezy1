@@ -132,7 +132,7 @@ export default function PharmacistOnboardingScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
           <ActivityIndicator size="large" color="#6366F1" />
           <Text style={{ marginTop: 16, color: '#6B7280' }}>Loading profile...</Text>
@@ -142,7 +142,7 @@ export default function PharmacistOnboardingScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text variant="headlineMedium" style={styles.headerTitle}>Complete Your Profile</Text>

@@ -663,7 +663,7 @@ export default function HubScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={styles.muted}>Loading hub...</Text>
@@ -674,7 +674,7 @@ export default function HubScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <Button mode="contained" onPress={loadContext} style={{ marginTop: 12 }}>
@@ -786,7 +786,7 @@ export default function HubScreen() {
     };
 
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <HubFeed
           scope={scope}
           onBack={() => setSelection(null)}
@@ -799,7 +799,7 @@ export default function HubScreen() {
   };
 
   const listContent = (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Text variant="titleLarge">Hub</Text>

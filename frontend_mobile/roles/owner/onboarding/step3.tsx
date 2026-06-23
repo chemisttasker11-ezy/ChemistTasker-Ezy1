@@ -75,7 +75,7 @@ export default function OwnerOnboardingStep3() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
                 <ProgressStepper
                     currentStep={3}

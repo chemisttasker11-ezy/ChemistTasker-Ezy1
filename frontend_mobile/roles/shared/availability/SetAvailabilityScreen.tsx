@@ -539,7 +539,7 @@ export default function SetAvailabilityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text variant="headlineMedium" style={styles.title}>Set Your Availability</Text>
 

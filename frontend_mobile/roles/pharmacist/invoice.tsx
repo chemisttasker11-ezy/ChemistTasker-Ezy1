@@ -73,7 +73,7 @@ export default function PharmacistInvoiceScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text variant="headlineMedium" style={styles.headerTitle}>Invoices</Text>
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 48,
+    paddingTop: 24,
     paddingHorizontal: 32,
   },
   emptyTitle: {

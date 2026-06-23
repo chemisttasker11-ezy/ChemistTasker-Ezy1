@@ -263,7 +263,7 @@ export default function InvoiceList({ basePath }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text variant="headlineMedium" style={styles.headerTitle}>

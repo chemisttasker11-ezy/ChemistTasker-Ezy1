@@ -255,7 +255,7 @@ export default function PharmacyOverviewContainer() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             {/* Header */}
             {!isOwner && (
                 <Appbar.Header elevated>

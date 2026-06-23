@@ -406,7 +406,7 @@ export default function OrganizationInviteScreen() {
 
   if (!orgId) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No organization membership found for this account.</Text>
         </View>
@@ -415,7 +415,7 @@ export default function OrganizationInviteScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <FlatList
         data={filteredMembers}
         keyExtractor={(item) => String(item.id)}

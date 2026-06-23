@@ -11,7 +11,7 @@ export default function ShiftDetailsScreen() {
 
     if (!shiftId || Number.isNaN(shiftId)) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <View style={styles.messageContainer}>
                     <Text variant="bodyMedium">Shift not found.</Text>
                 </View>

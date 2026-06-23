@@ -431,7 +431,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <IconButton icon="arrow-left" onPress={() => router.back()} />
         <Text variant="titleLarge" style={styles.headerTitle}>

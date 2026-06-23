@@ -229,7 +229,7 @@ export default function WorkerShiftDetailPage() {
 
     if (error) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <View style={styles.messageContainer}>
                     <Text variant="bodyMedium">{error}</Text>
                 </View>
@@ -238,7 +238,7 @@ export default function WorkerShiftDetailPage() {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <ShiftsBoard
                 title="Shift Details"
                 shifts={shift ? [shift] : []}

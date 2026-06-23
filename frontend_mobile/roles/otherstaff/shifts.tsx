@@ -69,7 +69,7 @@ export default function OtherStaffShiftsScreen() {
   }, [activeTab]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>

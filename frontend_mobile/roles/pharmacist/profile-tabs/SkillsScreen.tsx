@@ -148,7 +148,7 @@ export default function PharmacistSkillsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
           <Text>Loading skills...</Text>
         </View>
@@ -157,7 +157,7 @@ export default function PharmacistSkillsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Skills</Text>
         <Text variant="bodySmall" style={styles.help}>Only skills marked as certificate-required need uploads.</Text>

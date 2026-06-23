@@ -10,7 +10,7 @@ export default function OwnerShiftCenter() {
   const [activeTab, setActiveTab] = useState<'active' | 'confirmed' | 'history'>('active');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <View>
           <Text variant="headlineSmall" style={styles.title}>Shift Center</Text>

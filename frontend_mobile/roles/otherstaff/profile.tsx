@@ -150,7 +150,7 @@ export default function OtherStaffProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.headerTitle}>Profile</Text>

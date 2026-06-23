@@ -5,7 +5,7 @@ import { Text } from 'react-native-paper';
 
 export default function HubPlaceholder() {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.center}>
         <Text variant="titleMedium">Hub</Text>
         <Text variant="bodyMedium" style={styles.sub}>

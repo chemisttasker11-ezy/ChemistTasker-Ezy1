@@ -174,7 +174,7 @@ export default function OwnerProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.centerContent}>
           <Text>Loading profile...</Text>
         </View>
@@ -183,7 +183,7 @@ export default function OwnerProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView style={styles.scrollView}>
         {/* Header Profile Section */}
         <Card style={styles.heroCard} mode="contained">

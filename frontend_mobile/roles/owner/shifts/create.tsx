@@ -102,7 +102,7 @@ export default function CreateShiftScreen() {
 
     if (loadingPharmacies) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#1976d2" />
                 </View>
@@ -112,7 +112,7 @@ export default function CreateShiftScreen() {
 
     if (pharmacies.length === 0) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <Surface style={styles.errorContainer} elevation={1}>
                     <Text style={styles.errorText}>You need to add a pharmacy first</Text>
                     <Button onPress={() => router.push('/owner/pharmacies/add')}>
@@ -124,7 +124,7 @@ export default function CreateShiftScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}

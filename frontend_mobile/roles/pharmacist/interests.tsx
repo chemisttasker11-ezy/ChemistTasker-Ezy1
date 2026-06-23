@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PharmacistInterestsScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <Text variant="headlineMedium" style={styles.headerTitle}>Interests</Text>
         <Text variant="bodyMedium" style={styles.headerSubtitle}>Explore opportunities</Text>

@@ -158,7 +158,7 @@ export default function OtherStaffRegulatoryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}><Text>Loading regulatory docs...</Text></View>
       </SafeAreaView>
     );
@@ -172,7 +172,7 @@ export default function OtherStaffRegulatoryScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Regulatory Docs</Text>
 

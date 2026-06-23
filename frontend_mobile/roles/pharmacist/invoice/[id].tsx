@@ -100,7 +100,7 @@ export default function PharmacistInvoiceDetailScreen() {
 
   if (error || !invoice) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.header}>
           <IconButton icon="arrow-left" onPress={() => router.back()} />
           <Text variant="titleMedium" style={styles.headerTitle}>Error</Text>
@@ -121,7 +121,7 @@ export default function PharmacistInvoiceDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <View style={styles.header}>
         <IconButton icon="arrow-left" onPress={() => router.back()} />
         <Text variant="titleMedium" style={styles.headerTitle}>Invoice Details</Text>

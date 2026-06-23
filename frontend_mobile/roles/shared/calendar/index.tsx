@@ -646,7 +646,7 @@ export default function SharedCalendarScreen() {
   const safeSelectedDay = isValid(selectedDay) ? selectedDay : new Date();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerCard}>
           <View style={styles.headerRow}>
