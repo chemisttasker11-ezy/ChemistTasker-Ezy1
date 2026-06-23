@@ -5,7 +5,6 @@ import {
   Button,
   Chip,
   Collapse,
-  IconButton,
   Pagination,
   Paper,
   Skeleton,
@@ -19,8 +18,6 @@ import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import AssignmentIndRoundedIcon from '@mui/icons-material/AssignmentIndRounded';
-import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
-import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
 
 type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number };
@@ -104,9 +101,15 @@ const formatDateLabel = (rawDate?: string | null) => {
   };
 };
 
+const formatClockTime = (rawTime?: string | null) => {
+  if (!rawTime) return '--';
+  const [hour, minute] = String(rawTime).split(':');
+  return hour && minute ? `${hour}:${minute}` : String(rawTime);
+};
+
 const formatTimeRange = (slot: any) => {
-  const start = slot?.startTime ?? slot?.start_time ?? '--';
-  const end = slot?.endTime ?? slot?.end_time ?? '--';
+  const start = formatClockTime(slot?.startTime ?? slot?.start_time);
+  const end = formatClockTime(slot?.endTime ?? slot?.end_time);
   return `${start} - ${end}`;
 };
 
@@ -272,6 +275,16 @@ export default function OwnerAssignedShiftBoard({
           <Paper
             key={shift.id}
             elevation={0}
+            role="button"
+            tabIndex={0}
+            aria-expanded={isExpanded}
+            onClick={() => toggleShift(shift.id)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleShift(shift.id);
+              }
+            }}
             sx={{
               p: { xs: 2, md: 3 },
               borderRadius: 6,
@@ -279,6 +292,17 @@ export default function OwnerAssignedShiftBoard({
               background: palette.page,
               overflow: 'hidden',
               position: 'relative',
+              cursor: 'pointer',
+              transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: '0 18px 42px rgba(15,23,42,.08)',
+                borderColor: '#C7D2FE',
+              },
+              '&:focus-visible': {
+                outline: '3px solid rgba(124,58,237,.28)',
+                outlineOffset: 3,
+              },
             }}
           >
             <Box
@@ -337,16 +361,6 @@ export default function OwnerAssignedShiftBoard({
                         )}
                       </Stack>
                     </Box>
-                    <IconButton
-                      onClick={() => toggleShift(shift.id)}
-                      sx={{
-                        alignSelf: 'flex-start',
-                        border: `1px solid ${palette.border}`,
-                        bgcolor: '#FFFFFFCC',
-                      }}
-                    >
-                      {isExpanded ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                    </IconButton>
                   </Stack>
 
                   {location && (
@@ -375,7 +389,7 @@ export default function OwnerAssignedShiftBoard({
                 </Box>
               </Stack>
 
-              <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+              <Collapse in={isExpanded} timeout="auto" unmountOnExit onClick={(event) => event.stopPropagation()}>
                 <Box
                   sx={{
                     pt: 2.5,

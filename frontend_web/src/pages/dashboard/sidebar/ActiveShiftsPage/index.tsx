@@ -15,6 +15,9 @@ import {
     Tooltip,
     ThemeProvider,
     Divider,
+    Pagination,
+    alpha,
+    useTheme,
 } from '@mui/material';
 import {
     Close as X,
@@ -215,6 +218,8 @@ type ActiveShiftsPageProps = {
 
 const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Active Shifts' }) => {
     const navigate = useNavigate();
+    const outerTheme = useTheme();
+    const isDarkMode = outerTheme.palette.mode === 'dark';
     const { user, activePersona, activeAdminPharmacyId } = useAuth();
     const selectedPharmacyId = null; // TODO: Get from proper context
     const scopedPharmacyId =
@@ -226,6 +231,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
+    const itemsPerPage = 6;
+    const [page, setPage] = useState(1);
 
     const showSnackbar = useCallback((msg: string) => {
         setSnackbarMessage(msg);
@@ -777,7 +784,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         );
         const communityLevelKeys = viewableLevelKeys.filter(level => level !== PUBLIC_LEVEL_KEY);
         const communityTabData = communityLevelKeys.map(level => tabData[getTabKey(shift.id, level)]);
-        const communityDataLoading = communityLevelKeys.some((level, index) => {
+        const communityDataLoading = communityLevelKeys.some((_level, index) => {
             const data = communityTabData[index];
             return !data || data.loading;
         });
@@ -865,6 +872,18 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     <span>
                         <IconButton
                             size="small"
+                            sx={{
+                                color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
+                                bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
+                                border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
+                                '&:hover': {
+                                    bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
+                                    color: isDarkMode ? '#FFFFFF' : '#6D28D9',
+                                },
+                                '&.Mui-disabled': {
+                                    color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
+                                },
+                            }}
                             onClick={e => {
                                 e.stopPropagation();
                                 handleShare(shift);
@@ -878,6 +897,15 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 <Tooltip title="Edit">
                     <IconButton
                         size="small"
+                        sx={{
+                            color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
+                            bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
+                            border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
+                            '&:hover': {
+                                bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
+                                color: isDarkMode ? '#FFFFFF' : '#6D28D9',
+                            },
+                        }}
                         onClick={e => {
                             e.stopPropagation();
                             handleEditShift(shift.id);
@@ -889,6 +917,18 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 <Tooltip title="Delete">
                     <IconButton
                         size="small"
+                        sx={{
+                            color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
+                            bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
+                            border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
+                            '&:hover': {
+                                bgcolor: isDarkMode ? alpha('#EF4444', 0.2) : alpha('#EF4444', 0.08),
+                                color: isDarkMode ? '#FCA5A5' : '#DC2626',
+                            },
+                            '&.Mui-disabled': {
+                                color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
+                            },
+                        }}
                         onClick={e => {
                             e.stopPropagation();
                             setDeleteConfirmDialog({ open: true, shiftId: shift.id });
@@ -917,39 +957,47 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     position: 'relative',
                     overflow: 'hidden',
                     maxWidth: '100%',
-                    borderRadius: 3,
-                    border: '1px solid rgba(124, 58, 237, 0.18)',
-                    boxShadow: '0 22px 55px rgba(15, 23, 42, 0.10)',
+                    borderRadius: 6,
+                    border: '1px solid #D9E2F2',
+                    background: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
+                    boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
                     cursor: 'pointer',
-                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                    transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+                    '&:hover': {
+                        transform: 'translateY(-1px)',
+                        borderColor: '#C7D2FE',
+                        boxShadow: '0 28px 66px rgba(15, 23, 42, 0.10)',
+                    },
+                    '&:focus-visible': {
+                        outline: '3px solid rgba(124,58,237,.28)',
+                        outlineOffset: 3,
+                    },
                     '&:before': {
                         content: '""',
                         position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        width: 5,
-                        background: `linear-gradient(180deg, ${cardBorderColor}, #A855F7 48%, #0EA5E9)`,
+                        inset: 0,
+                        pointerEvents: 'none',
+                        background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
                     },
                 }}
             >
                 <CardHeader
                     disableTypography
-                    sx={{ px: { xs: 1.5, sm: 2, md: 3 }, pt: { xs: 1.75, md: 2.5 }, pb: 1.5, minWidth: 0 }}
+                    sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 1.5, minWidth: 0, position: 'relative' }}
                     title={
-                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={{ xs: 1.5, md: 2 }} justifyContent="space-between" alignItems="flex-start" sx={{ width: '100%', minWidth: 0 }}>
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.25, sm: 2 }} sx={{ minWidth: 0, width: { xs: '100%', md: 'auto' }, maxWidth: { md: '52%' } }}>
+                        <Stack direction={{ xs: 'column', xl: 'row' }} spacing={{ xs: 1.5, md: 2 }} justifyContent="space-between" alignItems={{ xs: 'stretch', xl: 'flex-start' }} sx={{ width: '100%', minWidth: 0 }}>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.25, sm: 2 }} sx={{ minWidth: 0, width: { xs: '100%', xl: 'auto' }, maxWidth: { xl: '52%' } }}>
                                 <Box
                                     sx={{
-                                        width: { xs: 52, sm: 64 },
-                                        height: { xs: 52, sm: 64 },
+                                        width: { xs: 54, sm: 58 },
+                                        height: { xs: 54, sm: 58 },
                                         flexShrink: 0,
                                         display: 'grid',
                                         placeItems: 'center',
-                                        borderRadius: 4,
+                                        borderRadius: 3.5,
                                         color: '#fff',
-                                        background: `linear-gradient(135deg, ${cardBorderColor}, #7C3AED)`,
-                                        boxShadow: '0 14px 28px rgba(124, 58, 237, 0.28)',
+                                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
+                                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
                                     }}
                                 >
                                     <Building />
@@ -981,49 +1029,64 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                     </Stack>
                                 </Box>
                             </Stack>
-                            <Stack sx={{ ml: { md: 'auto' }, width: '100%', maxWidth: { md: 670 }, alignItems: { xs: 'stretch', md: 'flex-end' }, minWidth: 0 }}>
+                            <Stack sx={{ ml: { xl: 'auto' }, width: '100%', maxWidth: { xs: '100%', xl: 520 }, alignItems: { xs: 'stretch', xl: 'flex-end' }, minWidth: 0 }}>
                                 {headerActions}
-                                <Stack
-                                    direction="row"
+                                <Box
                                     sx={{
-                                        mt: 1.25,
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                                        gap: { xs: 0.75, sm: 1.25 },
                                         width: '100%',
-                                        maxWidth: { xs: '100%', md: 560 },
-                                        border: '1px solid #E5E7EB',
-                                        borderRadius: { xs: 2, sm: 2.5 },
-                                        bgcolor: '#fff',
-                                        overflow: 'hidden',
+                                        mt: 1.25,
                                     }}
                                 >
-                                    {metricItems.map((item, itemIdx) => (
+                                    {metricItems.map((item) => (
                                         <Box
                                             key={item.label}
                                             sx={{
-                                                flex: 1,
+                                                borderRadius: 3,
+                                                border: `1px solid ${isDarkMode ? alpha('#FFFFFF', 0.14) : '#D9E2F2'}`,
+                                                background: isDarkMode ? alpha('#FFFFFF', 0.075) : '#FFFFFFCC',
+                                                minWidth: 0,
+                                                width: '100%',
+                                                px: { xs: 1.25, sm: 2 },
+                                                py: { xs: 1.25, sm: 1.75 },
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                gap: { xs: 0.5, sm: 1.2 },
-                                                minHeight: { xs: 52, sm: 70 },
-                                                px: { xs: 0.75, sm: 2 },
-                                                borderLeft: itemIdx === 0 ? 0 : '1px solid #E5E7EB',
-                                                minWidth: 0,
+                                                gap: { xs: 0.75, sm: 1.25 },
+                                                boxShadow: isDarkMode
+                                                    ? `0 12px 28px ${alpha('#000000', 0.16)}`
+                                                    : '0 12px 24px rgba(15,23,42,.05)',
                                             }}
                                         >
-                                            <Box sx={{ color: '#4F46E5', display: 'flex', '& svg': { fontSize: { xs: 18, sm: 20 } } }}>{item.icon}</Box>
-                                            <Box sx={{ minWidth: 0 }}>
-                                                <Typography sx={{ fontWeight: 900, lineHeight: 1, fontSize: { xs: 18, sm: 22 }, textAlign: 'center' }}>{item.value}</Typography>
+                                            <Box
+                                                sx={{
+                                                    width: { xs: 30, sm: 36 },
+                                                    height: { xs: 30, sm: 36 },
+                                                    borderRadius: '50%',
+                                                    bgcolor: isDarkMode ? alpha('#A78BFA', 0.18) : '#F3E8FF',
+                                                    color: isDarkMode ? '#C4B5FD' : '#7C3AED',
+                                                    display: 'grid',
+                                                    placeItems: 'center',
+                                                    flexShrink: 0,
+                                                    '& svg': { fontSize: { xs: 18, sm: 20 } },
+                                                }}
+                                            >
+                                                {item.icon}
+                                            </Box>
+                                            <Box sx={{ minWidth: 0, textAlign: 'center' }}>
+                                                <Typography sx={{ fontWeight: 800, color: isDarkMode ? '#F8FAFC' : '#0F172A', lineHeight: 1.05, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+                                                    {item.value}
+                                                </Typography>
                                                 <Typography
                                                     variant="caption"
-                                                    color="text.secondary"
                                                     sx={{
-                                                        display: 'block',
-                                                        fontWeight: 700,
-                                                        fontSize: { xs: 10.5, sm: 12 },
-                                                        lineHeight: 1.15,
-                                                        textAlign: 'center',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
+                                                        color: isDarkMode ? alpha('#FFFFFF', 0.72) : '#64748B',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: { xs: 0.2, sm: 0.6 },
+                                                        fontSize: { xs: '0.62rem', sm: '0.75rem' },
+                                                        fontWeight: 400,
                                                     }}
                                                 >
                                                     {item.label}
@@ -1031,15 +1094,23 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                             </Box>
                                         </Box>
                                     ))}
-                                </Stack>
+                                </Box>
                             </Stack>
                         </Stack>
                     }
                 />
-                <CardContent sx={{ px: { xs: 1.5, sm: 2, md: 3 }, pt: 0, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2, color: '#64748B' }}>
+                <CardContent sx={{ px: { xs: 2, md: 3 }, pt: 0, minWidth: 0, position: 'relative' }}>
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            gap: 1,
+                            alignItems: 'center',
+                            mb: 2,
+                            color: isDarkMode ? alpha('#FFFFFF', 0.66) : '#64748B',
+                        }}
+                    >
                         <LocationOn sx={{ fontSize: 17 }} />
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" sx={{ color: 'inherit' }}>
                             {location}
                         </Typography>
                     </Box>
@@ -1286,10 +1357,21 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         });
         return list;
     }, [shifts, isDedicatedShift]);
+    const pageCount = Math.ceil(orderedShifts.length / itemsPerPage);
+    const visibleShifts = useMemo(
+        () => orderedShifts.slice((page - 1) * itemsPerPage, page * itemsPerPage),
+        [orderedShifts, page]
+    );
+
+    React.useEffect(() => {
+        if (pageCount > 0 && page > pageCount) {
+            setPage(pageCount);
+        }
+    }, [page, pageCount]);
 
     if (shiftsLoading) {
         return (
-            <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, sm: 2, md: 3 }, overflowX: 'hidden' }}>
+            <Container maxWidth="xl" sx={{ py: 4, overflowX: 'hidden' }}>
                 <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
                     <CircularProgress />
                 </Box>
@@ -1299,7 +1381,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
     return (
         <ThemeProvider theme={customTheme}>
-            <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, sm: 2, md: 3 }, overflowX: 'hidden' }}>
+            <Container maxWidth="xl" sx={{ py: 4, overflowX: 'hidden' }}>
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
                         {title}
@@ -1315,11 +1397,12 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     </Typography>
                 ) : (
                     <Stack spacing={2.5}>
-                        {orderedShifts.map((shift, idx) => {
+                        {visibleShifts.map((shift, idx) => {
+                            const absoluteIdx = (page - 1) * itemsPerPage + idx;
                             const isDedicated = isDedicatedShift(shift);
-                            const prev = idx > 0 ? orderedShifts[idx - 1] : null;
+                            const prev = absoluteIdx > 0 ? orderedShifts[absoluteIdx - 1] : null;
                             const showSectionHeader =
-                                idx === 0 || (prev && isDedicatedShift(prev) !== isDedicated);
+                                isDedicated && (idx === 0 || (prev && isDedicatedShift(prev) !== isDedicated));
                             return (
                                 <React.Fragment key={shift.id}>
                                     {showSectionHeader && (
@@ -1333,6 +1416,19 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                 </React.Fragment>
                             );
                         })}
+                        {pageCount > 1 && (
+                            <Box display="flex" justifyContent="center" mt={1}>
+                                <Pagination
+                                    count={pageCount}
+                                    page={page}
+                                    onChange={(_, value) => {
+                                        setPage(value);
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    color="primary"
+                                />
+                            </Box>
+                        )}
                     </Stack>
                 )}
 

@@ -788,11 +788,14 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>{title}</Text>
+                <View style={styles.pageHeader}>
+                    <Text style={styles.title}>{title}</Text>
+                    <Text style={styles.subtitle}>Manage and track your live shifts</Text>
+                </View>
                 {orderedShifts.map((shift, idx) => {
                     const isDedicated = isDedicatedShift(shift);
                     const prev = idx > 0 ? orderedShifts[idx - 1] : null;
-                    const showSectionHeader = idx === 0 || (prev && isDedicatedShift(prev) !== isDedicated);
+                    const showSectionHeader = isDedicated && (idx === 0 || (prev && isDedicatedShift(prev) !== isDedicated));
                     const isExpanded = expandedShifts.has(shift.id);
                     const isSingleUserShift = Boolean((shift as any).singleUserOnly);
                     const shiftLevel = getCurrentLevelKey(shift);
@@ -1215,11 +1218,20 @@ const styles = StyleSheet.create({
         padding: customTheme.spacing.lg,
         gap: customTheme.spacing.md,
     },
+    pageHeader: {
+        gap: 4,
+        marginBottom: customTheme.spacing.sm,
+    },
     title: {
         fontSize: 24,
         fontWeight: '900',
         color: '#111827',
         letterSpacing: -0.4,
+    },
+    subtitle: {
+        color: '#64748B',
+        fontSize: 14,
+        fontWeight: '600',
     },
     sectionTitle: {
         fontSize: 12,
@@ -1263,22 +1275,22 @@ const styles = StyleSheet.create({
         position: 'relative',
         overflow: 'hidden',
         marginBottom: customTheme.spacing.md,
-        borderRadius: 22,
+        borderRadius: 24,
         borderWidth: 1,
-        borderColor: '#DDD6FE',
+        borderColor: '#D9E2F2',
         backgroundColor: '#FFFFFF',
-        elevation: 4,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.09,
-        shadowRadius: 24,
+        elevation: 5,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.12,
+        shadowRadius: 28,
     },
     cardAccent: {
         position: 'absolute',
         left: 0,
         top: 0,
         bottom: 0,
-        width: 5,
+        width: 0,
     },
     cardPressArea: {
         marginTop: 0,
@@ -1293,13 +1305,13 @@ const styles = StyleSheet.create({
     pharmacyMark: {
         width: 58,
         height: 58,
-        borderRadius: 20,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.22,
-        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.24,
+        shadowRadius: 24,
         elevation: 5,
     },
     markIcon: {
@@ -1381,33 +1393,43 @@ const styles = StyleSheet.create({
     },
     statsRow: {
         flexDirection: 'row',
-        alignSelf: 'center',
-        width: '78%',
+        flexWrap: 'nowrap',
+        justifyContent: 'space-between',
+        alignItems: 'stretch',
+        alignSelf: 'stretch',
+        width: '100%',
         marginTop: customTheme.spacing.md,
         marginBottom: customTheme.spacing.sm,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: 16,
-        backgroundColor: '#fff',
-        overflow: 'hidden',
+        marginHorizontal: -4,
     },
     statBox: {
         flex: 1,
-        minHeight: 58,
+        minHeight: 64,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: customTheme.spacing.xs,
-        paddingHorizontal: customTheme.spacing.sm,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        marginHorizontal: 4,
+        borderWidth: 1,
+        borderColor: '#D9E2F2',
+        borderRadius: 18,
+        backgroundColor: '#F8FAFC',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        elevation: 2,
     },
     statDivider: {
-        width: 1,
-        backgroundColor: '#E5E7EB',
-        marginVertical: customTheme.spacing.sm,
+        width: 0,
     },
     statIcon: {
         margin: 0,
-        width: 28,
-        height: 28,
+        width: 32,
+        height: 32,
+        backgroundColor: '#F3E8FF',
     },
     statValue: {
         color: '#111827',

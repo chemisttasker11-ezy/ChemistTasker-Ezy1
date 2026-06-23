@@ -85,6 +85,11 @@ export default function ConfirmedShiftsView() {
 
     return (
         <>
+            <View style={styles.pageHeader}>
+                <Text style={styles.pageTitle}>Confirmed Shifts</Text>
+                <Text style={styles.pageSubtitle}>Review booked shifts and assigned chemists</Text>
+            </View>
+
             <OwnerAssignedShiftBoard
                 title="Confirmed Shifts"
                 shifts={shifts}
@@ -145,6 +150,9 @@ export default function ConfirmedShiftsView() {
 }
 
 const styles = StyleSheet.create({
+    pageHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 4 },
+    pageTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
+    pageSubtitle: { color: '#64748B', fontSize: 14, fontWeight: '600' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     bold: { fontWeight: '700' },
 });

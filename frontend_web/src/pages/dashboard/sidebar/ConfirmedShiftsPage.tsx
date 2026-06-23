@@ -88,6 +88,15 @@ export default function ConfirmedShiftsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
+          Confirmed Shifts
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
+          Review booked shifts and assigned chemists
+        </Typography>
+      </Box>
+
       <OwnerAssignedShiftBoard
         title="Confirmed Shifts"
         shifts={shifts}

@@ -117,6 +117,15 @@ export default function HistoryShiftsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
+          Shift History
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
+          Review completed shifts and rate assigned workers
+        </Typography>
+      </Box>
+
       <OwnerAssignedShiftBoard
         title="Shift History"
         shifts={shifts}

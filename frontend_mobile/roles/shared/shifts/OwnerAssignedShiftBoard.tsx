@@ -6,7 +6,6 @@ import {
     Button,
     Card,
     Chip,
-    IconButton,
     Surface,
     Text,
 } from 'react-native-paper';
@@ -42,9 +41,15 @@ const formatDateLabel = (rawDate?: string | null) => {
     };
 };
 
+const formatClockTime = (rawTime?: string | null) => {
+    if (!rawTime) return '--';
+    const [hour, minute] = String(rawTime).split(':');
+    return hour && minute ? `${hour}:${minute}` : String(rawTime);
+};
+
 const formatTimeRange = (slot: any) => {
-    const start = slot?.startTime ?? slot?.start_time ?? '--';
-    const end = slot?.endTime ?? slot?.end_time ?? '--';
+    const start = formatClockTime(slot?.startTime ?? slot?.start_time);
+    const end = formatClockTime(slot?.endTime ?? slot?.end_time);
     return `${start} - ${end}`;
 };
 
@@ -192,12 +197,6 @@ export default function OwnerAssignedShiftBoard({
                                         </View>
                                     </View>
                                 </View>
-                                <IconButton
-                                    icon={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                    size={22}
-                                    iconColor={customTheme.colors.primary}
-                                    onPress={() => toggleShift(shift.id)}
-                                />
                             </View>
 
                             {location ? <Text style={styles.locationText}>{location}</Text> : null}

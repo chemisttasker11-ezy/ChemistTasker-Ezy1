@@ -33,6 +33,7 @@ type BaseProps = {
 
 function ShiftCenterLayout({ scope, basePath, title, subtitle }: BaseProps) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const params = useParams<{ section?: string }>();
 
@@ -161,7 +162,9 @@ function ShiftCenterLayout({ scope, basePath, title, subtitle }: BaseProps) {
         elevation={0}
         sx={{
           borderRadius: { xs: 3, md: 4 },
-          border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+          border: `1px solid ${isDark ? alpha(theme.palette.common.white, 0.12) : alpha(theme.palette.divider, 0.7)}`,
+          backgroundColor: isDark ? alpha(theme.palette.common.white, 0.035) : theme.palette.background.paper,
+          boxShadow: isDark ? `0 24px 80px ${alpha(theme.palette.common.black, 0.22)}` : "none",
           minWidth: 0,
           overflow: "hidden",
         }}
@@ -195,14 +198,43 @@ function ShiftCenterLayout({ scope, basePath, title, subtitle }: BaseProps) {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: { xs: 0.5, sm: 1 },
-                  color: selected ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.72),
-                  border: `1px solid ${selected ? alpha(theme.palette.primary.main, 0.38) : alpha(theme.palette.divider, 0.6)}`,
-                  backgroundColor: selected ? alpha(theme.palette.primary.main, 0.12) : "#fff",
-                  boxShadow: selected ? `0 6px 16px ${alpha(theme.palette.primary.main, 0.18)}` : "none",
+                  color: selected
+                    ? isDark
+                      ? "#C4B5FD"
+                      : theme.palette.primary.main
+                    : isDark
+                      ? alpha(theme.palette.common.white, 0.78)
+                      : alpha(theme.palette.text.primary, 0.72),
+                  border: `1px solid ${
+                    selected
+                      ? alpha(theme.palette.primary.main, isDark ? 0.55 : 0.38)
+                      : isDark
+                        ? alpha(theme.palette.common.white, 0.12)
+                        : alpha(theme.palette.divider, 0.6)
+                  }`,
+                  backgroundColor: selected
+                    ? alpha(theme.palette.primary.main, isDark ? 0.24 : 0.12)
+                    : isDark
+                      ? alpha(theme.palette.common.white, 0.06)
+                      : "#fff",
+                  boxShadow: selected ? `0 10px 24px ${alpha(theme.palette.primary.main, isDark ? 0.25 : 0.18)}` : "none",
                   transition: theme.transitions.create(["color", "background-color", "border-color", "box-shadow"]),
                   "&:hover": {
-                    backgroundColor: selected ? alpha(theme.palette.primary.main, 0.16) : alpha(theme.palette.primary.main, 0.08),
-                    borderColor: alpha(theme.palette.primary.main, selected ? 0.45 : 0.25),
+                    backgroundColor: selected
+                      ? alpha(theme.palette.primary.main, isDark ? 0.3 : 0.16)
+                      : alpha(theme.palette.primary.main, isDark ? 0.16 : 0.08),
+                    borderColor: alpha(theme.palette.primary.main, selected ? 0.55 : 0.3),
+                    color: selected
+                      ? isDark
+                        ? "#DDD6FE"
+                        : theme.palette.primary.main
+                      : isDark
+                        ? theme.palette.common.white
+                        : theme.palette.primary.main,
+                  },
+                  "&:focus-visible": {
+                    outline: `3px solid ${alpha(theme.palette.primary.main, isDark ? 0.35 : 0.22)}`,
+                    outlineOffset: 2,
                   },
                   "& svg": {
                     fontSize: { xs: 16, sm: 20 },

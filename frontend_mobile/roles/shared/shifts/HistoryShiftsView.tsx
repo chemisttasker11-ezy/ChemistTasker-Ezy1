@@ -134,6 +134,11 @@ export default function HistoryShiftsView() {
 
     return (
         <>
+            <View style={styles.pageHeader}>
+                <Text style={styles.pageTitle}>Shift History</Text>
+                <Text style={styles.pageSubtitle}>Review completed shifts and rate assigned workers</Text>
+            </View>
+
             <OwnerAssignedShiftBoard
                 title="Shift History"
                 shifts={shifts}
@@ -234,6 +239,9 @@ export default function HistoryShiftsView() {
 }
 
 const styles = StyleSheet.create({
+    pageHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 4 },
+    pageTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
+    pageSubtitle: { color: '#64748B', fontSize: 14, fontWeight: '600' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     starRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     bold: { fontWeight: '700' },
