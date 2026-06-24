@@ -188,28 +188,30 @@ export default function OwnerProfileScreen() {
         {/* Header Profile Section */}
         <Card style={styles.heroCard} mode="contained">
           <LinearGradient
-            colors={['#6366F1', '#8B5CF6']}
-            start={{ x: 0, y: 0 }}
+            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradientHeader}
           >
             <View style={styles.heroContent}>
               <View style={styles.avatarWrapper}>
                 {profilePhoto ? (
-                  <Avatar.Image size={92} source={{ uri: profilePhoto }} style={styles.avatar} />
+                  <Avatar.Image size={76} source={{ uri: profilePhoto }} style={styles.avatar} />
                 ) : (
                   <Avatar.Text
-                    size={92}
+                    size={76}
                     label={`${profile?.first_name?.[0] || ''}${profile?.last_name?.[0] || ''}`}
                     style={styles.avatar}
+                    color="#4338CA"
                   />
                 )}
                 <IconButton
                   icon="camera"
-                  size={20}
+                  size={18}
                   style={styles.cameraButton}
-                  iconColor="#FFFFFF"
-                  containerColor="#6366F1"
+                  iconColor="#4338CA"
+                  containerColor="#FFFFFF"
                   onPress={pickImage}
                 />
               </View>
@@ -431,51 +433,60 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 16,
     borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D6DCEF',
+    elevation: 0,
   },
   gradientHeader: {
-    paddingVertical: 28,
+    paddingVertical: 18,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   heroContent: {
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   avatarWrapper: {
     position: 'relative',
   },
   avatar: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginBottom: 10,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 6,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.96)',
   },
   cameraButton: {
     position: 'absolute',
-    bottom: -6,
-    right: -6,
+    bottom: -4,
+    right: -4,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
   name: {
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    marginTop: 2,
+    color: '#0F172A',
+    marginBottom: 2,
+    marginTop: 0,
   },
   email: {
-    color: '#E5E7EB',
-    marginBottom: 8,
+    color: '#475569',
+    marginBottom: 6,
   },
   roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 16,
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.22)',
   },
   roleText: {
-    color: '#FFFFFF',
+    color: '#5B21B6',
     fontWeight: '700',
     textTransform: 'uppercase',
   },

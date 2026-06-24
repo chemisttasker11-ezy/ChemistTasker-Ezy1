@@ -4,6 +4,7 @@ import {
     ActivityIndicator,
     Button,
     Dialog,
+    IconButton,
     Portal,
     Snackbar,
     Text,
@@ -186,7 +187,7 @@ export default function HistoryShiftsView() {
 
             <Portal>
                 <Dialog visible={ratingDialog} onDismiss={() => setRatingDialog(false)}>
-                    <Dialog.Title>Rate Assigned Worker</Dialog.Title>
+                    <Dialog.Title>Review Assigned Worker</Dialog.Title>
                     <Dialog.Content>
                         {loadingRating ? (
                             <View style={styles.centered}>
@@ -197,14 +198,14 @@ export default function HistoryShiftsView() {
                                 <Text>Select a star rating:</Text>
                                 <View style={styles.starRow}>
                                     {[1, 2, 3, 4, 5].map((val) => (
-                                        <Button
+                                        <IconButton
                                             key={val}
-                                            mode={val <= currentStars ? 'contained' : 'outlined'}
                                             onPress={() => setCurrentStars(val)}
-                                            compact
-                                        >
-                                            {val}
-                                        </Button>
+                                            icon={val <= currentStars ? 'star' : 'star-outline'}
+                                            iconColor={val <= currentStars ? '#F4B400' : '#D1D5DB'}
+                                            size={34}
+                                            style={styles.starButton}
+                                        />
                                     ))}
                                 </View>
                                 <TextInput
@@ -243,6 +244,7 @@ const styles = StyleSheet.create({
     pageTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
     pageSubtitle: { color: '#64748B', fontSize: 14, fontWeight: '600' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-    starRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    starRow: { flexDirection: 'row', alignItems: 'center', marginLeft: -8 },
+    starButton: { margin: 0 },
     bold: { fontWeight: '700' },
 });

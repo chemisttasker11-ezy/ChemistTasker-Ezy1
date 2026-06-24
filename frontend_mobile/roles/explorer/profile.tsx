@@ -156,27 +156,28 @@ export default function ExplorerProfileScreen() {
 
         <Card style={styles.profileCard}>
           <LinearGradient
-            colors={['#6366F1', '#8B5CF6']}
-            start={{ x: 0, y: 0 }}
+            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradientHeader}
           >
             <View style={styles.avatarContainer}>
               {profilePhoto ? (
-                <Avatar.Image size={80} source={{ uri: profilePhoto }} />
+                <Avatar.Image size={72} source={{ uri: profilePhoto }} style={styles.avatar} />
               ) : (
                 <Avatar.Text
-                  size={80}
+                  size={72}
                   label={(user?.username || user?.email || 'U').substring(0, 2).toUpperCase()}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                  color="#FFFFFF"
+                  style={styles.avatar}
+                  color="#4338CA"
                 />
               )}
               <IconButton
                 icon="camera"
-                size={20}
-                iconColor="#FFFFFF"
-                containerColor="#6366F1"
+                size={18}
+                iconColor="#4338CA"
+                containerColor="#FFFFFF"
                 style={styles.cameraButton}
                 onPress={pickImage}
                 disabled={uploading}
@@ -320,37 +321,45 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     borderRadius: 24,
     overflow: 'hidden',
-    marginBottom: 24,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#D6DCEF',
+    elevation: 0,
   },
   gradientHeader: {
-    padding: 32,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     alignItems: 'center',
   },
   avatarContainer: {
     position: 'relative',
   },
+  avatar: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.96)',
+  },
   cameraButton: {
     position: 'absolute',
-    bottom: 0,
+    bottom: -4,
     right: -4,
     margin: 0,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
-  name: { color: '#FFFFFF', fontWeight: 'bold', marginTop: 16 },
-  email: { color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  name: { color: '#0F172A', fontWeight: 'bold', marginTop: 12 },
+  email: { color: '#475569', marginTop: 4 },
   roleChip: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    marginTop: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.22)',
   },
   roleText: {
-    color: '#FFFFFF',
+    color: '#5B21B6',
     fontWeight: '600',
   },
   section: { paddingHorizontal: 16, marginTop: 16 },

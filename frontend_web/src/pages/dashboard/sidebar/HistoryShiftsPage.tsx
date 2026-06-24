@@ -149,7 +149,7 @@ export default function HistoryShiftsPage() {
       />
 
       <Dialog open={rateModalOpen} onClose={() => setRateModalOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Rate Assigned Worker</DialogTitle>
+        <DialogTitle>Review Assigned Worker</DialogTitle>
         <DialogContent>
           {loadingExistingWorkerRating ? (
             <Box display="flex" justifyContent="center" py={3}>

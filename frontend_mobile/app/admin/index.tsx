@@ -96,7 +96,7 @@ export default function AdminHomeScreen() {
             { title: 'Post Shift', description: 'Create coverage', icon: 'plus-circle-outline', route: adminPath('post-shift') },
             { title: 'Pharmacies', description: 'Store details', icon: 'store-outline', route: '/admin/pharmacies' },
             { title: 'Chat', description: 'Open messages', icon: 'message-text-outline', route: '/admin/chat' },
-            { title: 'Pills', description: 'Rewards activity', icon: 'pill', route: adminPath('pills') },
+            { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/admin/shifts' },
             { title: 'Notifications', description: 'Alerts', icon: 'bell-outline', route: '/admin/notifications' },
           ]}
           onNavigate={(route) => router.push(route as any)}

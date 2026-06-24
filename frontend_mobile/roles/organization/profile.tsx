@@ -123,16 +123,17 @@ export default function OrganizationProfileScreen() {
       <ScrollView style={styles.scrollView}>
         <Card style={styles.heroCard} mode="contained">
           <LinearGradient
-            colors={['#6366F1', '#8B5CF6']}
-            start={{ x: 0, y: 0 }}
+            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradientHeader}
           >
             <View style={styles.heroContent}>
               {profilePhoto ? (
-                <Avatar.Image size={92} source={{ uri: profilePhoto as string }} style={styles.avatar} />
+                <Avatar.Image size={76} source={{ uri: profilePhoto as string }} style={styles.avatar} />
               ) : (
-                <Avatar.Text size={92} label={initials} style={styles.avatar} labelStyle={styles.avatarLabel} />
+                <Avatar.Text size={76} label={initials} style={styles.avatar} labelStyle={styles.avatarLabel} />
               )}
               <Text variant="headlineSmall" style={styles.name}>
                 {organizationName}
@@ -339,23 +340,28 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   heroCard: {
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 16,
     borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D6DCEF',
+    elevation: 0,
   },
   gradientHeader: {
-    paddingVertical: 28,
+    paddingVertical: 18,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  heroContent: { alignItems: 'center', gap: 6 },
+  heroContent: { alignItems: 'center', gap: 4 },
   avatar: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginBottom: 10,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 6,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.96)',
   },
   avatarLabel: {
-    color: '#FFFFFF',
+    color: '#4338CA',
     fontWeight: '800',
   },
   name: {
@@ -366,19 +372,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   email: {
-    color: '#E5E7EB',
-    marginBottom: 8,
+    color: '#475569',
+    marginBottom: 6,
     textAlign: 'center',
   },
   roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 16,
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.22)',
   },
   roleText: {
-    color: '#FFFFFF',
+    color: '#5B21B6',
     fontWeight: '700',
     textTransform: 'uppercase',
   },

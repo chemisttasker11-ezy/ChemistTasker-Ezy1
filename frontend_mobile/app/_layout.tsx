@@ -242,6 +242,8 @@ function AuthGate() {
     const second = segmentList[1];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
+    const allowAuthenticatedAccess = new Set(['contact']);
+    const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
     const expectedTopByRole: Record<string, string> = {
       OWNER: 'owner',
@@ -265,7 +267,7 @@ function AuthGate() {
         return;
       }
 
-      if (user && isPublic) {
+      if (user && isPublic && !isSharedAuthenticatedRoute) {
         if (hasOrganizationAccess(user)) {
           router.replace('/organization/dashboard' as any);
           return;
@@ -283,6 +285,10 @@ function AuthGate() {
       }
 
       if (user && top) {
+        if (isSharedAuthenticatedRoute) {
+          return;
+        }
+
         const normalizedRole = String(user.role || '').toUpperCase();
 
         if (top === 'admin' && hasAdminAccess(user)) {

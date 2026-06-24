@@ -124,7 +124,7 @@ export default function OwnerDashboard() {
       { title: 'Talent Board', description: 'Find talent', icon: 'account-search-outline', route: '/owner/talent-board' },
       { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/owner/hub' },
       { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/owner/chat' },
-      { title: 'Pills', description: 'Rewards activity', icon: 'pill', route: '/owner/pills' },
+      { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/owner/shifts' },
       { title: 'Subscription', description: 'Billing seats', icon: 'credit-card-outline', route: '/owner/subscription-seats' },
       { title: 'Profile', description: 'Account details', icon: 'account-circle-outline', route: '/owner/profile' },
     ],
@@ -544,5 +544,4 @@ const styles = StyleSheet.create({
   bottomMenuTitle: { color: '#111827', fontWeight: '600' },
   bottomMenuDesc: { color: '#6B7280', fontSize: 12, marginTop: 2 },
 });
-
 

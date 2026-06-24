@@ -100,7 +100,7 @@ export default function OrganizationDashboard() {
       { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/organization/hub' },
       { title: 'Talent Hub', description: 'Find talent', icon: 'account-search-outline', route: '/organization/talent-board' },
       { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/organization/chat' },
-      { title: 'Pills', description: 'Rewards activity', icon: 'pill', route: '/organization/pills' },
+      { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/organization/shifts' },
       { title: 'Profile', description: 'Account details', icon: 'account-circle-outline', route: '/organization/profile' },
       { title: 'Notifications', description: 'Alerts', icon: 'bell-outline', route: '/organization/notifications' },
     ],
