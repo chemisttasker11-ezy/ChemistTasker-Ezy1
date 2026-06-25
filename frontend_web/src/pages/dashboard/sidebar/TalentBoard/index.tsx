@@ -49,6 +49,11 @@ const mapRoleToShiftRole = (value?: string | null) => {
   if (["PHARMACIST", "INTERN", "STUDENT", "ASSISTANT", "TECHNICIAN", "EXPLORER"].includes(normalized)) {
     return normalized;
   }
+  if (normalized.includes("OTHER_STAFF")) return "ASSISTANT";
+  if (normalized.includes("COMMUNITY_PHARMACIST")) return "PHARMACIST";
+  if (normalized.includes("DISPENSARY_TECHNICIAN")) return "TECHNICIAN";
+  if (normalized.includes("PHARMACY_TECHNICIAN")) return "TECHNICIAN";
+  if (normalized.includes("PHARMACY_ASSISTANT")) return "ASSISTANT";
   if (normalized.includes("PHARMACIST")) return "PHARMACIST";
   if (normalized.includes("TECHNICIAN")) return "TECHNICIAN";
   if (normalized.includes("ASSISTANT")) return "ASSISTANT";
@@ -201,6 +206,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             : null;
       const pitchText = post.body || (post as any).shortBio || "";
       const availabilityMode = post.availabilityMode || null;
+      const postKind =
+        post.postKind ||
+        (availabilityMode === "FULL_TIME_NOTICE" ? "FULL_TIME_APPLICATION" : "AVAILABILITY");
+      const isFullTimeApplication = postKind === "FULL_TIME_APPLICATION";
 
       const availabilityRaw = Array.isArray(post.availabilityDays) ? post.availabilityDays : [];
       const availableSlots = availabilityRaw
@@ -224,7 +233,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         ) as Array<{ date: string; startTime?: string | null; endTime?: string | null; isAllDay?: boolean }>;
       const availableDates = availableSlots.map((slot: any) => slot.date);
 
-      const showCalendar = availableDates.length > 0;
+      const showCalendar = !isFullTimeApplication && availableDates.length > 0;
 
       const rawSkills = Array.from(new Set([...(post.software ?? []), ...(post.skills ?? [])])).filter(Boolean) as string[];
       const clinicalServices: string[] = [];
@@ -285,8 +294,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         dispenseSoftware,
         expandedScope,
         experience: null,
-        availabilityText: "",
+        availabilityText: isFullTimeApplication ? "Open anytime" : "",
         availabilityMode,
+        postKind,
+        isFullTimeApplication,
         showCalendar,
         availableDates,
         availableSlots,
@@ -417,9 +428,15 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     const targetUserId = candidate.authorUserId ?? candidate.explorerUserId ?? null;
     if (!targetUserId) return;
     const uniqueDates = Array.from(new Set(dates)).sort();
-    if (uniqueDates.length === 0) return;
     const params = new URLSearchParams(location.search);
-    params.set("dates", uniqueDates.join(","));
+    if (uniqueDates.length > 0) {
+      params.set("dates", uniqueDates.join(","));
+      const firstSlot = (candidate.availableSlots || []).find((slot) => uniqueDates.includes(slot.date));
+      const startTime = firstSlot?.startTime || (firstSlot as any)?.start_time || null;
+      const endTime = firstSlot?.endTime || (firstSlot as any)?.end_time || null;
+      if (startTime) params.set("start_time", String(startTime).slice(0, 5));
+      if (endTime) params.set("end_time", String(endTime).slice(0, 5));
+    }
     params.set("dedicated_user", String(targetUserId));
     const shiftRole =
       mapRoleToShiftRole(candidate.rawRoleCategory) ||
@@ -427,6 +444,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       mapRoleToShiftRole(candidate.role);
     if (shiftRole) {
       params.set("role", shiftRole);
+      params.set("role_needed", shiftRole);
     }
     params.set("embedded", "1");
     setPreviousSearch(location.search);
@@ -434,6 +452,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     setSelectedCalendarCandidate(null);
     setIsPostShiftModalOpen(true);
   }, [canRequestBooking, location.pathname, location.search, navigate]);
+
+  const handleBookTalent = useCallback((candidate: Candidate) => {
+    handleRequestBooking(candidate, candidate.isFullTimeApplication ? [] : candidate.availableDates || []);
+  }, [handleRequestBooking]);
 
   const handleClosePostShiftModal = useCallback(() => {
     setIsPostShiftModalOpen(false);
@@ -488,6 +510,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     headline: "",
     body: "",
     workTypes: [] as string[],
+    postKind: "AVAILABILITY",
     streetAddress: "",
     suburb: "",
     state: "",
@@ -509,12 +532,13 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const isOtherStaff = user?.role === "OTHER_STAFF";
 
   const resetPitchForm = useCallback(() => {
-    setPitchForm({
-      headline: "",
-      body: "",
-      workTypes: [] as string[],
-      streetAddress: "",
-      suburb: "",
+      setPitchForm({
+        headline: "",
+        body: "",
+        workTypes: [] as string[],
+        postKind: "AVAILABILITY",
+        streetAddress: "",
+        suburb: "",
       state: "",
       postcode: "",
       openToTravel: false,
@@ -604,12 +628,16 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       }
       const mine = posts.find((post) => post.authorUserId === user?.id);
       if (mine) {
+        const minePostKind =
+          mine.postKind ||
+          (mine.availabilityMode === "FULL_TIME_NOTICE" ? "FULL_TIME_APPLICATION" : "AVAILABILITY");
         setExistingPostId(mine.id);
         setPitchForm((prev) => ({
           ...prev,
           headline: mine.headline || prev.headline,
           body: mine.body || prev.body,
           workTypes: mine.workTypes && mine.workTypes.length ? mine.workTypes : prev.workTypes,
+          postKind: minePostKind,
           streetAddress: prev.streetAddress,
           suburb: mine.locationSuburb || prev.suburb,
           state: mine.locationState || prev.state,
@@ -617,18 +645,20 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           openToTravel: mine.openToTravel != null ? Boolean(mine.openToTravel) : prev.openToTravel,
           coverageRadiusKm:
             mine.coverageRadiusKm != null ? Number(mine.coverageRadiusKm) : prev.coverageRadiusKm,
-          availabilitySlots: Array.isArray(mine.availabilityDays) ? mine.availabilityDays.map((entry: any) => {
-            if (typeof entry === 'string') {
-              return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
-            }
-            return {
-              date: String(entry?.date || ''),
-              startTime: entry?.start_time || entry?.startTime || '09:00',
-              endTime: entry?.end_time || entry?.endTime || '17:00',
-              isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
-              notes: entry?.notes || '',
-            };
-          }) : prev.availabilitySlots,
+          availabilitySlots: minePostKind === "FULL_TIME_APPLICATION"
+            ? []
+            : Array.isArray(mine.availabilityDays) ? mine.availabilityDays.map((entry: any) => {
+              if (typeof entry === 'string') {
+                return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
+              }
+              return {
+                date: String(entry?.date || ''),
+                startTime: entry?.start_time || entry?.startTime || '09:00',
+                endTime: entry?.end_time || entry?.endTime || '17:00',
+                isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
+                notes: entry?.notes || '',
+              };
+            }) : prev.availabilitySlots,
         }));
       }
       if (mine && Array.isArray(mine.skills) && mine.skills.length > 0) {
@@ -684,37 +714,45 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       }
       await updateOnboardingLocationPrefs();
 
-      const availabilityDays = (pitchForm.availabilitySlots || [])
-        .filter((entry: any) => entry && entry.date)
-        .map((entry: any) => ({
-          date: String(entry.date),
-          start_time: entry.startTime || entry.start_time || null,
-          end_time: entry.endTime || entry.end_time || null,
-          is_all_day: Boolean(entry.isAllDay ?? entry.is_all_day),
-          startTime: entry.startTime || entry.start_time || null,
-          endTime: entry.endTime || entry.end_time || null,
-          isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
-        }));
+      const isFullTimeApplication = pitchForm.postKind === "FULL_TIME_APPLICATION";
+      const normalizedWorkTypes = isFullTimeApplication
+        ? Array.from(new Set([...(pitchForm.workTypes || []), "FULL_TIME"]))
+        : pitchForm.workTypes;
+      const availabilityDays = isFullTimeApplication
+        ? []
+        : (pitchForm.availabilitySlots || [])
+          .filter((entry: any) => entry && entry.date)
+          .map((entry: any) => ({
+            date: String(entry.date),
+            start_time: entry.startTime || entry.start_time || null,
+            end_time: entry.endTime || entry.end_time || null,
+            is_all_day: Boolean(entry.isAllDay ?? entry.is_all_day),
+            startTime: entry.startTime || entry.start_time || null,
+            endTime: entry.endTime || entry.end_time || null,
+            isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
+          }));
       if (isExplorer) {
         if (!pitchForm.headline.trim() && !pitchForm.body.trim()) {
           setPitchError("Please add a headline or some text.");
           setPitchSaving(false);
           return;
         }
-        const payload: Record<string, any> = {
-          headline: pitchForm.headline.trim(),
-          body: pitchForm.body.trim(),
-          role_category: "EXPLORER",
-          work_types: pitchForm.workTypes.length > 0 ? pitchForm.workTypes : undefined,
-          skills: pitchSkills.length > 0 ? pitchSkills : undefined,
-          location_suburb: pitchForm.suburb || undefined,
-          location_state: pitchForm.state || undefined,
-          location_postcode: pitchForm.postcode || undefined,
-          open_to_travel: pitchForm.openToTravel,
-          coverage_radius_km: pitchForm.coverageRadiusKm,
-          availability_days: availabilityDays,
-          availability_mode: availabilityDays.length > 0 ? "CASUAL_CALENDAR" : null,
-        };
+          const payload: Record<string, any> = {
+            headline: pitchForm.headline.trim(),
+            body: pitchForm.body.trim(),
+            role_category: "EXPLORER",
+            work_types: normalizedWorkTypes.length > 0 ? normalizedWorkTypes : undefined,
+            post_kind: pitchForm.postKind,
+            skills: pitchSkills.length > 0 ? pitchSkills : undefined,
+            location_suburb: pitchForm.suburb || undefined,
+            location_state: pitchForm.state || undefined,
+            location_postcode: pitchForm.postcode || undefined,
+            open_to_travel: pitchForm.openToTravel,
+            coverage_radius_km: pitchForm.coverageRadiusKm,
+            availability_days: availabilityDays,
+            availability_mode: isFullTimeApplication ? "FULL_TIME_NOTICE" : availabilityDays.length > 0 ? "CASUAL_CALENDAR" : null,
+            availability_summary: isFullTimeApplication ? "Open to anytime" : undefined,
+          };
         if (explorerProfileId) payload.explorer_profile = explorerProfileId;
         if (existingPostId) {
           await updateExplorerPost(existingPostId, payload);
@@ -722,22 +760,24 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           await createExplorerPost(payload);
         }
       } else {
-        const payload: Record<string, any> = {
-          headline: pitchForm.headline || "",
-          body: pitchForm.body || "",
-          role_category: isPharmacist ? "PHARMACIST" : "OTHER_STAFF",
-          role_title: roleTitle || "",
-          work_types: pitchForm.workTypes.length > 0 ? pitchForm.workTypes : undefined,
-          skills: pitchSkills.length > 0 ? pitchSkills : undefined,
-          location_suburb: pitchForm.suburb || undefined,
-          location_state: pitchForm.state || undefined,
+          const payload: Record<string, any> = {
+            headline: pitchForm.headline || "",
+            body: pitchForm.body || "",
+            role_category: isPharmacist ? "PHARMACIST" : "OTHER_STAFF",
+            role_title: roleTitle || "",
+            work_types: normalizedWorkTypes.length > 0 ? normalizedWorkTypes : undefined,
+            post_kind: pitchForm.postKind,
+            skills: pitchSkills.length > 0 ? pitchSkills : undefined,
+            location_suburb: pitchForm.suburb || undefined,
+            location_state: pitchForm.state || undefined,
           location_postcode: pitchForm.postcode || undefined,
           open_to_travel: pitchForm.openToTravel,
-          coverage_radius_km: pitchForm.coverageRadiusKm,
-          is_anonymous: true,
-          availability_days: availabilityDays,
-          availability_mode: availabilityDays.length > 0 ? "CASUAL_CALENDAR" : null,
-        };
+            coverage_radius_km: pitchForm.coverageRadiusKm,
+            is_anonymous: true,
+            availability_days: availabilityDays,
+            availability_mode: isFullTimeApplication ? "FULL_TIME_NOTICE" : availabilityDays.length > 0 ? "CASUAL_CALENDAR" : null,
+            availability_summary: isFullTimeApplication ? "Open to anytime" : undefined,
+          };
         if (existingPostId) {
           await updateExplorerPost(existingPostId, payload);
         } else {
@@ -890,9 +930,11 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                   candidate={candidate}
                   onViewCalendar={handleViewCalendar}
                   onToggleLike={handleToggleLike}
-                  canViewCalendar={publicMode ? true : canRequestBooking}
+                  onRequestBooking={handleBookTalent}
+                  canViewAvailability={!publicMode}
+                  canRequestBooking={canRequestBooking}
                 />
-                ))
+              ))
               ) : (
                 !loading && (
                   <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
@@ -953,17 +995,17 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         open={isPostShiftModalOpen}
         onClose={handleClosePostShiftModal}
         fullWidth
-        maxWidth="md"
+        maxWidth="lg"
         PaperProps={{
           sx: {
-            width: "78vw",
-            maxHeight: "80vh",
+            width: { xs: "96vw", md: "88vw", xl: "1180px" },
+            maxHeight: "88vh",
             borderRadius: 3,
             overflow: "hidden",
           },
         }}
       >
-        <Box sx={{ maxHeight: "80vh", overflow: "auto", bgcolor: "background.default" }}>
+        <Box sx={{ maxHeight: "88vh", overflow: "auto", bgcolor: "background.default" }}>
           <PostShiftPage onCompleted={handlePostShiftCompleted} />
         </Box>
       </Dialog>

@@ -133,8 +133,16 @@ export default function PharmacyForm({
             rate_public_holiday: '',
             rate_early_morning: '',
             rate_late_night: '',
-            weekdays_start: '',
-            weekdays_end: '',
+            monday_start: '',
+            monday_end: '',
+            tuesday_start: '',
+            tuesday_end: '',
+            wednesday_start: '',
+            wednesday_end: '',
+            thursday_start: '',
+            thursday_end: '',
+            friday_start: '',
+            friday_end: '',
             saturdays_start: '',
             saturdays_end: '',
             sundays_start: '',
@@ -174,7 +182,11 @@ export default function PharmacyForm({
         rate_early_morning: '',
         rate_late_night: '',
         // Hours
-        weekdays_start: '', weekdays_end: '',
+        monday_start: '', monday_end: '',
+        tuesday_start: '', tuesday_end: '',
+        wednesday_start: '', wednesday_end: '',
+        thursday_start: '', thursday_end: '',
+        friday_start: '', friday_end: '',
         saturdays_start: '', saturdays_end: '',
         sundays_start: '', sundays_end: '',
         public_holidays_start: '', public_holidays_end: '',
@@ -276,8 +288,16 @@ export default function PharmacyForm({
                     rate_public_holiday: String(data.rate_public_holiday || ''),
                     rate_early_morning: String(data.rate_early_morning || ''),
                     rate_late_night: String(data.rate_late_night || ''),
-                    weekdays_start: data.weekdays_start || '',
-                    weekdays_end: data.weekdays_end || '',
+                    monday_start: data.monday_start || data.weekdays_start || '',
+                    monday_end: data.monday_end || data.weekdays_end || '',
+                    tuesday_start: data.tuesday_start || data.weekdays_start || '',
+                    tuesday_end: data.tuesday_end || data.weekdays_end || '',
+                    wednesday_start: data.wednesday_start || data.weekdays_start || '',
+                    wednesday_end: data.wednesday_end || data.weekdays_end || '',
+                    thursday_start: data.thursday_start || data.weekdays_start || '',
+                    thursday_end: data.thursday_end || data.weekdays_end || '',
+                    friday_start: data.friday_start || data.weekdays_start || '',
+                    friday_end: data.friday_end || data.weekdays_end || '',
                     saturdays_start: data.saturdays_start || '',
                     saturdays_end: data.saturdays_end || '',
                     sundays_start: data.sundays_start || '',
@@ -833,7 +853,11 @@ export default function PharmacyForm({
                             {activeTab === 4 && (
                                 <>
                                     <Text style={styles.helperText}>Format: HH:MM (e.g. 09:00, 17:30)</Text>
-                                    <HoursRow label="Weekdays" startKey="weekdays_start" endKey="weekdays_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Monday" startKey="monday_start" endKey="monday_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Tuesday" startKey="tuesday_start" endKey="tuesday_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Wednesday" startKey="wednesday_start" endKey="wednesday_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Thursday" startKey="thursday_start" endKey="thursday_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Friday" startKey="friday_start" endKey="friday_end" form={form} setActiveTimeField={setActiveTimeField} />
                                     <HoursRow label="Saturdays" startKey="saturdays_start" endKey="saturdays_end" form={form} setActiveTimeField={setActiveTimeField} />
                                     <HoursRow label="Sundays" startKey="sundays_start" endKey="sundays_end" form={form} setActiveTimeField={setActiveTimeField} />
                                     <HoursRow label="Public Holidays" startKey="public_holidays_start" endKey="public_holidays_end" form={form} setActiveTimeField={setActiveTimeField} />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
     ActivityIndicator,
     Avatar,
@@ -121,6 +121,8 @@ export default function OwnerAssignedShiftBoard({
     title,
 }: Props) {
     const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
+    const { width: screenWidth } = useWindowDimensions();
+    const useTwoColumnSlots = screenWidth <= 420;
 
     const toggleShift = (shiftId: number) => {
         setExpandedShiftIds((prev) => ({
@@ -230,7 +232,10 @@ export default function OwnerAssignedShiftBoard({
                                                     activeOpacity={assigned ? 0.84 : 1}
                                                     disabled={!assigned}
                                                     onPress={() => assigned ? onViewAssigned(shift.id, slot?.id ?? null, userId as number) : undefined}
-                                                    style={mode === 'history' ? styles.slotGridCell : undefined}
+                                                    style={[
+                                                        styles.slotGridCell,
+                                                        useTwoColumnSlots ? styles.slotGridCellHalf : styles.slotGridCellThird,
+                                                    ]}
                                                 >
                                                     <Surface
                                                         style={[
@@ -248,10 +253,7 @@ export default function OwnerAssignedShiftBoard({
                                                                 <Text style={[styles.slotDay, mode === 'history' ? styles.slotDayCompact : null]}>{dateBits.day}</Text>
                                                                 <Text style={[styles.slotDate, mode === 'history' ? styles.slotDateCompact : null]}>{dateBits.date}</Text>
                                                             </View>
-                                                            <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                                                                <Chip compact style={[styles.metaChip, { backgroundColor: assigned ? (mode === 'history' ? customTheme.colors.warningLight : customTheme.colors.infoLight) : customTheme.colors.greyLight }]} textStyle={[styles.metaChipText, { color: assigned ? (mode === 'history' ? customTheme.colors.warning : customTheme.colors.info) : customTheme.colors.grey }]}>
-                                                                    {assigned ? 'Assigned' : 'Open'}
-                                                                </Chip>
+                                                            <View style={styles.slotTopMeta}>
                                                                 <Avatar.Icon size={mode === 'history' ? 28 : 34} icon="account" style={styles.slotAvatar} color={assigned ? customTheme.colors.primary : customTheme.colors.grey} />
                                                             </View>
                                                         </View>
@@ -396,6 +398,8 @@ const styles = StyleSheet.create({
     },
     metaChip: {
         borderRadius: 999,
+        alignSelf: 'flex-start',
+        maxWidth: '100%',
     },
     metaChipText: {
         fontWeight: '800',
@@ -475,9 +479,14 @@ const styles = StyleSheet.create({
         marginHorizontal: -4,
     },
     slotGridCell: {
-        width: '33.3333%',
         paddingHorizontal: 4,
         marginBottom: 8,
+    },
+    slotGridCellHalf: {
+        width: '50%',
+    },
+    slotGridCellThird: {
+        width: '33.3333%',
     },
     slotCard: {
         borderRadius: 18,
@@ -500,6 +509,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
+        gap: 8,
+    },
+    slotTopMeta: {
+        alignItems: 'flex-end',
+        flexShrink: 1,
+        minWidth: 0,
     },
     slotDay: {
         color: customTheme.colors.grey,

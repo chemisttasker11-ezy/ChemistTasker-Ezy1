@@ -31,6 +31,7 @@ export type PitchFormState = {
   headline: string;
   body: string;
   workTypes: string[];
+  postKind: "FULL_TIME_APPLICATION" | "AVAILABILITY";
   streetAddress: string;
   suburb: string;
   state: string;
@@ -133,6 +134,15 @@ export default function PitchDialog(props: {
     if (!pitchForm.availabilitySlots || pitchForm.availabilitySlots.length === 0) return;
     setAvailabilityEntries(pitchForm.availabilitySlots);
   }, [open, availabilityEntries.length, pitchForm.availabilitySlots]);
+
+  useEffect(() => {
+    if (pitchForm.postKind === "FULL_TIME_APPLICATION") {
+      setAvailabilityEntries([]);
+      setAvailabilityError(null);
+    } else if (!pitchForm.availabilitySlots || pitchForm.availabilitySlots.length === 0) {
+      setAvailabilityEntries([]);
+    }
+  }, [pitchForm.postKind, pitchForm.availabilitySlots]);
 
   const validateTimeRange = (start: string, end: string) =>
     new Date(`2025-01-01T${end}`) > new Date(`2025-01-01T${start}`);
@@ -412,6 +422,47 @@ export default function PitchDialog(props: {
 
         {tabIndex === 2 && (
           <Stack spacing={2} sx={{ pt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Availability Style</InputLabel>
+              <Select
+                label="Availability Style"
+                value={pitchForm.postKind}
+                onChange={(event) => {
+                  setAvailabilityEntries([]);
+                  setPitchForm((prev) => ({
+                    ...prev,
+                    postKind: event.target.value as "FULL_TIME_APPLICATION" | "AVAILABILITY",
+                    workTypes:
+                      event.target.value === "FULL_TIME_APPLICATION" && !prev.workTypes.includes("FULL_TIME")
+                        ? [...prev.workTypes, "FULL_TIME"]
+                        : prev.workTypes,
+                    availabilitySlots:
+                      event.target.value === "FULL_TIME_APPLICATION" ? [] : prev.availabilitySlots,
+                  }));
+                }}
+              >
+                <MenuItem value="FULL_TIME_APPLICATION">Open to Opportunities</MenuItem>
+                <MenuItem value="AVAILABILITY">Posting Availability</MenuItem>
+              </Select>
+            </FormControl>
+            {pitchForm.postKind === "FULL_TIME_APPLICATION" ? (
+              <Box
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  px: 2,
+                  py: 1.5,
+                  bgcolor: "background.default",
+                }}
+              >
+                <Typography variant="subtitle2">Open anytime</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Opportunity posts do not show dated availability on the talent board.
+                </Typography>
+              </Box>
+            ) : (
+              <>
             {availabilityError && (
               <Box sx={{ color: "error.main", fontSize: 14 }}>
                 {availabilityError}
@@ -517,6 +568,8 @@ export default function PitchDialog(props: {
                   </Button>
                 </Box>
               ))
+            )}
+              </>
             )}
           </Stack>
         )}

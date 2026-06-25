@@ -15,6 +15,7 @@ export type PitchFormState = {
   headline: string;
   body: string;
   workTypes: string[];
+  postKind: 'FULL_TIME_APPLICATION' | 'AVAILABILITY';
   streetAddress: string;
   suburb: string;
   state: string;
@@ -80,6 +81,15 @@ export default function PitchDialog(props: {
     if (!pitchForm.availabilitySlots || pitchForm.availabilitySlots.length === 0) return;
     setAvailabilityEntries(pitchForm.availabilitySlots);
   }, [open, availabilityEntries.length, pitchForm.availabilitySlots]);
+
+  useEffect(() => {
+    if (pitchForm.postKind === 'FULL_TIME_APPLICATION') {
+      setAvailabilityEntries([]);
+      setAvailabilityError(null);
+    } else if (!pitchForm.availabilitySlots || pitchForm.availabilitySlots.length === 0) {
+      setAvailabilityEntries([]);
+    }
+  }, [pitchForm.postKind, pitchForm.availabilitySlots]);
 
   const validateTimeRange = (start: string, end: string) => new Date(`2025-01-01T${end}`) > new Date(`2025-01-01T${start}`);
 
@@ -280,6 +290,35 @@ export default function PitchDialog(props: {
 
           {tabIndex === 2 ? (
             <View style={styles.tabBody}>
+              <Text style={styles.label}>Availability Style</Text>
+              <SegmentedButtons
+                value={pitchForm.postKind}
+                onValueChange={(value) => {
+                  setAvailabilityEntries([]);
+                  setPitchForm((prev) => ({
+                    ...prev,
+                    postKind: value as 'FULL_TIME_APPLICATION' | 'AVAILABILITY',
+                    workTypes:
+                      value === 'FULL_TIME_APPLICATION' && !prev.workTypes.includes('FULL_TIME')
+                        ? [...prev.workTypes, 'FULL_TIME']
+                        : prev.workTypes,
+                    availabilitySlots: value === 'FULL_TIME_APPLICATION' ? [] : prev.availabilitySlots,
+                  }));
+                }}
+                buttons={[
+                  { label: 'Open to Opportunities', value: 'FULL_TIME_APPLICATION' },
+                  { label: 'Posting Availability', value: 'AVAILABILITY' },
+                ]}
+              />
+              {pitchForm.postKind === 'FULL_TIME_APPLICATION' ? (
+                <View style={styles.infoBox}>
+                  <Text style={styles.infoTitle}>Open anytime</Text>
+                  <Text style={styles.smallMuted}>
+                    Opportunity posts do not show dated availability on the talent board.
+                  </Text>
+                </View>
+              ) : (
+                <>
               {availabilityError ? <Text style={styles.errorText}>{availabilityError}</Text> : null}
               <Text style={styles.label}>Pick your available day</Text>
               <Button mode="outlined" onPress={() => setDatePickerOpen(true)}>
@@ -343,6 +382,8 @@ export default function PitchDialog(props: {
                   </View>
                 ))
               )}
+                </>
+              )}
             </View>
           ) : null}
         </ScrollView>
@@ -386,6 +427,8 @@ const styles = StyleSheet.create({
   tabBody: { gap: 10, paddingVertical: 8 },
   warningBox: { backgroundColor: '#FFF1F2', borderWidth: 1, borderColor: '#F87171', borderRadius: 12, padding: 12 },
   warningText: { color: '#B91C1C', fontWeight: '700', fontSize: 12, textAlign: 'center' },
+  infoBox: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, gap: 4 },
+  infoTitle: { fontWeight: '700', color: '#111827' },
   errorText: { color: '#B91C1C', fontSize: 13 },
   row: { flexDirection: 'row', gap: 8 },
   flex: { flex: 1 },

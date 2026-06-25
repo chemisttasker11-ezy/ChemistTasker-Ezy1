@@ -106,6 +106,16 @@ type PharmacyApi = {
   roles_needed?: string[];
   weekdays_start: string | null;
   weekdays_end: string | null;
+  monday_start: string | null;
+  monday_end: string | null;
+  tuesday_start: string | null;
+  tuesday_end: string | null;
+  wednesday_start: string | null;
+  wednesday_end: string | null;
+  thursday_start: string | null;
+  thursday_end: string | null;
+  friday_start: string | null;
+  friday_end: string | null;
   saturdays_start: string | null;
   saturdays_end: string | null;
   sundays_start: string | null;
@@ -148,6 +158,16 @@ const normalizePharmacy = (raw: any): Pharmacy => ({
   roles_needed: raw.roles_needed ?? raw.rolesNeeded ?? [],
   weekdays_start: raw.weekdays_start ?? raw.weekdaysStart ?? "",
   weekdays_end: raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  monday_start: raw.monday_start ?? raw.mondayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
+  monday_end: raw.monday_end ?? raw.mondayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  tuesday_start: raw.tuesday_start ?? raw.tuesdayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
+  tuesday_end: raw.tuesday_end ?? raw.tuesdayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  wednesday_start: raw.wednesday_start ?? raw.wednesdayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
+  wednesday_end: raw.wednesday_end ?? raw.wednesdayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  thursday_start: raw.thursday_start ?? raw.thursdayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
+  thursday_end: raw.thursday_end ?? raw.thursdayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  friday_start: raw.friday_start ?? raw.fridayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
+  friday_end: raw.friday_end ?? raw.fridayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
   saturdays_start: raw.saturdays_start ?? raw.saturdaysStart ?? "",
   saturdays_end: raw.saturdays_end ?? raw.saturdaysEnd ?? "",
   sundays_start: raw.sundays_start ?? raw.sundaysStart ?? "",
@@ -443,8 +463,16 @@ export default function PharmacyPage({
   const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
   const [rolesNeeded, setRolesNeeded] = useState<string[]>([]);
 
-  const [weekdaysStart, setWeekdaysStart] = useState("");
-  const [weekdaysEnd, setWeekdaysEnd] = useState("");
+  const [mondayStart, setMondayStart] = useState("");
+  const [mondayEnd, setMondayEnd] = useState("");
+  const [tuesdayStart, setTuesdayStart] = useState("");
+  const [tuesdayEnd, setTuesdayEnd] = useState("");
+  const [wednesdayStart, setWednesdayStart] = useState("");
+  const [wednesdayEnd, setWednesdayEnd] = useState("");
+  const [thursdayStart, setThursdayStart] = useState("");
+  const [thursdayEnd, setThursdayEnd] = useState("");
+  const [fridayStart, setFridayStart] = useState("");
+  const [fridayEnd, setFridayEnd] = useState("");
   const [saturdaysStart, setSaturdaysStart] = useState("");
   const [saturdaysEnd, setSaturdaysEnd] = useState("");
   const [sundaysStart, setSundaysStart] = useState("");
@@ -1115,7 +1143,11 @@ export default function PharmacyPage({
   }, [searchParams, setSearchParams]);
 
   const hoursFields = [
-    { label: "Weekdays", start: weekdaysStart, setStart: setWeekdaysStart, end: weekdaysEnd, setEnd: setWeekdaysEnd },
+    { label: "Monday", start: mondayStart, setStart: setMondayStart, end: mondayEnd, setEnd: setMondayEnd },
+    { label: "Tuesday", start: tuesdayStart, setStart: setTuesdayStart, end: tuesdayEnd, setEnd: setTuesdayEnd },
+    { label: "Wednesday", start: wednesdayStart, setStart: setWednesdayStart, end: wednesdayEnd, setEnd: setWednesdayEnd },
+    { label: "Thursday", start: thursdayStart, setStart: setThursdayStart, end: thursdayEnd, setEnd: setThursdayEnd },
+    { label: "Friday", start: fridayStart, setStart: setFridayStart, end: fridayEnd, setEnd: setFridayEnd },
     { label: "Saturdays", start: saturdaysStart, setStart: setSaturdaysStart, end: saturdaysEnd, setEnd: setSaturdaysEnd },
     { label: "Sundays", start: sundaysStart, setStart: setSundaysStart, end: sundaysEnd, setEnd: setSundaysEnd },
     { label: "Public Holidays", start: publicHolidaysStart, setStart: setPublicHolidaysStart, end: publicHolidaysEnd, setEnd: setPublicHolidaysEnd },
@@ -1446,8 +1478,16 @@ export default function PharmacyPage({
       setExistingSumpDocs(pharmacy.qld_sump_docs || null);
       setEmploymentTypes(pharmacy.employment_types || []);
       setRolesNeeded(pharmacy.roles_needed || []);
-      setWeekdaysStart(pharmacy.weekdays_start || "");
-      setWeekdaysEnd(pharmacy.weekdays_end || "");
+      setMondayStart(pharmacy.monday_start || pharmacy.weekdays_start || "");
+      setMondayEnd(pharmacy.monday_end || pharmacy.weekdays_end || "");
+      setTuesdayStart(pharmacy.tuesday_start || pharmacy.weekdays_start || "");
+      setTuesdayEnd(pharmacy.tuesday_end || pharmacy.weekdays_end || "");
+      setWednesdayStart(pharmacy.wednesday_start || pharmacy.weekdays_start || "");
+      setWednesdayEnd(pharmacy.wednesday_end || pharmacy.weekdays_end || "");
+      setThursdayStart(pharmacy.thursday_start || pharmacy.weekdays_start || "");
+      setThursdayEnd(pharmacy.thursday_end || pharmacy.weekdays_end || "");
+      setFridayStart(pharmacy.friday_start || pharmacy.weekdays_start || "");
+      setFridayEnd(pharmacy.friday_end || pharmacy.weekdays_end || "");
       setSaturdaysStart(pharmacy.saturdays_start || "");
       setSaturdaysEnd(pharmacy.saturdays_end || "");
       setSundaysStart(pharmacy.sundays_start || "");
@@ -1482,8 +1522,16 @@ export default function PharmacyPage({
       setExistingSumpDocs(null);
       setEmploymentTypes([]);
       setRolesNeeded([]);
-      setWeekdaysStart("");
-      setWeekdaysEnd("");
+      setMondayStart("");
+      setMondayEnd("");
+      setTuesdayStart("");
+      setTuesdayEnd("");
+      setWednesdayStart("");
+      setWednesdayEnd("");
+      setThursdayStart("");
+      setThursdayEnd("");
+      setFridayStart("");
+      setFridayEnd("");
       setSaturdaysStart("");
       setSaturdaysEnd("");
       setSundaysStart("");
@@ -1647,8 +1695,16 @@ export default function PharmacyPage({
     if (sumpDocsFile) fd.append("qld_sump_docs", sumpDocsFile);
     fd.append("employment_types", JSON.stringify(employmentTypes));
     fd.append("roles_needed", JSON.stringify(rolesNeeded));
-    fd.append("weekdays_start", weekdaysStart);
-    fd.append("weekdays_end", weekdaysEnd);
+    fd.append("monday_start", mondayStart);
+    fd.append("monday_end", mondayEnd);
+    fd.append("tuesday_start", tuesdayStart);
+    fd.append("tuesday_end", tuesdayEnd);
+    fd.append("wednesday_start", wednesdayStart);
+    fd.append("wednesday_end", wednesdayEnd);
+    fd.append("thursday_start", thursdayStart);
+    fd.append("thursday_end", thursdayEnd);
+    fd.append("friday_start", fridayStart);
+    fd.append("friday_end", fridayEnd);
     fd.append("saturdays_start", saturdaysStart);
     fd.append("saturdays_end", saturdaysEnd);
     fd.append("sundays_start", sundaysStart);

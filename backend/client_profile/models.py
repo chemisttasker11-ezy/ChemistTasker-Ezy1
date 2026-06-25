@@ -610,6 +610,16 @@ class Pharmacy(models.Model):
     # Opening hours split by day‐type
     weekdays_start         = models.TimeField(blank=True, null=True)
     weekdays_end           = models.TimeField(blank=True, null=True)
+    monday_start           = models.TimeField(blank=True, null=True)
+    monday_end             = models.TimeField(blank=True, null=True)
+    tuesday_start          = models.TimeField(blank=True, null=True)
+    tuesday_end            = models.TimeField(blank=True, null=True)
+    wednesday_start        = models.TimeField(blank=True, null=True)
+    wednesday_end          = models.TimeField(blank=True, null=True)
+    thursday_start         = models.TimeField(blank=True, null=True)
+    thursday_end           = models.TimeField(blank=True, null=True)
+    friday_start           = models.TimeField(blank=True, null=True)
+    friday_end             = models.TimeField(blank=True, null=True)
     saturdays_start        = models.TimeField(blank=True, null=True)
     saturdays_end          = models.TimeField(blank=True, null=True)
     sundays_start          = models.TimeField(blank=True, null=True)
@@ -2302,6 +2312,10 @@ class ExplorerPost(models.Model):
         ("PART_TIME_DAYS", "Part Time Days"),
         ("CASUAL_CALENDAR", "Casual/Locum Calendar"),
     ]
+    POST_KIND_CHOICES = [
+        ("FULL_TIME_APPLICATION", "Full Time Application"),
+        ("AVAILABILITY", "Availability Post"),
+    ]
 
     explorer_profile = models.ForeignKey(
         'ExplorerOnboarding',
@@ -2324,6 +2338,7 @@ class ExplorerPost(models.Model):
     role_category = models.CharField(max_length=20, choices=ROLE_CATEGORY_CHOICES, blank=True, null=True)
     role_title = models.CharField(max_length=120, blank=True, null=True)
     work_types = models.JSONField(default=list, blank=True)  # multi-select support
+    post_kind = models.CharField(max_length=30, choices=POST_KIND_CHOICES, default="AVAILABILITY")
     coverage_radius_km = models.PositiveSmallIntegerField(blank=True, null=True)
     open_to_travel = models.BooleanField(default=False)
     availability_mode = models.CharField(max_length=30, choices=AVAILABILITY_MODE_CHOICES, blank=True, null=True)
@@ -2357,6 +2372,36 @@ class ExplorerPost(models.Model):
         if self.explorer_profile and getattr(self.explorer_profile, "user", None):
             return f"{self.headline} - {self.explorer_profile.user.get_full_name()}"
         return self.headline
+
+    def parsed_availability_dates(self):
+        dates = []
+        for entry in self.availability_days or []:
+            raw_date = None
+            if isinstance(entry, str):
+                raw_date = entry
+            elif isinstance(entry, dict):
+                raw_date = entry.get("date")
+            if not raw_date:
+                continue
+            try:
+                dates.append(date.fromisoformat(str(raw_date)))
+            except (TypeError, ValueError):
+                continue
+        return dates
+
+    def latest_availability_date(self):
+        dates = self.parsed_availability_dates()
+        if not dates:
+            return None
+        return max(dates)
+
+    def is_talent_board_visible(self, today=None):
+        if self.post_kind == "FULL_TIME_APPLICATION":
+            return True
+        latest_date = self.latest_availability_date()
+        if latest_date is None:
+            return True
+        return latest_date >= (today or timezone.localdate())
 
 class ExplorerPostReaction(models.Model):
     """

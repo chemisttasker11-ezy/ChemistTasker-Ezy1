@@ -45,6 +45,11 @@ const mapRoleToShiftRole = (value?: string | null) => {
   if (['PHARMACIST', 'INTERN', 'STUDENT', 'ASSISTANT', 'TECHNICIAN', 'EXPLORER'].includes(normalized)) {
     return normalized;
   }
+  if (normalized.includes('OTHER_STAFF')) return 'ASSISTANT';
+  if (normalized.includes('COMMUNITY_PHARMACIST')) return 'PHARMACIST';
+  if (normalized.includes('DISPENSARY_TECHNICIAN')) return 'TECHNICIAN';
+  if (normalized.includes('PHARMACY_TECHNICIAN')) return 'TECHNICIAN';
+  if (normalized.includes('PHARMACY_ASSISTANT')) return 'ASSISTANT';
   if (normalized.includes('PHARMACIST')) return 'PHARMACIST';
   if (normalized.includes('TECHNICIAN')) return 'TECHNICIAN';
   if (normalized.includes('ASSISTANT')) return 'ASSISTANT';
@@ -190,6 +195,10 @@ export default function TalentBoard({
                 ? `${yearsExperience} yrs exp`
                 : null
               : null;
+        const postKind =
+          post.postKind ||
+          (post.availabilityMode === 'FULL_TIME_NOTICE' ? 'FULL_TIME_APPLICATION' : 'AVAILABILITY');
+        const isFullTimeApplication = postKind === 'FULL_TIME_APPLICATION';
         const availabilityRaw = Array.isArray(post.availabilityDays) ? post.availabilityDays : [];
         const availableSlots = availabilityRaw
           .map((entry: any) => {
@@ -243,9 +252,11 @@ export default function TalentBoard({
           dispenseSoftware,
           expandedScope,
           experience: null,
-          availabilityText: '',
+          availabilityText: isFullTimeApplication ? 'Open anytime' : '',
           availabilityMode: post.availabilityMode || null,
-          showCalendar: availableDates.length > 0,
+          postKind,
+          isFullTimeApplication,
+          showCalendar: !isFullTimeApplication && availableDates.length > 0,
           availableDates,
           availableSlots: availableSlots as any,
           isInternshipSeeker:
@@ -307,14 +318,19 @@ export default function TalentBoard({
     if (!canRequestBooking) return;
     const targetUserId = candidate.authorUserId ?? candidate.explorerUserId ?? null;
     const uniqueDates = Array.from(new Set(dates)).sort();
-    if (uniqueDates.length === 0) return;
     const shiftRole =
       mapRoleToShiftRole(candidate.rawRoleCategory) ||
       mapRoleToShiftRole(candidate.explorerRoleType) ||
       mapRoleToShiftRole(candidate.role);
+    const firstSlot = (candidate.availableSlots || []).find((slot: any) => uniqueDates.includes(slot.date));
+    const startTime = firstSlot?.startTime || firstSlot?.start_time || null;
+    const endTime = firstSlot?.endTime || firstSlot?.end_time || null;
     const params: Record<string, string | undefined> = {
-      dates: uniqueDates.join(','),
+      dates: uniqueDates.length > 0 ? uniqueDates.join(',') : undefined,
       role: shiftRole || undefined,
+      role_needed: shiftRole || undefined,
+      start_time: startTime ? String(startTime).slice(0, 5) : undefined,
+      end_time: endTime ? String(endTime).slice(0, 5) : undefined,
       embedded: '1',
     };
     if (targetUserId) {
@@ -327,6 +343,10 @@ export default function TalentBoard({
     router.push(`${postShiftRoute}${search ? `?${search}` : ''}` as any);
     setSelectedCalendarCandidate(null);
   }, [canRequestBooking, postShiftRoute, router]);
+
+  const handleBookTalent = useCallback((candidate: Candidate) => {
+    handleRequestBooking(candidate, candidate.isFullTimeApplication ? [] : candidate.availableDates || []);
+  }, [handleRequestBooking]);
 
   const handleToggleLike = useCallback(async (candidate: Candidate) => {
     if (publicMode) return onRequireLogin?.('like');
@@ -362,6 +382,7 @@ export default function TalentBoard({
     headline: '',
     body: '',
     workTypes: [],
+    postKind: 'AVAILABILITY',
     streetAddress: '',
     suburb: '',
     state: '',
@@ -379,8 +400,34 @@ export default function TalentBoard({
   const isPharmacist = user?.role === 'PHARMACIST';
   const isOtherStaff = user?.role === 'OTHER_STAFF';
 
+  const resetPitchForm = useCallback(() => {
+    setPitchForm({
+      headline: '',
+      body: '',
+      workTypes: [],
+      postKind: 'AVAILABILITY',
+      streetAddress: '',
+      suburb: '',
+      state: '',
+      postcode: '',
+      openToTravel: false,
+      travelStates: [],
+      coverageRadiusKm: 30,
+      latitude: null,
+      longitude: null,
+      googlePlaceId: '',
+      availabilitySlots: [],
+    });
+    setExistingPostId(null);
+    setExplorerProfileId(null);
+    setRoleTitle('Explorer');
+    setPitchSkills([]);
+  }, []);
+
   const loadPitchDefaults = useCallback(async () => {
     if (!user) return;
+    setPitchError(null);
+    resetPitchForm();
     let onboardingSkills: string[] = [];
     try {
       if (isExplorer) {
@@ -395,15 +442,49 @@ export default function TalentBoard({
         const onboarding: any = await getOnboarding('other_staff');
         setRoleTitle((onboarding?.role_type || 'Other Staff').replace('_', ' '));
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
-      }
-      const mine = posts.find((post) => post.authorUserId === user?.id);
-      if (mine) setExistingPostId(mine.id);
-      if (mine && Array.isArray(mine.skills) && mine.skills.length > 0) setPitchSkills(mine.skills);
-      else if (onboardingSkills.length > 0) setPitchSkills(onboardingSkills);
+        }
+        const mine = posts.find((post) => post.authorUserId === user?.id);
+        if (mine) {
+          const minePostKind =
+            mine.postKind ||
+            (mine.availabilityMode === 'FULL_TIME_NOTICE' ? 'FULL_TIME_APPLICATION' : 'AVAILABILITY');
+          setExistingPostId(mine.id);
+          setPitchForm((prev) => ({
+            ...prev,
+            headline: mine.headline || prev.headline,
+            body: mine.body || prev.body,
+            workTypes: Array.isArray(mine.workTypes) ? mine.workTypes : prev.workTypes,
+            postKind: minePostKind,
+            suburb: mine.locationSuburb || prev.suburb,
+            state: mine.locationState || prev.state,
+            postcode: mine.locationPostcode || prev.postcode,
+            openToTravel: mine.openToTravel != null ? Boolean(mine.openToTravel) : prev.openToTravel,
+            coverageRadiusKm: mine.coverageRadiusKm != null ? Number(mine.coverageRadiusKm) : prev.coverageRadiusKm,
+            availabilitySlots:
+              minePostKind === 'FULL_TIME_APPLICATION'
+                ? []
+                : Array.isArray(mine.availabilityDays)
+                  ? mine.availabilityDays.map((entry: any) => {
+                      if (typeof entry === 'string') {
+                        return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
+                      }
+                      return {
+                        date: String(entry?.date || ''),
+                        startTime: entry?.start_time || entry?.startTime || '09:00',
+                        endTime: entry?.end_time || entry?.endTime || '17:00',
+                        isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
+                        notes: entry?.notes || '',
+                      };
+                    })
+                  : prev.availabilitySlots,
+          }));
+        }
+        if (mine && Array.isArray(mine.skills) && mine.skills.length > 0) setPitchSkills(mine.skills);
+        else if (onboardingSkills.length > 0) setPitchSkills(onboardingSkills);
     } catch (err: any) {
       setPitchError(err?.message || 'Failed to load your profile.');
     }
-  }, [isExplorer, isOtherStaff, isPharmacist, posts, user]);
+  }, [isExplorer, isOtherStaff, isPharmacist, posts, resetPitchForm, user]);
 
   useEffect(() => {
     if (pitchOpen) void loadPitchDefaults();
@@ -433,18 +514,25 @@ export default function TalentBoard({
     setPitchError(null);
     try {
       await updateOnboardingLocationPrefs();
-      const availabilityDays = (pitchForm.availabilitySlots || []).map((entry: any) => ({
-        date: String(entry.date),
-        start_time: entry.startTime || null,
-        end_time: entry.endTime || null,
-        is_all_day: Boolean(entry.isAllDay),
-      }));
+      const isFullTimeApplication = pitchForm.postKind === 'FULL_TIME_APPLICATION';
+      const normalizedWorkTypes = isFullTimeApplication
+        ? Array.from(new Set([...(pitchForm.workTypes || []), 'FULL_TIME']))
+        : pitchForm.workTypes;
+      const availabilityDays = isFullTimeApplication
+        ? []
+        : (pitchForm.availabilitySlots || []).map((entry: any) => ({
+            date: String(entry.date),
+            start_time: entry.startTime || null,
+            end_time: entry.endTime || null,
+            is_all_day: Boolean(entry.isAllDay),
+          }));
       const payload: Record<string, any> = {
         headline: pitchForm.headline || '',
         body: pitchForm.body || '',
         role_category: isExplorer ? 'EXPLORER' : isPharmacist ? 'PHARMACIST' : 'OTHER_STAFF',
         role_title: roleTitle || '',
-        work_types: pitchForm.workTypes.length > 0 ? pitchForm.workTypes : undefined,
+        work_types: normalizedWorkTypes.length > 0 ? normalizedWorkTypes : undefined,
+        post_kind: pitchForm.postKind,
         skills: pitchSkills.length > 0 ? pitchSkills : undefined,
         location_suburb: pitchForm.suburb || undefined,
         location_state: pitchForm.state || undefined,
@@ -452,7 +540,8 @@ export default function TalentBoard({
         open_to_travel: pitchForm.openToTravel,
         coverage_radius_km: pitchForm.coverageRadiusKm,
         availability_days: availabilityDays,
-        availability_mode: availabilityDays.length > 0 ? 'CASUAL_CALENDAR' : null,
+        availability_mode: isFullTimeApplication ? 'FULL_TIME_NOTICE' : availabilityDays.length > 0 ? 'CASUAL_CALENDAR' : null,
+        availability_summary: isFullTimeApplication ? 'Open to anytime' : undefined,
       };
       if (explorerProfileId) payload.explorer_profile = explorerProfileId;
       if (existingPostId) await updateExplorerPost(existingPostId, payload);
@@ -507,7 +596,15 @@ export default function TalentBoard({
         <View style={{ gap: 10 }}>
           {pagedCandidates.length > 0
             ? pagedCandidates.map((candidate) => (
-                <TalentCardV2 key={candidate.id} candidate={candidate} onViewCalendar={handleViewCalendar} onToggleLike={handleToggleLike} canViewCalendar={publicMode ? true : canRequestBooking} />
+                <TalentCardV2
+                  key={candidate.id}
+                  candidate={candidate}
+                  onViewCalendar={handleViewCalendar}
+                  onRequestBooking={handleBookTalent}
+                  onToggleLike={handleToggleLike}
+                  canViewAvailability={!publicMode}
+                  canRequestBooking={canRequestBooking}
+                />
               ))
             : !loading
               ? (

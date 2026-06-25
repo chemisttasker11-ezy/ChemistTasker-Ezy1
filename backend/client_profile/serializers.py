@@ -3152,6 +3152,16 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             # hours:
             "weekdays_start",
             "weekdays_end",
+            "monday_start",
+            "monday_end",
+            "tuesday_start",
+            "tuesday_end",
+            "wednesday_start",
+            "wednesday_end",
+            "thursday_start",
+            "thursday_end",
+            "friday_start",
+            "friday_end",
             "saturdays_start",
             "saturdays_end",
             "sundays_start",
@@ -3179,6 +3189,49 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         ]
 
         read_only_fields = ["owner", "organization", "verified"]
+
+    _weekday_day_names = ("monday", "tuesday", "wednesday", "thursday", "friday")
+
+    def _apply_weekday_hours_compat(self, attrs):
+        weekday_start = attrs.get("weekdays_start", serializers.empty)
+        weekday_end = attrs.get("weekdays_end", serializers.empty)
+
+        if weekday_start is not serializers.empty:
+            for day_name in self._weekday_day_names:
+                attrs.setdefault(f"{day_name}_start", weekday_start)
+        if weekday_end is not serializers.empty:
+            for day_name in self._weekday_day_names:
+                attrs.setdefault(f"{day_name}_end", weekday_end)
+
+        monday_start = attrs.get("monday_start", serializers.empty)
+        monday_end = attrs.get("monday_end", serializers.empty)
+        if "weekdays_start" not in attrs and monday_start is not serializers.empty:
+            attrs["weekdays_start"] = monday_start
+        if "weekdays_end" not in attrs and monday_end is not serializers.empty:
+            attrs["weekdays_end"] = monday_end
+
+        return attrs
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        return self._apply_weekday_hours_compat(attrs)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        weekday_start = data.get("weekdays_start")
+        weekday_end = data.get("weekdays_end")
+        for day_name in self._weekday_day_names:
+            start_key = f"{day_name}_start"
+            end_key = f"{day_name}_end"
+            if not data.get(start_key):
+                data[start_key] = weekday_start
+            if not data.get(end_key):
+                data[end_key] = weekday_end
+        if not weekday_start:
+            data["weekdays_start"] = data.get("monday_start")
+        if not weekday_end:
+            data["weekdays_end"] = data.get("monday_end")
+        return data
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_chain(self, obj) -> bool:
@@ -5405,6 +5458,7 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
             "role_category",
             "role_title",
             "work_types",
+            "post_kind",
             "coverage_radius_km",
             "open_to_travel",
             "travel_states",
@@ -5537,6 +5591,7 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
             "role_category",
             "role_title",
             "work_types",
+            "post_kind",
             "coverage_radius_km",
             "open_to_travel",
             "availability_mode",
@@ -5576,6 +5631,31 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
                 attrs["software"] = json.loads(software)
             except Exception:
                 raise serializers.ValidationError({"software": "Invalid JSON list."})
+        availability_days = attrs.get("availability_days")
+        if isinstance(availability_days, str):
+            try:
+                attrs["availability_days"] = json.loads(availability_days)
+            except Exception:
+                raise serializers.ValidationError({"availability_days": "Invalid JSON list."})
+
+        post_kind = attrs.get("post_kind", getattr(self.instance, "post_kind", None))
+        existing_work_types = getattr(self.instance, "work_types", []) if self.instance else []
+        work_types = list(attrs.get("work_types") if "work_types" in attrs else (existing_work_types or []))
+        if post_kind == "FULL_TIME_APPLICATION":
+            if "FULL_TIME" not in work_types:
+                work_types.append("FULL_TIME")
+            attrs["work_types"] = work_types
+            attrs["availability_days"] = []
+            attrs["availability_mode"] = "FULL_TIME_NOTICE"
+            attrs["availability_summary"] = "Open to anytime"
+            attrs["availability_notice"] = None
+        elif post_kind == "AVAILABILITY":
+            availability_days = list(attrs.get("availability_days") or [])
+            attrs["availability_days"] = availability_days
+            attrs["availability_mode"] = "CASUAL_CALENDAR" if availability_days else None
+            attrs["availability_summary"] = attrs.get("availability_summary") or None
+            if not availability_days:
+                attrs["availability_notice"] = attrs.get("availability_notice") or None
 
         request = self.context.get("request")
         profile = attrs.get("explorer_profile")
@@ -5604,6 +5684,7 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
             "role_category",
             "role_title",
             "work_types",
+            "post_kind",
             "coverage_radius_km",
             "open_to_travel",
             "availability_mode",

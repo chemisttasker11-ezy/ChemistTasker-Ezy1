@@ -7447,13 +7447,17 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         if not IsPostOwner().has_object_permission(self.request, self, obj):
             raise permissions.PermissionDenied("Only the owner can modify this post.")
 
+    def _visible_posts(self, queryset):
+        today = timezone.localdate()
+        return [post for post in queryset if post.is_talent_board_visible(today=today)]
+
     # --------- Feeds ---------
     @action(detail=False, methods=["get"], url_path="feed")
     def feed(self, request):
         """
         Newest-first feed. (Extend with follow-graph later if needed.)
         """
-        qs = self.filter_queryset(self.get_queryset())
+        qs = self._visible_posts(self.filter_queryset(self.get_queryset()))
         page = self.paginate_queryset(qs)
         ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:
@@ -7465,7 +7469,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         """
         Public feed for non-authenticated users.
         """
-        qs = self.filter_queryset(self.get_queryset())
+        qs = self._visible_posts(self.filter_queryset(self.get_queryset()))
         page = self.paginate_queryset(qs)
         ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:
@@ -7474,7 +7478,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"by-profile/(?P<profile_id>[^/.]+)")
     def by_profile(self, request, profile_id=None):
-        qs = self.get_queryset().filter(explorer_profile_id=profile_id)
+        qs = self._visible_posts(self.get_queryset().filter(explorer_profile_id=profile_id))
         page = self.paginate_queryset(qs)
         ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:

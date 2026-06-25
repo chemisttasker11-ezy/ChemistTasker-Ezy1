@@ -168,12 +168,31 @@ const formatDateLabel = (value?: string) => {
     if (!value) return 'Choose a date';
     const date = new Date(`${value}T00:00:00`);
     if (Number.isNaN(date.getTime())) return value;
-    return formatAuDate(value);
+  return formatAuDate(value);
+};
+
+const normalizePrefillRole = (value?: string | null) => {
+    if (!value) return '';
+    const normalized = value.trim().toUpperCase().replace(/\s+/g, '_');
+    if (['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT', 'EXPLORER'].includes(normalized)) {
+        return normalized;
+    }
+    if (normalized.includes('OTHER_STAFF')) return 'ASSISTANT';
+    if (normalized.includes('COMMUNITY_PHARMACIST')) return 'PHARMACIST';
+    if (normalized.includes('DISPENSARY_TECHNICIAN')) return 'TECHNICIAN';
+    if (normalized.includes('PHARMACY_TECHNICIAN')) return 'TECHNICIAN';
+    if (normalized.includes('PHARMACY_ASSISTANT')) return 'ASSISTANT';
+    if (normalized.includes('PHARMACIST')) return 'PHARMACIST';
+    if (normalized.includes('TECHNICIAN')) return 'TECHNICIAN';
+    if (normalized.includes('ASSISTANT')) return 'ASSISTANT';
+    if (normalized.includes('INTERN')) return 'INTERN';
+    if (normalized.includes('STUDENT')) return 'STUDENT';
+    return '';
 };
 
 export default function PostShiftScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams<{ edit?: string; dates?: string; date?: string; role?: string; dedicated_user?: string; embedded?: string }>();
+    const params = useLocalSearchParams<{ edit?: string; dates?: string; date?: string; role?: string; role_needed?: string; start_time?: string; end_time?: string; dedicated_user?: string; embedded?: string }>();
     const editingId = params?.edit ? Number(params.edit) : null;
     const loadedVisibilityRef = React.useRef<string | null>(null);
     const isEmbedded = params?.embedded === '1';
@@ -551,6 +570,15 @@ export default function PostShiftScreen() {
                 .filter(Boolean);
         }
         const uniqueDates = Array.from(new Set(parsedDates.length ? parsedDates : (singleDate ? [singleDate] : []))).sort();
+        const startParam = typeof params?.start_time === 'string' && params.start_time ? params.start_time.slice(0, 5) : slotStart;
+        const endParam = typeof params?.end_time === 'string' && params.end_time ? params.end_time.slice(0, 5) : slotEnd;
+
+        if (params?.start_time) {
+            setSlotStart(startParam);
+        }
+        if (params?.end_time) {
+            setSlotEnd(endParam);
+        }
 
         if (uniqueDates.length > 0) {
             setSlotDate(uniqueDates[0]);
@@ -558,15 +586,15 @@ export default function PostShiftScreen() {
             setSelectedDates(uniqueDates);
             setSelectedDateTimes(
                 uniqueDates.reduce<Record<string, { startTime: string; endTime: string }>>((acc, date) => {
-                    acc[date] = { startTime: slotStart, endTime: slotEnd };
+                    acc[date] = { startTime: startParam, endTime: endParam };
                     return acc;
                 }, {})
             );
             setSlots(
                 uniqueDates.map((date) => ({
                     date,
-                    startTime: slotStart,
-                    endTime: slotEnd,
+                    startTime: startParam,
+                    endTime: endParam,
                     isRecurring: false,
                     recurringDays: [],
                     recurringEndDate: '',
@@ -575,9 +603,10 @@ export default function PostShiftScreen() {
             setActiveStep('details');
         }
 
-        const roleParam = params?.role;
-        if (roleParam && typeof roleParam === 'string') {
-            setRoleNeeded(roleParam.toUpperCase());
+        const roleParam = params?.role_needed || params?.role;
+        const normalizedRole = typeof roleParam === 'string' ? normalizePrefillRole(roleParam) : '';
+        if (normalizedRole) {
+            setRoleNeeded(normalizedRole);
         }
         const dedicated = params?.dedicated_user;
         if (dedicated && typeof dedicated === 'string') {
@@ -586,7 +615,7 @@ export default function PostShiftScreen() {
                 setDedicatedUserId(parsed);
             }
         }
-    }, [editingId, params?.date, params?.dates, params?.dedicated_user, params?.role, slotEnd, slotStart]);
+    }, [editingId, params?.date, params?.dates, params?.dedicated_user, params?.end_time, params?.role, params?.role_needed, params?.start_time, slotEnd, slotStart]);
 
     useEffect(() => {
         applyBookingPrefillFromParams();

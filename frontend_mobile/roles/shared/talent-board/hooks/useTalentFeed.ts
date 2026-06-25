@@ -8,6 +8,7 @@ const mapPost = (post: any): ExplorerPost => ({
   authorUserId: post.author_user_id ?? post.authorUserId ?? null,
   roleTitle: post.role_title ?? post.roleTitle ?? null,
   workTypes: post.work_types ?? post.workTypes ?? null,
+  postKind: post.post_kind ?? post.postKind ?? null,
   coverageRadiusKm: post.coverage_radius_km ?? post.coverageRadiusKm ?? null,
   openToTravel: post.open_to_travel ?? post.openToTravel ?? null,
   availabilityMode: post.availability_mode ?? post.availabilityMode ?? null,

@@ -29,6 +29,8 @@ export type Candidate = {
   experience: number | null;
   availabilityText: string;
   availabilityMode: string | null;
+  postKind?: string | null;
+  isFullTimeApplication?: boolean;
   showCalendar: boolean;
   availableDates: string[];
   availableSlots?: Array<{

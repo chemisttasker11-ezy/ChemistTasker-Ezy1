@@ -557,7 +557,8 @@ export interface ExplorerPostApi {
     body: string;
     role_category?: "EXPLORER" | "PHARMACIST" | "OTHER_STAFF" | null;
     role_title?: string | null;
-    work_type?: "FULL_TIME" | "PART_TIME" | "CASUAL" | null;
+    work_types?: Array<"FULL_TIME" | "PART_TIME" | "CASUAL" | "VOLUNTEERING" | "PLACEMENT"> | null;
+    post_kind?: "FULL_TIME_APPLICATION" | "AVAILABILITY" | null;
     coverage_radius_km?: number | null;
     open_to_travel?: boolean;
     travel_states?: string[] | null;
@@ -565,7 +566,7 @@ export interface ExplorerPostApi {
     years_experience?: string | null;
     availability_mode?: "FULL_TIME_NOTICE" | "PART_TIME_DAYS" | "CASUAL_CALENDAR" | null;
     availability_summary?: string | null;
-    availability_days?: string[] | number[] | null;
+    availability_days?: Array<string | number | Record<string, unknown>> | null;
     availability_notice?: string | null;
     location_suburb?: string | null;
     location_state?: string | null;
@@ -593,12 +594,13 @@ export interface ExplorerPostPayload {
     body?: string | null;
     role_category?: "EXPLORER" | "PHARMACIST" | "OTHER_STAFF" | null;
     role_title?: string | null;
-    work_type?: "FULL_TIME" | "PART_TIME" | "CASUAL" | null;
+    work_types?: Array<"FULL_TIME" | "PART_TIME" | "CASUAL" | "VOLUNTEERING" | "PLACEMENT"> | null;
+    post_kind?: "FULL_TIME_APPLICATION" | "AVAILABILITY" | null;
     coverage_radius_km?: number | null;
     open_to_travel?: boolean;
     availability_mode?: "FULL_TIME_NOTICE" | "PART_TIME_DAYS" | "CASUAL_CALENDAR" | null;
     availability_summary?: string | null;
-    availability_days?: string[] | number[] | null;
+    availability_days?: Array<string | number | Record<string, unknown>> | null;
     availability_notice?: string | null;
     location_suburb?: string | null;
     location_state?: string | null;

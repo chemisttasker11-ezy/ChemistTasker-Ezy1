@@ -13,18 +13,23 @@ const formatDate = (date: string) => {
 export default function TalentCardV2({
   candidate,
   onViewCalendar,
+  onRequestBooking,
   onToggleLike,
-  canViewCalendar,
+  canViewAvailability,
+  canRequestBooking,
 }: {
   candidate: Candidate;
   onViewCalendar: (candidate: Candidate) => void;
+  onRequestBooking: (candidate: Candidate) => void;
   onToggleLike: (candidate: Candidate) => void;
-  canViewCalendar?: boolean;
+  canViewAvailability?: boolean;
+  canRequestBooking?: boolean;
 }) {
   const availableDateLabels = (candidate.availableDates || []).map(formatDate).filter(Boolean);
   const visibleDateLabels = availableDateLabels.slice(0, 3);
   const remainingDates = Math.max(availableDateLabels.length - visibleDateLabels.length, 0);
   const showCalendarButton = (candidate.availableDates || []).length > 0;
+  const isFullTimeApplication = Boolean(candidate.isFullTimeApplication || candidate.postKind === 'FULL_TIME_APPLICATION');
   const travelStateLabel =
     candidate.willingToTravel && (candidate.travelStates || []).length > 0
       ? `Open to Travel: ${(candidate.travelStates || []).join(', ')}`
@@ -73,21 +78,25 @@ export default function TalentCardV2({
         {candidate.pitch ? <Text style={styles.pitch}>"{candidate.pitch}"</Text> : null}
 
         <View style={styles.detailsCol}>
-          <View style={styles.engagementRow}>
+          <View style={styles.headerMetaRow}>
+            <View style={styles.engagementRow}>
             <Chip compact style={styles.engagementChip}>
               Engagement: {candidate.workTypes.length ? candidate.workTypes.join(', ') : '-'}
             </Chip>
           </View>
+          </View>
 
           <View style={styles.availabilityBox}>
             <View style={styles.availabilityHeader}>
-              <Text variant="bodyMedium">Availability</Text>
-              {showCalendarButton && canViewCalendar !== false ? (
+              <Text variant="bodyMedium">{isFullTimeApplication ? 'Open to Opportunities' : 'Availability'}</Text>
+              {!isFullTimeApplication && showCalendarButton && canViewAvailability !== false ? (
                 <Button compact onPress={() => onViewCalendar(candidate)} textColor="#4F46E5">View Calendar</Button>
               ) : null}
             </View>
 
-            {showCalendarButton ? (
+            {isFullTimeApplication ? (
+              <Text variant="bodySmall" style={styles.subtle}>Open anytime</Text>
+            ) : showCalendarButton ? (
               <Text variant="bodySmall" style={styles.subtle}>
                 Dates: {visibleDateLabels.join(', ')}{remainingDates > 0 ? ` +${remainingDates}` : ''}
               </Text>
@@ -105,7 +114,14 @@ export default function TalentCardV2({
           ) : null}
         </View>
 
-        {canViewCalendar !== false ? (
+        {isFullTimeApplication && canRequestBooking ? (
+          <View style={styles.bookingRow}>
+            <Button mode="contained" onPress={() => onRequestBooking(candidate)} buttonColor="#4F46E5" textColor="#FFFFFF">
+              Propose Shift
+            </Button>
+          </View>
+        ) : null}
+        {!isFullTimeApplication && showCalendarButton && canRequestBooking ? (
           <View style={styles.bookingRow}>
             <Button mode="contained" onPress={() => onViewCalendar(candidate)} buttonColor="#4F46E5" textColor="#FFFFFF">
               Request Booking
@@ -159,6 +175,7 @@ const styles = StyleSheet.create({
   },
   roleBlock: { flex: 1, gap: 6 },
   detailsCol: { gap: 8 },
+  headerMetaRow: { alignItems: 'flex-start' },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   role: { fontWeight: '700' },
   subtle: { color: '#6B7280' },

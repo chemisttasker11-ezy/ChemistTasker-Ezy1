@@ -27,13 +27,17 @@ import { Candidate } from "../types";
 export default function TalentCard({
   candidate,
   onViewCalendar,
+  onRequestBooking,
   onToggleLike,
-  canViewCalendar,
+  canViewAvailability,
+  canRequestBooking,
 }: {
   candidate: Candidate;
   onViewCalendar: (candidate: Candidate) => void;
+  onRequestBooking: (candidate: Candidate) => void;
   onToggleLike: (candidate: Candidate) => void;
-  canViewCalendar?: boolean;
+  canViewAvailability?: boolean;
+  canRequestBooking?: boolean;
 }) {
   let roleColor: "primary" | "success" | "warning" = "primary";
   let RoleIcon = WorkOutlineIcon;
@@ -55,6 +59,7 @@ export default function TalentCard({
   const visibleDateLabels = availableDateLabels.slice(0, 3);
   const remainingDates = Math.max(availableDateLabels.length - visibleDateLabels.length, 0);
   const showCalendarButton = (candidate.availableDates || []).length > 0;
+  const isFullTimeApplication = Boolean(candidate.isFullTimeApplication || candidate.postKind === "FULL_TIME_APPLICATION");
   const travelStateLabel =
     candidate.willingToTravel && (candidate.travelStates || []).length > 0
       ? `Open to Travel: ${(candidate.travelStates || []).join(", ")}`
@@ -105,7 +110,7 @@ export default function TalentCard({
       </Box>
 
       <CardContent sx={{ pt: 2.5 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "flex-start", md: "center" }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "flex-start", md: "stretch" }}>
           <Stack alignItems="center" spacing={1} sx={{ minWidth: 80 }}>
             <Box
               sx={(theme) => ({
@@ -130,9 +135,9 @@ export default function TalentCard({
             </Stack>
           </Stack>
 
-          <Box sx={{ flex: 1 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-              <Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} alignItems={{ xs: "flex-start", sm: "flex-start" }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                   <Typography variant="h6" fontWeight={700}>
                     {candidate.role}
@@ -155,12 +160,14 @@ export default function TalentCard({
                   </Typography>
                 ) : null}
               </Box>
-              <Chip
-                size="small"
-                label={`Engagement: ${candidate.workTypes.length ? candidate.workTypes.join(", ") : "-"}`}
-                variant="outlined"
-                sx={{ alignSelf: { xs: "flex-start", sm: "center" }, borderColor: "divider" }}
-              />
+              <Box sx={{ width: { xs: "100%", sm: 320 }, display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
+                <Chip
+                  size="small"
+                  label={`Engagement: ${candidate.workTypes.length ? candidate.workTypes.join(", ") : "-"}`}
+                  variant="outlined"
+                  sx={{ maxWidth: "100%", borderColor: "divider" }}
+                />
+              </Box>
             </Stack>
 
             <Box
@@ -176,24 +183,40 @@ export default function TalentCard({
               })}
             >
               <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CalendarTodayOutlinedIcon fontSize="small" color="action" />
-                  <Typography variant="body2">
-                    Availability
-                  </Typography>
-                </Stack>
-                {showCalendarButton && canViewCalendar !== false ? (
-                  <Button size="small" onClick={() => onViewCalendar(candidate)}>
-                    View Calendar
-                  </Button>
-                ) : null}
-                {!showCalendarButton && (
-                  <Typography variant="caption" color="text.secondary">
-                    No dates shared yet
-                  </Typography>
+                {isFullTimeApplication ? (
+                  <>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <WorkOutlineIcon fontSize="small" color="action" />
+                      <Typography variant="body2">
+                        Open to Opportunities
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary">
+                      Open anytime
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <CalendarTodayOutlinedIcon fontSize="small" color="action" />
+                      <Typography variant="body2">
+                        Availability
+                      </Typography>
+                    </Stack>
+                    {showCalendarButton && canViewAvailability !== false ? (
+                      <Button size="small" onClick={() => onViewCalendar(candidate)}>
+                        View Calendar
+                      </Button>
+                    ) : null}
+                    {!showCalendarButton && (
+                      <Typography variant="caption" color="text.secondary">
+                        No dates shared yet
+                      </Typography>
+                    )}
+                  </>
                 )}
               </Stack>
-              {visibleDateLabels.length > 0 && (
+              {!isFullTimeApplication && visibleDateLabels.length > 0 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
                   Dates: {visibleDateLabels.join(", ")}
                   {remainingDates > 0 ? ` +${remainingDates}` : ""}
@@ -202,7 +225,17 @@ export default function TalentCard({
             </Box>
           </Box>
 
-          {canViewCalendar !== false && (
+          <Stack spacing={1} sx={{ minWidth: 180, alignSelf: { xs: "stretch", md: "center" } }}>
+            {isFullTimeApplication && canRequestBooking ? (
+              <Button
+                variant="contained"
+                startIcon={<CalendarTodayOutlinedIcon />}
+                onClick={() => onRequestBooking(candidate)}
+              >
+                Propose Shift
+              </Button>
+            ) : null}
+          {!isFullTimeApplication && showCalendarButton && canRequestBooking && (
             <Stack spacing={1} sx={{ minWidth: 160 }}>
               <Button
                 variant="contained"
@@ -213,6 +246,7 @@ export default function TalentCard({
               </Button>
             </Stack>
           )}
+          </Stack>
         </Stack>
 
         {!candidate.isExplorer && (

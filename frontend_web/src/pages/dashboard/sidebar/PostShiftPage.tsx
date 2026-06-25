@@ -194,6 +194,25 @@ const RATE_TYPE_DESCRIPTIONS: Record<string, string> = {
 const toInputDateTimeLocal = (value?: string | null) =>
   value ? dayjs(value).local().format('YYYY-MM-DDTHH:mm') : '';
 
+const normalizePrefillRole = (value?: string | null) => {
+  if (!value) return '';
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, '_');
+  if (['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT', 'EXPLORER'].includes(normalized)) {
+    return normalized;
+  }
+  if (normalized.includes('OTHER_STAFF')) return 'ASSISTANT';
+  if (normalized.includes('COMMUNITY_PHARMACIST')) return 'PHARMACIST';
+  if (normalized.includes('DISPENSARY_TECHNICIAN')) return 'TECHNICIAN';
+  if (normalized.includes('PHARMACY_TECHNICIAN')) return 'TECHNICIAN';
+  if (normalized.includes('PHARMACY_ASSISTANT')) return 'ASSISTANT';
+  if (normalized.includes('PHARMACIST')) return 'PHARMACIST';
+  if (normalized.includes('TECHNICIAN')) return 'TECHNICIAN';
+  if (normalized.includes('ASSISTANT')) return 'ASSISTANT';
+  if (normalized.includes('INTERN')) return 'INTERN';
+  if (normalized.includes('STUDENT')) return 'STUDENT';
+  return '';
+};
+
 const describeRecurringDays = (days: number[]) => {
   if (!days?.length) return '';
   const ordered = [...days].sort((a, b) => ((a === 0 ? 7 : a) - (b === 0 ? 7 : b)));
@@ -314,7 +333,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [activeStep, setActiveStep] = useState(0);
-  const [prefillApplied, setPrefillApplied] = useState(false);
+  const [prefillAppliedFor, setPrefillAppliedFor] = useState<string | null>(null);
 
   // --- Calendar Control State ---
   const todayStart = useMemo(() => dayjs().startOf('day'), []);
@@ -452,7 +471,20 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
 
 
   useEffect(() => {
-    if (!hasPrefill || editingShiftId || prefillApplied) {
+    const prefillSignature = [
+      prefillPharmacyId,
+      prefillRoleNeeded,
+      prefillDate,
+      prefillDatesParam,
+      prefillStartTime,
+      prefillEndTime,
+      prefillVisibility,
+      prefillEmploymentType,
+      prefillDedicatedUser,
+      scopedPharmacyId,
+    ].join('|');
+
+    if (!hasPrefill || editingShiftId || prefillAppliedFor === prefillSignature) {
       return;
     }
 
@@ -465,8 +497,9 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
     if (parsedPharmacyId && scopedPharmacyId == null) {
       setPharmacyId(parsedPharmacyId);
     }
-    if (prefillRoleNeeded) {
-      setRoleNeeded(prefillRoleNeeded);
+    const normalizedPrefillRole = normalizePrefillRole(prefillRoleNeeded);
+    if (normalizedPrefillRole) {
+      setRoleNeeded(normalizedPrefillRole);
     }
     if (prefillEmploymentType) {
       setEmploymentType(prefillEmploymentType);
@@ -487,6 +520,16 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
     if (parsedPrefillDates.length > 0) {
       setSelectedDates(parsedPrefillDates);
       setSlotDate(parsedPrefillDates[0]);
+      setSlots(
+        parsedPrefillDates.map((date) => ({
+          date,
+          startTime,
+          endTime,
+          isRecurring: false,
+          recurringDays: [],
+          recurringEndDate: '',
+        }))
+      );
       const parsedDate = dayjs(parsedPrefillDates[0]);
       if (parsedDate.isValid()) {
         setCalendarDate(parsedDate.toDate());
@@ -501,6 +544,16 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
     } else if (prefillDate) {
       setSlotDate(prefillDate);
       setSelectedDates([prefillDate]);
+      setSlots([
+        {
+          date: prefillDate,
+          startTime,
+          endTime,
+          isRecurring: false,
+          recurringDays: [],
+          recurringEndDate: '',
+        },
+      ]);
       const parsedDate = dayjs(prefillDate);
       if (parsedDate.isValid()) {
         setCalendarDate(parsedDate.toDate());
@@ -518,8 +571,8 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       }
     }
 
-    setPrefillApplied(true);
-  }, [hasPrefill, editingShiftId, prefillApplied, prefillPharmacyId, prefillRoleNeeded, prefillDate, prefillDatesParam, prefillStartTime, prefillEndTime, prefillVisibility, prefillEmploymentType, prefillDedicatedUser, scopedPharmacyId, slotStartTime, slotEndTime]);
+    setPrefillAppliedFor(prefillSignature);
+  }, [hasPrefill, editingShiftId, prefillAppliedFor, prefillPharmacyId, prefillRoleNeeded, prefillDate, prefillDatesParam, prefillStartTime, prefillEndTime, prefillVisibility, prefillEmploymentType, prefillDedicatedUser, scopedPharmacyId, slotStartTime, slotEndTime]);
 
   useEffect(() => {
     if (scopedPharmacyId != null) {
@@ -1450,7 +1503,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                       <Box
                         sx={{
                           display: 'grid',
-                          gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                          gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
                         }}
                       >
                         {category.items.map((s: any, idx: number) => {
@@ -1465,15 +1518,16 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                               key={s.code}
                               sx={{
                                 display: 'flex',
-                                flexDirection: { xs: 'column', sm: 'row' },
-                                alignItems: { xs: 'flex-start', sm: 'center' },
+                                flexDirection: { xs: 'column', xl: 'row' },
+                                alignItems: { xs: 'flex-start', xl: 'center' },
                                 justifyContent: 'space-between',
                                 p: 2.5,
                                 gap: 2,
+                                minHeight: 124,
                                 minWidth: 0,
                                 borderBottom: idx < category.items.length - 1 ? '1px solid' : 'none',
                                 borderRight: {
-                                  md: idx % 2 === 0 && idx < category.items.length - 1 ? '1px solid' : 'none',
+                                  lg: idx % 2 === 0 && idx < category.items.length - 1 ? '1px solid' : 'none',
                                 },
                                 borderColor: 'grey.100',
                                 bgcolor: value === 'required' ? 'rgba(109, 40, 217, 0.06)' : value === 'favorable' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
@@ -1483,12 +1537,17 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                 }
                               }}
                             >
-                              <Box sx={{ flex: 1 }}>
-                                <Typography variant="body1" fontWeight={value ? 600 : 500} color={value ? 'text.primary' : 'text.secondary'}>
+                              <Box sx={{ flex: '1 1 auto', minWidth: 0, pr: { xl: 1 } }}>
+                                <Typography
+                                  variant="body1"
+                                  fontWeight={value ? 600 : 500}
+                                  color={value ? 'text.primary' : 'text.secondary'}
+                                  sx={{ overflowWrap: 'anywhere' }}
+                                >
                                   {s.label}
                                 </Typography>
                                 {s.description && (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
                                     {s.description}
                                   </Typography>
                                 )}
@@ -1508,6 +1567,8 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                   }
                                 }}
                                 sx={{
+                                  flex: '0 0 auto',
+                                  width: { xs: '100%', sm: 'auto' },
                                   bgcolor: 'background.paper',
                                   boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
                                   '& .MuiToggleButtonGroup-grouped': {
@@ -1515,6 +1576,8 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                     borderColor: 'grey.300',
                                   },
                                   '& .MuiToggleButton-root': {
+                                    flex: { xs: 1, sm: '0 0 auto' },
+                                    minWidth: 108,
                                     px: 2,
                                     py: 0.75,
                                     textTransform: 'none',
