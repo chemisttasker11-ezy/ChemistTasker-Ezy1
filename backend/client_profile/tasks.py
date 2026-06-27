@@ -362,18 +362,15 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
     if "abn_gst_to" in parsed:
         obj.abn_gst_to = parsed["abn_gst_to"]
     obj.abn_last_checked = timezone.now()
+    if obj.abn_entity_confirmed:
+        obj.abn_verified = True
 
-    # note is informational only
+    # note is informational only; final verification depends on user confirmation in the UI
     if not legal_name:
         note = "Failed to fetch ABN details. ABN may be invalid or ABR site unavailable."
     else:
-        note = (
-            f"ABN legal name is '{legal_name}'. "
-            "If this belongs to your company/entity, confirm in the UI."
-            if not simple_name_match(legal_name, first_name, last_name)
-            else f"Name match OK (expected {first_name} {last_name}, actual {legal_name}). Please confirm in the UI."
-        )
-    updates = ["abn_entity_name","abn_entity_type","abn_status","abn_gst_registered","abn_gst_from","abn_gst_to","abn_last_checked"]
+        note = "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you."
+    updates = ["abn_entity_name","abn_entity_type","abn_status","abn_gst_registered","abn_gst_from","abn_gst_to","abn_last_checked", "abn_verified"]
     if note_field and hasattr(obj, note_field):
         setattr(obj, note_field, note[:255]); updates.append(note_field)
     obj.save(update_fields=list({f for f in updates if hasattr(obj, f)}))

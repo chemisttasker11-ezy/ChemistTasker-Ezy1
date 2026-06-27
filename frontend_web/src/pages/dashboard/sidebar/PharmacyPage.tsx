@@ -1,6 +1,6 @@
 /// <reference types="@types/google.maps" />
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -69,6 +69,7 @@ import {
   fetchPharmacyAdminsService,
   getOnboarding,
   getPharmacyClaims,
+  lookupPharmacyAbn,
   updatePharmacy,
   updatePharmacyClaim,
   type MembershipSummary,
@@ -89,6 +90,10 @@ type PharmacyApi = {
   owner: number;
   name: string;
   email: string | null;
+  claimed?: boolean | null;
+  claim_status?: string | null;
+  organization?: { id: number; name?: string | null } | number | null;
+  organization_id?: number | null;
   street_address: string;
   suburb: string;
   postcode: string;
@@ -98,6 +103,16 @@ type PharmacyApi = {
   state: string;
   chain: number | null;
   abn: string;
+  abn_verified?: boolean | null;
+  abn_entity_confirmed?: boolean | null;
+  abn_entity_name?: string | null;
+  abn_entity_type?: string | null;
+  abn_status?: string | null;
+  abn_gst_registered?: boolean | null;
+  abn_gst_from?: string | null;
+  abn_gst_to?: string | null;
+  abn_last_checked?: string | null;
+  abn_verification_note?: string | null;
   methadone_s8_protocols?: string;
   qld_sump_docs?: string;
   sops?: string;
@@ -141,6 +156,10 @@ const normalizePharmacy = (raw: any): Pharmacy => ({
   owner: raw.owner ?? raw.ownerId ?? 0,
   name: raw.name ?? "",
   email: raw.email ?? null,
+  claimed: raw.claimed ?? false,
+  claim_status: raw.claim_status ?? raw.claimStatus ?? null,
+  organization: raw.organization ?? null,
+  organization_id: raw.organization_id ?? raw.organizationId ?? null,
   street_address: raw.street_address ?? raw.streetAddress ?? "",
   suburb: raw.suburb ?? "",
   postcode: raw.postcode ?? "",
@@ -150,6 +169,16 @@ const normalizePharmacy = (raw: any): Pharmacy => ({
   state: raw.state ?? "",
   chain: raw.chain ?? null,
   abn: raw.abn ?? "",
+  abn_verified: raw.abn_verified ?? false,
+  abn_entity_confirmed: raw.abn_entity_confirmed ?? false,
+  abn_entity_name: raw.abn_entity_name ?? null,
+  abn_entity_type: raw.abn_entity_type ?? null,
+  abn_status: raw.abn_status ?? null,
+  abn_gst_registered: raw.abn_gst_registered ?? null,
+  abn_gst_from: raw.abn_gst_from ?? null,
+  abn_gst_to: raw.abn_gst_to ?? null,
+  abn_last_checked: raw.abn_last_checked ?? null,
+  abn_verification_note: raw.abn_verification_note ?? null,
   methadone_s8_protocols: raw.methadone_s8_protocols ?? raw.methadoneS8Protocols ?? undefined,
   qld_sump_docs: raw.qld_sump_docs ?? raw.qldSumpDocs ?? undefined,
   sops: raw.sops ?? undefined,
@@ -248,6 +277,9 @@ const CLAIM_STATUS_COLORS: Record<ClaimStatus, "success" | "warning" | "error"> 
 
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "-";
+
+const formatDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString() : "-";
 
 const tabLabels = [
   { label: "Basic", icon: <BusinessRoundedIcon fontSize="small" /> },
@@ -450,6 +482,16 @@ export default function PharmacyPage({
   const [longitude, setLongitude] = useState<number | null>(null);
   const [state, setState] = useState("");
   const [abn, setAbn] = useState("");
+  const [abnEntityName, setAbnEntityName] = useState<string | null>(null);
+  const [abnEntityType, setAbnEntityType] = useState<string | null>(null);
+  const [abnStatus, setAbnStatus] = useState<string | null>(null);
+  const [abnGstRegistered, setAbnGstRegistered] = useState<boolean | null>(null);
+  const [abnGstFrom, setAbnGstFrom] = useState<string | null>(null);
+  const [abnGstTo, setAbnGstTo] = useState<string | null>(null);
+  const [abnLastChecked, setAbnLastChecked] = useState<string | null>(null);
+  const [abnVerificationNote, setAbnVerificationNote] = useState<string | null>(null);
+  const [checkingABN, setCheckingABN] = useState(false);
+  const [abnConfirmedLocal, setAbnConfirmedLocal] = useState(false);
 
   const [approvalCertFile, setApprovalCertFile] = useState<File | null>(null);
   const [existingApprovalCert, setExistingApprovalCert] = useState<string | null>(null);
@@ -513,6 +555,20 @@ export default function PharmacyPage({
 
   const abnDigits = abn.replace(/\D/g, "");
   const abnInvalid = abnDigits.length > 0 && abnDigits.length !== 11;
+  const abnLocked = Boolean(editing?.abn_verified && editing?.abn_entity_confirmed);
+  const abnIsLocked = abnLocked || abnConfirmedLocal;
+
+  const applyAbnMeta = useCallback((pharmacy?: Partial<PharmacyApi> | null) => {
+    setAbnEntityName(pharmacy?.abn_entity_name ?? null);
+    setAbnEntityType(pharmacy?.abn_entity_type ?? null);
+    setAbnStatus(pharmacy?.abn_status ?? null);
+    setAbnGstRegistered(pharmacy?.abn_gst_registered ?? null);
+    setAbnGstFrom(pharmacy?.abn_gst_from ?? null);
+    setAbnGstTo(pharmacy?.abn_gst_to ?? null);
+    setAbnLastChecked(pharmacy?.abn_last_checked ?? null);
+    setAbnVerificationNote(pharmacy?.abn_verification_note ?? null);
+    setAbnConfirmedLocal(Boolean(pharmacy?.abn_entity_confirmed));
+  }, []);
 
   const ownerPharmacies = useMemo(() => pharmacies.map(toOwnerPharmacyDTO), [pharmacies]);
   const activePharmacy = useMemo(
@@ -560,6 +616,14 @@ export default function PharmacyPage({
     const accepted = ownerClaims.filter((item) => item.status === "ACCEPTED").length;
     return { pending, accepted };
   }, [ownerClaims]);
+  const claimedPharmacyCount = useMemo(
+    () =>
+      pharmacies.filter((pharmacy) => {
+        const status = String(pharmacy.claim_status ?? "").toUpperCase();
+        return Boolean(pharmacy.claimed || pharmacy.organization || pharmacy.organization_id || status === "ACCEPTED");
+      }).length,
+    [pharmacies]
+  );
 
   const normalizedTargetPharmacyCount = Math.max(1, targetPharmacyCount || 1);
   const toggleArrayValue = (
@@ -571,6 +635,92 @@ export default function PharmacyPage({
       current.includes(nextValue)
         ? current.filter((item) => item !== nextValue)
         : [...current, nextValue]
+    );
+  };
+
+  const renderABNChip = () => {
+    if (abnIsLocked) {
+      return <Chip color="success" variant="outlined" label="ABN verified" />;
+    }
+    if (!abnEntityName && abnVerificationNote) {
+      return <Chip color="error" variant="outlined" label="ABN invalid/unavailable" />;
+    }
+    if (abnEntityName || abnVerificationNote) {
+      return <Chip variant="outlined" label="ABN awaiting confirmation" />;
+    }
+    return <Chip variant="outlined" label="ABN not checked" />;
+  };
+
+  const abrResults = () => {
+    if (checkingABN) {
+      return (
+        <Box
+          sx={{
+            mt: 1.5,
+            p: 1.75,
+            borderRadius: 2.5,
+            border: `1px solid ${LIGHT_BORDER}`,
+            bgcolor: "#FFFFFF",
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 800 }}>
+            ABN details (from ABR)
+          </Typography>
+          <Skeleton variant="text" width="70%" height={28} />
+          <Skeleton variant="text" width="56%" height={28} />
+          <Skeleton variant="text" width="62%" height={28} />
+          <Skeleton variant="rectangular" height={42} sx={{ mt: 1, borderRadius: 1.5 }} />
+        </Box>
+      );
+    }
+
+    const hasAny = Boolean(abnEntityName || abnEntityType || abnStatus || abnLastChecked || abnGstRegistered !== null);
+    if (!hasAny && !abnVerificationNote) {
+      return null;
+    }
+    if (!hasAny && abnVerificationNote) {
+      return (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          We couldn&apos;t verify this ABN. Reason: {abnVerificationNote}
+        </Alert>
+      );
+    }
+    return (
+      <Box
+        sx={{
+          mt: 1.5,
+          p: 1.75,
+          borderRadius: 2.5,
+          border: `1px solid ${LIGHT_BORDER}`,
+          bgcolor: "#FFFFFF",
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 800 }}>
+          ABN details (from ABR)
+        </Typography>
+        <Box component="ul" sx={{ pl: 2.25, m: 0, color: "#64748B" }}>
+          {abnEntityName ? <li><strong>Entity name:</strong> {abnEntityName}</li> : null}
+          {abnEntityType ? <li><strong>Entity type:</strong> {abnEntityType}</li> : null}
+          {abnStatus ? <li><strong>ABN status:</strong> {abnStatus}</li> : null}
+          <li>
+            <strong>GST registered (ABR):</strong>{" "}
+            {abnGstRegistered == null ? "-" : abnGstRegistered ? "Yes" : "No"}
+            {abnGstRegistered ? (
+              <>
+                {" • "}
+                <strong>From:</strong> {formatDate(abnGstFrom)}
+                {abnGstTo ? <> {" • "} <strong>To:</strong> {formatDate(abnGstTo)}</> : null}
+              </>
+            ) : null}
+          </li>
+          {abnLastChecked ? <li><strong>Last checked:</strong> {formatDateTime(abnLastChecked)}</li> : null}
+        </Box>
+        {abnVerificationNote ? (
+          <Alert severity={editing?.abn_verified ? "success" : "info"} sx={{ mt: 1.25 }}>
+            {abnVerificationNote}
+          </Alert>
+        ) : null}
+      </Box>
     );
   };
 
@@ -714,9 +864,42 @@ export default function PharmacyPage({
             margin="normal"
             value={abn}
             onChange={(e) => setAbn(e.target.value)}
+            disabled={abnIsLocked}
             error={abnInvalid}
-            helperText={abnInvalid ? "ABN must be exactly 11 digits" : undefined}
+            helperText={
+              abnIsLocked
+                ? "This pharmacy ABN is locked after verification and confirmation."
+                : abnInvalid
+                  ? "ABN must be exactly 11 digits"
+                  : undefined
+            }
           />
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: { xs: "stretch", md: "center" }, mt: 0.5 }}>
+            <Button
+              variant="outlined"
+              onClick={checkABN}
+              disabled={abnIsLocked || abnInvalid || !abnDigits || checkingABN}
+            >
+              {checkingABN ? "Checking..." : "Check ABN"}
+            </Button>
+            {renderABNChip()}
+          </Stack>
+          {/* {!editing ? (
+            <Alert severity="info" sx={{ mt: 1.5 }}>
+              Checking the ABN does not create a pharmacy record. The real pharmacy will be created when you finish and save the onboarding.
+            </Alert>
+          ) : null} */}
+          {abrResults()}
+          <Stack direction="row" spacing={1.25} sx={{ mt: 1.5 }}>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={confirmABN}
+              disabled={isSaving || !abnEntityName || abnIsLocked}
+            >
+              {abnIsLocked ? "Confirmed" : isSaving ? "Confirming..." : "Confirm this ABN"}
+            </Button>
+          </Stack>
         </Box>
       )}
 
@@ -857,8 +1040,10 @@ export default function PharmacyPage({
                     sx={{
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "center",
                       gap: 1.25,
                       p: 1.5,
+                      minHeight: 78,
                       borderRadius: 2.5,
                       border: `1px solid ${rolesNeeded.includes(option) ? alpha(HERO_GRADIENT_START, 0.34) : LIGHT_BORDER}`,
                       bgcolor: rolesNeeded.includes(option) ? alpha(HERO_GRADIENT_START, 0.08) : "#FBFCFE",
@@ -875,11 +1060,8 @@ export default function PharmacyPage({
                       onChange={() => toggleArrayValue(rolesNeeded, option, setRolesNeeded)}
                       sx={{ p: 0.5 }}
                     />
-                    <Box>
+                    <Box sx={{ flex: 1, display: "flex", justifyContent: "left" }}>
                       <Typography fontWeight={700}>{prettifyOptionLabel(option)}</Typography>
-                      <Typography variant="body2" sx={{ color: "#64748B" }}>
-                        Include in staffing requests
-                      </Typography>
                     </Box>
                   </Box>
                 ))}
@@ -892,34 +1074,46 @@ export default function PharmacyPage({
       {tabIndex === 4 && (
         <Box sx={{ p: 2 }}>
           {hoursFields.map(({ label, start, setStart, end, setEnd }) => (
-            <Box
-              key={label}
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "150px 1fr 1fr" },
-                gap: 2,
-                alignItems: "center",
-                mb: 2,
-              }}
-            >
-              <Typography>{label}</Typography>
-              <TextField
-                label="Start"
-                type="time"
-                fullWidth
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                label="End"
-                type="time"
-                fullWidth
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Box>
+            <React.Fragment key={label}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "150px 1fr 1fr" },
+                  gap: 2,
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
+                <Typography>{label}</Typography>
+                <TextField
+                  label="Start"
+                  type="time"
+                  fullWidth
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  label="End"
+                  type="time"
+                  fullWidth
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+              {label === "Monday" && (
+                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2, mt: -1 }}>
+                  <Button
+                    size="small"
+                    onClick={handleApplyToWeekdays}
+                    disabled={!mondayStart || !mondayEnd}
+                  >
+                    Apply to all weekdays
+                  </Button>
+                </Stack>
+              )}
+            </React.Fragment>
           ))}
         </Box>
       )}
@@ -1454,6 +1648,8 @@ export default function PharmacyPage({
     setSopsFile(null);
     setInductionGuidesFile(null);
     setSumpDocsFile(null);
+    applyAbnMeta(null);
+    setCheckingABN(false);
     setTabIndex(0);
     setError("");
   };
@@ -1472,6 +1668,7 @@ export default function PharmacyPage({
       setLongitude(pharmacy.longitude !== null && pharmacy.longitude !== undefined ? Number(pharmacy.longitude) : null);
       setState(pharmacy.state || "");
       setAbn(pharmacy.abn || "");
+      applyAbnMeta(pharmacy);
       setExistingApprovalCert(pharmacy.methadone_s8_protocols || null);
       setExistingSops(pharmacy.sops || null);
       setExistingInductionGuides(pharmacy.induction_guides || null);
@@ -1516,6 +1713,7 @@ export default function PharmacyPage({
       setLongitude(null);
       setState("");
       setAbn("");
+      applyAbnMeta(null);
       setExistingApprovalCert(null);
       setExistingSops(null);
       setExistingInductionGuides(null);
@@ -1597,6 +1795,89 @@ export default function PharmacyPage({
     if (input) input.value = "";
   };
 
+  const updatePharmacyAbnState = (saved: Pharmacy) => {
+    setEditing(saved);
+    setAbn(saved.abn || "");
+    applyAbnMeta(saved);
+    setPharmacies((prev) => {
+      const exists = prev.some((item) => item.id === saved.id);
+      const next = exists
+        ? prev.map((item) => (item.id === saved.id ? saved : item))
+        : [...prev, saved];
+      return scopePharmacies(next);
+    });
+    if (activePharmacyId === saved.id) {
+      setActivePharmacyId(saved.id);
+    }
+  };
+
+  const checkABN = async () => {
+    if (!name.trim() || !streetAddress.trim() || !suburb.trim() || !postcode.trim()) {
+      setError("Enter the pharmacy basic details first so the ABN check can run during onboarding.");
+      setTabIndex(0);
+      return;
+    }
+    if (abnDigits.length !== 11) {
+      setError("ABN must be 11 digits.");
+      setTabIndex(1);
+      return;
+    }
+    setCheckingABN(true);
+    setError("");
+    try {
+      const res = await lookupPharmacyAbn({ abn: abnDigits });
+      setAbnConfirmedLocal(false);
+      setAbn(res?.abn || abnDigits);
+      applyAbnMeta(res);
+      showSnackbar("ABN details fetched.", "success");
+    } catch (err: any) {
+      setError(err?.response?.data?.abn?.[0] || err?.response?.data?.detail || err?.message || "Failed to check ABN.");
+    } finally {
+      setCheckingABN(false);
+    }
+  };
+
+  const confirmABN = async () => {
+    if (!abnEntityName) {
+      setError("Run the ABN check first, then confirm the ABN details.");
+      return;
+    }
+    if (!editing) {
+      setAbnConfirmedLocal(true);
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    try {
+      const res = await updatePharmacy(editing.id, {
+        abn: abnDigits,
+        submitted_for_verification: true,
+        abn_entity_confirmed: true,
+      });
+      const saved = normalizePharmacy(res);
+      updatePharmacyAbnState(saved);
+      showSnackbar("ABN confirmed.", "success");
+    } catch (err: any) {
+      setError(err?.response?.data?.abn?.[0] || err?.response?.data?.detail || err?.message || "Failed to confirm ABN.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleApplyToWeekdays = () => {
+    if (mondayStart && mondayEnd) {
+      setTuesdayStart(mondayStart);
+      setTuesdayEnd(mondayEnd);
+      setWednesdayStart(mondayStart);
+      setWednesdayEnd(mondayEnd);
+      setThursdayStart(mondayStart);
+      setThursdayEnd(mondayEnd);
+      setFridayStart(mondayStart);
+      setFridayEnd(mondayEnd);
+      showSnackbar("Monday hours applied to all weekdays.", "success");
+    }
+  };
+
   const handlePlaceChanged = () => {
     if (!autocompleteRef.current) return;
     const place = autocompleteRef.current.getPlace();
@@ -1659,21 +1940,7 @@ export default function PharmacyPage({
       defaultRateType === "PHARMACIST_PROVIDED" ||
       Boolean(rateWeekday && rateSaturday && rateSunday && ratePublicHoliday));
 
-  const persistPharmacy = async ({ redirectAfterSave = false }: { redirectAfterSave?: boolean } = {}) => {
-    if (abnDigits.length !== 11) {
-      setError("ABN must be 11 digits.");
-      return false;
-    }
-
-    if (defaultRateType && defaultRateType !== "PHARMACIST_PROVIDED") {
-      if (!rateWeekday || !rateSaturday || !rateSunday || !ratePublicHoliday) {
-        setError(
-          "Please fill in base rates (Weekday, Saturday, Sunday, Public Holiday) or select 'Pharmacist Provided'."
-        );
-        return false;
-      }
-    }
-
+  const buildPharmacyFormData = ({ includeFiles = true, submittedForVerification = false }: { includeFiles?: boolean; submittedForVerification?: boolean } = {}) => {
     const fd = new FormData();
     fd.append("name", name);
     fd.append("email", email.trim());
@@ -1689,10 +1956,10 @@ export default function PharmacyPage({
     }
     fd.append("state", state);
     fd.append("abn", abnDigits);
-    if (approvalCertFile) fd.append("methadone_s8_protocols", approvalCertFile);
-    if (sopsFile) fd.append("sops", sopsFile);
-    if (inductionGuidesFile) fd.append("induction_guides", inductionGuidesFile);
-    if (sumpDocsFile) fd.append("qld_sump_docs", sumpDocsFile);
+    if (includeFiles && approvalCertFile) fd.append("methadone_s8_protocols", approvalCertFile);
+    if (includeFiles && sopsFile) fd.append("sops", sopsFile);
+    if (includeFiles && inductionGuidesFile) fd.append("induction_guides", inductionGuidesFile);
+    if (includeFiles && sumpDocsFile) fd.append("qld_sump_docs", sumpDocsFile);
     fd.append("employment_types", JSON.stringify(employmentTypes));
     fd.append("roles_needed", JSON.stringify(rolesNeeded));
     fd.append("monday_start", mondayStart);
@@ -1722,6 +1989,13 @@ export default function PharmacyPage({
     if (rateLateNight) fd.append("rate_late_night", rateLateNight);
     fd.append("about", about);
     fd.append("auto_publish_worker_requests", String(autoPublishWorkerRequests));
+    if (submittedForVerification) {
+      fd.append("submitted_for_verification", "true");
+    }
+    if (abnConfirmedLocal) {
+      fd.append("abn_entity_confirmed", "true");
+      fd.append("submitted_for_verification", "true");
+    }
 
     const orgMem = Array.isArray(user?.memberships)
       ? user.memberships.find(
@@ -1732,6 +2006,26 @@ export default function PharmacyPage({
     if (orgMem?.organization_id) {
       fd.append("organization", String(orgMem.organization_id));
     }
+
+    return fd;
+  };
+
+  const persistPharmacy = async ({ redirectAfterSave = false }: { redirectAfterSave?: boolean } = {}) => {
+    if (abnDigits.length !== 11) {
+      setError("ABN must be 11 digits.");
+      return false;
+    }
+
+    if (defaultRateType && defaultRateType !== "PHARMACIST_PROVIDED") {
+      if (!rateWeekday || !rateSaturday || !rateSunday || !ratePublicHoliday) {
+        setError(
+          "Please fill in base rates (Weekday, Saturday, Sunday, Public Holiday) or select 'Pharmacist Provided'."
+        );
+        return false;
+      }
+    }
+
+    const fd = buildPharmacyFormData();
 
     try {
       setIsSaving(true);
@@ -2079,7 +2373,7 @@ export default function PharmacyPage({
         </Box>
       )}
 
-      {view === "list" && !isOrganizationUser && !standalone && (
+      {view === "list" && !isOrganizationUser && !standalone && claimedPharmacyCount > 0 && (
         <Box
           sx={{
             ...pharmacyPageFrameSx,
@@ -2475,30 +2769,35 @@ export default function PharmacyPage({
               {renderPharmacyFormSections()}
             </Box>
             <Stack direction="row" justifyContent="space-between" sx={{ px: { xs: 2, md: 4 }, pb: { xs: 2.5, md: 3.5 } }}>
-              <Button
-                variant="outlined"
-                onClick={tabIndex > 0 ? handlePreviousTab : handleContinueLater}
-                sx={{ borderColor: LIGHT_BORDER, color: "#111827" }}
-                disabled={isSaving}
-              >
-                {tabIndex > 0 ? "Back" : "Save & Continue Later"}
-              </Button>
-              <Button
-                variant="contained"
-                onClick={tabIndex === lastTabIndex ? handleSave : handleNextTab}
-                disabled={isSaving}
-                sx={{
-                  bgcolor: "#7C8CF8",
-                  color: "#FFFFFF",
-                  px: 3,
-                  boxShadow: "none",
-                  "&:hover": { bgcolor: "#6978F5", boxShadow: "none" },
-                }}
-              >
-                {tabIndex === lastTabIndex
-                  ? isSaving ? "Saving..." : editing ? "Save Changes" : "Create Pharmacy"
-                  : "Next"}
-              </Button>
+              {editing ? (
+                <>
+                  <Button variant="outlined" onClick={handleSave} disabled={isSaving} sx={{ borderColor: LIGHT_BORDER, color: "#111827" }}>
+                    {isSaving ? "Saving..." : "Save Changes"}
+                  </Button>
+                  <Stack direction="row" spacing={1.5}>
+                    <Button variant="outlined" onClick={handlePreviousTab} disabled={isSaving || tabIndex === 0} sx={{ borderColor: LIGHT_BORDER, color: "#111827" }}>
+                      Back
+                    </Button>
+                    <Button variant="contained" onClick={handleNextTab} disabled={isSaving || tabIndex === lastTabIndex} sx={{ bgcolor: "#7C8CF8", color: "#FFFFFF", px: 3, boxShadow: "none", "&:hover": { bgcolor: "#6978F5", boxShadow: "none" } }}>
+                      Next
+                    </Button>
+                  </Stack>
+                </>
+              ) : (
+                <>
+                  <Button variant="outlined" onClick={tabIndex > 0 ? handlePreviousTab : handleContinueLater} sx={{ borderColor: LIGHT_BORDER, color: "#111827" }} disabled={isSaving}>
+                    {tabIndex > 0 ? "Back" : "Save & Continue Later"}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={tabIndex === lastTabIndex ? handleSave : handleNextTab}
+                    disabled={isSaving}
+                    sx={{ bgcolor: "#7C8CF8", color: "#FFFFFF", px: 3, boxShadow: "none", "&:hover": { bgcolor: "#6978F5", boxShadow: "none" } }}
+                  >
+                    {tabIndex === lastTabIndex ? (isSaving ? "Saving..." : "Create Pharmacy") : "Next"}
+                  </Button>
+                </>
+              )}
             </Stack>
           </Paper>
         </Box>
@@ -2716,24 +3015,30 @@ export default function PharmacyPage({
           {renderPharmacyFormSections()}
         </DialogContent>
         <DialogActions sx={{ px: { xs: 2, md: 3 }, pb: { xs: 2, md: 2.5 } }}>
-          <Button onClick={tabIndex > 0 ? handlePreviousTab : closeDialog}>
-            {tabIndex > 0 ? "Back" : "Cancel"}
-          </Button>
-          <Button
-            variant="contained"
-            onClick={tabIndex === lastTabIndex ? handleSave : handleNextTab}
-            disabled={isSaving}
-            sx={{
-              bgcolor: "#7C8CF8",
-              color: "#FFFFFF",
-              boxShadow: "none",
-              "&:hover": { bgcolor: "#6978F5", boxShadow: "none" },
-            }}
-          >
-            {tabIndex === lastTabIndex
-              ? isSaving ? "Saving..." : editing ? "Save Changes" : "Create Pharmacy"
-              : "Next"}
-          </Button>
+          {editing ? (
+            <Stack direction="row" justifyContent="space-between" sx={{ width: '100%' }}>
+              <Button variant="outlined" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+              <Stack direction="row" spacing={1.5}>
+                <Button onClick={handlePreviousTab} disabled={isSaving || tabIndex === 0}>
+                  Back
+                </Button>
+                <Button variant="contained" onClick={handleNextTab} disabled={isSaving || tabIndex === lastTabIndex} sx={{ bgcolor: "#7C8CF8", color: "#FFFFFF", boxShadow: "none", "&:hover": { bgcolor: "#6978F5", boxShadow: "none" } }}>
+                  Next
+                </Button>
+              </Stack>
+            </Stack>
+          ) : (
+            <Stack direction="row" justifyContent="space-between" sx={{ width: '100%' }}>
+              <Button onClick={tabIndex > 0 ? handlePreviousTab : closeDialog} disabled={isSaving}>
+                {tabIndex > 0 ? "Back" : "Cancel"}
+              </Button>
+              <Button variant="contained" onClick={tabIndex === lastTabIndex ? handleSave : handleNextTab} disabled={isSaving} sx={{ bgcolor: "#7C8CF8", color: "#FFFFFF", boxShadow: "none", "&:hover": { bgcolor: "#6978F5", boxShadow: "none" } }}>
+                {tabIndex === lastTabIndex ? (isSaving ? "Saving..." : "Create Pharmacy") : "Next"}
+              </Button>
+            </Stack>
+          )}
         </DialogActions>
       </Dialog>
       )}

@@ -3110,6 +3110,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     claim_status = serializers.SerializerMethodField()
     claim_request_id = serializers.SerializerMethodField()
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    submitted_for_verification = serializers.BooleanField(write_only=True, required=False)
     file_fields = [
         'methadone_s8_protocols',
         'qld_sump_docs',
@@ -3142,6 +3143,15 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "organization",
             "verified",
             "abn",
+            "abn_entity_name",
+            "abn_entity_type",
+            "abn_status",
+            "abn_gst_registered",
+            "abn_gst_from",
+            "abn_gst_to",
+            "abn_last_checked",
+            "abn_entity_confirmed",
+            "abn_verification_note",
             "timezone",
             # "asic_number",
             # your file fields:
@@ -3186,9 +3196,20 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             'claimed',
             'claim_status',
             'claim_request_id',
+            'submitted_for_verification',
         ]
 
         read_only_fields = ["owner", "organization", "verified"]
+        extra_kwargs = {
+            "abn_entity_name": {"read_only": True},
+            "abn_entity_type": {"read_only": True},
+            "abn_status": {"read_only": True},
+            "abn_gst_registered": {"read_only": True},
+            "abn_gst_from": {"read_only": True},
+            "abn_gst_to": {"read_only": True},
+            "abn_last_checked": {"read_only": True},
+            "abn_verification_note": {"read_only": True},
+        }
 
     _weekday_day_names = ("monday", "tuesday", "wednesday", "thursday", "friday")
 
@@ -3214,6 +3235,17 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if self.instance and "abn" in attrs:
+            incoming_abn = attrs.get("abn")
+            current_abn = getattr(self.instance, "abn", None)
+            is_locked = bool(
+                getattr(self.instance, "abn_verified", False)
+                and getattr(self.instance, "abn_entity_confirmed", False)
+            )
+            if is_locked and incoming_abn != current_abn:
+                raise serializers.ValidationError(
+                    {"abn": ["This ABN is locked after verification and confirmation."]}
+                )
         return self._apply_weekday_hours_compat(attrs)
 
     def to_representation(self, instance):
@@ -3291,6 +3323,112 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         if upper not in allowed:
             raise serializers.ValidationError("Invalid Australian state/territory.")
         return upper
+
+    def _owner_identity_for_abn(self, instance: Pharmacy):
+        owner_user = getattr(getattr(instance, "owner", None), "user", None)
+        return (
+            getattr(owner_user, "first_name", "") or "",
+            getattr(owner_user, "last_name", "") or "",
+            getattr(owner_user, "email", "") or "",
+        )
+
+    def _apply_abn_side_effects(
+        self,
+        instance: Pharmacy,
+        *,
+        previous_abn: str | None,
+        submitted_for_verification: bool,
+        confirmation_provided: bool,
+        confirmation_value: bool,
+    ) -> None:
+        update_fields: list[str] = []
+        current_abn = getattr(instance, "abn", None)
+        abn_changed = previous_abn != current_abn
+
+        if abn_changed:
+            instance.abn_verified = False
+            instance.abn_entity_confirmed = False
+            instance.abn_entity_name = None
+            instance.abn_entity_type = None
+            instance.abn_status = None
+            instance.abn_gst_registered = None
+            instance.abn_gst_from = None
+            instance.abn_gst_to = None
+            instance.abn_last_checked = None
+            instance.abn_verification_note = ""
+            update_fields.extend([
+                "abn_verified",
+                "abn_entity_confirmed",
+                "abn_entity_name",
+                "abn_entity_type",
+                "abn_status",
+                "abn_gst_registered",
+                "abn_gst_from",
+                "abn_gst_to",
+                "abn_last_checked",
+                "abn_verification_note",
+            ])
+
+        if confirmation_provided:
+            instance.abn_entity_confirmed = confirmation_value
+            update_fields.append("abn_entity_confirmed")
+            if confirmation_value and instance.abn_entity_name:
+                instance.abn_verified = True
+                if not instance.abn_verification_note:
+                    instance.abn_verification_note = "User confirmed ABN entity details."
+                update_fields.extend(["abn_verified", "abn_verification_note"])
+            else:
+                instance.abn_verified = False
+                update_fields.append("abn_verified")
+
+        if update_fields:
+            instance.save(update_fields=list(dict.fromkeys(update_fields)))
+
+        if submitted_for_verification and instance.abn:
+            first_name, last_name, email = self._owner_identity_for_abn(instance)
+
+            def enqueue_abn_check():
+                async_task(
+                    "client_profile.tasks.verify_abn_task",
+                    instance._meta.model_name,
+                    instance.pk,
+                    instance.abn,
+                    first_name,
+                    last_name,
+                    email,
+                    note_field="abn_verification_note",
+                )
+
+            transaction.on_commit(enqueue_abn_check)
+
+    def create(self, validated_data):
+        submitted_for_verification = bool(validated_data.pop("submitted_for_verification", False))
+        confirmation_provided = "abn_entity_confirmed" in validated_data
+        confirmation_value = bool(validated_data.pop("abn_entity_confirmed", False))
+        instance = super().create(validated_data)
+        self._apply_abn_side_effects(
+            instance,
+            previous_abn=None,
+            submitted_for_verification=submitted_for_verification,
+            confirmation_provided=confirmation_provided,
+            confirmation_value=confirmation_value,
+        )
+        return instance
+
+    def update(self, instance, validated_data):
+        submitted_for_verification = bool(validated_data.pop("submitted_for_verification", False))
+        confirmation_provided = "abn_entity_confirmed" in validated_data
+        confirmation_value = bool(validated_data.pop("abn_entity_confirmed", False))
+        previous_abn = instance.abn
+        instance = super().update(instance, validated_data)
+        self._apply_abn_side_effects(
+            instance,
+            previous_abn=previous_abn,
+            submitted_for_verification=submitted_for_verification,
+            confirmation_provided=confirmation_provided,
+            confirmation_value=confirmation_value,
+        )
+        return instance
 
 
 class PharmacyClaimSerializer(serializers.ModelSerializer):

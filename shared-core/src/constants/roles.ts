@@ -35,6 +35,13 @@ export type PharmacyDTO = {
     suburb: string;
     state: string;
     postcode: string;
+    email?: string | null;
+    claimed?: boolean;
+    claim_status?: string | null;
+    claimStatus?: string | null;
+    organization?: number | { id: number; name?: string | null } | null;
+    organization_id?: number | null;
+    organizationId?: number | null;
 };
 
 export type MembershipDTO = {

@@ -65,6 +65,7 @@ export default function OwnerDashboard() {
   const fetchData = useCallback(async () => {
     if (normalizedRole !== 'OWNER' || !access) return;
     setRefreshing(true);
+    setErrorMessage(null);
     try {
       const [dashboardPayload, pillRes] = await Promise.all([
         scope.fetchDashboard(),
@@ -114,21 +115,24 @@ export default function OwnerDashboard() {
   }, [fetchData, normalizedRole, access, authLoading]);
 
   const quickActions = useMemo(
-    () => [
-      { title: 'Post Shift', description: 'Create coverage', icon: 'plus-circle-outline', route: '/owner/post-shift' },
-      { title: 'Pharmacies', description: 'Manage stores', icon: 'store-outline', route: '/owner/pharmacies' },
-      { title: 'Roster', description: 'Shift centre', icon: 'calendar-month-outline', route: '/owner/shifts' },
-      { title: 'Calendar', description: 'Schedule view', icon: 'calendar-outline', route: '/owner/calendar' },
-      { title: 'Staff', description: 'Team members', icon: 'account-group-outline', route: '/owner/staff' },
-      { title: 'Locums', description: 'Casual workers', icon: 'account-heart-outline', route: '/owner/locums' },
-      { title: 'Talent Board', description: 'Find talent', icon: 'account-search-outline', route: '/owner/talent-board' },
-      { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/owner/hub' },
-      { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/owner/chat' },
-      { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/owner/shifts' },
-      { title: 'Subscription', description: 'Billing seats', icon: 'credit-card-outline', route: '/owner/subscription-seats' },
-      { title: 'Profile', description: 'Account details', icon: 'account-circle-outline', route: '/owner/profile' },
-    ],
-    []
+    () => {
+      const pharmacyCount = scope.pharmacies.length;
+      return [
+        { title: 'Post Shift', description: 'Create coverage', icon: 'plus-circle-outline', route: '/owner/post-shift' },
+        { title: pharmacyCount > 1 ? 'Manage Pharmacies' : 'Manage Pharmacy', description: pharmacyCount > 1 ? 'Manage stores' : 'Manage staff', icon: 'store-outline', route: '/owner/pharmacies' },
+        { title: 'Roster', description: 'Shift centre', icon: 'calendar-month-outline', route: '/owner/shifts' },
+        { title: 'Calendar', description: 'Schedule view', icon: 'calendar-outline', route: '/owner/calendar' },
+        { title: 'Staff', description: 'Team members', icon: 'account-group-outline', route: '/owner/staff' },
+        { title: 'Locums', description: 'Casual workers', icon: 'account-heart-outline', route: '/owner/locums' },
+        { title: 'Talent Board', description: 'Find talent', icon: 'account-search-outline', route: '/owner/talent-board' },
+        { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/owner/hub' },
+        { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/owner/chat' },
+        { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/owner/shifts' },
+        { title: 'Subscription', description: 'Billing seats', icon: 'credit-card-outline', route: '/owner/subscription-seats' },
+        { title: 'Profile', description: 'Account details', icon: 'account-circle-outline', route: '/owner/profile' },
+      ];
+    },
+    [scope.pharmacies]
   );
 
   const upcomingShifts: ShiftSummary[] = useMemo(
@@ -544,4 +548,3 @@ const styles = StyleSheet.create({
   bottomMenuTitle: { color: '#111827', fontWeight: '600' },
   bottomMenuDesc: { color: '#6B7280', fontSize: 12, marginTop: 2 },
 });
-

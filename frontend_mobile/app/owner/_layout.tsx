@@ -87,6 +87,25 @@ export default function OwnerLayout() {
   const pathname = usePathname();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Do not update the photo based on an intermediate or loading user object.
+    // This prevents the avatar from flickering during navigation.
+    if (isLoading) {
+      return;
+    }
+    if (!user) {
+      setPhotoUrl(null);
+      return;
+    }
+    const newPhoto =
+      (user as any)?.profile_photo ||
+      (user as any)?.profile_photo_url ||
+      (user as any)?.profilePhoto ||
+      null;
+    setPhotoUrl(newPhoto);
+  }, [user, isLoading]);
 
   const requestNavigation = useCallback(
     (action: () => void) => {
@@ -291,11 +310,6 @@ export default function OwnerLayout() {
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
-            const photo =
-              (user as any)?.profile_photo ||
-              (user as any)?.profile_photo_url ||
-              (user as any)?.profilePhoto ||
-              null;
             return (
               <View style={styles.headerRight}>
                 {showBack ? (
@@ -321,8 +335,8 @@ export default function OwnerLayout() {
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => pushWithGuard('/owner/profile')}>
-                  {photo ? (
-                    <Avatar.Image size={32} source={{ uri: photo as string }} />
+                  {photoUrl ? (
+                    <Avatar.Image size={32} source={{ uri: photoUrl }} />
                   ) : (
                     <Avatar.Text
                       size={32}

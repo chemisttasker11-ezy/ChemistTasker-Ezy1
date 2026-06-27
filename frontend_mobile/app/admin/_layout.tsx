@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
@@ -73,8 +73,28 @@ function AdminSidebar({
 
 export default function AdminLayout() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Do not update the photo based on an intermediate or loading user object.
+    // This prevents the avatar from flickering during navigation.
+    if (isLoading) {
+      return;
+    }
+    if (!user) {
+      setPhotoUrl(null);
+      return;
+    }
+    const newPhoto =
+      (user as any)?.profile_photo ||
+      (user as any)?.profile_photo_url ||
+      (user as any)?.profilePhoto ||
+      null;
+    setPhotoUrl(newPhoto);
+  }, [user, isLoading]);
+
   const assignment = useMemo(() => {
     const assignments = Array.isArray((user as any)?.admin_assignments)
       ? (user as any).admin_assignments
@@ -83,11 +103,6 @@ export default function AdminLayout() {
   }, [user]);
   const pharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy ?? null;
   const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
-  const photo =
-    (user as any)?.profile_photo ||
-    (user as any)?.profile_photo_url ||
-    (user as any)?.profilePhoto ||
-    null;
   const profileRoute = profileRouteForRole(user?.role);
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
@@ -123,8 +138,8 @@ export default function AdminLayout() {
                 onPress={() => router.push('/admin/notifications' as any)}
               />
               <TouchableOpacity onPress={() => router.push(profileRoute as any)}>
-                {photo ? (
-                  <Avatar.Image size={32} source={{ uri: photo as string }} />
+                {photoUrl ? (
+                  <Avatar.Image size={32} source={{ uri: photoUrl }} />
                 ) : (
                   <Avatar.Text
                     size={32}

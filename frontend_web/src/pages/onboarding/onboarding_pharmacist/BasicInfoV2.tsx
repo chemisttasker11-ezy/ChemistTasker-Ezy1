@@ -69,7 +69,8 @@ export default function BasicInfoV2() {
   const [snack, setSnack] = React.useState<string>('');
   const [error, setError] = React.useState<string>('');
   const [addressDisplay, setAddressDisplay] = React.useState<string>('');
-    const canSubmit = Boolean(data.ahpra_number);
+  const isAhpraVerified = data.ahpra_verified === true;
+  const canSubmit = Boolean(data.ahpra_number) && !isAhpraVerified;
 
 
 
@@ -190,7 +191,7 @@ export default function BasicInfoV2() {
     try {
       const fd = new FormData();
       fd.append('tab', 'basic');
-      if (submitForVerification) fd.append('submitted_for_verification', 'true');
+      if (submitForVerification && !isAhpraVerified) fd.append('submitted_for_verification', 'true');
 
       // user names
       if (data.username != null)   fd.append('username',   String(data.username));
@@ -487,8 +488,9 @@ export default function BasicInfoV2() {
           label="AHPRA Number"
           value={data.ahpra_number || ''}
           onChange={e => setField('ahpra_number', e.target.value)}
+          disabled={isAhpraVerified}
           InputProps={{ startAdornment: <InputAdornment position="start">PHA</InputAdornment> }}
-          helperText={AHPRA_CONSENT_TEXT}
+          helperText={isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}
           sx={{ flex: '1 1 320px', minWidth: 240, maxWidth: 420 }}
         />
         <TextField

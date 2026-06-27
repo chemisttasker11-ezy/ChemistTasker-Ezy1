@@ -88,6 +88,25 @@ export default function OtherStaffTabs() {
   const pathname = usePathname();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Do not update the photo based on an intermediate or loading user object.
+    // This prevents the avatar from flickering during navigation.
+    if (isLoading) {
+      return;
+    }
+    if (!user) {
+      setPhotoUrl(null);
+      return;
+    }
+    const newPhoto =
+      (user as any)?.profile_photo ||
+      (user as any)?.profile_photo_url ||
+      (user as any)?.profilePhoto ||
+      null;
+    setPhotoUrl(newPhoto);
+  }, [user, isLoading]);
 
   const loadUnread = useCallback(async () => {
     try {
@@ -248,11 +267,6 @@ export default function OtherStaffTabs() {
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
-            const photo =
-              (user as any)?.profile_photo ||
-              (user as any)?.profile_photo_url ||
-              (user as any)?.profilePhoto ||
-              null;
             return showBack ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <IconButton
@@ -276,8 +290,8 @@ export default function OtherStaffTabs() {
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => router.push('/otherstaff/profile' as any)}>
-                  {photo ? (
-                    <Avatar.Image size={32} source={{ uri: photo as string }} />
+                  {photoUrl ? (
+                    <Avatar.Image size={32} source={{ uri: photoUrl }} />
                   ) : (
                     <Avatar.Text
                       size={32}
@@ -297,8 +311,8 @@ export default function OtherStaffTabs() {
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => router.push('/otherstaff/profile' as any)}>
-                  {photo ? (
-                    <Avatar.Image size={32} source={{ uri: photo as string }} />
+                  {photoUrl ? (
+                    <Avatar.Image size={32} source={{ uri: photoUrl }} />
                   ) : (
                     <Avatar.Text
                       size={32}

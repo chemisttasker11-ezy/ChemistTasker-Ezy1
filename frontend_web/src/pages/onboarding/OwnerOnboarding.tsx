@@ -10,11 +10,13 @@ import {
   Button,
   Alert,
   Snackbar,
-  Switch,
-  FormControlLabel,
   InputAdornment,
   Chip,
   Stack,
+  ToggleButtonGroup,
+  ToggleButton,
+  FormControl,
+  FormLabel,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -64,7 +66,7 @@ const LIGHT_PAGE_BG = '#F4F7FB';
 const LIGHT_SURFACE = '#FFFFFF';
 const LIGHT_BORDER = '#D9E2F2';
 const HERO_GRADIENT_START = '#143EEA';
-const HERO_GRADIENT_END = '#D20DAE';
+// const HERO_GRADIENT_END = '#D20DAE';
 const HERO_GRADIENT = 'linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)';
 
 type OwnerOnboardingProps = {
@@ -79,6 +81,7 @@ function OwnerOnboardingContent({
   const roleKey = 'owner';
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
+  const [isUpdate, setIsUpdate] = useState(false);
   const isMobileVerified = Boolean(user?.is_mobile_verified);
 
   const [data, setData] = useState<FormData>({
@@ -122,6 +125,15 @@ function OwnerOnboardingContent({
   }, [data.first_name, data.last_name, data.username]);
   const roleLabel = ROLE_OPTIONS.find((option) => option.value === data.role)?.label ?? 'Owner';
   const showAhpra = data.role === 'PHARMACIST' || Boolean(data.ahpra_number);
+  const isAhpraVerified = data.ahpra_verified === true;
+  const sectionCardSx = {
+    p: { xs: 2, md: 3 },
+    borderRadius: 4,
+    border: `1px solid ${LIGHT_BORDER}`,
+    boxShadow: '0 18px 42px rgba(99, 102, 241, 0.08)',
+    bgcolor: LIGHT_SURFACE,
+    color: '#111827',
+  } as const;
   const inputSx = {
     '& .MuiOutlinedInput-root': {
       bgcolor: LIGHT_SURFACE,
@@ -185,6 +197,7 @@ function OwnerOnboardingContent({
           ahpra_verified: typeof d.ahpra_verified === 'boolean' ? d.ahpra_verified : null,
           ahpra_verification_note: d.ahpra_verification_note || null,
         };
+        setIsUpdate(true);
         setData(nextData);
         setLockedNames({
           first: Boolean(d.first_name),
@@ -237,13 +250,18 @@ function OwnerOnboardingContent({
     }));
   };
 
-  const handleSwitch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setData(prev => ({
-      ...prev,
-      [name]: checked,
-      ...(name === 'chain_pharmacy' && !checked ? { number_of_pharmacies: 1 } : {}),
-    }));
+  const handleChainPharmacyToggle = (
+    _event: React.MouseEvent<HTMLElement>,
+    newValue: 'yes' | 'no' | null,
+  ) => {
+    if (newValue !== null) {
+      const isChain = newValue === 'yes';
+      setData(prev => ({
+        ...prev,
+        chain_pharmacy: isChain,
+        ...(!isChain ? { number_of_pharmacies: 1 } : {}),
+      }));
+    }
   };
 
 const handleSubmit = async (e: React.FormEvent) => {
@@ -260,7 +278,9 @@ const handleSubmit = async (e: React.FormEvent) => {
     Object.entries(normalizedData).forEach(([k, v]) => {
       payload.append(k, String(v));
     });
-    payload.append('submitted_for_verification', 'true');
+    if (!isAhpraVerified) {
+      payload.append('submitted_for_verification', 'true');
+    }
     if (profilePhotoFile) {
       payload.append('profile_photo', profilePhotoFile);
     } else if (profilePhotoCleared) {
@@ -297,7 +317,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
-    navigate(onSuccessPath || '/dashboard/owner');
+    navigate(onSuccessPath || '/dashboard/owner/overview');
   };
 
   const handleCopyFriendReferral = async () => {
@@ -464,27 +484,18 @@ const handleSubmit = async (e: React.FormEvent) => {
         </Stack>
       </Box>
 
-      <Paper
-        sx={{
-          p: { xs: 2, md: 3 },
-          borderRadius: 3,
-          border: `1px solid ${LIGHT_BORDER}`,
-          boxShadow: '0 18px 42px rgba(99, 102, 241, 0.08)',
-          bgcolor: LIGHT_SURFACE,
-          color: '#111827',
-        }}
-        elevation={0}
-      >
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#111827' }}>
-            {standalone ? 'Complete Owner Setup' : 'Complete Onboarding'}
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#64748B' }}>
-            Finish your owner profile before adding your pharmacy workspace.
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'grid', gap: 3 }}>
+        <Paper sx={sectionCardSx} elevation={0}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#111827' }}>
+              Profile
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748B' }}>
+              Complete your owner profile details before moving to referral and subscription actions.
+            </Typography>
+          </Box>
 
-        <Box component="form" onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
             margin="normal"
@@ -569,32 +580,30 @@ const handleSubmit = async (e: React.FormEvent) => {
             ))}
           </TextField>
 
-          <FormControlLabel
-            sx={{
-              mt: 0.5,
-              color: '#111827',
-              '& .MuiFormControlLabel-label': {
-                color: '#111827',
-                fontWeight: 600,
-              },
-            }}
-            control={
-              <Switch
-                checked={data.chain_pharmacy}
-                onChange={handleSwitch}
-                name="chain_pharmacy"
-                sx={{
-                  '& .MuiSwitch-switchBase.Mui-checked': {
-                    color: HERO_GRADIENT_START,
-                  },
-                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                    backgroundColor: HERO_GRADIENT_START,
-                  },
-                }}
-              />
-            }
-            label="Do you have more than one pharmacy?"
-          />
+          <FormControl component="fieldset" fullWidth sx={{ mt: 2, mb: 1 }}>
+            <FormLabel component="legend" sx={{ ...inputSx['& .MuiInputLabel-root'], mb: 1, fontWeight: 600, color: '#111827' }}>
+              Do you have more than one pharmacy?
+            </FormLabel>
+            <ToggleButtonGroup
+              value={data.chain_pharmacy ? 'yes' : 'no'}
+              exclusive
+              onChange={handleChainPharmacyToggle}
+              aria-label="Do you have more than one pharmacy?"
+            >
+              <ToggleButton
+                value="yes"
+                sx={{ '&.Mui-selected, &.Mui-selected:hover': { color: 'white', backgroundColor: 'success.main' }, fontWeight: 700 }}
+              >
+                Yes
+              </ToggleButton>
+              <ToggleButton
+                value="no"
+                sx={{ '&.Mui-selected, &.Mui-selected:hover': { color: 'white', backgroundColor: 'error.main' }, fontWeight: 700 }}
+              >
+                No
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </FormControl>
 
           {data.chain_pharmacy && (
             <TextField
@@ -639,8 +648,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="ahpra_number"
                 value={data.ahpra_number}
                 onChange={handleChange}
+                disabled={isAhpraVerified}
                 required={data.role === 'PHARMACIST'}
-                helperText={AHPRA_CONSENT_TEXT}
+                helperText={isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">PHA</InputAdornment>,
                 }}
@@ -684,35 +694,57 @@ const handleSubmit = async (e: React.FormEvent) => {
             </>
           )}
 
-          <Box sx={{ mt: 3, textAlign: 'right' }}>
+          <Paper
+            variant="outlined"
+            sx={{
+              mt: 4,
+              p: 3,
+              borderRadius: 3,
+              borderColor: '#CBD5E1',
+              bgcolor: '#F8FAFF',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+            }}
+          >
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={700} sx={{ color: '#111827' }}>
+                  Save profile
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748B' }}>
+                  Submit your profile details here. Referral and subscription tools are separated below.
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
             <Button
               type="submit"
               variant="contained"
               disabled={loading}
-              sx={{
-                bgcolor: '#7C8CF8',
-                color: '#FFFFFF',
-                px: 3,
-                boxShadow: 'none',
-                '&:hover': { bgcolor: '#6978F5', boxShadow: 'none' },
-              }}
+              sx={{ px: 3, minWidth: 160 }}
             >
-              {loading ? 'Saving…' : 'Submit'}
+              {loading ? 'Saving…' : isUpdate ? 'Save Changes' : 'Submit'}
             </Button>
+              </Box>
+            </Stack>
+          </Paper>
           </Box>
-        </Box>
+        </Paper>
 
         {!standalone && (
-        <Paper variant="outlined" sx={{ mt: 4, p: 3, borderRadius: 3 }}>
+        <Paper sx={sectionCardSx} elevation={0}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <PersonAddAltIcon color="primary" />
-                <Typography variant="h6" fontWeight={700}>
-                  Refer a colleague 
+                <Typography variant="h5" fontWeight={800}>
+                  Refer a colleague
                 </Typography>
               </Stack>
-              <Typography variant="body2" sx={{ color: '#64748B' }}>
+              <Typography variant="body2" sx={{ color: '#64748B', maxWidth: 720 }}>
                 Copy a referral link. When your friend registers with it, pills can be awarded to your account.
               </Typography>
             </Box>
@@ -724,16 +756,16 @@ const handleSubmit = async (e: React.FormEvent) => {
         )}
 
         {!standalone && (
-        <Paper variant="outlined" sx={{ mt: 4, p: 3, borderRadius: 3 }}>
+        <Paper sx={sectionCardSx} elevation={0}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <CreditCardIcon color="primary" />
-                <Typography variant="h6" fontWeight={700}>
+                <Typography variant="h5" fontWeight={800}>
                   Subscription and seats
                 </Typography>
               </Stack>
-              <Typography variant="body2" sx={{ color: '#64748B' }}>
+              <Typography variant="body2" sx={{ color: '#64748B', maxWidth: 720 }}>
                 {subscriptionSummary?.active
                   ? `Active subscription with ${subscriptionSummary.staffCount} total seats (${subscriptionSummary.extraSeatCount} extra).`
                   : 'No active subscription yet. Once active, you can manage extra seats here.'}
@@ -748,7 +780,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           </Stack>
         </Paper>
         )}
-      </Paper>
+      </Box>
     </Container>
     </Box>
       )}

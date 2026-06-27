@@ -593,6 +593,15 @@ class Pharmacy(models.Model):
                              )
     verified               = models.BooleanField(default=False)
     abn                    = models.CharField(max_length=20, blank=True, null=True)
+    abn_entity_name        = models.CharField(max_length=255, blank=True, null=True)
+    abn_entity_type        = models.CharField(max_length=100, blank=True, null=True)
+    abn_status             = models.CharField(max_length=50, blank=True, null=True)
+    abn_gst_registered     = models.BooleanField(null=True, blank=True)
+    abn_gst_from           = models.DateField(blank=True, null=True)
+    abn_gst_to             = models.DateField(blank=True, null=True)
+    abn_last_checked       = models.DateTimeField(blank=True, null=True)
+    abn_entity_confirmed   = models.BooleanField(default=False)
+    abn_verification_note  = models.TextField(blank=True, null=True)
 
     timezone               = models.CharField(
                                 max_length=50,

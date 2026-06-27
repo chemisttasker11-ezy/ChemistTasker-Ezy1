@@ -64,7 +64,8 @@ export default function PharmacistBasicInfoScreen() {
     };
   }, []);
 
-  const canSubmit = useMemo(() => Boolean(form.ahpra_number), [form.ahpra_number]);
+  const isAhpraVerified = form.ahpra_verified === true;
+  const canSubmit = useMemo(() => Boolean(form.ahpra_number) && !isAhpraVerified, [form.ahpra_number, isAhpraVerified]);
   const ahpraChip = boolChipProps(form.ahpra_verified);
   const genderLabel = GENDER_OPTIONS.find((g) => g.value === form.gender)?.label || 'Select gender';
 
@@ -97,7 +98,7 @@ export default function PharmacistBasicInfoScreen() {
     try {
       const fd = new FormData();
       fd.append('tab', 'basic');
-      if (submitForVerification) fd.append('submitted_for_verification', 'true');
+      if (submitForVerification && !isAhpraVerified) fd.append('submitted_for_verification', 'true');
       if (form.username != null) fd.append('username', String(form.username));
       if (form.first_name != null) fd.append('first_name', String(form.first_name));
       if (form.last_name != null) fd.append('last_name', String(form.last_name));
@@ -203,9 +204,10 @@ export default function PharmacistBasicInfoScreen() {
           label="AHPRA Number"
           value={form.ahpra_number || ''}
           onChangeText={(v) => setField('ahpra_number', v)}
+          editable={!isAhpraVerified}
           left={<TextInput.Affix text="PHA" />}
         />
-        <HelperText type="info">{AHPRA_CONSENT_TEXT}</HelperText>
+        <HelperText type="info">{isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}</HelperText>
         <TextInput
           mode="outlined"
           label="Years Since First Registration"

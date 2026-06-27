@@ -172,9 +172,9 @@ export default function OwnerOverviewHome({
 
   const quickActions: QuickAction[] = [
     {
-      title: "Manage Pharmacies",
-      description: "Create, edit and configure stores",
+      title: totalPharmacies > 1 ? "Manage Pharmacies" : "Manage Pharmacy",
       icon: <StoreIcon />,
+      description: totalPharmacies > 1 ? "Create, edit and configure stores" : "Manage staff",
       onClick: onOpenManage,
       tone: "blue",
     },

@@ -30,6 +30,7 @@ import MenuItem from "@mui/material/MenuItem";
 import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { fetchWsTicket } from "../utils/tokenService";
+import apiClient from "../utils/apiClient";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import SearchIcon from "@mui/icons-material/Search";
@@ -610,6 +611,7 @@ export default function TopBarActions({
   const [deleteError, setDeleteError] = React.useState("");
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
   const [deleteSnackbarOpen, setDeleteSnackbarOpen] = React.useState(false);
+  const [pharmacyCount, setPharmacyCount] = React.useState<number | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
 
   const filterOptions = React.useMemo(
@@ -737,6 +739,30 @@ export default function TopBarActions({
     };
   }, [user?.id, user?.role]);
 
+  React.useEffect(() => {
+    const roleKey = (user?.role || "").toUpperCase();
+    if (roleKey === "OWNER" || roleKey === "PHARMACY_ADMIN" || roleKey.startsWith("ORG")) {
+      apiClient
+        .get("/client-profile/pharmacies/")
+        .then((response) => {
+          let count = 0;
+          if (typeof response.data.count === "number") {
+            count = response.data.count;
+          } else if (Array.isArray(response.data.results)) {
+            count = response.data.results.length;
+          } else if (Array.isArray(response.data)) {
+            count = response.data.length;
+          }
+          setPharmacyCount(count);
+        })
+        .catch(() => {
+          setPharmacyCount(0);
+        });
+    } else {
+      setPharmacyCount(null);
+    }
+  }, [user?.id, user?.role]);
+
   const handleCloseProfileMenu = React.useCallback(() => {
     setProfileAnchor(null);
   }, []);
@@ -808,6 +834,30 @@ export default function TopBarActions({
     const roleKey = (user?.role || "DEFAULT").toUpperCase();
     let baseOptions = ROLE_SEARCH_OPTIONS[roleKey] ?? ROLE_SEARCH_OPTIONS.DEFAULT;
 
+    if (pharmacyCount !== null && pharmacyCount <= 1) {
+      if (roleKey === "OWNER" || roleKey === "PHARMACY_ADMIN") {
+        baseOptions = ownerOptions.map((opt) => {
+          if (opt.path === "/dashboard/owner/manage-pharmacies") {
+            return { ...opt, label: "Manage Pharmacy" };
+          }
+          if (opt.path === "/dashboard/owner/manage-pharmacies/my-chain") {
+            return { ...opt, label: "My Pharmacy" };
+          }
+          return opt;
+        });
+      } else if (roleKey.startsWith("ORG")) {
+        baseOptions = organizationOptions.map((opt) => {
+          if (opt.path === "/dashboard/organization/manage-pharmacies") {
+            return { ...opt, label: "Manage Pharmacy" };
+          }
+          if (opt.path === "/dashboard/organization/manage-pharmacies/my-pharmacies") {
+            return { ...opt, label: "My Pharmacy" };
+          }
+          return opt;
+        });
+      }
+    }
+
     if (
       activePersona === "admin" &&
       activeAdminAssignment?.pharmacy_id
@@ -832,7 +882,7 @@ export default function TopBarActions({
     }
 
     return baseOptions;
-  }, [user?.role, activePersona, activeAdminAssignment?.pharmacy_id]);
+  }, [user?.role, activePersona, activeAdminAssignment?.pharmacy_id, pharmacyCount]);
 
   const searchFieldSx = React.useMemo(
     () => ({

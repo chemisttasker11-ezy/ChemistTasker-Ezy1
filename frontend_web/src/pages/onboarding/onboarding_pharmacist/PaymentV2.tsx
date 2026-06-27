@@ -2,7 +2,7 @@
 import * as React from 'react';
 import {
   Box, Stack, Typography, TextField, Button, RadioGroup, FormControlLabel, Radio,
-  Switch, Chip, Divider, Snackbar, Alert, CircularProgress
+  Switch, Chip, Divider, Snackbar, Alert, CircularProgress, Skeleton
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -152,6 +152,18 @@ export default function PaymentV2() {
   };
 
   const abrBullets = () => {
+    if (checkingABN) {
+      return (
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: .75 }}>ABN details (from ABR)</Typography>
+          <Skeleton variant="text" width="72%" height={28} />
+          <Skeleton variant="text" width="56%" height={28} />
+          <Skeleton variant="text" width="64%" height={28} />
+          <Skeleton variant="rectangular" height={44} sx={{ mt: 1, borderRadius: 1 }} />
+        </Box>
+      );
+    }
+
     const hasAny =
       !!data.abn_entity_name ||
       !!data.abn_status ||

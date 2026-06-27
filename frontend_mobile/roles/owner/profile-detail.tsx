@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Avatar, Button, Chip, HelperText, Menu, Text, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Avatar, Button, Card, Chip, HelperText, IconButton, Menu, Text, TextInput } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getOnboarding, updateOnboardingForm } from '@chemisttasker/shared-core';
@@ -48,8 +48,6 @@ const GENDER_OPTIONS = [
 const LIGHT_PAGE_BG = '#F4F7FB';
 const LIGHT_SURFACE = '#FFFFFF';
 const LIGHT_BORDER = '#D9E2F2';
-const HERO_GRADIENT_START = '#6366F1';
-const HERO_GRADIENT_END = '#8B5CF6';
 
 const inputTheme = {
   colors: {
@@ -57,7 +55,7 @@ const inputTheme = {
     surface: LIGHT_SURFACE,
     onSurface: '#111827',
     onSurfaceVariant: '#64748B',
-    primary: HERO_GRADIENT_START,
+    primary: '#6366F1',
     outline: LIGHT_BORDER,
   },
 };
@@ -122,6 +120,7 @@ export default function OwnerProfileDetailScreen({
     return name || form.username || 'Owner setup';
   }, [form.first_name, form.last_name, form.username]);
   const showAhpra = form.role === 'PHARMACIST' || Boolean(form.ahpra_number);
+  const isAhpraVerified = form.ahpra_verified === true;
 
   const buildFormFromResponse = (data: any): OwnerFormData => ({
     username: data?.username || '',
@@ -206,7 +205,9 @@ export default function OwnerProfileDetailScreen({
     payload.append('chain_pharmacy', String(form.chain_pharmacy));
     payload.append('number_of_pharmacies', String(form.chain_pharmacy ? Math.max(1, form.number_of_pharmacies) : 1));
     payload.append('ahpra_number', showAhpra ? form.ahpra_number : '');
-    payload.append('submitted_for_verification', 'true');
+    if (!isAhpraVerified) {
+      payload.append('submitted_for_verification', 'true');
+    }
     if (profilePhotoAsset?.uri) {
       payload.append('profile_photo', {
         uri: profilePhotoAsset.uri,
@@ -261,44 +262,49 @@ export default function OwnerProfileDetailScreen({
       <ScrollView contentContainerStyle={styles.content}>
         {error ? <HelperText type="error">{error}</HelperText> : null}
 
-        <LinearGradient
-          colors={[HERO_GRADIENT_START, HERO_GRADIENT_END]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <View style={styles.heroContent}>
-            <View style={styles.heroPhotoRow}>
-              {profilePhotoPreview ? (
-                <Avatar.Image size={78} source={{ uri: profilePhotoPreview }} style={styles.heroAvatar} />
-              ) : (
-                <Avatar.Text
-                  size={78}
-                  label={displayName.slice(0, 1).toUpperCase() || 'Y'}
-                  style={styles.heroAvatar}
-                  color="#111827"
+        <Card style={styles.heroCard} mode="contained">
+          <LinearGradient
+            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0, y: 0.1 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradientHeader}
+          >
+            <View style={styles.heroContent}>
+              <View style={styles.avatarWrapper}>
+                {profilePhotoPreview ? (
+                  <Avatar.Image size={76} source={{ uri: profilePhotoPreview }} style={styles.avatar} />
+                ) : (
+                  <Avatar.Text
+                    size={76}
+                    label={`${form.first_name?.[0] || ''}${form.last_name?.[0] || ''}`.toUpperCase() || 'Y'}
+                    style={styles.avatar}
+                    color="#4338CA"
+                  />
+                )}
+                <IconButton
+                  icon="camera"
+                  size={18}
+                  style={styles.cameraButton}
+                  iconColor="#4338CA"
+                  containerColor="#FFFFFF"
+                  onPress={pickImage}
                 />
-              )}
-              <Button
-                mode="contained"
-                icon="camera-outline"
-                onPress={pickImage}
-                buttonColor="#93C5FD"
-                textColor="#1E293B"
-                compact
-                style={styles.photoButton}
-              >
-                Upload Photo
-              </Button>
+              </View>
+              <Text variant="headlineSmall" style={styles.name}>
+                {displayName}
+              </Text>
+              <Text variant="bodyMedium" style={styles.email}>
+                {user?.email}
+              </Text>
+              <View style={styles.roleBadge}>
+                <Text variant="labelSmall" style={styles.roleText}>
+                  {roleLabel.replace('_', ' ')}
+                </Text>
+              </View>
             </View>
-            <Text variant="headlineMedium" style={styles.heroName}>
-              {displayName}
-            </Text>
-            <Chip style={styles.heroRoleChip} textStyle={styles.heroRoleText}>
-              {roleLabel.toUpperCase()}
-            </Chip>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </Card>
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -353,8 +359,13 @@ export default function OwnerProfileDetailScreen({
           <Chip
             mode="outlined"
             icon={isMobileVerified ? 'check-circle-outline' : 'clock-outline'}
-            style={styles.statusChip}
-            textStyle={styles.statusChipText}
+            style={[
+              styles.statusChipBase,
+              isMobileVerified ? styles.successChip : styles.pendingChip,
+            ]}
+            textStyle={
+              isMobileVerified ? styles.successChipText : styles.pendingChipText
+            }
           >
             {isMobileVerified ? 'Mobile Verified' : 'Mobile Not Verified'}
           </Chip>
@@ -382,19 +393,34 @@ export default function OwnerProfileDetailScreen({
 
           <View style={styles.switchRow}>
             <Text variant="bodyMedium" style={styles.switchLabel}>Do you have more than one pharmacy?</Text>
-            <Button
-              mode={form.chain_pharmacy ? 'contained' : 'outlined'}
-              onPress={() => setForm((prev) => ({
-                ...prev,
-                chain_pharmacy: !prev.chain_pharmacy,
-                number_of_pharmacies: !prev.chain_pharmacy ? prev.number_of_pharmacies : 1,
-              }))}
-              buttonColor={form.chain_pharmacy ? '#7C8CF8' : undefined}
-              textColor={form.chain_pharmacy ? '#FFFFFF' : '#111827'}
-              compact
-            >
-              {form.chain_pharmacy ? 'Yes' : 'No'}
-            </Button>
+            <View style={{ flexDirection: 'row' }}>
+              <Button
+                mode={form.chain_pharmacy ? 'contained' : 'outlined'}
+                onPress={() => setForm((prev) => ({ ...prev, chain_pharmacy: true }))}
+                style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0, minWidth: 64 }}
+                buttonColor={form.chain_pharmacy ? '#16a34a' : LIGHT_SURFACE}
+                textColor={form.chain_pharmacy ? '#FFFFFF' : '#111827'}
+                compact
+              >
+                Yes
+              </Button>
+              <Button
+                mode={!form.chain_pharmacy ? 'contained' : 'outlined'}
+                onPress={() => {
+                  setForm((prev) => ({
+                    ...prev,
+                    chain_pharmacy: false,
+                    number_of_pharmacies: 1,
+                  }));
+                }}
+                style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, marginLeft: -1, minWidth: 64 }}
+                buttonColor={!form.chain_pharmacy ? '#dc2626' : LIGHT_SURFACE}
+                textColor={!form.chain_pharmacy ? '#FFFFFF' : '#111827'}
+                compact
+              >
+                No
+              </Button>
+            </View>
           </View>
 
           {form.chain_pharmacy ? (
@@ -443,11 +469,12 @@ export default function OwnerProfileDetailScreen({
                 label="AHPRA Number"
                 value={form.ahpra_number}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, ahpra_number: value }))}
+                editable={!isAhpraVerified}
                 left={<TextInput.Affix text="PHA" />}
                 theme={inputTheme}
                 style={styles.input}
               />
-              <HelperText type="info">{AHPRA_CONSENT_TEXT}</HelperText>
+              <HelperText type="info">{isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}</HelperText>
 
               <TextInput
                 mode="outlined"
@@ -461,8 +488,13 @@ export default function OwnerProfileDetailScreen({
               <Chip
                 mode="outlined"
                 icon={form.ahpra_verified === true ? 'check-circle-outline' : form.ahpra_verified === false ? 'close-circle-outline' : 'clock-outline'}
-                style={styles.statusChip}
-                textStyle={styles.statusChipText}
+                style={[
+                  styles.statusChipBase,
+                  form.ahpra_verified === true ? styles.successChip : form.ahpra_verified === false ? styles.errorChip : styles.pendingChip
+                ]}
+                textStyle={
+                  form.ahpra_verified === true ? styles.successChipText : form.ahpra_verified === false ? styles.errorChipText : styles.pendingChipText
+                }
               >
                 {form.ahpra_verified === true ? 'AHPRA Verified' : form.ahpra_verified === false ? 'AHPRA Not Verified' : 'AHPRA Pending'}
               </Chip>
@@ -529,46 +561,64 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  hero: {
-    borderRadius: 24,
-    overflow: 'hidden',
+  heroCard: {
+    marginHorizontal: 0,
+    marginTop: 0,
     marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D6DCEF',
+    elevation: 0,
+  },
+  gradientHeader: {
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
   heroContent: {
-    minHeight: 236,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 28,
+    gap: 4,
   },
-  heroPhotoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+  avatarWrapper: {
+    position: 'relative',
   },
-  heroAvatar: {
-    backgroundColor: '#DBEAFE',
+  avatar: {
+    backgroundColor: '#FFFFFF',
+    marginBottom: 6,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.96)',
   },
-  photoButton: {
-    borderRadius: 10,
-  },
-  heroName: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  heroRoleChip: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  cameraButton: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderColor: '#CBD5E1',
   },
-  heroRoleText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+  name: {
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 2,
+    marginTop: 0,
+  },
+  email: {
+    color: '#475569',
+    marginBottom: 6,
+  },
+  roleBadge: {
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.22)',
+  },
+  roleText: {
+    color: '#5B21B6',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   card: {
     backgroundColor: LIGHT_SURFACE,
@@ -597,14 +647,30 @@ const styles = StyleSheet.create({
     backgroundColor: LIGHT_SURFACE,
     marginBottom: 10,
   },
-  statusChip: {
+  statusChipBase: {
     alignSelf: 'flex-start',
-    borderColor: '#86EFAC',
-    backgroundColor: '#F0FDF4',
     marginBottom: 12,
   },
-  statusChipText: {
+  successChip: {
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
+  successChipText: {
     color: '#166534',
+  },
+  errorChip: {
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+  },
+  errorChipText: {
+    color: '#B91C1C',
+  },
+  pendingChip: {
+    borderColor: '#FDBA74',
+    backgroundColor: '#FFF7ED',
+  },
+  pendingChipText: {
+    color: '#B45309',
   },
   menuButton: {
     justifyContent: 'space-between',

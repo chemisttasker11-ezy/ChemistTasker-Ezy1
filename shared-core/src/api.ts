@@ -466,6 +466,9 @@ export function updatePharmacy(id, data) {
     const body = data instanceof FormData ? data : JSON.stringify(data);
     return fetchApi(`/client-profile/pharmacies/${id}/`, { method: 'PATCH', body });
 }
+export function lookupPharmacyAbn(data) {
+    return fetchApi('/client-profile/pharmacies/lookup-abn/', { method: 'POST', body: JSON.stringify(data) });
+}
 export function deletePharmacy(id) {
     return fetchApi(`/client-profile/pharmacies/${id}/`, { method: 'DELETE' });
 }

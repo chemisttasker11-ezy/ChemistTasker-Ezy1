@@ -36,6 +36,7 @@ import {
     createPharmacy,
     updatePharmacy,
     getPharmacyById,
+    lookupPharmacyAbn,
     type PharmacyDTO,
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
@@ -104,6 +105,7 @@ export default function PharmacyForm({
     showSetupHero = false,
 }: Props) {
     const router = useRouter();
+    const initialPharmacyId = pharmacyId ? String(pharmacyId) : null;
     const initialStateRef = useRef({
         employmentTypes: [] as string[],
         existingFiles: { approval: null, sops: null, induction: null, sump: null } as {
@@ -155,6 +157,7 @@ export default function PharmacyForm({
     const [loading, setLoading] = useState(mode === 'edit');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [currentPharmacyId, setCurrentPharmacyId] = useState<string | null>(initialPharmacyId);
     const [activeTab, setActiveTab] = useState(0); // 0 to 6
     const lastTabIndex = TABS.length - 1;
 
@@ -216,6 +219,17 @@ export default function PharmacyForm({
     const [rateMenuVisible, setRateMenuVisible] = useState(false);
     const [stateMenuVisible, setStateMenuVisible] = useState(false);
     const [activeTimeField, setActiveTimeField] = useState<null | { key: string; label: string }>(null);
+    const [abnLocked, setAbnLocked] = useState(false);
+    const [abnEntityName, setAbnEntityName] = useState<string | null>(null);
+    const [abnEntityType, setAbnEntityType] = useState<string | null>(null);
+    const [abnStatus, setAbnStatus] = useState<string | null>(null);
+    const [abnGstRegistered, setAbnGstRegistered] = useState<boolean | null>(null);
+    const [abnGstFrom, setAbnGstFrom] = useState<string | null>(null);
+    const [abnGstTo, setAbnGstTo] = useState<string | null>(null);
+    const [abnLastChecked, setAbnLastChecked] = useState<string | null>(null);
+    const [abnVerificationNote, setAbnVerificationNote] = useState<string | null>(null);
+    const [checkingABN, setCheckingABN] = useState(false);
+    const [abnConfirmedLocal, setAbnConfirmedLocal] = useState(false);
     const resetToSavedState = async () => {
         const initial = initialStateRef.current;
         setForm(initial.form);
@@ -257,6 +271,35 @@ export default function PharmacyForm({
         }
         return String(data);
     };
+
+    const formatDate = (value?: string | null) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+    };
+
+    const formatDateTime = (value?: string | null) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+    };
+
+    const applyAbnMeta = (data?: any) => {
+        setAbnEntityName(data?.abn_entity_name ?? null);
+        setAbnEntityType(data?.abn_entity_type ?? null);
+        setAbnStatus(data?.abn_status ?? null);
+        setAbnGstRegistered(data?.abn_gst_registered ?? null);
+        setAbnGstFrom(data?.abn_gst_from ?? null);
+        setAbnGstTo(data?.abn_gst_to ?? null);
+        setAbnLastChecked(data?.abn_last_checked ?? null);
+        setAbnVerificationNote(data?.abn_verification_note ?? null);
+        setAbnLocked(Boolean(data?.abn_verified && data?.abn_entity_confirmed));
+        setAbnConfirmedLocal(Boolean(data?.abn_entity_confirmed));
+    };
+
+    const abnDigits = form.abn.replace(/\D/g, '');
+    const abnInvalid = abnDigits.length > 0 && abnDigits.length !== 11;
+    const abnIsLocked = abnLocked || abnConfirmedLocal;
 
     // Initial Load
     useEffect(() => {
@@ -316,6 +359,7 @@ export default function PharmacyForm({
                 };
 
                 setForm(nextForm);
+                applyAbnMeta(data);
                 setEmploymentTypes(nextEmploymentTypes);
                 setRolesNeeded(nextRolesNeeded);
                 setExistingFiles(nextExistingFiles);
@@ -349,6 +393,7 @@ export default function PharmacyForm({
             form,
             rolesNeeded,
         };
+        applyAbnMeta(null);
         unsaved.markClean({ form, employmentTypes, rolesNeeded, files });
     }, []);
 
@@ -435,6 +480,90 @@ export default function PharmacyForm({
         return true;
     };
 
+    const buildPharmacyPayload = ({ submittedForVerification = false }: { submittedForVerification?: boolean } = {}) => {
+        const payload: Record<string, any> = {};
+        Object.entries(form).forEach(([k, v]) => {
+            if (v === null || v === undefined) return;
+            if (typeof v === 'string' && v.trim() === '') return;
+            if (k === 'abn' && typeof v === 'string') {
+                payload[k] = v.replace(/\D/g, '');
+                return;
+            }
+            if (k === 'latitude' && typeof v === 'number') {
+                payload[k] = normalizeCoord(v);
+                return;
+            }
+            if (k === 'longitude' && typeof v === 'number') {
+                payload[k] = normalizeCoord(v);
+                return;
+            }
+            payload[k] = v;
+        });
+        payload.employment_types = employmentTypes;
+        payload.roles_needed = rolesNeeded;
+        if (submittedForVerification) {
+            payload.submitted_for_verification = true;
+        }
+        if (abnConfirmedLocal) {
+            payload.abn_entity_confirmed = true;
+            payload.submitted_for_verification = true;
+        }
+        return payload;
+    };
+
+    const checkABN = async () => {
+        if (!form.name || !form.street_address || !form.suburb || !form.state || !form.postcode) {
+            setError('Enter the pharmacy basic details first so the ABN check can run during onboarding.');
+            setActiveTab(0);
+            return;
+        }
+        if (abnDigits.length !== 11) {
+            setError('ABN must be exactly 11 digits.');
+            setActiveTab(1);
+            return;
+        }
+        setCheckingABN(true);
+        setError('');
+        try {
+            const res = await lookupPharmacyAbn({ abn: abnDigits });
+            setAbnConfirmedLocal(false);
+            setForm((prev) => ({ ...prev, abn: res?.abn || prev.abn }));
+            applyAbnMeta(res);
+        } catch (err: any) {
+            const apiMessage = formatApiError(err?.response?.data);
+            setError(apiMessage || err?.message || 'ABN check failed');
+        } finally {
+            setCheckingABN(false);
+        }
+    };
+
+    const confirmABN = async () => {
+        if (!abnEntityName) {
+            setError('Run the ABN check first, then confirm the ABN details.');
+            return;
+        }
+        if (!currentPharmacyId) {
+            setAbnConfirmedLocal(true);
+            return;
+        }
+        setSaving(true);
+        setError('');
+        try {
+            const res = await updatePharmacy(currentPharmacyId, {
+                abn: abnDigits,
+                submitted_for_verification: true,
+                abn_entity_confirmed: true,
+            } as any);
+            setForm((prev) => ({ ...prev, abn: res?.abn || prev.abn }));
+            applyAbnMeta(res);
+        } catch (err: any) {
+            const apiMessage = formatApiError(err?.response?.data);
+            setError(apiMessage || err?.message || 'ABN confirmation failed');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const hasDraftContent = useMemo(() => {
         if (employmentTypes.length > 0 || rolesNeeded.length > 0) return true;
         if (files.approval || files.sops || files.induction || files.sump) return true;
@@ -455,28 +584,10 @@ export default function PharmacyForm({
         setError('');
 
         try {
-            const payload: Record<string, any> = {};
-            Object.entries(form).forEach(([k, v]) => {
-                if (v === null || v === undefined) return;
-                if (typeof v === 'string' && v.trim() === '') return;
-                if (k === 'abn' && typeof v === 'string') {
-                    payload[k] = v.replace(/\D/g, '');
-                    return;
-                }
-                if (k === 'latitude' && typeof v === 'number') {
-                    payload[k] = normalizeCoord(v);
-                    return;
-                }
-                if (k === 'longitude' && typeof v === 'number') {
-                    payload[k] = normalizeCoord(v);
-                    return;
-                }
-                payload[k] = v;
-            });
-            payload.employment_types = employmentTypes;
-            payload.roles_needed = rolesNeeded;
+            const payload = buildPharmacyPayload();
 
             const hasFiles = Boolean(files.approval || files.sops || files.induction || files.sump);
+            const targetPharmacyId = currentPharmacyId ?? (mode === 'edit' ? pharmacyId ?? null : null);
 
             if (hasFiles) {
                 const formData = new FormData();
@@ -496,16 +607,22 @@ export default function PharmacyForm({
                 if (files.induction) formData.append('induction_guides', { uri: files.induction.uri, name: files.induction.name, type: files.induction.mimeType ?? 'application/pdf' } as any);
                 if (files.sump) formData.append('qld_sump_docs', { uri: files.sump.uri, name: files.sump.name, type: files.sump.mimeType ?? 'application/pdf' } as any);
 
-                if (mode === 'edit' && pharmacyId) {
-                    await updatePharmacy(pharmacyId, formData as any);
+                if (targetPharmacyId) {
+                    await updatePharmacy(targetPharmacyId, formData as any);
                 } else {
-                    await createPharmacy(formData as any);
+                    const created = await createPharmacy(formData as any);
+                    if (created?.id != null) {
+                        setCurrentPharmacyId(String(created.id));
+                    }
                 }
             } else {
-                if (mode === 'edit' && pharmacyId) {
-                    await updatePharmacy(pharmacyId, payload as any);
+                if (targetPharmacyId) {
+                    await updatePharmacy(targetPharmacyId, payload as any);
                 } else {
-                    await createPharmacy(payload as any);
+                    const created = await createPharmacy(payload as any);
+                    if (created?.id != null) {
+                        setCurrentPharmacyId(String(created.id));
+                    }
                 }
             }
 
@@ -539,6 +656,23 @@ export default function PharmacyForm({
 
     const handleSave = async () => {
         await persistPharmacy();
+    };
+
+    const handleApplyToWeekdays = () => {
+        const { monday_start, monday_end } = form;
+        if (monday_start && monday_end) {
+            setForm(prev => ({
+                ...prev,
+                tuesday_start: monday_start,
+                tuesday_end: monday_end,
+                wednesday_start: monday_start,
+                wednesday_end: monday_end,
+                thursday_start: monday_start,
+                thursday_end: monday_end,
+                friday_start: monday_start,
+                friday_end: monday_end,
+            }));
+        }
     };
 
     const handleContinueLater = async () => {
@@ -757,10 +891,82 @@ export default function PharmacyForm({
                             {/* TAB 1: APPROVAL */}
                             {activeTab === 1 && (
                                 <>
-                                    <TextInput label="ABN *" value={form.abn} onChangeText={(v) => setForm(p => ({ ...p, abn: v }))} mode="outlined" style={styles.input} keyboardType="numeric" />
-                                    <HelperText type="error" visible={Boolean(error) && !form.abn}>
-                                        ABN is required and must be 11 digits.
-                                    </HelperText>
+                                    <TextInput
+                                        label="ABN *"
+                                        value={form.abn}
+                                        onChangeText={(v) => setForm(p => ({ ...p, abn: v }))}
+                                        mode="outlined"
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        disabled={abnIsLocked}
+                                    />
+                                    {abnIsLocked ? (
+                                        <HelperText type="info" visible>
+                                            This pharmacy ABN is locked after verification and confirmation.
+                                        </HelperText>
+                                    ) : (
+                                        <HelperText type="error" visible={Boolean(error) && !form.abn}>
+                                            ABN is required and must be 11 digits.
+                                        </HelperText>
+                                    )}
+                                    <View style={styles.abnActionsRow}>
+                                        <Button
+                                            mode="outlined"
+                                            onPress={() => void checkABN()}
+                                            loading={checkingABN}
+                                            disabled={abnIsLocked || abnInvalid || abnDigits.length !== 11 || checkingABN}
+                                        >
+                                            Check ABN
+                                        </Button>
+                                        <Chip mode="outlined" style={styles.abnChip}>
+                                            {abnIsLocked
+                                                ? 'ABN verified'
+                                                : (!abnEntityName && abnVerificationNote)
+                                                    ? 'ABN invalid/unavailable'
+                                                    : (abnEntityName || abnVerificationNote)
+                                                        ? 'ABN awaiting confirmation'
+                                                        : 'ABN not checked'}
+                                        </Chip>
+                                    </View>
+                                    {/* {!currentPharmacyId ? (
+                                        <HelperText type="info" visible>
+                                            Checking the ABN does not create a pharmacy record. The real pharmacy will be created when you finish and save the onboarding.
+                                        </HelperText>
+                                    ) : null} */}
+                                    {(checkingABN || abnEntityName || abnEntityType || abnStatus || abnVerificationNote || abnLastChecked || abnGstRegistered !== null) ? (
+                                        <Surface style={styles.abnCard} elevation={0}>
+                                            <Text style={styles.abnCardTitle}>ABN details (from ABR)</Text>
+                                            {checkingABN ? (
+                                                <>
+                                                    <ActivityIndicator size="small" color={surfaceTokens.primary} style={styles.abnSpinner} />
+                                                    <View style={styles.abnSkeletonLineLg} />
+                                                    <View style={styles.abnSkeletonLineMd} />
+                                                    <View style={styles.abnSkeletonLineSm} />
+                                                    <View style={styles.abnSkeletonNote} />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {abnEntityName ? <Text style={styles.abnCardLine}>Entity name: {abnEntityName}</Text> : null}
+                                                    {abnEntityType ? <Text style={styles.abnCardLine}>Entity type: {abnEntityType}</Text> : null}
+                                                    {abnStatus ? <Text style={styles.abnCardLine}>ABN status: {abnStatus}</Text> : null}
+                                                    <Text style={styles.abnCardLine}>
+                                                        GST registered (ABR): {abnGstRegistered == null ? '-' : abnGstRegistered ? 'Yes' : 'No'}
+                                                        {abnGstRegistered ? ` • From: ${formatDate(abnGstFrom)}${abnGstTo ? ` • To: ${formatDate(abnGstTo)}` : ''}` : ''}
+                                                    </Text>
+                                                    {abnLastChecked ? <Text style={styles.abnCardLine}>Last checked: {formatDateTime(abnLastChecked)}</Text> : null}
+                                                    {abnVerificationNote ? <Text style={styles.abnCardNote}>{abnVerificationNote}</Text> : null}
+                                                </>
+                                            )}
+                                            <Button
+                                                mode="contained"
+                                                onPress={() => void confirmABN()}
+                                                disabled={saving || !abnEntityName || abnIsLocked}
+                                                style={styles.abnConfirmButton}
+                                            >
+                                                {abnIsLocked ? 'Confirmed' : saving ? 'Confirming...' : 'Confirm this ABN'}
+                                            </Button>
+                                        </Surface>
+                                    ) : null}
 
                                     <Text style={styles.label}>Approval Certificate</Text>
                                     <Button mode="outlined" icon="upload" onPress={() => handlePickFile('approval')} style={{ marginBottom: 8 }}>
@@ -839,7 +1045,6 @@ export default function PharmacyForm({
                                                         <Checkbox status={checked ? 'checked' : 'unchecked'} onPress={() => toggleList(rolesNeeded, setRolesNeeded, role)} />
                                                         <View style={styles.selectionTextBlock}>
                                                             <Text style={styles.selectionTitle}>{prettifyOptionLabel(role)}</Text>
-                                                            <Text style={styles.selectionSubtitle}>Include in staffing requests</Text>
                                                         </View>
                                                     </TouchableOpacity>
                                                 );
@@ -854,6 +1059,15 @@ export default function PharmacyForm({
                                 <>
                                     <Text style={styles.helperText}>Format: HH:MM (e.g. 09:00, 17:30)</Text>
                                     <HoursRow label="Monday" startKey="monday_start" endKey="monday_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <Button
+                                        mode="text"
+                                        onPress={handleApplyToWeekdays}
+                                        disabled={!form.monday_start || !form.monday_end}
+                                        style={{ alignSelf: 'flex-end', marginTop: -8, marginBottom: 8 }}
+                                        labelStyle={{ fontSize: 12 }}
+                                    >
+                                        Apply to all weekdays
+                                    </Button>
                                     <HoursRow label="Tuesday" startKey="tuesday_start" endKey="tuesday_end" form={form} setActiveTimeField={setActiveTimeField} />
                                     <HoursRow label="Wednesday" startKey="wednesday_start" endKey="wednesday_end" form={form} setActiveTimeField={setActiveTimeField} />
                                     <HoursRow label="Thursday" startKey="thursday_start" endKey="thursday_end" form={form} setActiveTimeField={setActiveTimeField} />
@@ -990,38 +1204,57 @@ export default function PharmacyForm({
 
                         {/* ACTIONS */}
                         <View style={styles.actions}>
-                            <Button
-                                mode="outlined"
-                                onPress={() => {
-                                    if (activeTab > 0) {
-                                        setActiveTab((prev) => Math.max(prev - 1, 0));
-                                        return;
-                                    }
-                                    if (onContinueLater) {
-                                        void handleContinueLater();
-                                        return;
-                                    }
-                                    unsaved.confirmDiscard(() => {
-                                        if (onCancel) onCancel();
-                                        else router.back();
-                                    });
-                                }}
-                                disabled={saving}
-                                style={{ flex: 1 }}
-                            >
-                                {activeTab > 0 ? 'Back' : onContinueLater ? 'Continue Later' : 'Cancel'}
-                            </Button>
-                            <Button
-                                mode="contained"
-                                onPress={activeTab === lastTabIndex ? handleSave : handleNext}
-                                loading={activeTab === lastTabIndex ? saving : false}
-                                disabled={saving}
-                                style={{ flex: 1 }}
-                            >
-                                {activeTab === lastTabIndex
-                                    ? mode === 'edit' ? 'Save Changes' : 'Create Pharmacy'
-                                    : 'Next'}
-                            </Button>
+                            {mode === 'edit' ? (
+                                <>
+                                    <Button
+                                        mode="outlined"
+                                        onPress={handleSave}
+                                        loading={saving}
+                                        disabled={saving}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Save Changes
+                                    </Button>
+                                    <View style={{ flexDirection: 'row', flex: 1, gap: 12 }}>
+                                        <Button
+                                            mode="outlined"
+                                            onPress={() => activeTab > 0 && setActiveTab(p => p - 1)}
+                                            disabled={saving || activeTab === 0}
+                                            style={{ flex: 1 }}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Button
+                                            mode="contained"
+                                            onPress={handleNext}
+                                            disabled={saving || activeTab === lastTabIndex}
+                                            style={{ flex: 1 }}
+                                        >
+                                            Next
+                                        </Button>
+                                    </View>
+                                </>
+                            ) : (
+                                <>
+                                    <Button
+                                        mode="outlined"
+                                        onPress={() => activeTab > 0 ? setActiveTab(p => p - 1) : (onCancel ? onCancel() : router.back())}
+                                        disabled={saving}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {activeTab > 0 ? 'Back' : 'Cancel'}
+                                    </Button>
+                                    <Button
+                                        mode="contained"
+                                        onPress={activeTab === lastTabIndex ? handleSave : handleNext}
+                                        loading={activeTab === lastTabIndex ? saving : false}
+                                        disabled={saving}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {activeTab === lastTabIndex ? 'Create Pharmacy' : 'Next'}
+                                    </Button>
+                                </>
+                            )}
                         </View>
                     </ScrollView>
                 )}
@@ -1350,7 +1583,7 @@ const styles = StyleSheet.create({
     },
     selectionCard: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         gap: 8,
         paddingHorizontal: 12,
         paddingVertical: 12,
@@ -1376,6 +1609,7 @@ const styles = StyleSheet.create({
     selectionTextBlock: {
         flex: 1,
         gap: 2,
+        justifyContent: 'center',
     },
     selectionTitle: {
         color: surfaceTokens.text,
@@ -1391,6 +1625,76 @@ const styles = StyleSheet.create({
     error: { color: surfaceTokens.error, marginBottom: 8 },
     mb: { marginBottom: 12 },
     fileText: { fontSize: 12, fontStyle: 'italic', marginBottom: 8, color: surfaceTokens.primary },
+    abnActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginTop: 4,
+        marginBottom: 4,
+    },
+    abnChip: {
+        backgroundColor: '#FFFFFF',
+    },
+    abnCard: {
+        marginTop: 6,
+        marginBottom: 12,
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#D9E2F2',
+        backgroundColor: '#FFFFFF',
+        gap: 6,
+    },
+    abnCardTitle: {
+        color: surfaceTokens.text,
+        fontWeight: '800',
+        marginBottom: 2,
+    },
+    abnSpinner: {
+        marginTop: 2,
+        marginBottom: 4,
+        alignSelf: 'flex-start',
+    },
+    abnSkeletonLineLg: {
+        height: 14,
+        width: '82%',
+        borderRadius: 999,
+        backgroundColor: '#E6ECF8',
+    },
+    abnSkeletonLineMd: {
+        height: 14,
+        width: '68%',
+        borderRadius: 999,
+        backgroundColor: '#E6ECF8',
+    },
+    abnSkeletonLineSm: {
+        height: 14,
+        width: '74%',
+        borderRadius: 999,
+        backgroundColor: '#E6ECF8',
+    },
+    abnSkeletonNote: {
+        marginTop: 4,
+        height: 38,
+        width: '100%',
+        borderRadius: 12,
+        backgroundColor: '#EEF3FC',
+    },
+    abnCardLine: {
+        color: surfaceTokens.textMuted,
+        lineHeight: 20,
+    },
+    abnCardNote: {
+        marginTop: 4,
+        color: surfaceTokens.primary,
+        lineHeight: 20,
+        fontWeight: '600',
+    },
+    abnConfirmButton: {
+        marginTop: 8,
+        alignSelf: 'flex-start',
+    },
     sectionHeader: { fontSize: 16, fontWeight: '700', marginTop: 8, marginBottom: 2, color: surfaceTokens.text },
     sectionHelper: { fontSize: 12, color: surfaceTokens.textMuted, marginBottom: 4 },
     helperText: { fontSize: 12, color: surfaceTokens.textMuted, marginBottom: 8 },

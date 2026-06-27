@@ -63,6 +63,7 @@ from django.core.signing import TimestampSigner, BadSignature
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 from client_profile.tasks import cancel_referee_reminder, schedule_referee_reminder, cancel_all_referee_reminders
+from client_profile.tasks import abn_lookup, _parse_abn_html_fields
 from client_profile.rewards import (
     RewardError,
     claim_referral_code,
@@ -773,7 +774,7 @@ class OwnerOnboardingV2MeView(generics.RetrieveUpdateAPIView):
             user=self.request.user,
             defaults={
                 "phone_number": "",
-                "role": OwnerOnboarding.ROLE_CHOICES[0][0],
+                "role": "MANAGER",
                 "chain_pharmacy": False,
                 "number_of_pharmacies": 1,
             },
@@ -1963,6 +1964,36 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         super().perform_update(serializer)
+
+    @action(detail=False, methods=['post'], url_path='lookup-abn')
+    def lookup_abn(self, request):
+        raw_abn = str(request.data.get("abn") or "").strip()
+        digits = "".join(ch for ch in raw_abn if ch.isdigit())
+        if len(digits) != 11:
+            return Response({"abn": ["ABN must be 11 digits."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        legal_name, html = abn_lookup(digits)
+        parsed = _parse_abn_html_fields(html or "")
+
+        if not legal_name:
+            note = "Failed to fetch ABN details. ABN may be invalid or ABR site unavailable."
+        else:
+            note = "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you."
+
+        payload = {
+            "abn": digits,
+            "abn_entity_name": parsed.get("entity_name") or legal_name or "",
+            "abn_entity_type": parsed.get("entity_type") or "",
+            "abn_status": parsed.get("abn_status") or "",
+            "abn_gst_registered": parsed.get("abn_gst_registered", None),
+            "abn_gst_from": parsed.get("abn_gst_from").isoformat() if parsed.get("abn_gst_from") else None,
+            "abn_gst_to": parsed.get("abn_gst_to").isoformat() if parsed.get("abn_gst_to") else None,
+            "abn_last_checked": timezone.now().isoformat(),
+            "abn_verification_note": note,
+            "abn_verified": False,
+            "abn_entity_confirmed": False,
+        }
+        return Response(payload)
 
 class MembershipViewSet(viewsets.ModelViewSet):
     """
