@@ -6,7 +6,6 @@ import { fetchMembershipsByPharmacy, startDirectMessageByMembership, type Member
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useRouter } from 'expo-router';
 import StaffManager from '@/roles/shared/pharmacies/StaffManager';
-import MembershipApplicationsPanel from '@/roles/shared/pharmacies/MembershipApplicationsPanel';
 import { surfaceTokens } from '@/roles/shared/pharmacies/types';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 
@@ -118,15 +117,6 @@ export default function ManageStaffScreen() {
                             messagingMemberId={messagingMemberId}
                         />
                     </View>
-
-                    <MembershipApplicationsPanel
-                        pharmacyId={String(selectedPharmacyId)}
-                        category="FULL_PART_TIME"
-                        title="Pending Staff Applications"
-                        allowedEmploymentTypes={['FULL_TIME', 'PART_TIME', 'CASUAL']}
-                        defaultEmploymentType="CASUAL"
-                        onApproved={loadData}
-                    />
                 </>
             )}
         </SafeAreaView>

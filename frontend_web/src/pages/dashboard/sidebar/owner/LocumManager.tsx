@@ -154,9 +154,16 @@ type LocumManagerProps = {
   memberships: MembershipDTO[];
   onMembershipsChanged: () => void;
   loading?: boolean;
+  pharmacyName?: string;
 };
 
-export default function LocumManager({ pharmacyId, memberships, onMembershipsChanged, loading = false }: LocumManagerProps) {
+export default function LocumManager({
+  pharmacyId,
+  memberships,
+  onMembershipsChanged,
+  loading = false,
+  pharmacyName,
+}: LocumManagerProps) {
   const derivedLocums: Locum[] = useMemo(() => {
     return (memberships || []).map((m) => {
       const fullName =
@@ -193,6 +200,7 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | number | null>(null);
   const [toast, setToast] = useState<{ message: string; severity: "success" | "error" } | null>(null);
   const handleApplicationsNotification = useCallback(
@@ -210,7 +218,10 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
 
   const [inviteRows, setInviteRows] = useState<InviteRowState[]>([createInviteRow()]);
 
-  const resetInviteRows = () => setInviteRows([createInviteRow()]);
+  const resetInviteRows = () => {
+    setInviteRows([createInviteRow()]);
+    setInviteError(null);
+  };
 
   const handleInviteFieldChange = (
     idx: number,
@@ -319,9 +330,10 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
       ...row,
       email: row.email.trim(),
     }));
+    setInviteError(null);
     const rowsWithEmail = rows.filter((row) => row.email);
     if (!rowsWithEmail.length) {
-      setToast({ message: "Please add at least one invite.", severity: "error" });
+      setInviteError("Please add at least one invite.");
       return;
     }
 
@@ -364,10 +376,7 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
 
     setInviteRows(rows);
     if (hasErrors) {
-      setToast({
-        message: "One or more invitations need attention before sending.",
-        severity: "error",
-      });
+      setInviteError("One or more invitations need attention before sending.");
       setInviteSubmitting(false);
       return;
     }
@@ -386,12 +395,33 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
       const response = await bulkInviteMembersService({ invitations: payload });
       const errors = (response as any)?.errors;
       if (Array.isArray(errors) && errors.length > 0) {
-        const first = errors[0];
-        const message =
-          first?.error ||
-          first?.detail ||
-          (typeof first === "string" ? first : "Failed to send invites.");
-        setToast({ message, severity: "error" });
+        const nextRows = [...rows];
+        let fallbackError: string | null = null;
+
+        errors.forEach((entry: any) => {
+          const message =
+            entry?.error ||
+            entry?.detail ||
+            (typeof entry === "string" ? entry : "Failed to send invites.");
+          const lineIndex =
+            typeof entry?.line === "number" && entry.line > 0 ? entry.line - 1 : -1;
+          if (lineIndex >= 0 && nextRows[lineIndex]) {
+            nextRows[lineIndex] = {
+              ...nextRows[lineIndex],
+              error: message,
+              checking: false,
+            };
+          } else if (!fallbackError) {
+            fallbackError = message;
+          }
+        });
+
+        setInviteRows(nextRows);
+        setInviteError(fallbackError);
+        if ((response as any)?.results?.length) {
+          setToast({ message: "Some invites were sent.", severity: "success" });
+          onMembershipsChanged();
+        }
         return;
       }
       setToast({ message: "Invites sent!", severity: "success" });
@@ -403,7 +433,7 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
         error?.response?.data?.detail ||
         error?.response?.data?.errors?.[0]?.error ||
         error?.message;
-      setToast({ message: detail || "Failed to send invites.", severity: "error" });
+      setInviteError(detail || "Failed to send invites.");
     } finally {
       setInviteSubmitting(false);
     }
@@ -645,8 +675,9 @@ export default function LocumManager({ pharmacyId, memberships, onMembershipsCha
       </Dialog>
 
       <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Invite Favourite Locums</DialogTitle>
+        <DialogTitle>Invite Favourite Locums to {pharmacyName || pharmacyId}</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
+          {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
             <Box
               key={idx}

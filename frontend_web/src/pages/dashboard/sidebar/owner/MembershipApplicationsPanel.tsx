@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Box,
   Card,
   CardContent,
@@ -68,6 +67,9 @@ const formatTimestamp = (value?: string | null) => {
   const parsed = dayjs.utc(value);
   return parsed.isValid() ? parsed.local().toDate().toLocaleString() : value;
 };
+
+const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
+  (app as any)?.[camelKey] ?? (app as any)?.[snakeKey] ?? "";
 
 export default function MembershipApplicationsPanel({
   pharmacyId,
@@ -171,14 +173,14 @@ export default function MembershipApplicationsPanel({
             Loading applications...
           </Typography>
         </Stack>
-      ) : applications.length === 0 ? (
-        <Alert severity="info">No pending applications.</Alert>
-      ) : (
+      ) : applications.length === 0 ? null : (
         <Stack spacing={1.5}>
           {applications.map((app) => {
             const applicantName = [app.firstName, app.lastName].filter(Boolean).join(" ") || "Applicant";
             const selectedType = approveTypeById[app.id] || defaultEmploymentType;
             const classification = formatClassification(app);
+            const jobTitle = readValue(app, "jobTitle", "job_title");
+            const mobileNumber = readValue(app, "mobileNumber", "mobile_number");
 
             return (
               <Card key={app.id} variant="outlined">
@@ -207,6 +209,37 @@ export default function MembershipApplicationsPanel({
                     <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
                       Submitted: {formatTimestamp(app.submittedAt)}
                     </Typography>
+                    <Box
+                      sx={{
+                        mt: 1.25,
+                        px: 1.25,
+                        py: 1,
+                        borderRadius: 2,
+                        bgcolor: "rgba(6, 18, 58, 0.04)",
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ display: "block", fontWeight: 800, color: "text.secondary" }}>
+                        Candidate Summary
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        Role requested: {app.role}
+                      </Typography>
+                      {jobTitle ? (
+                        <Typography variant="body2">
+                          Job title: {jobTitle}
+                        </Typography>
+                      ) : null}
+                      {mobileNumber ? (
+                        <Typography variant="body2">
+                          Mobile: {mobileNumber}
+                        </Typography>
+                      ) : null}
+                      {classification ? (
+                        <Typography variant="body2">
+                          Classification: {classification}
+                        </Typography>
+                      ) : null}
+                    </Box>
                   </Box>
 
                   <Stack

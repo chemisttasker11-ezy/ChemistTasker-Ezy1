@@ -2249,7 +2249,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
             # Enforce maximum active pharmacy memberships per user
             active_memberships = _count_active_memberships(user)
             if active_memberships >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
-                return None, f'This user already belongs to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'
+                return None, f'This user already a member in {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'
 
             # Membership exists?
             if Membership.objects.filter(user=user, pharmacy_id=pharmacy_id).exists():

@@ -6,7 +6,6 @@ import { fetchMembershipsByPharmacy, startDirectMessageByMembership, type Member
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useRouter } from 'expo-router';
 import LocumManager from '@/roles/shared/pharmacies/LocumManager';
-import MembershipApplicationsPanel from '@/roles/shared/pharmacies/MembershipApplicationsPanel';
 import { surfaceTokens } from '@/roles/shared/pharmacies/types';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 
@@ -118,15 +117,6 @@ export default function ManageLocumsScreen() {
                             messagingMemberId={messagingMemberId}
                         />
                     </View>
-
-                    <MembershipApplicationsPanel
-                        pharmacyId={String(selectedPharmacyId)}
-                        category="LOCUM_CASUAL"
-                        title="Pending Locum Applications"
-                        allowedEmploymentTypes={['LOCUM', 'SHIFT_HERO']}
-                        defaultEmploymentType="LOCUM"
-                        onApproved={loadData}
-                    />
                 </>
             )}
         </SafeAreaView>

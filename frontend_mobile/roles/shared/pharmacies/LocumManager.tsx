@@ -36,6 +36,7 @@ import {
     normalizeEmail,
 } from './inviteUtils';
 import { surfaceTokens } from './types';
+import MembershipApplicationsPanel from './MembershipApplicationsPanel';
 
 const LOCUM_WORK_TYPES = ['LOCUM', 'SHIFT_HERO'] as const;
 
@@ -155,6 +156,7 @@ export default function LocumManager({
 
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteRows, setInviteRows] = useState<InviteRowState[]>([createInviteRow()]);
+    const [inviteError, setInviteError] = useState<string | null>(null);
     const [activeMenu, setActiveMenu] = useState<{ idx: number; type: 'role' } | null>(null);
     const [inviteSubmitting, setInviteSubmitting] = useState(false);
 
@@ -167,10 +169,19 @@ export default function LocumManager({
     const [deleteLoadingId, setDeleteLoadingId] = useState<string | number | null>(null);
 
     const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+    const handleApplicationsNotification = useCallback(
+        (message: string, severity: 'success' | 'error') => {
+            setToast({ message, severity });
+        },
+        []
+    );
 
     const showSkeleton = loading && memberships.length === 0;
 
-    const resetInviteForm = () => setInviteRows([createInviteRow()]);
+    const resetInviteForm = () => {
+        setInviteRows([createInviteRow()]);
+        setInviteError(null);
+    };
 
     const openInviteDialog = () => {
         resetInviteForm();
@@ -265,9 +276,10 @@ export default function LocumManager({
 
     const handleSendInvites = async () => {
         let rows = inviteRows.map((row) => ({ ...row, email: row.email.trim() }));
+        setInviteError(null);
         const rowsWithEmail = rows.filter((row) => row.email);
         if (!rowsWithEmail.length) {
-            setToast({ message: 'Please fill out at least one invite.', severity: 'error' });
+            setInviteError('Please fill out at least one invite.');
             return;
         }
 
@@ -307,10 +319,7 @@ export default function LocumManager({
 
         setInviteRows(rows);
         if (hasErrors) {
-            setToast({
-                message: 'One or more invitations need attention before sending.',
-                severity: 'error',
-            });
+            setInviteError('One or more invitations need attention before sending.');
             setInviteSubmitting(false);
             return;
         }
@@ -329,12 +338,33 @@ export default function LocumManager({
             const response = await bulkInviteMembersService({ invitations: payload });
             const errors = (response as any)?.errors;
             if (Array.isArray(errors) && errors.length > 0) {
-                const first = errors[0];
-                const message =
-                    first?.error ||
-                    first?.detail ||
-                    (typeof first === 'string' ? first : 'Failed to send invitations.');
-                setToast({ message, severity: 'error' });
+                const nextRows = [...rows];
+                let fallbackError: string | null = null;
+
+                errors.forEach((entry: any) => {
+                    const message =
+                        entry?.error ||
+                        entry?.detail ||
+                        (typeof entry === 'string' ? entry : 'Failed to send invitations.');
+                    const lineIndex =
+                        typeof entry?.line === 'number' && entry.line > 0 ? entry.line - 1 : -1;
+                    if (lineIndex >= 0 && nextRows[lineIndex]) {
+                        nextRows[lineIndex] = {
+                            ...nextRows[lineIndex],
+                            error: message,
+                            checking: false,
+                        };
+                    } else if (!fallbackError) {
+                        fallbackError = message;
+                    }
+                });
+
+                setInviteRows(nextRows);
+                setInviteError(fallbackError);
+                if ((response as any)?.results?.length) {
+                    setToast({ message: 'Some invitations were sent.', severity: 'success' });
+                    onMembershipsChanged();
+                }
             } else {
                 setToast({ message: 'Invitations sent!', severity: 'success' });
                 setInviteOpen(false);
@@ -346,7 +376,7 @@ export default function LocumManager({
                 error?.response?.data?.detail ||
                 error?.response?.data?.errors?.[0]?.error ||
                 error?.message;
-            setToast({ message: detail || 'Failed to send invitations.', severity: 'error' });
+            setInviteError(detail || 'Failed to send invitations.');
         } finally {
             setInviteSubmitting(false);
         }
@@ -581,6 +611,7 @@ export default function LocumManager({
                 >
                     <ScrollView>
                         <Text style={styles.modalTitle}>Invite Locum to {pharmacyName || pharmacyId}</Text>
+                        {inviteError ? <Text style={styles.dialogErrorText}>{inviteError}</Text> : null}
                         {inviteRows.map((row, idx) => (
                             <View key={idx} style={styles.inviteRow}>
                                 <TextInput
@@ -766,6 +797,16 @@ export default function LocumManager({
             >
                 {toast?.message}
             </Snackbar>
+
+            <MembershipApplicationsPanel
+                pharmacyId={pharmacyId}
+                category="LOCUM_CASUAL"
+                title="Pending Favourite Applications"
+                allowedEmploymentTypes={Array.from(LOCUM_WORK_TYPES)}
+                defaultEmploymentType="LOCUM"
+                onApproved={onMembershipsChanged}
+                onNotification={handleApplicationsNotification}
+            />
         </View>
     );
 }
@@ -837,6 +878,7 @@ const styles = StyleSheet.create({
     rowInputs: { flexDirection: 'row', gap: 8, marginBottom: 8 },
     helperText: { fontSize: 12, color: surfaceTokens.textMuted, marginBottom: 4 },
     errorText: { fontSize: 12, color: surfaceTokens.error, marginBottom: 4 },
+    dialogErrorText: { fontSize: 13, color: surfaceTokens.error, marginBottom: 12 },
     divider: { marginVertical: 8 },
     modalActions: {
         flexDirection: 'row',

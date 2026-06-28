@@ -225,6 +225,7 @@ export default function StaffManager({
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteRows, setInviteRows] = useState<InviteRowState[]>([createInviteRow()]);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; severity: "success" | "error" } | null>(null);
   const handleApplicationsNotification = useCallback(
@@ -242,6 +243,7 @@ export default function StaffManager({
 
   const resetInviteForm = () => {
     setInviteRows([createInviteRow()]);
+    setInviteError(null);
   };
 
   const handleInviteFieldChange = (
@@ -385,9 +387,10 @@ export default function StaffManager({
       ...row,
       email: row.email.trim(),
     }));
+    setInviteError(null);
     const rowsWithEmail = rows.filter((row) => row.email);
     if (!rowsWithEmail.length) {
-      setToast({ message: "Please fill out at least one invite.", severity: "error" });
+      setInviteError("Please fill out at least one invite.");
       return;
     }
 
@@ -441,10 +444,7 @@ export default function StaffManager({
 
     setInviteRows(rows);
     if (hasErrors) {
-      setToast({
-        message: "One or more invitations need attention before sending.",
-        severity: "error",
-      });
+      setInviteError("One or more invitations need attention before sending.");
       setInviteSubmitting(false);
       return;
     }
@@ -466,12 +466,33 @@ export default function StaffManager({
       const response = await bulkInviteMembersService({ invitations: payload });
       const errors = (response as any)?.errors;
       if (Array.isArray(errors) && errors.length > 0) {
-        const first = errors[0];
-        const message =
-          first?.error ||
-          first?.detail ||
-          (typeof first === "string" ? first : "Failed to send invitations.");
-        setToast({ message, severity: "error" });
+        const nextRows = [...rows];
+        let fallbackError: string | null = null;
+
+        errors.forEach((entry: any) => {
+          const message =
+            entry?.error ||
+            entry?.detail ||
+            (typeof entry === "string" ? entry : "Failed to send invitations.");
+          const lineIndex =
+            typeof entry?.line === "number" && entry.line > 0 ? entry.line - 1 : -1;
+          if (lineIndex >= 0 && nextRows[lineIndex]) {
+            nextRows[lineIndex] = {
+              ...nextRows[lineIndex],
+              error: message,
+              checking: false,
+            };
+          } else if (!fallbackError) {
+            fallbackError = message;
+          }
+        });
+
+        setInviteRows(nextRows);
+        setInviteError(fallbackError);
+        if ((response as any)?.results?.length) {
+          setToast({ message: "Some invitations were sent.", severity: "success" });
+          onMembershipsChanged();
+        }
       } else {
         setToast({ message: "Invitations sent!", severity: "success" });
         setInviteOpen(false);
@@ -483,7 +504,7 @@ export default function StaffManager({
         error?.response?.data?.detail ||
         error?.response?.data?.errors?.[0]?.error ||
         error?.message;
-      setToast({ message: detail || "Failed to send invitations.", severity: "error" });
+      setInviteError(detail || "Failed to send invitations.");
     } finally {
       setInviteSubmitting(false);
     }
@@ -700,6 +721,7 @@ export default function StaffManager({
       <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Invite Staff to {pharmacyName || pharmacyId}</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
+          {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
             <Box key={idx} sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, pt: 1 }}>
               <TextField
@@ -828,7 +850,6 @@ export default function StaffManager({
         onApproved={onMembershipsChanged}
         onNotification={handleApplicationsNotification}
       />
-
       <Dialog open={linkOpen} onClose={() => setLinkOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Generate Invite Link</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2, pt: 2, overflow: "visible" }}>

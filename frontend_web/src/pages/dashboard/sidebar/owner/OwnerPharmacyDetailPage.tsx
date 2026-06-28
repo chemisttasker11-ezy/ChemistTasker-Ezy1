@@ -280,6 +280,7 @@ export default function OwnerPharmacyDetailPage({
           pharmacyId={pharmacy.id}
           memberships={locumMemberships}
           onMembershipsChanged={onMembershipsChanged}
+          pharmacyName={pharmacy.name}
           loading={membershipsLoading}
         />
       </Box>

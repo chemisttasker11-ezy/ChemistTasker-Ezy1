@@ -1119,6 +1119,11 @@ def _manage_path_for_role(recipient_role: str) -> str:
     return "/dashboard/owner/manage-pharmacies/my-pharmacies"
 
 
+def _manage_detail_url_for_role(recipient_role: str, pharmacy_id: int | str) -> str:
+    base_path = _manage_path_for_role(recipient_role)
+    return f"{base_path}?view=detail&pharmacyId={pharmacy_id}"
+
+
 def email_membership_application_submitted(app_id: int):
     """
     Notify the pharmacy Owner, Pharmacy Admins, and Organization Admins
@@ -1194,7 +1199,7 @@ def email_membership_application_submitted(app_id: int):
 
     # Send one email per recipient with a role-correct manage_url
     for email, r_role in recipients_by_role.items():
-        manage_url = f"{base}{_manage_path_for_role(r_role)}"
+        manage_url = f"{base}{_manage_detail_url_for_role(r_role, pharmacy.id)}"
         ctx = {**ctx_common, "manage_url": manage_url}
         notification_payload = {
             "title": f"New membership application: {pharmacy.name}",

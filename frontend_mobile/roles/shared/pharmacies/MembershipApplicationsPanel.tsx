@@ -7,7 +7,6 @@ import {
     Card,
     Text,
     Button,
-    Chip,
     ActivityIndicator,
     Menu,
 } from 'react-native-paper';
@@ -42,12 +41,17 @@ export default function MembershipApplicationsPanel({
 }: MembershipApplicationsPanelProps) {
     const [applications, setApplications] = useState<MembershipApplication[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
     const [processingId, setProcessingId] = useState<string | number | null>(null);
     const [employmentMenuVisible, setEmploymentMenuVisible] = useState<string | number | null>(null);
     const [selectedEmployment, setSelectedEmployment] = useState<Record<string | number, string>>({});
 
+    const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
+        (app as any)?.[camelKey] ?? (app as any)?.[snakeKey] ?? '';
+
     const loadApplications = async () => {
         setLoading(true);
+        setLoadError('');
         try {
             const results = await fetchMembershipApplicationsService({ status: 'PENDING' });
             const filtered = results.filter(
@@ -55,8 +59,11 @@ export default function MembershipApplicationsPanel({
                     String(app.pharmacy) === String(pharmacyId) && app.category === category
             );
             setApplications(filtered);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load applications', error);
+            const detail = error?.response?.data?.detail || error?.message || 'Failed to load pending applications.';
+            setLoadError(detail);
+            onNotification?.(detail, 'error');
         } finally {
             setLoading(false);
         }
@@ -109,6 +116,14 @@ export default function MembershipApplicationsPanel({
         );
     }
 
+    if (loadError) {
+        return (
+            <View style={styles.container}>
+                <Text style={styles.errorText}>{loadError}</Text>
+            </View>
+        );
+    }
+
     if (applications.length === 0) {
         return null; // Don't show panel if no applications
     }
@@ -120,6 +135,13 @@ export default function MembershipApplicationsPanel({
                 {applications.map((app) => {
                     const applicantName =
                         [app.firstName, app.lastName].filter(Boolean).join(' ') || 'Applicant';
+                    const jobTitle = readValue(app, 'jobTitle', 'job_title');
+                    const mobileNumber = readValue(app, 'mobileNumber', 'mobile_number');
+                    const classification =
+                        readValue(app, 'pharmacistAwardLevel', 'pharmacist_award_level') ||
+                        readValue(app, 'otherstaffClassificationLevel', 'otherstaff_classification_level') ||
+                        readValue(app, 'internHalf', 'intern_half') ||
+                        readValue(app, 'studentYear', 'student_year');
 
                     return (
                         <Card key={app.id} style={styles.card}>
@@ -133,6 +155,9 @@ export default function MembershipApplicationsPanel({
 
                                 <View style={styles.details}>
                                     <Text style={styles.detailText}>Role: {app.role || 'N/A'}</Text>
+                                    {jobTitle ? <Text style={styles.detailText}>Job title: {jobTitle}</Text> : null}
+                                    {mobileNumber ? <Text style={styles.detailText}>Mobile: {mobileNumber}</Text> : null}
+                                    {classification ? <Text style={styles.detailText}>Classification: {classification}</Text> : null}
                                 </View>
 
                                 {category === 'FULL_PART_TIME' && (
@@ -248,11 +273,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginBottom: 4,
     },
-    message: {
-        fontSize: 13,
-        color: surfaceTokens.textMuted,
-        fontStyle: 'italic',
-    },
     employmentSelector: {
         marginBottom: 12,
     },
@@ -264,5 +284,9 @@ const styles = StyleSheet.create({
     actions: {
         flexDirection: 'row',
         gap: 8,
+    },
+    errorText: {
+        color: surfaceTokens.error,
+        fontSize: 14,
     },
 });
