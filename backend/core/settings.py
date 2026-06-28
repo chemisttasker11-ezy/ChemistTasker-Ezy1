@@ -201,7 +201,7 @@ Q_CLUSTER = {
     'broker_class': 'core.q_broker.LowCommandRedis',
     'redis': _redis_options,
 }
-Q_REDIS_BLPOP_TIMEOUT = env.int("Q_REDIS_BLPOP_TIMEOUT", default=1)
+Q_REDIS_BLPOP_TIMEOUT = env.int("Q_REDIS_BLPOP_TIMEOUT", default=100)
 
 
 MIDDLEWARE = [

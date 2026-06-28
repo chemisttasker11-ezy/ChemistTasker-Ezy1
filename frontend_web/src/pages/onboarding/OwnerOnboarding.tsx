@@ -715,9 +715,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <Typography variant="h6" fontWeight={700} sx={{ color: '#111827' }}>
                   Save profile
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#64748B' }}>
+                {/* <Typography variant="body2" sx={{ color: '#64748B' }}>
                   Submit your profile details here. Referral and subscription tools are separated below.
-                </Typography>
+                </Typography> */}
               </Box>
               <Box sx={{ textAlign: 'right' }}>
             <Button

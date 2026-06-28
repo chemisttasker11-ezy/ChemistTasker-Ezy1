@@ -251,14 +251,6 @@ export default function OwnerProfileDetailScreen({
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      <View style={styles.topBar}>
-        <Image
-          source={require('../../assets/images/clipsnap-edit-6-1-2026.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
       <ScrollView contentContainerStyle={styles.content}>
         {error ? <HelperText type="error">{error}</HelperText> : null}
 
