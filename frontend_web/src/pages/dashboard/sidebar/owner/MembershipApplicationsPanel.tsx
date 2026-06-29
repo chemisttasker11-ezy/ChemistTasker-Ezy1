@@ -27,6 +27,13 @@ import utc from "dayjs/plugin/utc";
 
 dayjs.extend(utc);
 
+const getFirstErrorMessage = (value: unknown): string | null => {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : null;
+  }
+  return null;
+};
+
 type MembershipApplicationsPanelProps = {
   pharmacyId: string;
   category: "FULL_PART_TIME" | "LOCUM_CASUAL";
@@ -141,7 +148,14 @@ export default function MembershipApplicationsPanel({
         await fetchApplications();
         onApproved?.();
       } catch (error: any) {
-        notify(error?.response?.data?.detail || "Failed to approve application.", "error");
+        const data = error?.response?.data;
+        const firstFieldError =
+          data && typeof data === "object"
+            ? Object.values(data as Record<string, unknown>)
+                .map(getFirstErrorMessage)
+                .find((value): value is string => Boolean(value))
+            : null;
+        notify(data?.detail || firstFieldError || "Failed to approve application.", "error");
       }
     },
     [approveTypeById, defaultEmploymentType, fetchApplications, notify, onApproved]
@@ -154,7 +168,8 @@ export default function MembershipApplicationsPanel({
         notify("Application rejected.", "success");
         await fetchApplications();
       } catch (error: any) {
-        notify(error?.response?.data?.detail || "Failed to reject application.", "error");
+        const data = error?.response?.data;
+        notify(data?.detail || "Failed to reject application.", "error");
       }
     },
     [fetchApplications, notify]

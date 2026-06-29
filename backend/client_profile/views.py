@@ -2262,9 +2262,8 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 job_title_value = ''
 
             membership_data = {
-                'user': user,
-                'pharmacy_id': pharmacy_id,
-                'invited_by': inviter,
+                'user': user.pk,
+                'pharmacy': pharmacy.pk,
                 'invited_name': data.get('invited_name', ''),
                 'role': role,
                 'employment_type': employment_type,
@@ -2276,9 +2275,24 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 'student_year': data.get('student_year', None),
             }
 
-            # Create membership using the prepared dictionary
+            # Create membership through the serializer so role/classification rules
+            # stay identical across manual invites and magic-link approvals.
+            membership_serializer = MembershipSerializer(
+                data=membership_data,
+                context={'request': getattr(self, 'request', None)},
+            )
             try:
-                membership = Membership.objects.create(**membership_data)
+                membership_serializer.is_valid(raise_exception=True)
+                membership = membership_serializer.save(invited_by=inviter)
+            except serializers.ValidationError as e:
+                detail = e.detail
+                if isinstance(detail, dict):
+                    for messages in detail.values():
+                        if isinstance(messages, list) and messages:
+                            return None, str(messages[0])
+                        if isinstance(messages, str):
+                            return None, messages
+                return None, str(detail)
             except Exception as e:
                 import traceback
                 traceback.print_exc()

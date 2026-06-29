@@ -3702,14 +3702,47 @@ class MembershipSerializer(serializers.ModelSerializer):
                 if f in attrs:
                     attrs[f] = None
 
+        pharmacist_award_level = attrs.get(
+            'pharmacist_award_level',
+            getattr(self.instance, 'pharmacist_award_level', None) if self.instance else None,
+        )
+        otherstaff_classification_level = attrs.get(
+            'otherstaff_classification_level',
+            getattr(self.instance, 'otherstaff_classification_level', None) if self.instance else None,
+        )
+        intern_half = attrs.get(
+            'intern_half',
+            getattr(self.instance, 'intern_half', None) if self.instance else None,
+        )
+        student_year = attrs.get(
+            'student_year',
+            getattr(self.instance, 'student_year', None) if self.instance else None,
+        )
+
         if role == 'PHARMACIST':
             clear('otherstaff_classification_level', 'intern_half', 'student_year')
+            if not pharmacist_award_level:
+                raise serializers.ValidationError({
+                    'pharmacist_award_level': 'Pharmacist award level is required for pharmacists.'
+                })
         elif role in ('ASSISTANT', 'TECHNICIAN'):
             clear('pharmacist_award_level', 'intern_half', 'student_year')
+            if not otherstaff_classification_level:
+                raise serializers.ValidationError({
+                    'otherstaff_classification_level': 'Classification level is required for assistants and technicians.'
+                })
         elif role == 'INTERN':
             clear('pharmacist_award_level', 'otherstaff_classification_level', 'student_year')
+            if not intern_half:
+                raise serializers.ValidationError({
+                    'intern_half': 'Intern half is required for intern pharmacists.'
+                })
         elif role == 'STUDENT':
             clear('pharmacist_award_level', 'otherstaff_classification_level', 'intern_half')
+            if not student_year:
+                raise serializers.ValidationError({
+                    'student_year': 'Student year is required for pharmacy students.'
+                })
 
         return attrs
 
@@ -3772,6 +3805,7 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         invite_link = attrs.get('invite_link')
+        role = attrs.get('role')
         job_title_value = (attrs.get('job_title') or '').strip()
         if invite_link and invite_link.category == 'FULL_PART_TIME':
             if not job_title_value:
@@ -3781,6 +3815,40 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
         else:
             job_title_value = ''
         attrs['job_title'] = job_title_value
+
+        if role == 'PHARMACIST':
+            attrs['otherstaff_classification_level'] = None
+            attrs['intern_half'] = None
+            attrs['student_year'] = None
+            if not attrs.get('pharmacist_award_level'):
+                raise serializers.ValidationError({
+                    'pharmacist_award_level': 'Pharmacist award level is required for pharmacists.'
+                })
+        elif role in ('ASSISTANT', 'TECHNICIAN'):
+            attrs['pharmacist_award_level'] = None
+            attrs['intern_half'] = None
+            attrs['student_year'] = None
+            if not attrs.get('otherstaff_classification_level'):
+                raise serializers.ValidationError({
+                    'otherstaff_classification_level': 'Classification level is required for assistants and technicians.'
+                })
+        elif role == 'INTERN':
+            attrs['pharmacist_award_level'] = None
+            attrs['otherstaff_classification_level'] = None
+            attrs['student_year'] = None
+            if not attrs.get('intern_half'):
+                raise serializers.ValidationError({
+                    'intern_half': 'Intern half is required for intern pharmacists.'
+                })
+        elif role == 'STUDENT':
+            attrs['pharmacist_award_level'] = None
+            attrs['otherstaff_classification_level'] = None
+            attrs['intern_half'] = None
+            if not attrs.get('student_year'):
+                raise serializers.ValidationError({
+                    'student_year': 'Student year is required for pharmacy students.'
+                })
+
         return super().validate(attrs)
 
     def create(self, validated_data):

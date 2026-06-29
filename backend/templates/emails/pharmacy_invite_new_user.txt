@@ -1,4 +1,4 @@
-🚀🩺  You’ve Been Invited to Join {{ pharmacy_name }}!
+🚀  You’ve Been Invited to Join {{ pharmacy_name }}!
 
 Hi there,
 

@@ -18,6 +18,13 @@ import {
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
 
+const getFirstErrorMessage = (value: unknown): string | null => {
+    if (Array.isArray(value)) {
+        return typeof value[0] === 'string' ? value[0] : null;
+    }
+    return null;
+};
+
 type ApplicationCategory = 'FULL_PART_TIME' | 'LOCUM_CASUAL';
 
 interface MembershipApplicationsPanelProps {
@@ -86,7 +93,14 @@ export default function MembershipApplicationsPanel({
             onApproved?.();
             await loadApplications();
         } catch (error: any) {
-            const detail = error?.response?.data?.detail || error?.message;
+            const data = error?.response?.data;
+            const firstFieldError =
+                data && typeof data === 'object'
+                    ? Object.values(data as Record<string, unknown>)
+                        .map(getFirstErrorMessage)
+                        .find((value): value is string => Boolean(value))
+                    : null;
+            const detail = data?.detail || firstFieldError || error?.message;
             onNotification?.(detail || 'Failed to approve application', 'error');
         } finally {
             setProcessingId(null);
@@ -100,7 +114,8 @@ export default function MembershipApplicationsPanel({
             onNotification?.('Application rejected', 'success');
             await loadApplications();
         } catch (error: any) {
-            const detail = error?.response?.data?.detail || error?.message;
+            const data = error?.response?.data;
+            const detail = data?.detail || error?.message;
             onNotification?.(detail || 'Failed to reject application', 'error');
         } finally {
             setProcessingId(null);

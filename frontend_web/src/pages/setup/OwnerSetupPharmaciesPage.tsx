@@ -4,7 +4,7 @@ import { alpha } from "@mui/material/styles";
 import { Navigate } from "react-router-dom";
 import PharmacyPage from "../dashboard/sidebar/PharmacyPage";
 import { getOwnerSetupStatus, ownerSetupPaths } from "../../utils/ownerSetup";
-import logoBanner from "../../assets/logo-banner.jpg";
+import logoBanner from "../../assets/clipsnap-edit-6-1-2026.png";
 
 export default function OwnerSetupPharmaciesPage() {
   const [redirectPath, setRedirectPath] = useState<string | null>(null);

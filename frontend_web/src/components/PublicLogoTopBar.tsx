@@ -1,5 +1,5 @@
 import { Box, Container, Toolbar } from "@mui/material";
-import logoBanner from "../assets/logo-banner.jpg";
+import logoBanner from "../assets/clipsnap-edit-6-1-2026.png";
 
 export default function PublicLogoTopBar() {
   return (

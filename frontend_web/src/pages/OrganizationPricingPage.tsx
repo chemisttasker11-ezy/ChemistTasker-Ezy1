@@ -8,7 +8,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import HubIcon from '@mui/icons-material/Hub';
-import logoBanner from '../assets/logo-banner.jpg';
+import logoBanner from '../assets/clipsnap-edit-6-1-2026.png';
 import PublicContactFormSection from '../components/PublicContactFormSection';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveDashboardPath } from '../utils/dashboardPath';

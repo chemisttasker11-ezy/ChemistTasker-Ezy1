@@ -6,7 +6,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
-import logoBanner from '../assets/logo-banner.jpg';
+import logoBanner from '../assets/clipsnap-edit-6-1-2026.png';
 import AuthLayout from '../layouts/AuthLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveDashboardPath } from '../utils/dashboardPath';

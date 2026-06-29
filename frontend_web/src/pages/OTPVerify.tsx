@@ -9,9 +9,11 @@ import {
   Alert,
   Link,
   Typography,
+  Stack,
 } from '@mui/material';
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 import AuthLayout from '../layouts/AuthLayout'; // Import the new layout
+import PublicLogoTopBar from '../components/PublicLogoTopBar';
 
 export default function OTPVerify() {
   const navigate = useNavigate();
@@ -64,29 +66,51 @@ export default function OTPVerify() {
   };
 
   return (
-    <AuthLayout title="Email Verification">
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {status && <Alert severity="success" sx={{ mb: 2 }}>{status}</Alert>}
-      <form onSubmit={handleVerify}>
-        <TextField fullWidth margin="normal" label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-        <TextField fullWidth margin="normal" label="Enter OTP Code" value={otp} onChange={e => setOtp(e.target.value)} required />
-        <Box mt={3}>
-          <Button fullWidth type="submit" variant="contained" disabled={loading} sx={{ py: 1.5, backgroundColor: '#00a99d', '&:hover': {backgroundColor: '#00877d'} }}>
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Verify'}
-          </Button>
+    <>
+      <PublicLogoTopBar />
+      <AuthLayout title="Email Verification">
+        <Box
+          sx={{
+            mb: 3,
+            p: 2.25,
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(0,169,157,0.12), rgba(15,23,42,0.04))',
+            border: '1px solid rgba(148,163,184,0.22)',
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Confirm your email
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Enter the one-time code sent to your inbox to continue with your account setup.
+          </Typography>
         </Box>
-      </form>
-      <Box mt={2} textAlign="center">
-        <Link component="button" onClick={handleResend} disabled={loading} color="#00a99d">
-          Resend Code
-        </Link>
-      </Box>
-      <Typography variant="body2" mt={3} textAlign="center">
-        Back to{' '}
-        <Link component={RouterLink} to="/login" fontWeight="bold" color="#00a99d">
-          Login
-        </Link>
-      </Typography>
-    </AuthLayout>
+
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {status && <Alert severity="success" sx={{ mb: 2 }}>{status}</Alert>}
+        <form onSubmit={handleVerify}>
+          <Stack spacing={1.5}>
+            <TextField fullWidth margin="normal" label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+            <TextField fullWidth margin="normal" label="Enter OTP Code" value={otp} onChange={e => setOtp(e.target.value)} required />
+          </Stack>
+          <Box mt={3}>
+            <Button fullWidth type="submit" variant="contained" disabled={loading} sx={{ py: 1.5, backgroundColor: '#00a99d', '&:hover': {backgroundColor: '#00877d'} }}>
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Verify'}
+            </Button>
+          </Box>
+        </form>
+        <Box mt={2} textAlign="center">
+          <Link component="button" onClick={handleResend} disabled={loading} color="#00a99d">
+            Resend Code
+          </Link>
+        </Box>
+        <Typography variant="body2" mt={3} textAlign="center">
+          Back to{' '}
+          <Link component={RouterLink} to="/login" fontWeight="bold" color="#00a99d">
+            Login
+          </Link>
+        </Typography>
+      </AuthLayout>
+    </>
   );
 }
