@@ -15,10 +15,14 @@ export default function MobileVerifyScreen() {
     const { logout, markMobileVerified, user } = useAuth();
 
     const [mobile, setMobile] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [username, setUsername] = useState('');
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
     const [error, setError] = useState('');
+    const [identityLocked, setIdentityLocked] = useState(false);
     const otpInputRef = useRef<RNTextInput | null>(null);
 
     const getRoleHome = (role?: string | null): string => {
@@ -36,13 +40,19 @@ export default function MobileVerifyScreen() {
     const requestCode = async () => {
         setError('');
         setStatus('');
-        if (!mobile) {
-            setError('Please enter your mobile number.');
+        if (!firstName || !lastName || !username || !mobile) {
+            setError('Please enter your first name, last name, username, and mobile number.');
             return;
         }
         setLoading(true);
         try {
-            await mobileRequestOtp({ mobile_number: mobile });
+            await mobileRequestOtp({
+                first_name: firstName,
+                last_name: lastName,
+                username,
+                mobile_number: mobile,
+            });
+            setIdentityLocked(true);
             setStatus('We sent a code to your mobile.');
         } catch (err: any) {
             setError(err?.message || 'Failed to send code.');
@@ -61,7 +71,12 @@ export default function MobileVerifyScreen() {
         setLoading(true);
         try {
             await mobileVerifyOtp({ otp });
-            await markMobileVerified();
+            await markMobileVerified({
+                first_name: firstName,
+                last_name: lastName,
+                username,
+                mobile_number: mobile,
+            });
             setStatus('Mobile verified! Redirecting...');
             setTimeout(() => router.replace(getRoleHome(user?.role) as any), 800);
         } catch (err: any) {
@@ -110,6 +125,33 @@ export default function MobileVerifyScreen() {
             ) : null}
 
             <TextInput
+                label="First Legal Name"
+                value={firstName}
+                onChangeText={setFirstName}
+                mode="outlined"
+                style={styles.input}
+                disabled={identityLocked || loading}
+            />
+
+            <TextInput
+                label="Last Legal Name"
+                value={lastName}
+                onChangeText={setLastName}
+                mode="outlined"
+                style={styles.input}
+                disabled={identityLocked || loading}
+            />
+
+            <TextInput
+                label="Username"
+                value={username}
+                onChangeText={setUsername}
+                mode="outlined"
+                style={styles.input}
+                disabled={loading}
+            />
+
+            <TextInput
                 label="Mobile Number"
                 value={mobile}
                 onChangeText={setMobile}
@@ -117,6 +159,7 @@ export default function MobileVerifyScreen() {
                 style={styles.input}
                 keyboardType="phone-pad"
                 placeholder="e.g. 041x xxx xxx"
+                disabled={identityLocked || loading}
             />
 
             <Button

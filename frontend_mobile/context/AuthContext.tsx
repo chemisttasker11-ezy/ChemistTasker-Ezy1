@@ -27,6 +27,8 @@ export type User = {
   role: string;
   mobile_number?: string | null;
   is_mobile_verified?: boolean;
+  first_name?: string;
+  last_name?: string;
   profile_photo?: string;
   profile_photo_url?: string;
   memberships?: OrgMembership[];
@@ -61,7 +63,7 @@ type AuthContextType = {
   logout: () => Promise<void>;
   verifyOTP: (code: string, email?: string) => Promise<void>;
   resendOTP: (email?: string) => Promise<void>;
-  markMobileVerified: () => Promise<void>;
+  markMobileVerified: (updates?: Partial<User>) => Promise<void>;
   updateUserProfilePhoto: (photoUrl: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
@@ -364,9 +366,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const markMobileVerified = async () => {
+  const markMobileVerified = async (updates?: Partial<User>) => {
     if (!user) return;
-    const updated = { ...user, is_mobile_verified: true };
+    const updated = { ...user, ...updates, is_mobile_verified: true };
     setUser(updated);
     const session = await readStoredSession();
     await writeStoredSession({

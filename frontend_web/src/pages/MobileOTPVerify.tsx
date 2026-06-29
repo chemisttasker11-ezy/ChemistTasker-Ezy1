@@ -15,22 +15,44 @@ import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import apiClient from '../utils/apiClient';
 
 export default function MobileOTPVerify() {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName]   = useState('');
+  const [username, setUsername]   = useState('');
   const [mobile, setMobile]   = useState('');
   const [otp, setOtp]         = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus]   = useState('');
   const [error, setError]     = useState('');
+  const [identityLocked, setIdentityLocked] = useState(false);
+
+  const extractError = (err: unknown, fallback: string) => {
+    const anyErr = err as any;
+    const data = anyErr?.response?.data;
+    if (typeof data?.detail === 'string' && data.detail) return data.detail;
+    if (typeof data?.error === 'string' && data.error) return data.error;
+    if (data && typeof data === 'object') {
+      const firstValue = Object.values(data)[0];
+      if (Array.isArray(firstValue) && typeof firstValue[0] === 'string') return firstValue[0];
+      if (typeof firstValue === 'string') return firstValue;
+    }
+    return fallback;
+  };
 
   const requestCode = async () => {
     setError('');
     setStatus('');
     setLoading(true);
     try {
-      await apiClient.post('/users/mobile/request-otp/', { mobile_number: mobile });
+      await apiClient.post('/users/mobile/request-otp/', {
+        first_name: firstName,
+        last_name: lastName,
+        username,
+        mobile_number: mobile,
+      });
+      setIdentityLocked(true);
       setStatus('We sent a code to your mobile.');
     } catch (err) {
-      const anyErr = err as any;
-      setError(anyErr?.response?.data?.error || anyErr?.response?.data?.detail || 'Failed to send code.');
+      setError(extractError(err, 'Failed to send code.'));
     } finally {
       setLoading(false);
     }
@@ -46,8 +68,7 @@ export default function MobileOTPVerify() {
       setStatus('Mobile verified! Redirecting...');
       setTimeout(() => window.location.assign('/login'), 800);
     } catch (err) {
-      const anyErr = err as any;
-      setError(anyErr?.response?.data?.error || anyErr?.response?.data?.detail || 'Verification failed.');
+      setError(extractError(err, 'Verification failed.'));
     } finally {
       setLoading(false);
     }
@@ -61,8 +82,7 @@ export default function MobileOTPVerify() {
       await apiClient.post('/users/mobile/resend-otp/', {});
       setStatus('A new code has been sent to your mobile.');
     } catch (err) {
-      const anyErr = err as any;
-      setError(anyErr?.response?.data?.error || anyErr?.response?.data?.detail || 'Could not resend code.');
+      setError(extractError(err, 'Could not resend code.'));
     } finally {
       setLoading(false);
     }
@@ -97,11 +117,42 @@ export default function MobileOTPVerify() {
             <TextField
               fullWidth
               margin="normal"
+              label="First Legal Name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+              disabled={loading || identityLocked}
+            />
+
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Last Legal Name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+              disabled={loading || identityLocked}
+            />
+
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              disabled={loading}
+            />
+
+            <TextField
+              fullWidth
+              margin="normal"
               label="Mobile Number"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               placeholder="e.g., 041x xxx xxx"
               required
+              disabled={loading || identityLocked}
             />
 
             <Box mt={1}>
@@ -110,7 +161,7 @@ export default function MobileOTPVerify() {
                 type="button"
                 onClick={requestCode}
                 variant="outlined"
-                disabled={loading || !mobile}
+                disabled={loading || !mobile || !firstName || !lastName || !username}
                 sx={{ py: 1.25, borderColor: '#00a99d', color: '#00a99d' }}
               >
                 {loading ? <CircularProgress size={22} /> : 'Send Code'}

@@ -150,6 +150,50 @@ def _should_clear_flag(initial_data, key):
         return value
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
+
+def _normalize_identity_value(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _update_locked_user_fields(user, user_data):
+    errors = {}
+    changed_user_fields = []
+
+    if "username" in user_data:
+        incoming_username = _normalize_identity_value(user_data.get("username"))
+        if user.username != incoming_username:
+            user.username = incoming_username
+            changed_user_fields.append("username")
+
+    for field_name in ("first_name", "last_name"):
+        if field_name not in user_data:
+            continue
+        incoming_value = _normalize_identity_value(user_data.get(field_name))
+        existing_value = _normalize_identity_value(getattr(user, field_name))
+        if existing_value and incoming_value != existing_value:
+            errors[field_name] = f"{field_name.replace('_', ' ').title()} is locked and cannot be changed."
+            continue
+        if getattr(user, field_name) != incoming_value:
+            setattr(user, field_name, incoming_value)
+            changed_user_fields.append(field_name)
+
+    if "mobile_number" in user_data:
+        incoming_mobile = _normalize_identity_value(user_data.get("mobile_number")) or None
+        existing_mobile = _normalize_identity_value(getattr(user, "mobile_number", None)) or None
+        if getattr(user, "is_mobile_verified", False) and existing_mobile and incoming_mobile != existing_mobile:
+            errors["phone_number"] = "Verified mobile number is locked and cannot be changed."
+        elif user.mobile_number != incoming_mobile:
+            user.mobile_number = incoming_mobile
+            changed_user_fields.append("mobile_number")
+
+    if errors:
+        raise serializers.ValidationError(errors)
+
+    if changed_user_fields:
+        user.save(update_fields=sorted(set(changed_user_fields)))
+
 class RemoveOldFilesMixin:
     file_fields: list[str] = []
     def update(self, instance, validated_data):
@@ -369,13 +413,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
         update_fields: list[str] = []
 
         if user_data:
-            changed_user_fields = []
-            for key in ("username", "first_name", "last_name", "mobile_number"):
-                if key in user_data:
-                    setattr(instance.user, key, user_data[key])
-                    changed_user_fields.append(key)
-            if changed_user_fields:
-                instance.user.save(update_fields=changed_user_fields)
+            _update_locked_user_fields(instance.user, user_data)
 
         clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
         if "profile_photo" in vdata or clear_photo:
@@ -868,13 +906,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         update_fields = []
 
         if user_data:
-            changed_user_fields = []
-            for k in ('username', 'first_name', 'last_name', 'mobile_number'):
-                if k in user_data:
-                    setattr(instance.user, k, user_data[k])
-                    changed_user_fields.append(k)
-            if changed_user_fields:
-                instance.user.save(update_fields=changed_user_fields)
+            _update_locked_user_fields(instance.user, user_data)
 
         clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
         if "profile_photo" in vdata or clear_photo:
@@ -1931,13 +1963,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         # nested user data
         user_data = vdata.pop('user', {})
         if user_data:
-            changed_user_fields = []
-            for k in ('username', 'first_name', 'last_name', 'mobile_number'):
-                if k in user_data:
-                    setattr(instance.user, k, user_data[k])
-                    changed_user_fields.append(k)
-            if changed_user_fields:
-                instance.user.save(update_fields=changed_user_fields)
+            _update_locked_user_fields(instance.user, user_data)
 
         update_fields = []
 
@@ -2717,13 +2743,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
         # nested user data
         user_data = vdata.pop('user', {})
         if user_data:
-            changed_user_fields = []
-            for k in ('username', 'first_name', 'last_name', 'mobile_number'):
-                if k in user_data:
-                    setattr(instance.user, k, user_data[k])
-                    changed_user_fields.append(k)
-            if changed_user_fields:
-                instance.user.save(update_fields=changed_user_fields)
+            _update_locked_user_fields(instance.user, user_data)
 
         update_fields = []
 
@@ -3191,6 +3211,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "rate_early_morning",
             "rate_late_night",
             "about",
+            "auto_publish_worker_requests",
 
             'has_chain',
             'claimed',
@@ -3702,47 +3723,14 @@ class MembershipSerializer(serializers.ModelSerializer):
                 if f in attrs:
                     attrs[f] = None
 
-        pharmacist_award_level = attrs.get(
-            'pharmacist_award_level',
-            getattr(self.instance, 'pharmacist_award_level', None) if self.instance else None,
-        )
-        otherstaff_classification_level = attrs.get(
-            'otherstaff_classification_level',
-            getattr(self.instance, 'otherstaff_classification_level', None) if self.instance else None,
-        )
-        intern_half = attrs.get(
-            'intern_half',
-            getattr(self.instance, 'intern_half', None) if self.instance else None,
-        )
-        student_year = attrs.get(
-            'student_year',
-            getattr(self.instance, 'student_year', None) if self.instance else None,
-        )
-
         if role == 'PHARMACIST':
             clear('otherstaff_classification_level', 'intern_half', 'student_year')
-            if not pharmacist_award_level:
-                raise serializers.ValidationError({
-                    'pharmacist_award_level': 'Pharmacist award level is required for pharmacists.'
-                })
         elif role in ('ASSISTANT', 'TECHNICIAN'):
             clear('pharmacist_award_level', 'intern_half', 'student_year')
-            if not otherstaff_classification_level:
-                raise serializers.ValidationError({
-                    'otherstaff_classification_level': 'Classification level is required for assistants and technicians.'
-                })
         elif role == 'INTERN':
             clear('pharmacist_award_level', 'otherstaff_classification_level', 'student_year')
-            if not intern_half:
-                raise serializers.ValidationError({
-                    'intern_half': 'Intern half is required for intern pharmacists.'
-                })
         elif role == 'STUDENT':
             clear('pharmacist_award_level', 'otherstaff_classification_level', 'intern_half')
-            if not student_year:
-                raise serializers.ValidationError({
-                    'student_year': 'Student year is required for pharmacy students.'
-                })
 
         return attrs
 

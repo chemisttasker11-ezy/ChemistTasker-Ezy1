@@ -59,6 +59,7 @@ export default function BasicInfoV2() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [data, setData] = React.useState<ApiData>({});
+  const [lockedNames, setLockedNames] = React.useState({ first: false, last: false });
   const [profilePhotoFile, setProfilePhotoFile] = React.useState<File | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = React.useState<string | null>(null);
   const [profilePhotoCleared, setProfilePhotoCleared] = React.useState(false);
@@ -111,6 +112,10 @@ export default function BasicInfoV2() {
         if (!mounted) return;
         const nextData = res as any;
         setData(nextData);
+        setLockedNames({
+          first: Boolean(nextData?.first_name),
+          last: Boolean(nextData?.last_name),
+        });
         const nextPhoto =
           nextData?.profile_photo_url ||
           (nextData?.profile_photo ? `${API_BASE_URL}${nextData.profile_photo}` : null);
@@ -220,6 +225,10 @@ export default function BasicInfoV2() {
       const res = await updateOnboardingForm(roleKey, fd as any);
       const nextData = res as any;
       setData(nextData);
+      setLockedNames({
+        first: Boolean(nextData?.first_name),
+        last: Boolean(nextData?.last_name),
+      });
       const nextPhoto =
         nextData?.profile_photo_url ||
         (nextData?.profile_photo ? `${API_BASE_URL}${nextData.profile_photo}` : null);
@@ -262,7 +271,13 @@ export default function BasicInfoV2() {
 const sendMobileOtp = async () => {
   setOtpBusy(true); setOtpErr(''); setOtpMsg('');
   try {
-    await mobileRequestOtp({ mobile_number: data.phone_number } as any);
+    await mobileRequestOtp({
+      first_name: data.first_name,
+      last_name: data.last_name,
+      username: data.username,
+      mobile_number: data.phone_number,
+    } as any);
+    setLockedNames({ first: true, last: true });
     setOtpMsg('Code sent to your mobile.');
   } catch (e: any) {
     setOtpErr(e?.response?.data?.error || e?.response?.data?.detail || e.message || 'Failed to send code.');
@@ -335,12 +350,14 @@ const resendMobileOtp = async () => {
           label="First Legal Name"
           value={data.first_name || ''}
           onChange={e => setField('first_name', e.target.value)}
+          disabled={lockedNames.first}
           sx={{ flex: '1 1 220px', minWidth: 200, maxWidth: 320 }}
         />
         <TextField
           label="Last Legal Name"
           value={data.last_name || ''}
           onChange={e => setField('last_name', e.target.value)}
+          disabled={lockedNames.last}
           sx={{ flex: '1 1 220px', minWidth: 200, maxWidth: 320 }}
         />
         <TextField

@@ -38,6 +38,7 @@ export default function OtherStaffBasicInfoScreen() {
   const [error, setError] = useState('');
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
   const [form, setForm] = useState<ApiData>({});
+  const [lockedNames, setLockedNames] = useState({ first: false, last: false });
   const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, saving });
 
   useEffect(() => {
@@ -47,6 +48,10 @@ export default function OtherStaffBasicInfoScreen() {
         const data: any = await getOnboardingDetail(roleKey);
         if (!mounted) return;
         setForm(data || {});
+        setLockedNames({
+          first: Boolean(data?.first_name),
+          last: Boolean(data?.last_name),
+        });
         unsaved.markClean(data || {});
       } catch (err: any) {
         if (!mounted) return;
@@ -108,6 +113,10 @@ export default function OtherStaffBasicInfoScreen() {
       });
       const res: any = await updateOnboardingForm(roleKey, fd as any);
       setForm(res || {});
+      setLockedNames({
+        first: Boolean(res?.first_name),
+        last: Boolean(res?.last_name),
+      });
       unsaved.markClean(res || {});
       Alert.alert('Saved', submitForVerification ? 'Submitted for verification.' : 'Basic info saved.');
     } catch (err: any) {
@@ -134,8 +143,8 @@ export default function OtherStaffBasicInfoScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Basic Info</Text>
-        <TextInput mode="outlined" label="First Legal Name" value={form.first_name || ''} onChangeText={(v) => setField('first_name', v)} />
-        <TextInput mode="outlined" label="Last Legal Name" value={form.last_name || ''} onChangeText={(v) => setField('last_name', v)} />
+        <TextInput mode="outlined" label="First Legal Name" value={form.first_name || ''} onChangeText={(v) => setField('first_name', v)} editable={!lockedNames.first} />
+        <TextInput mode="outlined" label="Last Legal Name" value={form.last_name || ''} onChangeText={(v) => setField('last_name', v)} editable={!lockedNames.last} />
         <TextInput mode="outlined" label="Username" value={form.username || ''} onChangeText={(v) => setField('username', v)} />
         <TextInput mode="outlined" label="Phone Number" value={form.phone_number || ''} onChangeText={(v) => setField('phone_number', v)} />
         <TextInput mode="outlined" label="Date of Birth" value={form.date_of_birth || ''} onChangeText={(v) => setField('date_of_birth', v)} placeholder="YYYY-MM-DD" />

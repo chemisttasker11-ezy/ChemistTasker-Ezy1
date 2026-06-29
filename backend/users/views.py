@@ -643,6 +643,52 @@ def valid_otp_format(otp: str) -> bool:
     return bool(otp and otp.isdigit() and len(otp) == 6)
 
 
+def _clean_identity_value(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _capture_mobile_identity(user, payload):
+    errors = {}
+
+    incoming_first_name = _clean_identity_value(payload.get("first_name"))
+    incoming_last_name = _clean_identity_value(payload.get("last_name"))
+    incoming_username = _clean_identity_value(payload.get("username"))
+
+    existing_first_name = _clean_identity_value(user.first_name)
+    existing_last_name = _clean_identity_value(user.last_name)
+
+    if not incoming_first_name:
+        errors["first_name"] = "First name is required."
+    elif existing_first_name and incoming_first_name != existing_first_name:
+        errors["first_name"] = "First name is locked and cannot be changed."
+
+    if not incoming_last_name:
+        errors["last_name"] = "Last name is required."
+    elif existing_last_name and incoming_last_name != existing_last_name:
+        errors["last_name"] = "Last name is locked and cannot be changed."
+
+    if not incoming_username:
+        errors["username"] = "Username is required."
+
+    if errors:
+        return None, Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    changed_fields = []
+    if user.first_name != incoming_first_name:
+        user.first_name = incoming_first_name
+        changed_fields.append("first_name")
+    if user.last_name != incoming_last_name:
+        user.last_name = incoming_last_name
+        changed_fields.append("last_name")
+    if user.username != incoming_username:
+        user.username = incoming_username
+        changed_fields.append("username")
+
+    return changed_fields, None
+
+
 def _resolve_mobile_otp_user(request):
     if request.user and request.user.is_authenticated:
         return request.user, None
@@ -689,6 +735,17 @@ class RequestMobileOTPView(APIView):
         if not normalized or not normalized.startswith("61"):
             return Response({"error": "Invalid Australian mobile number format"}, status=status.HTTP_400_BAD_REQUEST)
 
+        changed_identity_fields, identity_error = _capture_mobile_identity(user, request.data)
+        if identity_error is not None:
+            return identity_error
+
+        existing_mobile = _clean_identity_value(user.mobile_number) or None
+        if user.is_mobile_verified and existing_mobile and normalized != existing_mobile:
+            return Response(
+                {"mobile_number": "Verified mobile number is locked and cannot be changed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # 60-second cooldown to prevent spamming
         if user.mobile_otp_created_at and timezone.now() - user.mobile_otp_created_at < timedelta(seconds=60):
             return Response(
@@ -703,7 +760,31 @@ class RequestMobileOTPView(APIView):
         user.mobile_otp_created_at = timezone.now()
         user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
-        user.save()
+        update_fields = [
+            "mobile_number",
+            "mobile_otp_code",
+            "mobile_otp_created_at",
+            "is_mobile_verified",
+            "mobile_otp_failed_attempts",
+            "mobile_otp_locked_until",
+        ]
+        if changed_identity_fields:
+            update_fields.extend(changed_identity_fields)
+        user.save(update_fields=sorted(set(update_fields)))
+
+        if settings.DEBUG:
+            debug_message = (
+                f"[DEBUG] Mobile OTP for user={user.id} mobile={normalized}: {otp_code}"
+            )
+            print(debug_message)
+            logging.getLogger(__name__).info(debug_message)
+            return Response(
+                {
+                    "detail": "OTP generated successfully (DEBUG mode).",
+                    "debug_otp": otp_code,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # Send SMS
         sms_payload = {
@@ -811,7 +892,27 @@ class ResendMobileOTPView(APIView):
         user.mobile_otp_created_at = timezone.now()
         user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
-        user.save()
+        user.save(update_fields=[
+            "mobile_otp_code",
+            "mobile_otp_created_at",
+            "is_mobile_verified",
+            "mobile_otp_failed_attempts",
+            "mobile_otp_locked_until",
+        ])
+
+        if settings.DEBUG:
+            debug_message = (
+                f"[DEBUG] Mobile OTP resend for user={user.id} mobile={user.mobile_number}: {otp_code}"
+            )
+            print(debug_message)
+            logging.getLogger(__name__).info(debug_message)
+            return Response(
+                {
+                    "detail": "OTP regenerated successfully (DEBUG mode).",
+                    "debug_otp": otp_code,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # Send SMS
         sms_payload = {

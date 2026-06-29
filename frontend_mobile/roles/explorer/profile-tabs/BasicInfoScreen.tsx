@@ -47,6 +47,7 @@ export default function ExplorerBasicInfoScreen() {
   const [roleMenuVisible, setRoleMenuVisible] = useState(false);
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
   const [form, setForm] = useState<ApiData>({});
+  const [lockedNames, setLockedNames] = useState({ first: false, last: false });
   const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, saving });
 
   useEffect(() => {
@@ -56,6 +57,10 @@ export default function ExplorerBasicInfoScreen() {
         const data: any = await getOnboarding(roleKey as any);
         if (!mounted) return;
         setForm(data || {});
+        setLockedNames({
+          first: Boolean(data?.first_name),
+          last: Boolean(data?.last_name),
+        });
         unsaved.markClean(data || {});
       } catch (err: any) {
         if (!mounted) return;
@@ -119,6 +124,10 @@ export default function ExplorerBasicInfoScreen() {
       });
       const res: any = await updateOnboarding(roleKey as any, fd as any);
       setForm(res || {});
+      setLockedNames({
+        first: Boolean(res?.first_name),
+        last: Boolean(res?.last_name),
+      });
       unsaved.markClean(res || {});
       Alert.alert('Saved', submitForVerification ? 'Submitted for verification.' : 'Basic info saved.');
     } catch (err: any) {
@@ -145,8 +154,8 @@ export default function ExplorerBasicInfoScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Basic Info</Text>
-        <TextInput mode="outlined" label="First Legal Name" value={form.first_name || ''} onChangeText={(v) => setField('first_name', v)} />
-        <TextInput mode="outlined" label="Last Legal Name" value={form.last_name || ''} onChangeText={(v) => setField('last_name', v)} />
+        <TextInput mode="outlined" label="First Legal Name" value={form.first_name || ''} onChangeText={(v) => setField('first_name', v)} editable={!lockedNames.first} />
+        <TextInput mode="outlined" label="Last Legal Name" value={form.last_name || ''} onChangeText={(v) => setField('last_name', v)} editable={!lockedNames.last} />
         <TextInput mode="outlined" label="Username" value={form.username || ''} onChangeText={(v) => setField('username', v)} />
         <TextInput mode="outlined" label="Phone Number" value={form.phone_number || ''} onChangeText={(v) => setField('phone_number', v)} />
         <Menu visible={roleMenuVisible} onDismiss={() => setRoleMenuVisible(false)} anchor={<Button mode="outlined" onPress={() => setRoleMenuVisible(true)}>{roleLabel}</Button>}>
