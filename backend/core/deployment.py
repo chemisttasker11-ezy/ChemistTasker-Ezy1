@@ -100,7 +100,7 @@ STORAGES = {
             "azure_container": env("AZURE_CONTAINER"),
 
             "azure_ssl":       True,            # ← NOT "ssl"
-            "overwrite_files": True,            # ← new
+            "overwrite_files": False,
             "expiration_secs": 3600,            # 1 hour (adjust as you like)
 
             # In case of network slowness, bump this up (defaults to None)

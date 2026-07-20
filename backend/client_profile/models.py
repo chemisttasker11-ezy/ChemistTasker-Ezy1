@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from datetime import timedelta
 from django.utils import timezone
 from client_profile.fields import EncryptedTextField
+import os
 
 
 GENDER_CHOICES = [
@@ -17,6 +18,107 @@ GENDER_CHOICES = [
     ("FEMALE", "Female"),
     ("PREFER_NOT_TO_SAY", "Prefer not to say"),
 ]
+
+
+def _safe_ext(filename):
+    _base, ext = os.path.splitext(filename or "")
+    return ext.lower()
+
+
+def _unique_upload_path(prefix, filename):
+    return f"{prefix}/{uuid.uuid4().hex}{_safe_ext(filename)}"
+
+
+def organization_cover_upload_path(instance, filename):
+    owner = instance.pk or "new"
+    return _unique_upload_path(f"organizations/{owner}/covers", filename)
+
+
+def onboarding_upload_path(instance, filename, folder):
+    user_id = getattr(instance, "user_id", None) or "new"
+    return _unique_upload_path(f"users/{user_id}/{folder}", filename)
+
+
+def owner_profile_photo_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "profile_photos")
+
+
+def pharmacist_profile_photo_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "profile_photos")
+
+
+def pharmacist_gov_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids")
+
+
+def pharmacist_secondary_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids_secondary")
+
+
+def pharmacist_resume_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "resumes")
+
+
+def otherstaff_profile_photo_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "profile_photos")
+
+
+def otherstaff_gov_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids")
+
+
+def otherstaff_secondary_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids_secondary")
+
+
+def otherstaff_role_doc_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "role_docs")
+
+
+def otherstaff_resume_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "resumes")
+
+
+def explorer_gov_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids")
+
+
+def explorer_resume_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "resumes")
+
+
+def explorer_profile_photo_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "profile_photos")
+
+
+def explorer_secondary_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids_secondary")
+
+
+def pharmacy_upload_path(instance, filename, folder):
+    owner = instance.pk or getattr(instance, "owner_id", None) or "new"
+    return _unique_upload_path(f"pharmacies/{owner}/{folder}", filename)
+
+
+def pharmacy_reg_doc_upload_path(instance, filename):
+    return pharmacy_upload_path(instance, filename, "reg_docs")
+
+
+def pharmacy_other_doc_upload_path(instance, filename):
+    return pharmacy_upload_path(instance, filename, "other_docs")
+
+
+def pharmacy_cover_upload_path(instance, filename):
+    return pharmacy_upload_path(instance, filename, "covers")
+
+
+def chain_logo_upload_path(instance, filename):
+    owner = instance.pk or getattr(instance, "owner_id", None) or "new"
+    return _unique_upload_path(f"chains/{owner}/logos", filename)
+
+
+def hub_attachment_upload_path(instance, filename):
+    return _unique_upload_path("pharmacy_hub/attachments", filename)
 
 
 class Organization(models.Model):
@@ -27,7 +129,7 @@ class Organization(models.Model):
     slug = models.SlugField(max_length=255, unique=True, db_index=True)
     about = models.TextField(blank=True, null=True)
     cover_image = models.ImageField(
-        upload_to="organization_covers/", blank=True, null=True
+        upload_to=organization_cover_upload_path, blank=True, null=True
     )
 
     def __str__(self):
@@ -83,7 +185,7 @@ class OwnerOnboarding(models.Model):
     role            = models.CharField(max_length=20, choices=ROLE_CHOICES)
     chain_pharmacy  = models.BooleanField(default=False)
     number_of_pharmacies = models.PositiveIntegerField(default=1)
-    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to=owner_profile_photo_upload_path, blank=True, null=True)
 
     # Regulatory Info for pharmacists only
     ahpra_number    = models.CharField(max_length=100, blank=True, null=True)
@@ -149,11 +251,11 @@ class PharmacistOnboarding(models.Model):
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
-    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
-    government_id = models.FileField(upload_to='gov_ids/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to=pharmacist_profile_photo_upload_path, blank=True, null=True)
+    government_id = models.FileField(upload_to=pharmacist_gov_id_upload_path, blank=True, null=True)
     government_id_type = models.CharField(max_length=32, choices=ID_DOC_CHOICES, blank=True, null=True)
     identity_meta = models.JSONField(default=dict, blank=True)  # per-type details: state/country/expiry/visa_type_number/valid_to
-    identity_secondary_file = models.FileField(upload_to='gov_ids_secondary/', blank=True, null=True)  # second doc when required
+    identity_secondary_file = models.FileField(upload_to=pharmacist_secondary_id_upload_path, blank=True, null=True)  # second doc when required
     ahpra_number = models.CharField(max_length=100, blank=True, null=True)
     # phone_number = models.CharField(max_length=20, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
@@ -161,7 +263,7 @@ class PharmacistOnboarding(models.Model):
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
     short_bio = models.TextField(blank=True, null=True)
-    resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    resume = models.FileField(upload_to=pharmacist_resume_upload_path, blank=True, null=True)
 
     skills = models.JSONField(default=list, blank=True)
     skill_certificates = models.JSONField(default=dict, blank=True)
@@ -287,13 +389,13 @@ class OtherStaffOnboarding(models.Model):
     # --- Core ---
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
-    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to=otherstaff_profile_photo_upload_path, blank=True, null=True)
 
     # --- Identity (parity with Pharmacist) ---
-    government_id = models.FileField(upload_to='gov_ids/', blank=True, null=True)
+    government_id = models.FileField(upload_to=otherstaff_gov_id_upload_path, blank=True, null=True)
     government_id_type = models.CharField(max_length=32, choices=PharmacistOnboarding.ID_DOC_CHOICES, blank=True, null=True)
     identity_meta = models.JSONField(default=dict, blank=True)
-    identity_secondary_file = models.FileField(upload_to='gov_ids_secondary/', blank=True, null=True)
+    identity_secondary_file = models.FileField(upload_to=otherstaff_secondary_id_upload_path, blank=True, null=True)
 
     # --- Role selection ---
     role_type = models.CharField(max_length=50, choices=ROLE_CHOICES, blank=True, null=True)
@@ -345,12 +447,12 @@ class OtherStaffOnboarding(models.Model):
     intern_half = models.CharField(max_length=20, choices=INTERN_HALF_CHOICES, blank=True, null=True)
 
     # --- Role-specific docs (kept) ---
-    ahpra_proof = models.FileField(upload_to='role_docs/', blank=True, null=True)
-    hours_proof = models.FileField(upload_to='role_docs/', blank=True, null=True)
-    certificate = models.FileField(upload_to='role_docs/', blank=True, null=True)
-    university_id = models.FileField(upload_to='role_docs/', blank=True, null=True)
-    cpr_certificate = models.FileField(upload_to='role_docs/', blank=True, null=True)
-    s8_certificate = models.FileField(upload_to='role_docs/', blank=True, null=True)
+    ahpra_proof = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
+    hours_proof = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
+    certificate = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
+    university_id = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
+    cpr_certificate = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
+    s8_certificate = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
 
     # --- Referees ---
     referee1_name = models.CharField(max_length=150, blank=True, null=True)
@@ -371,7 +473,7 @@ class OtherStaffOnboarding(models.Model):
 
     # --- Profile / Rate ---
     short_bio = models.TextField(blank=True, null=True)
-    resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    resume = models.FileField(upload_to=otherstaff_resume_upload_path, blank=True, null=True)
 
     # --- Status ---
     verified = models.BooleanField(default=False)
@@ -429,7 +531,7 @@ class ExplorerOnboarding(models.Model):
         ('AGE_PROOF', 'Age Proof Card'),
     ]
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    government_id = models.FileField(upload_to='gov_ids/', blank=True, null=True)
+    government_id = models.FileField(upload_to=explorer_gov_id_upload_path, blank=True, null=True)
     role_type = models.CharField(max_length=50, choices=ROLE_CHOICES, blank=True, null=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
@@ -455,7 +557,7 @@ class ExplorerOnboarding(models.Model):
     referee2_last_sent = models.DateTimeField(null=True, blank=True)
 
     short_bio = models.TextField(blank=True, null=True)
-    resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    resume = models.FileField(upload_to=explorer_resume_upload_path, blank=True, null=True)
 
     verified = models.BooleanField(default=False)
     submitted_for_verification = models.BooleanField(default=False)
@@ -472,13 +574,13 @@ class ExplorerOnboarding(models.Model):
     travel_states    = models.JSONField(default=list, blank=True)
     coverage_radius_km = models.PositiveSmallIntegerField(blank=True, null=True)
 
-    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to=explorer_profile_photo_upload_path, blank=True, null=True)
 
     # --- Identity  ---
-    government_id = models.FileField(upload_to='gov_ids/', blank=True, null=True)
+    government_id = models.FileField(upload_to=explorer_gov_id_upload_path, blank=True, null=True)
     government_id_type = models.CharField(max_length=32, choices=ID_DOC_CHOICES, blank=True, null=True)
     identity_meta = models.JSONField(default=dict, blank=True)  # per-type details (state, expiry, visa fields…)
-    identity_secondary_file = models.FileField(upload_to='gov_ids_secondary/', blank=True, null=True)
+    identity_secondary_file = models.FileField(upload_to=explorer_secondary_id_upload_path, blank=True, null=True)
 
     # Verification flags/notes
     gov_id_verified = models.BooleanField(default=False, db_index=True)
@@ -611,10 +713,10 @@ class Pharmacy(models.Model):
                              )
 
     # asic_number            = models.CharField(max_length=50, blank=True, null=True)
-    methadone_s8_protocols = models.FileField(upload_to='reg_docs/', blank=True, null=True)
-    qld_sump_docs          = models.FileField(upload_to='reg_docs/', blank=True, null=True)
-    sops                   = models.FileField(upload_to='other_docs/', blank=True, null=True)
-    induction_guides       = models.FileField(upload_to='other_docs/', blank=True, null=True)
+    methadone_s8_protocols = models.FileField(upload_to=pharmacy_reg_doc_upload_path, blank=True, null=True)
+    qld_sump_docs          = models.FileField(upload_to=pharmacy_reg_doc_upload_path, blank=True, null=True)
+    sops                   = models.FileField(upload_to=pharmacy_other_doc_upload_path, blank=True, null=True)
+    induction_guides       = models.FileField(upload_to=pharmacy_other_doc_upload_path, blank=True, null=True)
 
     # Opening hours split by day‐type
     weekdays_start         = models.TimeField(blank=True, null=True)
@@ -664,7 +766,7 @@ class Pharmacy(models.Model):
 
     about                  = models.TextField(blank=True)
     cover_image            = models.ImageField(
-                                upload_to="pharmacy_covers/",
+                                upload_to=pharmacy_cover_upload_path,
                                 blank=True,
                                 null=True
                              )
@@ -1193,7 +1295,7 @@ class Chain(models.Model):
         blank=True
     )
     name = models.CharField(max_length=120)  # Chain name
-    logo = models.ImageField(upload_to='chain_logos/', blank=True)  # Chain logo
+    logo = models.ImageField(upload_to=chain_logo_upload_path, blank=True)  # Chain logo
     subscription_plan = models.CharField(max_length=50, default="Basic")  # Subscription plan
     primary_contact_email = models.EmailField()  # Primary contact email for the chain admin
     created_at = models.DateTimeField(auto_now_add=True)  # Date when the chain was created
@@ -2562,7 +2664,8 @@ class Participant(models.Model):
 
 
 def chat_upload_path(instance, filename):
-    return f"chat/{instance.conversation_id}/{filename}"
+    conversation_id = instance.conversation_id or "new"
+    return _unique_upload_path(f"chat/{conversation_id}", filename)
 
 
 class Message(models.Model):
@@ -3218,7 +3321,7 @@ class PharmacyHubAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name="attachments",
     )
-    file = models.FileField(upload_to="pharmacy_hub/attachments/")
+    file = models.FileField(upload_to=hub_attachment_upload_path)
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.FILE)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

@@ -126,6 +126,58 @@ def _file_has_changed(new_file, old_file):
     return getattr(new_file, "name", None) != getattr(old_file, "name", None)
 
 
+def _known_file_references():
+    return [
+        (OwnerOnboarding, "profile_photo"),
+        (PharmacistOnboarding, "profile_photo"),
+        (PharmacistOnboarding, "government_id"),
+        (PharmacistOnboarding, "identity_secondary_file"),
+        (PharmacistOnboarding, "resume"),
+        (OtherStaffOnboarding, "profile_photo"),
+        (OtherStaffOnboarding, "government_id"),
+        (OtherStaffOnboarding, "identity_secondary_file"),
+        (OtherStaffOnboarding, "ahpra_proof"),
+        (OtherStaffOnboarding, "hours_proof"),
+        (OtherStaffOnboarding, "certificate"),
+        (OtherStaffOnboarding, "university_id"),
+        (OtherStaffOnboarding, "cpr_certificate"),
+        (OtherStaffOnboarding, "s8_certificate"),
+        (OtherStaffOnboarding, "resume"),
+        (ExplorerOnboarding, "profile_photo"),
+        (ExplorerOnboarding, "government_id"),
+        (ExplorerOnboarding, "identity_secondary_file"),
+        (ExplorerOnboarding, "resume"),
+        (Organization, "cover_image"),
+        (Pharmacy, "methadone_s8_protocols"),
+        (Pharmacy, "qld_sump_docs"),
+        (Pharmacy, "sops"),
+        (Pharmacy, "induction_guides"),
+        (Pharmacy, "cover_image"),
+        (Chain, "logo"),
+        (Message, "attachment"),
+        (PharmacyHubAttachment, "file"),
+    ]
+
+
+def _delete_file_if_unreferenced(file_field, *, current_instance=None):
+    name = getattr(file_field, "name", None)
+    if not name:
+        return False
+
+    for model, field_name in _known_file_references():
+        qs = model.objects.filter(**{field_name: name})
+        if current_instance is not None and isinstance(current_instance, model):
+            qs = qs.exclude(pk=getattr(current_instance, "pk", None))
+        if qs.exists():
+            return False
+
+    try:
+        file_field.delete(save=False)
+        return True
+    except Exception:
+        return False
+
+
 def _resolve_user_profile_photo(user):
     if not user:
         return None
@@ -201,11 +253,11 @@ class RemoveOldFilesMixin:
             if field_name in validated_data:
                 new_file, old_file = validated_data[field_name], getattr(instance, field_name)
                 if old_file and old_file.name and (new_file is None or old_file.name != new_file.name):
-                    old_file.delete(save=False)
+                    _delete_file_if_unreferenced(old_file, current_instance=instance)
             elif field_name in validated_data and validated_data[field_name] is None:
                 old_file = getattr(instance, field_name)
                 if old_file:
-                    old_file.delete(save=False)
+                    _delete_file_if_unreferenced(old_file, current_instance=instance)
         return super().update(instance, validated_data)
 
 
@@ -422,7 +474,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
             if new_photo is None and clear_photo:
                 if old_photo:
                     try:
-                        old_photo.delete(save=False)
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
                     except Exception:
                         pass
                 instance.profile_photo = None
@@ -430,7 +482,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
             elif new_photo is not None:
                 if old_photo and _file_has_changed(new_photo, old_photo):
                     try:
-                        old_photo.delete(save=False)
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
                     except Exception:
                         pass
                 instance.profile_photo = new_photo
@@ -550,8 +602,6 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     first_name = serializers.CharField(source='user.first_name', required=False, allow_blank=True)
     last_name  = serializers.CharField(source='user.last_name',  required=False, allow_blank=True)
     phone_number = serializers.CharField(source='user.mobile_number', required=False, allow_blank=True, allow_null=True)
-    profile_photo = serializers.ImageField(required=False, allow_null=True)
-    profile_photo_url = serializers.SerializerMethodField(read_only=True)
     profile_photo = serializers.ImageField(required=False, allow_null=True)
     profile_photo_url = serializers.SerializerMethodField(read_only=True)
 
@@ -915,7 +965,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             if new_photo is None and clear_photo:
                 if old_photo:
                     try:
-                        old_photo.delete(save=False)
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
                     except Exception:
                         pass
                 instance.profile_photo = None
@@ -923,7 +973,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             elif new_photo is not None:
                 if old_photo and _file_has_changed(new_photo, old_photo):
                     try:
-                        old_photo.delete(save=False)
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
                     except Exception:
                         pass
                 instance.profile_photo = new_photo
@@ -956,7 +1006,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         #         # explicit clear
         #         if old_file:
         #             try:
-        #                 old_file.delete(save=False)   # Azure/local safe
+        #                 _delete_file_if_unreferenced(old_file, current_instance=instance)   # Azure/local safe
         #             except Exception:
         #                 pass
         #         instance.government_id = None
@@ -965,7 +1015,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         #         # replacing: delete old first if it's different
         #         if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
         #             try:
-        #                 old_file.delete(save=False)
+        #                 _delete_file_if_unreferenced(old_file, current_instance=instance)
         #             except Exception:
         #                 pass
         #         instance.government_id = new_file
@@ -1078,7 +1128,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
                 old_sec = getattr(instance, 'identity_secondary_file', None)
                 if old_sec:
                     try:
-                        old_sec.delete(save=False)
+                        _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception:
                         pass
                     instance.identity_secondary_file = None
@@ -1100,7 +1150,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             if new_file is None:
                 if old_file:
                     try:
-                        old_file.delete(save=False)
+                        _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception:
                         pass
                 instance.government_id = None
@@ -1108,7 +1158,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             else:
                 if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
                     try:
-                        old_file.delete(save=False)
+                        _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception:
                         pass
                 instance.government_id = new_file
@@ -1123,7 +1173,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             if new_sec is None:
                 if old_sec:
                     try:
-                        old_sec.delete(save=False)
+                        _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception:
                         pass
                 instance.identity_secondary_file = None
@@ -1131,7 +1181,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             else:
                 if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
                     try:
-                        old_sec.delete(save=False)
+                        _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception:
                         pass
                 instance.identity_secondary_file = new_sec
@@ -1578,7 +1628,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             if new_file is None:
                 # explicit clear
                 if old_file:
-                    old_file.delete(save=False)  # Azure/local safe
+                    _delete_file_if_unreferenced(old_file, current_instance=instance)  # Azure/local safe
                 instance.resume = None
                 update_fields.append('resume')
             else:
@@ -1587,7 +1637,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
                     try:
                         # delete only if name differs (optional; safe to always delete)
                         if getattr(old_file, 'name', None) != getattr(new_file, 'name', None):
-                            old_file.delete(save=False)
+                            _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception:
                         # swallow storage deletion errors to avoid blocking user save
                         pass
@@ -1615,6 +1665,8 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     first_name   = serializers.CharField(source='user.first_name', required=False, allow_blank=True)
     last_name    = serializers.CharField(source='user.last_name',  required=False, allow_blank=True)
     phone_number = serializers.CharField(source='user.mobile_number', required=False, allow_blank=True, allow_null=True)
+    profile_photo = serializers.ImageField(required=False, allow_null=True)
+    profile_photo_url = serializers.SerializerMethodField(read_only=True)
 
     latitude  = serializers.DecimalField(max_digits=18, decimal_places=12, required=False, allow_null=True)
     longitude = serializers.DecimalField(max_digits=18, decimal_places=12, required=False, allow_null=True)
@@ -1636,6 +1688,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     # computed
     progress_percent = serializers.SerializerMethodField()
     upload_validation_map = {
+        "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
         "identity_secondary_file": DOCUMENT_UPLOAD_POLICY,
         "ahpra_proof": DOCUMENT_UPLOAD_POLICY,
@@ -1652,7 +1705,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         fields = [
             # ---------- BASIC ----------
             'username','first_name','last_name','phone_number','date_of_birth','gender',
-            'emergency_contact_number','emergency_contact_relation',
+            'emergency_contact_number','emergency_contact_relation','profile_photo','profile_photo_url',
             'street_address','suburb','state','postcode','google_place_id','latitude','longitude','open_to_travel','travel_states','coverage_radius_km',
 
             # ---------- IDENTITY ----------
@@ -1704,6 +1757,8 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
             # basic optional
             'phone_number': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'profile_photo': {'required': False, 'allow_null': True},
+            'profile_photo_url': {'read_only': True},
             'date_of_birth': {'required': False, 'allow_null': True},
             'gender': {'required': False, 'allow_blank': True, 'allow_null': True},
             'emergency_contact_number': {'required': False, 'allow_blank': True, 'allow_null': True},
@@ -1967,6 +2022,27 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
         update_fields = []
 
+        clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
+        if "profile_photo" in vdata or clear_photo:
+            new_photo = vdata.pop("profile_photo", None)
+            old_photo = getattr(instance, "profile_photo", None)
+            if new_photo is None and clear_photo:
+                if old_photo:
+                    try:
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
+                    except Exception:
+                        pass
+                instance.profile_photo = None
+                update_fields.append("profile_photo")
+            elif new_photo is not None:
+                if old_photo and _file_has_changed(new_photo, old_photo):
+                    try:
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
+                    except Exception:
+                        pass
+                instance.profile_photo = new_photo
+                update_fields.append("profile_photo")
+
         # regular writes for basic fields (address + dob)
         direct_fields = [
             'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km','date_of_birth',
@@ -2018,7 +2094,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             if new_type in ('DRIVER_LICENSE', 'AUS_PASSPORT', 'AGE_PROOF'):
                 old_sec = getattr(instance, 'identity_secondary_file', None)
                 if old_sec:
-                    try: old_sec.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception: pass
                 instance.identity_secondary_file = None
                 update_fields.append('identity_secondary_file')
@@ -2037,13 +2113,13 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             gov_id_changed = (_fname(new_file) != _fname(old_file))
             if new_file is None:
                 if old_file:
-                    try: old_file.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception: pass
                 instance.government_id = None
                 update_fields.append('government_id')
             else:
                 if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                    try: old_file.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception: pass
                 instance.government_id = new_file
                 update_fields.append('government_id')
@@ -2055,13 +2131,13 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             sec_changed = (_fname(new_sec) != _fname(old_sec)) or sec_changed
             if new_sec is None:
                 if old_sec:
-                    try: old_sec.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception: pass
                 instance.identity_secondary_file = None
                 update_fields.append('identity_secondary_file')
             else:
                 if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
-                    try: old_sec.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception: pass
                 instance.identity_secondary_file = new_sec
                 update_fields.append('identity_secondary_file')
@@ -2187,13 +2263,13 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
                 changed = (_fname(new_file) != _fname(old_file))
                 if new_file is None:
                     if old_file:
-                        try: old_file.delete(save=False)
+                        try: _delete_file_if_unreferenced(old_file, current_instance=instance)
                         except Exception: pass
                     setattr(instance, field, None)
                     update_fields.append(field)
                 else:
                     if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                        try: old_file.delete(save=False)
+                        try: _delete_file_if_unreferenced(old_file, current_instance=instance)
                         except Exception: pass
                     setattr(instance, field, new_file)
                     update_fields.append(field)
@@ -2486,14 +2562,14 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             old_file = getattr(instance, 'resume', None)
             if new_file is None:
                 if old_file:
-                    old_file.delete(save=False)
+                    _delete_file_if_unreferenced(old_file, current_instance=instance)
                 instance.resume = None
                 update_fields.append('resume')
             else:
                 if old_file:
                     try:
                         if getattr(old_file, 'name', None) != getattr(new_file, 'name', None):
-                            old_file.delete(save=False)
+                            _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception:
                         pass
                 instance.resume = new_file
@@ -2754,7 +2830,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             if new_photo is None and clear_photo:
                 if old_photo:
                     try:
-                        old_photo.delete(save=False)
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
                     except Exception:
                         pass
                 instance.profile_photo = None
@@ -2762,7 +2838,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             elif new_photo is not None:
                 if old_photo and _file_has_changed(new_photo, old_photo):
                     try:
-                        old_photo.delete(save=False)
+                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
                     except Exception:
                         pass
                 instance.profile_photo = new_photo
@@ -2817,7 +2893,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             if new_type in ('DRIVER_LICENSE', 'AUS_PASSPORT', 'AGE_PROOF'):
                 old_sec = getattr(instance, 'identity_secondary_file', None)
                 if old_sec:
-                    try: old_sec.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception: pass
                 instance.identity_secondary_file = None
                 update_fields.append('identity_secondary_file')
@@ -2836,13 +2912,13 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             gov_id_changed = (_fname(new_file) != _fname(old_file))
             if new_file is None:
                 if old_file:
-                    try: old_file.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception: pass
                 instance.government_id = None
                 update_fields.append('government_id')
             else:
                 if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                    try: old_file.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception: pass
                 instance.government_id = new_file
                 update_fields.append('government_id')
@@ -2854,13 +2930,13 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             sec_changed = (_fname(new_sec) != _fname(old_sec)) or sec_changed
             if new_sec is None:
                 if old_sec:
-                    try: old_sec.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception: pass
                 instance.identity_secondary_file = None
                 update_fields.append('identity_secondary_file')
             else:
                 if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
-                    try: old_sec.delete(save=False)
+                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
                     except Exception: pass
                 instance.identity_secondary_file = new_sec
                 update_fields.append('identity_secondary_file')
@@ -3049,14 +3125,14 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             old_file = getattr(instance, 'resume', None)
             if new_file is None:
                 if old_file:
-                    old_file.delete(save=False)
+                    _delete_file_if_unreferenced(old_file, current_instance=instance)
                 instance.resume = None
                 update_fields.append('resume')
             else:
                 if old_file:
                     try:
                         if getattr(old_file, 'name', None) != getattr(new_file, 'name', None):
-                            old_file.delete(save=False)
+                            _delete_file_if_unreferenced(old_file, current_instance=instance)
                     except Exception:
                         pass
                 instance.resume = new_file
