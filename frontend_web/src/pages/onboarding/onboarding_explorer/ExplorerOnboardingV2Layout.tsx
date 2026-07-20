@@ -15,6 +15,7 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { getOnboardingDetail } from "@chemisttasker/shared-core";
 import { UnsavedChangesBoundary } from "../../../hooks/useUnsavedChangesGuard";
 import { useColorMode } from "../../../theme/sleekTheme";
+import AccountDeletionSection from "../../../components/AccountDeletionSection";
 
 const BRAND = {
   grad: "linear-gradient(90deg, #7c3aed 0%, #2563eb 100%)",
@@ -291,6 +292,9 @@ return (
 
         </Box>
       </Paper>
+      <Box sx={{ mt: { xs: 8, md: 10 } }}>
+        <AccountDeletionSection />
+      </Box>
     </Container>
         );
       }}

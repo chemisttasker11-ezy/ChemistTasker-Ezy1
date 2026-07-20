@@ -33,6 +33,7 @@ import apiClient from '../../utils/apiClient';
 import { useAuth, type User } from '../../contexts/AuthContext';
 import { UnsavedChangesBoundary, useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { AHPRA_CONSENT_TEXT } from '../../constants/ahpraConsent';
+import AccountDeletionSection from '../../components/AccountDeletionSection';
 
 interface FormData {
   username: string;
@@ -780,6 +781,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           </Stack>
         </Paper>
         )}
+      </Box>
+      <Box sx={{ mt: { xs: 8, md: 10 }, mb: 2 }}>
+        <AccountDeletionSection />
       </Box>
     </Container>
     </Box>

@@ -12,6 +12,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import { getOnboardingDetail } from "@chemisttasker/shared-core";
 import { UnsavedChangesBoundary } from "../../../hooks/useUnsavedChangesGuard";
+import AccountDeletionSection from "../../../components/AccountDeletionSection";
 
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -293,6 +294,9 @@ return (
 
         </Box>
       </Paper>
+      <Box sx={{ mt: { xs: 8, md: 10 } }}>
+        <AccountDeletionSection />
+      </Box>
     </Container>
         );
       }}

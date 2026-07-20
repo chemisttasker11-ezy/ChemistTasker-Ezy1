@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,6 +16,7 @@ import { alpha } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { deleteAccount } from "@chemisttasker/shared-core";
 import { useAuth } from "../contexts/AuthContext";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 
 const CONFIRM_TEXT = "DELETE";
 
@@ -27,6 +29,7 @@ export default function AccountDeletionSection() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const canConfirm = confirmValue.trim().toUpperCase() === CONFIRM_TEXT;
 
@@ -58,28 +61,50 @@ export default function AccountDeletionSection() {
   return (
     <Box
       sx={(theme) => ({
-        mt: 4,
         border: "1px solid",
-        borderColor: "error.main",
+        borderColor: theme.palette.divider,
         borderRadius: 2,
-        p: { xs: 2, md: 3 },
-        bgcolor: alpha(theme.palette.error.main, 0.08),
+        bgcolor: alpha(theme.palette.primary.main, 0.03),
       })}
     >
-      <Typography variant="h6" color="error" fontWeight={700} gutterBottom>
-        Danger Zone
-      </Typography>
-      <Typography variant="body2" sx={{ mb: 2 }}>
-        Deleting your account is permanent. Your account will be deactivated immediately, and
-        verification documents are removed within 7 days.
-      </Typography>
       <Button
-        variant="contained"
-        color="error"
-        onClick={() => setDialogOpen(true)}
+        fullWidth
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        endIcon={
+          <KeyboardArrowDownIcon
+            sx={{
+              transform: expanded ? "rotate(180deg)" : "none",
+              transition: "transform .18s",
+            }}
+          />
+        }
+        sx={{
+          justifyContent: "space-between",
+          px: 2,
+          py: 1.25,
+          color: "text.primary",
+          textTransform: "none",
+          fontWeight: 700,
+        }}
       >
-        Delete My Account
+        Other options
       </Button>
+      <Collapse in={expanded} unmountOnExit>
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Deleting your account is permanent. Your account will be deactivated immediately, and
+            verification documents are removed within 7 days.
+          </Typography>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => setDialogOpen(true)}
+          >
+            Delete my account
+          </Button>
+        </Box>
+      </Collapse>
 
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Confirm Account Deletion</DialogTitle>

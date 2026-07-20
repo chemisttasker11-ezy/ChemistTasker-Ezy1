@@ -6,9 +6,7 @@ import Badge from "@mui/material/Badge";
 import Avatar from "@mui/material/Avatar";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
 import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import Popover from "@mui/material/Popover";
@@ -19,7 +17,6 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Divider from "@mui/material/Divider";
 import CircularProgress from "@mui/material/CircularProgress";
-import Snackbar from "@mui/material/Snackbar";
 import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
@@ -41,12 +38,11 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useNavigate } from "react-router-dom";
 import { useColorMode } from "../theme/sleekTheme";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchNotifications, markNotificationsRead, NotificationItem } from "../api/notifications";
-import { deleteAccount, fetchRooms, getOnboarding } from "@chemisttasker/shared-core";
+import { fetchRooms, getOnboarding } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../constants/api";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -490,8 +486,6 @@ const DASHBOARD_ROUTES: Record<string, string> = {
   EXPLORER: "/dashboard/explorer/overview",
 };
 
-const CONFIRM_DELETE_TEXT = "DELETE";
-
 function onboardingRoleForUserRole(role?: string | null) {
   const normalized = String(role || "").toUpperCase();
   if (normalized === "OWNER" || normalized === "PHARMACY_ADMIN") return "owner";
@@ -606,11 +600,6 @@ export default function TopBarActions({
   const [unreadMessages, setUnreadMessages] = React.useState(0);
   const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
   const [onboardingProfile, setOnboardingProfile] = React.useState<any>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [deleteConfirmValue, setDeleteConfirmValue] = React.useState("");
-  const [deleteError, setDeleteError] = React.useState("");
-  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
-  const [deleteSnackbarOpen, setDeleteSnackbarOpen] = React.useState(false);
   const [pharmacyCount, setPharmacyCount] = React.useState<number | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
 
@@ -712,8 +701,6 @@ export default function TopBarActions({
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "CT";
-  const canConfirmDelete = deleteConfirmValue.trim().toUpperCase() === CONFIRM_DELETE_TEXT;
-
   React.useEffect(() => {
     const role = onboardingRoleForUserRole(user?.role);
     if (!user || !role) {
@@ -798,37 +785,6 @@ export default function TopBarActions({
     logout();
     navigate("/login", { replace: true });
   }, [handleCloseProfileMenu, logout, navigate]);
-
-  const handleOpenDeleteDialog = React.useCallback(() => {
-    setProfileAnchor(null);
-    setDeleteConfirmValue("");
-    setDeleteError("");
-    setDeleteDialogOpen(true);
-  }, []);
-
-  const handleCloseDeleteDialog = React.useCallback(() => {
-    if (isDeletingAccount) return;
-    setDeleteDialogOpen(false);
-    setDeleteConfirmValue("");
-    setDeleteError("");
-  }, [isDeletingAccount]);
-
-  const handleDeleteAccount = React.useCallback(async () => {
-    if (!canConfirmDelete || isDeletingAccount) return;
-    setIsDeletingAccount(true);
-    setDeleteError("");
-    try {
-      await deleteAccount();
-      logout();
-      setDeleteSnackbarOpen(true);
-      setDeleteDialogOpen(false);
-      navigate("/login", { replace: true });
-    } catch (err: any) {
-      setDeleteError(err?.message || "Failed to delete account.");
-    } finally {
-      setIsDeletingAccount(false);
-    }
-  }, [canConfirmDelete, isDeletingAccount, logout, navigate]);
 
   const options = React.useMemo(() => {
     const roleKey = (user?.role || "DEFAULT").toUpperCase();
@@ -1745,91 +1701,7 @@ export default function TopBarActions({
           <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Logout" />
         </MenuItem>
-        <MenuItem
-          onClick={handleOpenDeleteDialog}
-          sx={{
-            color: "error.main",
-            "& .MuiListItemIcon-root": { color: "error.main" },
-          }}
-        >
-          <ListItemIcon><DeleteOutlineIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary="Delete my account" />
-        </MenuItem>
       </Menu>
-
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleCloseDeleteDialog}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: (dialogTheme) => ({
-            borderRadius: 3,
-            border: `1px solid ${dialogTheme.palette.error.main}`,
-            boxShadow: `0 28px 80px ${alpha(dialogTheme.palette.error.dark, 0.32)}`,
-          }),
-        }}
-      >
-        <DialogTitle
-          sx={(dialogTheme) => ({
-            color: dialogTheme.palette.error.main,
-            fontWeight: 900,
-            pb: 1,
-          })}
-        >
-          Confirm Account Deletion
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            This action cannot be undone. Type DELETE to confirm.
-          </Typography>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {deleteError}
-            </Alert>
-          )}
-          <TextField
-            fullWidth
-            label="Type DELETE to confirm"
-            value={deleteConfirmValue}
-            onChange={(event) => setDeleteConfirmValue(event.target.value)}
-            disabled={isDeletingAccount}
-            autoComplete="off"
-            sx={{
-              "& .MuiOutlinedInput-root.Mui-focused fieldset": {
-                borderColor: "error.main",
-              },
-              "& .MuiInputLabel-root.Mui-focused": {
-                color: "error.main",
-              },
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={handleCloseDeleteDialog} disabled={isDeletingAccount}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={handleDeleteAccount}
-            disabled={!canConfirmDelete || isDeletingAccount}
-          >
-            {isDeletingAccount ? "Deleting..." : "Confirm delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={deleteSnackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setDeleteSnackbarOpen(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-      >
-        <Alert severity="success" sx={{ width: "100%" }}>
-          Account deletion requested/completed.
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }
