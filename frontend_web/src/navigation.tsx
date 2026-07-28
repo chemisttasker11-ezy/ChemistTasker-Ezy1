@@ -192,7 +192,7 @@ export function getOwnerNav(progressPercent: number, hasUnreadMessages: boolean)
       title: "Manage Pharmacies",
       icon: <MedicationLiquidIcon />,
       children: [
-        { segment: "my-pharmacies", title: "My Pharmacies", icon: <StoreIcon /> },
+        { segment: "my-pharmacies", title: "My Pharmacy", icon: <StoreIcon /> },
         { segment: "my-chain", title: "My Chain", icon: <CorporateFareIcon /> },
         { segment: "roster", title: "Internal Roster", icon: <EventAvailableIcon /> },
       ],

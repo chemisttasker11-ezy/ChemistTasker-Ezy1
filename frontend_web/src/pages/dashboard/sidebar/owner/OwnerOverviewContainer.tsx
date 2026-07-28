@@ -198,7 +198,16 @@ export default function OwnerOverviewContainer() {
   const goToPostShift = () => navigate(resolvePath("post-shift"));
   const goToProfile = () => navigate(resolvePath("onboarding"));
   const goToInterests = () => navigate(resolvePath("interests"));
-  const goToManagePharmacies = () => navigate(resolvePath("manage-pharmacies/my-pharmacies"));
+  const goToManagePharmacies = () => {
+    if (pharmacies.length === 1) {
+      const pharmacyId = pharmacies[0].id;
+      navigate(
+        `${resolvePath("manage-pharmacies/my-pharmacies")}?workspace=internal&pharmacy_id=${pharmacyId}&view=detail&pharmacyId=${pharmacyId}`
+      );
+      return;
+    }
+    navigate(resolvePath("manage-pharmacies/my-pharmacies"));
+  };
   const goToPills = () => navigate("/dashboard/owner/pills");
   const goToSettings = () => undefined;
   const goToPharmacyManager = (query: string) =>

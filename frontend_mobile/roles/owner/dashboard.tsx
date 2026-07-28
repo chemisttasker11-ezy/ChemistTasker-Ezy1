@@ -117,9 +117,14 @@ export default function OwnerDashboard() {
   const quickActions = useMemo(
     () => {
       const pharmacyCount = scope.pharmacies.length;
+      const firstPharmacyId = scope.pharmacies[0]?.id;
+      const managePharmacyRoute =
+        pharmacyCount === 1 && firstPharmacyId
+          ? `/owner/pharmacies/${firstPharmacyId}`
+          : '/owner/pharmacies';
       return [
         { title: 'Post Shift', description: 'Create coverage', icon: 'plus-circle-outline', route: '/owner/post-shift' },
-        { title: pharmacyCount > 1 ? 'Manage Pharmacies' : 'Manage Pharmacy', description: pharmacyCount > 1 ? 'Manage stores' : 'Manage staff', icon: 'store-outline', route: '/owner/pharmacies' },
+        { title: pharmacyCount > 1 ? 'Manage Pharmacies' : 'Manage Pharmacy', description: pharmacyCount > 1 ? 'Manage stores' : 'Manage staff', icon: 'store-outline', route: managePharmacyRoute },
         { title: 'Roster', description: 'Shift centre', icon: 'calendar-month-outline', route: '/owner/shifts' },
         { title: 'Calendar', description: 'Schedule view', icon: 'calendar-outline', route: '/owner/calendar' },
         { title: 'Staff', description: 'Team members', icon: 'account-group-outline', route: '/owner/staff' },
