@@ -4687,6 +4687,15 @@ class ShiftSerializer(serializers.ModelSerializer):
             'PLATFORM': {'notify_pharmacy_staff', 'notify_favorite_staff', 'notify_chain_members'},
         }
         allowed = set(visibility_rules.get(shift.visibility, set()))
+        if getattr(shift, "post_anonymously", False):
+            anonymous_rules = {
+                'FULL_PART_TIME': {'notify_pharmacy_staff'},
+                'LOCUM_CASUAL': {'notify_favorite_staff'},
+                'OWNER_CHAIN': {'notify_chain_members'},
+                'ORG_CHAIN': {'notify_chain_members'},
+                'PLATFORM': set(),
+            }
+            allowed &= anonymous_rules.get(shift.visibility, set())
         if not allowed:
             return
 

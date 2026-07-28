@@ -923,10 +923,20 @@ def _worker_visible_pharmacy_shifts(user, pharmacy_ids):
                 pharmacy_id=membership.pharmacy_id,
                 visibility="FULL_PART_TIME",
             )
+            eligible_filter |= Q(
+                pharmacy_id=membership.pharmacy_id,
+                visibility__in=["LOCUM_CASUAL", "PLATFORM"],
+                post_anonymously=False,
+            )
         elif employment_type in {"LOCUM", "SHIFT_HERO"}:
             eligible_filter |= Q(
                 pharmacy_id=membership.pharmacy_id,
                 visibility="LOCUM_CASUAL",
+            )
+            eligible_filter |= Q(
+                pharmacy_id=membership.pharmacy_id,
+                visibility="PLATFORM",
+                post_anonymously=False,
             )
 
         owner_id = getattr(getattr(membership, "pharmacy", None), "owner_id", None)
@@ -4326,7 +4336,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         # _dbg(f"get_queryset: user_id={getattr(user,'id',None)} email={getattr(user,'email',None)} top_role={getattr(user,'role',None)}")
 
         qs = super().get_queryset().filter(
-            visibility__in=COMMUNITY_LEVELS
+            Q(visibility__in=COMMUNITY_LEVELS) |
+            Q(visibility=PUBLIC_LEVEL, post_anonymously=False)
         ).annotate(
             slot_count=Count('slots', distinct=True)
         ).filter(
@@ -4378,6 +4389,22 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             # 2. Any active member at this pharmacy (for locum_casual)
             Q(
                 visibility='LOCUM_CASUAL',
+                pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=['LOCUM', 'SHIFT_HERO'],
+                pharmacy__memberships__is_active=True,
+            )
+            |
+            Q(
+                visibility='LOCUM_CASUAL',
+                post_anonymously=False,
+                pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
+                pharmacy__memberships__is_active=True,
+            )
+            |
+            Q(
+                visibility=PUBLIC_LEVEL,
+                post_anonymously=False,
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__is_active=True,
             )
@@ -4555,10 +4582,13 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
         elif shift.visibility == 'LOCUM_CASUAL':
-            ok = membership and membership.employment_type in allowed_locum
+            allowed_for_shift = allowed_locum
+            if not getattr(shift, "post_anonymously", False):
+                allowed_for_shift = allowed_locum | allowed_ftpt
+            ok = membership and membership.employment_type in allowed_for_shift
             if not ok:
                 return Response(
-                    {"detail": f"Only locum/shift-hero members can claim this shift. [DBG:TIER_MISMATCH emp={getattr(membership,'employment_type',None)}]"},
+                    {"detail": f"Only eligible pharmacy members can claim this shift. [DBG:TIER_MISMATCH emp={getattr(membership,'employment_type',None)}]"},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
@@ -5666,9 +5696,51 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         combined_filter |= is_owner_admin_of_pharmacy_q
 
         # 3. Shifts visible through Membership relationship (client_profile.models.Membership)
-        eligible_membership_q = Q(
-            pharmacy__memberships__user=user,
-            pharmacy__memberships__is_active=True,
+        eligible_membership_q = (
+            Q(
+                visibility='FULL_PART_TIME',
+                pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
+                pharmacy__memberships__is_active=True,
+            )
+            |
+            Q(
+                visibility='LOCUM_CASUAL',
+                pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=['LOCUM', 'SHIFT_HERO'],
+                pharmacy__memberships__is_active=True,
+            )
+            |
+            Q(
+                visibility='LOCUM_CASUAL',
+                post_anonymously=False,
+                pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
+                pharmacy__memberships__is_active=True,
+            )
+            |
+            Q(
+                visibility='PLATFORM',
+                post_anonymously=False,
+                pharmacy__memberships__user=user,
+                pharmacy__memberships__is_active=True,
+            )
+            |
+            Q(
+                visibility='OWNER_CHAIN',
+                pharmacy__owner__in=Pharmacy.objects.filter(
+                    memberships__user=user,
+                    memberships__is_active=True,
+                ).values_list('owner', flat=True),
+            )
+            |
+            Q(
+                visibility='ORG_CHAIN',
+                pharmacy__organization__in=Pharmacy.objects.filter(
+                    memberships__user=user,
+                    memberships__is_active=True,
+                ).values_list('organization', flat=True),
+            )
         )
         combined_filter |= eligible_membership_q
 
