@@ -4,18 +4,24 @@ import { alpha } from "@mui/material/styles";
 import { Navigate } from "react-router-dom";
 import OwnerOnboarding from "../onboarding/OwnerOnboarding";
 import { getOwnerSetupStatus, ownerSetupPaths } from "../../utils/ownerSetup";
+import { useAuth } from "../../contexts/AuthContext";
 import logoBanner from "../../assets/clipsnap-edit-6-1-2026.png";
 
 export default function OwnerSetupOnboardingPage() {
+  const { user } = useAuth();
   const [nextPath, setNextPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    void getOwnerSetupStatus()
+    void getOwnerSetupStatus(user)
       .then((status) => {
         if (!active) return;
+        if (!status.nextPath) {
+          setNextPath("/dashboard/owner/overview");
+          return;
+        }
         if (status.nextPath && status.nextPath !== ownerSetupPaths.onboarding) {
           setNextPath(status.nextPath);
         }
@@ -30,7 +36,7 @@ export default function OwnerSetupOnboardingPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user]);
 
   if (nextPath) {
     return <Navigate to={nextPath} replace />;

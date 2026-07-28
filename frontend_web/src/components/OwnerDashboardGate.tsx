@@ -3,14 +3,16 @@ import { useEffect, useState } from "react";
 import { CircularProgress, Stack, Typography } from "@mui/material";
 import { Navigate } from "react-router-dom";
 import { getOwnerSetupStatus } from "../utils/ownerSetup";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function OwnerDashboardGate({ children }: { children: ReactElement }) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void getOwnerSetupStatus()
+    void getOwnerSetupStatus(user)
       .then((status) => {
         if (!active) return;
         if (status.nextPath) {
@@ -27,7 +29,7 @@ export default function OwnerDashboardGate({ children }: { children: ReactElemen
     return () => {
       active = false;
     };
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (

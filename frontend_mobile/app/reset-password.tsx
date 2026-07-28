@@ -4,9 +4,11 @@ import { Text, TextInput, Button, Surface } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { passwordResetConfirm } from '@chemisttasker/shared-core';
 import AuthLayout from '../components/AuthLayout';
+import { useAuth } from '../context/AuthContext';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
+    const { logout } = useAuth();
     const { uid, token } = useLocalSearchParams<{ uid: string; token: string }>();
 
     const [newPassword, setNewPassword] = useState('');
@@ -30,6 +32,7 @@ export default function ResetPasswordScreen() {
                 new_password1: newPassword,
                 new_password2: confirmPassword,
             });
+            await logout();
             router.replace('/login');
         } catch {
             setError('Failed to reset password. The link may be invalid or expired.');

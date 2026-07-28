@@ -47,7 +47,7 @@ export default function HomeScreen() {
       if (hasOrganizationAccess(user)) {
         router.replace('/organization/dashboard' as any);
       } else if (role === 'OWNER') {
-        const setupStatus = await getOwnerSetupStatus();
+        const setupStatus = await getOwnerSetupStatus(user);
         if (active) {
           router.replace((setupStatus.nextPath || '/owner/dashboard') as any);
         }

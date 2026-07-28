@@ -5,9 +5,11 @@ import { ActivityIndicator, Button, Dialog, HelperText, Portal, Text } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PharmacyForm from '@/roles/shared/pharmacies/PharmacyForm';
 import { getOwnerSetupStatus, markOwnerPharmacySetupSkipped, ownerSetupPaths } from '@/utils/ownerSetup';
+import { useAuth } from '@/context/AuthContext';
 
 export default function OwnerSetupPharmacyScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [targetPharmacyCount, setTargetPharmacyCount] = useState(1);
@@ -17,7 +19,7 @@ export default function OwnerSetupPharmacyScreen() {
 
   useEffect(() => {
     let active = true;
-    void getOwnerSetupStatus()
+    void getOwnerSetupStatus(user)
       .then((status) => {
         if (!active) return;
         setTargetPharmacyCount(status.numberOfPharmacies);
@@ -43,7 +45,7 @@ export default function OwnerSetupPharmacyScreen() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, user]);
 
   const handleCreateSuccess = () => {
     const nextCount = createdCount + 1;

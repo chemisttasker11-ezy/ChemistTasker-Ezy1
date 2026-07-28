@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchPharmaciesService, getOnboarding } from '@chemisttasker/shared-core';
+import type { User } from '../context/AuthContext';
 
 export type OwnerSetupStatus = {
   onboardingExists: boolean;
@@ -26,7 +27,52 @@ async function isOwnerPharmacySetupSkipped() {
   return (await AsyncStorage.getItem(OWNER_PHARMACY_SETUP_SKIPPED_KEY)) === 'true';
 }
 
-export async function getOwnerSetupStatus(): Promise<OwnerSetupStatus> {
+function countOwnedPharmaciesFromUser(user?: User | null) {
+  if (!user) return 0;
+
+  for (const key of ['owned_pharmacies', 'owner_pharmacies', 'pharmacies']) {
+    const value = (user as any)[key];
+    if (Array.isArray(value) && value.length > 0) {
+      return value.length;
+    }
+  }
+
+  if (!Array.isArray(user.memberships)) return 0;
+
+  const ownedPharmacyIds = new Set<number>();
+  for (const membership of user.memberships) {
+    if (!membership || typeof membership !== 'object') {
+      continue;
+    }
+
+    const pharmacyId = Number((membership as any).pharmacy_id ?? (membership as any).pharmacyId);
+    const role = String((membership as any).role || '').toUpperCase();
+    const isOwner =
+      role === 'OWNER' ||
+      role === 'PHARMACY_OWNER' ||
+      (membership as any).is_pharmacy_owner === true;
+
+    if (isOwner && Number.isFinite(pharmacyId)) {
+      ownedPharmacyIds.add(pharmacyId);
+    }
+  }
+
+  return ownedPharmacyIds.size;
+}
+
+export async function getOwnerSetupStatus(user?: User | null): Promise<OwnerSetupStatus> {
+  const ownedPharmaciesCount = countOwnedPharmaciesFromUser(user);
+  if (ownedPharmaciesCount > 0) {
+    await clearOwnerPharmacySetupSkipped().catch(() => null);
+    return {
+      onboardingExists: true,
+      onboardingComplete: true,
+      pharmaciesCount: ownedPharmaciesCount,
+      numberOfPharmacies: ownedPharmaciesCount,
+      nextPath: null,
+    };
+  }
+
   try {
     const onboarding: any = await getOnboarding('owner');
     const numberOfPharmacies = Math.max(1, Number(onboarding?.number_of_pharmacies) || 1);

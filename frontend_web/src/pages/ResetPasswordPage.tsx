@@ -12,6 +12,7 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 import AuthLayout from '../layouts/AuthLayout'; // Import the new layout
 import { passwordResetConfirm } from '@chemisttasker/shared-core';
 import { setRobotsMeta } from '../utils/seo';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ResetPasswordPage() {
   useEffect(() => {
@@ -22,6 +23,7 @@ export default function ResetPasswordPage() {
   // --- All logic is unchanged ---
   const { uid, token } = useParams<{ uid: string; token: string }>();
   const navigate       = useNavigate();
+  const { logout } = useAuth();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -44,6 +46,7 @@ export default function ResetPasswordPage() {
         new_password1: newPassword,
         new_password2: confirmPassword,
       });
+      logout();
       navigate('/login');
     } catch {
       setError('Failed to reset password. The link may be invalid or expired.');

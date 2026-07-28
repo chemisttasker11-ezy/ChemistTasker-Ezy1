@@ -33,6 +33,7 @@ from django.utils import timezone
 import secrets
 import logging
 from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import AuthenticationFailed
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Max, Sum
@@ -212,6 +213,43 @@ def _login_failure_response(attempt_state):
         f"Invalid email or password. {attempts_remaining} attempt"
         f"{'s' if attempts_remaining != 1 else ''} remaining before temporary lockout."
     )
+
+
+def _login_invalid_credentials_response(user, attempt_state):
+    if attempt_state and attempt_state["locked"]:
+        return _login_failure_response(attempt_state)
+
+    if user is None:
+        detail = "No account was found for this email address."
+        code = "email_not_found"
+    elif not user.is_active:
+        detail = "This account is disabled. Please contact support."
+        code = "account_disabled"
+    elif not getattr(user, "is_otp_verified", False):
+        detail = "Your email address is not verified. Enter the email OTP we sent before logging in."
+        code = "email_not_verified"
+    else:
+        detail = "The password is incorrect for this email address."
+        code = "incorrect_password"
+
+    payload = {"detail": detail, "code": code}
+    status_code = status.HTTP_401_UNAUTHORIZED
+
+    if attempt_state:
+        payload.update(
+            {
+                "failure_limit": attempt_state["failure_limit"],
+                "attempts_remaining": attempt_state["attempts_remaining"],
+            }
+        )
+        if code == "incorrect_password":
+            attempts = attempt_state["attempts_remaining"]
+            payload["detail"] = (
+                f"The password is incorrect for this email address. "
+                f"{attempts} login attempt{'s' if attempts != 1 else ''} remaining before temporary lockout."
+            )
+
+    return Response(payload, status=status_code)
     return Response(
         {
             "detail": detail,
@@ -971,15 +1009,22 @@ class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
-        credentials = {"username": (request.data.get("email") or "").strip().lower()}
+        email = (request.data.get("email") or "").strip().lower()
+        credentials = {"username": email}
         attempt_state = _get_login_attempt_state(request, credentials)
         if attempt_state and attempt_state["locked"]:
             return _login_failure_response(attempt_state)
 
-        response = super().post(request, *args, **kwargs)
+        user = User.objects.filter(email__iexact=email).first() if email else None
+        try:
+            response = super().post(request, *args, **kwargs)
+        except AuthenticationFailed:
+            attempt_state = _get_login_attempt_state(request, credentials)
+            return _login_invalid_credentials_response(user, attempt_state)
+
         if response.status_code >= 400:
             attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_failure_response(attempt_state)
+            return _login_invalid_credentials_response(user, attempt_state)
         access = response.data.get("access")
         refresh = response.data.get("refresh")
         if access and refresh:

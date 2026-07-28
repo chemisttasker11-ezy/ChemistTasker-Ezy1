@@ -49,7 +49,7 @@ export default function LoginScreen() {
       if (hasOrganizationAccess(userData)) {
         router.replace('/organization/dashboard' as never);
       } else if (userData.role === 'OWNER') {
-        const setupStatus = await getOwnerSetupStatus();
+        const setupStatus = await getOwnerSetupStatus(userData);
         router.replace((setupStatus.nextPath || '/owner/dashboard') as never);
       } else if (userData.role === 'PHARMACIST') {
         router.replace('/pharmacist/dashboard' as never);

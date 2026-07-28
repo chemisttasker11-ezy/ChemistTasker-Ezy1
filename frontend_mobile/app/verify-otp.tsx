@@ -97,7 +97,7 @@ export default function VerifyOTPScreen() {
                         Verify Your Email
                     </Text>
                     <Text variant="bodyMedium" style={styles.subtitle}>
-                        We&apos;ve sent a 6-digit code to {email}
+                        This is the email verification step. We ask for it after registration, or when you try to log in before your email has been verified. We&apos;ve sent a 6-digit code to {email}.
                     </Text>
                 </Surface>
 

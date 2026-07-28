@@ -82,7 +82,7 @@ export default function OTPVerify() {
             Confirm your email
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Enter the one-time code sent to your inbox to continue with your account setup.
+            This is the email verification step. We ask for it after registration, or when you try to log in before your email has been verified. Enter the code sent to your inbox to activate email login for this account.
           </Typography>
         </Box>
 

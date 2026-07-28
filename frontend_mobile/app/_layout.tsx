@@ -242,7 +242,7 @@ function AuthGate() {
     const second = segmentList[1];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
-    const allowAuthenticatedAccess = new Set(['contact']);
+    const allowAuthenticatedAccess = new Set(['contact', 'reset-password']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
     const expectedTopByRole: Record<string, string> = {
@@ -273,7 +273,7 @@ function AuthGate() {
           return;
         }
         if (String(user.role || '').toUpperCase() === 'OWNER') {
-          const status = await getOwnerSetupStatus();
+          const status = await getOwnerSetupStatus(user);
           if (active) {
             router.replace((status.nextPath || ownerSetupPaths.dashboard) as any);
           }
@@ -303,7 +303,7 @@ function AuthGate() {
         }
 
         if (normalizedRole === 'OWNER') {
-          const status = await getOwnerSetupStatus();
+          const status = await getOwnerSetupStatus(user);
           if (!active) return;
 
           if (isOwnerSetupRoute) {

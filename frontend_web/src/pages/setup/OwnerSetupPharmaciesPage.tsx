@@ -4,9 +4,11 @@ import { alpha } from "@mui/material/styles";
 import { Navigate } from "react-router-dom";
 import PharmacyPage from "../dashboard/sidebar/PharmacyPage";
 import { getOwnerSetupStatus, ownerSetupPaths } from "../../utils/ownerSetup";
+import { useAuth } from "../../contexts/AuthContext";
 import logoBanner from "../../assets/clipsnap-edit-6-1-2026.png";
 
 export default function OwnerSetupPharmaciesPage() {
+  const { user } = useAuth();
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -14,7 +16,7 @@ export default function OwnerSetupPharmaciesPage() {
 
   useEffect(() => {
     let active = true;
-    void getOwnerSetupStatus()
+    void getOwnerSetupStatus(user)
       .then((status) => {
         if (!active) return;
         setTargetPharmacyCount(status.numberOfPharmacies);
@@ -36,7 +38,7 @@ export default function OwnerSetupPharmaciesPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user]);
 
   if (redirectPath) {
     return <Navigate to={redirectPath} replace />;

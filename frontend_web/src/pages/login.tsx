@@ -82,7 +82,7 @@ export default function Login() {
       }
 
       if (userInfo?.role === 'OWNER') {
-        const ownerSetup = await getOwnerSetupStatus();
+        const ownerSetup = await getOwnerSetupStatus(userInfo);
         if (ownerSetup.nextPath) {
           navigate(ownerSetup.nextPath);
           return;
@@ -136,6 +136,7 @@ export default function Login() {
       navigate(redirectPath);
     } catch (err) {
       if (axios.isAxiosError(err)) {
+        const code = err.response?.data?.code;
         const msg =
           err.response?.data?.detail ||
           (Array.isArray(err.response?.data?.email)
@@ -145,8 +146,8 @@ export default function Login() {
         setError(msg);
 
         if (
-          msg &&
-          msg.toLowerCase().includes("please verify your email address")
+          code === "email_not_verified" ||
+          (msg && msg.toLowerCase().includes("verify your email"))
         ) {
           navigate("/otp-verify", { state: { email: email.toLowerCase() } });
         }

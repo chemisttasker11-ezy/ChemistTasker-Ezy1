@@ -112,6 +112,15 @@ export default function MobileVerifyScreen() {
 
     return (
         <AuthLayout title="Mobile Verification">
+            <Surface style={styles.infoContainer} elevation={0}>
+                <Text variant="titleMedium" style={styles.infoTitle}>
+                    Why mobile verification is required
+                </Text>
+                <Text variant="bodyMedium" style={styles.infoText}>
+                    Your email is verified, but this account still needs a verified mobile number. We use this step after login to confirm your legal name, username, and mobile number before opening your workspace.
+                </Text>
+            </Surface>
+
             {error ? (
                 <Surface style={styles.errorContainer} elevation={1}>
                     <Text style={styles.errorText}>{error}</Text>
@@ -230,6 +239,20 @@ export default function MobileVerifyScreen() {
 const styles = StyleSheet.create({
     input: {
         backgroundColor: '#fff',
+    },
+    infoContainer: {
+        backgroundColor: '#EEF8F7',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 12,
+    },
+    infoTitle: {
+        color: '#0F766E',
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    infoText: {
+        color: '#334155',
     },
     hiddenInput: {
         position: 'absolute',

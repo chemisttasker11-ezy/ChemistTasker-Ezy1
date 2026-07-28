@@ -5,17 +5,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import OwnerProfileDetailScreen from './profile-detail';
 import { getOwnerSetupStatus, ownerSetupPaths } from '@/utils/ownerSetup';
+import { useAuth } from '@/context/AuthContext';
 
 export default function OwnerSetupOnboardingScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    void getOwnerSetupStatus()
+    void getOwnerSetupStatus(user)
       .then((status) => {
         if (!active) return;
+        if (!status.nextPath) {
+          router.replace(ownerSetupPaths.dashboard as any);
+          return;
+        }
         if (status.nextPath && status.nextPath !== ownerSetupPaths.onboarding) {
           router.replace(status.nextPath as any);
         }
@@ -31,7 +37,7 @@ export default function OwnerSetupOnboardingScreen() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, user]);
 
   if (loading) {
     return (

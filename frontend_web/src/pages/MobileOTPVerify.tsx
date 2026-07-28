@@ -105,7 +105,7 @@ export default function MobileOTPVerify() {
             Confirm your mobile number
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Request a code, then enter it below to verify the mobile number linked to your account.
+            This step happens after email verification and login when your mobile number has not been verified yet. We use it to lock your legal name, username, and mobile number for account security.
           </Typography>
         </Box>
 
