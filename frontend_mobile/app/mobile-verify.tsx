@@ -52,7 +52,6 @@ export default function MobileVerifyScreen() {
                 username,
                 mobile_number: mobile,
             });
-            setIdentityLocked(true);
             setStatus('We sent a code to your mobile.');
         } catch (err: any) {
             setError(err?.message || 'Failed to send code.');
@@ -71,6 +70,7 @@ export default function MobileVerifyScreen() {
         setLoading(true);
         try {
             await mobileVerifyOtp({ otp });
+            setIdentityLocked(true);
             await markMobileVerified({
                 first_name: firstName,
                 last_name: lastName,
@@ -148,7 +148,7 @@ export default function MobileVerifyScreen() {
                 onChangeText={setUsername}
                 mode="outlined"
                 style={styles.input}
-                disabled={loading}
+                disabled={identityLocked || loading}
             />
 
             <TextInput

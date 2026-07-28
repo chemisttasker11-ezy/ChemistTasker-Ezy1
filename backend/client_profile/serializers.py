@@ -3205,6 +3205,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     claimed   = serializers.SerializerMethodField()
     claim_status = serializers.SerializerMethodField()
     claim_request_id = serializers.SerializerMethodField()
+    public_holiday_dates = serializers.SerializerMethodField()
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     submitted_for_verification = serializers.BooleanField(write_only=True, required=False)
     file_fields = [
@@ -3260,20 +3261,29 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "weekdays_end",
             "monday_start",
             "monday_end",
+            "monday_closed",
             "tuesday_start",
             "tuesday_end",
+            "tuesday_closed",
             "wednesday_start",
             "wednesday_end",
+            "wednesday_closed",
             "thursday_start",
             "thursday_end",
+            "thursday_closed",
             "friday_start",
             "friday_end",
+            "friday_closed",
             "saturdays_start",
             "saturdays_end",
+            "saturdays_closed",
             "sundays_start",
             "sundays_end",
+            "sundays_closed",
             "public_holidays_start",
             "public_holidays_end",
+            "public_holidays_closed",
+            "public_holiday_dates",
             # arrays:
             "employment_types",
             "roles_needed",
@@ -3309,6 +3319,13 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         }
 
     _weekday_day_names = ("monday", "tuesday", "wednesday", "thursday", "friday")
+    _hours_day_names = _weekday_day_names + ("saturdays", "sundays", "public_holidays")
+
+    def get_public_holiday_dates(self, obj):
+        from client_profile.services import PUBLIC_HOLIDAYS, _normalize_state_code
+
+        state_code = _normalize_state_code(getattr(obj, "state", ""))
+        return PUBLIC_HOLIDAYS.get(state_code, [])
 
     def _apply_weekday_hours_compat(self, attrs):
         weekday_start = attrs.get("weekdays_start", serializers.empty)
@@ -3316,10 +3333,12 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
 
         if weekday_start is not serializers.empty:
             for day_name in self._weekday_day_names:
-                attrs.setdefault(f"{day_name}_start", weekday_start)
+                if not attrs.get(f"{day_name}_closed", getattr(self.instance, f"{day_name}_closed", False) if self.instance else False):
+                    attrs.setdefault(f"{day_name}_start", weekday_start)
         if weekday_end is not serializers.empty:
             for day_name in self._weekday_day_names:
-                attrs.setdefault(f"{day_name}_end", weekday_end)
+                if not attrs.get(f"{day_name}_closed", getattr(self.instance, f"{day_name}_closed", False) if self.instance else False):
+                    attrs.setdefault(f"{day_name}_end", weekday_end)
 
         monday_start = attrs.get("monday_start", serializers.empty)
         monday_end = attrs.get("monday_end", serializers.empty)
@@ -3328,6 +3347,21 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         if "weekdays_end" not in attrs and monday_end is not serializers.empty:
             attrs["weekdays_end"] = monday_end
 
+        return attrs
+
+    def _clear_closed_day_hours(self, attrs):
+        for day_name in self._hours_day_names:
+            closed_key = f"{day_name}_closed"
+            is_closed = attrs.get(
+                closed_key,
+                getattr(self.instance, closed_key, False) if self.instance else False,
+            )
+            if is_closed:
+                attrs[f"{day_name}_start"] = None
+                attrs[f"{day_name}_end"] = None
+        if any(attrs.get(f"{day_name}_closed") for day_name in self._weekday_day_names):
+            attrs["weekdays_start"] = None
+            attrs["weekdays_end"] = None
         return attrs
 
     def validate(self, attrs):
@@ -3343,7 +3377,8 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
                 raise serializers.ValidationError(
                     {"abn": ["This ABN is locked after verification and confirmation."]}
                 )
-        return self._apply_weekday_hours_compat(attrs)
+        attrs = self._apply_weekday_hours_compat(attrs)
+        return self._clear_closed_day_hours(attrs)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -3808,6 +3843,21 @@ class MembershipSerializer(serializers.ModelSerializer):
         elif role == 'STUDENT':
             clear('pharmacist_award_level', 'otherstaff_classification_level', 'intern_half')
 
+        return attrs
+
+    def _clear_closed_day_hours(self, attrs):
+        for day_name in self._hours_day_names:
+            closed_key = f"{day_name}_closed"
+            is_closed = attrs.get(
+                closed_key,
+                getattr(self.instance, closed_key, False) if self.instance else False,
+            )
+            if is_closed:
+                attrs[f"{day_name}_start"] = None
+                attrs[f"{day_name}_end"] = None
+        if any(attrs.get(f"{day_name}_closed") for day_name in self._weekday_day_names):
+            attrs["weekdays_start"] = None
+            attrs["weekdays_end"] = None
         return attrs
 
     def get_is_pharmacy_owner(self, obj):

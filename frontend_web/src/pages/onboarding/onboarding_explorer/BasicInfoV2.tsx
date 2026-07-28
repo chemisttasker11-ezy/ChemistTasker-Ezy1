@@ -126,8 +126,8 @@ export default function BasicInfoV2() {
         const nextData = res as any;
         setData(nextData);
         setLockedNames({
-          first: Boolean(nextData?.first_name),
-          last: Boolean(nextData?.last_name),
+          first: isMobileVerified,
+          last: isMobileVerified,
         });
         const nextPhoto =
           nextData?.profile_photo_url ||
@@ -241,8 +241,8 @@ export default function BasicInfoV2() {
       const nextData = res as any;
       setData(nextData);
       setLockedNames({
-        first: Boolean(nextData?.first_name),
-        last: Boolean(nextData?.last_name),
+        first: isMobileVerified || mobileVerifiedLocal,
+        last: isMobileVerified || mobileVerifiedLocal,
       });
       const nextPhoto =
         nextData?.profile_photo_url ||
@@ -293,7 +293,6 @@ export default function BasicInfoV2() {
         username: data.username,
         mobile_number: data.phone_number,
       } as any);
-      setLockedNames({ first: true, last: true });
       setOtpMsg('Code sent to your mobile.');
     } catch (e: any) {
       setOtpErr(e?.response?.data?.error || e?.response?.data?.detail || e.message || 'Failed to send code.');
@@ -308,8 +307,16 @@ export default function BasicInfoV2() {
       await mobileVerifyOtp({ otp } as any);
       setOtpMsg('Mobile verified!');
       setMobileVerifiedLocal(true);
+      setLockedNames({ first: true, last: true });
       if (setUser) {
-        setUser((prev: User | null) => (prev ? { ...prev, is_mobile_verified: true } : prev));
+        setUser((prev: User | null) => (prev ? {
+          ...prev,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          username: data.username || prev.username,
+          mobile_number: data.phone_number,
+          is_mobile_verified: true,
+        } : prev));
       }
       // Optionally close after success:
       // setTimeout(() => setOtpOpen(false), 800);

@@ -1082,6 +1082,33 @@ export type PharmacySummary = {
     suburb?: string | null;
     state?: string | null;
     postcode?: string | null;
+    weekdaysStart?: string | null;
+    weekdaysEnd?: string | null;
+    mondayStart?: string | null;
+    mondayEnd?: string | null;
+    mondayClosed?: boolean | null;
+    tuesdayStart?: string | null;
+    tuesdayEnd?: string | null;
+    tuesdayClosed?: boolean | null;
+    wednesdayStart?: string | null;
+    wednesdayEnd?: string | null;
+    wednesdayClosed?: boolean | null;
+    thursdayStart?: string | null;
+    thursdayEnd?: string | null;
+    thursdayClosed?: boolean | null;
+    fridayStart?: string | null;
+    fridayEnd?: string | null;
+    fridayClosed?: boolean | null;
+    saturdaysStart?: string | null;
+    saturdaysEnd?: string | null;
+    saturdaysClosed?: boolean | null;
+    sundaysStart?: string | null;
+    sundaysEnd?: string | null;
+    sundaysClosed?: boolean | null;
+    publicHolidaysStart?: string | null;
+    publicHolidaysEnd?: string | null;
+    publicHolidaysClosed?: boolean | null;
+    publicHolidayDates?: string[];
 };
 
 export interface ChainApi {

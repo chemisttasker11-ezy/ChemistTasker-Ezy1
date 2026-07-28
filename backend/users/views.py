@@ -314,7 +314,10 @@ def _build_authenticated_user_payload(user):
         "id": user.id,
         "username": user.username,
         "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
         "role": user.role,
+        "mobile_number": user.mobile_number,
         "memberships": org_payload + deduped_pharmacy_memberships,
         "admin_assignments": admin_payload,
         "is_pharmacy_admin": bool(admin_payload),
@@ -658,19 +661,23 @@ def _capture_mobile_identity(user, payload):
 
     existing_first_name = _clean_identity_value(user.first_name)
     existing_last_name = _clean_identity_value(user.last_name)
+    existing_username = _clean_identity_value(user.username)
+    identity_locked = bool(getattr(user, "is_mobile_verified", False))
 
     if not incoming_first_name:
         errors["first_name"] = "First name is required."
-    elif existing_first_name and incoming_first_name != existing_first_name:
+    elif identity_locked and existing_first_name and incoming_first_name != existing_first_name:
         errors["first_name"] = "First name is locked and cannot be changed."
 
     if not incoming_last_name:
         errors["last_name"] = "Last name is required."
-    elif existing_last_name and incoming_last_name != existing_last_name:
+    elif identity_locked and existing_last_name and incoming_last_name != existing_last_name:
         errors["last_name"] = "Last name is locked and cannot be changed."
 
     if not incoming_username:
         errors["username"] = "Username is required."
+    elif identity_locked and existing_username and incoming_username != existing_username:
+        errors["username"] = "Username is locked and cannot be changed."
 
     if errors:
         return None, Response(errors, status=status.HTTP_400_BAD_REQUEST)
@@ -746,8 +753,14 @@ class RequestMobileOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 60-second cooldown to prevent spamming
-        if user.mobile_otp_created_at and timezone.now() - user.mobile_otp_created_at < timedelta(seconds=60):
+        # 60-second cooldown to prevent spamming the same pending number.
+        # Allow immediate correction when the pending number has not been verified yet.
+        same_pending_mobile = existing_mobile == normalized
+        if (
+            same_pending_mobile
+            and user.mobile_otp_created_at
+            and timezone.now() - user.mobile_otp_created_at < timedelta(seconds=60)
+        ):
             return Response(
                 {"error": "Please wait 60 seconds before requesting a new OTP."},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -859,7 +872,13 @@ class VerifyMobileOTPView(APIView):
         _reset_mobile_otp_security_state(user)
         user.save()
 
-        return Response({"detail": "Mobile number verified successfully"}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "detail": "Mobile number verified successfully",
+                "user": _build_authenticated_user_payload(user),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class ResendMobileOTPView(APIView):

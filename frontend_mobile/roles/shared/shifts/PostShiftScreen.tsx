@@ -101,6 +101,12 @@ type SlotEntry = {
     recurringDays: number[];
     recurringEndDate: string;
 };
+type SlotTime = { startTime: string; endTime: string };
+type PharmacyHoursForDate = SlotTime & {
+    closed: boolean;
+    label: string;
+    isPublicHoliday: boolean;
+};
 
 type PharmacyOption = {
     id: number;
@@ -112,6 +118,78 @@ type PharmacyOption = {
     organizationId?: number;
     allowed_escalation_levels?: VisibilityTier[];
     allowedEscalationLevels?: VisibilityTier[];
+};
+
+const readPharmacyValue = (pharmacy: any, snake: string, camel?: string) =>
+    pharmacy?.[snake] ?? (camel ? pharmacy?.[camel] : undefined);
+
+const normalizeHour = (value: unknown): string => {
+    if (typeof value !== 'string') return '';
+    return value ? value.slice(0, 5) : '';
+};
+
+const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
+    `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+
+const pharmacyPublicHolidayDates = (pharmacy: any): string[] => {
+    const raw =
+        pharmacy?.public_holiday_dates ??
+        pharmacy?.publicHolidayDates ??
+        pharmacy?.public_holidays_dates ??
+        pharmacy?.publicHolidaysDates ??
+        pharmacy?.public_holidays ??
+        pharmacy?.publicHolidays;
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .map((value) => (typeof value === 'string' ? value.slice(0, 10) : ''))
+        .filter(Boolean);
+};
+
+const isPublicHolidayDate = (date: string, pharmacy: any) =>
+    pharmacyPublicHolidayDates(pharmacy).includes(date);
+
+const pharmacyHoursForDate = (
+    pharmacy: PharmacyOption | undefined,
+    date: string,
+    fallback: SlotTime
+): PharmacyHoursForDate => {
+    if (!pharmacy || !date) {
+        return { ...fallback, closed: false, label: 'selected day', isPublicHoliday: false };
+    }
+
+    const parsed = new Date(`${date}T00:00:00`);
+    const weekday = Number.isNaN(parsed.getTime()) ? -1 : parsed.getDay();
+    const isPublicHoliday = isPublicHolidayDate(date, pharmacy);
+    const prefix = isPublicHoliday
+        ? 'public_holidays'
+        : weekday === 0
+            ? 'sundays'
+            : weekday === 6
+                ? 'saturdays'
+                : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][weekday - 1] || '';
+    const label = isPublicHoliday
+        ? 'public holiday'
+        : weekday === 0
+            ? 'Sunday'
+            : weekday === 6
+                ? 'Saturday'
+                : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][weekday - 1] || 'selected day';
+
+    if (!prefix) {
+        return { ...fallback, closed: false, label, isPublicHoliday };
+    }
+
+    const start = normalizeHour(readPharmacyValue(pharmacy, `${prefix}_start`, toCamelHoursKey(prefix, 'start')));
+    const end = normalizeHour(readPharmacyValue(pharmacy, `${prefix}_end`, toCamelHoursKey(prefix, 'end')));
+    const closed = Boolean(readPharmacyValue(pharmacy, `${prefix}_closed`, toCamelHoursKey(prefix, 'closed')));
+
+    return {
+        startTime: start || fallback.startTime,
+        endTime: end || fallback.endTime,
+        closed,
+        label,
+        isPublicHoliday,
+    };
 };
 
 const toIsoDate = (value: string): Date | null => {
@@ -376,6 +454,25 @@ export default function PostShiftScreen() {
         () => pharmacies.find((x) => x.id === pharmacyId),
         [pharmacyId, pharmacies]
     );
+    const getDefaultTimesForDate = useCallback(
+        (date: string, fallback: SlotTime = { startTime: slotStart, endTime: slotEnd }) =>
+            pharmacyHoursForDate(selectedPharmacy, date, fallback),
+        [selectedPharmacy, slotEnd, slotStart]
+    );
+    const slotDateHours = useMemo(
+        () => (slotDate ? getDefaultTimesForDate(slotDate) : null),
+        [getDefaultTimesForDate, slotDate]
+    );
+    const closedSelectedDates = useMemo(
+        () => selectedDates.map((date) => ({ date, hours: getDefaultTimesForDate(date) })).filter((item) => item.hours.closed),
+        [getDefaultTimesForDate, selectedDates]
+    );
+    useEffect(() => {
+        if (editingId || !selectedPharmacy || !slotDate || selectedDates.length > 0 || slots.length > 0) return;
+        const hours = getDefaultTimesForDate(slotDate);
+        setSlotStart(hours.startTime);
+        setSlotEnd(hours.endTime);
+    }, [editingId, getDefaultTimesForDate, selectedDates.length, selectedPharmacy, slotDate, slots.length]);
 
     useEffect(() => {
         if (!selectedPharmacy || editingId) return;
@@ -432,6 +529,9 @@ export default function PostShiftScreen() {
                     : [];
             // Keep full objects so allowed_escalation_levels/chain/org flags flow through
             setPharmacies(list as PharmacyOption[]);
+            if (!editingId && list.length > 0) {
+                setPharmacyId((current) => current || Number(list[0].id));
+            }
             setPharmaciesLoaded(true);
         } catch {
             setError('Unable to load pharmacies');
@@ -636,13 +736,20 @@ export default function PostShiftScreen() {
             const next = { ...prev };
             valid.forEach((date) => {
                 if (!next[date]) {
-                    next[date] = { startTime: slotStart, endTime: slotEnd };
+                    const hours = getDefaultTimesForDate(date);
+                    next[date] = { startTime: hours.startTime, endTime: hours.endTime };
                 }
             });
             return next;
         });
-        setSlotDate(valid[valid.length - 1]);
-    }, [slotEnd, slotStart]);
+        const latest = valid[valid.length - 1];
+        if (latest) {
+            const latestHours = getDefaultTimesForDate(latest);
+            setSlotDate(latest);
+            setSlotStart(latestHours.startTime);
+            setSlotEnd(latestHours.endTime);
+        }
+    }, [getDefaultTimesForDate]);
 
     const selectedDateObjects = useMemo(
         () => selectedDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -1662,6 +1769,13 @@ export default function PostShiftScreen() {
                     placeholder="17:00"
                 />
             </View>
+            {slotDateHours?.closed ? (
+                <View style={styles.closedNotice}>
+                    <Text style={styles.closedNoticeText}>
+                        This pharmacy is marked closed on this {slotDateHours.label}. You can still edit the times and add the shift.
+                    </Text>
+                </View>
+            ) : null}
 
             <Surface style={styles.calendarPanel} elevation={0}>
                 <View style={styles.calendarHeader}>
@@ -1689,16 +1803,21 @@ export default function PostShiftScreen() {
                         }
                         const isSelected = selectedDateSet.has(cell.iso);
                         const hasSlot = slotDateSet.has(cell.iso);
+                        const hours = getDefaultTimesForDate(cell.iso);
                         return (
                             <TouchableOpacity
                                 key={`${cell.iso}-${idx}`}
                                 style={[
                                     styles.calendarCell,
+                                    hours.closed && styles.calendarCellClosed,
                                     isSelected && styles.calendarCellSelected,
+                                    hours.closed && isSelected && styles.calendarCellClosedSelected,
                                     hasSlot && styles.calendarCellWithSlot,
                                 ]}
                                 onPress={() => {
                                     setSlotDate(cell.iso);
+                                    setSlotStart(hours.startTime);
+                                    setSlotEnd(hours.endTime);
                                     setSelectedDates((prev) =>
                                         prev.includes(cell.iso)
                                             ? prev.filter((d) => d !== cell.iso)
@@ -1709,7 +1828,7 @@ export default function PostShiftScreen() {
                                         if (selectedDateSet.has(cell.iso)) {
                                             delete next[cell.iso];
                                         } else if (!next[cell.iso]) {
-                                            next[cell.iso] = { startTime: slotStart, endTime: slotEnd };
+                                            next[cell.iso] = { startTime: hours.startTime, endTime: hours.endTime };
                                         }
                                         return next;
                                     });
@@ -1775,26 +1894,41 @@ export default function PostShiftScreen() {
                             </Button>
                         </View>
                     </View>
+                    {closedSelectedDates.length > 0 ? (
+                        <View style={styles.closedNotice}>
+                            <Text style={styles.closedNoticeText}>
+                                {closedSelectedDates.length} selected date{closedSelectedDates.length > 1 ? 's are' : ' is'} marked closed for this pharmacy. They stay selected and the times remain editable.
+                            </Text>
+                        </View>
+                    ) : null}
                     <View style={{ gap: 10 }}>
                         {selectedDates.map((date) => {
                             const times = selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd };
+                            const hours = getDefaultTimesForDate(date, times);
                             return (
-                                <Surface key={date} style={styles.selectedDayCard} elevation={0}>
+                                <Surface key={date} style={[styles.selectedDayCard, hours.closed && styles.selectedDayCardClosed]} elevation={0}>
                                     <View style={styles.selectedDayHeader}>
-                                        <Chip
-                                            onClose={() => {
-                                                setSelectedDates((prev) => prev.filter((d) => d !== date));
-                                                setSelectedDateTimes((prev) => {
-                                                    const next = { ...prev };
-                                                    delete next[date];
-                                                    return next;
-                                                });
-                                            }}
-                                            style={styles.chipUnselected}
-                                            textStyle={styles.chipText}
-                                        >
-                                            {formatAuDate(date)}
-                                        </Chip>
+                                        <View style={styles.selectedDayChipRow}>
+                                            <Chip
+                                                onClose={() => {
+                                                    setSelectedDates((prev) => prev.filter((d) => d !== date));
+                                                    setSelectedDateTimes((prev) => {
+                                                        const next = { ...prev };
+                                                        delete next[date];
+                                                        return next;
+                                                    });
+                                                }}
+                                                style={styles.chipUnselected}
+                                                textStyle={styles.chipText}
+                                            >
+                                                {formatAuDate(date)}
+                                            </Chip>
+                                            {hours.closed ? (
+                                                <Chip icon="block-helper" style={styles.closedChip} textStyle={styles.closedChipText}>
+                                                    Closed {hours.label}
+                                                </Chip>
+                                            ) : null}
+                                        </View>
                                         <TouchableOpacity style={styles.selectedDayAddBtn} onPress={() => addSelectedDateSlot(date)}>
                                             <IconButton icon="plus" size={18} iconColor="#FFFFFF" />
                                         </TouchableOpacity>
@@ -2069,6 +2203,15 @@ const styles = StyleSheet.create({
         borderColor: '#E5E7EB',
         borderRadius: 8,
         marginBottom: 4,
+    },
+    calendarCellClosed: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#EF4444',
+    },
+    calendarCellClosedSelected: {
+        backgroundColor: '#FEE2E2',
+        borderColor: '#DC2626',
+        borderWidth: 2,
     },
     calendarCellPad: {
         borderColor: 'transparent',
@@ -2353,11 +2496,46 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         gap: 10,
     },
+    selectedDayCardClosed: {
+        borderColor: '#FCA5A5',
+        backgroundColor: '#FEF2F2',
+    },
     selectedDayHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         gap: 8,
+    },
+    selectedDayChipRow: {
+        flex: 1,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        alignItems: 'center',
+    },
+    closedChip: {
+        backgroundColor: '#FEE2E2',
+        borderColor: '#DC2626',
+        borderWidth: 1,
+    },
+    closedChipText: {
+        color: '#991B1B',
+        fontWeight: '700',
+    },
+    closedNotice: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        backgroundColor: '#FEF2F2',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginTop: 8,
+    },
+    closedNoticeText: {
+        color: '#991B1B',
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '600',
     },
     selectedDayAddBtn: {
         width: 36,

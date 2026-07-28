@@ -135,22 +135,32 @@ export default function PharmacyForm({
             rate_public_holiday: '',
             rate_early_morning: '',
             rate_late_night: '',
+            weekdays_start: '',
+            weekdays_end: '',
             monday_start: '',
             monday_end: '',
+            monday_closed: false,
             tuesday_start: '',
             tuesday_end: '',
+            tuesday_closed: false,
             wednesday_start: '',
             wednesday_end: '',
+            wednesday_closed: false,
             thursday_start: '',
             thursday_end: '',
+            thursday_closed: false,
             friday_start: '',
             friday_end: '',
+            friday_closed: false,
             saturdays_start: '',
             saturdays_end: '',
+            saturdays_closed: false,
             sundays_start: '',
             sundays_end: '',
+            sundays_closed: false,
             public_holidays_start: '',
             public_holidays_end: '',
+            public_holidays_closed: false,
         },
         rolesNeeded: [] as string[],
     });
@@ -185,14 +195,23 @@ export default function PharmacyForm({
         rate_early_morning: '',
         rate_late_night: '',
         // Hours
+        weekdays_start: '', weekdays_end: '',
         monday_start: '', monday_end: '',
+        monday_closed: false,
         tuesday_start: '', tuesday_end: '',
+        tuesday_closed: false,
         wednesday_start: '', wednesday_end: '',
+        wednesday_closed: false,
         thursday_start: '', thursday_end: '',
+        thursday_closed: false,
         friday_start: '', friday_end: '',
+        friday_closed: false,
         saturdays_start: '', saturdays_end: '',
+        saturdays_closed: false,
         sundays_start: '', sundays_end: '',
+        sundays_closed: false,
         public_holidays_start: '', public_holidays_end: '',
+        public_holidays_closed: false,
     });
 
     // Lists logic
@@ -331,22 +350,32 @@ export default function PharmacyForm({
                     rate_public_holiday: String(data.rate_public_holiday || ''),
                     rate_early_morning: String(data.rate_early_morning || ''),
                     rate_late_night: String(data.rate_late_night || ''),
+                    weekdays_start: data.weekdays_start || data.monday_start || '',
+                    weekdays_end: data.weekdays_end || data.monday_end || '',
                     monday_start: data.monday_start || data.weekdays_start || '',
                     monday_end: data.monday_end || data.weekdays_end || '',
+                    monday_closed: Boolean(data.monday_closed),
                     tuesday_start: data.tuesday_start || data.weekdays_start || '',
                     tuesday_end: data.tuesday_end || data.weekdays_end || '',
+                    tuesday_closed: Boolean(data.tuesday_closed),
                     wednesday_start: data.wednesday_start || data.weekdays_start || '',
                     wednesday_end: data.wednesday_end || data.weekdays_end || '',
+                    wednesday_closed: Boolean(data.wednesday_closed),
                     thursday_start: data.thursday_start || data.weekdays_start || '',
                     thursday_end: data.thursday_end || data.weekdays_end || '',
+                    thursday_closed: Boolean(data.thursday_closed),
                     friday_start: data.friday_start || data.weekdays_start || '',
                     friday_end: data.friday_end || data.weekdays_end || '',
+                    friday_closed: Boolean(data.friday_closed),
                     saturdays_start: data.saturdays_start || '',
                     saturdays_end: data.saturdays_end || '',
+                    saturdays_closed: Boolean(data.saturdays_closed),
                     sundays_start: data.sundays_start || '',
                     sundays_end: data.sundays_end || '',
+                    sundays_closed: Boolean(data.sundays_closed),
                     public_holidays_start: data.public_holidays_start || '',
                     public_holidays_end: data.public_holidays_end || '',
+                    public_holidays_closed: Boolean(data.public_holidays_closed),
                 };
 
                 const nextEmploymentTypes = data.employment_types || [];
@@ -659,18 +688,34 @@ export default function PharmacyForm({
     };
 
     const handleApplyToWeekdays = () => {
-        const { monday_start, monday_end } = form;
-        if (monday_start && monday_end) {
+        const { weekdays_start, weekdays_end } = form;
+        if (weekdays_start && weekdays_end) {
             setForm(prev => ({
                 ...prev,
-                tuesday_start: monday_start,
-                tuesday_end: monday_end,
-                wednesday_start: monday_start,
-                wednesday_end: monday_end,
-                thursday_start: monday_start,
-                thursday_end: monday_end,
-                friday_start: monday_start,
-                friday_end: monday_end,
+                monday_start: weekdays_start,
+                monday_end: weekdays_end,
+                monday_closed: false,
+                tuesday_start: weekdays_start,
+                tuesday_end: weekdays_end,
+                tuesday_closed: false,
+                wednesday_start: weekdays_start,
+                wednesday_end: weekdays_end,
+                wednesday_closed: false,
+                thursday_start: weekdays_start,
+                thursday_end: weekdays_end,
+                thursday_closed: false,
+                friday_start: weekdays_start,
+                friday_end: weekdays_end,
+                friday_closed: false,
+                saturdays_start: weekdays_start,
+                saturdays_end: weekdays_end,
+                saturdays_closed: false,
+                sundays_start: weekdays_start,
+                sundays_end: weekdays_end,
+                sundays_closed: false,
+                public_holidays_start: weekdays_start,
+                public_holidays_end: weekdays_end,
+                public_holidays_closed: false,
             }));
         }
     };
@@ -1058,23 +1103,26 @@ export default function PharmacyForm({
                             {activeTab === 4 && (
                                 <>
                                     <Text style={styles.helperText}>Format: HH:MM (e.g. 09:00, 17:30)</Text>
-                                    <HoursRow label="Monday" startKey="monday_start" endKey="monday_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <Button
-                                        mode="text"
-                                        onPress={handleApplyToWeekdays}
-                                        disabled={!form.monday_start || !form.monday_end}
-                                        style={{ alignSelf: 'flex-end', marginTop: -8, marginBottom: 8 }}
-                                        labelStyle={{ fontSize: 12 }}
-                                    >
-                                        Apply to all weekdays
-                                    </Button>
-                                    <HoursRow label="Tuesday" startKey="tuesday_start" endKey="tuesday_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <HoursRow label="Wednesday" startKey="wednesday_start" endKey="wednesday_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <HoursRow label="Thursday" startKey="thursday_start" endKey="thursday_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <HoursRow label="Friday" startKey="friday_start" endKey="friday_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <HoursRow label="Saturdays" startKey="saturdays_start" endKey="saturdays_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <HoursRow label="Sundays" startKey="sundays_start" endKey="sundays_end" form={form} setActiveTimeField={setActiveTimeField} />
-                                    <HoursRow label="Public Holidays" startKey="public_holidays_start" endKey="public_holidays_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                    <View style={styles.weekdayTemplate}>
+                                        <HoursRow label="Weekdays" startKey="weekdays_start" endKey="weekdays_end" form={form} setActiveTimeField={setActiveTimeField} />
+                                        <Button
+                                            mode="text"
+                                            onPress={handleApplyToWeekdays}
+                                            disabled={!form.weekdays_start || !form.weekdays_end}
+                                            style={{ alignSelf: 'flex-end', marginTop: -8 }}
+                                            labelStyle={{ fontSize: 12 }}
+                                        >
+                                            Apply to all
+                                        </Button>
+                                    </View>
+                                    <HoursRow label="Monday" startKey="monday_start" endKey="monday_end" closedKey="monday_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Tuesday" startKey="tuesday_start" endKey="tuesday_end" closedKey="tuesday_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Wednesday" startKey="wednesday_start" endKey="wednesday_end" closedKey="wednesday_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Thursday" startKey="thursday_start" endKey="thursday_end" closedKey="thursday_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Friday" startKey="friday_start" endKey="friday_end" closedKey="friday_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Saturdays" startKey="saturdays_start" endKey="saturdays_end" closedKey="saturdays_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Sundays" startKey="sundays_start" endKey="sundays_end" closedKey="sundays_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
+                                    <HoursRow label="Public Holidays" startKey="public_holidays_start" endKey="public_holidays_end" closedKey="public_holidays_closed" form={form} setForm={setForm} setActiveTimeField={setActiveTimeField} />
                                 </>
                             )}
 
@@ -1282,21 +1330,53 @@ export default function PharmacyForm({
     );
 }
 
-const HoursRow = ({ label, startKey, endKey, form, setActiveTimeField }: any) => (
+const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActiveTimeField }: any) => {
+    const isClosed = Boolean(closedKey && form[closedKey]);
+    const toggleClosed = () => {
+        if (!closedKey || !setForm) return;
+        setForm((prev: any) => ({
+            ...prev,
+            [closedKey]: !Boolean(prev[closedKey]),
+            [startKey]: !Boolean(prev[closedKey]) ? '' : prev[startKey],
+            [endKey]: !Boolean(prev[closedKey]) ? '' : prev[endKey],
+        }));
+    };
+
+    return (
     <View style={{ marginBottom: 16 }}>
-        <Text style={{ fontWeight: '600', marginBottom: 4 }}>{label}</Text>
+        <View style={styles.hoursRowHeader}>
+            <Text style={{ fontWeight: '600', marginBottom: 4 }}>{label}</Text>
+            {closedKey ? (
+                <TouchableOpacity
+                    style={[styles.closedToggle, isClosed ? styles.closedToggleActive : null]}
+                    onPress={toggleClosed}
+                    activeOpacity={0.8}
+                >
+                    <MaterialCommunityIcons
+                        name="block-helper"
+                        size={16}
+                        color={isClosed ? '#B91C1C' : '#64748B'}
+                    />
+                    <Text style={[styles.closedToggleText, isClosed ? styles.closedToggleTextActive : null]}>
+                        Closed
+                    </Text>
+                </TouchableOpacity>
+            ) : null}
+        </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity
                 style={styles.timeField}
                 activeOpacity={0.85}
+                disabled={isClosed}
                 onPress={() => setActiveTimeField({ key: startKey, label: `${label} start time` })}
             >
                 <TextInput
                     label="Start"
-                    value={form[startKey]}
+                    value={isClosed ? '' : form[startKey]}
                     mode="outlined"
                     style={styles.timeInput}
                     placeholder="09:00"
+                    disabled={isClosed}
                     editable={false}
                     pointerEvents="none"
                     right={<TextInput.Icon icon="clock-outline" />}
@@ -1305,14 +1385,16 @@ const HoursRow = ({ label, startKey, endKey, form, setActiveTimeField }: any) =>
             <TouchableOpacity
                 style={styles.timeField}
                 activeOpacity={0.85}
+                disabled={isClosed}
                 onPress={() => setActiveTimeField({ key: endKey, label: `${label} end time` })}
             >
                 <TextInput
                     label="End"
-                    value={form[endKey]}
+                    value={isClosed ? '' : form[endKey]}
                     mode="outlined"
                     style={styles.timeInput}
                     placeholder="17:00"
+                    disabled={isClosed}
                     editable={false}
                     pointerEvents="none"
                     right={<TextInput.Icon icon="clock-outline" />}
@@ -1320,7 +1402,8 @@ const HoursRow = ({ label, startKey, endKey, form, setActiveTimeField }: any) =>
             </TouchableOpacity>
         </View>
     </View>
-);
+    );
+};
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: surfaceTokens.bgDark },
@@ -1492,6 +1575,44 @@ const styles = StyleSheet.create({
     },
     timeInput: {
         backgroundColor: surfaceTokens.bg,
+    },
+    weekdayTemplate: {
+        marginBottom: 18,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#d0d7de',
+        backgroundColor: '#f8faff',
+    },
+    hoursRowHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginBottom: 4,
+    },
+    closedToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minHeight: 36,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: '#d0d7de',
+        backgroundColor: '#f8fafc',
+    },
+    closedToggleActive: {
+        borderColor: 'rgba(220,38,38,0.5)',
+        backgroundColor: 'rgba(220,38,38,0.1)',
+    },
+    closedToggleText: {
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    closedToggleTextActive: {
+        color: '#B91C1C',
+        fontWeight: '900',
     },
     tabsOuter: {
         alignItems: 'center',

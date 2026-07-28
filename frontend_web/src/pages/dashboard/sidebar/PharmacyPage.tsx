@@ -48,6 +48,7 @@ import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import TopicRoundedIcon from "@mui/icons-material/TopicRounded";
+import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import { AxiosError } from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useJsApiLoader, Autocomplete } from "@react-google-maps/api";
@@ -123,20 +124,28 @@ type PharmacyApi = {
   weekdays_end: string | null;
   monday_start: string | null;
   monday_end: string | null;
+  monday_closed?: boolean | null;
   tuesday_start: string | null;
   tuesday_end: string | null;
+  tuesday_closed?: boolean | null;
   wednesday_start: string | null;
   wednesday_end: string | null;
+  wednesday_closed?: boolean | null;
   thursday_start: string | null;
   thursday_end: string | null;
+  thursday_closed?: boolean | null;
   friday_start: string | null;
   friday_end: string | null;
+  friday_closed?: boolean | null;
   saturdays_start: string | null;
   saturdays_end: string | null;
+  saturdays_closed?: boolean | null;
   sundays_start: string | null;
   sundays_end: string | null;
+  sundays_closed?: boolean | null;
   public_holidays_start: string | null;
   public_holidays_end: string | null;
+  public_holidays_closed?: boolean | null;
   default_rate_type: "FIXED" | "FLEXIBLE" | "PHARMACIST_PROVIDED" | null;
   default_fixed_rate: string | null;
   rate_weekday?: string | null;
@@ -189,20 +198,28 @@ const normalizePharmacy = (raw: any): Pharmacy => ({
   weekdays_end: raw.weekdays_end ?? raw.weekdaysEnd ?? "",
   monday_start: raw.monday_start ?? raw.mondayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
   monday_end: raw.monday_end ?? raw.mondayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  monday_closed: raw.monday_closed ?? raw.mondayClosed ?? false,
   tuesday_start: raw.tuesday_start ?? raw.tuesdayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
   tuesday_end: raw.tuesday_end ?? raw.tuesdayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  tuesday_closed: raw.tuesday_closed ?? raw.tuesdayClosed ?? false,
   wednesday_start: raw.wednesday_start ?? raw.wednesdayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
   wednesday_end: raw.wednesday_end ?? raw.wednesdayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  wednesday_closed: raw.wednesday_closed ?? raw.wednesdayClosed ?? false,
   thursday_start: raw.thursday_start ?? raw.thursdayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
   thursday_end: raw.thursday_end ?? raw.thursdayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  thursday_closed: raw.thursday_closed ?? raw.thursdayClosed ?? false,
   friday_start: raw.friday_start ?? raw.fridayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? "",
   friday_end: raw.friday_end ?? raw.fridayEnd ?? raw.weekdays_end ?? raw.weekdaysEnd ?? "",
+  friday_closed: raw.friday_closed ?? raw.fridayClosed ?? false,
   saturdays_start: raw.saturdays_start ?? raw.saturdaysStart ?? "",
   saturdays_end: raw.saturdays_end ?? raw.saturdaysEnd ?? "",
+  saturdays_closed: raw.saturdays_closed ?? raw.saturdaysClosed ?? false,
   sundays_start: raw.sundays_start ?? raw.sundaysStart ?? "",
   sundays_end: raw.sundays_end ?? raw.sundaysEnd ?? "",
+  sundays_closed: raw.sundays_closed ?? raw.sundaysClosed ?? false,
   public_holidays_start: raw.public_holidays_start ?? raw.publicHolidaysStart ?? "",
   public_holidays_end: raw.public_holidays_end ?? raw.publicHolidaysEnd ?? "",
+  public_holidays_closed: raw.public_holidays_closed ?? raw.publicHolidaysClosed ?? false,
   default_rate_type: raw.default_rate_type ?? raw.defaultRateType ?? null,
   default_fixed_rate: raw.default_fixed_rate ?? raw.defaultFixedRate ?? null,
   rate_weekday: raw.rate_weekday ?? raw.rateWeekday ?? null,
@@ -505,22 +522,32 @@ export default function PharmacyPage({
   const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
   const [rolesNeeded, setRolesNeeded] = useState<string[]>([]);
 
+  const [weekdaysStart, setWeekdaysStart] = useState("");
+  const [weekdaysEnd, setWeekdaysEnd] = useState("");
   const [mondayStart, setMondayStart] = useState("");
   const [mondayEnd, setMondayEnd] = useState("");
+  const [mondayClosed, setMondayClosed] = useState(false);
   const [tuesdayStart, setTuesdayStart] = useState("");
   const [tuesdayEnd, setTuesdayEnd] = useState("");
+  const [tuesdayClosed, setTuesdayClosed] = useState(false);
   const [wednesdayStart, setWednesdayStart] = useState("");
   const [wednesdayEnd, setWednesdayEnd] = useState("");
+  const [wednesdayClosed, setWednesdayClosed] = useState(false);
   const [thursdayStart, setThursdayStart] = useState("");
   const [thursdayEnd, setThursdayEnd] = useState("");
+  const [thursdayClosed, setThursdayClosed] = useState(false);
   const [fridayStart, setFridayStart] = useState("");
   const [fridayEnd, setFridayEnd] = useState("");
+  const [fridayClosed, setFridayClosed] = useState(false);
   const [saturdaysStart, setSaturdaysStart] = useState("");
   const [saturdaysEnd, setSaturdaysEnd] = useState("");
+  const [saturdaysClosed, setSaturdaysClosed] = useState(false);
   const [sundaysStart, setSundaysStart] = useState("");
   const [sundaysEnd, setSundaysEnd] = useState("");
+  const [sundaysClosed, setSundaysClosed] = useState(false);
   const [publicHolidaysStart, setPublicHolidaysStart] = useState("");
   const [publicHolidaysEnd, setPublicHolidaysEnd] = useState("");
+  const [publicHolidaysClosed, setPublicHolidaysClosed] = useState(false);
 
   const [defaultRateType, setDefaultRateType] = useState<string>("FIXED");
   const [defaultFixedRate, setDefaultFixedRate] = useState<string>("");
@@ -1073,47 +1100,97 @@ export default function PharmacyPage({
 
       {tabIndex === 4 && (
         <Box sx={{ p: 2 }}>
-          {hoursFields.map(({ label, start, setStart, end, setEnd }) => (
-            <React.Fragment key={label}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "150px 1fr 1fr auto" },
+              gap: 2,
+              alignItems: "center",
+              mb: 3,
+              p: 2,
+              borderRadius: 3,
+              border: `1px solid ${LIGHT_BORDER}`,
+              bgcolor: "#F8FAFF",
+            }}
+          >
+            <Typography fontWeight={800}>Weekdays</Typography>
+            <TextField
+              label="Start"
+              type="time"
+              fullWidth
+              value={weekdaysStart}
+              onChange={(e) => setWeekdaysStart(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="End"
+              type="time"
+              fullWidth
+              value={weekdaysEnd}
+              onChange={(e) => setWeekdaysEnd(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <Button size="small" onClick={handleApplyToWeekdays} disabled={!weekdaysStart || !weekdaysEnd}>
+              Apply to all
+            </Button>
+          </Box>
+
+          {hoursFields.map(({ label, start, setStart, end, setEnd, closed, setClosed }) => (
+            <Box
+              key={label}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "150px 1fr 1fr 110px" },
+                gap: 2,
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography>{label}</Typography>
+              <TextField
+                label="Start"
+                type="time"
+                fullWidth
+                value={closed ? "" : start}
+                onChange={(e) => setStart(e.target.value)}
+                disabled={closed}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="End"
+                type="time"
+                fullWidth
+                value={closed ? "" : end}
+                onChange={(e) => setEnd(e.target.value)}
+                disabled={closed}
+                InputLabelProps={{ shrink: true }}
+              />
               <Box
+                onClick={() => setClosed(!closed)}
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "150px 1fr 1fr" },
-                  gap: 2,
+                  display: "inline-flex",
                   alignItems: "center",
-                  mb: 2,
+                  justifyContent: "center",
+                  gap: 0.75,
+                  minHeight: 42,
+                  px: 1.25,
+                  borderRadius: 999,
+                  border: "1px solid",
+                  borderColor: closed ? alpha("#DC2626", 0.5) : LIGHT_BORDER,
+                  bgcolor: closed ? alpha("#DC2626", 0.1) : "#F8FAFC",
+                  color: closed ? "#B91C1C" : "#475569",
+                  cursor: "pointer",
+                  transition: "background-color 120ms ease, border-color 120ms ease, color 120ms ease",
+                  "&:hover": {
+                    borderColor: closed ? alpha("#DC2626", 0.65) : alpha("#DC2626", 0.34),
+                    bgcolor: closed ? alpha("#DC2626", 0.14) : alpha("#DC2626", 0.06),
+                  },
                 }}
               >
-                <Typography>{label}</Typography>
-                <TextField
-                  label="Start"
-                  type="time"
-                  fullWidth
-                  value={start}
-                  onChange={(e) => setStart(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-                <TextField
-                  label="End"
-                  type="time"
-                  fullWidth
-                  value={end}
-                  onChange={(e) => setEnd(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
+                <BlockRoundedIcon fontSize="small" />
+                <Typography variant="body2" fontWeight={900} sx={{ color: "inherit" }}>Closed</Typography>
               </Box>
-              {label === "Monday" && (
-                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2, mt: -1 }}>
-                  <Button
-                    size="small"
-                    onClick={handleApplyToWeekdays}
-                    disabled={!mondayStart || !mondayEnd}
-                  >
-                    Apply to all weekdays
-                  </Button>
-                </Stack>
-              )}
-            </React.Fragment>
+            </Box>
           ))}
         </Box>
       )}
@@ -1337,14 +1414,14 @@ export default function PharmacyPage({
   }, [searchParams, setSearchParams]);
 
   const hoursFields = [
-    { label: "Monday", start: mondayStart, setStart: setMondayStart, end: mondayEnd, setEnd: setMondayEnd },
-    { label: "Tuesday", start: tuesdayStart, setStart: setTuesdayStart, end: tuesdayEnd, setEnd: setTuesdayEnd },
-    { label: "Wednesday", start: wednesdayStart, setStart: setWednesdayStart, end: wednesdayEnd, setEnd: setWednesdayEnd },
-    { label: "Thursday", start: thursdayStart, setStart: setThursdayStart, end: thursdayEnd, setEnd: setThursdayEnd },
-    { label: "Friday", start: fridayStart, setStart: setFridayStart, end: fridayEnd, setEnd: setFridayEnd },
-    { label: "Saturdays", start: saturdaysStart, setStart: setSaturdaysStart, end: saturdaysEnd, setEnd: setSaturdaysEnd },
-    { label: "Sundays", start: sundaysStart, setStart: setSundaysStart, end: sundaysEnd, setEnd: setSundaysEnd },
-    { label: "Public Holidays", start: publicHolidaysStart, setStart: setPublicHolidaysStart, end: publicHolidaysEnd, setEnd: setPublicHolidaysEnd },
+    { label: "Monday", start: mondayStart, setStart: setMondayStart, end: mondayEnd, setEnd: setMondayEnd, closed: mondayClosed, setClosed: setMondayClosed },
+    { label: "Tuesday", start: tuesdayStart, setStart: setTuesdayStart, end: tuesdayEnd, setEnd: setTuesdayEnd, closed: tuesdayClosed, setClosed: setTuesdayClosed },
+    { label: "Wednesday", start: wednesdayStart, setStart: setWednesdayStart, end: wednesdayEnd, setEnd: setWednesdayEnd, closed: wednesdayClosed, setClosed: setWednesdayClosed },
+    { label: "Thursday", start: thursdayStart, setStart: setThursdayStart, end: thursdayEnd, setEnd: setThursdayEnd, closed: thursdayClosed, setClosed: setThursdayClosed },
+    { label: "Friday", start: fridayStart, setStart: setFridayStart, end: fridayEnd, setEnd: setFridayEnd, closed: fridayClosed, setClosed: setFridayClosed },
+    { label: "Saturdays", start: saturdaysStart, setStart: setSaturdaysStart, end: saturdaysEnd, setEnd: setSaturdaysEnd, closed: saturdaysClosed, setClosed: setSaturdaysClosed },
+    { label: "Sundays", start: sundaysStart, setStart: setSundaysStart, end: sundaysEnd, setEnd: setSundaysEnd, closed: sundaysClosed, setClosed: setSundaysClosed },
+    { label: "Public Holidays", start: publicHolidaysStart, setStart: setPublicHolidaysStart, end: publicHolidaysEnd, setEnd: setPublicHolidaysEnd, closed: publicHolidaysClosed, setClosed: setPublicHolidaysClosed },
   ];
 
   const showSnackbar = (message: string, severity: "success" | "error" | "info" = "info") => {
@@ -1675,22 +1752,32 @@ export default function PharmacyPage({
       setExistingSumpDocs(pharmacy.qld_sump_docs || null);
       setEmploymentTypes(pharmacy.employment_types || []);
       setRolesNeeded(pharmacy.roles_needed || []);
+      setWeekdaysStart(pharmacy.weekdays_start || pharmacy.monday_start || "");
+      setWeekdaysEnd(pharmacy.weekdays_end || pharmacy.monday_end || "");
       setMondayStart(pharmacy.monday_start || pharmacy.weekdays_start || "");
       setMondayEnd(pharmacy.monday_end || pharmacy.weekdays_end || "");
+      setMondayClosed(Boolean(pharmacy.monday_closed));
       setTuesdayStart(pharmacy.tuesday_start || pharmacy.weekdays_start || "");
       setTuesdayEnd(pharmacy.tuesday_end || pharmacy.weekdays_end || "");
+      setTuesdayClosed(Boolean(pharmacy.tuesday_closed));
       setWednesdayStart(pharmacy.wednesday_start || pharmacy.weekdays_start || "");
       setWednesdayEnd(pharmacy.wednesday_end || pharmacy.weekdays_end || "");
+      setWednesdayClosed(Boolean(pharmacy.wednesday_closed));
       setThursdayStart(pharmacy.thursday_start || pharmacy.weekdays_start || "");
       setThursdayEnd(pharmacy.thursday_end || pharmacy.weekdays_end || "");
+      setThursdayClosed(Boolean(pharmacy.thursday_closed));
       setFridayStart(pharmacy.friday_start || pharmacy.weekdays_start || "");
       setFridayEnd(pharmacy.friday_end || pharmacy.weekdays_end || "");
+      setFridayClosed(Boolean(pharmacy.friday_closed));
       setSaturdaysStart(pharmacy.saturdays_start || "");
       setSaturdaysEnd(pharmacy.saturdays_end || "");
+      setSaturdaysClosed(Boolean(pharmacy.saturdays_closed));
       setSundaysStart(pharmacy.sundays_start || "");
       setSundaysEnd(pharmacy.sundays_end || "");
+      setSundaysClosed(Boolean(pharmacy.sundays_closed));
       setPublicHolidaysStart(pharmacy.public_holidays_start || "");
       setPublicHolidaysEnd(pharmacy.public_holidays_end || "");
+      setPublicHolidaysClosed(Boolean(pharmacy.public_holidays_closed));
       setDefaultRateType(pharmacy.default_rate_type || "FIXED");
       setDefaultFixedRate(pharmacy.default_fixed_rate || "");
       setRateWeekday(pharmacy.rate_weekday || "");
@@ -1720,22 +1807,32 @@ export default function PharmacyPage({
       setExistingSumpDocs(null);
       setEmploymentTypes([]);
       setRolesNeeded([]);
+      setWeekdaysStart("");
+      setWeekdaysEnd("");
       setMondayStart("");
       setMondayEnd("");
+      setMondayClosed(false);
       setTuesdayStart("");
       setTuesdayEnd("");
+      setTuesdayClosed(false);
       setWednesdayStart("");
       setWednesdayEnd("");
+      setWednesdayClosed(false);
       setThursdayStart("");
       setThursdayEnd("");
+      setThursdayClosed(false);
       setFridayStart("");
       setFridayEnd("");
+      setFridayClosed(false);
       setSaturdaysStart("");
       setSaturdaysEnd("");
+      setSaturdaysClosed(false);
       setSundaysStart("");
       setSundaysEnd("");
+      setSundaysClosed(false);
       setPublicHolidaysStart("");
       setPublicHolidaysEnd("");
+      setPublicHolidaysClosed(false);
       setDefaultRateType("FIXED");
       setDefaultFixedRate("");
       setRateWeekday("");
@@ -1865,16 +1962,32 @@ export default function PharmacyPage({
   };
 
   const handleApplyToWeekdays = () => {
-    if (mondayStart && mondayEnd) {
-      setTuesdayStart(mondayStart);
-      setTuesdayEnd(mondayEnd);
-      setWednesdayStart(mondayStart);
-      setWednesdayEnd(mondayEnd);
-      setThursdayStart(mondayStart);
-      setThursdayEnd(mondayEnd);
-      setFridayStart(mondayStart);
-      setFridayEnd(mondayEnd);
-      showSnackbar("Monday hours applied to all weekdays.", "success");
+    if (weekdaysStart && weekdaysEnd) {
+      setMondayStart(weekdaysStart);
+      setMondayEnd(weekdaysEnd);
+      setTuesdayStart(weekdaysStart);
+      setTuesdayEnd(weekdaysEnd);
+      setWednesdayStart(weekdaysStart);
+      setWednesdayEnd(weekdaysEnd);
+      setThursdayStart(weekdaysStart);
+      setThursdayEnd(weekdaysEnd);
+      setFridayStart(weekdaysStart);
+      setFridayEnd(weekdaysEnd);
+      setSaturdaysStart(weekdaysStart);
+      setSaturdaysEnd(weekdaysEnd);
+      setSundaysStart(weekdaysStart);
+      setSundaysEnd(weekdaysEnd);
+      setPublicHolidaysStart(weekdaysStart);
+      setPublicHolidaysEnd(weekdaysEnd);
+      setMondayClosed(false);
+      setTuesdayClosed(false);
+      setWednesdayClosed(false);
+      setThursdayClosed(false);
+      setFridayClosed(false);
+      setSaturdaysClosed(false);
+      setSundaysClosed(false);
+      setPublicHolidaysClosed(false);
+      showSnackbar("Hours applied to every day.", "success");
     }
   };
 
@@ -1962,22 +2075,21 @@ export default function PharmacyPage({
     if (includeFiles && sumpDocsFile) fd.append("qld_sump_docs", sumpDocsFile);
     fd.append("employment_types", JSON.stringify(employmentTypes));
     fd.append("roles_needed", JSON.stringify(rolesNeeded));
-    fd.append("monday_start", mondayStart);
-    fd.append("monday_end", mondayEnd);
-    fd.append("tuesday_start", tuesdayStart);
-    fd.append("tuesday_end", tuesdayEnd);
-    fd.append("wednesday_start", wednesdayStart);
-    fd.append("wednesday_end", wednesdayEnd);
-    fd.append("thursday_start", thursdayStart);
-    fd.append("thursday_end", thursdayEnd);
-    fd.append("friday_start", fridayStart);
-    fd.append("friday_end", fridayEnd);
-    fd.append("saturdays_start", saturdaysStart);
-    fd.append("saturdays_end", saturdaysEnd);
-    fd.append("sundays_start", sundaysStart);
-    fd.append("sundays_end", sundaysEnd);
-    fd.append("public_holidays_start", publicHolidaysStart);
-    fd.append("public_holidays_end", publicHolidaysEnd);
+    fd.append("weekdays_start", weekdaysStart);
+    fd.append("weekdays_end", weekdaysEnd);
+    const appendHours = (prefix: string, start: string, end: string, closed: boolean) => {
+      fd.append(`${prefix}_closed`, String(closed));
+      fd.append(`${prefix}_start`, closed ? "" : start);
+      fd.append(`${prefix}_end`, closed ? "" : end);
+    };
+    appendHours("monday", mondayStart, mondayEnd, mondayClosed);
+    appendHours("tuesday", tuesdayStart, tuesdayEnd, tuesdayClosed);
+    appendHours("wednesday", wednesdayStart, wednesdayEnd, wednesdayClosed);
+    appendHours("thursday", thursdayStart, thursdayEnd, thursdayClosed);
+    appendHours("friday", fridayStart, fridayEnd, fridayClosed);
+    appendHours("saturdays", saturdaysStart, saturdaysEnd, saturdaysClosed);
+    appendHours("sundays", sundaysStart, sundaysEnd, sundaysClosed);
+    appendHours("public_holidays", publicHolidaysStart, publicHolidaysEnd, publicHolidaysClosed);
     fd.append("default_rate_type", defaultRateType);
     if (defaultFixedRate) fd.append("default_fixed_rate", defaultFixedRate);
 

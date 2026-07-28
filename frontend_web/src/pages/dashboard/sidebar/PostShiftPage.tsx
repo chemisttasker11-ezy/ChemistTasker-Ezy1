@@ -46,6 +46,7 @@ import {
   AttachMoney as RateIcon,
   Schedule as ScheduleIcon,
   ExpandMore as ExpandMoreIcon,
+  Block as BlockIcon,
 } from '@mui/icons-material';
 import Grid from '@mui/material/Grid';
 import { stepConnectorClasses } from '@mui/material/StepConnector';
@@ -74,6 +75,12 @@ import { useColorMode } from '../../../theme/sleekTheme';
 
 // --- Interface Definitions ---
 type PharmacyOption = PharmacySummary & { hasChain?: boolean; claimed?: boolean };
+type SlotTime = { startTime: string; endTime: string };
+type PharmacyHoursForDate = SlotTime & {
+  closed: boolean;
+  label: string;
+  isPublicHoliday: boolean;
+};
 interface SlotEntry {
   date: string; startTime: string; endTime: string; isRecurring: boolean;
   recurringDays: number[]; recurringEndDate: string;
@@ -217,6 +224,78 @@ const describeRecurringDays = (days: number[]) => {
   if (!days?.length) return '';
   const ordered = [...days].sort((a, b) => ((a === 0 ? 7 : a) - (b === 0 ? 7 : b)));
   return ordered.map((day) => DAY_LABELS_SHORT[day]).join(' / ');
+};
+
+const readPharmacyValue = (pharmacy: any, snake: string, camel?: string) =>
+  pharmacy?.[snake] ?? (camel ? pharmacy?.[camel] : undefined);
+
+const normalizeHour = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value ? value.slice(0, 5) : '';
+};
+
+const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
+  `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+
+const pharmacyPublicHolidayDates = (pharmacy: any): string[] => {
+  const raw =
+    pharmacy?.public_holiday_dates ??
+    pharmacy?.publicHolidayDates ??
+    pharmacy?.public_holidays_dates ??
+    pharmacy?.publicHolidaysDates ??
+    pharmacy?.public_holidays ??
+    pharmacy?.publicHolidays;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((value) => (typeof value === 'string' ? value.slice(0, 10) : ''))
+    .filter(Boolean);
+};
+
+const isPublicHolidayDate = (date: string, pharmacy: any) =>
+  pharmacyPublicHolidayDates(pharmacy).includes(date);
+
+const pharmacyHoursForDate = (
+  pharmacy: PharmacyOption | undefined,
+  date: string,
+  fallback: SlotTime
+): PharmacyHoursForDate => {
+  if (!pharmacy || !date) {
+    return { ...fallback, closed: false, label: 'selected day', isPublicHoliday: false };
+  }
+
+  const parsed = dayjs(date);
+  const isPublicHoliday = isPublicHolidayDate(date, pharmacy);
+  const weekday = parsed.isValid() ? parsed.day() : -1;
+  const prefix = isPublicHoliday
+    ? 'public_holidays'
+    : weekday === 0
+      ? 'sundays'
+      : weekday === 6
+        ? 'saturdays'
+        : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][weekday - 1] || '';
+  const label = isPublicHoliday
+    ? 'public holiday'
+    : weekday === 0
+      ? 'Sunday'
+      : weekday === 6
+        ? 'Saturday'
+        : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][weekday - 1] || 'selected day';
+
+  if (!prefix) {
+    return { ...fallback, closed: false, label, isPublicHoliday };
+  }
+
+  const start = normalizeHour(readPharmacyValue(pharmacy, `${prefix}_start`, toCamelHoursKey(prefix, 'start')));
+  const end = normalizeHour(readPharmacyValue(pharmacy, `${prefix}_end`, toCamelHoursKey(prefix, 'end')));
+  const closed = Boolean(readPharmacyValue(pharmacy, `${prefix}_closed`, toCamelHoursKey(prefix, 'closed')));
+
+  return {
+    startTime: start || fallback.startTime,
+    endTime: end || fallback.endTime,
+    closed,
+    label,
+    isPublicHoliday,
+  };
 };
 
 const ORG_ROLE_VALUES = ORG_ROLES as readonly string[];
@@ -380,6 +459,9 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         ) as PharmacyOption[];
         if (!cancelled) {
           setPharmacies(loadedPharmacies);
+          if (!editingShiftId && !prefillPharmacyId && scopedPharmacyId == null && loadedPharmacies.length > 0) {
+            setPharmacyId((current) => current || Number(loadedPharmacies[0].id));
+          }
         }
       } catch {
         if (!cancelled) {
@@ -787,6 +869,25 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   }, [slots]);
 
   const selectedDateSet = useMemo(() => new Set(selectedDates), [selectedDates]);
+  const getDefaultTimesForDate = useCallback(
+    (date: string, fallback: SlotTime = { startTime: slotStartTime, endTime: slotEndTime }) =>
+      pharmacyHoursForDate(selectedPharmacy, date, fallback),
+    [selectedPharmacy, slotEndTime, slotStartTime]
+  );
+  const slotDateHours = useMemo(
+    () => (slotDate ? getDefaultTimesForDate(slotDate) : null),
+    [getDefaultTimesForDate, slotDate]
+  );
+  const closedSelectedDates = useMemo(
+    () => selectedDates.map((date) => ({ date, hours: getDefaultTimesForDate(date) })).filter((item) => item.hours.closed),
+    [getDefaultTimesForDate, selectedDates]
+  );
+  useEffect(() => {
+    if (editingShiftId || !selectedPharmacy || !slotDate || selectedDates.length > 0 || slots.length > 0) return;
+    const hours = getDefaultTimesForDate(slotDate);
+    setSlotStartTime(hours.startTime);
+    setSlotEndTime(hours.endTime);
+  }, [editingShiftId, getDefaultTimesForDate, selectedDates.length, selectedPharmacy, slotDate, slots.length]);
   const mergeSelectedDates = useCallback(
     (incomingDates: string[], timeOverride?: { startTime: string; endTime: string }) => {
       if (!incomingDates.length) return;
@@ -805,16 +906,22 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           if (timeOverride) {
             next[date] = timeOverride;
           } else if (!next[date]) {
-            next[date] = { startTime: slotStartTime, endTime: slotEndTime };
+            const hours = getDefaultTimesForDate(date);
+            next[date] = { startTime: hours.startTime, endTime: hours.endTime };
           }
         });
         return next;
       });
 
       const latest = normalizedIncoming[normalizedIncoming.length - 1];
-      if (latest) setSlotDate(latest);
+      if (latest) {
+        const latestHours = timeOverride ?? getDefaultTimesForDate(latest);
+        setSlotDate(latest);
+        setSlotStartTime(latestHours.startTime);
+        setSlotEndTime(latestHours.endTime);
+      }
     },
-    [slotEndTime, slotStartTime, todayStart]
+    [getDefaultTimesForDate, todayStart]
   );
 
   const expandedSlots = useMemo(() => {
@@ -888,6 +995,17 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const dayPropGetter = useCallback(
     (date: Date) => {
       const iso = dayjs(date).format('YYYY-MM-DD');
+      const hours = getDefaultTimesForDate(iso);
+      if (hours.closed) {
+        return {
+          style: {
+            backgroundColor: selectedDateSet.has(iso) ? 'rgba(239, 68, 68, 0.14)' : 'rgba(254, 242, 242, 0.95)',
+            boxShadow: selectedDateSet.has(iso)
+              ? 'inset 0 0 0 2px rgba(220, 38, 38, 0.55)'
+              : 'inset 0 0 0 1px rgba(220, 38, 38, 0.35)',
+          },
+        };
+      }
       if (selectedDateSet.has(iso)) {
         return {
           style: {
@@ -898,7 +1016,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       }
       return {};
     },
-    [selectedDateSet]
+    [getDefaultTimesForDate, selectedDateSet]
   );
 
   useEffect(() => {
@@ -1945,7 +2063,15 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                             format="DD/MM/YYYY"
                             value={slotDate ? dayjs(slotDate) : null}
                             minDate={dayjs(minDateInputValue)}
-                            onChange={(value) => setSlotDate(value && value.isValid() ? value.format('YYYY-MM-DD') : '')}
+                            onChange={(value) => {
+                              const nextDate = value && value.isValid() ? value.format('YYYY-MM-DD') : '';
+                              setSlotDate(nextDate);
+                              if (nextDate) {
+                                const hours = getDefaultTimesForDate(nextDate);
+                                setSlotStartTime(hours.startTime);
+                                setSlotEndTime(hours.endTime);
+                              }
+                            }}
                             // slotProps={{
                             //   textField: {
                             //     fullWidth: true,
@@ -1981,6 +2107,13 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                           sx={fieldSx}
                         />
                       </Grid>
+                      {slotDateHours?.closed && (
+                        <Grid size={12}>
+                          <Alert severity="warning" icon={<BlockIcon />}>
+                            This pharmacy is marked closed on this {slotDateHours.label}. You can still edit the times and add the shift.
+                          </Alert>
+                        </Grid>
+                      )}
                       <Grid size={12}>
                         <Button
                           variant="contained"
@@ -2051,6 +2184,11 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                         </Stack>
                       </Stack>
                     )}
+                    {closedSelectedDates.length > 0 && (
+                      <Alert severity="warning" icon={<BlockIcon />}>
+                        {closedSelectedDates.length} selected date{closedSelectedDates.length > 1 ? 's are' : ' is'} marked closed for this pharmacy. They stay selected and the times remain editable.
+                      </Alert>
+                    )}
                   </Stack>
                 </Paper>
 
@@ -2082,6 +2220,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                       <Stack spacing={1}>
                         {selectedDates.map((date) => {
                           const times = selectedDateTimes[date] || { startTime: slotStartTime, endTime: slotEndTime };
+                          const hours = getDefaultTimesForDate(date, times);
                           return (
                             <Box
                               key={date}
@@ -2108,6 +2247,15 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                   });
                                 }}
                               />
+                              {hours.closed && (
+                                <Chip
+                                  icon={<BlockIcon />}
+                                  color="error"
+                                  variant="outlined"
+                                  label={`Closed ${hours.label}`}
+                                  sx={{ flexShrink: 0 }}
+                                />
+                              )}
                               <TextField
                                 label="Start"
                                 type="time"

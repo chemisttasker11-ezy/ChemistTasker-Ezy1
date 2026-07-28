@@ -49,7 +49,6 @@ export default function MobileOTPVerify() {
         username,
         mobile_number: mobile,
       });
-      setIdentityLocked(true);
       setStatus('We sent a code to your mobile.');
     } catch (err) {
       setError(extractError(err, 'Failed to send code.'));
@@ -65,6 +64,7 @@ export default function MobileOTPVerify() {
     setLoading(true);
     try {
       await apiClient.post('/users/mobile/verify-otp/', { otp });
+      setIdentityLocked(true);
       setStatus('Mobile verified! Redirecting...');
       setTimeout(() => window.location.assign('/login'), 800);
     } catch (err) {
@@ -141,7 +141,7 @@ export default function MobileOTPVerify() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              disabled={loading}
+              disabled={loading || identityLocked}
             />
 
             <TextField
