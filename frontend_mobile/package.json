@@ -72,6 +72,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@emnapi/core": "^2.0.0-alpha.3",
+    "@emnapi/runtime": "^2.0.0-alpha.3",
     "@types/lodash.debounce": "^4.0.9",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",

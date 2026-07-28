@@ -23,6 +23,8 @@
         "typescript": "^5.0.0"
     },
     "devDependencies": {
+        "@emnapi/core": "^2.0.0-alpha.3",
+        "@emnapi/runtime": "^2.0.0-alpha.3",
         "msw": "^2.0.0",
         "vitest": "^4.1.8"
     }
