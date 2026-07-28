@@ -19,6 +19,17 @@ import StoreIcon from "@mui/icons-material/Store";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { alpha } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
+import {
+  dashboardActionCardSx,
+  dashboardActionGridSx,
+  dashboardContentShellSx,
+  dashboardHeroSx,
+  dashboardMainStackSx,
+  dashboardMetricGridSx,
+  dashboardMetricItemSx,
+  dashboardPageSx,
+  dashboardSidebarSx,
+} from "./dashboardResponsive";
 
 const DNA = {
   ink: "#06123A",
@@ -158,14 +169,7 @@ export default function DashboardOverviewTemplate({
   return (
     <Box
       sx={{
-        width: "100%",
-        mx: "auto",
-        maxWidth: 1660,
-        color: DNA.ink,
-        fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
-        display: "flex",
-        flexDirection: "column",
-        gap: { xs: 2, md: 3.5 },
+        ...dashboardPageSx,
       }}
     >
       <Box>
@@ -192,19 +196,13 @@ export default function DashboardOverviewTemplate({
 
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1fr) 388px" },
-          gap: { xs: 2, md: 3 },
-          alignItems: "start",
-          minWidth: 0,
+          ...dashboardContentShellSx,
         }}
       >
-        <Stack spacing={{ xs: 2, md: 3 }} sx={{ minWidth: 0 }}>
+        <Stack spacing={{ xs: 2, md: 3 }} sx={dashboardMainStackSx}>
           <Paper
             sx={{
-              p: { xs: 2, sm: 3, md: 4 },
-              minHeight: { xs: "auto", md: 290 },
-              borderRadius: { xs: "18px", md: "22px" },
+              ...dashboardHeroSx,
               backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
               color: "#fff",
               overflow: "hidden",
@@ -263,11 +261,11 @@ export default function DashboardOverviewTemplate({
             </Stack>
           </Paper>
 
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: { xs: 1.5, md: 2.5 }, minWidth: 0 }}>
+          <Box sx={dashboardActionGridSx}>
             {actions.map((action) => {
               const tone = toneStyles[action.tone];
               return (
-                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ minHeight: { xs: 132, md: 196 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
+                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ ...dashboardActionCardSx, gridColumn: { xl: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
                   <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
                     <Box sx={{ width: { xs: 52, md: 64 }, height: { xs: 52, md: 64 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 28, md: 34 } } }}>
                       {action.icon}
@@ -283,7 +281,7 @@ export default function DashboardOverviewTemplate({
           </Box>
         </Stack>
 
-        <Stack spacing={{ xs: 2.5, md: 3 }}>
+        <Stack spacing={{ xs: 2.5, md: 3 }} sx={dashboardSidebarSx}>
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
               <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
@@ -418,11 +416,11 @@ export default function DashboardOverviewTemplate({
         </Stack>
       </Box>
 
-      <Paper sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(4, minmax(0, 1fr))" }, overflow: "hidden", borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
+      <Paper sx={{ ...dashboardMetricGridSx, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
         {metrics.map((item, index) => {
           const tone = toneStyles[item.tone];
           return (
-            <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: { xs: 1.5, md: 2.25 }, minHeight: { xs: 104, md: 132 }, px: { xs: 2, md: 4 }, py: { xs: 2, md: 2.5 }, borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` }, borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" } }}>
+            <Box key={item.label} sx={{ ...dashboardMetricItemSx, display: "flex", alignItems: "center", gap: { xs: 1.5, md: 2.25 }, borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` }, borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" } }}>
               <Box sx={{ width: { xs: 54, md: 66 }, height: { xs: 54, md: 66 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 30, md: 36 } } }}>{item.icon}</Box>
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 14 }}>{item.label}</Typography>

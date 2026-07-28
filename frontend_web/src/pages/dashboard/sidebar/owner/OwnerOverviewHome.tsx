@@ -27,6 +27,17 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../../../../utils/apiClient";
 import { useAuth } from "../../../../contexts/AuthContext";
 import type { PharmacyDTO } from "./types";
+import {
+  dashboardActionCardSx,
+  dashboardActionGridSx,
+  dashboardContentShellSx,
+  dashboardHeroSx,
+  dashboardMainStackSx,
+  dashboardMetricGridSx,
+  dashboardMetricItemSx,
+  dashboardPageSx,
+  dashboardSidebarSx,
+} from "../../../../components/dashboard/dashboardResponsive";
 
 const DNA = {
   ink: "#06123A",
@@ -251,15 +262,8 @@ export default function OwnerOverviewHome({
   return (
     <Box
       sx={{
-        width: "100%",
-        mx: "auto",
-        maxWidth: 1660,
+        ...dashboardPageSx,
         py: { xs: 1.5, md: 3 },
-        color: DNA.ink,
-        fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
-        display: "flex",
-        flexDirection: "column",
-        gap: { xs: 2, md: 3.5 },
       }}
     >
       <Box>
@@ -286,19 +290,13 @@ export default function OwnerOverviewHome({
 
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1fr) 388px" },
-          gap: { xs: 2, md: 3 },
-          alignItems: "start",
-          minWidth: 0,
+          ...dashboardContentShellSx,
         }}
       >
-        <Stack spacing={{ xs: 2, md: 3 }} sx={{ minWidth: 0 }}>
+        <Stack spacing={{ xs: 2, md: 3 }} sx={dashboardMainStackSx}>
           <Paper
         sx={{
-          p: { xs: 2, sm: 3, md: 4 },
-          minHeight: { xs: "auto", md: 290 },
-          borderRadius: { xs: "18px", md: "22px" },
+          ...dashboardHeroSx,
           backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
           color: "#fff",
           overflow: "hidden",
@@ -421,10 +419,7 @@ export default function OwnerOverviewHome({
 
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" },
-              gap: { xs: 1.5, md: 2.5 },
-              minWidth: 0,
+              ...dashboardActionGridSx,
             }}
           >
             {quickActions.map((action) => {
@@ -435,15 +430,14 @@ export default function OwnerOverviewHome({
                   role="button"
                   onClick={action.onClick}
                   sx={{
-                    minHeight: { xs: 132, md: 196 },
-                    gridColumn: { lg: action.wide ? "span 2" : "span 1" },
+                    ...dashboardActionCardSx,
+                    gridColumn: { xl: action.wide ? "span 2" : "span 1" },
                     borderRadius: { xs: "16px", md: "20px" },
                     bgcolor: "#FFFFFF",
                     border: `1px solid ${DNA.line}`,
                     boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
                     transition: "all 0.2s ease",
                     cursor: "pointer",
-                    p: { xs: 2, md: 3 },
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
@@ -485,7 +479,7 @@ export default function OwnerOverviewHome({
           </Box>
         </Stack>
 
-        <Stack spacing={{ xs: 2.5, md: 3 }}>
+        <Stack spacing={{ xs: 2.5, md: 3 }} sx={dashboardSidebarSx}>
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
               <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
@@ -554,9 +548,7 @@ export default function OwnerOverviewHome({
 
       <Paper
         sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(4, minmax(0, 1fr))" },
-          overflow: "hidden",
+          ...dashboardMetricGridSx,
           borderRadius: { xs: "16px", md: "20px" },
           bgcolor: "#FFFFFF",
           border: `1px solid ${DNA.line}`,
@@ -569,12 +561,10 @@ export default function OwnerOverviewHome({
             <Box
               key={item.label}
               sx={{
+                ...dashboardMetricItemSx,
                 display: "flex",
                 alignItems: "center",
                 gap: { xs: 1.5, md: 2.25 },
-                minHeight: { xs: 104, md: 132 },
-                px: { xs: 2, md: 4 },
-                py: { xs: 2, md: 2.5 },
                 borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` },
                 borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" },
               }}
