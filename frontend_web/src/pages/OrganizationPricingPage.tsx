@@ -13,6 +13,7 @@ import PublicContactFormSection from '../components/PublicContactFormSection';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveDashboardPath } from '../utils/dashboardPath';
 import { setCanonical, setPageMeta, setSocialMeta } from '../utils/seo';
+import { useNavigate } from 'react-router-dom';
 
 const theme = createTheme({
   palette: {
@@ -81,7 +82,8 @@ const featureGroups = [
 
 export default function OrganizationPricingPage() {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const dashboardHref = resolveDashboardPath(user?.role);
 
   useEffect(() => {
@@ -96,6 +98,11 @@ export default function OrganizationPricingPage() {
 
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElNav(event.currentTarget);
   const handleCloseNavMenu = () => setAnchorElNav(null);
+  const handleLogout = () => {
+    logout();
+    handleCloseNavMenu();
+    navigate(PAGE_ROUTES.login, { replace: true });
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -109,9 +116,12 @@ export default function OrganizationPricingPage() {
             <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
               <Button href="/pricing" sx={{ color: 'text.primary', fontWeight: 500 }}>Pricing</Button>
               {user ? (
-                <CtaButton href={dashboardHref} variant="contained" size="small" sx={{ px: 2.5, py: 1 }}>
-                  Go to Dashboard
-                </CtaButton>
+                <>
+                  <CtaButton href={dashboardHref} variant="contained" size="small" sx={{ px: 2.5, py: 1 }}>
+                    Go to Dashboard
+                  </CtaButton>
+                  <Button onClick={handleLogout} sx={{ color: 'text.primary', fontWeight: 500 }}>Logout</Button>
+                </>
               ) : (
                 <>
                   <Button href={PAGE_ROUTES.login} sx={{ color: 'text.primary', fontWeight: 500 }}>Login</Button>
@@ -134,7 +144,10 @@ export default function OrganizationPricingPage() {
               >
                 <MenuItem component="a" href="/pricing"><Typography>Pricing</Typography></MenuItem>
                 {user ? (
-                  <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
+                  <>
+                    <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
+                    <MenuItem onClick={handleLogout}><Typography>Logout</Typography></MenuItem>
+                  </>
                 ) : (
                   <>
                     <MenuItem component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>

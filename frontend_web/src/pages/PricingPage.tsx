@@ -76,7 +76,7 @@ const PricingCard = styled(Card)(() => ({
 function PricingPage() {
     const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const dashboardHref = resolveDashboardPath(user?.role);
 
     useEffect(() => {
@@ -91,6 +91,11 @@ function PricingPage() {
 
     const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElNav(event.currentTarget);
     const handleCloseNavMenu = () => setAnchorElNav(null);
+    const handleLogout = () => {
+        logout();
+        handleCloseNavMenu();
+        navigate(PAGE_ROUTES.login, { replace: true });
+    };
     const handleOwnerSubscribe = () => {
         if (!user) {
             navigate(PAGE_ROUTES.register);
@@ -118,9 +123,12 @@ function PricingPage() {
                         <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
                             <Button href="/" sx={{ color: 'text.primary', fontWeight: 500 }}>Home</Button>
                             {user ? (
-                                <CtaButton href={dashboardHref} variant="contained" size="small" sx={{ px: 2.5, py: 1 }}>
-                                    Go to Dashboard
-                                </CtaButton>
+                                <>
+                                    <CtaButton href={dashboardHref} variant="contained" size="small" sx={{ px: 2.5, py: 1 }}>
+                                        Go to Dashboard
+                                    </CtaButton>
+                                    <Button onClick={handleLogout} sx={{ color: 'text.primary', fontWeight: 500 }}>Logout</Button>
+                                </>
                             ) : (
                                 <>
                                     <Button href={PAGE_ROUTES.login} sx={{ color: 'text.primary', fontWeight: 500 }}>Login</Button>
@@ -138,7 +146,10 @@ function PricingPage() {
                                 sx={{ display: { xs: 'block', md: 'none' } }}>
                                 <MenuItem component="a" href="/"><Typography>Home</Typography></MenuItem>
                                 {user ? (
-                                    <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
+                                    <>
+                                        <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
+                                        <MenuItem onClick={handleLogout}><Typography>Logout</Typography></MenuItem>
+                                    </>
                                 ) : (
                                     <>
                                         <MenuItem component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>

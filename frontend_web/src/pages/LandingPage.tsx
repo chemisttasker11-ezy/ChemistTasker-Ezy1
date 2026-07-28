@@ -15,6 +15,7 @@ import { resolveDashboardPath } from '../utils/dashboardPath';
 import { setCanonical, setPageMeta, setSocialMeta } from '../utils/seo';
 import { contactSupport } from '@chemisttasker/shared-core';
 import ReCAPTCHA from 'react-google-recaptcha';
+import { useNavigate } from 'react-router-dom';
 
 // --- Constants ---
 const PAGE_ROUTES = {
@@ -83,7 +84,8 @@ const ElevatedSectionShell = styled(Box)({
 
 function LandingPage() {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const dashboardHref = resolveDashboardPath(user?.role);
 
   useEffect(() => {
@@ -110,6 +112,11 @@ function LandingPage() {
     document.querySelector(anchor)?.scrollIntoView({ behavior: 'smooth' });
     handleCloseNavMenu();
   };
+  const handleLogout = () => {
+    logout();
+    handleCloseNavMenu();
+    navigate(PAGE_ROUTES.login, { replace: true });
+  };
 
   return (
     <AuthLayout title="ChemistTasker" maxWidth={false} noCard showTitle={false}>
@@ -127,9 +134,12 @@ function LandingPage() {
                   <Button onClick={() => handleNavClick('#for-who')} sx={{ color: 'text.primary', fontWeight: 500 }}>For Who?</Button>
                   <Button onClick={() => handleNavClick('#contact')} sx={{ color: 'text.primary', fontWeight: 500 }}>Contact</Button>
                   {user ? (
-                    <CtaButton href={dashboardHref} variant="contained" size="small" sx={{ px: 2.5, py: 1 }}>
-                      Go to Dashboard
-                    </CtaButton>
+                    <>
+                      <CtaButton href={dashboardHref} variant="contained" size="small" sx={{ px: 2.5, py: 1 }}>
+                        Go to Dashboard
+                      </CtaButton>
+                      <Button onClick={handleLogout} sx={{ color: 'text.primary', fontWeight: 500 }}>Logout</Button>
+                    </>
                   ) : (
                     <>
                       <Button href={PAGE_ROUTES.login} sx={{ color: 'text.primary', fontWeight: 500 }}>Login</Button>
@@ -150,7 +160,10 @@ function LandingPage() {
                     <MenuItem onClick={() => handleNavClick('#for-who')}><Typography>For Who?</Typography></MenuItem>
                     <MenuItem onClick={() => handleNavClick('#contact')}><Typography>Contact</Typography></MenuItem>
                     {user ? (
-                      <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
+                      <>
+                        <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
+                        <MenuItem onClick={handleLogout}><Typography>Logout</Typography></MenuItem>
+                      </>
                     ) : (
                       <>
                         <MenuItem component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>
