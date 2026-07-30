@@ -86,7 +86,13 @@ function LandingPage() {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const dashboardHref = resolveDashboardPath(user?.role);
+  const needsBasicOnboarding = Boolean(
+    user &&
+      ["PHARMACIST", "OTHER_STAFF", "EXPLORER"].includes(user.role) &&
+      !user.is_mobile_verified
+  );
+  const dashboardHref =
+    needsBasicOnboarding ? '/mobile-verify' : resolveDashboardPath(user?.role);
 
   useEffect(() => {
     const title = 'ChemistTasker | Pharmacy Workforce Platform';

@@ -15,7 +15,8 @@ import { alpha } from "@mui/material/styles";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
-import { getOnboarding, getOwnerDashboard } from "@chemisttasker/shared-core";
+import { getOwnerDashboard } from "@chemisttasker/shared-core";
+import { dashboardGreetingName } from "../../../utils/displayName";
 
 const formatShiftDate = (value?: string | null) => {
   if (!value) return "No date provided";
@@ -47,7 +48,6 @@ export default function OverviewPageOwner() {
   const { user } = useAuth() as { user: User };
   const primary = "var(--ct-dashboard-accent, #4A16B8)";
 
-  const [ownerProfile, setOwnerProfile] = useState<User | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,23 +56,21 @@ export default function OverviewPageOwner() {
     let active = true;
     setLoading(true);
 
-    Promise.allSettled([getOwnerDashboard({ workspace: "platform" }), getOnboarding("owner")])
-      .then(([dashboardRes, onboardingRes]) => {
+    getOwnerDashboard({ workspace: "platform" })
+      .then((dashboard) => {
         if (!active) {
           return;
         }
 
-        if (dashboardRes.status === "fulfilled") {
-          setData(dashboardRes.value as any);
-          setError(null);
-        } else {
-          setData(null);
-          setError("Error loading dashboard.");
+        setData(dashboard as any);
+        setError(null);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
         }
-
-        if (onboardingRes.status === "fulfilled") {
-          setOwnerProfile(onboardingRes.value as any);
-        }
+        setData(null);
+        setError("Error loading dashboard.");
       })
       .finally(() => {
         if (active) {
@@ -128,12 +126,7 @@ export default function OverviewPageOwner() {
     { label: "Reward Points", value: data?.bills_summary?.points ?? "--" },
   ];
 
-  const welcomeName =
-    ownerProfile?.first_name ||
-    ownerProfile?.username ||
-    user?.first_name ||
-    user?.username ||
-    "there";
+  const welcomeName = dashboardGreetingName(user);
 
   return (
     <Box

@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from .notifications import notify_users
 from .timezone_utils import get_pharmacy_timezone
+from .utils import get_frontend_dashboard_url
 from .models import (
     CalendarEvent,
     Membership,
@@ -146,6 +147,45 @@ def _users_already_notified(note_id, user_ids, day_str):
     )
 
 
+def _build_work_note_calendar_url(user, *, pharmacy_id: int, target_date: date, note_id: int) -> str:
+    dashboard_url = get_frontend_dashboard_url(user).rstrip("/")
+    return f"{dashboard_url}/calendar?pharmacy_id={pharmacy_id}&date={target_date}&note_id={note_id}"
+
+
+def _send_work_note_notifications(*, user_ids, note, pharmacy_id: int, target_date: date, extra_payload=None) -> int:
+    User = apps.get_model("users", "User")
+    users = list(User.objects.filter(id__in=set(user_ids), is_active=True).only("id", "role"))
+    sent = 0
+
+    for user in users:
+        action_url = _build_work_note_calendar_url(
+            user,
+            pharmacy_id=pharmacy_id,
+            target_date=target_date,
+            note_id=note.id,
+        )
+        payload = {
+            "work_note_id": note.id,
+            "pharmacy_id": pharmacy_id,
+            "date": str(target_date),
+            "action_url": action_url,
+        }
+        if extra_payload:
+            payload.update(extra_payload)
+
+        notify_users(
+            user_ids=[user.id],
+            title=f"Work Note: {note.title}",
+            body=(note.body or "")[:200],
+            notification_type=Notification.Type.WORK_NOTE,
+            action_url=action_url,
+            payload=payload,
+        )
+        sent += 1
+
+    return sent
+
+
 def send_shift_start_work_note_notifications():
     """
     Hourly scheduled task to send work note notifications when shifts start.
@@ -219,18 +259,11 @@ def send_shift_start_work_note_notifications():
             if not to_notify:
                 continue
 
-            action_url = f"/dashboard/calendar?pharmacy_id={pharmacy_id}&date={local_today}&note_id={note.id}"
-            notify_users(
-                user_ids=list(to_notify),
-                title=f"Work Note: {note.title}",
-                body=(note.body or "")[:200],
-                notification_type=Notification.Type.WORK_NOTE,
-                action_url=action_url,
-                payload={
-                    "work_note_id": note.id,
-                    "pharmacy_id": pharmacy_id,
-                    "date": str(local_today),
-                },
+            sent_count = _send_work_note_notifications(
+                user_ids=to_notify,
+                note=note,
+                pharmacy_id=pharmacy_id,
+                target_date=local_today,
             )
 
             WorkNoteAssignee.objects.filter(
@@ -239,9 +272,9 @@ def send_shift_start_work_note_notifications():
                 notified_at__isnull=True,
             ).update(notified_at=local_now)
 
-            notifications_sent += len(to_notify)
+            notifications_sent += sent_count
             logger.info(
-                f"Sent work note notification for note {note.id} to {len(to_notify)} users (pharmacy {pharmacy_id})"
+                f"Sent work note notification for note {note.id} to {sent_count} users (pharmacy {pharmacy_id})"
             )
 
     logger.info(f"[send_shift_start_work_note_notifications] Completed. Sent {notifications_sent} notifications.")
@@ -293,19 +326,12 @@ def send_9am_work_note_fallback():
             if not to_notify:
                 continue
 
-            action_url = f"/dashboard/calendar?pharmacy_id={note.pharmacy_id}&date={local_today}&note_id={note.id}"
-            notify_users(
-                user_ids=list(to_notify),
-                title=f"Work Note: {note.title}",
-                body=(note.body or "")[:200],
-                notification_type=Notification.Type.WORK_NOTE,
-                action_url=action_url,
-                payload={
-                    "work_note_id": note.id,
-                    "pharmacy_id": note.pharmacy_id,
-                    "date": str(local_today),
-                    "fallback": True,
-                },
+            sent_count = _send_work_note_notifications(
+                user_ids=to_notify,
+                note=note,
+                pharmacy_id=note.pharmacy_id,
+                target_date=local_today,
+                extra_payload={"fallback": True},
             )
 
             WorkNoteAssignee.objects.filter(
@@ -314,7 +340,7 @@ def send_9am_work_note_fallback():
                 notified_at__isnull=True,
             ).update(notified_at=local_now)
 
-            notifications_sent += len(to_notify)
+            notifications_sent += sent_count
 
     logger.info(f"[send_9am_work_note_fallback] Completed. Sent {notifications_sent} notifications.")
     return notifications_sent

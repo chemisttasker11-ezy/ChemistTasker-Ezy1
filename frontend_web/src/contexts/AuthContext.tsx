@@ -51,7 +51,15 @@ export type User = {
   username: string;
   email?: string;
   role: string;
+  first_name?: string | null;
+  firstName?: string | null;
+  last_name?: string | null;
+  lastName?: string | null;
   mobile_number?: string | null;
+  profile_photo?: string | null;
+  profile_photo_url?: string | null;
+  profilePhoto?: string | null;
+  profilePhotoUrl?: string | null;
   is_pharmacy_admin?: boolean;
   memberships?: Array<OrgMembership | PharmacyMembership>;
   admin_assignments?: AdminAssignment[];

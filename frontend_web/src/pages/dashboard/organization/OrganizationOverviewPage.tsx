@@ -20,11 +20,6 @@ import { useAuth, type OrgMembership } from "../../../contexts/AuthContext";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import apiClient from "../../../utils/apiClient";
 
-function firstNameFromUser(user: any) {
-  const raw = user?.first_name || user?.firstName || user?.username || user?.email?.split("@")[0] || "there";
-  return String(raw).split(/\s+/)[0];
-}
-
 function isOrgMembership(membership: unknown): membership is OrgMembership {
   if (!membership || typeof membership !== "object") return false;
   const candidate = membership as OrgMembership & { role?: string };
@@ -146,7 +141,7 @@ export default function OrganizationOverviewPage() {
         title="Organization Dashboard"
         badge={selectedPharmacy ? "Internal workspace" : "Public platform"}
         subtitle="Manage pharmacies, teams and operations"
-        heroTitle={`Welcome back, ${firstNameFromUser(user)}!`}
+        heroTitle="Welcome back!"
         heroSubtitle={`Here's what's happening across ${selectedPharmacy ? scopeName : "your organization"} today.`}
         primaryAction={{ label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/post-shift") }}
         secondaryAction={{ label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { useIsFocused, useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useUnsavedChangesDialog } from './UnsavedChangesDialogProvider';
@@ -10,6 +10,8 @@ type Options = {
   title?: string;
   message?: string;
   onDiscard?: () => void | Promise<void>;
+  onSave?: () => void | Promise<void>;
+  saveLabel?: string;
 };
 
 const defaultTitle = 'Discard changes?';
@@ -43,11 +45,14 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     title = defaultTitle,
     message = defaultMessage,
     onDiscard,
+    onSave,
+    saveLabel = 'Save Changes',
   } = options;
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const dialog = useUnsavedChangesDialog();
   const registry = useUnsavedChangesRegistry();
+  const handlingBlockedNavigationRef = useRef(false);
   const [baseline, setBaseline] = useState<string | null>(null);
 
   const serializedValue = useMemo(() => serializeValue(value), [value]);
@@ -59,24 +64,24 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
 
   const requestConfirmation = useCallback(async () => {
     if (dialog) {
-      return dialog.confirm({ title, message });
+      return dialog.confirmAction({ title, message, onSave, saveLabel });
     }
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<'keep' | 'discard'>((resolve) => {
       Alert.alert(title, message, [
         {
           text: 'Keep editing',
           style: 'cancel',
-          onPress: () => resolve(false),
+          onPress: () => resolve('keep'),
         },
         {
           text: 'Discard',
           style: 'destructive',
-          onPress: () => resolve(true),
+          onPress: () => resolve('discard'),
         },
       ]);
     });
-  }, [dialog, message, title]);
+  }, [dialog, message, onSave, saveLabel, title]);
 
   const discardChanges = useCallback(async () => {
     if (!isDirty || saving) {
@@ -86,16 +91,17 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
       return true;
     }
 
-    const confirmed = await requestConfirmation();
-    if (!confirmed) {
+    const decision = await requestConfirmation();
+    if (decision === 'keep') {
       return false;
     }
 
-    if (onDiscard) {
+    if (decision === 'discard' && onDiscard) {
       await onDiscard();
     }
+    setBaseline(serializedValue);
     return true;
-  }, [isDirty, onDiscard, requestConfirmation, saving]);
+  }, [isDirty, onDiscard, requestConfirmation, saving, serializedValue]);
 
   const confirmDiscard = useCallback((onDiscardAction: () => void) => {
     if (!isDirty || saving) {
@@ -112,11 +118,21 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
   }, [discardChanges, isDirty, saving]);
 
   usePreventRemove(Platform.OS !== 'web' && isDirty && !saving, ({ data }) => {
+    if (handlingBlockedNavigationRef.current) {
+      return;
+    }
+
+    handlingBlockedNavigationRef.current = true;
     void (async () => {
-      const confirmed = await requestConfirmation();
-      if (confirmed) {
+      const decision = await requestConfirmation();
+      if (decision === 'discard' || decision === 'save') {
+        setBaseline(serializedValue);
+        handlingBlockedNavigationRef.current = false;
         navigation.dispatch(data.action);
+        return;
       }
+
+      handlingBlockedNavigationRef.current = false;
     })();
   });
 
@@ -127,20 +143,31 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
 
     const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
       if (!isDirty || saving) {
+        handlingBlockedNavigationRef.current = false;
         return;
       }
 
+      if (handlingBlockedNavigationRef.current) {
+        return;
+      }
+
+      handlingBlockedNavigationRef.current = true;
       event.preventDefault();
       void (async () => {
-        const confirmed = await requestConfirmation();
-        if (confirmed) {
+        const decision = await requestConfirmation();
+        if (decision === 'discard' || decision === 'save') {
+          setBaseline(serializedValue);
+          handlingBlockedNavigationRef.current = false;
           navigation.dispatch(event.data.action);
+          return;
         }
+
+        handlingBlockedNavigationRef.current = false;
       })();
     });
 
     return unsubscribe;
-  }, [isDirty, navigation, requestConfirmation, saving]);
+  }, [isDirty, navigation, requestConfirmation, saving, serializedValue]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !isDirty || saving || typeof window === 'undefined') {

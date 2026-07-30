@@ -17,13 +17,17 @@ const DEFAULT_TITLE = 'Discard changes?';
 type BoundaryGuard = {
   isDirty: boolean;
   message: string;
+  onSave?: () => Promise<void> | void;
+  saveLabel: string;
   title: string;
 };
+
+type UnsavedDecision = 'keep' | 'discard' | 'save';
 
 type BoundaryContextValue = {
   setGuard: (guard: BoundaryGuard | null) => void;
   confirmIfNeeded: () => Promise<boolean>;
-  requestConfirmation: (options?: { message?: string; title?: string }) => Promise<boolean>;
+  requestConfirmation: (options?: { message?: string; onSave?: () => Promise<void> | void; saveLabel?: string; title?: string }) => Promise<UnsavedDecision>;
 };
 
 const UnsavedChangesBoundaryContext = React.createContext<BoundaryContextValue | null>(null);
@@ -67,14 +71,21 @@ export function UnsavedChangesBoundary({
   children: (tools: { confirmIfNeeded: () => Promise<boolean> }) => React.ReactNode;
 }) {
   const guardRef = React.useRef<BoundaryGuard | null>(null);
-  const resolverRef = React.useRef<((confirmed: boolean) => void) | null>(null);
+  const pendingConfirmationRef = React.useRef<Promise<UnsavedDecision> | null>(null);
+  const resolverRef = React.useRef<((decision: UnsavedDecision) => void) | null>(null);
   const [dialogState, setDialogState] = React.useState<{
     message: string;
+    onSave?: () => Promise<void> | void;
     open: boolean;
+    saveLabel: string;
+    saving: boolean;
     title: string;
   }>({
     message: DEFAULT_MESSAGE,
+    onSave: undefined,
     open: false,
+    saveLabel: 'Save Changes',
+    saving: false,
     title: DEFAULT_TITLE,
   });
 
@@ -82,22 +93,62 @@ export function UnsavedChangesBoundary({
     guardRef.current = guard;
   }, []);
 
-  const closeDialog = React.useCallback((confirmed: boolean) => {
-    setDialogState((prev) => ({ ...prev, open: false }));
-    resolverRef.current?.(confirmed);
+  const closeDialog = React.useCallback((decision: UnsavedDecision) => {
+    setDialogState((prev) => ({ ...prev, open: false, saving: false }));
+    resolverRef.current?.(decision);
     resolverRef.current = null;
+    pendingConfirmationRef.current = null;
   }, []);
 
+  const saveAndClose = React.useCallback(() => {
+    const onSave = dialogState.onSave;
+    if (!onSave || dialogState.saving) {
+      return;
+    }
+
+    setDialogState((prev) => ({ ...prev, saving: true }));
+    void (async () => {
+      try {
+        await onSave();
+      } catch (error) {
+        console.error('Failed to save unsaved changes before navigation.', error);
+      } finally {
+        setDialogState((prev) => ({ ...prev, open: false, saving: false }));
+        window.setTimeout(() => {
+          resolverRef.current?.('save');
+          resolverRef.current = null;
+          pendingConfirmationRef.current = null;
+        }, 0);
+      }
+    })();
+  }, [dialogState.onSave, dialogState.saving]);
+
   const requestConfirmation = React.useCallback(
-    ({ message = DEFAULT_MESSAGE, title = DEFAULT_TITLE }: { message?: string; title?: string } = {}) =>
-      new Promise<boolean>((resolve) => {
-        resolverRef.current = resolve;
+    ({
+      message = DEFAULT_MESSAGE,
+      onSave,
+      saveLabel = 'Save Changes',
+      title = DEFAULT_TITLE,
+    }: { message?: string; onSave?: () => Promise<void> | void; saveLabel?: string; title?: string } = {}) =>
+      {
+        if (pendingConfirmationRef.current) {
+          return pendingConfirmationRef.current;
+        }
+
+        const pending = new Promise<UnsavedDecision>((resolve) => {
+          resolverRef.current = resolve;
+        });
+        pendingConfirmationRef.current = pending;
         setDialogState({
           message,
+          onSave,
           open: true,
+          saveLabel,
+          saving: false,
           title,
         });
-      }),
+        return pending;
+      },
     []
   );
 
@@ -106,7 +157,13 @@ export function UnsavedChangesBoundary({
     if (!guard?.isDirty) {
       return true;
     }
-    return requestConfirmation({ message: guard.message, title: guard.title });
+    const decision = await requestConfirmation({
+      message: guard.message,
+      onSave: guard.onSave,
+      saveLabel: guard.saveLabel,
+      title: guard.title,
+    });
+    return decision === 'discard' || decision === 'save';
   }, [requestConfirmation]);
 
   const contextValue = React.useMemo(
@@ -123,7 +180,7 @@ export function UnsavedChangesBoundary({
       {children({ confirmIfNeeded })}
       <Dialog
         open={dialogState.open}
-        onClose={() => closeDialog(false)}
+        onClose={() => closeDialog('keep')}
         maxWidth="xs"
         fullWidth
         PaperProps={{
@@ -145,10 +202,15 @@ export function UnsavedChangesBoundary({
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => closeDialog(false)} variant="outlined">
+          <Button disabled={dialogState.saving} onClick={() => closeDialog('keep')} variant="outlined">
             Keep Editing
           </Button>
-          <Button color="error" onClick={() => closeDialog(true)} variant="contained">
+          {dialogState.onSave && (
+            <Button disabled={dialogState.saving} onClick={saveAndClose} variant="contained">
+              {dialogState.saveLabel}
+            </Button>
+          )}
+          <Button color="error" disabled={dialogState.saving} onClick={() => closeDialog('discard')} variant="contained">
             Discard Changes
           </Button>
         </DialogActions>
@@ -160,16 +222,21 @@ export function UnsavedChangesBoundary({
 export function useUnsavedChangesGuard<T>({
   disabled = false,
   message = DEFAULT_MESSAGE,
+  onSave,
+  saveLabel = 'Save Changes',
   title = DEFAULT_TITLE,
   value,
 }: {
   disabled?: boolean;
   message?: string;
+  onSave?: () => Promise<void> | void;
+  saveLabel?: string;
   title?: string;
   value: T;
 }) {
   const boundary = React.useContext(UnsavedChangesBoundaryContext);
   const baselineRef = React.useRef(serializeForDirtyCheck(value));
+  const handlingBlockedNavigationRef = React.useRef(false);
   const currentSerialized = React.useMemo(() => serializeForDirtyCheck(value), [value]);
   const isDirty = !disabled && currentSerialized !== baselineRef.current;
 
@@ -177,32 +244,34 @@ export function useUnsavedChangesGuard<T>({
 
   React.useEffect(() => {
     if (blocker.state !== 'blocked') {
+      handlingBlockedNavigationRef.current = false;
       return;
     }
 
-    let active = true;
+    if (handlingBlockedNavigationRef.current) {
+      return;
+    }
+
+    handlingBlockedNavigationRef.current = true;
 
     void (async () => {
-      const confirmed = boundary
-        ? await boundary.requestConfirmation({ message, title })
-        : window.confirm(message);
+      const decision = boundary
+        ? await boundary.requestConfirmation({ message, onSave, saveLabel, title })
+        : window.confirm(message)
+          ? 'discard'
+          : 'keep';
 
-      if (!active) {
-        return;
-      }
-
-      if (confirmed) {
+      if (decision === 'discard' || decision === 'save') {
+        baselineRef.current = currentSerialized;
+        handlingBlockedNavigationRef.current = false;
         blocker.proceed();
         return;
       }
 
+      handlingBlockedNavigationRef.current = false;
       blocker.reset();
     })();
-
-    return () => {
-      active = false;
-    };
-  }, [blocker, boundary, message, title]);
+  }, [blocker, blocker.state, boundary, currentSerialized, message, onSave, saveLabel, title]);
 
   useBeforeUnload(
     React.useCallback(
@@ -223,11 +292,11 @@ export function useUnsavedChangesGuard<T>({
       return;
     }
 
-    boundary.setGuard({ isDirty, message, title });
+    boundary.setGuard({ isDirty, message, onSave, saveLabel, title });
     return () => {
       boundary.setGuard(null);
     };
-  }, [boundary, isDirty, message, title]);
+  }, [boundary, isDirty, message, onSave, saveLabel, title]);
 
   const markClean = React.useCallback((nextValue: T) => {
     baselineRef.current = serializeForDirtyCheck(nextValue);
@@ -235,13 +304,15 @@ export function useUnsavedChangesGuard<T>({
 
   const confirmDiscard = React.useCallback(
     async (onDiscard?: () => void) => {
-      const confirmed = isDirty
+      const decision = isDirty
         ? boundary
-          ? await boundary.requestConfirmation({ message, title })
+          ? await boundary.requestConfirmation({ message, onSave, saveLabel, title })
           : window.confirm(message)
-        : true;
+            ? 'discard'
+            : 'keep'
+        : 'discard';
 
-      if (!confirmed) {
+      if (decision === 'keep') {
         return false;
       }
 
@@ -249,7 +320,7 @@ export function useUnsavedChangesGuard<T>({
       onDiscard?.();
       return true;
     },
-    [boundary, currentSerialized, isDirty, message, title]
+    [boundary, currentSerialized, isDirty, message, onSave, saveLabel, title]
   );
 
   return {

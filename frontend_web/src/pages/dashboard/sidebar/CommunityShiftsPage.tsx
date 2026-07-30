@@ -76,7 +76,7 @@ export default function CommunityShiftsPage({
   const auth = useAuth();
   const user = auth?.user;
   if (!user) return null;
-  const { workspace } = useWorkspace();
+  const { workspace, selectedPharmacyId } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -224,6 +224,7 @@ export default function CommunityShiftsPage({
           endDate: activeFilters.dateRange.end || undefined,
           page: activePage,
           pageSize,
+          pharmacyId: workspace === 'internal' && selectedPharmacyId ? selectedPharmacyId : undefined,
         };
 
         const [communityShifts, interests, rejections] = await Promise.all([
@@ -272,7 +273,7 @@ export default function CommunityShiftsPage({
         setLoading(false);
       }
     },
-    [user.id]
+    [selectedPharmacyId, user.id, workspace]
   );
 
   useEffect(() => {

@@ -33,7 +33,7 @@ export default function PharmacistRateScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [rates, setRates] = useState<RatePref>(emptyRates);
-  const unsaved = useUnsavedChangesGuard(rates, { enabled: !loading, saving });
+  const unsaved = useUnsavedChangesGuard(rates, { enabled: !loading, onSave: () => save(), saving });
 
   useEffect(() => {
     let mounted = true;

@@ -88,8 +88,10 @@ export default function BasicInfoV2() {
   const [otpBusy, setOtpBusy] = React.useState(false);
   const [otpMsg, setOtpMsg] = React.useState('');
   const [otpErr, setOtpErr] = React.useState('');
+  const saveRef = React.useRef<(() => Promise<void>) | null>(null);
   const unsaved = useUnsavedChangesGuard({
     disabled: loading || saving,
+    onSave: () => saveRef.current?.(),
     value: {
       addressDisplay,
       data,
@@ -241,6 +243,20 @@ export default function BasicInfoV2() {
       setProfilePhotoPreview(updatedPhoto);
       setProfilePhotoCleared(false);
       setProfilePhotoFile(null);
+      setUser((prev: User | null) => (prev ? {
+        ...prev,
+        username: nextData.username || prev.username,
+        first_name: nextData.first_name ?? prev.first_name,
+        last_name: nextData.last_name ?? prev.last_name,
+        mobile_number: nextData.phone_number ?? prev.mobile_number,
+        profile_photo: updatedPhoto,
+        profile_photo_url: updatedPhoto,
+        profilePhoto: updatedPhoto,
+        profilePhotoUrl: updatedPhoto,
+      } : prev));
+      window.dispatchEvent(new CustomEvent('ct-profile-updated', {
+        detail: { ...nextData, profile_photo: updatedPhoto, profile_photo_url: updatedPhoto },
+      }));
 
       const s = [nextData?.street_address, nextData?.suburb, nextData?.state, nextData?.postcode]
         .filter(Boolean).join(', ');
@@ -265,6 +281,10 @@ export default function BasicInfoV2() {
       setSaving(false);
     }
   };
+
+  React.useEffect(() => {
+    saveRef.current = () => save(false);
+  });
 
   const VerifiedChip = ({ ok, label }: { ok?: boolean | null; label: string }) => {
     if (ok === true)   return <Chip icon={<CheckCircleOutlineIcon />} color="success" label={label} variant="outlined" />;

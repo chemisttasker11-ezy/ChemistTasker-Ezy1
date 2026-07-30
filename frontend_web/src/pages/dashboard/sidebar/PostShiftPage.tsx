@@ -72,9 +72,16 @@ import {
 } from '@chemisttasker/shared-core';
 import skillsCatalog from '../../../../../shared-core/skills_catalog.json';
 import { useColorMode } from '../../../theme/sleekTheme';
+import apiClient from '../../../utils/apiClient';
 
 // --- Interface Definitions ---
 type PharmacyOption = PharmacySummary & { hasChain?: boolean; claimed?: boolean };
+type ShiftDescriptionTemplate = {
+  id: number;
+  pharmacy: number;
+  role_needed: string;
+  description: string;
+};
 type SlotTime = { startTime: string; endTime: string };
 type PharmacyHoursForDate = SlotTime & {
   closed: boolean;
@@ -362,6 +369,10 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const [employmentType, setEmploymentType] = useState<string>('LOCUM');
   const [roleNeeded, setRoleNeeded] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [descriptionTemplate, setDescriptionTemplate] = useState<ShiftDescriptionTemplate | null>(null);
+  const [descriptionTemplateLoading, setDescriptionTemplateLoading] = useState(false);
+  const [descriptionTemplateSaving, setDescriptionTemplateSaving] = useState(false);
+  const [descriptionTemplateAutoAppliedKey, setDescriptionTemplateAutoAppliedKey] = useState<string | null>(null);
   const [workloadTags, setWorkloadTags] = useState<string[]>([]);
   const [dedicatedUserId, setDedicatedUserId] = useState<number | null>(null);
   const [mustHave, setMustHave] = useState<string[]>([]);
@@ -376,7 +387,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const [ratePublicHoliday, setRatePublicHoliday] = useState<string>('');
   const [rateEarlyMorning, setRateEarlyMorning] = useState<string>('');
   const [rateLateNight, setRateLateNight] = useState<string>('');
-  const [applyRatesToPharmacy, setApplyRatesToPharmacy] = useState(false);
+  const [savingPharmacyRates, setSavingPharmacyRates] = useState(false);
   const [slotRateRows, setSlotRateRows] = useState<Array<{ rate: string; status: 'idle' | 'loading' | 'success' | 'error'; error?: string; dirty?: boolean }>>([]);
   const [ownerBonus, setOwnerBonus] = useState<string>('');
   const [ftptPayMode, setFtptPayMode] = useState<'HOURLY' | 'ANNUAL'>('HOURLY');
@@ -534,7 +545,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           setSlots(parsedSlots);
           setSlotRateRows((detail.slots ?? []).map((slot: NonNullable<Shift['slots']>[number]) => {
             const rate = toRateInputString(getSlotRateValue(slot));
-            return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: rate !== '' };
+            return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: false };
           }));
         } catch {
           if (!cancelled) {
@@ -550,6 +561,123 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       cancelled = true;
     };
   }, [editingShiftId, scopedPharmacyId, navigate]);
+
+  useEffect(() => {
+    if (!pharmacyId || !roleNeeded) {
+      setDescriptionTemplate(null);
+      setDescriptionTemplateAutoAppliedKey(null);
+      return;
+    }
+
+    let cancelled = false;
+    const templateKey = `${pharmacyId}:${roleNeeded}`;
+
+    const loadDescriptionTemplate = async () => {
+      setDescriptionTemplateLoading(true);
+      try {
+        const { data } = await apiClient.get('/client-profile/shift-description-templates/', {
+          params: { pharmacy: pharmacyId, role_needed: roleNeeded },
+        });
+        if (cancelled) {
+          return;
+        }
+        const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+        const template = (list[0] ?? null) as ShiftDescriptionTemplate | null;
+        setDescriptionTemplate(template);
+        if (
+          template?.description &&
+          !editingShiftId &&
+          !description.trim() &&
+          descriptionTemplateAutoAppliedKey !== templateKey
+        ) {
+          setDescription(template.description);
+          setDescriptionTemplateAutoAppliedKey(templateKey);
+        }
+      } catch {
+        if (!cancelled) {
+          setDescriptionTemplate(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setDescriptionTemplateLoading(false);
+        }
+      }
+    };
+
+    loadDescriptionTemplate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pharmacyId, roleNeeded, editingShiftId, description, descriptionTemplateAutoAppliedKey]);
+
+  const handleUseDescriptionTemplate = () => {
+    if (!descriptionTemplate?.description) return;
+    setDescription(descriptionTemplate.description);
+  };
+
+  const handleSaveDescriptionTemplate = async () => {
+    if (!pharmacyId || !roleNeeded) {
+      showSnackbar('Select a pharmacy and role before saving a description template', 'error');
+      return;
+    }
+    if (!description.trim()) {
+      showSnackbar('Enter a description before saving it as a template', 'error');
+      return;
+    }
+    setDescriptionTemplateSaving(true);
+    try {
+      const { data } = await apiClient.post('/client-profile/shift-description-templates/', {
+        pharmacy: pharmacyId,
+        role_needed: roleNeeded,
+        description,
+      });
+      setDescriptionTemplate(data as ShiftDescriptionTemplate);
+      setDescriptionTemplateAutoAppliedKey(`${pharmacyId}:${roleNeeded}`);
+      showSnackbar('Description template saved for this role', 'success');
+    } catch {
+      showSnackbar('Unable to save description template', 'error');
+    } finally {
+      setDescriptionTemplateSaving(false);
+    }
+  };
+
+  const handleSavePharmacyRateDefaults = async () => {
+    if (!pharmacyId) {
+      showSnackbar('Select a pharmacy before updating default rates', 'error');
+      return;
+    }
+    if (roleNeeded !== 'PHARMACIST' || rateType === 'PHARMACIST_PROVIDED') {
+      showSnackbar('Default pharmacy rates can only be updated from fixed or flexible pharmacist rates', 'error');
+      return;
+    }
+
+    setSavingPharmacyRates(true);
+    try {
+      const payload = {
+        default_rate_type: rateType,
+        rate_weekday: rateWeekday || null,
+        rate_saturday: rateSaturday || null,
+        rate_sunday: rateSunday || null,
+        rate_public_holiday: ratePublicHoliday || null,
+        rate_early_morning: rateEarlyMorning || null,
+        rate_late_night: rateLateNight || null,
+      };
+      const { data } = await apiClient.patch(`/client-profile/pharmacies/${pharmacyId}/`, payload);
+      setPharmacies(current =>
+        current.map(pharmacy =>
+          Number(pharmacy.id) === Number(pharmacyId)
+            ? ({ ...pharmacy, ...data } as PharmacyOption)
+            : pharmacy
+        )
+      );
+      showSnackbar('Pharmacy default rates updated', 'success');
+    } catch {
+      showSnackbar('Unable to update pharmacy default rates', 'error');
+    } finally {
+      setSavingPharmacyRates(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -1339,7 +1467,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       payload.rate_public_holiday = ratePublicHoliday || null;
       payload.rate_early_morning = rateEarlyMorning || null;
       payload.rate_late_night = rateLateNight || null;
-      payload.apply_rates_to_pharmacy = applyRatesToPharmacy;
     }
     if (!editingShiftId) {
       payload.notify_pharmacy_staff = isEmbedded ? false : notifyPharmacyStaff;
@@ -1495,6 +1622,39 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
             </FormControl>
           </Grid>
           <Grid size={12}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1}
+              justifyContent="space-between"
+              alignItems={{ xs: 'stretch', sm: 'center' }}
+              sx={{ mb: 1 }}
+            >
+              <Typography variant="subtitle2" color="text.secondary">
+                {descriptionTemplateLoading
+                  ? 'Loading role description template...'
+                  : descriptionTemplate?.description
+                    ? 'Role description template available'
+                    : 'No role description template saved yet'}
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={!descriptionTemplate?.description}
+                  onClick={handleUseDescriptionTemplate}
+                >
+                  Use Template
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
+                  onClick={handleSaveDescriptionTemplate}
+                >
+                  {descriptionTemplateSaving ? 'Saving...' : 'Save as Template'}
+                </Button>
+              </Stack>
+            </Stack>
             <TextField
               label="Shift Description"
               multiline
@@ -2821,15 +2981,15 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                         />
                       </Grid>
                     </Grid>
-                    <FormControlLabel
-                      control={(
-                        <Checkbox
-                          checked={applyRatesToPharmacy}
-                          onChange={(_, checked) => setApplyRatesToPharmacy(checked)}
-                        />
-                      )}
-                      label="Apply these rates to Pharmacy defaults"
-                    />
+                    <Box>
+                      <Button
+                        variant="outlined"
+                        onClick={handleSavePharmacyRateDefaults}
+                        disabled={savingPharmacyRates || !pharmacyId}
+                      >
+                        {savingPharmacyRates ? 'Updating defaults...' : 'Update Pharmacy Default Rates'}
+                      </Button>
+                    </Box>
                   </Stack>
                 </Paper>
               )}

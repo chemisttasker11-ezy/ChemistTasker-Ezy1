@@ -36,7 +36,7 @@ export default function PharmacistPaymentScreen() {
   const [showSuperABN, setShowSuperABN] = useState(false);
   const unsaved = useUnsavedChangesGuard(
     { data, tfnInput, abnInput, showSuperABN },
-    { enabled: !loading, saving: saving || checkingABN }
+    { enabled: !loading, onSave: () => (isTFN ? saveTFNAndSuper() : saveABN()), saving: saving || checkingABN }
   );
 
   useEffect(() => {

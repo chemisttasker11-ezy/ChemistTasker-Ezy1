@@ -111,8 +111,10 @@ function OwnerOnboardingContent({
     extraSeatCount: number;
   } | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
+  const saveRef = React.useRef<(() => Promise<void>) | null>(null);
   const unsaved = useUnsavedChangesGuard({
     disabled: loading,
+    onSave: () => saveRef.current?.(),
     value: {
       data,
       profilePhotoCleared,
@@ -288,15 +290,38 @@ const handleSubmit = async (e: React.FormEvent) => {
       payload.append('profile_photo_clear', 'true');
     }
 
-    await updateOnboardingForm(roleKey, payload);
+    const saved = await updateOnboardingForm(roleKey, payload);
+    const nextData = (saved as any) || {};
+    const nextPhoto =
+      nextData?.profile_photo_url ||
+      (nextData?.profile_photo ? `${API_BASE_URL}${nextData.profile_photo}` : profilePhotoPreview);
+    const syncedProfile = {
+      ...nextData,
+      username: normalizedData.username || nextData.username,
+      first_name: nextData.first_name ?? normalizedData.first_name,
+      last_name: nextData.last_name ?? normalizedData.last_name,
+      phone_number: nextData.phone_number ?? normalizedData.phone_number,
+      profile_photo: nextPhoto,
+      profile_photo_url: nextPhoto,
+    };
     setUser((prev: User | null) => (
       prev
         ? {
             ...prev,
-            mobile_number: data.phone_number,
+            username: syncedProfile.username || prev.username,
+            first_name: syncedProfile.first_name ?? prev.first_name,
+            last_name: syncedProfile.last_name ?? prev.last_name,
+            mobile_number: syncedProfile.phone_number ?? prev.mobile_number,
+            profile_photo: nextPhoto,
+            profile_photo_url: nextPhoto,
+            profilePhoto: nextPhoto,
+            profilePhotoUrl: nextPhoto,
           }
         : prev
     ));
+    window.dispatchEvent(new CustomEvent('ct-profile-updated', {
+      detail: syncedProfile,
+    }));
 
     setSnackbarMessage('Profile saved successfully!');
     setSnackbarOpen(true);
@@ -315,6 +340,9 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 };
 
+  useEffect(() => {
+    saveRef.current = () => handleSubmit({ preventDefault: () => undefined } as React.FormEvent);
+  });
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, HelperText, Menu, Text, TextInput } from 'react-native-paper';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import GooglePlacesInput from '../../shared/pharmacies/GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { useAuth } from '../../../context/AuthContext';
 
 type ApiData = {
   username?: string;
@@ -39,7 +40,9 @@ export default function OtherStaffBasicInfoScreen() {
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
   const [form, setForm] = useState<ApiData>({});
   const [lockedNames, setLockedNames] = useState({ first: false, last: false });
-  const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, saving });
+  const saveRef = useRef<(() => Promise<void>) | null>(null);
+  const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, onSave: () => saveRef.current?.(), saving });
+  const { refreshUser } = useAuth();
 
   useEffect(() => {
     let mounted = true;
@@ -117,6 +120,7 @@ export default function OtherStaffBasicInfoScreen() {
         first: Boolean(res?.first_name),
         last: Boolean(res?.last_name),
       });
+      await refreshUser();
       unsaved.markClean(res || {});
       Alert.alert('Saved', submitForVerification ? 'Submitted for verification.' : 'Basic info saved.');
     } catch (err: any) {
@@ -130,6 +134,10 @@ export default function OtherStaffBasicInfoScreen() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    saveRef.current = () => save(false);
+  });
 
   if (loading) {
     return (

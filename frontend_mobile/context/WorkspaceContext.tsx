@@ -22,6 +22,9 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 const WORKSPACE_STORAGE_KEY = '@chemisttasker_workspace';
 const PHARMACY_ID_STORAGE_KEY = '@chemisttasker_selected_pharmacy_id';
 const PHARMACY_NAME_STORAGE_KEY = '@chemisttasker_selected_pharmacy_name';
+const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(['LOCUM', 'SHIFT_HERO']);
+const INTERNAL_PHARMACY_ROLES = new Set(['OWNER', 'PHARMACY_OWNER', 'MANAGER', 'PHARMACY_ADMIN', 'ADMIN', 'ROSTER_MANAGER', 'COMMUNICATION_MANAGER']);
 
 function coerceVerified(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
@@ -40,6 +43,15 @@ function isWorkerRole(role?: string | null): boolean {
   return normalized === 'PHARMACIST' || normalized === 'OTHER_STAFF';
 }
 
+function hasFavoriteStaffMembership(user: any): boolean {
+  const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
+  return memberships.some((membership: any) => {
+    const rawPharmacyId = membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id;
+    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
+    return Number.isFinite(Number(rawPharmacyId)) && FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType);
+  });
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const [workspace, setWorkspaceState] = useState<WorkspaceType>('internal');
@@ -48,7 +60,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [canUseInternal, setCanUseInternal] = useState(false);
   const [workerVerified, setWorkerVerified] = useState(false);
-  const canUsePlatform = isWorkerRole(user?.role) && workerVerified;
+  const canUsePlatform = isWorkerRole(user?.role) && (workerVerified || hasFavoriteStaffMembership(user));
 
   useEffect(() => {
     loadWorkspace();
@@ -58,7 +70,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const memberships = Array.isArray((user as any)?.memberships) ? (user as any).memberships : [];
     const hasPharmacyMembership = memberships.some((membership: any) => {
       const rawPharmacyId = membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id;
-      return Number.isFinite(Number(rawPharmacyId));
+      const role = String(membership?.role ?? '').toUpperCase();
+      const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
+      return Number.isFinite(Number(rawPharmacyId)) && (
+        INTERNAL_PHARMACY_ROLES.has(role) || PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType)
+      );
     });
     const adminAssignments = Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [];
     const hasAdminAssignment = adminAssignments.some((assignment: any) => {

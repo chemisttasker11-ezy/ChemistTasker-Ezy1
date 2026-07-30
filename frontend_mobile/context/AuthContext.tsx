@@ -199,7 +199,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (existing?.role) merged.role = existing.role;
     if (existing?.id != null) merged.id = existing.id;
     if (existing?.email) merged.email = existing.email;
-    if (existing?.username) merged.username = existing.username;
     return normalizeUser(merged);
   };
 
@@ -360,6 +359,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const hydrated = await fetchOnboardingProfile(user?.role, user);
       setUser(hydrated as User);
+      const session = await readStoredSession();
+      await writeStoredSession({
+        access: session?.access || session?.tokens?.access || access,
+        refresh: session?.refresh || session?.tokens?.refresh || refresh,
+        user: hydrated,
+      });
     } catch (error) {
       const msg = (error as any)?.message || error;
       console.debug('Error refreshing user (non-fatal):', msg);

@@ -25,6 +25,7 @@ import {
     calculateShiftRates,
 } from '@chemisttasker/shared-core';
 import skillsCatalog from '@chemisttasker/shared-core/skills_catalog.json';
+import apiClient from '@/utils/apiClient';
 
 const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
@@ -118,6 +119,12 @@ type PharmacyOption = {
     organizationId?: number;
     allowed_escalation_levels?: VisibilityTier[];
     allowedEscalationLevels?: VisibilityTier[];
+};
+type ShiftDescriptionTemplate = {
+    id: number;
+    pharmacy: number;
+    role_needed: string;
+    description: string;
 };
 
 const readPharmacyValue = (pharmacy: any, snake: string, camel?: string) =>
@@ -287,7 +294,6 @@ export default function PostShiftScreen() {
     const [hideName, setHideName] = useState(false);
     const [initialAudience, setInitialAudience] = useState<string>('');
     const [rateType, setRateType] = useState<RateType>('FLEXIBLE');
-    const [fixedRate, setFixedRate] = useState('');
     const [ownerBonus, setOwnerBonus] = useState('');
     const [slots, setSlots] = useState<SlotEntry[]>([]);
     const [slotDate, setSlotDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -303,6 +309,10 @@ export default function PostShiftScreen() {
     const [escalationPicker, setEscalationPicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
     const [escalationDates, setEscalationDates] = useState<VisibilityDates>({});
     const [description, setDescription] = useState('');
+    const [descriptionTemplate, setDescriptionTemplate] = useState<ShiftDescriptionTemplate | null>(null);
+    const [descriptionTemplateLoading, setDescriptionTemplateLoading] = useState(false);
+    const [descriptionTemplateSaving, setDescriptionTemplateSaving] = useState(false);
+    const [descriptionTemplateAutoAppliedKey, setDescriptionTemplateAutoAppliedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
@@ -338,7 +348,7 @@ export default function PostShiftScreen() {
     const [maxAnnual, setMaxAnnual] = useState('');
 
     // Other
-    const [applyRatesToPharmacy, setApplyRatesToPharmacy] = useState(false);
+    const [savingPharmacyRates, setSavingPharmacyRates] = useState(false);
     const [dedicatedUserId, setDedicatedUserId] = useState<number | null>(null);
 
     const isLocumLike = useMemo(
@@ -381,9 +391,12 @@ export default function PostShiftScreen() {
         setSingleUserOnly(false);
         setInitialAudience('');
         setRateType('FLEXIBLE');
-        setFixedRate('');
         setOwnerBonus('');
         setDescription('');
+        setDescriptionTemplate(null);
+        setDescriptionTemplateAutoAppliedKey(null);
+        setDescriptionTemplateLoading(false);
+        setDescriptionTemplateSaving(false);
         setSlots([]);
         setSlotDate(todayIso);
         setSelectedDates([]);
@@ -415,7 +428,7 @@ export default function PostShiftScreen() {
         setMaxHourly('');
         setMinAnnual('');
         setMaxAnnual('');
-        setApplyRatesToPharmacy(false);
+        setSavingPharmacyRates(false);
         setDedicatedUserId(null);
     }, []);
 
@@ -480,7 +493,6 @@ export default function PostShiftScreen() {
         const defaultRateType = (selectedPharmacy as any).default_rate_type || (selectedPharmacy as any).defaultRateType || 'FLEXIBLE';
 
         setRateType(defaultRateType);
-        setFixedRate(normalize((selectedPharmacy as any).default_fixed_rate ?? (selectedPharmacy as any).defaultFixedRate));
         setRateWeekday(normalize((selectedPharmacy as any).rate_weekday ?? (selectedPharmacy as any).rateWeekday));
         setRateSaturday(normalize((selectedPharmacy as any).rate_saturday ?? (selectedPharmacy as any).rateSaturday));
         setRateSunday(normalize((selectedPharmacy as any).rate_sunday ?? (selectedPharmacy as any).rateSunday));
@@ -592,12 +604,10 @@ export default function PostShiftScreen() {
                         ? String(data.ownerBonus)
                         : ''
             );
-            const fixed = data.fixed_rate ?? data.fixedRate;
-            setFixedRate(toRateInputString(fixed));
             const rateTypeValue = data.rate_type ?? data.rateType;
             if (rateTypeValue === 'PHARMACIST_PROVIDED') {
                 setRateType('PHARMACIST_PROVIDED');
-            } else if (rateTypeValue === 'FIXED' || fixed) {
+            } else if (rateTypeValue === 'FIXED') {
                 setRateType('FIXED');
             } else {
                 setRateType('FLEXIBLE');
@@ -631,7 +641,7 @@ export default function PostShiftScreen() {
             setSlots(parsedSlots);
             setSlotRateRows((Array.isArray(data.slots) ? data.slots : []).map((s: any) => {
                 const rate = toRateInputString(getSlotRateValue(s));
-                return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: rate !== '' };
+                return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: false };
             }));
         } catch {
             setError('Unable to load shift details');
@@ -726,6 +736,131 @@ export default function PostShiftScreen() {
             applyBookingPrefillFromParams();
         }, [applyBookingPrefillFromParams])
     );
+
+    useEffect(() => {
+        if (!pharmacyId || !roleNeeded) {
+            setDescriptionTemplate(null);
+            setDescriptionTemplateAutoAppliedKey(null);
+            return;
+        }
+
+        let cancelled = false;
+        const templateKey = `${pharmacyId}:${roleNeeded}`;
+
+        const loadDescriptionTemplate = async () => {
+            setDescriptionTemplateLoading(true);
+            try {
+                const { data } = await apiClient.get('/client-profile/shift-description-templates/', {
+                    params: { pharmacy: pharmacyId, role_needed: roleNeeded },
+                });
+                if (cancelled) return;
+                const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+                const template = (list[0] ?? null) as ShiftDescriptionTemplate | null;
+                setDescriptionTemplate(template);
+                if (
+                    template?.description &&
+                    !editingId &&
+                    !description.trim() &&
+                    descriptionTemplateAutoAppliedKey !== templateKey
+                ) {
+                    setDescription(template.description);
+                    setDescriptionTemplateAutoAppliedKey(templateKey);
+                }
+            } catch {
+                if (!cancelled) {
+                    setDescriptionTemplate(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setDescriptionTemplateLoading(false);
+                }
+            }
+        };
+
+        loadDescriptionTemplate();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [pharmacyId, roleNeeded, editingId, description, descriptionTemplateAutoAppliedKey]);
+
+    const handleUseDescriptionTemplate = useCallback(() => {
+        if (!descriptionTemplate?.description) return;
+        setDescription(descriptionTemplate.description);
+    }, [descriptionTemplate]);
+
+    const handleSaveDescriptionTemplate = useCallback(async () => {
+        if (!pharmacyId || !roleNeeded) {
+            setToast('Select a pharmacy and role before saving a template');
+            return;
+        }
+        if (!description.trim()) {
+            setToast('Enter a description before saving it as a template');
+            return;
+        }
+        setDescriptionTemplateSaving(true);
+        try {
+            const { data } = await apiClient.post('/client-profile/shift-description-templates/', {
+                pharmacy: pharmacyId,
+                role_needed: roleNeeded,
+                description,
+            });
+            setDescriptionTemplate(data as ShiftDescriptionTemplate);
+            setDescriptionTemplateAutoAppliedKey(`${pharmacyId}:${roleNeeded}`);
+            setToast('Description template saved for this role');
+        } catch {
+            setToast('Unable to save description template');
+        } finally {
+            setDescriptionTemplateSaving(false);
+        }
+    }, [description, pharmacyId, roleNeeded]);
+
+    const handleSavePharmacyRateDefaults = useCallback(async () => {
+        if (!pharmacyId) {
+            setToast('Select a pharmacy before updating default rates');
+            return;
+        }
+        if (roleNeeded !== 'PHARMACIST' || rateType === 'PHARMACIST_PROVIDED') {
+            setToast('Default pharmacy rates can only be updated from fixed or flexible pharmacist rates');
+            return;
+        }
+
+        setSavingPharmacyRates(true);
+        try {
+            const payload = {
+                default_rate_type: rateType,
+                rate_weekday: rateWeekday || null,
+                rate_saturday: rateSaturday || null,
+                rate_sunday: rateSunday || null,
+                rate_public_holiday: ratePublicHoliday || null,
+                rate_early_morning: rateEarlyMorning || null,
+                rate_late_night: rateLateNight || null,
+            };
+            const { data } = await apiClient.patch(`/client-profile/pharmacies/${pharmacyId}/`, payload);
+            setPharmacies((current) =>
+                current.map((pharmacy) =>
+                    Number(pharmacy.id) === Number(pharmacyId)
+                        ? ({ ...pharmacy, ...data } as PharmacyOption)
+                        : pharmacy
+                )
+            );
+            setToast('Pharmacy default rates updated');
+        } catch {
+            setToast('Unable to update pharmacy default rates');
+        } finally {
+            setSavingPharmacyRates(false);
+        }
+    }, [
+        pharmacyId,
+        rateEarlyMorning,
+        rateLateNight,
+        ratePublicHoliday,
+        rateSaturday,
+        rateSunday,
+        rateType,
+        rateWeekday,
+        roleNeeded,
+    ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
         const todayIso = new Date().toISOString().split('T')[0];
@@ -1111,7 +1246,6 @@ export default function PostShiftScreen() {
                 notify_chain_members: isEmbedded ? false : notifyChainMembers,
                 payment_preference: isLocumLike ? paymentPreference : null,
                 super_percent: isLocumLike ? (locumSuperIncluded ? 11.5 : 0) : null,
-                apply_rates_to_pharmacy: applyRatesToPharmacy,
             };
             if (dedicatedUserId) {
                 payload.dedicated_user = dedicatedUserId;
@@ -1125,9 +1259,6 @@ export default function PostShiftScreen() {
                 payload.rate_public_holiday = ratePublicHoliday || null;
                 payload.rate_early_morning = rateEarlyMorning || null;
                 payload.rate_late_night = rateLateNight || null;
-                if (rateType === 'FIXED' && fixedRate) {
-                    payload.fixed_rate = Number(fixedRate);
-                }
             } else {
                 if (ownerBonus) {
                     payload.owner_adjusted_rate = Number(ownerBonus);
@@ -1236,6 +1367,34 @@ export default function PostShiftScreen() {
             </View>
 
             <Text style={styles.label}>Description</Text>
+            <Text style={styles.templateStatus}>
+                {descriptionTemplateLoading
+                    ? 'Loading role description template...'
+                    : descriptionTemplate?.description
+                        ? 'Role description template available'
+                        : 'No role description template saved yet'}
+            </Text>
+            <View style={styles.templateActions}>
+                <Button
+                    mode="outlined"
+                    compact
+                    disabled={!descriptionTemplate?.description}
+                    onPress={handleUseDescriptionTemplate}
+                    style={styles.templateButton}
+                >
+                    Use Template
+                </Button>
+                <Button
+                    mode="contained"
+                    compact
+                    loading={descriptionTemplateSaving}
+                    disabled={descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
+                    onPress={handleSaveDescriptionTemplate}
+                    style={styles.templateButton}
+                >
+                    Save as Template
+                </Button>
+            </View>
             <TextInput
                 mode="outlined"
                 value={description}
@@ -1676,10 +1835,6 @@ export default function PostShiftScreen() {
                             <Text style={styles.rowText}>+ superannuation </Text>
                         </TouchableOpacity>
 
-                        {rateType === 'FIXED' ? (
-                            <TextInput mode="outlined" label="Fixed rate ($/hr)" value={fixedRate} onChangeText={setFixedRate} keyboardType="numeric" style={styles.input} />
-                        ) : null}
-
                         {rateType !== 'PHARMACIST_PROVIDED' ? (
                             <>
                                 <Text style={[styles.label, { marginTop: 16 }]}>
@@ -1696,10 +1851,15 @@ export default function PostShiftScreen() {
                                 <TextInput mode="outlined" label="Public Holiday" value={ratePublicHoliday} onChangeText={setRatePublicHoliday} keyboardType="numeric" style={styles.input} />
                                 <TextInput mode="outlined" label="Early Morning" value={rateEarlyMorning} onChangeText={setRateEarlyMorning} keyboardType="numeric" style={styles.input} />
                                 <TextInput mode="outlined" label="Late Night" value={rateLateNight} onChangeText={setRateLateNight} keyboardType="numeric" style={styles.input} />
-                                <TouchableOpacity style={styles.checkboxRow} onPress={() => setApplyRatesToPharmacy((v) => !v)}>
-                                    <Checkbox status={applyRatesToPharmacy ? 'checked' : 'unchecked'} />
-                                    <Text style={styles.rowText}>Apply these rates to pharmacy defaults</Text>
-                                </TouchableOpacity>
+                                <Button
+                                    mode="outlined"
+                                    onPress={handleSavePharmacyRateDefaults}
+                                    loading={savingPharmacyRates}
+                                    disabled={savingPharmacyRates || !pharmacyId}
+                                    style={styles.defaultRatesButton}
+                                >
+                                    Update Pharmacy Default Rates
+                                </Button>
                             </>
                         ) : null}
                         {renderSlotPreviewList()}
@@ -2150,6 +2310,10 @@ const styles = StyleSheet.create({
     subHeader: { fontWeight: '700', color: '#111827', marginTop: 8, marginBottom: 6 },
     input: { backgroundColor: '#FFFFFF' },
     helper: { color: '#6B7280', marginBottom: 8 },
+    templateStatus: { color: '#6B7280', marginBottom: 8, fontSize: 13 },
+    templateActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+    templateButton: { minWidth: 132 },
+    defaultRatesButton: { alignSelf: 'flex-start', marginTop: 8 },
     card: { padding: 12, borderRadius: 12, backgroundColor: '#FFFFFF', gap: 6 },
     selector: {
         backgroundColor: '#F3F4F6',

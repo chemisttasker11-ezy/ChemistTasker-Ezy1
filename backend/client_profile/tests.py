@@ -1,7 +1,23 @@
 from django.test import TestCase
+from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.test import RequestFactory
 
-from client_profile.models import OwnerOnboarding, PillLedgerEntry, PillReferralEvent
+from client_profile.admin import (
+    ExplorerOnboardingAdmin,
+    OtherStaffOnboardingAdmin,
+    OwnerOnboardingAdmin,
+    PharmacistOnboardingAdmin,
+)
+from client_profile.models import (
+    ExplorerOnboarding,
+    OtherStaffOnboarding,
+    OwnerOnboarding,
+    PharmacistOnboarding,
+    PillLedgerEntry,
+    PillReferralEvent,
+)
 from client_profile.rewards import (
     RewardError,
     award_verified_referrals_for_user,
@@ -11,6 +27,84 @@ from client_profile.rewards import (
     seed_default_reward_rules,
 )
 from client_profile.serializers import OwnerOnboardingV2Serializer
+
+
+class OnboardingRoleInvariantTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.owner = User.objects.create_user(email="owner-role@example.com", password="password", role="OWNER")
+        self.pharmacist = User.objects.create_user(email="pharmacist-role@example.com", password="password", role="PHARMACIST")
+        self.other_staff = User.objects.create_user(email="other-role@example.com", password="password", role="OTHER_STAFF")
+        self.explorer = User.objects.create_user(email="explorer-role@example.com", password="password", role="EXPLORER")
+
+    def test_model_validation_rejects_cross_role_onboarding(self):
+        with self.assertRaises(ValidationError):
+            PharmacistOnboarding(user=self.owner).full_clean()
+
+        with self.assertRaises(ValidationError):
+            OtherStaffOnboarding(user=self.pharmacist).full_clean()
+
+        with self.assertRaises(ValidationError):
+            OwnerOnboarding(
+                user=self.pharmacist,
+                phone_number="0400000000",
+                role="MANAGER",
+                chain_pharmacy=False,
+            ).full_clean()
+
+        with self.assertRaises(ValidationError):
+            ExplorerOnboarding(user=self.owner).full_clean()
+
+    def test_admin_querysets_only_include_matching_user_roles(self):
+        valid_owner = OwnerOnboarding.objects.create(
+            user=self.owner,
+            phone_number="0400000000",
+            role="MANAGER",
+            chain_pharmacy=False,
+        )
+        invalid_owner = OwnerOnboarding.objects.create(
+            user=self.pharmacist,
+            phone_number="0400000001",
+            role="MANAGER",
+            chain_pharmacy=False,
+        )
+        valid_pharmacist = PharmacistOnboarding.objects.create(user=self.pharmacist)
+        invalid_pharmacist = PharmacistOnboarding.objects.create(user=self.owner)
+        valid_other_staff = OtherStaffOnboarding.objects.create(user=self.other_staff)
+        invalid_other_staff = OtherStaffOnboarding.objects.create(user=self.pharmacist)
+        valid_explorer = ExplorerOnboarding.objects.create(user=self.explorer)
+        invalid_explorer = ExplorerOnboarding.objects.create(user=self.owner)
+
+        request = RequestFactory().get("/")
+        admin_site = admin.site
+
+        self.assertQuerySetEqual(
+            OwnerOnboardingAdmin(OwnerOnboarding, admin_site).get_queryset(request),
+            [valid_owner],
+            transform=lambda obj: obj,
+        )
+        self.assertNotIn(invalid_owner, OwnerOnboardingAdmin(OwnerOnboarding, admin_site).get_queryset(request))
+
+        self.assertQuerySetEqual(
+            PharmacistOnboardingAdmin(PharmacistOnboarding, admin_site).get_queryset(request),
+            [valid_pharmacist],
+            transform=lambda obj: obj,
+        )
+        self.assertNotIn(invalid_pharmacist, PharmacistOnboardingAdmin(PharmacistOnboarding, admin_site).get_queryset(request))
+
+        self.assertQuerySetEqual(
+            OtherStaffOnboardingAdmin(OtherStaffOnboarding, admin_site).get_queryset(request),
+            [valid_other_staff],
+            transform=lambda obj: obj,
+        )
+        self.assertNotIn(invalid_other_staff, OtherStaffOnboardingAdmin(OtherStaffOnboarding, admin_site).get_queryset(request))
+
+        self.assertQuerySetEqual(
+            ExplorerOnboardingAdmin(ExplorerOnboarding, admin_site).get_queryset(request),
+            [valid_explorer],
+            transform=lambda obj: obj,
+        )
+        self.assertNotIn(invalid_explorer, ExplorerOnboardingAdmin(ExplorerOnboarding, admin_site).get_queryset(request))
 
 
 class OwnerOnboardingV2SerializerTests(TestCase):

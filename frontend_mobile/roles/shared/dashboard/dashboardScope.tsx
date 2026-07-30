@@ -42,6 +42,8 @@ export type DashboardPayload = {
 };
 
 const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
+const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+const INTERNAL_PHARMACY_ROLES = new Set(['OWNER', 'PHARMACY_OWNER', 'MANAGER', 'PHARMACY_ADMIN', 'ADMIN', 'ROSTER_MANAGER', 'COMMUNICATION_MANAGER']);
 
 const isWorkerRole = (role?: string | null) => {
   const normalized = String(role || '').toUpperCase();
@@ -59,11 +61,14 @@ export function collectDashboardPharmacies(user: any): PharmacyOption[] {
   const byId = new Map<number, PharmacyOption>();
   const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
   memberships.forEach((membership: any) => {
+    const role = String(membership?.role ?? '').toUpperCase();
+    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
+    if (!INTERNAL_PHARMACY_ROLES.has(role) && !PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType)) return;
     addPharmacy(
       byId,
       membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
       membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-      membership?.role
+      role === 'OWNER' || role === 'PHARMACY_OWNER' ? 'Owner' : membership?.role
     );
     if (Array.isArray(membership?.pharmacies)) {
       membership.pharmacies.forEach((pharmacy: any) => addPharmacy(byId, pharmacy?.id, pharmacy?.name, 'Organization pharmacy'));

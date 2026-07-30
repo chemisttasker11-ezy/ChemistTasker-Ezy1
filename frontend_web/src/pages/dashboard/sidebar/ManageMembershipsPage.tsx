@@ -27,7 +27,8 @@ type Membership = {
   staff_category?: string;
   is_pharmacy_admin?: boolean;
   admin_level_label?: string | null;
-  admin_level_description?: string | null;
+  admin_capabilities?: string[];
+  capabilities?: string[];
   status: "PENDING" | "ACCEPTED" | "REJECTED" | "LEFT";
   created_at: string;
   pharmacy_detail?: {
@@ -54,6 +55,12 @@ function inviterName(membership: Membership) {
   const user = membership.invited_by_details;
   const fullName = `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
   return fullName || user?.email || "Pharmacy admin";
+}
+
+function adminCapabilitiesText(membership: Membership) {
+  const capabilities = membership.admin_capabilities || membership.capabilities || [];
+  if (!capabilities.length) return "";
+  return `Capabilities: ${capabilities.map((capability) => capability.replace(/_/g, " ").toLowerCase()).join(", ")}`;
 }
 
 export default function ManageMembershipsPage() {
@@ -123,6 +130,7 @@ export default function ManageMembershipsPage() {
             const pharmacy = membership.pharmacy_detail;
             const isPending = membership.status === "PENDING";
             const isAccepted = membership.status === "ACCEPTED";
+            const capabilitiesText = adminCapabilitiesText(membership);
             return (
               <Paper
                 key={membership.id}
@@ -151,9 +159,9 @@ export default function ManageMembershipsPage() {
                           : `${label(membership.role)} · ${label(membership.employment_type)}`}
                         {membership.job_title ? ` · ${membership.job_title}` : ""}
                       </Typography>
-                      {membership.is_pharmacy_admin && membership.admin_level_description ? (
+                      {membership.is_pharmacy_admin && capabilitiesText ? (
                         <Typography sx={{ color: "var(--ct-dashboard-muted)", fontSize: 13, mt: 0.5 }}>
-                          {membership.admin_level_description}
+                          {capabilitiesText}
                         </Typography>
                       ) : null}
                       <Typography sx={{ color: "var(--ct-dashboard-muted)", fontSize: 13, mt: 0.5 }}>

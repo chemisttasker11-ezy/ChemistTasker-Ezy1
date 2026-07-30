@@ -16,6 +16,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import { getExplorerDashboard } from "@chemisttasker/shared-core";
 import apiClient from "../../../utils/apiClient";
+import { dashboardGreetingName } from "../../../utils/displayName";
 import DashboardOverviewTemplate, {
   type DashboardAction,
   type DashboardMetric,
@@ -47,10 +48,6 @@ type DashboardData = {
   invoice_summary?: { unpaid_count?: number; unpaid_total?: string; total_billed?: string };
   activity?: any[];
 };
-
-function firstName(user?: User | null, fallback = "there") {
-  return user?.first_name || user?.username || user?.email?.split("@")[0] || fallback;
-}
 
 export default function OverviewPageStaff() {
   const { user } = useAuth() as { user: User };
@@ -152,7 +149,7 @@ export default function OverviewPageStaff() {
     );
   }
 
-  const displayName = firstName(data?.user || user, isExplorer ? "Explorer" : "there");
+  const displayName = dashboardGreetingName(user);
   const upcoming = {
     today: Number(data?.upcoming_stats?.today ?? 0),
     week: Number(data?.upcoming_stats?.week ?? data?.upcoming_shifts_count ?? 0),
@@ -164,6 +161,10 @@ export default function OverviewPageStaff() {
     : effectivePharmacyId
       ? `Working inside ${selectedPharmacyName}`
       : "Review shifts, availability and pharmacy opportunities";
+  const isInternalWorkspace = !isExplorer && workspace === "internal" && Boolean(effectivePharmacyId);
+  const openShiftActionTitle = isInternalWorkspace ? "Community Shifts" : "Public Shifts";
+  const openShiftActionDescription = isInternalWorkspace ? "View this pharmacy's open shifts" : "View open platform shifts";
+  const openShiftPath = `/dashboard/${roleSegment}/shifts/${isInternalWorkspace ? "community" : "public"}`;
 
   const actions: DashboardAction[] = isExplorer
     ? [
@@ -173,7 +174,7 @@ export default function OverviewPageStaff() {
         { title: "Talent Hub", description: "Discover learning paths", icon: <AppsIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/interests`), tone: "cyan" },
       ]
     : [
-        { title: "Public Shifts", description: "View open platform shifts", icon: <WorkOutlineIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/public`), tone: "blue" },
+        { title: openShiftActionTitle, description: openShiftActionDescription, icon: <WorkOutlineIcon />, onClick: () => navigate(openShiftPath), tone: "blue" },
         { title: "My Roster", description: "Review internal assignments", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/roster`), tone: "purple" },
         { title: "Confirmed Shifts", description: "Track your booked work", icon: <ShieldOutlinedIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/confirmed`), tone: "cyan" },
         { title: "Availability", description: "Update your working times", icon: <AccessTimeIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/availability`), tone: "pink" },
@@ -198,7 +199,7 @@ export default function OverviewPageStaff() {
       subtitle={dashboardSubtitle}
       heroTitle={`Welcome back, ${displayName}!`}
       heroSubtitle={isExplorer ? data?.message || "Discover open roles and finish onboarding to unlock personalised matches." : "Review your upcoming shifts, update availability, and keep an eye on community opportunities."}
-      primaryAction={{ label: isExplorer ? "Browse community shifts" : "View Public shifts", icon: <WorkOutlineIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/${isExplorer ? "community" : "public"}`) }}
+      primaryAction={{ label: isExplorer ? "Browse community shifts" : `View ${openShiftActionTitle.toLowerCase()}`, icon: <WorkOutlineIcon />, onClick: () => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath) }}
       secondaryAction={{ label: isExplorer ? "Complete profile" : "Update availability", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/${isExplorer ? "onboarding" : "availability"}`) }}
       actions={actions}
       upcoming={upcoming}

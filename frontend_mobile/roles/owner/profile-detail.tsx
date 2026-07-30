@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Avatar, Button, Card, Chip, HelperText, IconButton, Menu, Text, TextInput } from 'react-native-paper';
@@ -77,6 +77,7 @@ export default function OwnerProfileDetailScreen({
   const [lockedNames, setLockedNames] = useState({ first: false, last: false });
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [profilePhotoAsset, setProfilePhotoAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const saveRef = useRef<(() => Promise<void>) | null>(null);
   const [form, setForm] = useState<OwnerFormData>({
     username: '',
     first_name: '',
@@ -103,6 +104,7 @@ export default function OwnerProfileDetailScreen({
     },
     {
       enabled: !loading,
+      onSave: () => saveRef.current?.(),
       saving,
     }
   );
@@ -238,6 +240,10 @@ export default function OwnerProfileDetailScreen({
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    saveRef.current = submit;
+  });
 
   if (loading) {
     return (

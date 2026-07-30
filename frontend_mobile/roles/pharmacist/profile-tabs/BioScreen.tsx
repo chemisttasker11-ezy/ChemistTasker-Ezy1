@@ -27,7 +27,7 @@ export default function PharmacistBioScreen() {
   const [resumePending, setResumePending] = useState<any>(null);
   const unsaved = useUnsavedChangesGuard(
     { shortBio, resumeExistingUrl, resumePending },
-    { enabled: !loading, saving }
+    { enabled: !loading, onSave: () => save(), saving }
   );
 
   useEffect(() => {

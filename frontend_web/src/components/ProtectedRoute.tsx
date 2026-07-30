@@ -11,6 +11,13 @@ type ProtectedRouteProps = {
   requireAdmin?: boolean;
 };
 
+const ROLES_REQUIRING_BASIC_ONBOARDING = new Set(["PHARMACIST", "OTHER_STAFF", "EXPLORER"]);
+const MOBILE_VERIFY_PATH = "/mobile-verify";
+
+function needsMobileVerification(user: any) {
+  return !user?.is_mobile_verified;
+}
+
 export default function ProtectedRoute({
   children,
   requiredRole,
@@ -27,12 +34,30 @@ export default function ProtectedRoute({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!requiredRole && !requireAdmin) {
-    return children;
-  }
-
   if (!user) {
     return <div>Loading user...</div>;
+  }
+
+  const hasBaseRole = user.role === requiredRole;
+  const hasOrgRole =
+    Array.isArray(user.memberships) &&
+    user.memberships.some((m: any) => ORG_ROLES.includes(m.role as any));
+  const hasOwnerAccess = isAdminUser || user.role === "OWNER";
+
+  const isMobileVerificationRoute = location.pathname.startsWith(MOBILE_VERIFY_PATH);
+
+  if (
+    ROLES_REQUIRING_BASIC_ONBOARDING.has(user.role) &&
+    needsMobileVerification(user) &&
+    !isMobileVerificationRoute
+  ) {
+    return (
+      <Navigate
+        to={MOBILE_VERIFY_PATH}
+        state={{ from: location }}
+        replace
+      />
+    );
   }
 
   // If the route requires admin and the user is an admin, allow access.
@@ -51,11 +76,9 @@ export default function ProtectedRoute({
     );
   }
 
-  const hasBaseRole = user.role === requiredRole;
-  const hasOrgRole =
-    Array.isArray(user.memberships) &&
-    user.memberships.some((m: any) => ORG_ROLES.includes(m.role as any));
-  const hasOwnerAccess = isAdminUser || user.role === "OWNER";
+  if (!requiredRole && !requireAdmin) {
+    return children;
+  }
 
   if (hasBaseRole) {
     return children;

@@ -221,6 +221,11 @@ class OwnerOnboarding(models.Model):
         # Always show the user’s login email
         return self.user.email
 
+    def clean(self):
+        super().clean()
+        if self.user_id and getattr(self.user, "role", None) != "OWNER":
+            raise ValidationError({"user": "Owner onboarding can only be linked to users with role OWNER."})
+
     @property
     def ahpra_years_since_first_registration(self):
         start = self.ahpra_first_registration_date
@@ -339,6 +344,11 @@ class PharmacistOnboarding(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - Onboarding"
+
+    def clean(self):
+        super().clean()
+        if self.user_id and getattr(self.user, "role", None) != "PHARMACIST":
+            raise ValidationError({"user": "Pharmacist onboarding can only be linked to users with role PHARMACIST."})
 
     @property
     def ahpra_years_since_first_registration(self):
@@ -507,6 +517,11 @@ class OtherStaffOnboarding(models.Model):
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.role_type} Onboarding"
 
+    def clean(self):
+        super().clean()
+        if self.user_id and getattr(self.user, "role", None) != "OTHER_STAFF":
+            raise ValidationError({"user": "Other staff onboarding can only be linked to users with role OTHER_STAFF."})
+
 class ExplorerOnboarding(models.Model):
     ROLE_CHOICES = [
         ("STUDENT", "Student"),
@@ -589,6 +604,11 @@ class ExplorerOnboarding(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - Explorer Onboarding"
+
+    def clean(self):
+        super().clean()
+        if self.user_id and getattr(self.user, "role", None) != "EXPLORER":
+            raise ValidationError({"user": "Explorer onboarding can only be linked to users with role EXPLORER."})
 
 
 class RefereeResponse(models.Model):
@@ -926,6 +946,10 @@ STUDENT_YEAR_CHOICES = [
 
 
 # Membership Model - Manages the user roles within each pharmacy
+PHARMACY_STAFF_EMPLOYMENT_TYPES = ("FULL_TIME", "PART_TIME", "CASUAL")
+FAVORITE_STAFF_EMPLOYMENT_TYPES = ("LOCUM", "SHIFT_HERO")
+
+
 class Membership(models.Model):
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
@@ -1057,9 +1081,17 @@ class Membership(models.Model):
         - 'PHARMACY_STAFF' for FULL_TIME/PART_TIME/CASUAL
         - 'FAVORITE_STAFF' for LOCUM/SHIFT_HERO
         """
-        if self.employment_type in {'FULL_TIME', 'PART_TIME', 'CASUAL'}:
+        if self.employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES:
             return 'PHARMACY_STAFF'
         return 'FAVORITE_STAFF'
+
+    @property
+    def is_pharmacy_staff_member(self) -> bool:
+        return self.employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES
+
+    @property
+    def is_favorite_staff_member(self) -> bool:
+        return self.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES
 
 
     def __str__(self):
@@ -1532,6 +1564,46 @@ class Shift(models.Model):
             models.Index(fields=['pharmacy']),
             models.Index(fields=['created_by']),
         ]
+
+
+class ShiftDescriptionTemplate(models.Model):
+    pharmacy = models.ForeignKey(
+        'Pharmacy',
+        on_delete=models.CASCADE,
+        related_name='shift_description_templates',
+    )
+    role_needed = models.CharField(max_length=50, choices=Shift.ROLE_CHOICES)
+    description = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_shift_description_templates',
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_shift_description_templates',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['pharmacy', 'role_needed'],
+                name='unique_shift_description_template_per_pharmacy_role',
+            )
+        ]
+        indexes = [
+            models.Index(fields=['pharmacy', 'role_needed']),
+        ]
+
+    def __str__(self):
+        return f"{self.pharmacy_id} {self.role_needed} description template"
 
 
 class PillRewardRule(models.Model):

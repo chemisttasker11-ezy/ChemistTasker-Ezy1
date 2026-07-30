@@ -53,7 +53,7 @@ export default function OtherStaffRegulatoryScreen() {
   const [files, setFiles] = useState<Record<string, any>>({});
   const unsaved = useUnsavedChangesGuard(
     { data, files },
-    { enabled: !loading, saving }
+    { enabled: !loading, onSave: () => save(false), saving }
   );
 
   useEffect(() => {

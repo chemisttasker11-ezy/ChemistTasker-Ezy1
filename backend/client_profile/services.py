@@ -219,17 +219,6 @@ def _get_award_rate_for_segment(role_needed, day_type, time_bucket):
 def _get_pharmacist_rate_for_segment(shift, day_type, time_bucket, rate_preference):
     rate_type = getattr(shift, 'rate_type', None) or 'FLEXIBLE'
 
-    if rate_type == 'FIXED':
-        fixed_rate = getattr(shift, 'fixed_rate', None)
-        if fixed_rate is None:
-            raise KeyError('Shift fixed rate not configured')
-        return Decimal(str(fixed_rate)), {
-            'source': 'Shift',
-            'rate_type': 'FIXED',
-            'day_type': day_type,
-            'time_bucket': time_bucket,
-        }
-
     if rate_type == 'PHARMACIST_PROVIDED':
         rate_key = _resolve_pharmacist_rate_key(day_type, time_bucket, rate_preference)
         rate_value = rate_preference.get(rate_key)
@@ -243,7 +232,10 @@ def _get_pharmacist_rate_for_segment(shift, day_type, time_bucket, rate_preferen
             'time_bucket': time_bucket,
         }
 
-    rate_key = _resolve_pharmacist_rate_key(day_type, time_bucket, rate_preference)
+    # Owner-entered pharmacist rates for FIXED/FLEXIBLE shifts are pharmacy defaults
+    # for the calendar day. They should not be converted into a weighted hourly
+    # average using early-morning/late-night bands.
+    rate_key = day_type
     rate_value = _get_pharmacy_rate_for_key(shift.pharmacy, rate_key)
     if rate_value is None:
         raise KeyError(f'Pharmacy rate not configured for {rate_key}')

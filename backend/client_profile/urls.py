@@ -37,6 +37,7 @@ router.register(r'membership-applications', MembershipApplicationViewSet, basena
 
 router.register(r'community-shifts', CommunityShiftViewSet, basename='community-shifts')
 router.register(r'public-shifts',    PublicShiftViewSet,    basename='public-shifts')
+router.register(r'shift-description-templates', ShiftDescriptionTemplateViewSet, basename='shift-description-template')
 # My shifts by status for posters
 router.register(r'user-availability', UserAvailabilityViewSet, basename='user-availability')
 router.register(r'pill-rewards', PillRewardsViewSet, basename='pill-rewards')

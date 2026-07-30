@@ -24,6 +24,7 @@ from users.models import OrganizationMembership
 from client_profile.notifications import notify_users
 
 from ..models import (
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
     Membership,
     OtherStaffOnboarding,
     Organization,
@@ -207,7 +208,11 @@ class HubAttachmentMixin:
 
 def get_user_pharmacy_permissions(user):
     memberships = (
-        Membership.objects.filter(user=user, is_active=True)
+        Membership.objects.filter(
+            user=user,
+            is_active=True,
+            employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+        )
         .select_related("pharmacy", "pharmacy__organization", "pharmacy__owner__user")
     )
     pharmacies = {}
@@ -301,6 +306,7 @@ class HubScopeResolver:
                 user=self.user,
                 pharmacy=pharmacy,
                 is_active=True,
+                employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             )
             .select_related("user")
             .first()
@@ -399,6 +405,7 @@ class HubScopeResolver:
             Membership.objects.filter(
                 user=self.user,
                 is_active=True,
+                employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__organization=organization,
             )
             .select_related("pharmacy", "user")
@@ -537,6 +544,7 @@ class HubScopeResolver:
             Membership.objects.filter(
                 user=self.user,
                 is_active=True,
+                employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__organization=organization,
             )
             .select_related("pharmacy")

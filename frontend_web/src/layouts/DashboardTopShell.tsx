@@ -42,6 +42,10 @@ type PharmacyOption = {
   helper?: string;
 };
 
+const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(["FULL_TIME", "PART_TIME", "CASUAL"]);
+const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(["LOCUM", "SHIFT_HERO"]);
+const INTERNAL_PHARMACY_ROLES = new Set(["OWNER", "PHARMACY_OWNER", "MANAGER", "PHARMACY_ADMIN", "ADMIN", "ROSTER_MANAGER", "COMMUNICATION_MANAGER"]);
+
 const dashboardAccents = [
   {
     gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
@@ -124,10 +128,13 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
 
   const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
   memberships.forEach((membership: any) => {
+    const role = String(membership?.role ?? "").toUpperCase();
+    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
+    if (!INTERNAL_PHARMACY_ROLES.has(role) && !PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType)) return;
     add(
       membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
       membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-      membership?.role
+      role === "OWNER" || role === "PHARMACY_OWNER" ? "Owner" : membership?.role
     );
     if (Array.isArray(membership?.pharmacies)) {
       membership.pharmacies.forEach((pharmacy: any) => add(pharmacy?.id, pharmacy?.name, "Organization pharmacy"));
@@ -138,7 +145,21 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
     add(assignment?.pharmacy_id, assignment?.pharmacy_name, assignment?.admin_level ?? "Admin assignment");
   });
 
+  const ownerPharmacies = [user?.pharmacies, user?.owner_pharmacies, user?.owned_pharmacies].find(Array.isArray) ?? [];
+  ownerPharmacies.forEach((pharmacy: any) => {
+    add(pharmacy?.id, pharmacy?.name, "Owner");
+  });
+
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function hasFavoriteStaffMembership(user: any): boolean {
+  const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
+  return memberships.some((membership: any) => {
+    const rawPharmacyId = membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id;
+    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
+    return Number.isFinite(Number(rawPharmacyId)) && FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType);
+  });
 }
 
 function coerceVerified(value: unknown): boolean {
@@ -333,9 +354,10 @@ export default function DashboardTopShell({
   const isOrgUser = String(user?.role || "").toUpperCase().includes("ORG") || String(user?.role || "").toUpperCase() === "ORGANIZATION";
   const isOwner = String(user?.role || "").toUpperCase() === "OWNER";
   const isWorker = ["PHARMACIST", "OTHER_STAFF"].includes(String(user?.role || "").toUpperCase());
-  const canUsePlatformWorkspace = isWorker && workerVerified && activePersona !== "admin" && !forceAdminScope;
+  const isFavoriteStaff = useMemo(() => hasFavoriteStaffMembership(user), [user]);
+  const canUsePlatformWorkspace = isWorker && (workerVerified || isFavoriteStaff) && activePersona !== "admin" && !forceAdminScope;
   const hidePharmacyScope = forceAdminScope || activePersona === "admin";
-  const showPharmacySelector = !hidePharmacyScope && (isOwner || isOrgUser || isWorker) && pharmacies.length > 0;
+  const showPharmacySelector = !hidePharmacyScope && (isOwner || isOrgUser || isWorker) && (pharmacies.length > 0 || canUsePlatformWorkspace);
   const selectedPharmacy = pharmacies.find((item) => item.id === selectedPharmacyId) ?? null;
   const title = titleOverride ?? titleForRole(forceAdminScope ? "ADMIN" : user?.role);
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);

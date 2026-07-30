@@ -4,6 +4,21 @@ from django.core.exceptions import ValidationError
 from .models import *
 
 
+class RoleScopedOnboardingAdminMixin:
+    user_role = None
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if not self.user_role:
+            return queryset
+        return queryset.filter(user__role=self.user_role)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "user" and self.user_role:
+            kwargs["queryset"] = db_field.remote_field.model.objects.filter(role=self.user_role)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
 class OwnerOnboardingAdminForm(forms.ModelForm):
     phone_number = forms.CharField(required=False)
 
@@ -62,7 +77,8 @@ class OrganizationAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(OwnerOnboarding)
-class OwnerOnboardingAdmin(admin.ModelAdmin):
+class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+    user_role = "OWNER"
     form = OwnerOnboardingAdminForm
     list_display = [
         'user', 'role', 'chain_pharmacy', 'number_of_pharmacies', 'verified',
@@ -97,7 +113,8 @@ class OwnerOnboardingAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(PharmacistOnboarding)
-class PharmacistOnboardingAdmin(admin.ModelAdmin):
+class PharmacistOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+    user_role = "PHARMACIST"
     list_display = [
         'user', 'payment_preference', 'verified', 'member_of_chain',
         'referee1_confirmed', 'referee2_confirmed', 'submitted_for_verification','gov_id_verified',
@@ -143,7 +160,8 @@ class PharmacistOnboardingAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(OtherStaffOnboarding)
-class OtherStaffOnboardingAdmin(admin.ModelAdmin):
+class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+    user_role = "OTHER_STAFF"
     list_display = [
         'user', 'role_type', 'classification_level', 'student_year',
         'intern_half', 'payment_preference', 'verified',
@@ -186,7 +204,8 @@ class OtherStaffOnboardingAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(ExplorerOnboarding)
-class ExplorerOnboardingAdmin(admin.ModelAdmin):
+class ExplorerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+    user_role = "EXPLORER"
     list_display = [
         'user', 'role_type', 'verified', 'gov_id_verified',
         'referee1_confirmed', 'referee2_confirmed', 'submitted_for_verification'

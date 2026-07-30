@@ -47,7 +47,7 @@ export default function PharmacistSkillsScreen() {
   const [pendingFiles, setPendingFiles] = useState<Record<string, any>>({});
   const unsaved = useUnsavedChangesGuard(
     { selected, pendingFiles },
-    { enabled: !loading, saving }
+    { enabled: !loading, onSave: () => save(), saving }
   );
 
   const allItems = useMemo(

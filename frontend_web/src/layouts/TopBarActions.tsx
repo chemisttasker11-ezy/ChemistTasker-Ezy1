@@ -43,6 +43,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchNotifications, markNotificationsRead, NotificationItem } from "../api/notifications";
 import { fetchRooms, getOnboarding } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../constants/api";
+import { dashboardGreetingName } from "../utils/displayName";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 
@@ -503,15 +504,6 @@ function pickFirstString(...values: unknown[]) {
   return "";
 }
 
-function firstNameFromSource(source: any) {
-  const direct = pickFirstString(source?.first_name, source?.firstName);
-  if (direct) return direct.split(/\s+/)[0];
-  const full = pickFirstString(source?.full_name, source?.fullName, source?.name, source?.username);
-  if (full) return full.split(/\s+/)[0];
-  const email = pickFirstString(source?.email);
-  return email ? email.split("@")[0].split(/[._-]+/)[0] : "";
-}
-
 function profilePhotoFromSource(source: any) {
   return pickFirstString(
     source?.profile_photo_url,
@@ -688,10 +680,7 @@ export default function TopBarActions({
   const profileRoleKey = React.useMemo(() => String(user?.role || "DEFAULT").toUpperCase(), [user?.role]);
   const dashboardRoute = DASHBOARD_ROUTES[profileRoleKey] ?? "/dashboard";
   const profileRoute = PROFILE_ROUTES[profileRoleKey] ?? dashboardRoute;
-  const displayFirstName =
-    firstNameFromSource(onboardingProfile) ||
-    firstNameFromSource(user) ||
-    "ChemistTasker";
+  const displayFirstName = dashboardGreetingName(user);
   const avatarSrc = profilePhotoFromSource(onboardingProfile) || profilePhotoFromSource(user);
   const avatarInitials =
     displayFirstName
@@ -724,6 +713,20 @@ export default function TopBarActions({
       cancelled = true;
     };
   }, [user?.id, user?.role]);
+
+  React.useEffect(() => {
+    const handleProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail || typeof detail !== "object") {
+        return;
+      }
+      setOnboardingProfile((prev: any) => ({ ...(prev ?? {}), ...detail }));
+    };
+    window.addEventListener("ct-profile-updated", handleProfileUpdated);
+    return () => {
+      window.removeEventListener("ct-profile-updated", handleProfileUpdated);
+    };
+  }, []);
 
   React.useEffect(() => {
     const roleKey = (user?.role || "").toUpperCase();
@@ -1675,24 +1678,22 @@ export default function TopBarActions({
           <ListItemIcon><PersonOutlineIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Profile & onboarding" />
         </MenuItem>
-        {showPersonaSwitcher && (
-          <>
-            <Divider />
-            <Box sx={{ px: 2, pt: 1, pb: 0.5 }}>
+        {showPersonaSwitcher && [
+            <Divider key="persona-divider" />,
+            <Box key="persona-label" sx={{ px: 2, pt: 1, pb: 0.5 }}>
               <Typography sx={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.12em", textTransform: "uppercase", color: "text.secondary" }}>
                 Switch role
               </Typography>
-            </Box>
-            {personaOptions.map((option) => (
+            </Box>,
+            ...personaOptions.map((option) => (
               <MenuItem key={option.key} selected={option.key === activePersonaKey} onClick={() => handlePersonaSelect(option)}>
                 <ListItemIcon>
                   {option.kind === "ADMIN" ? <DashboardOutlinedIcon fontSize="small" /> : <PersonOutlineIcon fontSize="small" />}
                 </ListItemIcon>
                 <ListItemText primary={option.label} secondary={option.helper} />
               </MenuItem>
-            ))}
-          </>
-        )}
+            )),
+        ]}
         <Divider />
         <MenuItem onClick={handleLogout}>
           <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>

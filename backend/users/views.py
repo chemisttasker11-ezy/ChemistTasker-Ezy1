@@ -315,6 +315,7 @@ def _build_authenticated_user_payload(user):
             "pharmacy_id": pm.pharmacy_id,
             "pharmacy_name": pm.pharmacy.name if pm.pharmacy else None,
             "role": pm.role,
+            "employment_type": pm.employment_type,
         }
         for pm in pharm_memberships
     ]

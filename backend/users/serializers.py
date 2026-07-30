@@ -321,6 +321,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'pharmacy_id':   pm.pharmacy_id,
                 'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
                 'role':          pm.role,
+                'employment_type': pm.employment_type,
             }
             for pm in pharm_memberships
         ]
@@ -362,7 +363,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'id':       self.user.id,
             'username': self.user.username,
             'email':    self.user.email,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
             'role':     self.user.role,
+            'mobile_number': self.user.mobile_number,
             'memberships': org_payload + combined_pharm_payload,
             'admin_assignments': admin_payload,
             'is_pharmacy_admin': bool(admin_payload),
@@ -396,12 +400,13 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
             pharm_payload = [
                 {
-                    'pharmacy_id':   pm.pharmacy_id,
-                    'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
-                    'role':          pm.role,
-                }
-                for pm in pharm_memberships
-            ]
+                'pharmacy_id':   pm.pharmacy_id,
+                'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
+                'role':          pm.role,
+                'employment_type': pm.employment_type,
+            }
+            for pm in pharm_memberships
+        ]
 
             owned_pharmacies = Pharmacy.objects.filter(owner__user=user)
             owned_payload = [
@@ -439,7 +444,10 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 'id':       user.id,
                 'username': user.username,
                 'email':    user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
                 'role':     user.role,
+                'mobile_number': user.mobile_number,
                 'memberships': org_payload + combined_pharm_payload,
                 'admin_assignments': admin_payload,
                 'is_pharmacy_admin': bool(admin_payload),

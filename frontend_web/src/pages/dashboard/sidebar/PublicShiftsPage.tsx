@@ -266,7 +266,7 @@ export default function PublicShiftsPage({
 
   const handleApplyAll = async (shift: Shift) => {
     if (!isVerified) {
-      const msg = 'You must be verified by an admin before applying to public shifts.';
+      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
       showError(msg);
       throw new Error(msg);
     }
@@ -289,7 +289,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlot = async (shift: Shift, slotId: number) => {
     if (!isVerified) {
-      const msg = 'You must be verified by an admin before applying to public shifts.';
+      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
       showError(msg);
       throw new Error(msg);
     }
@@ -341,7 +341,7 @@ export default function PublicShiftsPage({
 
   const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
     if (!isVerified) {
-      const msg = 'You must be verified by an admin before applying to public shifts.';
+      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
       showError(msg);
       throw new Error(msg);
     }
@@ -437,7 +437,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlots = async (shift: Shift, slotIds: number[]) => {
     if (!isVerified) {
-      const msg = 'You must be verified by an admin before applying to public shifts.';
+      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process..';
       showError(msg);
       throw new Error(msg);
     }

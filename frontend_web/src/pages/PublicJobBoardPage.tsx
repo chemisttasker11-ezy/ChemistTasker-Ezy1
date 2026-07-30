@@ -15,11 +15,18 @@ import ShiftsBoard from './dashboard/sidebar/ShiftsBoard';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import {
   Shift,
+  ShiftCounterOfferPayload,
+  ShiftInterest,
+  expressInterestInPublicShiftService,
+  fetchShiftInterests,
+  getOnboardingDetail,
   PaginatedResponse,
   getPublicJobBoard,
+  submitShiftCounterOfferService,
 } from '@chemisttasker/shared-core';
 import AuthLayout from '../layouts/AuthLayout';
 import { setCanonical, setPageMeta, setSocialMeta } from '../utils/seo';
+import { useAuth } from '../contexts/AuthContext';
 
 type FilterConfig = {
   city: string[];
@@ -66,6 +73,7 @@ const normalizeRoleForApi = (role: string) =>
     : '';
 
 export default function PublicJobBoardPage() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +85,15 @@ export default function PublicJobBoardPage() {
   const pageSize = 10;
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [appliedShiftIds, setAppliedShiftIds] = useState<number[]>([]);
+  const [appliedSlotIds, setAppliedSlotIds] = useState<number[]>([]);
+  const [isVerified, setIsVerified] = useState(false);
+
+  const coerceVerified = (value: any) => {
+    if (value === true || value === 'true' || value === 'True') return true;
+    if (value === 1 || value === '1') return true;
+    return false;
+  };
 
   useEffect(() => {
     const title = 'Public Job Board | ChemistTasker';
@@ -192,7 +209,10 @@ export default function PublicJobBoardPage() {
           page_size: pageSize,
         };
 
-        const publicShifts = await getPublicJobBoard(payload) as PaginatedResponse<Shift>;
+        const [publicShifts, interests] = await Promise.all([
+          getPublicJobBoard(payload) as Promise<PaginatedResponse<Shift>>,
+          user?.id ? fetchShiftInterests({ userId: user.id }) : Promise.resolve([]),
+        ]);
         const list = Array.isArray(publicShifts?.results)
           ? publicShifts.results
           : Array.isArray(publicShifts)
@@ -200,6 +220,18 @@ export default function PublicJobBoardPage() {
             : [];
         setShifts((list as any[]).map(mapPublicShift));
         setTotalCount((publicShifts as any)?.count);
+
+        const nextShiftIds = new Set<number>();
+        const nextSlotIds = new Set<number>();
+        (interests as ShiftInterest[]).forEach((interest) => {
+          if (interest.slotId != null) {
+            nextSlotIds.add(interest.slotId);
+          } else if (typeof interest.shift === 'number') {
+            nextShiftIds.add(interest.shift);
+          }
+        });
+        setAppliedShiftIds(Array.from(nextShiftIds));
+        setAppliedSlotIds(Array.from(nextSlotIds));
       } catch (err) {
         console.error('Failed to load public shifts', err);
         showError('Failed to load public shifts.');
@@ -207,7 +239,7 @@ export default function PublicJobBoardPage() {
         setLoading(false);
       }
     },
-    [searchParams]
+    [searchParams, user?.id]
   );
 
   useEffect(() => {
@@ -220,6 +252,111 @@ export default function PublicJobBoardPage() {
   }, [debouncedFilters, page, loadShifts]);
 
   const requireLogin = () => setLoginDialogOpen(true);
+
+  useEffect(() => {
+    const fetchVerification = async () => {
+      if (!user) {
+        setIsVerified(false);
+        return;
+      }
+
+      const initialVerified =
+        coerceVerified((user as any)?.verified) ||
+        coerceVerified((user as any)?.pharmacist_profile?.verified) ||
+        coerceVerified((user as any)?.other_staff_profile?.verified);
+      setIsVerified(initialVerified);
+
+      const roleKey =
+        user.role === 'PHARMACIST' ? 'pharmacist' :
+        user.role === 'OTHER_STAFF' ? 'other_staff' :
+        user.role === 'EXPLORER' ? 'explorer' :
+        user.role === 'OWNER' ? 'owner' :
+        null;
+      if (!roleKey) return;
+
+      try {
+        const onboarding: any = await getOnboardingDetail(roleKey);
+        const verifiedFlag =
+          onboarding?.verified ??
+          onboarding?.data?.verified ??
+          (roleKey === 'pharmacist' ? onboarding?.ahpra_verified : undefined);
+        setIsVerified(coerceVerified(verifiedFlag));
+      } catch (err) {
+        console.warn('Failed to fetch onboarding verification', err);
+      }
+    };
+
+    void fetchVerification();
+  }, [user]);
+
+  const requireVerified = () => {
+    if (!user) {
+      requireLogin();
+      throw new Error('Login required.');
+    }
+    if (!isVerified) {
+      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
+      showError(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const handleApplyAll = async (shift: Shift) => {
+    requireVerified();
+    try {
+      const slots = shift.slots ?? [];
+      if (shift.singleUserOnly || slots.length === 0) {
+        await expressInterestInPublicShiftService({ shiftId: shift.id, slotId: null });
+        setAppliedShiftIds((prev) => Array.from(new Set([...prev, shift.id])));
+        return;
+      }
+
+      const slotIds = slots.map((slot) => slot.id);
+      await expressInterestInPublicShiftService({ shiftId: shift.id, slotIds } as any);
+      setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...slotIds])));
+    } catch (err) {
+      console.error('Failed to express interest', err);
+      showError('Failed to express interest in this shift.');
+      throw err;
+    }
+  };
+
+  const handleApplySlot = async (shift: Shift, slotId: number) => {
+    requireVerified();
+    try {
+      await expressInterestInPublicShiftService({ shiftId: shift.id, slotId });
+      setAppliedSlotIds((prev) => Array.from(new Set([...prev, slotId])));
+    } catch (err) {
+      console.error('Failed to express interest in slot', err);
+      showError('Failed to express interest in this slot.');
+      throw err;
+    }
+  };
+
+  const handleApplySlots = async (shift: Shift, slotIds: number[]) => {
+    requireVerified();
+    try {
+      const uniqueSlotIds = Array.from(new Set(slotIds)).filter((slotId) => Number.isFinite(slotId));
+      if (uniqueSlotIds.length === 0) return;
+      await expressInterestInPublicShiftService({ shiftId: shift.id, slotIds: uniqueSlotIds } as any);
+      setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...uniqueSlotIds])));
+    } catch (err) {
+      console.error('Failed to express interest in slots', err);
+      showError('Failed to express interest in the selected slots.');
+      throw err;
+    }
+  };
+
+  const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
+    requireVerified();
+    try {
+      await submitShiftCounterOfferService(payload);
+    } catch (err) {
+      console.error('Failed to submit counter offer', err);
+      showError('Failed to submit counter offer.');
+      throw err;
+    }
+  };
 
   const handleFiltersChange = (nextFilters: FilterConfig) => {
     setFilters(nextFilters);
@@ -250,16 +387,18 @@ export default function PublicJobBoardPage() {
             onPageChange={setPage}
             enableSaved={false}
             hideSaveToggle
-            readOnlyActions
+            readOnlyActions={!user}
             disableLocalPersistence
             roleOptionsOverride={PUBLIC_ROLE_OPTIONS}
-            initialAppliedShiftIds={[]}
-            initialAppliedSlotIds={[]}
+            initialAppliedShiftIds={appliedShiftIds}
+            initialAppliedSlotIds={appliedSlotIds}
             initialRejectedShiftIds={[]}
             initialRejectedSlotIds={[]}
-            onApplyAll={() => requireLogin()}
-            onApplySlot={() => requireLogin()}
-            hideCounterOffer
+            onApplyAll={handleApplyAll}
+            onApplySlot={handleApplySlot}
+            onApplySlots={handleApplySlots}
+            onSubmitCounterOffer={handleSubmitCounterOffer}
+            hideCounterOffer={!user}
             onRefresh={() => loadShifts(filters, page)}
           />
         </Box>

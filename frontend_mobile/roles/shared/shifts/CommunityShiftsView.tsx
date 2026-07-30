@@ -65,7 +65,7 @@ export default function CommunityShiftsView({
 }: CommunityShiftsViewProps = {}) {
     const scrollY = useRef(new Animated.Value(0)).current;
     const { user } = useAuth();
-    const { workspace } = useWorkspace();
+    const { workspace, selectedPharmacyId } = useWorkspace();
     const userId = user?.id;
     const isWorkspaceReady = workspace === 'internal';
 
@@ -140,6 +140,7 @@ export default function CommunityShiftsView({
                     endDate: activeFilters.dateRange.end || undefined,
                     page: activePage,
                     pageSize,
+                    pharmacyId: workspace === 'internal' && selectedPharmacyId ? selectedPharmacyId : undefined,
                 };
 
                 const [communityShifts, interests, rejections] = await Promise.all([
@@ -188,7 +189,7 @@ export default function CommunityShiftsView({
                 setLoading(false);
             }
         },
-        [userId]
+        [selectedPharmacyId, userId, workspace]
     );
 
     useEffect(() => {

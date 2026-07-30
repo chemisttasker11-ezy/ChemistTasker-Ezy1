@@ -26,6 +26,7 @@ import { alpha } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../../../utils/apiClient";
 import { useAuth } from "../../../../contexts/AuthContext";
+import { dashboardGreetingName } from "../../../../utils/displayName";
 import type { PharmacyDTO } from "./types";
 
 const DNA = {
@@ -74,16 +75,6 @@ const toneStyles = {
   pink: { bg: "#FDE7F5", color: "#EA0A8E", link: "#EA0A8E" },
   cyan: { bg: "#DDFBFF", color: "#008EA6", link: "#063BDA" },
 };
-
-function firstNameFromUser(user: any) {
-  const raw =
-    user?.first_name ||
-    user?.firstName ||
-    user?.username ||
-    user?.email?.split("@")[0] ||
-    "there";
-  return String(raw).split(/\s+/)[0];
-}
 
 function activityIcon(event: ActivityItem) {
   if (event.icon) return event.icon;
@@ -168,7 +159,7 @@ export default function OwnerOverviewHome({
   const allShiftCount = Number(dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? dashboardData?.upcoming_shifts_count ?? 0);
   const unpaidInvoiceCount = Number(dashboardData?.invoice_summary?.unpaid_count ?? 0);
   const unpaidInvoiceTotal = dashboardData?.invoice_summary?.unpaid_total ?? "$0.00";
-  const displayName = firstNameFromUser(user);
+  const displayName = dashboardGreetingName(user);
 
   const quickActions: QuickAction[] = [
     {

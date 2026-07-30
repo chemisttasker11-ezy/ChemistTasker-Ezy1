@@ -1039,18 +1039,18 @@ def _all_active_shifts(shifts_qs, today, now):
 
 def _membership_visibility_levels(membership):
     employment_type = str(getattr(membership, "employment_type", "") or "").upper()
-    if employment_type in {"FULL_TIME", "PART_TIME", "CASUAL"}:
+    if employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES:
         return ["FULL_PART_TIME"]
-    if employment_type in {"LOCUM", "SHIFT_HERO"}:
+    if employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
         return ["LOCUM_CASUAL"]
     return []
 
 
 def _membership_shift_employment_types(membership):
     employment_type = str(getattr(membership, "employment_type", "") or "").upper()
-    if employment_type in {"FULL_TIME", "PART_TIME", "CASUAL"}:
+    if employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES:
         return ["FULL_TIME", "PART_TIME"]
-    if employment_type in {"LOCUM", "SHIFT_HERO"}:
+    if employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
         return ["LOCUM"]
     return []
 
@@ -1064,7 +1064,7 @@ def _worker_visible_pharmacy_shifts(user, pharmacy_ids):
     eligible_filter = Q()
     for membership in memberships:
         employment_type = str(getattr(membership, "employment_type", "") or "").upper()
-        if employment_type in {"FULL_TIME", "PART_TIME", "CASUAL"}:
+        if employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES:
             eligible_filter |= Q(
                 pharmacy_id=membership.pharmacy_id,
                 visibility="FULL_PART_TIME",
@@ -1074,7 +1074,7 @@ def _worker_visible_pharmacy_shifts(user, pharmacy_ids):
                 visibility__in=["LOCUM_CASUAL", "PLATFORM"],
                 post_anonymously=False,
             )
-        elif employment_type in {"LOCUM", "SHIFT_HERO"}:
+        elif employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
             eligible_filter |= Q(
                 pharmacy_id=membership.pharmacy_id,
                 visibility="LOCUM_CASUAL",
@@ -3299,6 +3299,67 @@ ESCALATION_FIELD_MAP = {
     'PLATFORM': 'escalate_to_platform',
 }
 
+class ShiftDescriptionTemplateViewSet(viewsets.ModelViewSet):
+    serializer_class = ShiftDescriptionTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        managed = BaseShiftViewSet._managed_pharmacies(self.request.user)
+        qs = ShiftDescriptionTemplate.objects.filter(pharmacy__in=managed).select_related(
+            'pharmacy',
+            'created_by',
+            'updated_by',
+        )
+        pharmacy_id = self.request.query_params.get('pharmacy')
+        role_needed = self.request.query_params.get('role_needed') or self.request.query_params.get('roleNeeded')
+        if pharmacy_id:
+            qs = qs.filter(pharmacy_id=pharmacy_id)
+        if role_needed:
+            qs = qs.filter(role_needed=str(role_needed).upper())
+        return qs.order_by('pharmacy_id', 'role_needed')
+
+    def _get_pharmacy(self, pharmacy_id):
+        pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
+        if not BaseShiftViewSet._user_can_manage_pharmacy(self.request.user, pharmacy):
+            self.permission_denied(self.request)
+        return pharmacy
+
+    def create(self, request, *args, **kwargs):
+        pharmacy_id = request.data.get('pharmacy')
+        role_needed = str(request.data.get('role_needed') or request.data.get('roleNeeded') or '').upper()
+        description = (request.data.get('description') or '').strip()
+
+        if not pharmacy_id:
+            return Response({'pharmacy': 'This field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not role_needed:
+            return Response({'role_needed': 'This field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if role_needed not in dict(Shift.ROLE_CHOICES):
+            return Response({'role_needed': 'Invalid shift role.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pharmacy = self._get_pharmacy(pharmacy_id)
+        template, created = ShiftDescriptionTemplate.objects.get_or_create(
+            pharmacy=pharmacy,
+            role_needed=role_needed,
+            defaults={
+                'description': description,
+                'created_by': request.user,
+                'updated_by': request.user,
+            },
+        )
+        if not created:
+            template.description = description
+            template.updated_by = request.user
+            template.save(update_fields=['description', 'updated_by', 'updated_at'])
+        serializer = self.get_serializer(template)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def perform_update(self, serializer):
+        pharmacy = serializer.validated_data.get('pharmacy', serializer.instance.pharmacy)
+        if not BaseShiftViewSet._user_can_manage_pharmacy(self.request.user, pharmacy):
+            self.permission_denied(self.request)
+        serializer.save(updated_by=self.request.user)
+
+
 class BaseShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
@@ -4633,7 +4694,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             Q(
                 visibility='FULL_PART_TIME',
                 pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME'],
+                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -4641,7 +4702,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             Q(
                 visibility='LOCUM_CASUAL',
                 pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=['LOCUM', 'SHIFT_HERO'],
+                pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -4649,7 +4710,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 visibility='LOCUM_CASUAL',
                 post_anonymously=False,
                 pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
+                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -4657,6 +4718,9 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 visibility=PUBLIC_LEVEL,
                 post_anonymously=False,
                 pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=(
+                    PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
+                ),
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -4665,7 +4729,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 visibility='OWNER_CHAIN',
                 pharmacy__owner__in=Pharmacy.objects.filter(
                     memberships__user=user,
-                    memberships__is_active=True
+                    memberships__is_active=True,
+                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('owner', flat=True)
             )
             |
@@ -4674,7 +4739,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 visibility='ORG_CHAIN',
                 pharmacy__organization__in=Pharmacy.objects.filter(
                     memberships__user=user,
-                    memberships__is_active=True
+                    memberships__is_active=True,
+                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('organization', flat=True)
             )
         )
@@ -5951,14 +6017,14 @@ class ShiftDetailViewSet(BaseShiftViewSet):
             Q(
                 visibility='FULL_PART_TIME',
                 pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
+                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
             Q(
                 visibility='LOCUM_CASUAL',
                 pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=['LOCUM', 'SHIFT_HERO'],
+                pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -5966,7 +6032,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 visibility='LOCUM_CASUAL',
                 post_anonymously=False,
                 pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
+                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -5974,6 +6040,9 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 visibility='PLATFORM',
                 post_anonymously=False,
                 pharmacy__memberships__user=user,
+                pharmacy__memberships__employment_type__in=(
+                    PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
+                ),
                 pharmacy__memberships__is_active=True,
             )
             |
@@ -5982,6 +6051,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__owner__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
+                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('owner', flat=True),
             )
             |
@@ -5990,6 +6060,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__organization__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
+                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('organization', flat=True),
             )
         )
@@ -8381,7 +8452,9 @@ class ConversationViewSet(mixins.ListModelMixin,
 
         # --- Include community chats for pharmacies I belong to ---
         user_pharmacy_ids = Membership.objects.filter(
-            user=user, is_active=True
+            user=user,
+            is_active=True,
+            employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
         ).values_list('pharmacy_id', flat=True).distinct()
 
         community_chats = Conversation.objects.filter(
@@ -8715,7 +8788,12 @@ class ConversationViewSet(mixins.ListModelMixin,
         if pharmacy_id:
             pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
             
-            requester_membership = Membership.objects.filter(user=user, pharmacy=pharmacy, is_active=True).first()
+            requester_membership = Membership.objects.filter(
+                user=user,
+                pharmacy=pharmacy,
+                is_active=True,
+                employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            ).first()
             is_owner = getattr(pharmacy.owner, 'user', None) == user
             
             if not (requester_membership or is_owner):

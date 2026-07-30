@@ -14,11 +14,7 @@ import DashboardOverviewTemplate, {
 import { useAdminScope } from "../../../contexts/AdminScopeContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import apiClient from "../../../utils/apiClient";
-
-function firstNameFromUser(user: any) {
-  const raw = user?.first_name || user?.firstName || user?.username || user?.email?.split("@")[0] || "there";
-  return String(raw).split(/\s+/)[0];
-}
+import { dashboardGreetingName } from "../../../utils/displayName";
 
 export default function AdminOverview() {
   const { user } = useAuth();
@@ -95,7 +91,7 @@ export default function AdminOverview() {
       title="Admin Dashboard"
       badge="Internal workspace"
       subtitle="Manage staffing, rosters and operations for this pharmacy"
-      heroTitle={`Welcome back, ${firstNameFromUser(user)}!`}
+      heroTitle={`Welcome back, ${dashboardGreetingName(user)}!`}
       heroSubtitle={`Here's what's happening at ${pharmacyName} today.`}
       primaryAction={{ label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate(`${adminBasePath}/post-shift`) }}
       secondaryAction={{ label: "Manage pharmacy", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`) }}

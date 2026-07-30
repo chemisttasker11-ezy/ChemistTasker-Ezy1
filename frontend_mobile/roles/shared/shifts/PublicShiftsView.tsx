@@ -228,7 +228,7 @@ export default function PublicShiftsView({
 
     const guardVerified = () => {
         if (isVerified) return true;
-        const msg = 'You must be verified by an admin before applying to public shifts.';
+        const msg = 'ou must be verified before applying to public shifts. Please complete your onboarding and verification process.';
         showError(msg);
         return false;
     };

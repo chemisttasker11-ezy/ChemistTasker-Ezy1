@@ -19,7 +19,7 @@ export default function ExplorerInterestsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const unsaved = useUnsavedChangesGuard(selected, { enabled: !loading, saving });
+  const unsaved = useUnsavedChangesGuard(selected, { enabled: !loading, onSave: () => save(), saving });
 
   useEffect(() => {
     let mounted = true;

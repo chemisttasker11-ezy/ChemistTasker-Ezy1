@@ -3716,6 +3716,7 @@ class MembershipSerializer(serializers.ModelSerializer):
     admin_level = serializers.SerializerMethodField()
     admin_level_label = serializers.SerializerMethodField()
     admin_level_description = serializers.SerializerMethodField()
+    admin_capabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = Membership
@@ -3735,6 +3736,7 @@ class MembershipSerializer(serializers.ModelSerializer):
             'admin_level',
             'admin_level_label',
             'admin_level_description',
+            'admin_capabilities',
         ]
         read_only_fields = [
             'invited_by', 'invited_by_details', 'created_at', 'updated_at', 'is_pharmacy_owner',
@@ -3742,6 +3744,7 @@ class MembershipSerializer(serializers.ModelSerializer):
             'admin_level',
             'admin_level_label',
             'admin_level_description',
+            'admin_capabilities',
             'responded_at',
         ]
 
@@ -3923,6 +3926,12 @@ class MembershipSerializer(serializers.ModelSerializer):
             PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER: "Communications only. Cannot manage staff or admins.",
         }
         return descriptions.get(assignment.admin_level)
+
+    def get_admin_capabilities(self, obj):
+        assignment = self._get_admin_assignment(obj)
+        if not assignment:
+            return []
+        return sorted(list(assignment.capabilities))
 
     def update(self, instance, validated_data):
         """
@@ -4108,6 +4117,25 @@ class PharmacyAdminSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return obj.can_be_removed_by(request.user)
+
+
+class ShiftDescriptionTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShiftDescriptionTemplate
+        fields = [
+            "id",
+            "pharmacy",
+            "role_needed",
+            "description",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_by", "updated_by", "created_at", "updated_at"]
+
+    def validate_description(self, value):
+        return (value or "").strip()
 
 
 # === Shifts ===

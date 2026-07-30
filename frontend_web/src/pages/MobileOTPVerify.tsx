@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   TextField,
@@ -13,8 +13,10 @@ import {
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import apiClient from '../utils/apiClient';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function MobileOTPVerify() {
+  const { user, setUser } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [username, setUsername]   = useState('');
@@ -24,6 +26,14 @@ export default function MobileOTPVerify() {
   const [status, setStatus]   = useState('');
   const [error, setError]     = useState('');
   const [identityLocked, setIdentityLocked] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setFirstName(user.first_name || user.firstName || '');
+    setLastName(user.last_name || user.lastName || '');
+    setUsername(user.username || '');
+    setMobile(user.mobile_number || '');
+  }, [user]);
 
   const extractError = (err: unknown, fallback: string) => {
     const anyErr = err as any;
@@ -65,6 +75,18 @@ export default function MobileOTPVerify() {
     try {
       await apiClient.post('/users/mobile/verify-otp/', { otp });
       setIdentityLocked(true);
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              first_name: firstName,
+              last_name: lastName,
+              username,
+              mobile_number: mobile,
+              is_mobile_verified: true,
+            }
+          : prev
+      );
       setStatus('Mobile verified! Redirecting...');
       setTimeout(() => window.location.assign('/login'), 800);
     } catch (err) {

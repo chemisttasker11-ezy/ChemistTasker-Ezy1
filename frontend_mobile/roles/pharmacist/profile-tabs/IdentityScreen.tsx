@@ -34,7 +34,7 @@ export default function PharmacistIdentityScreen() {
   const [secondaryFile, setSecondaryFile] = useState<any>(null);
   const unsaved = useUnsavedChangesGuard(
     { data, meta, primaryFile, secondaryFile },
-    { enabled: !loading, saving }
+    { enabled: !loading, onSave: () => save(false), saving }
   );
 
   useEffect(() => {

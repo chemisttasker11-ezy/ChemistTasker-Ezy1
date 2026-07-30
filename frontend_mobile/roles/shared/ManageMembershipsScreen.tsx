@@ -11,7 +11,8 @@ type Membership = {
   job_title?: string;
   is_pharmacy_admin?: boolean;
   admin_level_label?: string | null;
-  admin_level_description?: string | null;
+  admin_capabilities?: string[];
+  capabilities?: string[];
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'LEFT';
   pharmacy_detail?: {
     name?: string;
@@ -34,6 +35,12 @@ function invitedBy(membership: Membership) {
   const user = membership.invited_by_details;
   const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
   return fullName || user?.email || 'Pharmacy admin';
+}
+
+function adminCapabilitiesText(membership: Membership) {
+  const capabilities = membership.admin_capabilities || membership.capabilities || [];
+  if (!capabilities.length) return '';
+  return `Capabilities: ${capabilities.map((capability) => capability.replace(/_/g, ' ').toLowerCase()).join(', ')}`;
 }
 
 export default function ManageMembershipsScreen() {
@@ -108,6 +115,7 @@ export default function ManageMembershipsScreen() {
           const pharmacy = membership.pharmacy_detail;
           const pending = membership.status === 'PENDING';
           const accepted = membership.status === 'ACCEPTED';
+          const capabilitiesText = adminCapabilitiesText(membership);
           return (
             <Card key={membership.id} style={styles.card}>
               <Card.Content>
@@ -129,8 +137,8 @@ export default function ManageMembershipsScreen() {
                   </Chip>
                 </View>
                 <Text style={styles.detail}>{[pharmacy?.suburb, pharmacy?.state, pharmacy?.postcode].filter(Boolean).join(', ') || 'Address details not provided'}</Text>
-                {membership.is_pharmacy_admin && membership.admin_level_description ? (
-                  <Text style={styles.detail}>{membership.admin_level_description}</Text>
+                {membership.is_pharmacy_admin && capabilitiesText ? (
+                  <Text style={styles.detail}>{capabilitiesText}</Text>
                 ) : null}
                 <Text style={styles.detail}>Invited by {invitedBy(membership)}</Text>
                 <View style={styles.actions}>

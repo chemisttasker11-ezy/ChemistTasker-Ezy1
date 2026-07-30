@@ -36,7 +36,7 @@ export default function PharmacistRefereesScreen() {
   const [data, setData] = useState<ApiData>({});
   const [menu1, setMenu1] = useState(false);
   const [menu2, setMenu2] = useState(false);
-  const unsaved = useUnsavedChangesGuard(data, { enabled: !loading, saving });
+  const unsaved = useUnsavedChangesGuard(data, { enabled: !loading, onSave: () => save(false), saving });
 
   useEffect(() => {
     let mounted = true;
