@@ -28,6 +28,14 @@ const ROLE_HUB_ROUTE_MAP: Record<string, string> = {
   otherstaff: '/otherstaff/hub',
 };
 
+const ROLE_MEMBERSHIP_ROUTE_MAP: Record<string, string> = {
+  owner: '/owner/pharmacies',
+  pharmacist: '/pharmacist/memberships',
+  otherstaff: '/otherstaff/memberships',
+  organization: '/organization/pharmacies',
+  admin: '/admin/pharmacies',
+};
+
 const normalizeRoleSlug = (rawRole?: string | null): string | null => {
   if (!rawRole) return null;
   const upper = String(rawRole).toUpperCase();
@@ -175,6 +183,39 @@ const parseHubFromPayload = (payload?: NotificationPayload | null) => {
   };
 };
 
+const parseMembershipFromActionUrl = (actionUrl?: string | null) => {
+  if (!actionUrl) return null;
+  try {
+    const url = new URL(actionUrl, 'http://localhost');
+    const path = url.pathname || '';
+    if (!path.includes('/memberships') && !path.includes('/manage-pharmacies/my-pharmacies')) {
+      return null;
+    }
+    const adminMatch = path.match(/\/dashboard\/admin\/(\d+)\/manage-pharmacies\/my-pharmacies\/?/);
+    return {
+      isWorkerMembershipPage: path.includes('/memberships'),
+      pharmacyId:
+        url.searchParams.get('pharmacyId') ||
+        url.searchParams.get('pharmacy_id') ||
+        adminMatch?.[1] ||
+        null,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const parseMembershipFromPayload = (payload?: NotificationPayload | null) => {
+  if (!payload) return null;
+  const pharmacyId = payload.pharmacy_id ?? payload.pharmacyId ?? null;
+  const membershipId = payload.membership_id ?? payload.membershipId ?? null;
+  if (pharmacyId == null && membershipId == null) return null;
+  return {
+    isWorkerMembershipPage: true,
+    pharmacyId: pharmacyId != null ? String(pharmacyId) : null,
+  };
+};
+
 export const resolveChatNotificationRoomId = ({
   actionUrl,
   payload,
@@ -278,4 +319,31 @@ export const resolveHubNotificationRoute = ({
 
   const query = params.toString();
   return query ? `${baseRoute}?${query}` : baseRoute;
+};
+
+export const resolveMembershipNotificationRoute = ({
+  actionUrl,
+  payload,
+  userRole,
+}: ResolveRouteInput): string | null => {
+  const roleSlug = normalizeRoleSlug(userRole);
+  const parsed = parseMembershipFromActionUrl(actionUrl) ?? parseMembershipFromPayload(payload);
+  if (!roleSlug || !parsed) return null;
+
+  if (roleSlug === 'pharmacist' || roleSlug === 'otherstaff') {
+    return ROLE_MEMBERSHIP_ROUTE_MAP[roleSlug];
+  }
+
+  const pharmacyId = parsed.pharmacyId ?? payload?.pharmacy_id ?? payload?.pharmacyId ?? null;
+  if (roleSlug === 'owner' && pharmacyId != null) {
+    return `/owner/pharmacies/${pharmacyId}`;
+  }
+  if (roleSlug === 'organization' && pharmacyId != null) {
+    return `/organization/pharmacies/${pharmacyId}`;
+  }
+  if (roleSlug === 'admin' && pharmacyId != null) {
+    return `/admin/pharmacies/${pharmacyId}`;
+  }
+
+  return ROLE_MEMBERSHIP_ROUTE_MAP[roleSlug] ?? null;
 };

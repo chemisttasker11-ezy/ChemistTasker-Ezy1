@@ -52,6 +52,11 @@ export default function PharmacyDetailView({
     const locumMemberships = memberships.filter((m) =>
         locumTypes.includes(m.employment_type || '')
     );
+    const pendingAdminMemberships = memberships.filter((membership: any) => {
+        const status = String(membership.status || '').toUpperCase();
+        const active = (membership.is_active ?? membership.isActive) !== false;
+        return (membership.is_pharmacy_admin ?? membership.isPharmacyAdmin) && (status === 'PENDING' || (!status && !active));
+    });
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
@@ -125,6 +130,7 @@ export default function PharmacyDetailView({
                     <PharmacyAdmins
                         pharmacyId={pharmacy.id}
                         admins={adminAssignments}
+                        pendingAdminMemberships={pendingAdminMemberships}
                         onAdminsChanged={onAdminsChanged}
                         loading={loading}
                         pharmacyName={pharmacy.name}

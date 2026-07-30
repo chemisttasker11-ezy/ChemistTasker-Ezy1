@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Text } from 'react-native-paper';
-import { fetchMembershipsByPharmacy, MembershipDTO } from '@chemisttasker/shared-core';
+import type { MembershipDTO } from '@chemisttasker/shared-core';
+import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import StaffManager from '@/roles/shared/pharmacies/StaffManager';
 
 export default function AdminPharmacyStaffScreen() {
@@ -15,7 +16,7 @@ export default function AdminPharmacyStaffScreen() {
     if (!id) return;
     setLoading(true);
     try {
-      const mData = await fetchMembershipsByPharmacy(Number(id));
+      const mData = await fetchMembershipsForPharmacy(id);
       setMemberships(mData as any || []);
     } catch (e: any) {
       console.error(e);

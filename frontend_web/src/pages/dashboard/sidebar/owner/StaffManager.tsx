@@ -49,7 +49,7 @@ import {
   deleteMembershipService,
   bulkInviteMembersService,
 } from "@chemisttasker/shared-core";
-import MembershipApplicationsPanel from "./MembershipApplicationsPanel";
+import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from "./MembershipApplicationsPanel";
 import { useAuth } from "../../../../contexts/AuthContext";
 
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CASUAL"] as const;
@@ -146,6 +146,17 @@ const getRoleChipColor = (role: Role) => {
   }
 };
 
+const membershipStatus = (membership: MembershipDTO) =>
+  String((membership as any).status || "").toUpperCase();
+
+const membershipIsActive = (membership: MembershipDTO) =>
+  ((membership as any).is_active ?? (membership as any).isActive) !== false;
+
+const membershipIsAccepted = (membership: MembershipDTO) => {
+  const status = membershipStatus(membership);
+  return !["PENDING", "REJECTED", "LEFT"].includes(status) && membershipIsActive(membership);
+};
+
 type Staff = {
   id: string | number;
   name: string;
@@ -178,6 +189,12 @@ export default function StaffManager({
     return (memberships || [])
       .filter((m) => {
         if (m.is_pharmacy_owner) {
+          return false;
+        }
+        if (Boolean((m as any).is_pharmacy_admin ?? (m as any).isPharmacyAdmin)) {
+          return false;
+        }
+        if (!membershipIsAccepted(m)) {
           return false;
         }
         const membershipUserId = typeof m.user === "number" ? m.user : null;
@@ -849,6 +866,10 @@ export default function StaffManager({
         defaultEmploymentType="CASUAL"
         onApproved={onMembershipsChanged}
         onNotification={handleApplicationsNotification}
+      />
+      <PendingDirectInvitationsPanel
+        memberships={memberships.filter((m) => !Boolean((m as any).is_pharmacy_admin ?? (m as any).isPharmacyAdmin))}
+        title="Pending Staff Invitations"
       />
       <Dialog open={linkOpen} onClose={() => setLinkOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Generate Invite Link</DialogTitle>

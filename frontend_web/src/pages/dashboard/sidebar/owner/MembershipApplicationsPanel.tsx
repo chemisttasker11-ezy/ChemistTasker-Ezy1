@@ -21,6 +21,7 @@ import {
   fetchMembershipApplicationsService,
   rejectMembershipApplicationService,
   type MembershipApplication,
+  type MembershipDTO,
 } from "@chemisttasker/shared-core";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -77,6 +78,81 @@ const formatTimestamp = (value?: string | null) => {
 
 const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
   (app as any)?.[camelKey] ?? (app as any)?.[snakeKey] ?? "";
+
+const readMembershipValue = (membership: MembershipDTO, camelKey: string, snakeKey: string) =>
+  (membership as any)?.[camelKey] ?? (membership as any)?.[snakeKey] ?? "";
+
+const formatMembershipName = (membership: MembershipDTO) => {
+  const userDetails = (membership as any).userDetails ?? (membership as any).user_details ?? {};
+  return (
+    readMembershipValue(membership, "invitedName", "invited_name") ||
+    (membership as any).name ||
+    [userDetails.firstName ?? userDetails.first_name, userDetails.lastName ?? userDetails.last_name].filter(Boolean).join(" ") ||
+    "Invited worker"
+  );
+};
+
+const formatMembershipEmail = (membership: MembershipDTO) => {
+  const userDetails = (membership as any).userDetails ?? (membership as any).user_details ?? {};
+  return userDetails.email || (membership as any).email || "";
+};
+
+export function PendingDirectInvitationsPanel({
+  memberships,
+  title,
+}: {
+  memberships: MembershipDTO[];
+  title: string;
+}) {
+  const pendingMemberships = memberships.filter((membership) => {
+    const status = String((membership as any).status || "").toUpperCase();
+    const active = ((membership as any).is_active ?? (membership as any).isActive) !== false;
+    return status === "PENDING" || (!status && !active);
+  });
+
+  if (pendingMemberships.length === 0) {
+    return null;
+  }
+
+  return (
+    <Box sx={{ mt: 3 }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        {title}
+      </Typography>
+      <Stack spacing={1.5}>
+        {pendingMemberships.map((membership) => {
+          const name = formatMembershipName(membership);
+          const email = formatMembershipEmail(membership);
+          const role = String((membership as any).role || "");
+          const workType = String(readMembershipValue(membership, "employmentType", "employment_type") || "");
+          const jobTitle = readMembershipValue(membership, "jobTitle", "job_title");
+          return (
+            <Card key={membership.id} variant="outlined">
+              <CardContent>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} justifyContent="space-between">
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography fontWeight={700}>{name}</Typography>
+                    {email ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                        {email}
+                      </Typography>
+                    ) : null}
+                    <Stack direction="row" spacing={1} flexWrap="wrap" mt={1}>
+                      {role ? <Chip size="small" label={role.replace(/_/g, " ")} /> : null}
+                      {workType ? <Chip size="small" label={labelEmploymentType(workType)} color="warning" variant="outlined" /> : null}
+                      {jobTitle ? <Chip size="small" label={jobTitle} variant="outlined" /> : null}
+                    </Stack>
+                  </Box>
+                  <Chip label="Waiting for worker response" color="warning" sx={{ alignSelf: { xs: "flex-start", md: "center" }, fontWeight: 800 }} />
+                </Stack>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Stack>
+    </Box>
+  );
+}
 
 export default function MembershipApplicationsPanel({
   pharmacyId,

@@ -349,7 +349,7 @@ export function getOtherStaffNavDynamic(_progress_percent: number, workspace: 'i
   // 2. Build and return the navigation array, matching the structure of the pharmacist nav
   return [
     // -- Profile Section --
-    { kind: 'header' as const, title: 'Profile and Availability' },
+    { kind: 'header' as const, title: 'Profile, Availability and Memberships' },
     { segment: 'dashboard/otherstaff/overview', title: 'Overview', icon: <DashboardIcon /> },
     // {
     //   segment: 'dashboard/otherstaff/onboarding',
@@ -379,6 +379,7 @@ export function getOtherStaffNavDynamic(_progress_percent: number, workspace: 'i
     { segment: 'dashboard/pharmacy-hub', title: 'Pharmacy Hub', icon: <ForumIcon /> },
     { segment: 'dashboard/otherstaff/calendar', title: 'Calendar', icon: <CalendarMonthIcon /> },
     { segment: 'dashboard/otherstaff/availability', title: 'Set Availability', icon: <EventAvailableIcon /> },
+    { segment: 'dashboard/otherstaff/memberships', title: 'Manage Memberships', icon: <StoreIcon /> },
 
     // -- Divider & Shifts Section --
     { kind: 'divider' as const },
@@ -420,7 +421,7 @@ export function getPharmacistNavDynamic(_progress_percent: number, workspace: 'i
     ];
 
   return [
-    { kind: 'header' as const, title: 'Profile and Availability' },
+    { kind: 'header' as const, title: 'Profile, Availability and Memberships' },
     { segment: 'dashboard/pharmacist/overview', title: 'Overview', icon: <DashboardIcon /> },
     // NEW: V2 onboarding � single sidebar item (tabs live inside the page)
     {
@@ -438,6 +439,7 @@ export function getPharmacistNavDynamic(_progress_percent: number, workspace: 'i
     { segment: 'dashboard/pharmacy-hub', title: 'Pharmacy Hub', icon: <ForumIcon /> },
     { segment: 'dashboard/pharmacist/calendar', title: 'Calendar', icon: <CalendarMonthIcon /> },
     { segment: 'dashboard/pharmacist/availability', title: 'Set Availability', icon: <EventAvailableIcon /> },
+    { segment: 'dashboard/pharmacist/memberships', title: 'Manage Memberships', icon: <StoreIcon /> },
     { kind: 'divider' as const },
     { kind: 'header' as const, title: 'Shifts & Invoices' },
     {

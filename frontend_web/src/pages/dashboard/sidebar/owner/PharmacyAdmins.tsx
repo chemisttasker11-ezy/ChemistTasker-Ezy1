@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
   Chip,
   Dialog,
   DialogActions,
@@ -22,11 +21,12 @@ import {
   Snackbar,
   CircularProgress,
   Skeleton,
+  Stack,
 } from "@mui/material";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import SecurityIcon from "@mui/icons-material/Security";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import {
   AdminLevel,
   AdminStaffRole,
@@ -40,6 +40,7 @@ import {
   formatUserPortalRole,
   surface,
 } from "./types";
+import type { MembershipDTO } from "@chemisttasker/shared-core";
 import { ADMIN_CAPABILITY_MANAGE_ADMINS, type AdminCapability } from "../../../../constants/adminCapabilities";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
@@ -48,10 +49,38 @@ import {
   normalizeEmail,
 } from "./inviteUtils";
 import { createPharmacyAdminService, deletePharmacyAdminService } from "@chemisttasker/shared-core";
+import { PendingDirectInvitationsPanel } from "./MembershipApplicationsPanel";
+
+const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
+const DASHBOARD_INK = "#06123A";
+const DASHBOARD_MUTED = "#5E6B8D";
+const LIGHT_BORDER = "#E5ECF7";
+
+const actionButtonSx = {
+  minHeight: 48,
+  px: 2.25,
+  borderRadius: "14px",
+  fontWeight: 900,
+  textTransform: "none",
+};
+
+const adminCardSx = {
+  borderRadius: { xs: "16px", md: "20px" },
+  borderColor: LIGHT_BORDER,
+  backgroundColor: "#FFFFFF",
+  boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
+  minWidth: 0,
+  transition: "transform 0.2s ease, box-shadow 0.2s ease",
+  "&:hover": {
+    transform: { xs: "none", md: "translateY(-4px)" },
+    boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
+  },
+};
 
 interface PharmacyAdminsProps {
   pharmacyId: string;
   admins: PharmacyAdminDTO[];
+  pendingAdminMemberships?: MembershipDTO[];
   onAdminsChanged: () => void;
   loading?: boolean;
 }
@@ -75,6 +104,7 @@ const DEFAULT_INVITE_FORM: InviteFormState = {
 export default function PharmacyAdmins({
   pharmacyId,
   admins,
+  pendingAdminMemberships = [],
   onAdminsChanged,
   loading = false,
 }: PharmacyAdminsProps) {
@@ -117,7 +147,7 @@ export default function PharmacyAdmins({
     hasCapability(ADMIN_CAPABILITY_MANAGE_ADMINS, numericPharmacyId) || isOwnerOfPharmacy;
 
   const visibleAdmins = useMemo(
-    () => admins.filter((admin) => admin.admin_level !== "OWNER"),
+    () => admins.filter((admin) => admin.admin_level !== "OWNER" && (admin as any).is_active !== false),
     [admins]
   );
 
@@ -249,22 +279,33 @@ export default function PharmacyAdmins({
   };
 
   return (
-    <Card variant="outlined" sx={{ background: tokens.bg, borderColor: tokens.border }}>
-      <CardHeader
-        title="Admins"
-        action={
-          canManageAdmins ? (
-            <Button variant="contained" startIcon={<ManageAccountsIcon />} onClick={() => setInviteOpen(true)}>
-              Invite Admin
-            </Button>
-          ) : null
-        }
-      />
-      <CardContent>
+    <Box sx={{ fontFamily: DASHBOARD_FONT_FAMILY }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        justifyContent="space-between"
+        spacing={1.5}
+        sx={{ mb: 2.5 }}
+      >
+        <Typography sx={{ color: DASHBOARD_INK, fontSize: { xs: 24, md: 30 }, fontWeight: 950, lineHeight: 1.12 }}>
+          Admins
+        </Typography>
+        {canManageAdmins ? (
+          <Button
+            variant="contained"
+            startIcon={<ManageAccountsIcon />}
+            onClick={() => setInviteOpen(true)}
+            sx={{ ...actionButtonSx, boxShadow: "0 12px 28px rgba(20, 62, 234, 0.18)" }}
+          >
+            Invite Admin
+          </Button>
+        ) : null}
+      </Stack>
+
         {showSkeleton ? (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
             {Array.from({ length: 2 }).map((_, idx) => (
-              <Card key={idx} variant="outlined" sx={{ borderColor: tokens.border }}>
+              <Card key={idx} variant="outlined" sx={adminCardSx}>
                 <CardContent sx={{ display: "flex", gap: 2 }}>
                   <Skeleton variant="circular" width={40} height={40} />
                   <Box sx={{ flex: 1 }}>
@@ -278,7 +319,7 @@ export default function PharmacyAdmins({
         ) : visibleAdmins.length === 0 ? (
           <Alert severity="info">No admins yet. Use "Invite Admin" to add one.</Alert>
         ) : (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
             {visibleAdmins.map((admin) => {
               const name =
                 admin.invited_name ||
@@ -296,59 +337,70 @@ export default function PharmacyAdmins({
                 <Card
                   key={admin.id}
                   variant="outlined"
-                  sx={{ flex: "1 1 420px", maxWidth: 560, background: tokens.bg, borderColor: tokens.border }}
+                  sx={adminCardSx}
                 >
-                  <CardContent sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-                    <Tooltip title={adminLevelHelper || "Admin access level"}>
-                      <Chip label={adminLevel} color="secondary" />
-                    </Tooltip>
-                    {staffRoleLabel && <Chip label={staffRoleLabel} variant="outlined" />}
-                    {jobTitle && (
-                      <Chip
-                        label={jobTitle}
-                        variant="outlined"
-                        sx={{ maxWidth: 180 }}
-                      />
-                    )}
-                    <Box sx={{ ml: 1 }}>
-                      <Typography fontWeight={600}>{name}</Typography>
-                      {email && (
-                        <Typography variant="body2" sx={{ color: tokens.textMuted }}>
-                          {email}
+                  <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: { xs: 2, md: 2.5 } } }}>
+                    <Stack spacing={1.5} sx={{ minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Tooltip title={adminLevelHelper || "Admin access level"}>
+                          <Chip label={adminLevel} color="secondary" sx={{ fontWeight: 800 }} />
+                        </Tooltip>
+                        {staffRoleLabel && <Chip label={staffRoleLabel} variant="outlined" sx={{ fontWeight: 800 }} />}
+                        {jobTitle && <Chip label={jobTitle} variant="outlined" sx={{ fontWeight: 800, maxWidth: "100%" }} />}
+                      </Stack>
+                      {adminLevelHelper && (
+                        <Typography sx={{ color: DASHBOARD_MUTED, fontWeight: 700, fontSize: 14, lineHeight: 1.45 }}>
+                          {adminLevelHelper}
                         </Typography>
                       )}
-                    </Box>
-                    <Box sx={{ ml: "auto", display: "flex", gap: 0.5 }}>
-                      <Tooltip title={formatCapabilityTooltip(admin.capabilities)}>
-                        <IconButton size="small">
-                          <SecurityIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {removable && (
-                        <Tooltip title="Remove">
-                          <span>
-                            <IconButton
-                              color="error"
-                              onClick={() => setConfirmRemove(admin)}
-                              disabled={loadingId === admin.id}
-                            >
-                              {loadingId === admin.id ? (
-                                <CircularProgress size={16} />
-                              ) : (
-                                <DeleteOutlineIcon fontSize="small" />
-                              )}
+                      <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ color: DASHBOARD_INK, fontWeight: 950, fontSize: { xs: 20, md: 22 }, lineHeight: 1.2, overflowWrap: "anywhere" }}>
+                            {name}
+                          </Typography>
+                          {email && (
+                            <Typography sx={{ mt: 0.5, color: DASHBOARD_MUTED, fontWeight: 700, fontSize: 15, lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                              {email}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Box sx={{ flexShrink: 0, display: "flex", gap: 0.5 }}>
+                          <Tooltip title={formatCapabilityTooltip(admin.capabilities)}>
+                            <IconButton size="small" sx={{ border: `1px solid ${alpha("#063BDA", 0.16)}` }}>
+                              <SecurityIcon fontSize="small" />
                             </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
-                    </Box>
+                          </Tooltip>
+                          {removable && (
+                            <Tooltip title="Remove">
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  onClick={() => setConfirmRemove(admin)}
+                                  disabled={loadingId === admin.id}
+                                  sx={{ border: `1px solid ${alpha("#EF4444", 0.18)}` }}
+                                >
+                                  {loadingId === admin.id ? (
+                                    <CircularProgress size={16} />
+                                  ) : (
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Stack>
                   </CardContent>
                 </Card>
               );
             })}
           </Box>
         )}
-      </CardContent>
+        <PendingDirectInvitationsPanel
+          memberships={pendingAdminMemberships}
+          title="Pending Admin Invitations"
+        />
       <Dialog
         open={Boolean(confirmRemove)}
         onClose={() => {
@@ -482,7 +534,7 @@ export default function PharmacyAdmins({
           </Alert>
         </Snackbar>
       )}
-    </Card>
+    </Box>
   );
 }
 

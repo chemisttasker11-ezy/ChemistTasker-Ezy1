@@ -15,6 +15,7 @@ import {
     approveMembershipApplicationService,
     rejectMembershipApplicationService,
     type MembershipApplication,
+    type MembershipDTO,
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
 
@@ -26,6 +27,69 @@ const getFirstErrorMessage = (value: unknown): string | null => {
 };
 
 type ApplicationCategory = 'FULL_PART_TIME' | 'LOCUM_CASUAL';
+
+const readMembershipValue = (membership: MembershipDTO, camelKey: string, snakeKey: string) =>
+    (membership as any)?.[camelKey] ?? (membership as any)?.[snakeKey] ?? '';
+
+const membershipDisplayName = (membership: MembershipDTO) => {
+    const userDetails = (membership as any).userDetails ?? (membership as any).user_details ?? {};
+    const first = userDetails.firstName ?? userDetails.first_name;
+    const last = userDetails.lastName ?? userDetails.last_name;
+    return (
+        readMembershipValue(membership, 'invitedName', 'invited_name') ||
+        (membership as any).name ||
+        [first, last].filter(Boolean).join(' ') ||
+        'Invited worker'
+    );
+};
+
+const membershipEmail = (membership: MembershipDTO) => {
+    const userDetails = (membership as any).userDetails ?? (membership as any).user_details ?? {};
+    return userDetails.email || (membership as any).email || '';
+};
+
+export function PendingDirectInvitationsPanel({
+    memberships,
+    title,
+}: {
+    memberships: MembershipDTO[];
+    title: string;
+}) {
+    const pendingMemberships = memberships.filter((membership) => {
+        const status = String((membership as any).status || '').toUpperCase();
+        const active = ((membership as any).is_active ?? (membership as any).isActive) !== false;
+        return status === 'PENDING' || (!status && !active);
+    });
+
+    if (!pendingMemberships.length) {
+        return null;
+    }
+
+    return (
+        <View style={styles.container}>
+            <Text style={styles.title}>{title}</Text>
+            {pendingMemberships.map((membership) => {
+                const role = String((membership as any).role || '').replace(/_/g, ' ');
+                const workType = String(readMembershipValue(membership, 'employmentType', 'employment_type') || '').replace(/_/g, ' ');
+                const jobTitle = readMembershipValue(membership, 'jobTitle', 'job_title');
+                return (
+                    <Card key={membership.id} style={styles.card}>
+                        <Card.Content>
+                            <Text style={styles.applicantName}>{membershipDisplayName(membership)}</Text>
+                            {membershipEmail(membership) ? <Text style={styles.applicantEmail}>{membershipEmail(membership)}</Text> : null}
+                            <View style={styles.details}>
+                                {role ? <Text style={styles.detailText}>Role: {role}</Text> : null}
+                                {workType ? <Text style={styles.detailText}>Work type: {workType}</Text> : null}
+                                {jobTitle ? <Text style={styles.detailText}>Job title: {jobTitle}</Text> : null}
+                                <Text style={styles.detailText}>Waiting for worker response</Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
+                );
+            })}
+        </View>
+    );
+}
 
 interface MembershipApplicationsPanelProps {
     pharmacyId: string;

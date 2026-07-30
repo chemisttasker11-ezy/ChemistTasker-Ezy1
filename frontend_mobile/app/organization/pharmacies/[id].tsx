@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Text } from 'react-native-paper';
-import { getPharmacyById, fetchMembershipsByPharmacy, fetchPharmacyAdminsService, PharmacyDTO, MembershipDTO, PharmacyAdminDTO } from '@chemisttasker/shared-core';
+import { getPharmacyById, fetchPharmacyAdminsService, PharmacyDTO, MembershipDTO, PharmacyAdminDTO } from '@chemisttasker/shared-core';
+import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import PharmacyDetailView from '@/roles/shared/pharmacies/PharmacyDetailView';
 
 export default function OrganizationPharmacyDetailsScreen() {
@@ -19,7 +20,7 @@ export default function OrganizationPharmacyDetailsScreen() {
     try {
       const [pData, mData, aData] = await Promise.all([
         getPharmacyById(id),
-        fetchMembershipsByPharmacy(Number(id)),
+        fetchMembershipsForPharmacy(id),
         fetchPharmacyAdminsService({ pharmacy: id })
       ]);
       setPharmacy(pData as any);

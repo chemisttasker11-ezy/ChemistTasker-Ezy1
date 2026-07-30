@@ -65,7 +65,6 @@ import {
   claimOnboarding,
   createPharmacy,
   deletePharmacy,
-  fetchMembershipsByPharmacy,
   fetchPharmaciesService,
   fetchPharmacyAdminsService,
   getOnboarding,
@@ -73,8 +72,8 @@ import {
   lookupPharmacyAbn,
   updatePharmacy,
   updatePharmacyClaim,
-  type MembershipSummary,
 } from "@chemisttasker/shared-core";
+import { fetchMembershipsForPharmacy } from "./owner/membershipApi";
 
 const GOOGLE_LIBRARIES = ["places"] as Array<"places">;
 const LIGHT_SURFACE = "#FFFFFF";
@@ -297,6 +296,11 @@ const formatDateTime = (value?: string | null) =>
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : "-";
+
+const membershipIsVisibleCategoryMember = (membership: MembershipDTO) => {
+  const status = String((membership as any).status || "").toUpperCase();
+  return !["REJECTED", "LEFT"].includes(status);
+};
 
 const tabLabels = [
   { label: "Basic", icon: <BusinessRoundedIcon fontSize="small" /> },
@@ -614,7 +618,7 @@ export default function PharmacyPage({
       activeMemberships.filter((m) => {
         const role = (m.role || "").toUpperCase();
         const work = (m.employment_type || "").toUpperCase();
-        return !role.includes("ADMIN") && !work.includes("LOCUM") && !work.includes("SHIFT");
+        return membershipIsVisibleCategoryMember(m) && !role.includes("ADMIN") && !work.includes("LOCUM") && !work.includes("SHIFT");
       }),
     [activeMemberships]
   );
@@ -623,13 +627,23 @@ export default function PharmacyPage({
       activeMemberships.filter((m) => {
         const role = (m.role || "").toUpperCase();
         const work = (m.employment_type || "").toUpperCase();
-        return !role.includes("ADMIN") && (work.includes("LOCUM") || work.includes("SHIFT"));
+        return membershipIsVisibleCategoryMember(m) && !role.includes("ADMIN") && (work.includes("LOCUM") || work.includes("SHIFT"));
       }),
     [activeMemberships]
   );
   const activeAdminAssignments = useMemo(
     () => (activePharmacyId ? adminAssignmentsByPharmacy[activePharmacyId] || [] : []),
     [activePharmacyId, adminAssignmentsByPharmacy]
+  );
+  const pendingAdminMemberships = useMemo(
+    () =>
+      activeMemberships.filter(
+        (membership) =>
+          Boolean((membership as any).is_pharmacy_admin ?? (membership as any).isPharmacyAdmin) &&
+          (String((membership as any).status || "").toUpperCase() === "PENDING" ||
+            ((membership as any).is_active ?? (membership as any).isActive) === false)
+      ),
+    [activeMemberships]
   );
 
   const claimCounts = useMemo(() => {
@@ -1569,28 +1583,10 @@ export default function PharmacyPage({
     async (pharmacyId: string) => {
       setMembershipsLoading((prev) => ({ ...prev, [pharmacyId]: true }));
       try {
-        const [memberSummaries, adminData] = await Promise.all([
-          fetchMembershipsByPharmacy(Number(pharmacyId)),
+        const [memberData, adminData] = await Promise.all([
+          fetchMembershipsForPharmacy(pharmacyId),
           fetchPharmacyAdminsService({ pharmacy: pharmacyId }),
         ]);
-        const memberData: MembershipDTO[] = memberSummaries.map((m: MembershipSummary) => ({
-          id: m.id,
-          pharmacy_id: m.pharmacyId ?? undefined,
-          pharmacy_name: m.pharmacyName ?? undefined,
-          role: m.role ?? undefined,
-          employment_type: m.employmentType ?? undefined,
-          invited_name: m.invitedName ?? undefined,
-          user_details: m.userDetails
-            ? {
-                email: m.userDetails.email ?? undefined,
-                first_name:
-                  (m.userDetails as any).first_name ?? (m.userDetails as any).firstName ?? undefined,
-                last_name:
-                  (m.userDetails as any).last_name ?? (m.userDetails as any).lastName ?? undefined,
-              }
-            : undefined,
-          is_pharmacy_owner: m.isPharmacyOwner ?? false,
-        }));
         setMembershipsByPharmacy((prev) => ({
           ...prev,
           [pharmacyId]: Array.isArray(memberData) ? memberData : [],
@@ -2955,6 +2951,7 @@ export default function PharmacyPage({
           staffMemberships={staffMemberships}
           locumMemberships={locumMemberships}
           adminAssignments={activeAdminAssignments}
+          pendingAdminMemberships={pendingAdminMemberships}
           onMembershipsChanged={() => loadMembers(activePharmacy.id)}
           onEditPharmacy={handleEditPharmacyDto}
           membershipsLoading={activeMembershipsLoading}

@@ -167,6 +167,12 @@ export default function OtherStaffOverviewScreen() {
       route: '/otherstaff/availability',
     },
     {
+      title: 'Memberships',
+      description: 'Manage pharmacies',
+      icon: 'store-cog-outline',
+      route: '/otherstaff/memberships',
+    },
+    {
       title: 'Calendar',
       description: 'View schedule',
       icon: 'calendar-outline',

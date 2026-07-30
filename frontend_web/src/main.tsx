@@ -97,6 +97,7 @@ import InvoiceManagePage from './pages/dashboard/sidebar/Invoices/InvoiceManageP
 import InvoiceGeneratePage from './pages/dashboard/sidebar/Invoices/InvoiceGeneratePage';
 import InvoiceDetailPage from './pages/dashboard/sidebar/Invoices/InvoiceDetailPage';
 import PharmacyCalendarPage from './pages/dashboard/sidebar/PharmacyCalendarPage';
+import ManageMembershipsPage from './pages/dashboard/sidebar/ManageMembershipsPage';
 
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -361,6 +362,7 @@ const router = createBrowserRouter([
             ],
           },
           { path: 'availability', element: <SetAvailabilityPage /> },
+          { path: 'memberships', element: <ManageMembershipsPage /> },
           {
             path: 'invoice',
             element: <Outlet />,
@@ -405,6 +407,7 @@ const router = createBrowserRouter([
             ],
           },
           { path: 'availability', element: <SetAvailabilityPage /> },
+          { path: 'memberships', element: <ManageMembershipsPage /> },
           {
             path: 'invoice',
             element: <Outlet />,

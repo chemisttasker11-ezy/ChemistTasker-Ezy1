@@ -171,6 +171,12 @@ export default function PharmacistOverviewScreen() {
       route: '/pharmacist/availability',
     },
     {
+      title: 'Memberships',
+      description: 'Manage pharmacies',
+      icon: 'store-cog-outline',
+      route: '/pharmacist/memberships',
+    },
+    {
       title: 'Calendar',
       description: 'View schedule',
       icon: 'calendar-outline',

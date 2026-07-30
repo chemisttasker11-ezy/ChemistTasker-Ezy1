@@ -1218,6 +1218,28 @@ export default function TopBarActions({
         payload.room_id ??
         payload.chat_room_id ??
         null;
+      const navigateToActionUrl = (actionUrl: string) => {
+        try {
+          const target = new URL(actionUrl, window.location.origin);
+          if (target.origin === window.location.origin) {
+            const ownerPharmacyId = payload.pharmacy_id ?? payload.pharmacyId ?? null;
+            const adminMembershipPathMatch = target.pathname.match(/^\/dashboard\/admin\/(\d+)\/manage-pharmacies\/my-pharmacies\/?$/);
+            if (String(user?.role || "").toUpperCase() === "OWNER" && adminMembershipPathMatch) {
+              const pharmacyId = ownerPharmacyId ?? adminMembershipPathMatch[1];
+              navigate(`/dashboard/owner/manage-pharmacies/my-pharmacies?view=detail&pharmacyId=${pharmacyId}`);
+              return;
+            }
+            navigate(`${target.pathname}${target.search}${target.hash}`);
+          } else {
+            window.location.href = target.toString();
+          }
+        } catch {
+          const normalized = actionUrl.startsWith('/')
+            ? actionUrl
+            : `/${actionUrl}`;
+          navigate(normalized);
+        }
+      };
       if (conversationId) {
         navigate(`${chatRoute}?conversationId=${conversationId}`);
       } else if (offerId || shiftId) {
@@ -1244,37 +1266,13 @@ export default function TopBarActions({
             navigate(`/dashboard/organization/shifts/${shiftId}`);
           }
         } else if (item.actionUrl) {
-          try {
-            const target = new URL(item.actionUrl, window.location.origin);
-            if (target.origin === window.location.origin) {
-              navigate(`${target.pathname}${target.search}${target.hash}`);
-            } else {
-              window.location.href = target.toString();
-            }
-          } catch {
-            const normalized = item.actionUrl.startsWith('/')
-              ? item.actionUrl
-              : `/${item.actionUrl}`;
-            navigate(normalized);
-          }
+          navigateToActionUrl(item.actionUrl);
         } else {
           handleCloseNotifications();
           return;
         }
       } else if (item.actionUrl) {
-        try {
-          const target = new URL(item.actionUrl, window.location.origin);
-          if (target.origin === window.location.origin) {
-            navigate(`${target.pathname}${target.search}${target.hash}`);
-          } else {
-            window.location.href = target.toString();
-          }
-        } catch {
-          const normalized = item.actionUrl.startsWith('/')
-            ? item.actionUrl
-            : `/${item.actionUrl}`;
-          navigate(normalized);
-        }
+        navigateToActionUrl(item.actionUrl);
       } else {
         handleCloseNotifications();
         return;

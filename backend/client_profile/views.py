@@ -44,7 +44,7 @@ from client_profile.utils import (
     build_shift_offer_context,
     finalize_shift_offer,
 )
-from client_profile.notifications import mark_notifications_read, broadcast_message_read, broadcast_message_badge
+from client_profile.notifications import mark_notifications_read, broadcast_message_read, broadcast_message_badge, notify_users
 from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from django.utils.crypto import get_random_string
 from django.contrib.auth.tokens import default_token_generator
@@ -135,7 +135,11 @@ def _log_shift_profile_access(*, request, shift, candidate, action, slot=None):
 def _count_active_memberships(user, exclude_membership_id=None):
     if not user:
         return 0
-    qs = Membership.objects.filter(user=user, is_active=True)
+    qs = Membership.objects.filter(
+        user=user,
+        is_active=True,
+        status=Membership.Status.ACCEPTED,
+    )
     if exclude_membership_id:
         qs = qs.exclude(pk=exclude_membership_id)
     return qs.count()
@@ -214,6 +218,148 @@ def _user_can_invite_members_to_pharmacy(user, pharmacy):
             return True
 
     return False
+
+
+def _worker_membership_url(user):
+    base = _frontend_base_url_for_notifications()
+    role = "pharmacist" if getattr(user, "role", "") == "PHARMACIST" else "otherstaff"
+    return f"{base}/dashboard/{role}/memberships"
+
+
+def _frontend_base_url_for_notifications():
+    return (getattr(settings, "FRONTEND_BASE_URL", "") or "http://localhost:5173").rstrip("/")
+
+
+def _pharmacy_membership_manage_url(pharmacy, recipient=None):
+    base = _frontend_base_url_for_notifications()
+    detail_query = f"?view=detail&pharmacyId={pharmacy.id}"
+    owner_user = getattr(getattr(pharmacy, "owner", None), "user", None)
+    if recipient and owner_user and getattr(owner_user, "id", None) == getattr(recipient, "id", None):
+        return f"{base}/dashboard/owner/manage-pharmacies/my-pharmacies{detail_query}"
+    if recipient and has_admin_capability(recipient, pharmacy, CAPABILITY_MANAGE_STAFF):
+        return f"{base}/dashboard/admin/{pharmacy.id}/manage-pharmacies/my-pharmacies{detail_query}"
+    if recipient and OrganizationMembership.objects.filter(user=recipient, organization_id=pharmacy.organization_id).exists():
+        return f"{base}/dashboard/organization/manage-pharmacies/my-pharmacies{detail_query}"
+    return f"{base}/dashboard/owner/manage-pharmacies/my-pharmacies{detail_query}"
+
+
+def _membership_controller_users(pharmacy, invited_by=None):
+    users_by_id = {}
+
+    def add(user):
+        if user and getattr(user, "id", None):
+            users_by_id[user.id] = user
+
+    add(invited_by)
+    add(getattr(getattr(pharmacy, "owner", None), "user", None))
+
+    for admin in PharmacyAdmin.objects.filter(pharmacy=pharmacy, is_active=True).select_related("user"):
+        add(admin.user)
+
+    if getattr(pharmacy, "organization_id", None):
+        for org_membership in OrganizationMembership.objects.filter(
+            organization_id=pharmacy.organization_id,
+            role="ORG_ADMIN",
+        ).select_related("user"):
+            add(org_membership.user)
+
+    return list(users_by_id.values())
+
+
+def _format_membership_person(user):
+    if not user:
+        return "A worker"
+    return user.get_full_name() or user.email or getattr(user, "username", "") or "A worker"
+
+
+def _notify_membership_invitation_sent(membership):
+    user = membership.user
+    pharmacy = membership.pharmacy
+    if not user or not pharmacy:
+        return
+    action_url = _worker_membership_url(user)
+    role_label = dict(Membership.ROLE_CHOICES).get(membership.role, membership.role)
+    notify_users(
+        [user.id],
+        title=f"Invitation to join {pharmacy.name}",
+        body=f"You have been invited as {role_label}. Accept or reject the invitation from Manage Memberships.",
+        notification_type=Notification.Type.ALERT,
+        action_url=action_url,
+        payload={
+            "membership_id": membership.id,
+            "pharmacy_id": pharmacy.id,
+            "status": membership.status,
+        },
+    )
+
+
+def _notify_membership_response(membership, response_status):
+    pharmacy = membership.pharmacy
+    worker = membership.user
+    if not pharmacy or not worker:
+        return
+
+    worker_name = _format_membership_person(worker)
+    role_label = dict(Membership.ROLE_CHOICES).get(membership.role, membership.role)
+    response_config = {
+        Membership.Status.ACCEPTED: {
+            "status_label": "accepted",
+            "action_phrase": "accepted the invitation to join",
+        },
+        Membership.Status.REJECTED: {
+            "status_label": "rejected",
+            "action_phrase": "rejected the invitation to join",
+        },
+        Membership.Status.LEFT: {
+            "status_label": "left",
+            "action_phrase": "left their membership at",
+        },
+    }.get(response_status, {
+        "status_label": str(response_status).lower(),
+        "action_phrase": "updated their membership at",
+    })
+    status_label = response_config["status_label"]
+    action_phrase = response_config["action_phrase"]
+    subject = f"{worker_name} {status_label} {pharmacy.name}"
+    body = f"{worker_name} has {action_phrase} {pharmacy.name}."
+    recipients = _membership_controller_users(pharmacy, invited_by=membership.invited_by)
+
+    for recipient in recipients:
+        recipient_id = getattr(recipient, "id", None)
+        if not recipient_id:
+            continue
+        action_url = _pharmacy_membership_manage_url(pharmacy, recipient=recipient)
+        notify_users(
+            [recipient_id],
+            title=subject,
+            body=body,
+            notification_type=Notification.Type.ALERT,
+            action_url=action_url,
+            payload={
+                "membership_id": membership.id,
+                "pharmacy_id": pharmacy.id,
+                "status": response_status,
+            },
+        )
+
+        if not getattr(recipient, "email", None):
+            continue
+        async_task(
+            "users.tasks.send_async_email",
+            subject=subject,
+            recipient_list=[recipient.email],
+            template_name="emails/membership_invitation_response.html",
+            text_template="emails/membership_invitation_response.txt",
+            context={
+                "worker_name": worker_name,
+                "worker_email": worker.email,
+                "pharmacy_name": pharmacy.name,
+                "role": role_label,
+                "status_label": status_label,
+                "action_phrase": action_phrase,
+                "manage_url": action_url,
+            },
+        )
 
 # Onboardings
 class OrganizationViewSet(viewsets.ModelViewSet):
@@ -2042,7 +2188,8 @@ class MembershipViewSet(viewsets.ModelViewSet):
         # NEW RULE: Pharmacies they are a regular, active member of
         member_pharmacies = Pharmacy.objects.filter(
             memberships__user=user,
-            memberships__is_active=True
+            memberships__is_active=True,
+            memberships__status=Membership.Status.ACCEPTED,
         )
 
         # Combine all visible pharmacies into one master queryset
@@ -2050,7 +2197,11 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
         # 2. Base the Membership query on these visible pharmacies.
         qs = (
-            Membership.objects.filter(pharmacy__in=visible_pharmacies, is_active=True)
+            Membership.objects.filter(pharmacy__in=visible_pharmacies)
+            .filter(
+                Q(is_active=True, status=Membership.Status.ACCEPTED)
+                | Q(status=Membership.Status.PENDING)
+            )
             .select_related(
                 "user",
                 "invited_by",
@@ -2109,6 +2260,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 is_org_pharmacy_member = Membership.objects.filter(
                     user=user,
                     is_active=True,
+                    status=Membership.Status.ACCEPTED,
                     pharmacy__organization_id=organization_id_int,
                 ).exists()
                 is_org_member = is_org_staff or is_org_pharmacy_member
@@ -2118,7 +2270,10 @@ class MembershipViewSet(viewsets.ModelViewSet):
                     qs = (
                         Membership.objects.filter(
                             pharmacy__organization_id=organization_id_int,
-                            is_active=True,
+                        )
+                        .filter(
+                            Q(is_active=True, status=Membership.Status.ACCEPTED)
+                            | Q(status=Membership.Status.PENDING)
                         )
                         .select_related(
                             "user",
@@ -2262,8 +2417,12 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 return None, f'This user already a member in {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'
 
             # Membership exists?
-            if Membership.objects.filter(user=user, pharmacy_id=pharmacy_id).exists():
-                return None, 'User is already a member of this pharmacy.'
+            existing_membership = Membership.objects.filter(user=user, pharmacy_id=pharmacy_id).first()
+            if existing_membership:
+                if existing_membership.status == Membership.Status.PENDING:
+                    return None, 'This user already has a pending invitation for this pharmacy.'
+                if existing_membership.status == Membership.Status.ACCEPTED and existing_membership.is_active:
+                    return None, 'User is already a member of this pharmacy.'
 
             # --- START OF THE FIX ---
             # Prepare data for Membership creation, including new classification fields
@@ -2284,16 +2443,39 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 'intern_half': data.get('intern_half', None),
                 'student_year': data.get('student_year', None),
             }
+            activate_immediately = bool(data.get('activate_immediately'))
+            if user_created or activate_immediately:
+                membership_data['is_active'] = True
+                membership_data['status'] = Membership.Status.ACCEPTED
+            else:
+                membership_data['is_active'] = False
+                membership_data['status'] = Membership.Status.PENDING
 
             # Create membership through the serializer so role/classification rules
             # stay identical across manual invites and magic-link approvals.
-            membership_serializer = MembershipSerializer(
-                data=membership_data,
-                context={'request': getattr(self, 'request', None)},
-            )
+            serializer_kwargs = {
+                'data': membership_data,
+                'context': {'request': getattr(self, 'request', None)},
+            }
+            if existing_membership:
+                serializer_kwargs['instance'] = existing_membership
+                serializer_kwargs['partial'] = True
+            membership_serializer = MembershipSerializer(**serializer_kwargs)
             try:
                 membership_serializer.is_valid(raise_exception=True)
                 membership = membership_serializer.save(invited_by=inviter)
+                desired_status = membership_data.get('status', Membership.Status.ACCEPTED)
+                desired_active = bool(membership_data.get('is_active', True))
+                force_update_fields = []
+                if membership.status != desired_status:
+                    membership.status = desired_status
+                    force_update_fields.append('status')
+                if membership.is_active != desired_active:
+                    membership.is_active = desired_active
+                    force_update_fields.append('is_active')
+                if force_update_fields:
+                    force_update_fields.append('updated_at')
+                    membership.save(update_fields=force_update_fields)
             except serializers.ValidationError as e:
                 detail = e.detail
                 if isinstance(detail, dict):
@@ -2311,7 +2493,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
             # Prepare and send email
             try:
-                base = (getattr(settings, "FRONTEND_BASE_URL", "") or "").rstrip("/")
+                base = _frontend_base_url_for_notifications()
                 admin_landing_url = f"{base}/dashboard/owner/manage-pharmacies/my-pharmacies"
                 login_url = f"{base}/login"
 
@@ -2348,14 +2530,18 @@ class MembershipViewSet(viewsets.ModelViewSet):
                         text_template="emails/pharmacy_invite_new_user.txt",
                     ))
 
+                elif activate_immediately:
+                    pass
                 else:
-                    # For admins, send them straight to admin dashboard; others go to login
-                    context["frontend_dashboard_link"] = admin_landing_url if is_admin_role else login_url
+                    worker_role = "pharmacist" if getattr(user, "role", "") == "PHARMACIST" else "otherstaff"
+                    membership_url = f"{base}/dashboard/{worker_role}/memberships"
+                    context["frontend_dashboard_link"] = admin_landing_url if is_admin_role else membership_url
+                    context["membership_url"] = membership_url
 
                     subject = (
                         f"You’ve been added as Pharmacy Admin at {pharmacy.name}"
                         if is_admin_role
-                        else "You have been added to a pharmacy on ChemistTasker"
+                        else f"Review your invitation to join {pharmacy.name}"
                     )
 
                     transaction.on_commit(lambda: async_task(
@@ -2365,6 +2551,18 @@ class MembershipViewSet(viewsets.ModelViewSet):
                         template_name="emails/pharmacy_invite_existing_user.html",
                         context=context,
                         text_template="emails/pharmacy_invite_existing_user.txt",
+                        notification={
+                            "user_ids": [user.id],
+                            "title": f"Invitation to join {pharmacy.name}",
+                            "body": f"You have been invited as {dict(Membership.ROLE_CHOICES).get(role, role)}. Accept or reject the invitation from Manage Memberships.",
+                            "type": Notification.Type.ALERT,
+                            "action_url": membership_url,
+                            "payload": {
+                                "membership_id": membership.id,
+                                "pharmacy_id": pharmacy.id,
+                                "status": membership.status,
+                            },
+                        },
                     ))
 
 
@@ -2464,7 +2662,10 @@ class MembershipViewSet(viewsets.ModelViewSet):
                     'email': invite.get('email'),
                     'role': invite.get('role'),
                     'employment_type': invite.get('employment_type'),
-                    'status': 'invited'
+                    'status': 'invited',
+                    'membership_id': membership.id,
+                    'membership_status': membership.status,
+                    'membership_is_active': membership.is_active,
                 })
 
         response = {'results': results}
@@ -2687,6 +2888,7 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
             'otherstaff_classification_level': app.otherstaff_classification_level,
             'intern_half': app.intern_half,
             'student_year': app.student_year,
+            'activate_immediately': True,
         }
 
         membership, error = MembershipViewSet()._create_membership_invite(data, inviter=request.user)
@@ -2822,6 +3024,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
             membership_role = self.STAFF_ROLE_MEMBERSHIP_MAP.get(staff_role, "CONTACT")
             expected_user_role = required_user_role_for_membership(membership_role) or "EXPLORER"
 
+        user_created = False
         with transaction.atomic():
             if not user:
                 user = User.objects.create_user(
@@ -2832,6 +3035,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
                 )
                 user.set_unusable_password()
                 user.save(update_fields=["password"])
+                user_created = True
             elif user.role != expected_user_role:
                 return Response(
                     {
@@ -2855,16 +3059,33 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
                 defaults={
                     "role": membership_role,
                     "employment_type": "FULL_TIME",
-                    "is_active": True,
+                    "is_active": user_created,
+                    "status": Membership.Status.ACCEPTED if user_created else Membership.Status.PENDING,
                     "invited_by": request.user,
+                    "invited_name": (data.get("invited_name") or "").strip(),
                 },
             )
+            membership_update_fields = []
             if membership.role != membership_role and membership_role:
                 membership.role = membership_role
-                membership.save(update_fields=["role"])
-            if not membership.is_active:
-                membership.is_active = True
-                membership.save(update_fields=["is_active"])
+                membership_update_fields.append("role")
+            desired_membership_active = user_created
+            desired_membership_status = Membership.Status.ACCEPTED if user_created else Membership.Status.PENDING
+            if membership.is_active != desired_membership_active:
+                membership.is_active = desired_membership_active
+                membership_update_fields.append("is_active")
+            if membership.status != desired_membership_status:
+                membership.status = desired_membership_status
+                membership_update_fields.append("status")
+            invited_name = (data.get("invited_name") or "").strip()
+            if invited_name and membership.invited_name != invited_name:
+                membership.invited_name = invited_name
+                membership_update_fields.append("invited_name")
+            if membership.invited_by_id != request.user.id:
+                membership.invited_by = request.user
+                membership_update_fields.append("invited_by")
+            if membership_update_fields:
+                membership.save(update_fields=list(set(membership_update_fields + ["updated_at"])))
 
             try:
                 assignment, created = PharmacyAdmin.objects.update_or_create(
@@ -2876,7 +3097,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
                         "job_title": job_title,
                         "membership": membership,
                         "created_by": request.user,
-                        "is_active": True,
+                        "is_active": user_created,
                      },
                  )
             except DjangoValidationError as exc:
@@ -2884,6 +3105,36 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
                 raise ValidationError(detail)
 
         serializer = self.get_serializer(assignment)
+        if not user_created and membership.status == Membership.Status.PENDING:
+            membership_url = _worker_membership_url(user)
+            context = {
+                "pharmacy_name": pharmacy.name,
+                "inviter": request.user.get_full_name() or request.user.email or "A pharmacy admin",
+                "role": dict(Membership.ROLE_CHOICES).get(membership.role, membership.role),
+                "is_admin": False,
+                "membership_url": membership_url,
+                "frontend_dashboard_link": membership_url,
+            }
+            transaction.on_commit(lambda: async_task(
+                "users.tasks.send_async_email",
+                subject=f"Review your admin invitation to join {pharmacy.name}",
+                recipient_list=[user.email],
+                template_name="emails/pharmacy_invite_existing_user.html",
+                text_template="emails/pharmacy_invite_existing_user.txt",
+                context=context,
+                notification={
+                    "user_ids": [user.id],
+                    "title": f"Admin invitation to join {pharmacy.name}",
+                    "body": "You have been invited as an admin. Accept or reject the invitation from Manage Memberships.",
+                    "type": Notification.Type.ALERT,
+                    "action_url": membership_url,
+                    "payload": {
+                        "membership_id": membership.id,
+                        "pharmacy_id": pharmacy.id,
+                        "status": membership.status,
+                    },
+                },
+            ))
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
@@ -8712,6 +8963,7 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
                         'role': 'OWNER',
                         'employment_type': 'FULL_TIME',
                         'is_active': True,
+                        'status': Membership.Status.ACCEPTED,
                         'invited_by': user,
                     }
                 )
@@ -8723,9 +8975,91 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
                     if not membership.is_active:
                         membership.is_active = True
                         updated = True
+                    if membership.status != Membership.Status.ACCEPTED:
+                        membership.status = Membership.Status.ACCEPTED
+                        updated = True
                     if updated:
-                        membership.save(update_fields=['role', 'is_active'])
-        return Membership.objects.filter(user=user, is_active=True).select_related('pharmacy', 'user')
+                        membership.save(update_fields=['role', 'is_active', 'status'])
+        return (
+            Membership.objects.filter(user=user)
+            .filter(status__in=[Membership.Status.PENDING, Membership.Status.ACCEPTED])
+            .select_related('pharmacy', 'user', 'invited_by', 'pharmacy__organization')
+            .order_by('-created_at')
+        )
+
+    def _get_owned_membership(self, pk):
+        return get_object_or_404(Membership, pk=pk, user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        membership = self._get_owned_membership(pk)
+        if membership.status != Membership.Status.PENDING:
+            return Response({'detail': 'Only pending invitations can be accepted.'}, status=status.HTTP_400_BAD_REQUEST)
+        active_count = _count_active_memberships(request.user, exclude_membership_id=membership.pk)
+        if active_count >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
+            return Response(
+                {'detail': f'You already belong to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        membership.status = Membership.Status.ACCEPTED
+        membership.is_active = True
+        membership.responded_at = timezone.now()
+        membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
+        PharmacyAdmin.objects.filter(membership=membership).update(
+            is_active=True,
+            updated_at=timezone.now(),
+        )
+        transaction.on_commit(
+            lambda membership_id=membership.id: _notify_membership_response(
+                Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
+                Membership.Status.ACCEPTED,
+            )
+        )
+        return Response(self.get_serializer(membership).data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        membership = self._get_owned_membership(pk)
+        if membership.status != Membership.Status.PENDING:
+            return Response({'detail': 'Only pending invitations can be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+        membership.status = Membership.Status.REJECTED
+        membership.is_active = False
+        membership.responded_at = timezone.now()
+        membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
+        PharmacyAdmin.objects.filter(membership=membership).update(
+            is_active=False,
+            updated_at=timezone.now(),
+        )
+        transaction.on_commit(
+            lambda membership_id=membership.id: _notify_membership_response(
+                Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
+                Membership.Status.REJECTED,
+            )
+        )
+        return Response({'status': 'rejected'})
+
+    @action(detail=True, methods=['post'])
+    def quit(self, request, pk=None):
+        membership = self._get_owned_membership(pk)
+        if membership.status != Membership.Status.ACCEPTED or not membership.is_active:
+            return Response({'detail': 'Only active memberships can be quit.'}, status=status.HTTP_400_BAD_REQUEST)
+        if membership.role == 'OWNER' or getattr(getattr(membership.pharmacy, 'owner', None), 'user_id', None) == request.user.id:
+            return Response({'detail': 'Pharmacy owners cannot quit their owner membership.'}, status=status.HTTP_400_BAD_REQUEST)
+        membership.status = Membership.Status.LEFT
+        membership.is_active = False
+        membership.responded_at = timezone.now()
+        membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
+        PharmacyAdmin.objects.filter(membership=membership).update(
+            is_active=False,
+            updated_at=timezone.now(),
+        )
+        transaction.on_commit(
+            lambda membership_id=membership.id: _notify_membership_response(
+                Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
+                Membership.Status.LEFT,
+            )
+        )
+        return Response({'status': 'left'})
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer

@@ -1,7 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { fetchPharmaciesService, fetchMembershipsByPharmacy, deletePharmacy, PharmacyDTO } from '@chemisttasker/shared-core';
+import { fetchPharmaciesService, deletePharmacy, PharmacyDTO } from '@chemisttasker/shared-core';
+import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import PharmaciesListView from '@/roles/shared/pharmacies/PharmaciesListView';
 import { Snackbar } from 'react-native-paper';
 
@@ -24,7 +25,7 @@ export default function OrganizationPharmaciesScreen() {
       await Promise.all(
         normalized.map(async (p) => {
           try {
-            const memberships: any = await fetchMembershipsByPharmacy(Number(p.id));
+            const memberships: any = await fetchMembershipsForPharmacy(p.id);
             counts[p.id] = Array.isArray(memberships) ? memberships.length : 0;
           } catch {
             counts[p.id] = 0;

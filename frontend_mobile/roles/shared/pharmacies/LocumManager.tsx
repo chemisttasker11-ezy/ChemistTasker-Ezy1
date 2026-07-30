@@ -36,7 +36,7 @@ import {
     normalizeEmail,
 } from './inviteUtils';
 import { surfaceTokens } from './types';
-import MembershipApplicationsPanel from './MembershipApplicationsPanel';
+import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from './MembershipApplicationsPanel';
 
 const LOCUM_WORK_TYPES = ['LOCUM', 'SHIFT_HERO'] as const;
 
@@ -99,6 +99,17 @@ type LocumManagerProps = {
     messagingMemberId?: string | number | null;
 };
 
+const membershipStatus = (membership: MembershipDTO) =>
+    String((membership as any).status || '').toUpperCase();
+
+const membershipIsActive = (membership: MembershipDTO) =>
+    ((membership as any).is_active ?? (membership as any).isActive) !== false;
+
+const membershipIsAccepted = (membership: MembershipDTO) => {
+    const status = membershipStatus(membership);
+    return !['PENDING', 'REJECTED', 'LEFT'].includes(status) && membershipIsActive(membership);
+};
+
 export default function LocumManager({
     pharmacyId,
     memberships,
@@ -110,7 +121,7 @@ export default function LocumManager({
 }: LocumManagerProps) {
     const baseInviteUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'https://www.chemisttasker.com';
     const derivedLocums: Locum[] = useMemo(() => {
-        return (memberships || []).map((inputM: any) => {
+        return (memberships || []).filter(membershipIsAccepted).map((inputM: any) => {
             const m = inputM;
             const userDetails = m.userDetails ?? m.user_details;
             const invitedName = m.invitedName ?? m.invited_name;
@@ -806,6 +817,10 @@ export default function LocumManager({
                 defaultEmploymentType="LOCUM"
                 onApproved={onMembershipsChanged}
                 onNotification={handleApplicationsNotification}
+            />
+            <PendingDirectInvitationsPanel
+                memberships={memberships}
+                title="Pending Favourite Invitations"
             />
         </View>
     );

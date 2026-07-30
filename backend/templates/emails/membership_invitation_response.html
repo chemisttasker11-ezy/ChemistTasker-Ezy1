@@ -1,0 +1,13 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Membership {{ status_label|title }}{% endblock %}
+
+{% block content %}
+<h2>Membership {{ status_label }}</h2>
+<p>
+  <b>{{ worker_name }}</b> ({{ worker_email }}) has {{ action_phrase }}
+  <b>{{ pharmacy_name }}</b> as <b>{{ role }}</b>.
+</p>
+<a class="btn" href="{{ manage_url }}" style="display:inline-block; background:#433894; color:#ffffff !important; padding:13px 26px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px; line-height:1.2; margin:16px 0;">Manage memberships</a>
+<p>The ChemistTasker Team</p>
+{% endblock %}

@@ -1,0 +1,8 @@
+Membership {{ status_label }}
+
+{{ worker_name }} ({{ worker_email }}) has {{ action_phrase }} {{ pharmacy_name }} as {{ role }}.
+
+Manage pharmacy memberships:
+{{ manage_url }}
+
+The ChemistTasker Team

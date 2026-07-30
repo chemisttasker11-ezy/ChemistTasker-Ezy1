@@ -49,7 +49,7 @@ import {
   formatExistingUserRole,
   normalizeEmail,
 } from "./inviteUtils";
-import MembershipApplicationsPanel from "./MembershipApplicationsPanel";
+import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from "./MembershipApplicationsPanel";
 
 const LOCUM_WORK_TYPES = ["LOCUM", "SHIFT_HERO"] as const;
 
@@ -157,6 +157,17 @@ type LocumManagerProps = {
   pharmacyName?: string;
 };
 
+const membershipStatus = (membership: MembershipDTO) =>
+  String((membership as any).status || "").toUpperCase();
+
+const membershipIsActive = (membership: MembershipDTO) =>
+  ((membership as any).is_active ?? (membership as any).isActive) !== false;
+
+const membershipIsAccepted = (membership: MembershipDTO) => {
+  const status = membershipStatus(membership);
+  return !["PENDING", "REJECTED", "LEFT"].includes(status) && membershipIsActive(membership);
+};
+
 export default function LocumManager({
   pharmacyId,
   memberships,
@@ -165,7 +176,7 @@ export default function LocumManager({
   pharmacyName,
 }: LocumManagerProps) {
   const derivedLocums: Locum[] = useMemo(() => {
-    return (memberships || []).map((m) => {
+    return (memberships || []).filter(membershipIsAccepted).map((m) => {
       const fullName =
         m.invited_name ||
         m.name ||
@@ -825,6 +836,10 @@ export default function LocumManager({
         defaultEmploymentType="LOCUM"
         onApproved={onMembershipsChanged}
         onNotification={handleApplicationsNotification}
+      />
+      <PendingDirectInvitationsPanel
+        memberships={memberships}
+        title="Pending Favourite Invitations"
       />
     </Box>
   );

@@ -8,11 +8,10 @@ import type {
 } from "../sidebar/owner/types";
 import { useAdminScope } from "../../../contexts/AdminScopeContext";
 import {
-  fetchMembershipsByPharmacy,
   fetchPharmacyAdminsService,
   getPharmacyById,
-  type MembershipSummary,
 } from "@chemisttasker/shared-core";
+import { fetchMembershipsForPharmacy } from "../sidebar/owner/membershipApi";
 
 type PharmacyResponse = {
   id: number | string;
@@ -38,9 +37,11 @@ function partitionMemberships(items: MembershipDTO[]) {
   const staff: MembershipDTO[] = [];
   const locums: MembershipDTO[] = [];
   items.forEach((member) => {
+    const status = String((member as any).status || "").toUpperCase();
+    if (["REJECTED", "LEFT"].includes(status)) return;
     const role = (member.role || "").toUpperCase();
     const employment = (member.employment_type || "").toUpperCase();
-    const isAdmin = role.includes("ADMIN");
+    const isAdmin = role.includes("ADMIN") || Boolean((member as any).is_pharmacy_admin);
     const isLocum = employment.includes("LOCUM") || employment.includes("SHIFT");
     if (!isAdmin && isLocum) {
       locums.push(member);
@@ -64,28 +65,10 @@ export default function AdminManagePharmaciesPage() {
     if (!pharmacyId) return;
     setMembershipsLoading(true);
     try {
-      const [memberSummaries, adminPayload] = await Promise.all([
-        fetchMembershipsByPharmacy(Number(pharmacyId)),
+      const [mappedMembers, adminPayload] = await Promise.all([
+        fetchMembershipsForPharmacy(pharmacyId),
         fetchPharmacyAdminsService({ pharmacy: pharmacyId }),
       ]);
-      const mappedMembers: MembershipDTO[] = (memberSummaries as MembershipSummary[]).map((m) => ({
-        id: m.id,
-        pharmacy_id: m.pharmacyId ?? undefined,
-        pharmacy_name: m.pharmacyName ?? undefined,
-        role: m.role ?? undefined,
-        employment_type: m.employmentType ?? undefined,
-        invited_name: m.invitedName ?? undefined,
-        user_details: m.userDetails
-          ? {
-              email: (m.userDetails as any).email ?? undefined,
-              first_name:
-                (m.userDetails as any).first_name ?? (m.userDetails as any).firstName ?? undefined,
-              last_name:
-                (m.userDetails as any).last_name ?? (m.userDetails as any).lastName ?? undefined,
-            }
-          : undefined,
-        is_pharmacy_owner: m.isPharmacyOwner ?? false,
-      }));
       setMemberships(mappedMembers);
       setAdmins(Array.isArray(adminPayload) ? adminPayload : []);
     } catch (err) {
@@ -117,6 +100,16 @@ export default function AdminManagePharmaciesPage() {
 
   const { staff, locums } = useMemo(
     () => partitionMemberships(memberships),
+    [memberships],
+  );
+  const pendingAdminMemberships = useMemo(
+    () =>
+      memberships.filter(
+        (member) =>
+          Boolean((member as any).is_pharmacy_admin) &&
+          (String((member as any).status || "").toUpperCase() === "PENDING" ||
+            ((member as any).is_active ?? (member as any).isActive) === false)
+      ),
     [memberships],
   );
 
@@ -154,10 +147,11 @@ export default function AdminManagePharmaciesPage() {
     <Box sx={{ pb: 4 }}>
       <OwnerPharmacyDetailPage
         pharmacy={pharmacy}
-        staffMemberships={staff}
-        locumMemberships={locums}
-        adminAssignments={admins}
-        onMembershipsChanged={loadMemberships}
+          staffMemberships={staff}
+          locumMemberships={locums}
+          adminAssignments={admins}
+          pendingAdminMemberships={pendingAdminMemberships}
+          onMembershipsChanged={loadMemberships}
         membershipsLoading={membershipsLoading}
       />
     </Box>

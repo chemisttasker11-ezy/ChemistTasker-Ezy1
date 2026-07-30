@@ -12,12 +12,17 @@ import { MembershipDTO, PharmacyAdminDTO, PharmacyDTO } from "./types";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchPharmaciesService,
-  fetchMembershipsByPharmacy,
   fetchPharmacyAdminsService,
 } from "@chemisttasker/shared-core";
 import apiClient from "../../../../utils/apiClient";
+import { fetchMembershipsForPharmacy } from "./membershipApi";
 
 type View = "overview" | "pharmacies" | "pharmacy" | "billing";
+
+const membershipIsVisibleCategoryMember = (membership: MembershipDTO) => {
+  const status = String((membership as any).status || "").toUpperCase();
+  return !["REJECTED", "LEFT"].includes(status);
+};
 
 export default function OwnerOverviewContainer() {
   const navigate = useNavigate();
@@ -35,7 +40,7 @@ export default function OwnerOverviewContainer() {
   const adminBasePath = scopedPharmacyId != null ? `/dashboard/admin/${scopedPharmacyId}` : null;
 
   const fetchMemberships = useCallback(
-    async (pharmacyId: string) => fetchMembershipsByPharmacy(Number(pharmacyId)),
+    async (pharmacyId: string) => fetchMembershipsForPharmacy(pharmacyId),
     []
   );
 
@@ -275,20 +280,27 @@ export default function OwnerOverviewContainer() {
             const staffMemberships = nonOwnerMemberships.filter((m) => {
               const role = (m.role || "").toUpperCase();
               const work = (m.employment_type || "").toUpperCase();
-              return !role.includes("ADMIN") && !work.includes("LOCUM") && !work.includes("SHIFT");
+              return membershipIsVisibleCategoryMember(m) && !role.includes("ADMIN") && !work.includes("LOCUM") && !work.includes("SHIFT");
             });
             const locumMemberships = nonOwnerMemberships.filter((m) => {
               const role = (m.role || "").toUpperCase();
               const work = (m.employment_type || "").toUpperCase();
-              return !role.includes("ADMIN") && (work.includes("LOCUM") || work.includes("SHIFT"));
+              return membershipIsVisibleCategoryMember(m) && !role.includes("ADMIN") && (work.includes("LOCUM") || work.includes("SHIFT"));
             });
-            const visibleAdminList = adminList.filter((admin) => admin.admin_level !== "OWNER");
+            const pendingAdminMemberships = nonOwnerMemberships.filter(
+              (m) =>
+                Boolean((m as any).is_pharmacy_admin ?? (m as any).isPharmacyAdmin) &&
+                (String((m as any).status || "").toUpperCase() === "PENDING" ||
+                  ((m as any).is_active ?? (m as any).isActive) === false)
+            );
+            const visibleAdminList = adminList.filter((admin) => admin.admin_level !== "OWNER" && admin.is_active !== false);
             return (
               <OwnerPharmacyDetailPage
                 pharmacy={activePharmacy}
                 staffMemberships={staffMemberships}
                 locumMemberships={locumMemberships}
                 adminAssignments={visibleAdminList}
+                pendingAdminMemberships={pendingAdminMemberships}
                 onMembershipsChanged={() => reloadPharmacyMemberships(activePharmacy.id)}
               />
             );

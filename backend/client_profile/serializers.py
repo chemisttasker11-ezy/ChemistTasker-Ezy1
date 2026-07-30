@@ -3683,7 +3683,11 @@ MAX_ACTIVE_PHARMACY_MEMBERSHIPS = 3
 def _count_active_memberships(user, exclude_membership_id=None):
     if not user:
         return 0
-    qs = Membership.objects.filter(user=user, is_active=True)
+    qs = Membership.objects.filter(
+        user=user,
+        is_active=True,
+        status=Membership.Status.ACCEPTED,
+    )
     if exclude_membership_id:
         qs = qs.exclude(pk=exclude_membership_id)
     return qs.count()
@@ -3708,12 +3712,17 @@ class MembershipSerializer(serializers.ModelSerializer):
     invited_by_details = UserProfileSerializer(source='invited_by', read_only=True)
     pharmacy_detail = PharmacySerializer(source='pharmacy', read_only=True)
     is_pharmacy_owner = serializers.SerializerMethodField()
+    is_pharmacy_admin = serializers.SerializerMethodField()
+    admin_level = serializers.SerializerMethodField()
+    admin_level_label = serializers.SerializerMethodField()
+    admin_level_description = serializers.SerializerMethodField()
 
     class Meta:
         model = Membership
         fields = [
             'id', 'user', 'user_details', 'pharmacy', 'pharmacy_detail', 'invited_by', 'invited_by_details',
             'invited_name', 'role', 'employment_type', 'is_active', 'created_at', 'updated_at',
+            'status', 'responded_at',
             'job_title',
             # All classification fields are included and will be handled automatically
             'pharmacist_award_level',
@@ -3722,9 +3731,18 @@ class MembershipSerializer(serializers.ModelSerializer):
             'student_year',
             'staff_category',
             'is_pharmacy_owner',
+            'is_pharmacy_admin',
+            'admin_level',
+            'admin_level_label',
+            'admin_level_description',
         ]
         read_only_fields = [
             'invited_by', 'invited_by_details', 'created_at', 'updated_at', 'is_pharmacy_owner',
+            'is_pharmacy_admin',
+            'admin_level',
+            'admin_level_label',
+            'admin_level_description',
+            'responded_at',
         ]
 
     # No 'create' method needed. The default ModelSerializer.create() works perfectly
@@ -3864,6 +3882,47 @@ class MembershipSerializer(serializers.ModelSerializer):
         owner = getattr(obj.pharmacy, "owner", None)
         owner_user_id = getattr(owner, "user_id", None) if owner else None
         return owner_user_id == obj.user_id
+
+    def get_is_pharmacy_admin(self, obj):
+        assignment = getattr(obj, "admin_assignment", None)
+        if assignment:
+            return True
+        return PharmacyAdmin.objects.filter(
+            user=obj.user,
+            pharmacy=obj.pharmacy,
+        ).exists()
+
+    def _get_admin_assignment(self, obj):
+        assignment = getattr(obj, "admin_assignment", None)
+        if assignment:
+            return assignment
+        return PharmacyAdmin.objects.filter(
+            user=obj.user,
+            pharmacy=obj.pharmacy,
+            is_active=True,
+        ).first()
+
+    def get_admin_level(self, obj):
+        assignment = self._get_admin_assignment(obj)
+        return assignment.admin_level if assignment else None
+
+    def get_admin_level_label(self, obj):
+        assignment = self._get_admin_assignment(obj)
+        if not assignment:
+            return None
+        return dict(PharmacyAdmin.AdminLevel.choices).get(assignment.admin_level, assignment.admin_level)
+
+    def get_admin_level_description(self, obj):
+        assignment = self._get_admin_assignment(obj)
+        if not assignment:
+            return None
+        descriptions = {
+            PharmacyAdmin.AdminLevel.OWNER: "Full control. Cannot be removed.",
+            PharmacyAdmin.AdminLevel.MANAGER: "Full control except removing the owner.",
+            PharmacyAdmin.AdminLevel.ROSTER_MANAGER: "Manage roster/shifts and broadcast communications.",
+            PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER: "Communications only. Cannot manage staff or admins.",
+        }
+        return descriptions.get(assignment.admin_level)
 
     def update(self, instance, validated_data):
         """

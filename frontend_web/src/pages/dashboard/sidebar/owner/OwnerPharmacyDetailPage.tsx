@@ -88,6 +88,7 @@ interface OwnerPharmacyDetailPageProps {
   staffMemberships: MembershipDTO[];
   locumMemberships: MembershipDTO[];
   adminAssignments: PharmacyAdminDTO[];
+  pendingAdminMemberships?: MembershipDTO[];
   onMembershipsChanged: () => void;
   onEditPharmacy?: (pharmacy: PharmacyDTO) => void;
   membershipsLoading?: boolean;
@@ -102,6 +103,7 @@ export default function OwnerPharmacyDetailPage({
   staffMemberships,
   locumMemberships,
   adminAssignments,
+  pendingAdminMemberships = [],
   onMembershipsChanged,
   onEditPharmacy,
   membershipsLoading = false,
@@ -289,6 +291,7 @@ export default function OwnerPharmacyDetailPage({
         <PharmacyAdmins
           pharmacyId={pharmacy.id}
           admins={adminAssignments}
+          pendingAdminMemberships={pendingAdminMemberships}
           onAdminsChanged={onMembershipsChanged}
           loading={membershipsLoading}
         />

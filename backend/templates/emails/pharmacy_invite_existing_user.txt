@@ -1,27 +1,15 @@
-🏥👋  Welcome to the Team at {{ pharmacy_name }}!
+Invitation to join {{ pharmacy_name }}
 
 Hi {{ user_first_name|default:"there" }},
 
-{% if is_admin %}
-{{ inviter }} has added you as a Pharmacy Admin at {{ pharmacy_name }} on ChemistTasker.
+{{ inviter }} has invited you to join {{ pharmacy_name }} as a {{ role|title }} on ChemistTasker.
 
-As an admin you can:
-- Manage the roster and create/assign shifts
-- Approve or reject membership applications
-- Invite and manage team members
-- Handle leave and shift escalations
+Please review this invitation from Manage Memberships. You can accept it if you want to join the pharmacy, or reject it if this invitation was not expected.
 
-Open Admin Dashboard: {{ admin_landing_url }}
-{% else %}
-{{ inviter }} has added you as a {{ role|title }} at {{ pharmacy_name }} on ChemistTasker.
-You now have access to all community shifts at this pharmacy.
+Review invitation: {{ membership_url|default:frontend_dashboard_link }}
 
-Go to ChemistTasker: {{ frontend_dashboard_link }}
-As a member of this pharmacy, you'll get priority access to new shifts and can view all internal opportunities.
-
-{% endif %}
-
+You will not get member access to this pharmacy until you accept the invitation.
 
 If you have any questions or need assistance, our team is always happy to help.
 
-— The ChemistTasker Team 💚
+The ChemistTasker Team

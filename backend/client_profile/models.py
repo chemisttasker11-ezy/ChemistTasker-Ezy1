@@ -927,6 +927,12 @@ STUDENT_YEAR_CHOICES = [
 
 # Membership Model - Manages the user roles within each pharmacy
 class Membership(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        REJECTED = "REJECTED", "Rejected"
+        LEFT = "LEFT", "Left"
+
     ROLE_CHOICES = [
         ("PHARMACIST", "Pharmacist"),
         ("INTERN", "Intern Pharmacist"),
@@ -986,6 +992,13 @@ class Membership(models.Model):
     )
 
     is_active = models.BooleanField(default=True)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.ACCEPTED,
+        db_index=True,
+    )
+    responded_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

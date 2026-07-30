@@ -38,7 +38,7 @@ import {
     normalizeEmail,
 } from './inviteUtils';
 import { surfaceTokens } from './types';
-import MembershipApplicationsPanel from './MembershipApplicationsPanel';
+import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from './MembershipApplicationsPanel';
 import { useAuth } from '../../../context/AuthContext';
 
 const EMPLOYMENT_TYPES = ['FULL_TIME', 'PART_TIME', 'CASUAL'] as const;
@@ -110,6 +110,17 @@ type StaffManagerProps = {
     messagingMemberId?: string | number | null;
 };
 
+const membershipStatus = (membership: MembershipDTO) =>
+    String((membership as any).status || '').toUpperCase();
+
+const membershipIsActive = (membership: MembershipDTO) =>
+    ((membership as any).is_active ?? (membership as any).isActive) !== false;
+
+const membershipIsAccepted = (membership: MembershipDTO) => {
+    const status = membershipStatus(membership);
+    return !['PENDING', 'REJECTED', 'LEFT'].includes(status) && membershipIsActive(membership);
+};
+
 export default function StaffManager({
     pharmacyId,
     memberships,
@@ -132,6 +143,8 @@ export default function StaffManager({
                 // Runtime data might be camelCase, cast to any to access safely
                 const isOwner = m.isPharmacyOwner ?? m.is_pharmacy_owner;
                 if (isOwner) return false;
+                if ((m.isPharmacyAdmin ?? m.is_pharmacy_admin) === true) return false;
+                if (!membershipIsAccepted(m)) return false;
 
                 // Exclude current user
                 const uDetails = m.userDetails ?? m.user_details;
@@ -871,6 +884,10 @@ export default function StaffManager({
                 defaultEmploymentType="CASUAL"
                 onApproved={onMembershipsChanged}
                 onNotification={handleApplicationsNotification}
+            />
+            <PendingDirectInvitationsPanel
+                memberships={memberships.filter((m: any) => !(m.isPharmacyAdmin ?? m.is_pharmacy_admin))}
+                title="Pending Staff Invitations"
             />
         </View>
     );

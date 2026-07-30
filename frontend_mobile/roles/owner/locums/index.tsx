@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Surface, Text } from 'react-native-paper';
-import { fetchMembershipsByPharmacy, startDirectMessageByMembership, type MembershipDTO } from '@chemisttasker/shared-core';
+import { startDirectMessageByMembership, type MembershipDTO } from '@chemisttasker/shared-core';
+import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useRouter } from 'expo-router';
 import LocumManager from '@/roles/shared/pharmacies/LocumManager';
@@ -32,7 +33,7 @@ export default function ManageLocumsScreen() {
         setLoading(true);
         setError('');
         try {
-            const membershipData = await fetchMembershipsByPharmacy(selectedPharmacyId);
+            const membershipData = await fetchMembershipsForPharmacy(selectedPharmacyId);
             setMemberships(Array.isArray(membershipData) ? (membershipData as MembershipDTO[]) : []);
         } catch (e) {
             console.error('Failed to load locum memberships', e);

@@ -49,12 +49,25 @@ export type MembershipDTO = {
     user?: number;
     role?: string;
     employment_type?: string;
+    employmentType?: string | null;
     job_title?: string | null;
+    jobTitle?: string | null;
     invited_name?: string;
+    invitedName?: string | null;
     name?: string;
     email?: string;
     user_details?: { email?: string; first_name?: string; last_name?: string };
+    userDetails?: { email?: string; firstName?: string; lastName?: string };
+    status?: string | null;
+    is_active?: boolean;
+    isActive?: boolean;
     is_pharmacy_owner?: boolean;
+    isPharmacyOwner?: boolean;
+    is_pharmacy_admin?: boolean;
+    isPharmacyAdmin?: boolean;
+    admin_level?: string | null;
+    admin_level_label?: string | null;
+    admin_level_description?: string | null;
 };
 
 export type PharmacyAdminDTO = {
@@ -70,6 +83,7 @@ export type PharmacyAdminDTO = {
     user_details?: { email?: string; first_name?: string; last_name?: string };
     capabilities?: AdminCapability[];
     can_remove?: boolean;
+    is_active?: boolean;
 };
 
 export const ROLE_LABELS: Record<Role, string> = {

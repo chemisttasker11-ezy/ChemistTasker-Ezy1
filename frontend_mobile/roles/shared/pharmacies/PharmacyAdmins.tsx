@@ -17,6 +17,7 @@ import {
     Menu,
 } from 'react-native-paper';
 import {
+    MembershipDTO,
     PharmacyAdminDTO,
     createPharmacyAdminService,
     deletePharmacyAdminService,
@@ -28,6 +29,7 @@ import {
 } from './inviteUtils';
 import { surfaceTokens } from './types';
 import { useAuth } from '../../../context/AuthContext';
+import { PendingDirectInvitationsPanel } from './MembershipApplicationsPanel';
 
 type AdminLevel = 'MANAGER' | 'SUPERVISOR' | 'COORDINATOR';
 type AdminStaffRole = 'PHARMACIST' | 'TECHNICIAN' | 'ASSISTANT';
@@ -63,6 +65,7 @@ const DEFAULT_INVITE_FORM: InviteFormState = {
 interface PharmacyAdminsProps {
     pharmacyId: string;
     admins: PharmacyAdminDTO[];
+    pendingAdminMemberships?: MembershipDTO[];
     onAdminsChanged: () => void;
     loading?: boolean;
     pharmacyName?: string;
@@ -71,6 +74,7 @@ interface PharmacyAdminsProps {
 export default function PharmacyAdmins({
     pharmacyId,
     admins,
+    pendingAdminMemberships = [],
     onAdminsChanged,
     loading = false,
     pharmacyName,
@@ -94,7 +98,7 @@ export default function PharmacyAdmins({
 
     // Filter out OWNER level admins
     const filteredAdmins = useMemo(() => {
-        return (admins || []).filter((admin) => admin.admin_level !== 'OWNER');
+        return (admins || []).filter((admin: any) => admin.admin_level !== 'OWNER' && admin.is_active !== false);
     }, [admins]);
 
     const showSkeleton = loading && admins.length === 0;
@@ -239,6 +243,10 @@ export default function PharmacyAdmins({
                     ))
                 )}
             </ScrollView>
+            <PendingDirectInvitationsPanel
+                memberships={pendingAdminMemberships}
+                title="Pending Admin Invitations"
+            />
 
             <Portal>
                 <Modal

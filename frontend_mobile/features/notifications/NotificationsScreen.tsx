@@ -10,6 +10,7 @@ import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
   resolveHubNotificationRoute,
+  resolveMembershipNotificationRoute,
   resolveShiftNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
@@ -147,6 +148,15 @@ export default function NotificationsScreen() {
     });
     if (hubRoute) {
       router.push(hubRoute as any);
+      return;
+    }
+    const membershipRoute = resolveMembershipNotificationRoute({
+      actionUrl: item.actionUrl,
+      payload: item.payload,
+      userRole: user?.role ?? null,
+    });
+    if (membershipRoute) {
+      router.push(membershipRoute as any);
       return;
     }
   };
