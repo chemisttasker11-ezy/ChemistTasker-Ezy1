@@ -130,11 +130,21 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
   memberships.forEach((membership: any) => {
     const role = String(membership?.role ?? "").toUpperCase();
     const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
-    if (!INTERNAL_PHARMACY_ROLES.has(role) && !PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType)) return;
+    if (
+      !INTERNAL_PHARMACY_ROLES.has(role) &&
+      !PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType) &&
+      !FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType)
+    ) return;
     add(
       membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
       membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-      role === "OWNER" || role === "PHARMACY_OWNER" ? "Owner" : membership?.role
+      role === "OWNER" || role === "PHARMACY_OWNER"
+        ? "Owner"
+        : employmentType === "LOCUM"
+          ? "Locum"
+          : employmentType === "SHIFT_HERO"
+            ? "Shift Hero"
+            : membership?.role
     );
     if (Array.isArray(membership?.pharmacies)) {
       membership.pharmacies.forEach((pharmacy: any) => add(pharmacy?.id, pharmacy?.name, "Organization pharmacy"));

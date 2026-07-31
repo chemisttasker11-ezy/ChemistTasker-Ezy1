@@ -28,7 +28,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const role = String(membership?.role ?? '').toUpperCase();
       const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
       return Number.isFinite(Number(rawPharmacyId)) && (
-        INTERNAL_PHARMACY_ROLES.has(role) || PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType)
+        INTERNAL_PHARMACY_ROLES.has(role) ||
+        PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType) ||
+        employmentType === 'LOCUM' ||
+        employmentType === 'SHIFT_HERO'
       );
     });
     const adminAssignments = Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [];
