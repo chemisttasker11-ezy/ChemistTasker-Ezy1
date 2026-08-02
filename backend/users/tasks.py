@@ -115,11 +115,13 @@ def send_async_email(subject,
                     msg.attach(fname, content, mimetype)
 
         msg.attach_alternative(html_content, "text/html")
+        msg.send(fail_silently=False)
+
         if notification:
             _dispatch_notification(notification, safe_recipient_list)
-        msg.send()
 
         logger.info("Email sent successfully.")
-    except Exception as e:
-        logger.error("Failed to send email: %s", str(e))
+    except Exception:
+        logger.exception("Failed to send email.")
         traceback.print_exc()
+        raise

@@ -37,6 +37,7 @@ from client_profile.file_validation import (
 from client_profile.rewards import get_pill_balance
 
 OFFER_EXPIRY_HOURS = 48
+SHIFT_EMAIL_RECIPIENT_CAP = 50
 
 class UploadValidationMixin:
     upload_validation_map = {}
@@ -4833,9 +4834,17 @@ class ShiftSerializer(serializers.ModelSerializer):
         if not recipient_map:
             return
 
-        slot_meta = self._build_shift_email_slot_meta(shift, slots_data)
+        recipients = sorted(recipient_map.values(), key=lambda user: user.id)
+        if len(recipients) > SHIFT_EMAIL_RECIPIENT_CAP:
+            logger.warning(
+                "Shift %s posted notification recipient cap hit: sending %s of %s recipients.",
+                shift.id,
+                SHIFT_EMAIL_RECIPIENT_CAP,
+                len(recipients),
+            )
+            recipients = recipients[:SHIFT_EMAIL_RECIPIENT_CAP]
 
-        for user in recipient_map.values():
+        for user in recipients:
             ctx = build_shift_email_context(shift, user=user)
             pharmacy_display_name = self._get_pharmacy_display_name(shift, user)
             slot_meta = self._build_shift_email_slot_meta(shift, slots_data, user=user)
@@ -4918,7 +4927,12 @@ class ShiftSerializer(serializers.ModelSerializer):
             }
             for entry in slot_entries
         ]
-        for user_id, availabilities in user_availability_map.items():
+        sent_count = 0
+        skipped_by_cap = 0
+        for user_id, availabilities in sorted(user_availability_map.items()):
+            if sent_count >= SHIFT_EMAIL_RECIPIENT_CAP:
+                skipped_by_cap += 1
+                continue
             user = availabilities[0].user
             if not user or not user.email:
                 continue
@@ -4968,6 +4982,14 @@ class ShiftSerializer(serializers.ModelSerializer):
                 context=ctx,
                 text_template="emails/shift_availability_match.txt",
                 notification=notification_payload,
+            )
+            sent_count += 1
+
+        if skipped_by_cap:
+            logger.warning(
+                "Shift %s availability notification recipient cap hit: skipped at least %s matching users.",
+                shift.id,
+                skipped_by_cap,
             )
 
     def create(self, validated_data):
