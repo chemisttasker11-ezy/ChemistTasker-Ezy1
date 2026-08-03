@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Count, Q, F
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django_q.tasks import async_task
+from core.task_queue import async_task
 
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action

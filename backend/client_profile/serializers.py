@@ -14,13 +14,12 @@ from client_profile.services import expand_shift_slots
 from client_profile.admin_helpers import has_admin_capability, CAPABILITY_MANAGE_ROSTER
 from datetime import date, timedelta, datetime, time
 from django.utils import timezone
-from django_q.tasks import async_task
+from core.task_queue import async_task
 import logging
 import math
 import uuid
 logger = logging.getLogger(__name__)
 User = get_user_model()
-from django_q.models import Schedule
 from client_profile.tasks import schedule_referee_reminder
 import os
 import json
@@ -378,17 +377,6 @@ def _get_user_short_bio(user):
 
 #         if update_fields:
 #             instance.save(update_fields=list(set(update_fields)))
-
-#         def schedule_orchestrator():
-#             Schedule.objects.create(
-#                 func='client_profile.tasks.run_all_verifications',
-#                 args=f"'{instance._meta.model_name}',{instance.pk}",
-#                 kwargs={'is_create': is_create},
-#                 schedule_type=Schedule.ONCE,
-#                 next_run=timezone.now() + timedelta(minutes=1),
-#             )
-#         transaction.on_commit(schedule_orchestrator)
-
 
 class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
     """
@@ -3017,7 +3005,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
             # schedule verification task
             if instance.government_id and (gov_id_changed or type_changed or meta_changed or not instance.gov_id_verified):
-                from django_q.tasks import async_task
+                from core.task_queue import async_task
                 async_task(
                     'client_profile.tasks.verify_filefield_task',
                     instance._meta.model_name, instance.pk,

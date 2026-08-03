@@ -1,20 +1,24 @@
 from pathlib import Path
 import os
-import ssl
 import socket
 import ipaddress
 from environ import Env
 from datetime import timedelta
 import dj_database_url
 import sys
-import urllib.parse
+from celery.schedules import crontab
 
 
 
 env = Env()
-Env.read_env(Path(__file__).resolve().parent / ".env.local", overwrite=True)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+ENV_FILE = os.environ.get("DJANGO_ENV_FILE")
+if ENV_FILE:
+    Env.read_env(ENV_FILE, overwrite=False)
+elif os.environ.get("APP_ENV", "local").lower() in {"local", "dev", "development"}:
+    Env.read_env(BASE_DIR.parent / "env" / "backend.dev.env", overwrite=False)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY')
@@ -72,6 +76,10 @@ def _build_dev_origins(hosts: list[str]) -> list[str]:
         origins.add(f"exp://{host}:8081")
     return sorted(origins)
 
+
+def _clean_env_list(name: str, default: list[str] | None = None) -> list[str]:
+    return [value.strip() for value in env.list(name, default=default or []) if value.strip()]
+
 # Only send cookies when they’re on an explicitly allowed origin:
 CORS_ALLOW_CREDENTIALS = True
 
@@ -81,25 +89,13 @@ if DEBUG:
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOWED_ORIGINS = _build_dev_origins(_dev_hosts)
 else:
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5175",
-        "http://localhost:5176",
-        "http://127.0.0.1:5176",
-        "http://localhost:19006",
-        "http://127.0.0.1:19006",
-        "http://localhost:8081",
-    ]
+    CORS_ALLOWED_ORIGINS = _clean_env_list("CORS_ALLOWED_ORIGINS")
 
-CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
+CSRF_TRUSTED_ORIGINS = _clean_env_list("CSRF_TRUSTED_ORIGINS", default=CORS_ALLOWED_ORIGINS)
 
-FRONTEND_BASE_URL = "http://localhost:5173"
+FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="http://localhost:5173")
 
-BACKEND_BASE_URL = "http://127.0.0.1:8000"
+BACKEND_BASE_URL = env("BACKEND_BASE_URL", default="http://127.0.0.1:8000")
 
 ADMIN_URL = env("ADMIN_URL")
 
@@ -128,8 +124,6 @@ INSTALLED_APPS = [
     'django_otp.plugins.otp_static',
     'two_factor',
     'axes',
-    # Async tasks
-    'django_q',
 
     "users.apps.UsersConfig",
     'django.contrib.auth',
@@ -159,49 +153,61 @@ INSTALLED_APPS = [
 
 
 
-# Use a single REDIS_URL env var everywhere
+# Redis URLs are split by responsibility so production can isolate queues,
+# websocket channels, and other lightweight apps on the same Redis server.
 # Examples:
 #   Local dev: redis://127.0.0.1:6379/0
 #   Azure Cache for Redis (TLS): rediss://:<PASSWORD>@<NAME>.redis.cache.windows.net:6380/0
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
+CHANNEL_REDIS_URL = env("CHANNEL_REDIS_URL", default=REDIS_URL)
 
-# Parse the REDIS_URL to get connection details dynamically
-_redis_url = urllib.parse.urlparse(REDIS_URL)
-_redis_is_ssl = _redis_url.scheme == "rediss"
-_redis_port = _redis_url.port or (6380 if _redis_is_ssl else 6379)
-_redis_options = {
-    'host': _redis_url.hostname or '127.0.0.1',
-    'port': _redis_port,
-    'db': int(_redis_url.path.strip('/')) if _redis_url.path and _redis_url.path != '/' else 0,
-    'password': _redis_url.password,
+# Celery handles all asynchronous task execution.
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
+CELERY_TASK_DEFAULT_QUEUE = env("CELERY_TASK_DEFAULT_QUEUE", default="default")
+CELERY_WORKER_PREFETCH_MULTIPLIER = env.int("CELERY_WORKER_PREFETCH_MULTIPLIER", default=1)
+CELERY_RESULT_EXPIRES = env.int("CELERY_RESULT_EXPIRES", default=3600)
+CELERY_TASK_IGNORE_RESULT = env.bool("CELERY_TASK_IGNORE_RESULT", default=True)
+CELERY_TASK_TRACK_STARTED = env.bool("CELERY_TASK_TRACK_STARTED", default=True)
+CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
+CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
+CELERY_ACCEPT_CONTENT = _clean_env_list("CELERY_ACCEPT_CONTENT", default=["json"])
+CELERY_IMPORTS = ("client_profile.calendar_tasks",)
+EMAIL_TASK_RATE_LIMIT = env("EMAIL_TASK_RATE_LIMIT", default="30/m")
+CELERY_TASK_ROUTES = {
+    "users.tasks.send_email_task": {"queue": "email"},
+    "client_profile.tasks.run_all_verifications": {"queue": "default"},
+    "client_profile.tasks.final_evaluation": {"queue": "default"},
+    "client_profile.tasks.send_shift_reminders": {"queue": "notifications"},
+    "client_profile.tasks.run_referee_reminder": {"queue": "notifications"},
+    "client_profile.tasks.email_membership_application_submitted": {"queue": "notifications"},
+    "client_profile.tasks.email_membership_application_approved": {"queue": "notifications"},
+    "client_profile.notifications.*": {"queue": "notifications"},
+    "client_profile.tasks.verify_*": {"queue": "ocr"},
+    "billing.tasks.*": {"queue": "billing"},
 }
-if _redis_is_ssl:
-    _redis_options.update({
-        'ssl': True,
-        'ssl_cert_reqs': {
-            "none": ssl.CERT_NONE,
-            "optional": ssl.CERT_OPTIONAL,
-            "required": ssl.CERT_REQUIRED,
-        }.get(env("REDIS_SSL_CERT_REQS", default="required").strip().lower(), ssl.CERT_REQUIRED),
-    })
-    redis_ssl_ca_certs = env("REDIS_SSL_CA_CERTS", default="").strip()
-    if redis_ssl_ca_certs:
-        _redis_options['ssl_ca_certs'] = redis_ssl_ca_certs
-
-Q_CLUSTER = {
-    'name': 'DjangoQ',
-    'workers': env.int("Q_WORKERS", default=1),
-    'timeout': 300,
-    'retry': 400,
-    'queue_limit': env.int("Q_QUEUE_LIMIT", default=50),
-    'bulk': env.int("Q_BULK", default=1),
-    'guard_cycle': float(env("Q_GUARD_CYCLE", default="2")),
-    'save_limit': env.int("Q_SAVE_LIMIT", default=50),
-    'catch_up': env.bool("Q_CATCH_UP", default=False),
-    'broker_class': 'core.q_broker.LowCommandRedis',
-    'redis': _redis_options,
+CELERY_BEAT_SCHEDULE = {
+    "calendar-birthdays-daily": {
+        "task": "client_profile.calendar_tasks.generate_all_birthday_events",
+        "schedule": crontab(hour=0, minute=15),
+        "options": {"queue": "notifications"},
+    },
+    "calendar-work-notes-hourly": {
+        "task": "client_profile.calendar_tasks.send_shift_start_work_note_notifications",
+        "schedule": crontab(minute=5),
+        "options": {"queue": "notifications"},
+    },
+    "calendar-work-notes-9am-fallback": {
+        "task": "client_profile.calendar_tasks.send_9am_work_note_fallback",
+        "schedule": crontab(minute=10),
+        "options": {"queue": "notifications"},
+    },
+    "shift-reminders-hourly": {
+        "task": "client_profile.tasks.send_shift_reminders",
+        "schedule": crontab(minute=15),
+        "options": {"queue": "notifications"},
+    },
 }
-Q_REDIS_BLPOP_TIMEOUT = env.int("Q_REDIS_BLPOP_TIMEOUT", default=5)
 
 
 MIDDLEWARE = [
@@ -298,13 +304,13 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-AZURE_DB_URL = env("AZURE_POSTGRESQL_CONNECTIONSTRING", default="")
-USE_AZURE_DB = env.bool("USE_AZURE_DB", default=False)
+PROD_DB = env("PROD_DB", default=env("DATABASE_URL", default=""))
+USE_PROD_DB = env.bool("USE_PROD_DB", default=bool(PROD_DB))
 
-if USE_AZURE_DB and AZURE_DB_URL:
+if USE_PROD_DB and PROD_DB:
     DATABASES = {
         "default": dj_database_url.parse(
-            AZURE_DB_URL,
+            PROD_DB,
             conn_max_age=600,
             ssl_require=True,
         )
@@ -423,6 +429,38 @@ CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+_azure_storage_required = [
+    env("AZURE_ACCOUNT_NAME", default="").strip(),
+    env("AZURE_ACCOUNT_KEY", default="").strip(),
+    env("AZURE_CONTAINER", default="").strip(),
+]
+USE_AZURE_STORAGE = env.bool(
+    "USE_AZURE_STORAGE",
+    default=not DEBUG and all(_azure_storage_required),
+)
+
+if USE_AZURE_STORAGE:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.azure_storage.AzureStorage",
+            "OPTIONS": {
+                "account_name": env("AZURE_ACCOUNT_NAME"),
+                "account_key": env("AZURE_ACCOUNT_KEY"),
+                "azure_container": env("AZURE_CONTAINER"),
+                "azure_ssl": True,
+                "overwrite_files": False,
+                "expiration_secs": env.int("AZURE_STORAGE_EXPIRATION_SECS", default=3600),
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        },
+    }
+    MEDIA_URL = (
+        f"https://{env('AZURE_ACCOUNT_NAME')}"
+        f".blob.core.windows.net/{env('AZURE_CONTAINER')}/"
+    )
+
 
 
 LOGGING = {
@@ -450,11 +488,6 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django_q': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
@@ -534,7 +567,7 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             # channels_redis accepts URLs with redis:// or rediss:// (TLS)
-            "hosts": [REDIS_URL],
+            "hosts": [CHANNEL_REDIS_URL],
             # Increase TTLs so room membership doesn’t expire while users sit in a chat
             "capacity": 100,
             "channel_capacity": {"*": 50},

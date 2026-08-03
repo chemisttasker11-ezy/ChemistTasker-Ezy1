@@ -8,17 +8,16 @@ from .admin_site import otp_admin_site
 from two_factor.urls import urlpatterns as two_factor_urlpatterns
 from .two_factor_views import AdminAwareLoginView
 from django.http import JsonResponse
-from django_q.status import Stat
+from django.db import connection
 
 def health_check(request):
     try:
-        stat = Stat.get_all()
-        if stat and any(cluster.get('status') == 'running' for cluster in stat.values()):
-            return JsonResponse({'status': 'healthy', 'worker': 'running'})
-        else:
-            return JsonResponse({'status': 'unhealthy', 'worker': 'not running'}, status=503)
-    except Exception:
-        return JsonResponse({'status': 'error'}, status=500)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        return JsonResponse({'status': 'healthy'})
+    except Exception as exc:
+        return JsonResponse({'status': 'error', 'detail': str(exc)}, status=500)
 
 two_factor_patterns, two_factor_app_name = two_factor_urlpatterns
 two_factor_patterns = list(two_factor_patterns)

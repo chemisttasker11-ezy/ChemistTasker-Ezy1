@@ -5,7 +5,6 @@ import tempfile
 import shutil
 from pathlib import Path
 from datetime import timedelta, datetime
-from django_q.models import Schedule
 from urllib.parse import urlencode
 from django.apps import apps
 from django.conf import settings
@@ -14,9 +13,11 @@ from django.db.models import Q
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.storage import default_storage
-from django_q.tasks import async_task
+from celery import shared_task
+from core.task_queue import async_task
 import time
 import requests
+import redis
 import dateutil.parser
 from bs4 import BeautifulSoup
 from scrapingbee import ScrapingBeeClient
@@ -40,13 +41,13 @@ User = get_user_model()
 
 # ==== ENV SETUP ====
 BASE_DIR = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parent.parent))
-ENV_PATH = BASE_DIR / "core" / ".env"
+ENV_PATH = BASE_DIR.parent / "env" / "backend.dev.env"
 env = Env()
-if ENV_PATH.exists():
+if os.environ.get("APP_ENV", "local").lower() in {"local", "dev", "development"} and ENV_PATH.exists():
     env.read_env(str(ENV_PATH))
     logger.info(f"[ENV] Loaded environment variables from {ENV_PATH}")
 else:
-    logger.info(f"[ENV] No .env file at {ENV_PATH}, using system environment.")
+    logger.info("[ENV] Using system environment.")
 
 # ==== OUTPUTS DIRECTORY ====
 OUTPUT_DIR = BASE_DIR / "verification_outputs"
@@ -152,6 +153,7 @@ def azure_ocr(file_path):
     logger.info(f"[azure_ocr] OCR done for {file_path}, found {len(lines)} lines.")
     return {"lines": lines}
 
+@shared_task(name="client_profile.tasks.verify_filefield_task", queue="ocr")
 def verify_filefield_task(
     model_name,
     object_pk,
@@ -330,6 +332,7 @@ def _parse_abn_html_fields(html_text: str) -> dict:
 
     return out
 
+@shared_task(name="client_profile.tasks.verify_abn_task", queue="ocr")
 def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, email, **kwargs):
     """
     Scrape ABR page and populate ABR fields. DOES NOT set abn_verified=True –
@@ -494,6 +497,7 @@ def parse_ahpra_html(html_file_path):
         "expiry_date": expiry_date
     }
 
+@shared_task(name="client_profile.tasks.verify_ahpra_task", queue="ocr")
 def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name, email, **kwargs):
     full_ahpra_number = f"PHA000{ahpra_number}"
     logger.info(f"[AHPRA TASK] Constructed full AHPRA number for lookup: {full_ahpra_number}")
@@ -603,6 +607,7 @@ def _update_ahpra_fields(model_name, object_pk, verified, note, reg_type=None, r
 
 
 # --- ORCHESTRATOR AND FINAL EVALUATOR ---
+@shared_task(name="client_profile.tasks.run_all_verifications", queue="default")
 def run_all_verifications(model_name, object_pk, is_create=False):
     """
     MODIFIED: This orchestrator now also sends the initial admin notification.
@@ -714,6 +719,7 @@ def mark_notification_sent(obj, notif_type):
         notification_type=notif_type
     )
 
+@shared_task(name="client_profile.tasks.final_evaluation", queue="default")
 def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     """
     REVISED: This task now correctly handles all states and cleans up scheduled tasks.
@@ -721,10 +727,9 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     from django.apps import apps
     from django.utils import timezone
     from datetime import timedelta
-    from django_q.models import Schedule
     from client_profile.utils import get_frontend_dashboard_url, send_referee_emails
     from django.contrib.contenttypes.models import ContentType
-    from django_q.tasks import async_task
+    from core.task_queue import async_task
     import logging
 
     logger = logging.getLogger("client_profile.tasks")
@@ -736,11 +741,15 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         logger.error(f"[FINAL EVALUATION] ERROR: No object for pk={object_pk}")
         return
 
+    reminder_key = _final_evaluation_reminder_key(model_name, object_pk)
+    if is_reminder:
+        if not _marker_get(reminder_key):
+            logger.info(f"[FINAL EVALUATION] Skipping cancelled reminder for pk={object_pk}.")
+            return
+        _marker_delete(reminder_key)
+
     def cancel_pending_reminders():
-        Schedule.objects.filter(
-            func='client_profile.tasks.final_evaluation',
-            args=f"'{model_name}',{object_pk}"
-        ).delete()
+        _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
     # Keep your retry guard
@@ -839,11 +848,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
 
     # Helper: do we already have a future reminder scheduled for this profile?
     def _has_future_reminder(model_name, object_pk):
-        return Schedule.objects.filter(
-            func='client_profile.tasks.final_evaluation',
-            args=f"'{model_name}',{object_pk}",
-            next_run__gt=timezone.now()
-        ).exists()
+        return _marker_get(_final_evaluation_reminder_key(model_name, object_pk))
 
     # Debug timing: 0.1h (~6 min). Use 48 for production.
     REMINDER_DELAY = timedelta(hours=48)
@@ -863,12 +868,15 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         # IMPORTANT: Do NOT cancel here; only cancel in final states.
         # Ensure exactly ONE future reminder exists
         if not _has_future_reminder(model_name, object_pk):
-            Schedule.objects.create(
-                func='client_profile.tasks.final_evaluation',
-                args=f"'{model_name}',{object_pk}",
+            _marker_set(
+                _final_evaluation_reminder_key(model_name, object_pk),
+                timeout=int(REMINDER_DELAY.total_seconds()) + 3600,
+            )
+            final_evaluation.apply_async(
+                args=(model_name, object_pk),
                 kwargs={'is_reminder': True},
-                schedule_type=Schedule.ONCE,
-                next_run=timezone.now() + REMINDER_DELAY,
+                eta=timezone.now() + REMINDER_DELAY,
+                queue="default",
             )
             logger.info(f"[FINAL EVALUATION] Scheduled next referee check for pk={object_pk} at {(timezone.now() + REMINDER_DELAY).isoformat()}.")
         else:
@@ -876,22 +884,20 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
 
         # If other automated checks are also pending, keep the quick re-check loop alive (properly delayed)
         if is_pending_check:
-            Schedule.objects.create(
-                func='client_profile.tasks.final_evaluation',
-                args=f"'{model_name}',{object_pk}",
-                schedule_type=Schedule.ONCE,
-                next_run=timezone.now() + RECHECK_DELAY,
+            final_evaluation.apply_async(
+                args=(model_name, object_pk),
+                eta=timezone.now() + RECHECK_DELAY,
+                queue="default",
             )
         return
 
     # Automated checks still pending (no referee pending) -> keep quick loop
     if is_pending_check:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} is waiting for automated tasks. Re-checking in 20s.")
-        Schedule.objects.create(
-            func='client_profile.tasks.final_evaluation',
-            args=f"'{model_name}',{object_pk}",
-            schedule_type=Schedule.ONCE,
-            next_run=timezone.now() + RECHECK_DELAY,
+        final_evaluation.apply_async(
+            args=(model_name, object_pk),
+            eta=timezone.now() + RECHECK_DELAY,
+            queue="default",
         )
         return
 
@@ -926,6 +932,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
 
 # ========== Shift Reminder (Scheduled) ==========
 
+@shared_task(name="client_profile.tasks.send_shift_reminders", queue="notifications")
 def send_shift_reminders():
     now_utc = timezone.now()
     today_utc = now_utc.date()
@@ -997,49 +1004,87 @@ def send_shift_reminders():
 # ========== Referee Reminder (Scheduled) ==========
 REFEREE_REMINDER_HOURS: float = float(getattr(settings, "REFEREE_REMINDER_HOURS", 48))
 
-# The function path Django-Q will call
 REMINDER_FUNC = 'client_profile.tasks.run_referee_reminder'
 
 
 def _rem_args(model_name: str, pk: int, ref_idx: int) -> str:
-    # Keep a stable args string for Django-Q to de-duplicate
     return f"'{model_name}',{pk},{ref_idx}"
+
+
+def _referee_reminder_key(model_name: str, pk: int, ref_idx: int) -> str:
+    return f"celery:referee-reminder:{model_name}:{pk}:{ref_idx}"
+
+
+def _final_evaluation_reminder_key(model_name: str, pk: int) -> str:
+    return f"celery:final-evaluation-reminder:{model_name}:{pk}"
+
+
+def _reminder_redis():
+    return redis.from_url(getattr(settings, "CELERY_BROKER_URL", getattr(settings, "REDIS_URL", "redis://127.0.0.1:6379/0")))
+
+
+def _marker_get(key: str) -> bool:
+    try:
+        return bool(_reminder_redis().get(key))
+    except Exception:
+        logger.exception("[reminder-marker] Failed to read marker %s", key)
+        return False
+
+
+def _marker_set(key: str, timeout: int, *, nx: bool = False) -> bool:
+    try:
+        return bool(_reminder_redis().set(key, "1", ex=timeout, nx=nx))
+    except Exception:
+        logger.exception("[reminder-marker] Failed to set marker %s", key)
+        raise
+
+
+def _marker_delete(key: str) -> int:
+    try:
+        return int(_reminder_redis().delete(key) or 0)
+    except Exception:
+        logger.exception("[reminder-marker] Failed to delete marker %s", key)
+        return 0
 
 
 def schedule_referee_reminder(model_name: str, pk: int, ref_idx: int, hours: float | None = None) -> None:
     """
-    Create a ONE-OFF schedule for a single referee.
+    Create a ONE-OFF Celery ETA task for a single referee.
     To test, pass hours=0.1 etc.
     """
-    args = _rem_args(model_name, pk, ref_idx)
-    if Schedule.objects.filter(func=REMINDER_FUNC, args=args, next_run__gt=timezone.now()).exists():
-        return
     delay = REFEREE_REMINDER_HOURS if hours is None else float(hours)
-    Schedule.objects.create(
-        func=REMINDER_FUNC,
-        args=args,
-        schedule_type=Schedule.ONCE,
-        next_run=timezone.now() + timedelta(hours=delay),
-        name=f"referee-reminder-{model_name}-{pk}-{ref_idx}",
+    delay_seconds = max(1, int(delay * 3600))
+    key = _referee_reminder_key(model_name, pk, ref_idx)
+    if not _marker_set(key, timeout=delay_seconds + 3600, nx=True):
+        return
+    run_referee_reminder.apply_async(
+        args=(model_name, pk, ref_idx),
+        eta=timezone.now() + timedelta(hours=delay),
+        queue="notifications",
     )
 
 
 def cancel_referee_reminder(model_name: str, pk: int, ref_idx: int) -> int:
-    args = _rem_args(model_name, pk, ref_idx)
-    return Schedule.objects.filter(func=REMINDER_FUNC, args=args).delete()[0]
+    return _marker_delete(_referee_reminder_key(model_name, pk, ref_idx))
 
 
 def cancel_all_referee_reminders(model_name: str, pk: int) -> int:
-    # Only used if you want to wipe all reminders for a profile (e.g., both confirmed)
-    prefix = f"'{model_name}',{pk},"
-    return Schedule.objects.filter(func=REMINDER_FUNC, args__startswith=prefix).delete()[0]
+    deleted = 0
+    for ref_idx in (1, 2):
+        deleted += cancel_referee_reminder(model_name, pk, ref_idx)
+    return deleted
 
+@shared_task(name="client_profile.tasks.run_referee_reminder", queue="notifications")
 def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     """
     Runs for ONE referee (ref_idx). If that referee is confirmed/rejected now,
     cancel and stop. Otherwise send reminder to that referee only
     and re-schedule only that referee.
     """
+    key = _referee_reminder_key(model_name, pk, ref_idx)
+    if not _marker_get(key):
+        return
+
     Model = apps.get_model('client_profile', model_name)
     obj = Model.objects.get(pk=pk)
 
@@ -1091,6 +1136,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     )
 
     # Re-schedule this referee only (keep your dev interval)
+    _marker_delete(key)
     schedule_referee_reminder(model_name, pk, ref_idx)
 
 
@@ -1124,6 +1170,7 @@ def _manage_detail_url_for_role(recipient_role: str, pharmacy_id: int | str) -> 
     return f"{base_path}?view=detail&pharmacyId={pharmacy_id}"
 
 
+@shared_task(name="client_profile.tasks.email_membership_application_submitted", queue="notifications")
 def email_membership_application_submitted(app_id: int):
     """
     Notify the pharmacy Owner, Pharmacy Admins, and Organization Admins
@@ -1220,6 +1267,7 @@ def email_membership_application_submitted(app_id: int):
         )
 
 
+@shared_task(name="client_profile.tasks.email_membership_application_approved", queue="notifications")
 def email_membership_application_approved(app_id: int):
     """
     Notify the applicant that their application was approved.

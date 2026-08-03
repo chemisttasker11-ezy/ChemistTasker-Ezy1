@@ -1,8 +1,8 @@
 # core/asgi.py
 import os
 
-# 1) Set the settings module first (default to the production module)
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.deployment")
+# 1) Set the settings module first. Production is env-driven from core.settings.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 
 # 2) Initialize Django before importing anything that uses Django
 import django

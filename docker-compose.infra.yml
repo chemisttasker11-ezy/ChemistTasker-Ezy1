@@ -1,0 +1,55 @@
+services:
+  shared_redis:
+    image: redis:8-alpine
+    container_name: shared_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - shared_backend_network
+    volumes:
+      - shared_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  shared_nginx:
+    image: nginx:1.27-alpine
+    container_name: shared_nginx
+    restart: unless-stopped
+    environment:
+      DOMAIN: "${DOMAIN:-chemisttasker.com.au}"
+      BACKEND_ADMIN_PATH: "${BACKEND_ADMIN_PATH:-admin/}"
+      NGINX_CLIENT_MAX_BODY_SIZE: "${NGINX_CLIENT_MAX_BODY_SIZE:-25m}"
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - shared_backend_network
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: shared_certbot
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done"]
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+
+volumes:
+  shared_redis_data:
+
+networks:
+  shared_backend_network:
+    name: shared_backend_network
+    driver: bridge

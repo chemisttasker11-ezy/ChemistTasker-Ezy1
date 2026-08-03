@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 
+from celery import shared_task
 from django.apps import apps
 from django.db.models import Q
 from django.utils import timezone
@@ -104,6 +105,7 @@ def _get_dob_for_membership(membership: Membership) -> date | None:
     return None
 
 
+@shared_task(name="client_profile.calendar_tasks.generate_all_birthday_events", queue="notifications")
 def generate_all_birthday_events():
     """
     Daily scheduled task to generate birthday events for all pharmacies.
@@ -186,6 +188,7 @@ def _send_work_note_notifications(*, user_ids, note, pharmacy_id: int, target_da
     return sent
 
 
+@shared_task(name="client_profile.calendar_tasks.send_shift_start_work_note_notifications", queue="notifications")
 def send_shift_start_work_note_notifications():
     """
     Hourly scheduled task to send work note notifications when shifts start.
@@ -281,6 +284,7 @@ def send_shift_start_work_note_notifications():
     return notifications_sent
 
 
+@shared_task(name="client_profile.calendar_tasks.send_9am_work_note_fallback", queue="notifications")
 def send_9am_work_note_fallback():
     """
     9 AM (pharmacy local) scheduled task as fallback for work note notifications.

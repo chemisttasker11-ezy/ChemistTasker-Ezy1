@@ -55,10 +55,9 @@ class Http400(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = 'Bad Request.'
     default_code = 'bad_request'
-from django_q.tasks import async_task
+from core.task_queue import async_task
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
-from django_q.models import Schedule
 from django.core.signing import TimestampSigner, BadSignature
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps

@@ -15,6 +15,7 @@ openapi.yaml
 # dotenv files
 .env
 .env.production
+env/
 
 # Django media/static
 backend/media/
@@ -41,6 +42,9 @@ frontend_web/.env
 frontend_web/.env.production
 frontend_web_old/.env
 frontend_web_old/.env.production
+frontend_mobile/.env
+frontend_mobile/.env.local
+frontend_mobile/.env.production
 
 # ─── Miscellaneous ─────────────────────────────────────────────────
 # OS and editor

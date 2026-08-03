@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:5173": "vite --port 5173",
-    "dev:5174": "vite --port 5174",
-    "dev:5175": "vite --port 5175",
-    "dev:5176": "vite --port 5176",
-    "build": "vite build",
+    "dev": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite",
+    "dev:5173": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5173",
+    "dev:5174": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5174",
+    "dev:5175": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5175",
+    "dev:5176": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5176",
+    "build": "node ../scripts/run-with-env.mjs ../env/web.prod.env vite build",
     "validate:staticwebapp-config": "node -e \"JSON.parse(require('fs').readFileSync('public/staticwebapp.config.json','utf8')); console.log('staticwebapp.config.json is valid JSON')\""
   },
   "dependencies": {

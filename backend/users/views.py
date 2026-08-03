@@ -24,7 +24,7 @@ from .org_roles import (
     membership_capabilities,
 )
 from django.conf import settings
-from django_q.tasks import async_task
+from core.task_queue import async_task
 from rest_framework.views import APIView
 from users.tasks import send_async_email
 from users.utils import get_frontend_onboarding_url, get_frontend_owner_pharmacies_url, build_org_invite_context

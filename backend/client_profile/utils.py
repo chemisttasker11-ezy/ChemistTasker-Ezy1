@@ -3,7 +3,7 @@ import re
 from datetime import datetime, date, time
 from decimal import Decimal
 from django.contrib.auth import get_user_model
-from django_q.tasks import async_task
+from core.task_queue import async_task
 import difflib
 from django.utils import timezone
 from django.core.signing import TimestampSigner
