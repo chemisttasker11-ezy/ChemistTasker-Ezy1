@@ -16,6 +16,8 @@ openapi.yaml
 .env
 .env.production
 env/
+VPS_Setup_Runbook.md
+Docker_Redis_Celery_VPS_Workflow.md
 
 # Django media/static
 backend/media/
