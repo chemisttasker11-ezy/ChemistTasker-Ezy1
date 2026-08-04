@@ -42,12 +42,10 @@ services:
     container_name: shared_certbot
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done"]
-    ports:
-      - "80:80"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-      
+
 volumes:
   shared_redis_data:
 
