@@ -120,15 +120,13 @@ services:
       CELERY_RESULT_BACKEND: "redis://shared_redis:6379/3"
       LOG_LEVEL: "INFO"
       CELERY_LOG_LEVEL: "INFO"
-    command: ["celery", "-A", "core", "beat", "-l", "INFO", "--schedule", "/app/celerybeat/celerybeat-schedule"]
+    command: ["celery", "-A", "core", "beat", "-l", "INFO", "--schedule", "/tmp/celerybeat-schedule"]
     depends_on:
       web:
         condition: service_started
     networks:
       - chemisttasker_network
       - shared_backend_network
-    volumes:
-      - celerybeat_data:/app/celerybeat
 
   frontend:
     build:
@@ -148,7 +146,6 @@ services:
 
 volumes:
   static_volume:
-  celerybeat_data:
 
 networks:
   chemisttasker_network:
