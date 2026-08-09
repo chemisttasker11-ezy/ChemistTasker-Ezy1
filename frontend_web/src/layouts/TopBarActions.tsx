@@ -1173,10 +1173,6 @@ export default function TopBarActions({
     };
   }, [user, refreshUnreadCount]);
 
-  const handleOpenNotifications = (event: React.MouseEvent<HTMLElement>) => {
-    setNotificationAnchor(event.currentTarget);
-  };
-
   const markAllNotifications = React.useCallback(async () => {
     const unreadIds = notifications.filter((item) => !item.readAt).map((item) => item.id);
     if (!unreadIds.length) {
@@ -1194,12 +1190,16 @@ export default function TopBarActions({
     }
   }, [notifications]);
 
-  const handleCloseNotifications = React.useCallback(() => {
-    setNotificationAnchor(null);
+  const handleOpenNotifications = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchor(event.currentTarget);
     if (anyUnreadNotifications) {
       void markAllNotifications();
     }
-  }, [anyUnreadNotifications, markAllNotifications]);
+  };
+
+  const handleCloseNotifications = React.useCallback(() => {
+    setNotificationAnchor(null);
+  }, []);
 
   const handleOpenMessages = (event: React.MouseEvent<HTMLElement>) => {
     setMessageAnchor(event.currentTarget);
