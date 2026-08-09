@@ -484,7 +484,7 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save()
         otp_subject = "Your ChemistTasker Verification Code"
-        otp_context = {"otp": getattr(user, "_plain_email_otp", ""), "user": user}
+        otp_context = {"otp": getattr(user, "_plain_email_otp", "")}
         send_async_email(
             subject=otp_subject,
             recipient_list=[user.email],
@@ -631,7 +631,7 @@ class ResendOTPView(APIView):
             _reset_email_otp_security_state(user)
             user.save()
 
-            context = {"otp": otp, "user": user}
+            context = {"otp": otp}
             send_async_email(
                 subject="Your ChemistTasker Verification Code",
                 recipient_list=[user.email],
@@ -1143,7 +1143,10 @@ class PasswordResetRequestAPIView(APIView):
                 subject="Reset your password",
                 recipient_list=[user.email],
                 template_name="emails/password_reset_email.html",
-                context={'reset_url': reset_url, 'user': user},
+                context={
+                    'reset_url': reset_url,
+                    'first_name': user.first_name,
+                },
                 text_template="emails/password_reset_email.txt",
             )
         # Always succeed (do not reveal which emails are registered)

@@ -10,7 +10,7 @@ Pills can be used toward eligible owner actions in ChemistTasker, including payi
 View pill activity:
 {{ pills_url }}
 
-Reward: {{ rule_name }}{% if shift %}
-Related shift: #{{ shift.id }}{% endif %}
+Reward: {{ rule_name }}{% if shift_id %}
+Related shift: #{{ shift_id }}{% endif %}
 
 The ChemistTasker Team

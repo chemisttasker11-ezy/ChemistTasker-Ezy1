@@ -249,7 +249,7 @@ def _send_pill_award_message(*, event: PillReferralEvent, ledger: PillLedgerEntr
                 "balance_after": ledger.balance_after,
                 "reward_label": reward_label,
                 "rule_name": rule.name,
-                "shift": event.shift,
+                "shift_id": event.shift_id,
                 "pills_url": pills_url,
             },
         )
