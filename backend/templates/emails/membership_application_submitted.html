@@ -3,46 +3,50 @@
 {% block title %}New Membership Application{% endblock %}
 
 {% block content %}
-<div class="wave">📬</div>
-    <h2 style="margin: 8px 0 0">New membership application received</h2>
-    <div class="subtitle">Pharmacy: <strong>{{ pharmacy_name }}</strong></div>
+    <div class="wave">New</div>
+    <h2 style="margin:8px 0 0;">New membership application received</h2>
+    <div class="subtitle" style="margin:0 0 18px; color:#475569;">
+      Pharmacy: <strong>{{ pharmacy_name }}</strong>
+    </div>
 
     <div class="card">
-      <div class="row">
-        <span class="label">Applicant</span>
-        <div class="value">{{ applicant_full_name }}</div>
-      </div>
-      <div class="row">
-        <span class="label">Role</span>
-        <div class="value">{{ role|title }}</div>
-      </div>
-      <div class="row">
-        <span class="label">Category</span>
-        <div class="value">{{ category }}</div>
-      </div>
-      <div class="row">
-        <span class="label">Submitted</span>
-        <div class="value">{{ submitted_at }}</div>
-      </div>
-      <div class="row">
-        <span class="label">Mobile</span>
-        <div class="value">{% if mobile_number %}{{ mobile_number }}{% else %}—{% endif %}</div>
-      </div>
-      <div class="row">
-        <span class="label">Email</span>
-        <div class="value">{% if email %}{{ email }}{% else %}—{% endif %}</div>
-      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Applicant:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ applicant_full_name }}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Role:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ role|title }}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Category:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ category }}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Submitted:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ submitted_at }}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Mobile:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{% if mobile_number %}{{ mobile_number }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Email:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top; word-break:break-word;">{% if email %}{{ email }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+      </table>
     </div>
 
     <a href="{{ manage_url }}" class="btn">Review application</a>
 
-    <div class="muted">
+    <div class="muted" style="color:#64748b; margin-top:8px;">
       Tip: You can approve as Full-time / Part-time / Casual for Pharmacy staff,
       or Locum / Shift Hero for Favorite staff.
     </div>
 
-    <div class="footer">
-      If you didn’t expect this email, you can safely ignore it.<br />
-      — The ChemistTasker Team 💚
+    <div class="footer" style="color:#64748b; margin-top:18px; font-size:13px;">
+      If you did not expect this email, you can safely ignore it.<br />
+      The ChemistTasker Team
     </div>
 {% endblock %}

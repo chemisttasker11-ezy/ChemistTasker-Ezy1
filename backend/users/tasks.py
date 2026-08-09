@@ -5,6 +5,7 @@ from email.mime.image import MIMEImage
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 
 logger = logging.getLogger(__name__)
@@ -53,8 +54,53 @@ def _dispatch_notification(notification_payload, recipients, subject):
             action_url=notification_payload.get("action_url"),
             payload=notification_payload.get("payload") or {},
         )
+        logger.info(
+            "Dispatched in-app notification for %s user(s): %s",
+            len(user_ids),
+            notification_payload.get("title") or subject,
+        )
     except Exception:
         logger.exception("Failed to dispatch in-app notification for email.")
+
+
+def _dispatch_notification_before_queue(kwargs):
+    notification = kwargs.pop("notification", None)
+    suppress_auto_notification = kwargs.pop("suppress_auto_notification", False)
+    recipients = list(kwargs.get("recipient_list") or [])
+    subject = kwargs.get("subject") or ""
+    if not notification and not suppress_auto_notification:
+        context = kwargs.get("context") or {}
+        if isinstance(context, dict):
+            action_url = (
+                context.get("action_url")
+                or context.get("shift_link")
+                or context.get("manage_url")
+                or context.get("dashboard_url")
+                or context.get("login_url")
+                or context.get("accept_url")
+                or context.get("reset_url")
+                or context.get("invite_url")
+                or context.get("invitation_url")
+                or context.get("verification_url")
+                or context.get("profile_url")
+                or context.get("roster_url")
+                or context.get("url")
+                or context.get("link")
+            )
+        else:
+            action_url = None
+        action_url = action_url or "/dashboard"
+        notification = {
+            "title": subject,
+            "body": "",
+            "action_url": action_url,
+            "payload": {
+                "notification_kind": "email_notification",
+                "template_name": kwargs.get("template_name") or "",
+            },
+        }
+    if notification:
+        transaction.on_commit(lambda: _dispatch_notification(notification, recipients, subject))
 
 
 def send_email_now(
@@ -143,6 +189,7 @@ def send_email_task(self, *args, **kwargs):
 
 
 def queue_email(*args, **kwargs):
+    _dispatch_notification_before_queue(kwargs)
     return send_email_task.apply_async(args=args, kwargs=kwargs, queue="email")
 
 

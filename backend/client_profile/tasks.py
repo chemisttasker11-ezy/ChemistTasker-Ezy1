@@ -1158,16 +1158,16 @@ def _manage_path_for_role(recipient_role: str) -> str:
     - Org Admin uses the Organization dashboard area
     """
     if recipient_role in ("OWNER", "PHARMACY_ADMIN"):
-        return "/dashboard/owner/manage-pharmacies/my-pharmacies"
+        return "/dashboard/owner/manage-pharmacies"
     if recipient_role == "ORG_ADMIN":
-        return "/dashboard/organization/manage-pharmacies/my-pharmacies"
+        return "/dashboard/organization/manage-pharmacies"
     # Fallback to owner area if something unexpected slips through
-    return "/dashboard/owner/manage-pharmacies/my-pharmacies"
+    return "/dashboard/owner/manage-pharmacies"
 
 
 def _manage_detail_url_for_role(recipient_role: str, pharmacy_id: int | str) -> str:
     base_path = _manage_path_for_role(recipient_role)
-    return f"{base_path}?view=detail&pharmacyId={pharmacy_id}"
+    return f"{base_path}?workspace=internal&pharmacy_id={pharmacy_id}&view=detail&pharmacyId={pharmacy_id}"
 
 
 @shared_task(name="client_profile.tasks.email_membership_application_submitted", queue="notifications")

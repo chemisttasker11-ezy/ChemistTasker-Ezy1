@@ -121,6 +121,8 @@ export default function PublicShiftsPage({
     setError(message && message.trim().length > 0 ? message : 'Something went wrong. Please try again.');
     setErrorOpen(true);
   };
+  const errorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
 
   useEffect(() => {
     if (!user) return;
@@ -266,7 +268,7 @@ export default function PublicShiftsPage({
 
   const handleApplyAll = async (shift: Shift) => {
     if (!isVerified) {
-      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
+      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -282,14 +284,14 @@ export default function PublicShiftsPage({
       setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...slots.map((slot) => slot.id)])));
     } catch (err) {
       console.error('Failed to express interest', err);
-      showError('Failed to express interest in this shift.');
+      showError(errorMessage(err, 'Failed to express interest in this shift.'));
       throw err;
     }
   };
 
   const handleApplySlot = async (shift: Shift, slotId: number) => {
     if (!isVerified) {
-      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
+      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -298,7 +300,7 @@ export default function PublicShiftsPage({
       setAppliedSlotIds((prev) => Array.from(new Set([...prev, slotId])));
     } catch (err) {
       console.error('Failed to express interest in slot', err);
-      showError('Failed to express interest in this slot.');
+      showError(errorMessage(err, 'Failed to express interest in this slot.'));
       throw err;
     }
   };
@@ -341,7 +343,7 @@ export default function PublicShiftsPage({
 
   const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
     if (!isVerified) {
-      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
+      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -349,7 +351,7 @@ export default function PublicShiftsPage({
       await submitShiftCounterOfferService(payload);
     } catch (err) {
       console.error('Failed to submit counter offer', err);
-      showError('Failed to submit counter offer.');
+      showError(errorMessage(err, 'Failed to submit counter offer.'));
       throw err;
     }
   };
@@ -437,7 +439,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlots = async (shift: Shift, slotIds: number[]) => {
     if (!isVerified) {
-      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process..';
+      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -448,7 +450,7 @@ export default function PublicShiftsPage({
       setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...uniqueSlotIds])));
     } catch (err) {
       console.error('Failed to express interest in slots', err);
-      showError('Failed to express interest in the selected slots.');
+      showError(errorMessage(err, 'Failed to express interest in the selected slots.'));
       throw err;
     }
   };
@@ -657,7 +659,12 @@ export default function PublicShiftsPage({
         </Box>
       </Paper>
 
-      <Snackbar open={errorOpen} autoHideDuration={4000} onClose={handleCloseError}>
+      <Snackbar
+        open={errorOpen}
+        autoHideDuration={4000}
+        onClose={handleCloseError}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 2 }}
+      >
         <Alert severity="error" onClose={handleCloseError} sx={{ width: '100%' }}>
           {error || 'Something went wrong. Please try again.'}
         </Alert>

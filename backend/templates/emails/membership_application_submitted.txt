@@ -1,4 +1,4 @@
-📬 New membership application received
+New membership application received
 
 Pharmacy: {{ pharmacy_name }}
 
@@ -6,12 +6,12 @@ Applicant: {{ applicant_full_name }}
 Role: {{ role|title }}
 Category: {{ category }}
 Submitted: {{ submitted_at }}
-Mobile: {% if mobile_number %}{{ mobile_number }}{% else %}—{% endif %}
-Email: {% if email %}{{ email }}{% else %}—{% endif %}
+Mobile: {% if mobile_number %}{{ mobile_number }}{% else %}-{% endif %}
+Email: {% if email %}{{ email }}{% else %}-{% endif %}
 
 Review application: {{ manage_url }}
 
 Tip: You can approve as Full-time / Part-time / Casual for Pharmacy staff,
 or Locum / Shift Hero for Favorite staff.
 
-— The ChemistTasker Team 💚
+The ChemistTasker Team

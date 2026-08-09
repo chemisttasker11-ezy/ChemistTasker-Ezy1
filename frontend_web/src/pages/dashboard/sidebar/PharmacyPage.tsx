@@ -1381,6 +1381,13 @@ export default function PharmacyPage({
     const idParam = searchParams.get("pharmacyId");
     const claimParam = searchParams.get("claim");
     if (viewParam === "detail" && idParam) {
+      if (searchParams.get("pharmacy_id") !== idParam) {
+        const params = new URLSearchParams(searchParams);
+        params.set("workspace", "internal");
+        params.set("pharmacy_id", idParam);
+        setSearchParams(params, { replace: true });
+        return;
+      }
       setView((prev) => (prev === "detail" ? prev : "detail"));
       setActivePharmacyId((prev) => (prev === idParam ? prev : idParam));
     } else {
@@ -1406,6 +1413,8 @@ export default function PharmacyPage({
       if (nextView === "detail" && options?.pharmacyId) {
         params.set("view", "detail");
         params.set("pharmacyId", options.pharmacyId);
+        params.set("workspace", "internal");
+        params.set("pharmacy_id", options.pharmacyId);
         setSearchParams(params, { replace: options?.replace });
         setView("detail");
         setActivePharmacyId(options.pharmacyId);

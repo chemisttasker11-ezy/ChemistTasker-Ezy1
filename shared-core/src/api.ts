@@ -244,7 +244,7 @@ const mapShiftInterest = (api) => {
         displayName,
         averageRating: base.averageRating ?? base.rating ?? null,
         rating: base.rating ?? base.averageRating ?? null,
-        slotId: base.slot ?? null,
+        slotId: base.slotId ?? base.slot ?? null,
         user: userValue,
         userDetail,
     };

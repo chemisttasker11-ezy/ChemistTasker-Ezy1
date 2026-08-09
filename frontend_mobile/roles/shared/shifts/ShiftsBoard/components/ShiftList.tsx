@@ -71,7 +71,6 @@ type ShiftListProps = {
     selectedSlotIds: Record<number, Set<number>>;
     toggleSlotSelection: (shiftId: number, slotId: number) => void;
     clearSelection: (shiftId: number) => void;
-    setAppliedSlotIds: React.Dispatch<React.SetStateAction<Set<number>>>;
     appliedShiftIds: Set<number>;
     appliedSlotIds: Set<number>;
     rejectedShiftIds: Set<number>;
@@ -113,7 +112,6 @@ const ShiftList: React.FC<ShiftListProps> = ({
     selectedSlotIds,
     toggleSlotSelection,
     clearSelection,
-    setAppliedSlotIds,
     appliedShiftIds,
     appliedSlotIds,
     rejectedShiftIds,
@@ -252,7 +250,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                 const hasActiveSlotSelection = isMulti && allowPartial && !disableSlotActions && selection.size > 0;
                 const shiftLevelLocked = isShiftApplied || isRejectedShift || hasShiftLevelCounter;
                 const slotLevelLocked = isShiftApplied || isRejectedShift;
-                const interactionLocked = shiftLevelLocked || hasSlotActions || hasActiveSlotSelection;
+                const interactionLocked = shiftLevelLocked || hasSlotActions;
                 const shiftActionsDisabled = actionsDisabled || (!disableActionGuards && interactionLocked);
                 const slotActionsDisabled = actionsDisabled || (!disableActionGuards && slotLevelLocked);
                 const urgent = getShiftUrgent(shift);
@@ -546,11 +544,6 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                                 disabled={slotActionsDisabled || isRejectedShift}
                                                 onPress={async () => {
                                                     const selectedIds = Array.from(selection);
-                                                    setAppliedSlotIds((prev) => {
-                                                        const next = new Set(prev);
-                                                        selectedIds.forEach((id) => next.add(id));
-                                                        return next;
-                                                    });
                                                     await handleApplySlots(shift, selectedIds);
                                                     clearSelection(shift.id);
                                                 }}

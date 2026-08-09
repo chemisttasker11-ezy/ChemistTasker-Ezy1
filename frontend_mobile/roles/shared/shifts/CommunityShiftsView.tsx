@@ -92,6 +92,8 @@ export default function CommunityShiftsView({
         const msg = message && message.trim().length > 0 ? message : 'Something went wrong. Please try again.';
         setError(msg);
     };
+    const errorMessage = (err: unknown, fallback: string) =>
+        err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
 
     useEffect(() => {
         if (activeTabOverride) {
@@ -215,7 +217,7 @@ export default function CommunityShiftsView({
             setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...slots.map((slot) => slot.id)])));
         } catch (err) {
             console.error('Failed to express interest', err);
-            setError('Failed to express interest in this shift.');
+            showError(errorMessage(err, 'Failed to express interest in this shift.'));
             throw err;
         }
     };
@@ -226,7 +228,7 @@ export default function CommunityShiftsView({
             setAppliedSlotIds((prev) => Array.from(new Set([...prev, slotId])));
         } catch (err) {
             console.error('Failed to express interest in slot', err);
-            setError('Failed to express interest in this slot.');
+            showError(errorMessage(err, 'Failed to express interest in this slot.'));
             throw err;
         }
     };
@@ -236,7 +238,7 @@ export default function CommunityShiftsView({
             await submitShiftCounterOfferService(payload);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
-            setError('Failed to submit counter offer.');
+            showError(errorMessage(err, 'Failed to submit counter offer.'));
             throw err;
         }
     };
@@ -274,7 +276,7 @@ export default function CommunityShiftsView({
             setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...uniqueSlotIds])));
         } catch (err) {
             console.error('Failed to express interest in slots', err);
-            setError('Failed to express interest in the selected slots.');
+            showError(errorMessage(err, 'Failed to express interest in the selected slots.'));
             throw err;
         }
     };

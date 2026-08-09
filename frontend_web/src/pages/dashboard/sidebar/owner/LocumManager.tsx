@@ -53,6 +53,9 @@ import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from "./Me
 
 const LOCUM_WORK_TYPES = ["LOCUM", "SHIFT_HERO"] as const;
 
+const deriveInviteEmploymentType = (role: Role): (typeof LOCUM_WORK_TYPES)[number] =>
+  role === "PHARMACIST" ? "LOCUM" : "SHIFT_HERO";
+
 const inviteTextFieldSx = {
   "& .MuiInputLabel-root": {
     backgroundColor: "background.paper",
@@ -251,6 +254,7 @@ export default function LocumManager({
         updated.error = null;
       }
       if (field === "role") {
+        updated.employment_type = deriveInviteEmploymentType(value as Role);
         updated.error = describeRoleMismatch(value as Role, updated.existingUserRole);
       }
       next[idx] = updated;
@@ -398,7 +402,7 @@ export default function LocumManager({
         email: row.email,
         invited_name: row.invited_name,
         role: row.role,
-        employment_type: row.employment_type,
+        employment_type: deriveInviteEmploymentType(row.role),
         pharmacy: pharmacyId,
       }));
 
@@ -732,21 +736,6 @@ export default function LocumManager({
                       </MenuItem>
                     );
                   })}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel id={`work-${idx}`}>Work type</InputLabel>
-                <Select
-                  labelId={`work-${idx}`}
-                  label="Work type"
-                  value={row.employment_type}
-                  onChange={(e) => handleInviteFieldChange(idx, "employment_type", e.target.value)}
-                >
-                  {LOCUM_WORK_TYPES.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type.replace("_", " ")}
-                    </MenuItem>
-                  ))}
                 </Select>
               </FormControl>
               <Box sx={{ gridColumn: "span 2", minHeight: 20 }}>

@@ -514,6 +514,47 @@ class ShiftCounterOfferAdmin(admin.ModelAdmin):
     pharmacy_name.short_description = "Pharmacy"
 
 
+@admin.register(ShiftOffer)
+class ShiftOfferAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'shift',
+        'pharmacy_name',
+        'slot',
+        'user',
+        'status',
+        'offered_slot_date',
+        'offered_start_time',
+        'offered_end_time',
+        'offered_rate',
+        'expires_at',
+        'created_at',
+    )
+    list_filter = (
+        'status',
+        'shift__pharmacy',
+        'offered_slot_date',
+        'expires_at',
+    )
+    search_fields = (
+        'id',
+        'shift__id',
+        'shift__pharmacy__name',
+        'user__email',
+        'user__first_name',
+        'user__last_name',
+        'user__username',
+    )
+    autocomplete_fields = ('shift', 'user', 'counter_offer')
+    readonly_fields = ('created_at', 'updated_at')
+    date_hierarchy = 'created_at'
+
+    def pharmacy_name(self, obj):
+        return getattr(obj.shift.pharmacy, 'name', None)
+
+    pharmacy_name.short_description = "Pharmacy"
+
+
 @admin.register(Rating)
 class RatingAdmin(admin.ModelAdmin):
     list_display = (

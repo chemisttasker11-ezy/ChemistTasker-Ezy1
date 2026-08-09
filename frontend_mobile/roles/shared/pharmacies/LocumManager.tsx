@@ -40,6 +40,9 @@ import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from './Me
 
 const LOCUM_WORK_TYPES = ['LOCUM', 'SHIFT_HERO'] as const;
 
+const deriveInviteEmploymentType = (role: Role): (typeof LOCUM_WORK_TYPES)[number] =>
+    role === 'PHARMACIST' ? 'LOCUM' : 'SHIFT_HERO';
+
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
     { value: 'PHARMACIST', label: 'Pharmacist' },
     { value: 'INTERN', label: 'Intern Pharmacist' },
@@ -216,6 +219,7 @@ export default function LocumManager({
                 updated.error = null;
             }
             if (field === 'role') {
+                updated.employment_type = deriveInviteEmploymentType(value as Role);
                 updated.error = describeRoleMismatch(value as Role, updated.existingUserRole);
             }
             next[idx] = updated;
@@ -341,7 +345,7 @@ export default function LocumManager({
                 email: row.email,
                 invited_name: row.invited_name,
                 role: row.role,
-                employment_type: row.employment_type,
+                employment_type: deriveInviteEmploymentType(row.role),
                 pharmacy: pharmacyId,
             }));
 
@@ -672,20 +676,6 @@ export default function LocumManager({
                                             ))}
                                         </Menu>
                                     </View>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                                    {LOCUM_WORK_TYPES.map((type) => (
-                                        <Chip
-                                            key={type}
-                                            selected={row.employment_type === type}
-                                            onPress={() => handleInviteFieldChange(idx, 'employment_type', type)}
-                                            mode={row.employment_type === type ? 'flat' : 'outlined'}
-                                            style={{ backgroundColor: row.employment_type === type ? surfaceTokens.primaryLight : undefined }}
-                                        >
-                                            {type.replace('_', ' ')}
-                                        </Chip>
-                                    ))}
                                 </View>
                                 {row.checking && <Text style={styles.helperText}>Checking existing account...</Text>}
                                 {row.error && <Text style={styles.errorText}>{row.error}</Text>}

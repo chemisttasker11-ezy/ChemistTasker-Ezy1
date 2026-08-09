@@ -105,6 +105,29 @@ const interestBelongsToSlot = (interest: any, slotId: number) => {
     return explicitSlotId === slotId;
 };
 
+const findInterestForMember = (member: any, data: any, slotId: number | null): ShiftInterest | null => {
+    const memberUserId = toFiniteNumber(member?.userId ?? member?.user_id ?? member?.user?.id);
+    const lists: any[] = [];
+    if (slotId != null) {
+        lists.push(...(data?.interestsBySlot?.[slotId] ?? data?.interests_by_slot?.[slotId] ?? []));
+    }
+    lists.push(...(data?.interestsAll ?? data?.interests_all ?? []));
+
+    return (
+        lists.find((interest: any) => {
+            const interestUserId = toFiniteNumber(
+                interest?.userId ??
+                interest?.user_id ??
+                interest?.userDetail?.id ??
+                interest?.user_detail?.id ??
+                (typeof interest?.user === 'object' ? interest.user?.id : interest?.user)
+            );
+            const slotMatches = slotId == null || interestBelongsToSlot(interest, slotId);
+            return memberUserId != null && interestUserId === memberUserId && slotMatches;
+        }) ?? null
+    );
+};
+
 const buildPublicSlotSignature = (slotId: number, interests: any[], offers: any[]) => {
     const interestSig = interests
         .filter((i: any) => interestBelongsToSlot(i, slotId))
@@ -524,15 +547,39 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const handleReviewCandidate = useCallback(
         async (shift: Shift, member: ShiftMemberStatus, offer: any | null, slotId: number | null) => {
             resetWorkerRatings();
+            const levelKey = selectedLevelByShift[shift.id] ?? getCurrentLevelKey(shift);
+            const currentTabData = tabData[getTabKey(shift.id, levelKey)] || {};
+            const interest = findInterestForMember(member, currentTabData, slotId);
+            let revealedUser: any = null;
+
+            if (interest && !(interest as any).revealed) {
+                try {
+                    revealedUser = await revealInterest(shift, interest, levelKey);
+                    await loadTabDataForShift(shift.id, levelKey);
+                } catch (error) {
+                    console.error('Failed to reveal reviewed candidate', error);
+                }
+            }
+
+            const revealedUserObj =
+                (typeof revealedUser === 'object' && revealedUser) ||
+                (typeof (interest as any)?.user === 'object' ? (interest as any).user : null) ||
+                (interest as any)?.user_detail ||
+                (interest as any)?.userDetail ||
+                null;
 
             const candidate = {
-                userId: (member as any).userId ?? (member as any).user?.id ?? null,
+                userId: revealedUserObj?.id ?? (member as any).userId ?? (member as any).user?.id ?? null,
                 name:
-                    (member as any).firstName && (member as any).lastName
+                    revealedUserObj?.firstName && revealedUserObj?.lastName
+                        ? `${revealedUserObj.firstName} ${revealedUserObj.lastName}`
+                        : revealedUserObj?.first_name && revealedUserObj?.last_name
+                            ? `${revealedUserObj.first_name} ${revealedUserObj.last_name}`
+                            : (member as any).firstName && (member as any).lastName
                         ? `${(member as any).firstName} ${(member as any).lastName}`
-                        : member.displayName || (member as any).email || 'Candidate',
-                email: (member as any).email || '',
-                shortBio: (member as any).shortBio || '',
+                        : revealedUserObj?.name || revealedUserObj?.displayName || revealedUserObj?.display_name || member.displayName || (member as any).email || 'Candidate',
+                email: revealedUserObj?.email || (member as any).email || '',
+                shortBio: revealedUserObj?.shortBio || revealedUserObj?.short_bio || (member as any).shortBio || '',
             };
 
             if ((member as any).userId != null) {
@@ -562,7 +609,16 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 slotId: resolvedSlotId,
             });
         },
-        [resetWorkerRatings, loadWorkerRatings, getOfferSlotIds]
+        [
+            resetWorkerRatings,
+            selectedLevelByShift,
+            tabData,
+            getTabKey,
+            revealInterest,
+            loadTabDataForShift,
+            loadWorkerRatings,
+            getOfferSlotIds,
+        ]
     );
 
     const handleAcceptOffer = useCallback(

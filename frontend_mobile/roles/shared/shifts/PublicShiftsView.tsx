@@ -3,7 +3,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Snackbar, SegmentedButtons, Text, Button } from 'react-native-paper';
+import { ActivityIndicator, Portal, Snackbar, SegmentedButtons, Text, Button } from 'react-native-paper';
 import {
     Shift,
     ShiftCounterOfferPayload,
@@ -104,6 +104,8 @@ export default function PublicShiftsView({
         setError(msg);
         setErrorOpen(true);
     };
+    const errorMessage = (err: unknown, fallback: string) =>
+        err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
 
     const loadSaved = useCallback(async () => {
         try {
@@ -228,7 +230,7 @@ export default function PublicShiftsView({
 
     const guardVerified = () => {
         if (isVerified) return true;
-        const msg = 'ou must be verified before applying to public shifts. Please complete your onboarding and verification process.';
+        const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
         showError(msg);
         return false;
     };
@@ -249,7 +251,7 @@ export default function PublicShiftsView({
             setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...slots.map((slot) => slot.id)])));
         } catch (err) {
             console.error('Failed to express interest', err);
-            showError('Failed to express interest in this shift.');
+            showError(errorMessage(err, 'Failed to express interest in this shift.'));
             throw err;
         }
     };
@@ -263,7 +265,7 @@ export default function PublicShiftsView({
             setAppliedSlotIds((prev) => Array.from(new Set([...prev, slotId])));
         } catch (err) {
             console.error('Failed to express interest in slot', err);
-            showError('Failed to express interest in this slot.');
+            showError(errorMessage(err, 'Failed to express interest in this slot.'));
             throw err;
         }
     };
@@ -276,7 +278,7 @@ export default function PublicShiftsView({
             await submitShiftCounterOfferService(payload);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
-            showError('Failed to submit counter offer.');
+            showError(errorMessage(err, 'Failed to submit counter offer.'));
             throw err;
         }
     };
@@ -409,7 +411,7 @@ export default function PublicShiftsView({
             setAppliedSlotIds((prev) => Array.from(new Set([...prev, ...uniqueSlotIds])));
         } catch (err) {
             console.error('Failed to express interest in slots', err);
-            showError('Failed to express interest in the selected slots.');
+            showError(errorMessage(err, 'Failed to express interest in the selected slots.'));
             throw err;
         }
     };
@@ -535,13 +537,15 @@ export default function PublicShiftsView({
                     onScroll={handleScroll}
                 />
             )}
-            <Snackbar
-                visible={errorOpen}
-                onDismiss={() => setErrorOpen(false)}
-                duration={4000}
-            >
-                {error || 'Something went wrong. Please try again.'}
-            </Snackbar>
+            <Portal>
+                <Snackbar
+                    visible={errorOpen}
+                    onDismiss={() => setErrorOpen(false)}
+                    duration={4000}
+                >
+                    {error || 'Something went wrong. Please try again.'}
+                </Snackbar>
+            </Portal>
         </View>
     );
 }

@@ -540,6 +540,17 @@ const isMessageNotification = (notification: NotificationItem): boolean => {
   return isChatNotificationPayload(notification?.payload);
 };
 
+const normalizeNotification = (raw: any): NotificationItem => ({
+  id: raw.id,
+  type: raw.type,
+  title: raw.title,
+  body: raw.body,
+  actionUrl: raw.actionUrl ?? raw.action_url ?? "",
+  payload: raw.payload ?? {},
+  createdAt: raw.createdAt ?? raw.created_at ?? "",
+  readAt: raw.readAt ?? raw.read_at ?? null,
+});
+
 export default function TopBarActions({
   hideSearch = false,
   hideThemeToggle = false,
@@ -680,6 +691,36 @@ export default function TopBarActions({
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "CT";
+
+  const loadNotifications = React.useCallback(async (options?: { showLoading?: boolean }) => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadNotifications(0);
+      setNotificationsLoading(false);
+      return;
+    }
+    if (options?.showLoading !== false) {
+      setNotificationsLoading(true);
+    }
+    try {
+      const response = await fetchNotifications();
+      const rawList: NotificationItem[] = Array.isArray(response?.results)
+        ? response.results
+        : [];
+      const list = rawList.filter((item) => !isMessageNotification(item));
+      setNotifications(list);
+      setUnreadNotifications(list.filter((item) => !item.readAt).length);
+    } catch (error) {
+      console.error("Failed to load notifications", error);
+      setNotifications([]);
+      setUnreadNotifications(0);
+    } finally {
+      if (options?.showLoading !== false) {
+        setNotificationsLoading(false);
+      }
+    }
+  }, [user]);
+
   React.useEffect(() => {
     const role = onboardingRoleForUserRole(user?.role);
     if (!user || !role) {
@@ -918,40 +959,8 @@ export default function TopBarActions({
   }, [messageSummaries]);
 
   React.useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      setUnreadNotifications(0);
-      setNotificationsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setNotificationsLoading(true);
-    fetchNotifications()
-      .then((response) => {
-        if (cancelled) return;
-        const rawList: NotificationItem[] = Array.isArray(response?.results)
-          ? response.results
-          : [];
-        const list = rawList.filter((item) => !isMessageNotification(item));
-        setNotifications(list);
-        const unreadCount = list.filter((item) => !item.readAt).length;
-        setUnreadNotifications(unreadCount);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("Failed to load notifications", error);
-        setNotifications([]);
-        setUnreadNotifications(0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setNotificationsLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+    loadNotifications().then(() => null);
+  }, [loadNotifications]);
 
   React.useEffect(() => {
     if (!user) {
@@ -1013,6 +1022,14 @@ export default function TopBarActions({
 
   React.useEffect(() => {
     if (!user) return;
+    const intervalId = window.setInterval(() => {
+      loadNotifications({ showLoading: false }).then(() => null);
+    }, 45000);
+    return () => window.clearInterval(intervalId);
+  }, [user, loadNotifications]);
+
+  React.useEffect(() => {
+    if (!user) return;
 
     let isCancelled = false;
 
@@ -1045,11 +1062,12 @@ export default function TopBarActions({
           switch (payload.type) {
             case "notification.counter":
               // Backend counter includes message notifications.
-              // Web bell excludes chat notifications, so keep local filtered count source-of-truth.
+              // Web bell excludes chat notifications, so refresh the filtered list/count.
+              loadNotifications({ showLoading: false }).then(() => null);
               break;
             case "notification.created":
               if (payload.notification) {
-                const incoming = payload.notification as NotificationItem;
+                const incoming = normalizeNotification(payload.notification);
                 if (isMessageNotification(incoming)) {
                   break;
                 }
@@ -1074,7 +1092,7 @@ export default function TopBarActions({
               break;
             case "notification.updated":
               if (payload.notification) {
-                const incoming = payload.notification as NotificationItem;
+                const incoming = normalizeNotification(payload.notification);
                 if (isMessageNotification(incoming)) {
                   setNotifications((prev) => {
                     const next = prev.filter((item) => item.id !== incoming.id);
@@ -1162,7 +1180,7 @@ export default function TopBarActions({
         wsRef.current = null;
       }
     };
-  }, [user, refreshUnreadCount]);
+  }, [user, refreshUnreadCount, loadNotifications]);
 
   const markAllNotifications = React.useCallback(async () => {
     const unreadIds = notifications.filter((item) => !item.readAt).map((item) => item.id);
@@ -1246,11 +1264,17 @@ export default function TopBarActions({
               : role === "OTHER_STAFF"
                 ? "otherstaff"
                 : "explorer";
-          const params = new URLSearchParams();
-          params.set("tab", "accepted");
-          if (shiftId != null) params.set("shift_id", String(shiftId));
-          if (offerId != null) params.set("offer_id", String(offerId));
-          navigate(`/dashboard/${rolePath}/shifts?${params.toString()}`);
+          if (offerId != null) {
+            const params = new URLSearchParams();
+            params.set("tab", "accepted");
+            if (shiftId != null) params.set("shift_id", String(shiftId));
+            params.set("offer_id", String(offerId));
+            navigate(`/dashboard/${rolePath}/shifts?${params.toString()}`);
+          } else if (shiftId != null) {
+            navigate(`/dashboard/${rolePath}/shifts/${shiftId}`);
+          } else if (item.actionUrl) {
+            navigateToActionUrl(item.actionUrl);
+          }
         } else if (shiftId != null) {
           if (activePersona === "admin" && activeAdminAssignment?.pharmacy_id) {
             navigate(`/dashboard/admin/${activeAdminAssignment.pharmacy_id}/shifts/${shiftId}`);

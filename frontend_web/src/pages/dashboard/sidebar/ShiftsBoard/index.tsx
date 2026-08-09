@@ -726,7 +726,6 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
             selectedSlotIds={selectedSlotIds}
             toggleSlotSelection={toggleSlotSelection}
             clearSelection={clearSelection}
-            setAppliedSlotIds={setAppliedSlotIds}
             appliedShiftIds={appliedShiftIds}
             appliedSlotIds={appliedSlotIds}
             rejectedShiftIds={rejectedShiftIds}

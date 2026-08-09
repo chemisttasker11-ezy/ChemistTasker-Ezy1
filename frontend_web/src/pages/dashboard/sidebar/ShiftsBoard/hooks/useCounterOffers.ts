@@ -459,12 +459,14 @@ export const useCounterOffers = ({
     };
     console.log('[ShiftsBoard] submit counter offer payload', payload);
 
+    setCounterOfferError(null);
     setCounterSubmitting(true);
     try {
       await onSubmitCounterOffer(payload);
     } catch (err) {
+      setCounterOfferError(err instanceof Error && err.message.trim().length > 0 ? err.message : 'Failed to submit counter offer.');
       setCounterSubmitting(false);
-      throw err;
+      return;
     }
 
     slotsToSend.forEach((slot) => {

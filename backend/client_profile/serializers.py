@@ -12,6 +12,7 @@ from decimal import Decimal
 from client_profile.utils import q6, send_referee_emails, clean_email, enforce_public_shift_daily_limit, build_shift_email_context, build_shift_offer_context
 from client_profile.services import expand_shift_slots
 from client_profile.admin_helpers import has_admin_capability, CAPABILITY_MANAGE_ROSTER
+from client_profile.shift_notifications import notify_shift_users
 from datetime import date, timedelta, datetime, time
 from django.utils import timezone
 from core.task_queue import async_task
@@ -5090,13 +5091,14 @@ class ShiftSerializer(serializers.ModelSerializer):
                             recipient=dedicated_user,
                             ignore_slot_filter=True,
                         )
-                        notification_payload = {
-                            "title": "Shift offer received",
-                            "body": "You have received a shift offer. Please confirm to lock it in.",
-                            "payload": {"shift_id": shift.id, "offer_id": offer_for_email.id},
-                        }
-                        if ctx.get("shift_link"):
-                            notification_payload["action_url"] = ctx["shift_link"]
+                        notify_shift_users(
+                            [dedicated_user],
+                            shift=shift,
+                            title="Shift offer received",
+                            body="You have received a shift offer. Please confirm to lock it in.",
+                            kind="shift_offer_received",
+                            payload={"offer_id": offer_for_email.id},
+                        )
                         async_task(
                             'users.tasks.send_async_email',
                             subject="You have a new shift offer",
@@ -5104,7 +5106,7 @@ class ShiftSerializer(serializers.ModelSerializer):
                             template_name="emails/shift_offer.html",
                             context=ctx,
                             text_template="emails/shift_offer.txt",
-                            notification=notification_payload,
+                            suppress_auto_notification=True,
                         )
 
                     transaction.on_commit(_send_offer_email)
