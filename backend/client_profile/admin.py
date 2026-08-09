@@ -189,7 +189,7 @@ class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
         'payment_preference', 'classification_level', 'student_year', 'intern_half',
         'ahpra_proof', 'hours_proof', 'certificate', 'university_id',
         'cpr_certificate', 's8_certificate',
-        'abn', 'gst_registered', 'gst_file', 'tfn_declaration',
+        'abn', 'gst_registered', 'tfn_number',
         'super_fund_name', 'super_usi', 'super_member_number',
         # Referee 1
         'referee1_name', 'referee1_relation', 'referee1_email', 'referee1_confirmed',

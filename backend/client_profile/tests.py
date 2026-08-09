@@ -106,6 +106,20 @@ class OnboardingRoleInvariantTests(TestCase):
         )
         self.assertNotIn(invalid_explorer, ExplorerOnboardingAdmin(ExplorerOnboarding, admin_site).get_queryset(request))
 
+    def test_other_staff_admin_form_uses_current_model_fields(self):
+        request = RequestFactory().get("/")
+        request.user = get_user_model().objects.create_superuser(
+            email="admin@example.com",
+            password="password",
+        )
+        admin_site = admin.site
+
+        form = OtherStaffOnboardingAdmin(OtherStaffOnboarding, admin_site).get_form(request)
+
+        self.assertIn("tfn_number", form.base_fields)
+        self.assertNotIn("tfn_declaration", form.base_fields)
+        self.assertNotIn("gst_file", form.base_fields)
+
 
 class OwnerOnboardingV2SerializerTests(TestCase):
     def test_submission_flag_is_saved_and_returned(self):

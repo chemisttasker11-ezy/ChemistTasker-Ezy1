@@ -28,6 +28,9 @@ const getFirstErrorMessage = (value: unknown): string | null => {
 
 type ApplicationCategory = 'FULL_PART_TIME' | 'LOCUM_CASUAL';
 
+const deriveLocumEmploymentType = (role?: string) =>
+    String(role || '').toUpperCase() === 'PHARMACIST' ? 'LOCUM' : 'SHIFT_HERO';
+
 const readMembershipValue = (membership: MembershipDTO, camelKey: string, snakeKey: string) =>
     (membership as any)?.[camelKey] ?? (membership as any)?.[snakeKey] ?? '';
 
@@ -144,10 +147,14 @@ export default function MembershipApplicationsPanel({
         void loadApplications();
     }, [pharmacyId, category]);
 
-    const handleApprove = async (applicationId: string | number, employment?: string) => {
+    const handleApprove = async (app: MembershipApplication, employment?: string) => {
+        const applicationId = app.id;
         setProcessingId(applicationId);
         try {
-            const employmentType = employment || selectedEmployment[applicationId] || defaultEmploymentType;
+            const employmentType =
+                app.category === 'LOCUM_CASUAL'
+                    ? deriveLocumEmploymentType(app.role)
+                    : employment || selectedEmployment[applicationId] || defaultEmploymentType;
 
             await approveMembershipApplicationService(String(applicationId), {
                 employment_type: employmentType,
@@ -272,7 +279,7 @@ export default function MembershipApplicationsPanel({
                                 <View style={styles.actions}>
                                     <Button
                                         mode="contained"
-                                        onPress={() => handleApprove(app.id)}
+                                        onPress={() => handleApprove(app)}
                                         loading={processingId === app.id}
                                         disabled={!!processingId}
                                         compact

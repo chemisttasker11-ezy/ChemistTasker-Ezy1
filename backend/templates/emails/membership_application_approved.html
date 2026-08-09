@@ -3,30 +3,33 @@
 {% block title %}Your Application Was Approved{% endblock %}
 
 {% block content %}
-<div class="wave">🎉</div>
-    <h2 style="margin: 8px 0 0">You’re approved to join {{ pharmacy_name }}</h2>
-    <div class="subtitle">Welcome aboard, {{ applicant_full_name }}!</div>
-
-    <div class="card">
-      <div class="row">
-        <span class="label">Role</span>
-        <div class="value">{{ role|title }}</div>
-      </div>
-      <div class="row">
-        <span class="label">Category</span>
-        <div class="value">{{ category }}</div>
-      </div>
+    <div class="wave">Approved</div>
+    <h2 style="margin:8px 0 0;">You're approved to join {{ pharmacy_name }}</h2>
+    <div class="subtitle" style="margin:0 0 18px; color:#475569;">
+      Welcome aboard, <strong>{{ applicant_full_name }}</strong>.
     </div>
 
-    <a href="{{ login_url }}" class="btn">Go to Login</a>
+    <div class="card">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Role:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ role|title }}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Category:</td>
+          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ category }}</td>
+        </tr>
+      </table>
+    </div>
 
-    <p style="margin-top: 14px; color: #666; line-height: 1.55;">
-      If you already have a ChemistTasker account, just sign in and you’ll see the pharmacy under your memberships.
-      If you’re new, check your inbox for the password setup / magic link.
-    </p>
+    <a href="{{ membership_url }}" class="btn">View memberships</a>
 
-    <div class="footer">
-      Need help? Just reply to this email and we’ll jump in.<br />
-      — The ChemistTasker Team 💚
+    <div class="muted" style="color:#64748b; margin-top:8px;">
+      If you already have a ChemistTasker account, just sign in and you'll see the pharmacy under your memberships.
+      If you're new, check your inbox for the password setup or magic link.
+    </div>
+
+    <div class="footer" style="color:#64748b; margin-top:18px; font-size:13px;">
+      The ChemistTasker Team
     </div>
 {% endblock %}

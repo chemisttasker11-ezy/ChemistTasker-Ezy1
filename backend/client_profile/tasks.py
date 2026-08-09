@@ -643,10 +643,6 @@ def run_all_verifications(model_name, object_pk, is_create=False):
             async_task('client_profile.tasks.verify_abn_task', model_name, object_pk, obj.abn, user.first_name, user.last_name, user.email, note_field='abn_verification_note')
         if obj.government_id:
             async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'government_id', user.first_name, user.last_name, user.email, 'gov_id_verified', note_field='gov_id_verification_note')
-        if obj.payment_preference == "TFN" and obj.tfn_declaration:
-            async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'tfn_declaration', user.first_name, user.last_name, user.email, 'tfn_declaration_verified', note_field='tfn_declaration_verification_note')
-        if obj.gst_registered and obj.gst_file:
-            async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'gst_file', user.first_name, user.last_name, user.email, 'gst_file_verified', note_field='gst_file_verification_note')
 
     elif model_name_lower == 'owneronboarding':
         # NOTE: AHPRA verification is handled manually to avoid automated scraping.
@@ -659,10 +655,6 @@ def run_all_verifications(model_name, object_pk, is_create=False):
             async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'government_id', user.first_name, user.last_name, user.email, 'gov_id_verified', note_field='gov_id_verification_note')
         if obj.payment_preference == 'ABN' and obj.abn:
             async_task('client_profile.tasks.verify_abn_task', model_name, object_pk, obj.abn, user.first_name, user.last_name, user.email, note_field='abn_verification_note')
-        if obj.payment_preference == 'TFN' and obj.tfn_declaration:
-            async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'tfn_declaration', user.first_name, user.last_name, user.email, 'tfn_declaration_verified', note_field='tfn_declaration_verification_note')
-        if obj.gst_registered and obj.gst_file:
-            async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'gst_file', user.first_name, user.last_name, user.email, 'gst_file_verified', note_field='gst_file_verification_note')
         # Role-specific files
         if obj.role_type == 'INTERN' and obj.ahpra_proof:
             async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'ahpra_proof', user.first_name, user.last_name, user.email, 'ahpra_proof_verified', note_field='ahpra_proof_verification_note')
@@ -771,19 +763,16 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         if obj.payment_preference == "ABN":
             if obj.abn:
                 required_checks.append('abn')
-            if obj.gst_registered:
-                required_checks.append('gst_file')
         elif obj.payment_preference == "TFN":
-            required_checks.append('tfn_declaration')
+            if obj.tfn_number:
+                required_checks.append('tfn_number')
 
     elif model_name_lower == 'otherstaffonboarding':
         required_checks.append('gov_id')
         if obj.payment_preference == 'ABN' and obj.abn:
             required_checks.append('abn')
-        if obj.payment_preference == 'TFN' and obj.tfn_declaration:
-            required_checks.append('tfn_declaration')
-        if obj.gst_registered and obj.gst_file:
-            required_checks.append('gst_file')
+        if obj.payment_preference == 'TFN' and obj.tfn_number:
+            required_checks.append('tfn_number')
         if getattr(obj, 'role_type', None) == 'INTERN':
             required_checks.extend(['ahpra_proof', 'hours_proof'])
         if getattr(obj, 'role_type', None) in ['ASSISTANT', 'TECHNICIAN']:
@@ -1252,7 +1241,12 @@ def email_membership_application_submitted(app_id: int):
             "title": f"New membership application: {pharmacy.name}",
             "body": f"{ctx_common['applicant_full_name']} applied for {ctx_common['role']}.",
             "action_url": manage_url,
-            "payload": {"application_id": app.id},
+            "payload": {
+                "application_id": app.id,
+                "pharmacy_id": pharmacy.id,
+                "category": app.category,
+                "role": app.role,
+            },
         }
         user_id = User.objects.filter(email=email).values_list('id', flat=True).first()
         if user_id:
@@ -1285,8 +1279,10 @@ def email_membership_application_approved(app_id: int):
         logger.info("Application %s has no email; skipping applicant notification.", app_id)
         return
 
-    base = _frontend_base_url()
     pharmacy = app.pharmacy
+    applicant_user = getattr(app, "submitted_by", None) or User.objects.filter(email=app.email).first()
+    dashboard_url = get_frontend_dashboard_url(applicant_user).rstrip("/")
+    membership_url = f"{dashboard_url}/memberships"
 
     ctx = {
         "pharmacy_name": pharmacy.name,
@@ -1297,15 +1293,13 @@ def email_membership_application_approved(app_id: int):
             if app.category == "FULL_PART_TIME"
             else "Favorite (Locum/Shift Hero)"
         ),
-        # Your existing invite helper still sends a login/reset link as needed;
-        # this is a friendly confirmation with a generic login entry point.
-        "login_url": f"{base}/login",
+        "membership_url": membership_url,
     }
 
     notification_payload = {
         "title": f"Application approved: {pharmacy.name}",
         "body": f"Your application with {pharmacy.name} has been approved.",
-        "action_url": ctx["login_url"],
+        "action_url": ctx["membership_url"],
         "payload": {"application_id": app.id},
     }
     user_ids = []

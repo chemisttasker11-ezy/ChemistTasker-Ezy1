@@ -428,8 +428,6 @@ export default function DashboardTopShell({
     nextParams.set("workspace", "internal");
     nextParams.delete("pharmacy_id");
     nextParams.delete("pharmacy");
-    nextParams.delete("pharmacyId");
-    nextParams.delete("view");
     if (fallbackPharmacyId != null) {
       nextParams.set("pharmacy_id", String(fallbackPharmacyId));
     }

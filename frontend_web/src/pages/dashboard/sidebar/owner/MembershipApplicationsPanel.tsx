@@ -55,6 +55,9 @@ const labelEmploymentType = (value?: string) =>
 const labelCategory = (category: "FULL_PART_TIME" | "LOCUM_CASUAL") =>
   category === "FULL_PART_TIME" ? "Full/Part-time" : "Favourite (Locum/Shift Hero)";
 
+const deriveLocumEmploymentType = (role?: string) =>
+  String(role || "").toUpperCase() === "PHARMACIST" ? "LOCUM" : "SHIFT_HERO";
+
 const formatClassification = (app: MembershipApplication) => {
   const raw =
     app.pharmacistAwardLevel ||
@@ -208,6 +211,23 @@ export default function MembershipApplicationsPanel({
     fetchApplications();
   }, [fetchApplications]);
 
+  useEffect(() => {
+    const handleNotification = (event: Event) => {
+      const notification = (event as CustomEvent).detail || {};
+      const payload = notification.payload || {};
+      const applicationId = payload.application_id ?? payload.applicationId;
+      const notificationPharmacyId = payload.pharmacy_id ?? payload.pharmacyId;
+      const notificationCategory = payload.category;
+      if (!applicationId) return;
+      if (notificationPharmacyId != null && String(notificationPharmacyId) !== String(pharmacyId)) return;
+      if (notificationCategory && notificationCategory !== category) return;
+      void fetchApplications();
+    };
+
+    window.addEventListener("chemisttasker-notification-created", handleNotification);
+    return () => window.removeEventListener("chemisttasker-notification-created", handleNotification);
+  }, [category, fetchApplications, pharmacyId]);
+
   const allowedTypes = useMemo(() => {
     if (!allowedEmploymentTypes?.length) {
       return [defaultEmploymentType];
@@ -217,7 +237,10 @@ export default function MembershipApplicationsPanel({
 
   const handleApprove = useCallback(
     async (app: MembershipApplication) => {
-      const employmentType = approveTypeById[app.id] || defaultEmploymentType;
+      const employmentType =
+        app.category === "LOCUM_CASUAL"
+          ? deriveLocumEmploymentType(app.role)
+          : approveTypeById[app.id] || defaultEmploymentType;
       try {
         await approveMembershipApplicationService(app.id, { employment_type: employmentType });
         notify("Application approved.", "success");
@@ -338,26 +361,28 @@ export default function MembershipApplicationsPanel({
                     spacing={1}
                     alignItems={{ xs: "stretch", sm: "center" }}
                   >
-                    <FormControl size="small" sx={{ minWidth: 160 }}>
-                      <InputLabel id={`employment-type-${app.id}`}>Approve as</InputLabel>
-                      <Select
-                        labelId={`employment-type-${app.id}`}
-                        label="Approve as"
-                        value={selectedType}
-                        onChange={(event) =>
-                          setApproveTypeById((prev) => ({
-                            ...prev,
-                            [app.id]: String(event.target.value),
-                          }))
-                        }
-                      >
-                        {allowedTypes.map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {labelEmploymentType(type)}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                    {app.category === "FULL_PART_TIME" ? (
+                      <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <InputLabel id={`employment-type-${app.id}`}>Approve as</InputLabel>
+                        <Select
+                          labelId={`employment-type-${app.id}`}
+                          label="Approve as"
+                          value={selectedType}
+                          onChange={(event) =>
+                            setApproveTypeById((prev) => ({
+                              ...prev,
+                              [app.id]: String(event.target.value),
+                            }))
+                          }
+                        >
+                          {allowedTypes.map((type) => (
+                            <MenuItem key={type} value={type}>
+                              {labelEmploymentType(type)}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    ) : null}
 
                     <Stack direction="row" spacing={0.5}>
                       <Tooltip title="Approve">

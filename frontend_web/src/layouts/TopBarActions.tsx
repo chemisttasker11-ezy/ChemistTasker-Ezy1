@@ -1077,6 +1077,11 @@ export default function TopBarActions({
                       detail: incoming,
                     })
                   );
+                  window.dispatchEvent(
+                    new CustomEvent("chemisttasker-notification-created", {
+                      detail: incoming,
+                    })
+                  );
                 } catch {
                   // ignore custom event failures
                 }
