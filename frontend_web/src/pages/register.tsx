@@ -53,6 +53,7 @@ export default function Register() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [captchaValue, setCaptchaValue] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
   const duplicateEmailMessage =
     "There is already an account registered with this email. Please log in or reset your password.";
 
@@ -184,7 +185,15 @@ export default function Register() {
             </span>
           }
         />
-        <Box mb={2} display="flex" justifyContent="center"> <ReCAPTCHA sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY} onChange={setCaptchaValue} /> </Box>
+        {recaptchaSiteKey ? (
+          <Box mb={2} display="flex" justifyContent="center">
+            <ReCAPTCHA sitekey={recaptchaSiteKey} onChange={setCaptchaValue} />
+          </Box>
+        ) : (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Registration is temporarily unavailable. Missing reCAPTCHA configuration.
+          </Alert>
+        )}
         {hasSubmitted && !acceptedTerms && ( <Alert severity="warning" sx={{ mt: 2 }}> You must accept the Terms of Service to register. </Alert> )}
         {hasSubmitted && !captchaValue && ( <Alert severity="warning" sx={{ mt: 2 }}> Please complete the CAPTCHA to register. </Alert> )}
         <Box mt={3}>

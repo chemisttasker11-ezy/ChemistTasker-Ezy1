@@ -3,7 +3,8 @@
 .agents
 .qwen
 .vscode
-env
+env/*
+!env/web.prod.env
 **/__pycache__
 **/*.pyc
 **/*.pyo

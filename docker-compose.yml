@@ -136,10 +136,6 @@ services:
     build:
       context: .
       dockerfile: frontend_web/Dockerfile
-      args:
-        VITE_API_URL: "${VITE_API_URL:-https://backend.chemisttasker.com.au}"
-        VITE_RECAPTCHA_SITE_KEY: "${VITE_RECAPTCHA_SITE_KEY:-}"
-        VITE_Maps_API_KEY: "${VITE_Maps_API_KEY:-}"
     container_name: chemisttasker_frontend_prod
     restart: unless-stopped
     expose:
