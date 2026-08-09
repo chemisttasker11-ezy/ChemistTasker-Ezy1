@@ -12,6 +12,8 @@ import { SidebarFooterProps } from "@toolpad/core/DashboardLayout";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { getOnboarding } from "@chemisttasker/shared-core";
+import { otherStaffRoleLabel } from "../utils/roleLabels";
 
 type PersonaMenuOption =
   | {
@@ -28,11 +30,6 @@ type PersonaMenuOption =
       label: string;
       helper?: string;
     };
-
-const STAFF_ROLE_LABELS: Record<"PHARMACIST" | "OTHER_STAFF", string> = {
-  PHARMACIST: "Pharmacist",
-  OTHER_STAFF: "Other Staff",
-};
 
 const ADMIN_LEVEL_LABELS: Record<string, string> = {
   OWNER: "Owner",
@@ -65,6 +62,31 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
   const { workspace, setWorkspace, canUseInternal } = useWorkspace();
   const [personaAnchor, setPersonaAnchor] = useState<null | HTMLElement>(null);
   const [workspaceAnchor, setWorkspaceAnchor] = useState<null | HTMLElement>(null);
+  const [otherStaffRoleType, setOtherStaffRoleType] = useState<string | null>(
+    () => (user as any)?.other_staff_profile?.role_type ?? (user as any)?.otherStaffProfile?.roleType ?? null
+  );
+
+  useEffect(() => {
+    if (user?.role !== "OTHER_STAFF") {
+      setOtherStaffRoleType(null);
+      return;
+    }
+    let cancelled = false;
+    getOnboarding("other_staff")
+      .then((profile: any) => {
+        if (!cancelled) {
+          setOtherStaffRoleType(profile?.data?.role_type ?? profile?.role_type ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOtherStaffRoleType(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -125,7 +147,7 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
         key: `ROLE:${user.role}`,
         kind: "ROLE",
         role: user.role,
-        label: STAFF_ROLE_LABELS[user.role],
+        label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) : "Pharmacist",
         helper: "Staff dashboard",
       });
     }
@@ -162,7 +184,7 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
     });
 
     return options;
-  }, [adminAssignments, user?.role]);
+  }, [adminAssignments, otherStaffRoleType, user?.role]);
 
   const activePersonaKey = useMemo(() => {
     if (activePersona === "admin") {

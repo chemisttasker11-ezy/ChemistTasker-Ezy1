@@ -20,6 +20,23 @@ from client_profile.admin_helpers import is_admin_of
 MAX_PUBLIC_SHIFTS_PER_DAY = 10
 TRAVEL_ORIGIN_PREFIX = "Traveling from:"
 STATE_CODES = {"NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"}
+OTHER_STAFF_ROLE_LABELS = {
+    "INTERN": "Intern Pharmacist",
+    "TECHNICIAN": "Dispensary Technician",
+    "ASSISTANT": "Pharmacy Assistant",
+    "STUDENT": "Pharmacy Student",
+}
+
+
+def other_staff_role_label(role_type, fallback="Other Staff"):
+    normalized = str(role_type or "").strip().upper()
+    return OTHER_STAFF_ROLE_LABELS.get(normalized, fallback)
+
+
+def membership_role_label(role):
+    if not role:
+        return ""
+    return dict(Membership.ROLE_CHOICES).get(role, other_staff_role_label(role, str(role).replace("_", " ").title()))
 
 
 def extract_travel_origin_from_message(message: str | None):
@@ -455,11 +472,13 @@ def get_candidate_role(obj) -> str:
     model = obj._meta.model_name
     if model == 'pharmacistonboarding':
         return 'Pharmacist'
+    if model == 'otherstaffonboarding':
+        return other_staff_role_label(getattr(obj, 'role_type', None))
 
-    for field in ('position_applied_for', 'desired_role', 'role', 'staff_role', 'explorer_role'):
+    for field in ('position_applied_for', 'desired_role', 'role_type', 'role', 'staff_role', 'explorer_role'):
         val = getattr(obj, field, None)
         if val:
-            return str(val)
+            return other_staff_role_label(val) if model == 'otherstaffonboarding' else str(val)
 
     rp = getattr(obj, 'rate_preference', None)
     if isinstance(rp, dict):

@@ -25,6 +25,7 @@ import {
   updateExplorerPost,
 } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../../../../constants/api";
+import { otherStaffRoleLabel } from "../../../../utils/roleLabels";
 import skillsCatalog from "../../../../../../shared-core/skills_catalog.json";
 
 const titleCase = (value: string) =>
@@ -605,11 +606,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         }));
       } else if (isOtherStaff) {
         const onboarding: any = await getOnboarding("other_staff");
-        const title = (onboarding?.role_type || "Other Staff")
-          .replace("_", " ")
-          .toLowerCase()
-          .replace(/(^|\s)\S/g, (t: string) => t.toUpperCase());
-        setRoleTitle(title);
+        setRoleTitle(otherStaffRoleLabel(onboarding?.role_type));
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
         setPitchForm((prev) => ({
           ...prev,

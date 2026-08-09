@@ -14,9 +14,10 @@ import { useNavigate } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
-import { getExplorerDashboard } from "@chemisttasker/shared-core";
+import { getExplorerDashboard, getOnboardingDetail } from "@chemisttasker/shared-core";
 import apiClient from "../../../utils/apiClient";
 import { dashboardGreetingName } from "../../../utils/displayName";
+import { dashboardTitleForRole } from "../../../utils/roleLabels";
 import DashboardOverviewTemplate, {
   type DashboardAction,
   type DashboardMetric,
@@ -71,6 +72,31 @@ export default function OverviewPageStaff() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [otherStaffRoleType, setOtherStaffRoleType] = useState<string | null>(
+    () => (user as any)?.other_staff_profile?.role_type ?? (user as any)?.otherStaffProfile?.roleType ?? null
+  );
+
+  useEffect(() => {
+    if (!isOtherStaff) {
+      setOtherStaffRoleType(null);
+      return;
+    }
+    let cancelled = false;
+    getOnboardingDetail("other_staff")
+      .then((onboarding: any) => {
+        if (!cancelled) {
+          setOtherStaffRoleType(onboarding?.data?.role_type ?? onboarding?.role_type ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOtherStaffRoleType(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOtherStaff, user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +181,7 @@ export default function OverviewPageStaff() {
     week: Number(data?.upcoming_stats?.week ?? data?.upcoming_shifts_count ?? 0),
     month: Number(data?.upcoming_stats?.month ?? data?.upcoming_shifts_count ?? 0),
   };
-  const dashboardTitle = isExplorer ? "Explorer Dashboard" : isPharmacist ? "Pharmacist Dashboard" : "Other Staff Dashboard";
+  const dashboardTitle = dashboardTitleForRole(user?.role, otherStaffRoleType);
   const dashboardSubtitle = isExplorer
     ? "Browse the public ChemistTasker platform, resources and opportunities"
     : effectivePharmacyId

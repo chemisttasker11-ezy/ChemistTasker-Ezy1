@@ -148,18 +148,21 @@ def _get_login_attempt_state(request, credentials):
         from axes.helpers import get_cool_off, get_failure_limit
 
         AxesProxyHandler.update_request(request)
-        attempts_list = get_user_attempts(request, credentials)
-        failures = 0
+        failures = getattr(request, "axes_failures_since_start", None)
         latest_attempt = None
-        for attempts in attempts_list:
-            aggregate = attempts.aggregate(
-                failures=Sum("failures_since_start"),
-                latest=Max("attempt_time"),
-            )
-            failures = max(failures, int(aggregate["failures"] or 0))
-            latest = aggregate["latest"]
-            if latest and (latest_attempt is None or latest > latest_attempt):
-                latest_attempt = latest
+        if failures is None:
+            attempts_list = get_user_attempts(request, credentials)
+            failures = 0
+            for attempts in attempts_list:
+                aggregate = attempts.aggregate(
+                    failures=Sum("failures_since_start"),
+                    latest=Max("attempt_time"),
+                )
+                failures = max(failures, int(aggregate["failures"] or 0))
+                latest = aggregate["latest"]
+                if latest and (latest_attempt is None or latest > latest_attempt):
+                    latest_attempt = latest
+        failures = int(failures or 0)
 
         failure_limit = int(get_failure_limit(request, credentials))
         remaining = max(failure_limit - failures, 0)
@@ -236,17 +239,19 @@ def _login_invalid_credentials_response(user, attempt_state):
     status_code = status.HTTP_401_UNAUTHORIZED
 
     if attempt_state:
+        failure_limit = int(attempt_state["failure_limit"])
+        failures = int(attempt_state.get("failures") or 0)
+        attempts_remaining = max(failure_limit - failures, 0)
         payload.update(
             {
-                "failure_limit": attempt_state["failure_limit"],
-                "attempts_remaining": attempt_state["attempts_remaining"],
+                "failure_limit": failure_limit,
+                "attempts_remaining": attempts_remaining,
             }
         )
         if code == "incorrect_password":
-            attempts = attempt_state["attempts_remaining"]
             payload["detail"] = (
                 f"The password is incorrect for this email address. "
-                f"{attempts} login attempt{'s' if attempts != 1 else ''} remaining before temporary lockout."
+                f"{attempts_remaining} login attempt{'s' if attempts_remaining != 1 else ''} remaining before temporary lockout."
             )
 
     return Response(payload, status=status_code)

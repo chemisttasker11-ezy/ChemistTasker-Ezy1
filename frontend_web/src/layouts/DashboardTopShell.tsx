@@ -22,6 +22,7 @@ import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { getOnboardingDetail } from "@chemisttasker/shared-core";
+import { dashboardTitleForRole } from "../utils/roleLabels";
 
 const DNA = {
   navy: "#061A3D",
@@ -66,16 +67,6 @@ const dashboardAccents = [
 
 function accentForScope(_scopeId: number | null, _workspace: string) {
   return dashboardAccents[0];
-}
-
-function titleForRole(role?: string | null) {
-  const normalized = String(role || "").toUpperCase();
-  if (normalized === "OWNER") return "Owner Dashboard";
-  if (normalized === "PHARMACIST") return "Pharmacist Dashboard";
-  if (normalized === "OTHER_STAFF") return "Other Staff Dashboard";
-  if (normalized === "EXPLORER") return "Explorer Dashboard";
-  if (normalized.includes("ORG") || normalized === "ORGANIZATION") return "Organization Dashboard";
-  return "Dashboard";
 }
 
 function workerOverviewPath(role?: string | null) {
@@ -359,6 +350,9 @@ export default function DashboardTopShell({
   const [adminAnchor, setAdminAnchor] = useState<HTMLElement | null>(null);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(activeAdminPharmacyId ?? workspaceSelectedPharmacyId ?? null);
   const [workerVerified, setWorkerVerified] = useState<boolean>(() => isOverallVerified(user));
+  const [otherStaffRoleType, setOtherStaffRoleType] = useState<string | null>(() => {
+    return (user as any)?.other_staff_profile?.role_type ?? (user as any)?.otherStaffProfile?.roleType ?? null;
+  });
 
   const pharmacies = useMemo(() => collectPharmacies(user, adminAssignments), [user, adminAssignments]);
   const isOrgUser = String(user?.role || "").toUpperCase().includes("ORG") || String(user?.role || "").toUpperCase() === "ORGANIZATION";
@@ -369,14 +363,14 @@ export default function DashboardTopShell({
   const hidePharmacyScope = forceAdminScope || activePersona === "admin";
   const showPharmacySelector = !hidePharmacyScope && (isOwner || isOrgUser || isWorker) && (pharmacies.length > 0 || canUsePlatformWorkspace);
   const selectedPharmacy = pharmacies.find((item) => item.id === selectedPharmacyId) ?? null;
-  const title = titleOverride ?? titleForRole(forceAdminScope ? "ADMIN" : user?.role);
+  const title = titleOverride ?? dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType);
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
 
   useEffect(() => {
     const initialVerified = isOverallVerified(user);
     setWorkerVerified(initialVerified);
 
-    if (!user || !isWorker || initialVerified) return;
+    if (!user || !isWorker) return;
 
     let cancelled = false;
     const roleKey = String(user.role).toUpperCase() === "PHARMACIST" ? "pharmacist" : "other_staff";
@@ -389,9 +383,13 @@ export default function DashboardTopShell({
           onboarding?.data?.verified ??
           (roleKey === "pharmacist" ? onboarding?.ahpra_verified : undefined);
         setWorkerVerified(coerceVerified(verifiedFlag));
+        if (roleKey === "other_staff") {
+          const roleType = onboarding?.role_type ?? onboarding?.data?.role_type ?? null;
+          setOtherStaffRoleType(roleType);
+        }
       })
       .catch(() => {
-        if (!cancelled) setWorkerVerified(false);
+        if (!cancelled) setWorkerVerified(initialVerified);
       });
 
     return () => {

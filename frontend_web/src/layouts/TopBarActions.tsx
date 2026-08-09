@@ -44,6 +44,7 @@ import { fetchNotifications, markNotificationsRead, NotificationItem } from "../
 import { fetchRooms, getOnboarding } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../constants/api";
 import { dashboardGreetingName } from "../utils/displayName";
+import { otherStaffRoleLabel, userRoleLabel } from "../utils/roleLabels";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 
@@ -71,11 +72,6 @@ type PersonaMenuOption =
     label: string;
     helper?: string;
   };
-
-const STAFF_ROLE_LABELS: Record<"PHARMACIST" | "OTHER_STAFF", string> = {
-  PHARMACIST: "Pharmacist",
-  OTHER_STAFF: "Other Staff",
-};
 
 const ADMIN_LEVEL_LABELS: Record<string, string> = {
   OWNER: "Owner",
@@ -515,18 +511,6 @@ function profilePhotoFromSource(source: any) {
   );
 }
 
-function roleLabel(role?: string | null) {
-  const normalized = String(role || "").toUpperCase();
-  if (normalized === "OTHER_STAFF") return "Other Staff";
-  if (normalized.includes("ORG") || normalized === "ORGANIZATION") return "Organization";
-  if (!normalized) return "Member";
-  return normalized
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 type MessageSummary = {
   conversation_id: number;
   conversation_title: string;
@@ -593,6 +577,13 @@ export default function TopBarActions({
   const [onboardingProfile, setOnboardingProfile] = React.useState<any>(null);
   const [pharmacyCount, setPharmacyCount] = React.useState<number | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
+  const otherStaffRoleType =
+    onboardingProfile?.role_type ??
+    onboardingProfile?.roleType ??
+    (user as any)?.other_staff_profile?.role_type ??
+    (user as any)?.otherStaffProfile?.roleType ??
+    null;
+  const currentRoleLabel = userRoleLabel(user?.role, otherStaffRoleType);
 
   const filterOptions = React.useMemo(
     () =>
@@ -615,7 +606,7 @@ export default function TopBarActions({
         key: `ROLE:${user.role}`,
         kind: "ROLE",
         role: user.role,
-        label: STAFF_ROLE_LABELS[user.role],
+        label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) : "Pharmacist",
         helper: "Staff dashboard",
       });
     }
@@ -655,7 +646,7 @@ export default function TopBarActions({
     });
 
     return options;
-  }, [adminAssignments, user?.role]);
+  }, [adminAssignments, otherStaffRoleType, user?.role]);
 
   const activePersonaKey = React.useMemo(() => {
     if (activePersona === "admin") {
@@ -1594,7 +1585,7 @@ export default function TopBarActions({
           <Typography sx={{ fontSize: 12, fontWeight: 800, color: "var(--ct-text-secondary)", textTransform: "uppercase" }}>
             {activePersona === "admin"
               ? activeAdminAssignment?.admin_level ?? "Admin"
-              : roleLabel(user?.role)}
+              : currentRoleLabel}
           </Typography>
         </Box>
         <KeyboardArrowDownIcon
@@ -1655,7 +1646,7 @@ export default function TopBarActions({
               {displayFirstName}
             </Typography>
             <Typography noWrap sx={{ fontSize: 12, fontWeight: 700, color: "var(--ct-text-secondary)" }}>
-              {user?.email || roleLabel(user?.role)}
+              {user?.email || currentRoleLabel}
             </Typography>
           </Box>
         </Box>

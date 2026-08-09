@@ -6,6 +6,40 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
 
+class LoginFailureAttemptCountTests(TestCase):
+    @override_settings(
+        AXES_ENABLED=True,
+        AXES_FAILURE_LIMIT=5,
+        AXES_LOCKOUT_PARAMETERS=[["username", "ip_address"]],
+    )
+    def test_wrong_password_attempts_remaining_decrements(self):
+        get_user_model().objects.create_user(
+            email="wrong-password@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+
+        first = self.client.post(
+            "/api/users/login/",
+            {"email": "wrong-password@example.com", "password": "WrongPassword123!"},
+            content_type="application/json",
+            REMOTE_ADDR="192.0.2.55",
+        )
+        second = self.client.post(
+            "/api/users/login/",
+            {"email": "wrong-password@example.com", "password": "WrongPassword123!"},
+            content_type="application/json",
+            REMOTE_ADDR="192.0.2.55",
+        )
+
+        self.assertEqual(first.status_code, 401)
+        self.assertEqual(second.status_code, 401)
+        self.assertEqual(first.json()["attempts_remaining"], 4)
+        self.assertEqual(second.json()["attempts_remaining"], 3)
+
+
 class PasswordResetConfirmTests(TestCase):
     @override_settings(AXES_ENABLED=True)
     def test_successful_password_reset_clears_axes_attempts_for_user(self):

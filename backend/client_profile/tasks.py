@@ -25,7 +25,7 @@ from users.tasks import send_async_email
 from client_profile.models import ShiftSlotAssignment, OnboardingNotification, MembershipApplication, Membership, Pharmacy, PharmacyAdmin
 from client_profile.timezone_utils import get_pharmacy_timezone
 from django.contrib.contenttypes.models import ContentType
-from client_profile.utils import build_shift_email_context, simple_name_match,clean_email,get_candidate_role, send_referee_emails, get_frontend_dashboard_url 
+from client_profile.utils import build_shift_email_context, simple_name_match, clean_email, get_candidate_role, send_referee_emails, get_frontend_dashboard_url, membership_role_label
 import logging
 import re
 from django.core.signing import TimestampSigner
@@ -1233,7 +1233,7 @@ def email_membership_application_submitted(app_id: int):
     ctx_common = {
         "pharmacy_name": pharmacy.name,
         "applicant_full_name": f"{app.first_name} {app.last_name}".strip(),
-        "role": app.role,
+        "role": membership_role_label(app.role),
         "category": (
             "Full/Part-time (Pharmacy staff)"
             if app.category == "FULL_PART_TIME"
@@ -1250,7 +1250,7 @@ def email_membership_application_submitted(app_id: int):
         ctx = {**ctx_common, "manage_url": manage_url}
         notification_payload = {
             "title": f"New membership application: {pharmacy.name}",
-            "body": f"{ctx_common['applicant_full_name']} applied for {app.role}.",
+            "body": f"{ctx_common['applicant_full_name']} applied for {ctx_common['role']}.",
             "action_url": manage_url,
             "payload": {"application_id": app.id},
         }
@@ -1291,7 +1291,7 @@ def email_membership_application_approved(app_id: int):
     ctx = {
         "pharmacy_name": pharmacy.name,
         "applicant_full_name": f"{app.first_name} {app.last_name}".strip(),
-        "role": app.role,
+        "role": membership_role_label(app.role),
         "category": (
             "Full/Part-time (Pharmacy staff)"
             if app.category == "FULL_PART_TIME"

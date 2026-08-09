@@ -13,6 +13,7 @@ import { alpha } from "@mui/material/styles";
 import { getOnboardingDetail } from "@chemisttasker/shared-core";
 import { UnsavedChangesBoundary } from "../../../hooks/useUnsavedChangesGuard";
 import AccountDeletionSection from "../../../components/AccountDeletionSection";
+import { otherStaffRoleLabel } from "../../../utils/roleLabels";
 
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -109,6 +110,7 @@ export default function OtherStaffOnboardingV2Layout() {
   const theme = React.useMemo(() => createOnboardingTheme(mode), [mode]);
   const [step, setStep] = React.useState<StepKey>("basic");
   const [progress, setProgress] = React.useState<number>(0);
+  const [roleType, setRoleType] = React.useState<string | null>(null);
   const idx = STEPS.findIndex(s => s.key === step);
   // const stepLabel = STEPS[idx]?.label ?? "";
 
@@ -117,6 +119,7 @@ export default function OtherStaffOnboardingV2Layout() {
     getOnboardingDetail("otherstaff")
       .then((res) => {
         const p = (res as any)?.progress_percent ?? 0;
+        setRoleType((res as any)?.role_type ?? null);
         setProgress(Number.isFinite(p) ? p : 0);
       })
       .catch(() => {
@@ -143,7 +146,7 @@ return (
         {/* Header + ONLY progress bar here */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h5" fontWeight={700} gutterBottom>
-            Other Staff Onboarding
+            {`${otherStaffRoleLabel(roleType)} Onboarding`}
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
             <Typography variant="body2" color="text.secondary">

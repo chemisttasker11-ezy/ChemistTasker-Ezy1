@@ -43,6 +43,8 @@ from client_profile.utils import (
     build_shift_interest_context,
     build_shift_offer_context,
     finalize_shift_offer,
+    membership_role_label,
+    other_staff_role_label,
 )
 from client_profile.notifications import mark_notifications_read, broadcast_message_read, broadcast_message_badge, notify_users
 from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
@@ -1901,7 +1903,7 @@ class OtherStaffDashboard(APIView):
             )
             data = {
                 "user": user_serializer.data,
-                "message": "Welcome Other Staff!",
+                "message": f"Welcome {other_staff_role_label(getattr(getattr(user, 'otherstaffonboarding', None), 'role_type', None))}!",
                 "upcoming_shifts_count": public_shifts.count(),
                 "confirmed_shifts_count": confirmed_shifts.count(),
                 "community_shifts_count": public_shifts.count(),
@@ -1970,7 +1972,7 @@ class OtherStaffDashboard(APIView):
 
         data = {
             "user": user_serializer.data,
-            "message": "Welcome Other Staff!",
+            "message": f"Welcome {other_staff_role_label(getattr(getattr(user, 'otherstaffonboarding', None), 'role_type', None))}!",
             "upcoming_shifts_count": upcoming_shifts.count(),
             "confirmed_shifts_count": confirmed_shifts.count(),
             "community_shifts_count": community_shifts.count(),
@@ -2402,12 +2404,12 @@ class MembershipViewSet(viewsets.ModelViewSet):
             else:
                 required_user_role = required_user_role_for_membership(role)
                 if required_user_role and user.role != required_user_role:
-                    membership_role_label = dict(Membership.ROLE_CHOICES).get(role, role)
+                    membership_role_label_text = membership_role_label(role)
                     user_role_label = dict(User.ROLE_CHOICES).get(user.role, user.role or "Unspecified")
                     required_role_label = dict(User.ROLE_CHOICES).get(required_user_role, required_user_role)
                     return None, (
                         f"{user.email} is registered as {user_role_label} and cannot be added as "
-                        f"{membership_role_label}. Ask them to complete the {required_role_label} onboarding first."
+                        f"{membership_role_label_text}. Ask them to complete the {required_role_label} onboarding first."
                     )
 
             # Enforce maximum active pharmacy memberships per user
@@ -2501,7 +2503,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 context = {
                     "pharmacy_name": pharmacy.name,
                     "inviter": inviter.get_full_name() or inviter.email or "A pharmacy admin",
-                    "role": role.title() if role else "",
+                    "role": membership_role_label(role),
                     "is_admin": is_admin_role,                    # <-- NEW
                     "admin_landing_url": admin_landing_url,       # <-- NEW
                 }
@@ -2553,7 +2555,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
                         notification={
                             "user_ids": [user.id],
                             "title": f"Invitation to join {pharmacy.name}",
-                            "body": f"You have been invited as {dict(Membership.ROLE_CHOICES).get(role, role)}. Accept or reject the invitation from Manage Memberships.",
+                            "body": f"You have been invited as {membership_role_label(role)}. Accept or reject the invitation from Manage Memberships.",
                             "type": Notification.Type.ALERT,
                             "action_url": membership_url,
                             "payload": {
@@ -3109,7 +3111,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
             context = {
                 "pharmacy_name": pharmacy.name,
                 "inviter": request.user.get_full_name() or request.user.email or "A pharmacy admin",
-                "role": dict(Membership.ROLE_CHOICES).get(membership.role, membership.role),
+                "role": membership_role_label(membership.role),
                 "is_admin": False,
                 "membership_url": membership_url,
                 "frontend_dashboard_link": membership_url,
