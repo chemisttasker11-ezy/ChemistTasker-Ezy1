@@ -344,15 +344,13 @@ export default function PublicShiftsPage({
   const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
     if (!isVerified) {
       const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
-      showError(msg);
       throw new Error(msg);
     }
     try {
       await submitShiftCounterOfferService(payload);
     } catch (err) {
       console.error('Failed to submit counter offer', err);
-      showError(errorMessage(err, 'Failed to submit counter offer.'));
-      throw err;
+      throw new Error(errorMessage(err, 'Failed to submit counter offer.'));
     }
   };
 

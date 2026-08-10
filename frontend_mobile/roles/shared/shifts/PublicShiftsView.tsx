@@ -272,14 +272,13 @@ export default function PublicShiftsView({
 
     const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
         if (!guardVerified()) {
-            throw new Error('Not verified');
+            throw new Error('Your onboarding must be verified by admin before applying for public shifts.');
         }
         try {
             await submitShiftCounterOfferService(payload);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
-            showError(errorMessage(err, 'Failed to submit counter offer.'));
-            throw err;
+            throw new Error(errorMessage(err, 'Failed to submit counter offer.'));
         }
     };
 

@@ -78,6 +78,49 @@ from client_profile.rewards import (
     spend_pills_for_shift_post,
     user_is_referral_reward_eligible,
 )
+
+NON_INTERN_OTHER_STAFF_SHIFT_ROLES = ("ASSISTANT", "TECHNICIAN", "STUDENT")
+ALL_OTHER_STAFF_SHIFT_ROLES = NON_INTERN_OTHER_STAFF_SHIFT_ROLES + ("INTERN",)
+
+
+def _normalized_role_code(value):
+    raw = str(value or "").strip().upper().replace("-", "_").replace(" ", "_")
+    if raw in {"PHARMACY_ASSISTANT", "ASSISTANT"}:
+        return "ASSISTANT"
+    if raw in {"DISPENSARY_TECHNICIAN", "TECHNICIAN"}:
+        return "TECHNICIAN"
+    if raw in {"INTERN_PHARMACIST", "INTERN"}:
+        return "INTERN"
+    if raw in {"PHARMACY_STUDENT", "STUDENT"}:
+        return "STUDENT"
+    if raw in {"PHARMACIST", "EXPLORER"}:
+        return raw
+    return raw
+
+
+def _otherstaff_onboarding_role(user):
+    onboarding = OtherStaffOnboarding.objects.filter(user=user).first()
+    return _normalized_role_code(getattr(onboarding, "role_type", None))
+
+
+def _shift_roles_visible_to_user(user):
+    top_role = _normalized_role_code(getattr(user, "role", None))
+    if top_role == "PHARMACIST":
+        return ["PHARMACIST"]
+    if top_role == "EXPLORER":
+        return ["EXPLORER"]
+    if top_role == "OTHER_STAFF":
+        staff_role = _otherstaff_onboarding_role(user)
+        if staff_role == "INTERN":
+            return ["INTERN"]
+        if staff_role in ALL_OTHER_STAFF_SHIFT_ROLES:
+            return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
+        return []
+    return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
+
+
+def _user_can_perform_shift_role(user, shift_role):
+    return _normalized_role_code(shift_role) in _shift_roles_visible_to_user(user)
 from django.db import transaction, IntegrityError
 from django.db.models.deletion import ProtectedError
 from datetime import timedelta                   # used in TimestampSigner max_age
@@ -1183,35 +1226,36 @@ def _dashboard_activity(*, shifts_qs, confirmed_qs, invoices_qs, pharmacy_name, 
             "created_at": latest_shift.created_at.isoformat() if latest_shift.created_at else None,
         })
 
-    hub_qs = PharmacyHubPost.objects.filter(deleted_at__isnull=True)
-    if selected_pharmacy is not None:
-        hub_qs = hub_qs.filter(pharmacy=selected_pharmacy)
-    elif pharmacy_ids:
-        hub_qs = hub_qs.filter(pharmacy_id__in=pharmacy_ids)
-    elif str(dashboard_role or "").lower() == "organization":
-        hub_qs = hub_qs.filter(organization__isnull=False)
-    else:
-        hub_qs = hub_qs.filter(platform_hub=PharmacyHubPost.PlatformHub.PUBLIC)
-    if str(dashboard_role or "").lower() == "owner" and user is not None:
-        hub_qs = hub_qs.filter(author_user=user)
-    latest_hub_post = hub_qs.select_related("pharmacy", "organization", "community_group").order_by("-created_at").first()
-    if latest_hub_post:
-        description = (
-            getattr(latest_hub_post.pharmacy, "name", None)
-            or getattr(latest_hub_post.organization, "name", None)
-            or getattr(latest_hub_post.community_group, "name", None)
-            or "ChemistTasker Hub"
-        )
-        activity.append({
-            "title": "Recent Hub post",
-            "description": description,
-            "time": _dashboard_activity_time(latest_hub_post.created_at),
-            "kind": "hub",
-            "target_type": "hub_post",
-            "target_id": latest_hub_post.id,
-            "action_url": _dashboard_hub_action_url(latest_hub_post),
-            "created_at": latest_hub_post.created_at.isoformat() if latest_hub_post.created_at else None,
-        })
+    if str(dashboard_role or "").lower() not in {"pharmacist", "otherstaff", "explorer"}:
+        hub_qs = PharmacyHubPost.objects.filter(deleted_at__isnull=True)
+        if selected_pharmacy is not None:
+            hub_qs = hub_qs.filter(pharmacy=selected_pharmacy)
+        elif pharmacy_ids:
+            hub_qs = hub_qs.filter(pharmacy_id__in=pharmacy_ids)
+        elif str(dashboard_role or "").lower() == "organization":
+            hub_qs = hub_qs.filter(organization__isnull=False)
+        else:
+            hub_qs = hub_qs.filter(platform_hub=PharmacyHubPost.PlatformHub.PUBLIC)
+        if str(dashboard_role or "").lower() == "owner" and user is not None:
+            hub_qs = hub_qs.filter(author_user=user)
+        latest_hub_post = hub_qs.select_related("pharmacy", "organization", "community_group").order_by("-created_at").first()
+        if latest_hub_post:
+            description = (
+                getattr(latest_hub_post.pharmacy, "name", None)
+                or getattr(latest_hub_post.organization, "name", None)
+                or getattr(latest_hub_post.community_group, "name", None)
+                or "ChemistTasker Hub"
+            )
+            activity.append({
+                "title": "Recent Hub post",
+                "description": description,
+                "time": _dashboard_activity_time(latest_hub_post.created_at),
+                "kind": "hub",
+                "target_type": "hub_post",
+                "target_id": latest_hub_post.id,
+                "action_url": _dashboard_hub_action_url(latest_hub_post),
+                "created_at": latest_hub_post.created_at.isoformat() if latest_hub_post.created_at else None,
+            })
 
     reveal_qs = ShiftProfileAccessAudit.objects.filter(
         shift__in=shift_scope,
@@ -1774,7 +1818,7 @@ class PharmacistDashboard(APIView):
             user=user, is_active=True
         ).values_list('pharmacy_id', flat=True))
         if workspace == "platform":
-            public_shifts = _public_platform_shifts(today, now)
+            public_shifts = _public_platform_shifts(today, now).filter(role_needed__in=_shift_roles_visible_to_user(user))
             confirmed_shifts = _user_confirmed_platform_shifts(user, today, now)
             invoices_qs = Invoice.objects.filter(user=user, pharmacy__isnull=True)
             extras = _dashboard_payload_extras(
@@ -1888,7 +1932,7 @@ class OtherStaffDashboard(APIView):
             user=user, is_active=True
         ).values_list('pharmacy_id', flat=True))
         if workspace == "platform":
-            public_shifts = _public_platform_shifts(today, now)
+            public_shifts = _public_platform_shifts(today, now).filter(role_needed__in=_shift_roles_visible_to_user(user))
             confirmed_shifts = _user_confirmed_platform_shifts(user, today, now)
             invoices_qs = Invoice.objects.filter(user=user, pharmacy__isnull=True)
             extras = _dashboard_payload_extras(
@@ -3453,9 +3497,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     def _worker_role_for_shift(user):
         role = getattr(user, 'role', None)
         if role == 'OTHER_STAFF':
-            onboarding = OtherStaffOnboarding.objects.filter(user=user).first()
-            return getattr(onboarding, 'role_type', None)
-        return role
+            return _otherstaff_onboarding_role(user)
+        return _normalized_role_code(role)
 
     @staticmethod
     def _is_public_shift_member_access(user, shift):
@@ -3465,7 +3508,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             return False
         if getattr(shift, "post_anonymously", False):
             return False
-        if BaseShiftViewSet._worker_role_for_shift(user) != getattr(shift, "role_needed", None):
+        if not _user_can_perform_shift_role(user, getattr(shift, "role_needed", None)):
             return False
         return Membership.objects.filter(
             user=user,
@@ -4783,29 +4826,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
 
         qs = qs.filter(eligible_q).distinct()
 
-        # Your clinical-role logic as before (can remain unchanged)
-        top_role = getattr(user, 'role', None)
-        if top_role == 'PHARMACIST':
-            allowed = ['PHARMACIST']
-        elif top_role == 'OTHER_STAFF':
-            onboard = OtherStaffOnboarding.objects.filter(user=user).first()
-            sub = getattr(onboard, 'role_type', None)
-            if sub == 'TECHNICIAN':
-                allowed = ['TECHNICIAN']
-            elif sub == 'ASSISTANT':
-                allowed = ['ASSISTANT']
-            elif sub == 'INTERN':
-                allowed = ['INTERN']
-            elif sub == 'STUDENT':
-                allowed = ['STUDENT']
-            else:
-                allowed = []
-        elif top_role == 'EXPLORER':
-            allowed = ['EXPLORER']
-        else:
-            allowed = COMMUNITY_LEVELS
-
-        qs = qs.filter(role_needed__in=allowed)
+        qs = qs.filter(role_needed__in=_shift_roles_visible_to_user(user))
 
         params = self.request.query_params
         search = params.get('search')
@@ -4960,8 +4981,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        effective_user_role = onboarding_role or user_role
-        if effective_user_role != shift.role_needed:
+        effective_user_role = _normalized_role_code(onboarding_role or user_role)
+        if not _user_can_perform_shift_role(user, shift.role_needed):
             return Response(
                 {"detail": f"This shift requires a {shift.role_needed}, but your role is {effective_user_role}. [DBG:ROLE_MISMATCH]"},
                 status=status.HTTP_403_FORBIDDEN
@@ -5062,33 +5083,7 @@ class PublicShiftViewSet(BaseShiftViewSet):
         )
 
         user = self.request.user
-        top_role = getattr(user, 'role', None)
-
-        if top_role == 'PHARMACIST':
-            allowed = ['PHARMACIST']
-
-        elif top_role == 'OTHER_STAFF':
-            onboard = OtherStaffOnboarding.objects.filter(user=user).first()
-            sub = getattr(onboard, 'role_type', None)
-            if sub == 'TECHNICIAN':
-                allowed = ['TECHNICIAN']
-            elif sub == 'ASSISTANT':
-                allowed = ['ASSISTANT']
-            elif sub == 'INTERN':
-                allowed = ['INTERN']
-            elif sub == 'STUDENT':
-                allowed = ['STUDENT']
-            else:
-                allowed = []
-
-        elif top_role == 'EXPLORER':
-            allowed = ['EXPLORER']
-
-        else:
-            # Owners / ORG_ADMIN see every role on public
-            allowed = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'EXPLORER', 'INTERN', 'STUDENT']
-
-        qs = qs.filter(role_needed__in=allowed)
+        qs = qs.filter(role_needed__in=_shift_roles_visible_to_user(user))
 
         # --- Filters from query params ---
         params = self.request.query_params
@@ -6129,20 +6124,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         # ... (rest of the get_queryset logic for public shifts and assigned shifts)
         
         eligible_platform_q = Q()
-        top_role = getattr(user, 'role', None)
-        allowed_roles_for_user = []
-        if top_role == 'PHARMACIST':
-            allowed_roles_for_user = ['PHARMACIST']
-        elif top_role == 'OTHER_STAFF':
-            onboard = OtherStaffOnboarding.objects.filter(user=user).first()
-            if onboard:
-                sub = getattr(onboard, 'role_type', None)
-                if sub == 'TECHNICIAN': allowed_roles_for_user = ['TECHNICIAN']
-                elif sub == 'ASSISTANT': allowed_roles_for_user = ['ASSISTANT']
-                elif sub == 'INTERN': allowed_roles_for_user = ['INTERN']
-                elif sub == 'STUDENT': allowed_roles_for_user = ['STUDENT']
-        elif top_role == 'EXPLORER':
-            allowed_roles_for_user = ['EXPLORER']
+        allowed_roles_for_user = _shift_roles_visible_to_user(user)
 
         if allowed_roles_for_user:
             eligible_platform_q |= Q(

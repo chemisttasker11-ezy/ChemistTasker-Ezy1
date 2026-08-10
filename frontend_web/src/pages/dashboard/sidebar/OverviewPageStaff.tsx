@@ -59,7 +59,7 @@ export default function OverviewPageStaff() {
   const effectivePharmacyId =
     workspace === "internal" && selectedPharmacyId
       ? selectedPharmacyId
-      : Number.isFinite(urlPharmacyId)
+      : workspace === "internal" && Number.isFinite(urlPharmacyId)
         ? urlPharmacyId
         : null;
 
@@ -107,7 +107,7 @@ export default function OverviewPageStaff() {
         const dashboardParams =
           workspace === "internal" && selectedPharmacyId
             ? { workspace: "internal", pharmacy_id: selectedPharmacyId }
-            : effectivePharmacyId
+            : workspace === "internal" && effectivePharmacyId
               ? { workspace: "internal", pharmacy_id: effectivePharmacyId }
             : { workspace: "platform" };
         const result = isPharmacist
@@ -241,8 +241,8 @@ export default function OverviewPageStaff() {
         buttonLabel: "Invoices",
         onClick: () => navigate(`/dashboard/${roleSegment}/invoice`),
       }}
-      onOpenShifts={() => navigate(`/dashboard/${roleSegment}/shifts/${isExplorer ? "community" : "confirmed"}`)}
-      onOpenActivity={() => navigate(`/dashboard/${roleSegment}/shifts/${isExplorer ? "community" : "confirmed"}`)}
+      onOpenShifts={() => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath)}
+      onOpenActivity={() => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath)}
     />
   );
 }

@@ -404,8 +404,7 @@ export default function CommunityShiftsPage({
       await submitShiftCounterOfferService(payload);
     } catch (err) {
       console.error('Failed to submit counter offer', err);
-      showError(errorMessage(err, 'Failed to submit counter offer.'));
-      throw err;
+      throw new Error(errorMessage(err, 'Failed to submit counter offer.'));
     }
   };
 
