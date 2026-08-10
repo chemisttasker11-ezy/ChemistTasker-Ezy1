@@ -16,6 +16,7 @@ import {
   formatHubDate,
   formatMemberLabel,
   getHubAuthorName,
+  getMemberDisplayName,
   reactionEmojis,
 } from './hubUtils';
 
@@ -100,7 +101,7 @@ export function PostCard({ post, onEdit, onComment, onRefresh, highlighted = fal
           const key = t.membership_id || t.membershipId || t.email || `tag-${idx}`;
           return (
             <Chip key={key} compact style={styles.tagChip}>
-              @{t.full_name || t.fullName || t.email || 'Member'}
+              @{getMemberDisplayName(t)}
             </Chip>
           );
         })}

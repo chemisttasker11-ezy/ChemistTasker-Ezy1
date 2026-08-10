@@ -8,7 +8,11 @@ from client_profile.models import Message
 from django.utils.text import slugify
 import logging
 from client_profile.serializers import MessageSerializer
-from client_profile.notifications import broadcast_message_badge, notify_users
+from client_profile.notifications import (
+    broadcast_message_badge,
+    notify_users,
+    participant_can_receive_chat_updates,
+)
 
 from .models import (
     Membership,
@@ -19,6 +23,7 @@ from .models import (
     PharmacistOnboarding,
     OtherStaffOnboarding,
     ExplorerOnboarding,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
 )
 
 log = logging.getLogger("client_profile.signals")
@@ -103,6 +108,8 @@ def broadcast_new_message(sender, instance, created, **kwargs):
 
             recipient_user_ids = set()
             for participant in Participant.objects.select_related("membership__user", "conversation").filter(conversation_id=msg.conversation_id):
+                if not participant_can_receive_chat_updates(participant):
+                    continue
                 # Skip notifying the sender (membership or user) so they don't get self-badges
                 if participant.membership_id == msg.sender_id:
                     continue
@@ -148,7 +155,12 @@ def broadcast_new_message(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Membership)
 def sync_membership_to_community_chat(sender, instance, created, **kwargs):
-    if instance.is_active and instance.pharmacy:
+    if (
+        instance.is_active
+        and instance.status == Membership.Status.ACCEPTED
+        and instance.pharmacy
+        and instance.employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES
+    ):
         community_chat, chat_created = Conversation.objects.get_or_create(
             pharmacy=instance.pharmacy,
             type=Conversation.Type.GROUP,
@@ -161,6 +173,12 @@ def sync_membership_to_community_chat(sender, instance, created, **kwargs):
             conversation=community_chat,
             membership=instance
         )
+    elif instance.pharmacy_id:
+        Participant.objects.filter(
+            conversation__type=Conversation.Type.GROUP,
+            conversation__pharmacy_id=instance.pharmacy_id,
+            membership=instance,
+        ).delete()
 
 
 def _award_verified_referrals_after_commit(instance):

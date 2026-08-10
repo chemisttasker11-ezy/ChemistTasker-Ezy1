@@ -43,6 +43,7 @@ import type {
 } from './types';
 import HubPlaceholder from './HubPlaceholder';
 import { HubFeed } from './HubFeed';
+import { useAuth } from '@/context/AuthContext';
 
 type Scope =
   | { type: 'pharmacy'; id: number }
@@ -95,8 +96,33 @@ type GroupFormState = {
   memberIds: number[];
 };
 
+const STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+const filterPharmacyStaffMembers = (members: HubGroupMemberOption[]) =>
+  members.filter((member: any) => STAFF_EMPLOYMENT_TYPES.has(member?.employmentType || member?.employment_type || ''));
+const isEmailLike = (value?: string | null) => Boolean(value && value.includes('@'));
+const getMemberDisplayName = (member: any, fallback = 'Member') => {
+  const firstLast = `${member?.firstName ?? member?.first_name ?? ''} ${member?.lastName ?? member?.last_name ?? ''}`.trim();
+  const candidates = [
+    member?.fullName,
+    member?.full_name,
+    firstLast,
+    member?.invitedName,
+    member?.invited_name,
+    member?.username,
+  ];
+  for (const candidate of candidates) {
+    const value = typeof candidate === 'string' ? candidate.trim() : '';
+    if (value && !isEmailLike(value)) {
+      return value;
+    }
+  }
+  const id = member?.membershipId ?? member?.membership_id ?? member?.id;
+  return id ? `${fallback} ${id}` : fallback;
+};
+
 export default function HubScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const pathname = usePathname();
   const searchParams = useLocalSearchParams<{
     scope?: string;
@@ -334,14 +360,16 @@ export default function HubScreen() {
         } else {
           options = (await fetchOrganizationGroupMembers(scope.id)) as any;
         }
-        setMemberOptions(options || []);
+        setMemberOptions(
+          filterPharmacyStaffMembers(options || []).filter((member: any) => user?.id == null || member?.userId !== user.id),
+        );
       } catch (err: any) {
         setSnackbar(err?.message || 'Failed to load members');
       } finally {
         setMembersLoading(false);
       }
     },
-    [scopeAllowsGroupCreate],
+    [scopeAllowsGroupCreate, user?.id],
   );
 
   const closeGroupModal = useCallback(() => {
@@ -543,7 +571,7 @@ export default function HubScreen() {
     const base = roleFilter === 'all' ? memberOptions : memberOptions.filter((m) => String(m.role) === roleFilter);
     if (!query) return base;
     return base.filter((m) => {
-      const name = (m.fullName || '').toLowerCase();
+      const name = getMemberDisplayName(m).toLowerCase();
       const email = (m.email || '').toLowerCase();
       return name.includes(query) || email.includes(query);
     });
@@ -1055,7 +1083,7 @@ export default function HubScreen() {
               <View style={styles.selectedChips}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {selectedMemberDetails.map((m) => {
-                    const label = (m.fullName || m.email || 'Member') + (m.pharmacyName ? ` — ${m.pharmacyName}` : '');
+                    const label = getMemberDisplayName(m) + (m.pharmacyName ? ` — ${m.pharmacyName}` : '');
                     const id = (m as any).membershipId ?? (m as any).id;
                     return (
                       <Chip
@@ -1097,7 +1125,7 @@ export default function HubScreen() {
                             }
                           />
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: '600' }}>{m.fullName || m.email || 'Member'}</Text>
+                            <Text style={{ fontWeight: '600' }}>{getMemberDisplayName(m)}</Text>
                             <Text style={styles.meta}>
                               {[m.role, m.jobTitle].filter(Boolean).join(' | ')}
                             </Text>

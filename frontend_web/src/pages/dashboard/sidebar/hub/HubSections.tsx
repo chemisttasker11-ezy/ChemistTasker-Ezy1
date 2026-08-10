@@ -29,7 +29,11 @@ import type {
   HubScopeSelection,
 } from '../../../../types/hub';
 import { ScopeFeed } from './HubFeed';
-import { formatMemberLabel } from './hubUtils';
+import { formatMemberLabel, getMemberDisplayName } from './hubUtils';
+
+const STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+const filterPharmacyStaffMembers = (members: HubGroupMemberOption[]) =>
+  members.filter((member) => STAFF_EMPLOYMENT_TYPES.has(member.employmentType || ''));
 interface HomePageContentProps {
   details: {
     id: number;
@@ -164,7 +168,7 @@ function MembersPreviewPanel({ loadMembers, title, emptyMessage }: MembersPrevie
     loadMembers()
       .then((list) => {
         if (isMounted) {
-          setMembers(list);
+          setMembers(filterPharmacyStaffMembers(list));
         }
       })
       .catch((err) => {
@@ -218,7 +222,7 @@ function MembersPreviewPanel({ loadMembers, title, emptyMessage }: MembersPrevie
         ) : members.length ? (
           <Stack direction="row" flexWrap="wrap" gap={1}>
             {preview.map((member) => {
-              const baseName = member.fullName || member.email || 'Member';
+              const baseName = getMemberDisplayName(member);
               return (
                 <Chip
                   key={member.membershipId}

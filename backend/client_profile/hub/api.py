@@ -8,7 +8,7 @@ from django.http import QueryDict
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q, F, Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from core.task_queue import async_task
@@ -58,6 +58,25 @@ from ..serializers import (
 from ..file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 
 
+STAFF_GROUP_MEMBER_FILTER = Q(
+    memberships__membership__is_active=True,
+    memberships__membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+
+
+def staff_group_members_prefetch():
+    return Prefetch(
+        "memberships",
+        queryset=(
+            PharmacyCommunityGroupMembership.objects.filter(
+                membership__is_active=True,
+                membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            ).select_related("membership", "membership__user", "membership__pharmacy")
+        ),
+        to_attr="staff_memberships",
+    )
+
+
 CHEMISTTASKER_HUB_DEFINITIONS = {
     PharmacyHubPost.PlatformHub.PUBLIC: {
         "key": PharmacyHubPost.PlatformHub.PUBLIC,
@@ -94,7 +113,7 @@ def _get_user_display_name(user):
     return full_name or getattr(user, "username", "") or getattr(user, "email", "") or "A user"
 
 
-def _build_hub_post_action_url(post):
+def _build_hub_post_action_params(post):
     params = {"post": post.id}
     if post.platform_hub:
         params.update(
@@ -124,7 +143,11 @@ def _build_hub_post_action_url(post):
                 "pharmacy_id": post.pharmacy_id,
             }
         )
-    return f"/dashboard/pharmacy-hub?{urlencode(params)}"
+    return params
+
+
+def _build_hub_post_action_url(post):
+    return f"/dashboard/pharmacy-hub?{urlencode(_build_hub_post_action_params(post))}"
 
 
 def _notify_hub_post_owner(*, post, actor_user, title, body="", payload=None):
@@ -363,6 +386,9 @@ class HubScopeResolver:
             "membership",
             "membership__user",
             "membership__pharmacy",
+        ).filter(
+            membership__is_active=True,
+            membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
         )
         if membership:
             group_membership = membership_query.filter(
@@ -812,7 +838,9 @@ class HubContextBuilder:
         pharmacy_ids = [pharmacy.id for pharmacy in pharmacy_list]
         member_group_ids = list(
             PharmacyCommunityGroupMembership.objects.filter(
-                membership__user=self.user
+                membership__user=self.user,
+                membership__is_active=True,
+                membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             ).values_list("group_id", flat=True)
         )
         filters = Q()
@@ -825,8 +853,8 @@ class HubContextBuilder:
         groups = list(
             PharmacyCommunityGroup.objects.filter(filters)
             .select_related("pharmacy", "pharmacy__organization")
-            .prefetch_related("memberships__membership__user", "memberships__membership__pharmacy")
-            .annotate(member_count=Count("memberships"))
+            .prefetch_related(staff_group_members_prefetch())
+            .annotate(staff_member_count=Count("memberships", filter=STAFF_GROUP_MEMBER_FILTER))
             .order_by("name")
             .distinct()
         )
@@ -897,8 +925,8 @@ class HubCommunityGroupViewSet(
         queryset = (
             PharmacyCommunityGroup.objects.all()
             .select_related("pharmacy", "pharmacy__organization")
-            .prefetch_related("memberships__membership__user", "memberships__membership__pharmacy")
-            .annotate(member_count=Count("memberships"))
+            .prefetch_related(staff_group_members_prefetch())
+            .annotate(staff_member_count=Count("memberships", filter=STAFF_GROUP_MEMBER_FILTER))
             .order_by("name")
         )
         pharmacy_id = self.request.query_params.get("pharmacy_id")
@@ -910,7 +938,9 @@ class HubCommunityGroupViewSet(
         pharmacies, _, _, _ = self._load_permissions()
         member_group_ids = list(
             PharmacyCommunityGroupMembership.objects.filter(
-                membership__user=self.request.user
+                membership__user=self.request.user,
+                membership__is_active=True,
+                membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             ).values_list("group_id", flat=True)
         )
         filters = Q()
@@ -1068,7 +1098,11 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
         title = f"{author_name} mentioned you in {context_label}"
         body_preview = (post.body or "").strip()
         body = body_preview[:280]
-        hub_path = "/dashboard/pharmacy-hub"
+        hub_path = _build_hub_post_action_url(post)
+        notification_payload = {
+            "post_id": post.id,
+            **_build_hub_post_action_params(post),
+        }
         user_payloads = []
         for membership in memberships:
             user = getattr(membership, "user", None)
@@ -1090,7 +1124,7 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
                 title=title,
                 body=body,
                 action_url=hub_path,
-                payload={"post_id": post.id},
+                payload=notification_payload,
             )
         email_targets = {}
         for payload in user_payloads:
@@ -1112,6 +1146,7 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
                     "context_label": context_label,
                     "post_body": body_preview,
                     "hub_url": hub_url,
+                    "action_url": hub_path,
                 }
                 async_task(
                     "users.tasks.send_async_email",
@@ -1120,6 +1155,7 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
                     template_name="emails/hub_post_tagged.html",
                     context=context,
                     text_template="emails/hub_post_tagged.txt",
+                    suppress_auto_notification=True,
                 )
 
     def list(self, request, *args, **kwargs):

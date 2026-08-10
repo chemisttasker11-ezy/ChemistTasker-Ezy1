@@ -12,6 +12,7 @@ import {
 } from './api';
 import type { HubPost, HubPostPayload } from './types';
 import { SubmissionNotice, useSubmissionGuard } from './submissionGuard';
+import { useAuth } from '@/context/AuthContext';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message.trim()) {
@@ -28,6 +29,31 @@ const getErrorMessage = (error: unknown, fallback: string) => {
     return detail.trim();
   }
   return fallback;
+};
+
+const STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+const filterPharmacyStaffMembers = (members: any[]) =>
+  members.filter((member) => STAFF_EMPLOYMENT_TYPES.has(member?.employmentType || member?.employment_type || ''));
+
+const isEmailLike = (value?: string | null) => Boolean(value && value.includes('@'));
+const getMemberDisplayName = (member: any, fallback = 'Member') => {
+  const firstLast = `${member?.firstName ?? member?.first_name ?? ''} ${member?.lastName ?? member?.last_name ?? ''}`.trim();
+  const candidates = [
+    member?.fullName,
+    member?.full_name,
+    firstLast,
+    member?.invitedName,
+    member?.invited_name,
+    member?.username,
+  ];
+  for (const candidate of candidates) {
+    const value = typeof candidate === 'string' ? candidate.trim() : '';
+    if (value && !isEmailLike(value)) {
+      return value;
+    }
+  }
+  const id = member?.membershipId ?? member?.membership_id ?? member?.id;
+  return id ? `${fallback} ${id}` : fallback;
 };
 
 type Scope =
@@ -47,6 +73,7 @@ type Props = {
 };
 
 export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Props) {
+  const { user } = useAuth();
   const [body, setBody] = useState(editing?.body || '');
   const [attachments, setAttachments] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
   const [taggedMemberIds, setTaggedMemberIds] = useState<number[]>([]);
@@ -86,7 +113,9 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
         resp = [];
       }
       const normalized = Array.isArray(resp?.results) ? resp.results : Array.isArray(resp) ? resp : [];
-      setMembers(normalized);
+      setMembers(
+        filterPharmacyStaffMembers(normalized).filter((member: any) => user?.id == null || member?.userId !== user.id),
+      );
     } catch (err: any) {
       setMemberError(err?.message || 'Failed to load members');
       setMembers([]);
@@ -269,7 +298,7 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 8, maxHeight: 180 }}>
               {members.map((m) => {
                 const id = m.membershipId || m.membership_id || m.id;
-                const name = m.fullName || m.full_name || m.email || 'Member';
+                const name = getMemberDisplayName(m);
                 const checked = taggedMemberIds.includes(id);
                 return (
                   <View key={id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, gap: 8 }}>
@@ -302,7 +331,7 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
               {taggedMemberIds.map((id) => {
                 const member = members.find((m) => (m.membershipId || m.membership_id || m.id) === id);
                 const label = member
-                  ? `${member.fullName || member.full_name || member.email || 'Member'}${
+                  ? `${getMemberDisplayName(member)}${
                       member.pharmacyName || member.pharmacy_name ? ' @ ' + (member.pharmacyName || member.pharmacy_name) : ''
                     }`
                   : `Member #${id}`;

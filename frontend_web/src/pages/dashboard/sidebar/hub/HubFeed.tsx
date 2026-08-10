@@ -75,7 +75,7 @@ import type {
   HubScopeSelection,
 } from '../../../../types/hub';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { formatHubAuthorLabel, formatHubDate, formatMemberLabel, getHubAuthorName } from './hubUtils';
+import { formatHubAuthorLabel, formatHubDate, formatMemberLabel, getHubAuthorName, getMemberDisplayName } from './hubUtils';
 
 const reactionEmojis: Record<HubReactionType, string> = {
   LIKE: '\u{1F44D}',
@@ -623,7 +623,7 @@ function PostCard({ post, onUpdate, onEdit, onDelete, highlighted = false }: Pos
             </Typography>
             <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
               {post.taggedMembers.map((member) => {
-                const baseName = member.fullName || member.email || 'Member';
+                const baseName = getMemberDisplayName(member);
                 const label = formatMemberLabel(baseName, member.role, member.jobTitle);
                 return (
                   <Chip
@@ -1330,8 +1330,13 @@ type AggregatedMemberOption = {
   pharmacyNames: string[];
 };
 
+const STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+const filterPharmacyStaffMembers = (members: HubGroupMemberOption[]) =>
+  members.filter((member) => STAFF_EMPLOYMENT_TYPES.has(member.employmentType || ''));
+
 function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: TagMembersSelectorProps) {
   const theme = useTheme();
+  const { user } = useAuth();
   const isDarkMode = theme.palette.mode === 'dark';
   const [options, setOptions] = useState<HubGroupMemberOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1347,7 +1352,9 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
     loadMembers()
       .then((members) => {
         if (isMounted) {
-          setOptions(members);
+          setOptions(
+            filterPharmacyStaffMembers(members).filter((member) => user?.id == null || member.userId !== user.id),
+          );
         }
       })
       .catch(() => {
@@ -1363,7 +1370,7 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
     return () => {
       isMounted = false;
     };
-  }, [loadMembers]);
+  }, [loadMembers, user?.id]);
 
   if (!loadMembers) {
     return null;
@@ -1399,7 +1406,7 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
       } else {
         map.set(key, {
           key,
-          fullName: member.fullName,
+          fullName: getMemberDisplayName(member),
           email: member.email,
           role: member.role,
           jobTitle: member.jobTitle ?? null,
@@ -1409,8 +1416,8 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
       }
     });
     return Array.from(map.values()).sort((a, b) => {
-      const labelA = (a.fullName || a.email || '').toLowerCase();
-      const labelB = (b.fullName || b.email || '').toLowerCase();
+      const labelA = (a.fullName || '').toLowerCase();
+      const labelB = (b.fullName || '').toLowerCase();
       return labelA.localeCompare(labelB);
     });
   }, [options]);
@@ -1472,7 +1479,7 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
         ) : aggregatedOptions.length ? (
           <Stack direction="row" flexWrap="wrap" gap={1}>
             {previewMembers.map((member) => {
-              const baseName = member.fullName || member.email || 'Member';
+              const baseName = member.fullName || 'Member';
               return (
                 <Chip
                   key={member.key}
@@ -1513,14 +1520,14 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
         onChange={(_, newValue) => applyAggregatedSelection(newValue as AggregatedMemberOption[])}
         isOptionEqualToValue={(option, selected) => option.key === selected.key}
         getOptionLabel={(option) =>
-          formatMemberLabel(option.fullName || option.email || 'Member', option.role, option.jobTitle)
+          formatMemberLabel(option.fullName || 'Member', option.role, option.jobTitle)
         }
         renderOption={(props, option, { selected }) => (
           <li {...props}>
             <Checkbox checked={selected} sx={{ mr: 1 }} />
             <Box>
               <Typography variant="body2" fontWeight={600}>
-                {option.fullName || option.email || 'Member'}
+                {option.fullName || 'Member'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {[
@@ -1538,7 +1545,7 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
           tagValue.map((option, index) => (
             <Chip
               {...getTagProps({ index })}
-              label={formatMemberLabel(option.fullName || option.email || 'Member', option.role, option.jobTitle)}
+              label={formatMemberLabel(option.fullName || 'Member', option.role, option.jobTitle)}
               size="small"
             />
           ))

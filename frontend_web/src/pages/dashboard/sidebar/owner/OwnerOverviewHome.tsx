@@ -238,6 +238,16 @@ export default function OwnerOverviewHome({
       navigate(actionUrl);
     }
   };
+  const handleOpenActivity = () => {
+    const firstActionUrl = activityItems
+      .map((event) => event.actionUrl || event.action_url)
+      .find(Boolean);
+    if (firstActionUrl) {
+      navigate(firstActionUrl);
+      return;
+    }
+    onOpenShifts();
+  };
 
   return (
     <Box
@@ -536,7 +546,7 @@ export default function OwnerOverviewHome({
                 </ButtonBase>
               )})}
             </Stack>
-            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
               View all activity
             </Button>
           </Paper>

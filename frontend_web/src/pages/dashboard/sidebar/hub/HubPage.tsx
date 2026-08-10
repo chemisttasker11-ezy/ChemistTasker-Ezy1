@@ -4,6 +4,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../../../contexts/AuthContext';
 
 import {
   createHubGroup,
@@ -50,6 +51,7 @@ type SelectedView =
 
 export default function HubPage() {
   const theme = useTheme();
+  const { user } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [searchParams, setSearchParams] = useSearchParams();
   const [hubContext, setHubContext] = useState<HubContext | null>(null);
@@ -615,6 +617,7 @@ export default function HubPage() {
           }}
           pharmacies={pharmacies}
           initialGroup={groupModal.group}
+          currentUserId={user?.id ?? null}
         />
       )}
 

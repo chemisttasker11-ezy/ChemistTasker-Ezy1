@@ -55,3 +55,25 @@ export const formatMemberLabel = (
   }
   return parts.join(' | ');
 };
+
+const isEmailLike = (value?: string | null) => Boolean(value && value.includes('@'));
+
+export const getMemberDisplayName = (member: any, fallback = 'Member') => {
+  const firstLast = `${member?.firstName ?? member?.first_name ?? ''} ${member?.lastName ?? member?.last_name ?? ''}`.trim();
+  const candidates = [
+    member?.fullName,
+    member?.full_name,
+    firstLast,
+    member?.invitedName,
+    member?.invited_name,
+    member?.username,
+  ];
+  for (const candidate of candidates) {
+    const value = typeof candidate === 'string' ? candidate.trim() : '';
+    if (value && !isEmailLike(value)) {
+      return value;
+    }
+  }
+  const id = member?.membershipId ?? member?.membership_id ?? member?.id;
+  return id ? `${fallback} ${id}` : fallback;
+};

@@ -37,7 +37,7 @@ import type {
   HubGroupMemberOption,
   HubPharmacy,
 } from '../../../../types/hub';
-import { formatMemberLabel } from './hubUtils';
+import { getMemberDisplayName, formatMemberLabel } from './hubUtils';
 
 export type GroupModalScope =
   | { type: 'pharmacy'; pharmacyId: number }
@@ -59,6 +59,7 @@ interface CreateGroupModalProps {
   onSubmit: (values: GroupModalFormValues) => void;
   pharmacies: HubPharmacy[];
   initialGroup?: HubGroup;
+  currentUserId?: number | null;
 }
 
 export function CreateGroupModal({
@@ -69,6 +70,7 @@ export function CreateGroupModal({
   onSubmit,
   pharmacies,
   initialGroup,
+  currentUserId,
 }: CreateGroupModalProps) {
   const [groupName, setGroupName] = useState(initialGroup?.name ?? '');
   const [description, setDescription] = useState(initialGroup?.description ?? '');
@@ -83,11 +85,17 @@ export function CreateGroupModal({
     setGroupName(initialGroup?.name ?? '');
     setDescription(initialGroup?.description ?? '');
     if (initialGroup?.members) {
-      setSelectedMembers(new Set(initialGroup.members.map((member) => member.membershipId)));
+      setSelectedMembers(
+        new Set(
+          initialGroup.members
+            .filter((member) => currentUserId == null || member.member?.userDetails?.id !== currentUserId)
+            .map((member) => member.membershipId),
+        ),
+      );
     } else if (mode === 'create') {
       setSelectedMembers(new Set());
     }
-  }, [initialGroup, mode]);
+  }, [currentUserId, initialGroup, mode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -110,7 +118,7 @@ export function CreateGroupModal({
           results = await fetchOrganizationMembers(scope.organizationId);
         }
         if (isMounted) {
-          setMembers(results);
+          setMembers(results.filter((member) => currentUserId == null || member.userId !== currentUserId));
         }
       } catch (err) {
         console.error('Failed to load members for group', err);
@@ -127,7 +135,7 @@ export function CreateGroupModal({
     return () => {
       isMounted = false;
     };
-  }, [scope, pharmacies]);
+  }, [currentUserId, scope, pharmacies]);
 
   const uniqueRoles = useMemo(() => {
     const roles = new Set<string>();
@@ -143,7 +151,7 @@ export function CreateGroupModal({
     return members.filter(member => {
       const matchesRole = roleFilter === 'ALL' || member.role === roleFilter;
       const matchesQuery =
-        member.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        getMemberDisplayName(member).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
       return matchesRole && matchesQuery;
     });
@@ -216,6 +224,7 @@ export function CreateGroupModal({
 
   const renderMemberRow = (member: HubGroupMemberOption) => {
     const isChecked = selectedMembers.has(member.membershipId);
+    const displayName = getMemberDisplayName(member);
     return (
       <ListItemButton
         key={member.membershipId}
@@ -232,14 +241,14 @@ export function CreateGroupModal({
         <ListItemText
           primary={
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="subtitle2">{member.fullName}</Typography>
+              <Typography variant="subtitle2">{displayName}</Typography>
               <Chip label={member.role.replace(/_/g, ' ')} size="small" />
             </Box>
           }
           secondary={
             <Stack spacing={0.5}>
               <Typography variant="body2" color="text.secondary">
-                {member.email || 'No email provided'}
+                {formatMemberLabel(displayName, member.role, member.jobTitle)}
               </Typography>
               {member.jobTitle && (
                 <Typography variant="caption" color="text.secondary">
@@ -280,10 +289,16 @@ export function CreateGroupModal({
     e.preventDefault();
     const trimmedName = groupName.trim();
     if (!trimmedName) return;
+    const hiddenCurrentMemberIds =
+      mode === 'edit'
+        ? initialGroup?.members
+            ?.filter((member) => currentUserId != null && member.member?.userDetails?.id === currentUserId)
+            .map((member) => member.membershipId) ?? []
+        : [];
     onSubmit({
       name: trimmedName,
       description: description.trim(),
-      memberIds: Array.from(selectedMembers),
+      memberIds: Array.from(new Set([...selectedMembers, ...hiddenCurrentMemberIds])),
     });
   };
 
@@ -397,7 +412,7 @@ export function CreateGroupModal({
             >
               {selectedMemberDetails.map(member => {
                 const nameLabel = formatMemberLabel(
-                  member.fullName || member.email || 'Member',
+                  getMemberDisplayName(member),
                   member.role,
                   member.jobTitle,
                 );

@@ -34,7 +34,6 @@ const isImage = (url: string) => {
 
 type Props = {
   msg: ChatMessage;
-  prevMsg: ChatMessage | null;
   isMe: boolean;
   onStartDm: (partnerMembershipId: number) => void;
   onEdit: (messageId: number, newBody: string) => void;
@@ -47,7 +46,6 @@ type Props = {
 
 export const MessageBubble: FC<Props> = ({
   msg,
-  prevMsg,
   isMe,
   onStartDm,
   onEdit,
@@ -67,7 +65,7 @@ export const MessageBubble: FC<Props> = ({
   if (!user) {
     return null; 
   }
-  const fallbackDetails = !user.profile_photo_url && resolveMemberDetails
+  const fallbackDetails = resolveMemberDetails
     ? resolveMemberDetails(msg.sender?.id ?? null)
     : null;
 
@@ -78,10 +76,8 @@ export const MessageBubble: FC<Props> = ({
   const effectiveEmail = user.email || fallbackDetails?.email || null;
   const effectiveFullName = ((effectiveFirstName || '') + (effectiveLastName ? ` ${effectiveLastName}` : '')).trim();
   
-  const fullName = effectiveFullName || '';
+  const fullName = effectiveFullName || `Member ${msg.sender.id}`;
   const attachmentFilename = msg.attachment_filename || (msg.attachment_url ? msg.attachment_url.split('/').pop() : 'Download');
-
-  const isSameSenderAsPrevious = prevMsg?.sender.id === msg.sender.id;
 
   const handleStartDmClick = () => {
     onStartDm(msg.sender.id);
@@ -115,33 +111,27 @@ export const MessageBubble: FC<Props> = ({
       className={`msg-row ${isMe ? 'me' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => { setIsHovered(false); setPickerOpen(false); }}
-      sx={{ mt: isSameSenderAsPrevious ? 0.5 : 2 }}
+      sx={{ mt: 2 }}
     >
-      <Box sx={{ width: 36, display: 'flex', alignItems: 'center' }} />
-
-      {isSameSenderAsPrevious ? (
-        <Box sx={{ width: 36, flexShrink: 0 }} />
-      ) : (
-        <Box sx={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Avatar
-            src={effectiveProfilePhoto || undefined}
-            alt={fullName || effectiveEmail || 'Chat member'}
-            sx={{
-              width: 36,
-              height: 36,
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              bgcolor: effectiveProfilePhoto ? 'transparent' : '#dfe3ec',
-              color: effectiveProfilePhoto ? 'inherit' : '#4c5a78',
-              border: effectiveProfilePhoto ? '1px solid rgba(15,23,42,0.08)' : 'none',
-            }}
-          >
-            {!effectiveProfilePhoto
-              ? initialsOf(effectiveFirstName, effectiveLastName, effectiveEmail || fullName)
-              : null}
-          </Avatar>
-        </Box>
-      )}
+      <Box sx={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <Avatar
+          src={effectiveProfilePhoto || undefined}
+          alt={fullName}
+          sx={{
+            width: 36,
+            height: 36,
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            bgcolor: effectiveProfilePhoto ? 'transparent' : '#dfe3ec',
+            color: effectiveProfilePhoto ? 'inherit' : '#4c5a78',
+            border: effectiveProfilePhoto ? '1px solid rgba(15,23,42,0.08)' : 'none',
+          }}
+        >
+          {!effectiveProfilePhoto
+            ? initialsOf(effectiveFirstName, effectiveLastName, fullName)
+            : null}
+        </Avatar>
+      </Box>
 
       <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
         <Box sx={{ position: 'relative', display: 'inline-block' }}>
@@ -153,14 +143,12 @@ export const MessageBubble: FC<Props> = ({
             </Box>
           ) : (
             <Box className={`bubble ${isMe ? 'me' : ''}`}>
-              {!isMe && !isSameSenderAsPrevious && fullName && (
-                <Typography
-                  variant="caption"
-                  sx={{ display: 'block', fontWeight: 700, mb: 0.5, color: 'text.secondary' }}
-                >
-                  {fullName}
-                </Typography>
-              )}
+              <Typography
+                variant="caption"
+                sx={{ display: 'block', fontWeight: 700, mb: 0.5, color: isMe ? 'rgba(255,255,255,0.82)' : 'text.secondary' }}
+              >
+                {fullName}
+              </Typography>
               {msg.attachment_url && (
                 <Box sx={{ mb: msg.body ? 1 : 0, maxWidth: 320 }}>
                   {isImage(msg.attachment_url) ? (

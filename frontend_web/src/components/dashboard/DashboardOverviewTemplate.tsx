@@ -154,6 +154,16 @@ export default function DashboardOverviewTemplate({
       navigate(url);
     }
   };
+  const handleOpenActivity = () => {
+    const firstActionUrl = activity
+      .map((event) => event.actionUrl || event.action_url)
+      .find(Boolean);
+    if (firstActionUrl) {
+      navigate(firstActionUrl);
+      return;
+    }
+    onOpenActivity?.();
+  };
 
   return (
     <Box
@@ -339,7 +349,7 @@ export default function DashboardOverviewTemplate({
                 </ButtonBase>
               )})}
             </Stack>
-            <Button onClick={onOpenActivity ?? onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
               View all activity
             </Button>
           </Paper>

@@ -1869,6 +1869,50 @@ const mapOptionFromSource = (source) => ({
     jobTitle: source.jobTitle ?? null,
     profilePhotoUrl: source.profilePhotoUrl ?? null,
 });
+
+const isEmailLike = (value) => typeof value === 'string' && value.includes('@');
+
+const memberDisplayName = (member, membershipId) => {
+    const details = member.user_details ?? member.userDetails ?? member.user ?? {};
+    const composed = `${details.first_name ?? details.firstName ?? ''} ${details.last_name ?? details.lastName ?? ''}`.trim();
+    const candidates = [
+        details.full_name,
+        details.fullName,
+        composed,
+        member.invited_name,
+        member.invitedName,
+        member.name,
+        details.username,
+    ];
+    for (const candidate of candidates) {
+        const value = typeof candidate === 'string' ? candidate.trim() : '';
+        if (value && !isEmailLike(value)) {
+            return value;
+        }
+    }
+    return `Member ${membershipId ?? member.id ?? ''}`.trim();
+};
+
+const groupMemberDisplayName = (member) => {
+    const details = member.member?.userDetails ?? member.member?.user_details ?? {};
+    const composed = `${details.firstName ?? details.first_name ?? ''} ${details.lastName ?? details.last_name ?? ''}`.trim();
+    const candidates = [
+        details.fullName,
+        details.full_name,
+        composed,
+        member.member?.invitedName,
+        member.member?.invited_name,
+        details.username,
+    ];
+    for (const candidate of candidates) {
+        const value = typeof candidate === 'string' ? candidate.trim() : '';
+        if (value && !isEmailLike(value)) {
+            return value;
+        }
+    }
+    return `Member ${member.membership_id ?? member.membershipId ?? ''}`.trim();
+};
+
 export async function fetchHubContext() {
     const response = await getHubContext();
     return mapContext(response);
@@ -2065,11 +2109,11 @@ export async function updateOrganizationHubProfileService(organizationId, payloa
 export async function fetchPharmacyGroupMembers(pharmacyId) {
     const data = await fetchApi(`/client-profile/memberships/?pharmacy=${pharmacyId}`);
     return asList(data)
+        .filter(member => ['FULL_TIME', 'PART_TIME', 'CASUAL'].includes(member.employment_type ?? member.employmentType ?? ''))
         .map(member => mapOptionFromSource({
             membershipId: member.id,
             userId: member.user,
-            fullName: member.user_details?.full_name ??
-                `${member.user_details?.first_name ?? ''} ${member.user_details?.last_name ?? ''}`.trim(),
+            fullName: memberDisplayName(member, member.id),
             email: member.user_details?.email ?? null,
             role: member.role ?? null,
             employmentType: member.employment_type ?? null,
@@ -2086,9 +2130,7 @@ export async function fetchOrganizationGroupMembers(organizationId) {
         .map(member => mapOptionFromSource({
             membershipId: member.membership_id,
             userId: member.member?.userDetails.id ?? null,
-            fullName: member.member?.userDetails.firstName && member.member?.userDetails.lastName
-                ? `${member.member.userDetails.firstName} ${member.member.userDetails.lastName}`
-                : member.member?.userDetails.email ?? 'Member',
+            fullName: groupMemberDisplayName(member),
             email: member.member?.userDetails.email ?? null,
             role: member.member?.role ?? null,
             employmentType: member.member?.employmentType ?? null,
@@ -2101,18 +2143,10 @@ export async function fetchOrganizationGroupMembers(organizationId) {
 export async function fetchOrganizationMembers(organizationId) {
     const data = await fetchApi(`/client-profile/memberships/?organization=${organizationId}&page_size=500`);
     const list = asList(data.results ?? data);
-    return list.map((member) => mapOptionFromSource({
+    return list.filter(member => ['FULL_TIME', 'PART_TIME', 'CASUAL'].includes(member.employment_type ?? member.employmentType ?? '')).map((member) => mapOptionFromSource({
         membershipId: member.id,
         userId: member.user_details?.id ?? null,
-        fullName: (() => {
-            const preferred = member.user_details?.full_name;
-            const composed = `${member.user_details?.first_name ?? ''} ${member.user_details?.last_name ?? ''}`.trim();
-            const fallback = member.user_details?.email;
-            if (preferred && preferred.trim()) return preferred;
-            if (composed) return composed;
-            if (fallback) return fallback;
-            return 'Member';
-        })(),
+        fullName: memberDisplayName(member, member.id),
         email: member.user_details?.email ?? null,
         role: member.role ?? null,
         employmentType: member.employment_type ?? null,
@@ -2127,9 +2161,7 @@ export async function fetchHubGroupMembers(groupId) {
     return (group.members ?? []).map(member => mapOptionFromSource({
         membershipId: member.membershipId,
         userId: member.member.userDetails.id,
-        fullName: `${member.member.userDetails.firstName ?? ''} ${member.member.userDetails.lastName ?? ''}`.trim() ||
-            member.member.userDetails.email ||
-            'Member',
+        fullName: groupMemberDisplayName(member),
         email: member.member.userDetails.email,
         role: member.member.role,
         employmentType: member.member.employmentType,

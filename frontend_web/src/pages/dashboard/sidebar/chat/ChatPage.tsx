@@ -920,7 +920,9 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
             myMemberships={myMemberships}
             myMembershipId={myMembershipIdInActiveRoom ?? undefined}
             currentUserId={user?.id}
+            participantCache={participantCache}
             memberCache={memberCache}
+            shiftContacts={shiftContacts}
             onSendText={handleSendText}
             onSendAttachment={handleSendAttachment}
             isLoadingMessages={isLoadingMessages} // <-- FIX: Use explicit loading state

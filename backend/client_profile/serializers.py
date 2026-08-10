@@ -195,6 +195,36 @@ def _resolve_user_profile_photo(user):
     return None
 
 
+def _split_chat_display_name(value):
+    parts = (value or "").strip().split()
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def _chat_member_identity(user, request=None, membership=None):
+    first_name = (getattr(user, "first_name", "") or "").strip() if user else ""
+    last_name = (getattr(user, "last_name", "") or "").strip() if user else ""
+
+    if not (first_name or last_name) and membership:
+        first_name, last_name = _split_chat_display_name(getattr(membership, "invited_name", "") or "")
+
+    if not (first_name or last_name) and user:
+        fallback_name = (getattr(user, "get_full_name", lambda: "")() or getattr(user, "username", "") or "").strip()
+        first_name, last_name = _split_chat_display_name(fallback_name)
+
+    photo = _resolve_user_profile_photo(user)
+    return {
+        "id": getattr(user, "id", None),
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": getattr(user, "email", None),
+        "profile_photo_url": _build_absolute_media_url(request, photo),
+    }
+
+
 def _should_clear_flag(initial_data, key):
     value = initial_data.get(key)
     if value is None:
@@ -3698,7 +3728,7 @@ def required_user_role_for_membership(role):
 
 
 class MembershipSerializer(serializers.ModelSerializer):
-    user_details = UserProfileSerializer(source='user', read_only=True)
+    user_details = serializers.SerializerMethodField()
     invited_by_details = UserProfileSerializer(source='invited_by', read_only=True)
     pharmacy_detail = PharmacySerializer(source='pharmacy', read_only=True)
     is_pharmacy_owner = serializers.SerializerMethodField()
@@ -3742,6 +3772,15 @@ class MembershipSerializer(serializers.ModelSerializer):
     # because all the classification fields are listed in Meta.fields. It will
     # create the new Membership object and save all provided fields in one step.
 
+    def get_user_details(self, obj):
+        payload = UserProfileSerializer(obj.user, context=self.context).data if obj.user_id else {}
+        identity = _chat_member_identity(
+            obj.user,
+            request=self.context.get("request"),
+            membership=obj,
+        )
+        payload.update(identity)
+        return payload
 
     def validate(self, attrs):
         """
@@ -6227,20 +6266,38 @@ class PendingRatingsSerializer(serializers.Serializer):
 # --- Chat Serializers --------------------------------------------------------
 class ChatMemberSerializer(serializers.ModelSerializer):
     profile_photo_url = serializers.SerializerMethodField()
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ["id", "first_name", "last_name", "email", "profile_photo_url"]
 
+    def _identity(self, obj):
+        return _chat_member_identity(obj, self.context.get("request"), self.context.get("membership"))
+
+    def get_first_name(self, obj):
+        return self._identity(obj)["first_name"]
+
+    def get_last_name(self, obj):
+        return self._identity(obj)["last_name"]
+
     def get_profile_photo_url(self, obj):
-        photo = _resolve_user_profile_photo(obj)
-        return _build_absolute_media_url(self.context.get("request"), photo)
+        return self._identity(obj)["profile_photo_url"]
 
 class ChatMembershipSerializer(serializers.ModelSerializer):
-    user_details = ChatMemberSerializer(source='user', read_only=True)
+    user_details = serializers.SerializerMethodField()
+
     class Meta:
         model = Membership
         fields = ["id", "user_details"]
+
+    def get_user_details(self, obj):
+        return _chat_member_identity(
+            getattr(obj, "user", None),
+            self.context.get("request"),
+            obj,
+        )
 
 class ReactionSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id')
@@ -6541,8 +6598,15 @@ class ChatParticipantSerializer(serializers.ModelSerializer):
     A specific serializer to provide user details for all participants
     in a user's conversations, regardless of their active status.
     """
-    user_details = ChatMemberSerializer(source='user', read_only=True)
+    user_details = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+
+    def get_user_details(self, obj):
+        return _chat_member_identity(
+            getattr(obj, "user", None),
+            self.context.get("request"),
+            obj,
+        )
 
     def get_is_admin(self, obj):
         # A membership can have multiple participant rows; return True if any mark this membership as admin.
@@ -6764,12 +6828,19 @@ class HubOrganizationProfileSerializer(UploadValidationMixin, serializers.ModelS
 
 
 class HubMembershipSerializer(serializers.ModelSerializer):
-    user_details = ChatMemberSerializer(source="user", read_only=True)
+    user_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Membership
         fields = ["id", "role", "employment_type", "job_title", "user_details"]
         read_only_fields = fields
+
+    def get_user_details(self, obj):
+        return _chat_member_identity(
+            getattr(obj, "user", None),
+            self.context.get("request"),
+            obj,
+        )
 
 
 class PharmacyCommunityGroupMemberSerializer(serializers.ModelSerializer):
@@ -6805,9 +6876,7 @@ class PharmacyCommunityGroupMemberSerializer(serializers.ModelSerializer):
 
 
 class HubCommunityGroupSerializer(serializers.ModelSerializer):
-    members = PharmacyCommunityGroupMemberSerializer(
-        source="memberships", many=True, read_only=True
-    )
+    members = serializers.SerializerMethodField()
     member_ids = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False
     )
@@ -6863,6 +6932,7 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
         memberships_qs = Membership.objects.filter(
             id__in=member_ids,
             is_active=True,
+            employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
         )
         if allowed_pharmacy_ids:
             memberships_qs = memberships_qs.filter(
@@ -6894,6 +6964,7 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
                 user=user,
                 pharmacy=pharmacy,
                 is_active=True,
+                employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             )
             .order_by("id")
             .first()
@@ -6952,7 +7023,28 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
         return response
 
     def get_member_count(self, obj):
-        return getattr(obj, "member_count", obj.memberships.count())
+        return getattr(
+            obj,
+            "staff_member_count",
+            obj.memberships.filter(
+                membership__is_active=True,
+                membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            ).count(),
+        )
+
+    def get_members(self, obj):
+        links = getattr(obj, "_prefetched_objects_cache", {}).get("staff_memberships")
+        if links is None:
+            links = obj.memberships.filter(
+                membership__is_active=True,
+                membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            ).select_related("membership", "membership__user", "membership__pharmacy")
+        serializer = PharmacyCommunityGroupMemberSerializer(
+            links,
+            many=True,
+            context=self.context,
+        )
+        return serializer.data
 
     def get_is_admin(self, obj):
         request = self.context.get("request")
@@ -7806,6 +7898,8 @@ class ShiftSavedSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+
+# Pills and Refferals
 class PillRewardRuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = PillRewardRule

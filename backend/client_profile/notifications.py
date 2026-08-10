@@ -8,7 +8,13 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from client_profile.models import Notification, Participant, Message
+from client_profile.models import (
+    Membership,
+    Notification,
+    Participant,
+    Message,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
 from users.models import DeviceToken
 
 USER_GROUP_FMT = "user.{user_id}"
@@ -120,6 +126,8 @@ def broadcast_message_badge(
     sender_membership_id: Optional[int] = None,
     sender_user_id: Optional[int] = None,
 ) -> None:
+    if not participant_can_receive_chat_updates(participant):
+        return
     # Skip notifying the sender (by membership or user id) if provided
     if sender_membership_id and participant.membership_id == sender_membership_id:
         return
@@ -167,3 +175,26 @@ def _calculate_unread_messages(participant: Participant) -> int:
     if participant.last_read_at:
         qs = qs.filter(created_at__gt=participant.last_read_at)
     return qs.count()
+
+
+def participant_can_receive_chat_updates(participant: Participant) -> bool:
+    """
+    Keep realtime/push chat delivery aligned with ConversationViewSet visibility.
+    Favorite locum memberships are intentionally not members of pharmacy community
+    chats, even if a legacy Participant row exists.
+    """
+    membership = getattr(participant, "membership", None)
+    conversation = getattr(participant, "conversation", None)
+    if not membership or not conversation:
+        return False
+    if (
+        getattr(conversation, "type", None) == "GROUP"
+        and getattr(conversation, "pharmacy_id", None)
+    ):
+        return (
+            getattr(membership, "is_active", False)
+            and getattr(membership, "status", None) == Membership.Status.ACCEPTED
+            and getattr(membership, "pharmacy_id", None) == conversation.pharmacy_id
+            and getattr(membership, "employment_type", None) in PHARMACY_STAFF_EMPLOYMENT_TYPES
+        )
+    return True

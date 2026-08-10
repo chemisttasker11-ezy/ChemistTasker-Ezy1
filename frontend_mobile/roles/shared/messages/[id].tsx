@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar } from 'react-native-paper';
+import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -12,6 +12,8 @@ import {
     updateMessageService,
     deleteMessageService,
     toggleRoomPinService,
+    fetchChatParticipants,
+    fetchShiftContacts,
     type ChatMessage,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../../../context/AuthContext';
@@ -23,18 +25,48 @@ import { setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
 
 type MessageDisplay = ChatMessage & { is_me: boolean };
+type ChatIdentity = {
+    id?: number;
+    first_name?: string | null;
+    firstName?: string | null;
+    last_name?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    profile_photo_url?: string | null;
+    profilePhotoUrl?: string | null;
+    profile_photo?: string | null;
+    profilePhoto?: string | null;
+};
+type IdentityRecord = { details: ChatIdentity; invited_name?: string | null };
+
 const messageKey = (item: MessageDisplay) => item.id ?? `${item.created_at}-${item.body}`;
 const messageTime = (item: MessageDisplay) => {
     const time = item.created_at ? new Date(item.created_at).getTime() : 0;
     return Number.isFinite(time) ? time : 0;
 };
-const senderIdOf = (item: MessageDisplay) => {
+const senderMembershipIdOf = (item: MessageDisplay) => {
     const sender: any = item.sender;
-    return sender?.user_details?.id ?? sender?.user?.id ?? sender?.id ?? sender ?? null;
+    return typeof sender?.id === 'number' ? sender.id : null;
 };
-const senderNameOf = (item: MessageDisplay) => {
+const senderUserIdOf = (item: MessageDisplay) => {
     const sender: any = item.sender;
-    return displayNameFromUser(sender?.user_details || sender?.user || sender);
+    return sender?.user_details?.id ?? sender?.user?.id ?? null;
+};
+const senderPayloadIdentityOf = (item: MessageDisplay): ChatIdentity => {
+    const sender: any = item.sender;
+    return sender?.user_details || sender?.user || sender || {};
+};
+const photoOf = (identity?: ChatIdentity | null) => {
+    return identity?.profile_photo_url || identity?.profilePhotoUrl || identity?.profile_photo || identity?.profilePhoto || null;
+};
+const hasName = (identity?: ChatIdentity | null) => {
+    return Boolean(`${identity?.first_name || identity?.firstName || ''} ${identity?.last_name || identity?.lastName || ''}`.trim());
+};
+const initialsOf = (name: string) => {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 };
 
 const upsertSortedMessage = (list: MessageDisplay[], incoming: MessageDisplay) => {
@@ -77,6 +109,8 @@ export default function SharedMessageDetailScreen() {
     const insets = useSafeAreaInsets();
 
     const [messages, setMessages] = useState<MessageDisplay[]>([]);
+    const [participantCache, setParticipantCache] = useState<Record<number, IdentityRecord>>({});
+    const [shiftContactByUserId, setShiftContactByUserId] = useState<Record<number, ChatIdentity>>({});
     const [newMessage, setNewMessage] = useState('');
     const [editingId, setEditingId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
@@ -96,6 +130,103 @@ export default function SharedMessageDetailScreen() {
     }, [id]);
 
     const flatListRef = useRef<FlatList<MessageDisplay>>(null);
+
+    useEffect(() => {
+        let mounted = true;
+        const loadIdentityCaches = async () => {
+            try {
+                const [participantsData, shiftData] = await Promise.all([
+                    fetchChatParticipants(),
+                    fetchShiftContacts(),
+                ]);
+                if (!mounted) return;
+
+                const participants = Array.isArray((participantsData as any)?.results)
+                    ? (participantsData as any).results
+                    : Array.isArray(participantsData)
+                        ? (participantsData as any)
+                        : [];
+                const nextParticipantCache: Record<number, IdentityRecord> = {};
+                participants.forEach((participant: any) => {
+                    const membershipId = participant.id ?? participant.membership_id;
+                    if (!membershipId) return;
+                    const details = participant.userDetails || participant.user_details || participant.user || {};
+                    nextParticipantCache[Number(membershipId)] = {
+                        details: {
+                            id: typeof details.id === 'number' ? details.id : undefined,
+                            first_name: details.first_name ?? details.firstName ?? null,
+                            firstName: details.firstName ?? details.first_name ?? null,
+                            last_name: details.last_name ?? details.lastName ?? null,
+                            lastName: details.lastName ?? details.last_name ?? null,
+                            email: details.email ?? null,
+                            profile_photo_url: details.profile_photo_url ?? details.profilePhotoUrl ?? null,
+                            profilePhotoUrl: details.profilePhotoUrl ?? details.profile_photo_url ?? null,
+                        },
+                        invited_name: participant.invitedName ?? participant.invited_name ?? null,
+                    };
+                });
+                setParticipantCache(nextParticipantCache);
+
+                const shiftContacts = Array.isArray((shiftData as any)?.results)
+                    ? (shiftData as any).results
+                    : Array.isArray(shiftData)
+                        ? (shiftData as any)
+                        : [];
+                const nextShiftMap: Record<number, ChatIdentity> = {};
+                shiftContacts.forEach((contact: any) => {
+                    const contactUser = contact?.user;
+                    if (!contactUser?.id) return;
+                    const existing = nextShiftMap[contactUser.id];
+                    if (!existing || (!photoOf(existing) && photoOf(contactUser))) {
+                        nextShiftMap[contactUser.id] = contactUser;
+                    }
+                });
+                setShiftContactByUserId(nextShiftMap);
+            } catch {
+                // Identity caches are best effort; message payload remains as fallback.
+            }
+        };
+        void loadIdentityCaches();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const resolveMessageIdentity = useCallback(
+        (item: MessageDisplay): ChatIdentity => {
+            const membershipId = senderMembershipIdOf(item);
+            const userId = senderUserIdOf(item);
+            const payloadIdentity = senderPayloadIdentityOf(item);
+            const byMembership = membershipId ? participantCache[membershipId]?.details : null;
+            const byShift = userId ? shiftContactByUserId[userId] : null;
+            const source =
+                (byMembership && (photoOf(byMembership) || hasName(byMembership)) ? byMembership : null) ||
+                (byShift && (photoOf(byShift) || hasName(byShift)) ? byShift : null) ||
+                payloadIdentity;
+
+            return {
+                ...payloadIdentity,
+                ...byMembership,
+                ...byShift,
+                first_name: source.first_name ?? source.firstName ?? payloadIdentity.first_name ?? null,
+                firstName: source.firstName ?? source.first_name ?? payloadIdentity.firstName ?? null,
+                last_name: source.last_name ?? source.lastName ?? payloadIdentity.last_name ?? null,
+                lastName: source.lastName ?? source.last_name ?? payloadIdentity.lastName ?? null,
+                profile_photo_url: photoOf(source) || photoOf(payloadIdentity),
+                profilePhotoUrl: photoOf(source) || photoOf(payloadIdentity),
+            };
+        },
+        [participantCache, shiftContactByUserId],
+    );
+
+    const senderNameOf = useCallback(
+        (item: MessageDisplay) => {
+            const identity = resolveMessageIdentity(item);
+            const name = displayNameFromUser(identity as any);
+            return name && name !== identity.email ? name : `Member ${senderMembershipIdOf(item) ?? ''}`.trim();
+        },
+        [resolveMessageIdentity],
+    );
 
     const fetchMessages = useCallback(async () => {
         const roomId = parseRoomId();
@@ -467,21 +598,26 @@ const pinnedMessage = useMemo(() => {
         );
     };
 
-    const renderMessage = ({ item, index }: { item: MessageDisplay; index: number }) => {
+    const renderMessage = ({ item }: { item: MessageDisplay; index: number }) => {
         const isMe = item.is_me;
-        const prev = index > 0 ? messages[index - 1] : null;
-        const isSameSender = prev ? senderIdOf(prev) === senderIdOf(item) : false;
-        const showSenderName = !isMe && !isSameSender;
-        const senderName = showSenderName ? senderNameOf(item) : '';
+        const senderName = senderNameOf(item);
+        const senderPhoto = photoOf(resolveMessageIdentity(item));
         return (
             <View style={[
                 styles.messageContainer,
                 isMe ? styles.myMessageContainer : styles.theirMessageContainer,
-                isSameSender ? styles.groupedMessage : null,
             ]}>
+                <View style={styles.avatarSlot}>
+                    {senderPhoto ? (
+                        <Avatar.Image size={34} source={{ uri: senderPhoto }} style={styles.senderAvatar} />
+                    ) : (
+                        <Avatar.Text size={34} label={initialsOf(senderName)} style={styles.senderAvatar} labelStyle={styles.senderAvatarLabel} />
+                    )}
+                </View>
                 <TouchableOpacity
                     activeOpacity={0.9}
                     onLongPress={() => setMenuFor(item.id as number)}
+                    style={styles.messageTouchTarget}
                 >
                     <Surface
                         style={[
@@ -492,9 +628,7 @@ const pinnedMessage = useMemo(() => {
                         elevation={1}
                     >
                         <View style={styles.bubbleHeader}>
-                            {showSenderName ? (
-                                <Text style={styles.senderName}>{senderName}</Text>
-                            ) : null}
+                            <Text style={[styles.senderName, isMe ? styles.mySenderName : styles.theirSenderName]}>{senderName}</Text>
                             <Text style={[
                                 styles.messageText,
                                 isMe ? styles.myMessageText : styles.theirMessageText
@@ -679,20 +813,36 @@ const styles = StyleSheet.create({
     },
     messageContainer: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
         marginBottom: 12,
-    },
-    groupedMessage: {
-        marginTop: -6,
     },
     myMessageContainer: {
         justifyContent: 'flex-end',
+        flexDirection: 'row-reverse',
     },
     theirMessageContainer: {
         justifyContent: 'flex-start',
     },
+    avatarSlot: {
+        width: 34,
+        flexShrink: 0,
+        alignItems: 'center',
+    },
+    senderAvatar: {
+        backgroundColor: '#DDE3EF',
+    },
+    senderAvatarLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#4B5563',
+    },
+    messageTouchTarget: {
+        maxWidth: '82%',
+    },
     messageBubble: {
-        maxWidth: '88%',
-        minWidth: '55%',
+        maxWidth: '100%',
+        minWidth: 120,
         borderRadius: 14,
         paddingHorizontal: 14,
         paddingVertical: 12,
@@ -704,8 +854,13 @@ const styles = StyleSheet.create({
     senderName: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#374151',
         marginBottom: 4,
+    },
+    mySenderName: {
+        color: '#065F46',
+    },
+    theirSenderName: {
+        color: '#374151',
     },
     menuButton: {
         margin: 0,

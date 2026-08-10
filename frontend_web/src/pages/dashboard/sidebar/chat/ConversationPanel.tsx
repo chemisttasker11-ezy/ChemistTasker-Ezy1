@@ -35,7 +35,9 @@ type Props = {
   messages: ChatMessage[];
   myMembershipId?: number;
   currentUserId?: number;
+  participantCache: Record<number, { details: UserLite; invited_name?: string }>;
   memberCache: MemberCache;
+  shiftContacts?: Array<{ user?: UserLite | null }>;
   onSendText: (body: string) => void;
   onSendAttachment: (files: File[], body?: string) => void;
   isLoadingMessages: boolean;
@@ -61,7 +63,9 @@ export const ConversationPanel: FC<Props> = ({
   messages,
   myMembershipId,
   currentUserId,
+  participantCache,
   memberCache,
+  shiftContacts = [],
   onSendText,
   onSendAttachment,
   isLoadingMessages,
@@ -137,6 +141,10 @@ export const ConversationPanel: FC<Props> = ({
       if (!membershipId) {
         return null;
       }
+      const participant = participantCache[membershipId]?.details;
+      if (participant) {
+        return participant;
+      }
       for (const pharmacyId in memberCache) {
         const record = memberCache[Number(pharmacyId)]?.[membershipId];
         if (record?.details) {
@@ -145,7 +153,60 @@ export const ConversationPanel: FC<Props> = ({
       }
       return null;
     },
-    [memberCache],
+    [memberCache, participantCache],
+  );
+
+  const resolveMemberDetailsForMessage = useCallback(
+    (message: ChatMessage): UserLite | null => {
+      const membershipId = message.sender?.id ?? null;
+      const byMembership = resolveMemberDetails(membershipId);
+      const senderUserId = message.sender?.user_details?.id;
+      const hasUsefulMembershipDetails = Boolean(
+        byMembership?.profile_photo_url ||
+        `${byMembership?.first_name || ''} ${byMembership?.last_name || ''}`.trim()
+      );
+      if (hasUsefulMembershipDetails) {
+        return byMembership;
+      }
+      if (senderUserId) {
+        const shiftContact = shiftContacts.find((contact) => contact?.user?.id === senderUserId);
+        if (shiftContact?.user) {
+          return {
+            ...byMembership,
+            ...shiftContact.user,
+            first_name: shiftContact.user.first_name || byMembership?.first_name,
+            last_name: shiftContact.user.last_name || byMembership?.last_name,
+            profile_photo_url: shiftContact.user.profile_photo_url || byMembership?.profile_photo_url,
+          } as UserLite;
+        }
+        for (const cached of Object.values(participantCache)) {
+          if (cached?.details?.id === senderUserId) {
+            return cached.details;
+          }
+        }
+        for (const pharmacyId in memberCache) {
+          const inner = memberCache[Number(pharmacyId)];
+          for (const rec of Object.values(inner)) {
+            if (rec?.details?.id === senderUserId) {
+              return rec.details;
+            }
+          }
+        }
+      }
+      return byMembership;
+    },
+    [memberCache, participantCache, resolveMemberDetails, shiftContacts],
+  );
+
+  const isMessageFromMe = useCallback(
+    (message: ChatMessage) => {
+      if (myMembershipId && message.sender?.id === myMembershipId) {
+        return true;
+      }
+      const senderUserId = message.sender?.user_details?.id;
+      return Boolean(currentUserId && senderUserId && senderUserId === currentUserId);
+    },
+    [currentUserId, myMembershipId],
   );
 
   const updateMentionState = useCallback(
@@ -507,14 +568,13 @@ return 'Direct Message';
             )}
             <MessageBubble
               msg={m}
-              prevMsg={index > 0 ? messages[index - 1] : null}
-              isMe={Boolean(myMembershipId && m.sender?.id === myMembershipId)}
+              isMe={isMessageFromMe(m)}
               onStartDm={onStartDm}
               onEdit={onEditMessage}
               onDelete={onDeleteMessage}
               onReact={onReact}
               onTogglePin={onTogglePin}
-              resolveMemberDetails={resolveMemberDetails}
+              resolveMemberDetails={() => resolveMemberDetailsForMessage(m)}
               innerRef={(el) => {
                 if (el) {
                   messageRefs.current[m.id] = el;
