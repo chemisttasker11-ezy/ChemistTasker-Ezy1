@@ -1,12 +1,20 @@
 // src/utils/tokenService.ts
 import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
-import { storageGetItem, storageSetItem, storageRemoveItem } from '@chemisttasker/shared-core';
 
 export const AUTH_TOKENS_CLEARED_EVENT = 'auth:tokens-cleared';
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let refreshPromise: Promise<{ access: string; refresh: string } | null> | null = null;
+let authStorage: Storage = localStorage;
+
+const ACCESS_KEY = 'ct_access';
+const REFRESH_KEY = 'ct_refresh';
+const STORAGE_MODE_KEY = 'ct_auth_storage';
+
+function resolveAuthStorage(): Storage {
+  return localStorage.getItem(STORAGE_MODE_KEY) === 'session' ? sessionStorage : localStorage;
+}
 
 const decodeJwtPayload = (token: string): { exp?: number } | null => {
   try {
@@ -29,8 +37,9 @@ export function isTokenExpired(token: string, leewaySeconds = 30): boolean {
 }
 
 export async function restoreTokensFromStorage(): Promise<void> {
-  const access = await storageGetItem('ct_access');
-  const refresh = await storageGetItem('ct_refresh');
+  authStorage = resolveAuthStorage();
+  const access = authStorage.getItem(ACCESS_KEY);
+  const refresh = authStorage.getItem(REFRESH_KEY);
   accessToken = access || null;
   refreshToken = refresh || null;
 }
@@ -43,19 +52,31 @@ export function getRefreshToken(): string | null {
   return refreshToken;
 }
 
-export function setTokens(access: string, refresh: string) {
+export function setTokens(access: string, refresh: string, rememberMe?: boolean) {
+  if (typeof rememberMe === 'boolean') {
+    authStorage = rememberMe ? localStorage : sessionStorage;
+    localStorage.setItem(STORAGE_MODE_KEY, rememberMe ? 'local' : 'session');
+  } else {
+    authStorage = resolveAuthStorage();
+  }
   accessToken = access;
   refreshToken = refresh;
-  // Fire and forget storage writes because localStorage backing the web adapter is synchronous anyways
-  storageSetItem('ct_access', access);
-  storageSetItem('ct_refresh', refresh);
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  sessionStorage.removeItem(ACCESS_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
+  authStorage.setItem(ACCESS_KEY, access);
+  authStorage.setItem(REFRESH_KEY, refresh);
 }
 
 export function clearTokens() {
   accessToken = null;
   refreshToken = null;
-  storageRemoveItem('ct_access');
-  storageRemoveItem('ct_refresh');
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(STORAGE_MODE_KEY);
+  sessionStorage.removeItem(ACCESS_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
   window.dispatchEvent(new Event(AUTH_TOKENS_CLEARED_EVENT));
 }
 

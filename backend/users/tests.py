@@ -4,6 +4,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from datetime import timedelta
+import jwt
 
 
 class LoginFailureAttemptCountTests(TestCase):
@@ -38,6 +40,53 @@ class LoginFailureAttemptCountTests(TestCase):
         self.assertEqual(second.status_code, 401)
         self.assertEqual(first.json()["attempts_remaining"], 4)
         self.assertEqual(second.json()["attempts_remaining"], 3)
+
+
+class LoginRememberMeTests(TestCase):
+    @override_settings(
+        AXES_ENABLED=False,
+        JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME=timedelta(days=7),
+    )
+    def test_remember_me_caps_refresh_token_and_cookie_to_one_week(self):
+        get_user_model().objects.create_user(
+            email="remember@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+
+        response = self.client.post(
+            "/api/users/login/",
+            {"email": "remember@example.com", "password": "CorrectPassword123!", "remember_me": True},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = jwt.decode(response.json()["refresh"], options={"verify_signature": False})
+        self.assertTrue(payload["remember_me"])
+        self.assertLessEqual(payload["exp"] - payload["iat"], 7 * 24 * 60 * 60)
+        self.assertEqual(response.cookies["ct_refresh"]["max-age"], 7 * 24 * 60 * 60)
+
+    @override_settings(AXES_ENABLED=False)
+    def test_without_remember_me_uses_session_cookies_for_web_login(self):
+        get_user_model().objects.create_user(
+            email="session@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+
+        response = self.client.post(
+            "/api/users/login/",
+            {"email": "session@example.com", "password": "CorrectPassword123!", "remember_me": False},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies["ct_access"]["max-age"], "")
+        self.assertEqual(response.cookies["ct_refresh"]["max-age"], "")
 
 
 class PasswordResetConfirmTests(TestCase):

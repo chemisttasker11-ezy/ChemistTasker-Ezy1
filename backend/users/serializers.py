@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.tokens      import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from django.conf import settings
 from client_profile.models import Organization
 from client_profile.rewards import RewardError, claim_referral_code
 from .models import OrganizationMembership, ContactMessage
@@ -298,13 +299,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    remember_me = serializers.BooleanField(write_only=True, required=False)
+
     def validate(self, attrs):
+        remember_me = attrs.pop('remember_me', None)
         data = super().validate(attrs)
 
         user = self.user
         if not user.is_otp_verified:
             from rest_framework.exceptions import AuthenticationFailed
             raise AuthenticationFailed("Please verify your email address (check your inbox for your OTP code).")
+
+        if remember_me is True:
+            refresh = RefreshToken(data['refresh'])
+            refresh['remember_me'] = True
+            refresh.set_exp(lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
+            data['refresh'] = str(refresh)
+            data['access'] = str(refresh.access_token)
 
         # 1) Organization memberships
         org_memberships = OrganizationMembership.objects.filter(user=self.user)
@@ -388,6 +399,12 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
 
         data = super().validate(attrs)
+        if original_refresh.get('remember_me') is True and data.get('refresh'):
+            refresh = RefreshToken(data['refresh'])
+            refresh['remember_me'] = True
+            refresh['exp'] = original_refresh['exp']
+            data['refresh'] = str(refresh)
+            data['access'] = str(refresh.access_token)
 
         try:
             org_memberships = OrganizationMembership.objects.filter(user=user)

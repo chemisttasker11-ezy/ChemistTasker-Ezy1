@@ -275,17 +275,22 @@ def _cookie_kwargs():
     }
 
 
-def _set_auth_cookies(response, *, access_token, refresh_token):
+def _set_auth_cookies(response, *, access_token, refresh_token, remember_me=None):
+    persistent = remember_me is not False
     response.set_cookie(
         getattr(settings, "JWT_AUTH_COOKIE", "ct_access"),
         access_token,
-        max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()),
+        max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()) if persistent else None,
         **_cookie_kwargs(),
     )
     response.set_cookie(
         getattr(settings, "JWT_REFRESH_COOKIE", "ct_refresh"),
         refresh_token,
-        max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+        max_age=int(settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME.total_seconds())
+        if remember_me is True
+        else int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+        if persistent
+        else None,
         **_cookie_kwargs(),
     )
 
@@ -1016,6 +1021,8 @@ class CustomLoginView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         email = (request.data.get("email") or "").strip().lower()
+        remember_me = request.data.get("remember_me")
+        remember_me = remember_me if isinstance(remember_me, bool) else None
         credentials = {"username": email}
         attempt_state = _get_login_attempt_state(request, credentials)
         if attempt_state and attempt_state["locked"]:
@@ -1034,7 +1041,7 @@ class CustomLoginView(TokenObtainPairView):
         access = response.data.get("access")
         refresh = response.data.get("refresh")
         if access and refresh:
-            _set_auth_cookies(response, access_token=access, refresh_token=refresh)
+            _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=remember_me)
         return response
 
 class CustomTokenRefreshView(TokenRefreshView):

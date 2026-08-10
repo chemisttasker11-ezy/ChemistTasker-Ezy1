@@ -411,6 +411,10 @@ SIMPLE_JWT = {
     'ALGORITHM': 'HS256',
 }
 
+JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME = timedelta(
+    days=env.int("JWT_REMEMBER_ME_REFRESH_TOKEN_DAYS", default=7)
+)
+
 # HttpOnly JWT cookie settings for web clients
 JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="ct_access")
 JWT_REFRESH_COOKIE = env("JWT_REFRESH_COOKIE", default="ct_refresh")

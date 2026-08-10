@@ -11,6 +11,8 @@ import {
   Link,
   InputAdornment,
   IconButton,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
@@ -40,6 +42,7 @@ export default function Login() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +57,7 @@ export default function Login() {
     try {
       const { data } = await axios.post(
         `${API_BASE_URL}${API_ENDPOINTS.login}`,
-        { email: email.toLowerCase(), password },
+        { email: email.toLowerCase(), password, remember_me: rememberMe },
         { withCredentials: true }
       );
       const { access, refresh, user: userInfo } = data;
@@ -62,7 +65,7 @@ export default function Login() {
         throw new Error('Both access and refresh tokens are required');
       }
 
-      login(access, refresh, userInfo);
+      login(access, refresh, userInfo, rememberMe);
 
       if (!userInfo?.is_mobile_verified) {
         navigate('/mobile-verify');
@@ -201,6 +204,21 @@ export default function Login() {
               </InputAdornment>
             ),
           }}
+        />
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              sx={{
+                color: '#00a99d',
+                '&.Mui-checked': { color: '#00a99d' },
+              }}
+            />
+          }
+          label="Keep me signed in"
+          sx={{ mt: 1 }}
         />
 
         <Box mt={3}>

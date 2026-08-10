@@ -73,7 +73,7 @@ type AuthContextType = {
   token: string | null;
   refresh: string | null;
   user: User | null;
-  login: (access: string, refresh: string, user: User) => void;
+  login: (access: string, refresh: string, user: User, rememberMe?: boolean) => void;
   logout: () => void;
   isLoading: boolean;
   setUser: Dispatch<SetStateAction<User | null>>;
@@ -485,8 +485,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ]
   );
 
-  const login = (newAccess: string, newRefresh: string, userInfo: User) => {
-    setTokens(newAccess, newRefresh);
+  const login = (newAccess: string, newRefresh: string, userInfo: User, rememberMe?: boolean) => {
+    setTokens(newAccess, newRefresh, rememberMe);
     setAccess(newAccess);
     setRefresh(newRefresh);
     setActivePersonaState("staff");
