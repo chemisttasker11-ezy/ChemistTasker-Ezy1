@@ -165,6 +165,12 @@ export default function PharmacistOverviewScreen() {
       route: '/pharmacist/shifts',
     },
     {
+      title: 'Publish Availability',
+      description: 'Post available times',
+      icon: 'calendar-plus-outline',
+      route: '/pharmacist/publish-availability',
+    },
+    {
       title: 'Availability',
       description: 'Set schedule',
       icon: 'calendar-clock-outline',

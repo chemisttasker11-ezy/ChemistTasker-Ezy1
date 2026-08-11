@@ -531,6 +531,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const isExplorer = user?.role === "EXPLORER";
   const isPharmacist = user?.role === "PHARMACIST";
   const isOtherStaff = user?.role === "OTHER_STAFF";
+  const showPitchButton =
+    !publicMode &&
+    user?.role &&
+    ["EXPLORER", "PHARMACIST", "OTHER_STAFF"].includes(user.role);
 
   const resetPitchForm = useCallback(() => {
       setPitchForm({
@@ -674,6 +678,21 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     }
   }, [pitchOpen, loadPitchDefaults]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldOpen =
+      params.get("publish_availability") === "1" ||
+      params.get("pitch") === "1";
+    if (!shouldOpen || publicMode || !showPitchButton) return;
+    setPitchOpen(true);
+    params.delete("publish_availability");
+    params.delete("pitch");
+    navigate(
+      { pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : "" },
+      { replace: true }
+    );
+  }, [location.pathname, location.search, navigate, publicMode, showPitchButton]);
+
   const updateOnboardingLocationPrefs = useCallback(async () => {
     if (!token) return;
     const safeRole = isOtherStaff ? "otherstaff" : isPharmacist ? "pharmacist" : "explorer";
@@ -789,12 +808,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       setPitchSaving(false);
     }
   };
-
-  const showPitchButton =
-    !publicMode &&
-    user?.role &&
-    ["EXPLORER", "PHARMACIST", "OTHER_STAFF"].includes(user.role);
-
 
   return (
     <Box sx={{ width: "100%", bgcolor: "background.default", color: "text.primary" }}>
@@ -995,14 +1008,17 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         maxWidth="lg"
         PaperProps={{
           sx: {
-            width: { xs: "96vw", md: "88vw", xl: "1180px" },
-            maxHeight: "88vh",
-            borderRadius: 3,
+            width: { xs: "100vw", sm: "96vw", lg: "92vw", xl: "1320px" },
+            maxWidth: "none",
+            maxHeight: { xs: "100dvh", sm: "94dvh" },
+            m: { xs: 0, sm: 2 },
+            borderRadius: { xs: 0, sm: 3 },
             overflow: "hidden",
+            display: "flex",
           },
         }}
       >
-        <Box sx={{ maxHeight: "88vh", overflow: "auto", bgcolor: "background.default" }}>
+        <Box sx={{ flex: 1, minHeight: 0, maxHeight: { xs: "100dvh", sm: "94dvh" }, overflow: "auto", bgcolor: "background.default" }}>
           <PostShiftPage onCompleted={handlePostShiftCompleted} />
         </Box>
       </Dialog>

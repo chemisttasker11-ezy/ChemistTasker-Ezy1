@@ -2,12 +2,14 @@
 // Displays public shift candidates with counter offers and interests
 
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { Image, View, StyleSheet, ScrollView } from 'react-native';
 import { Surface, Text, Button, Divider, Chip, Card, Avatar } from 'react-native-paper';
 import { Shift, ShiftInterest } from '@chemisttasker/shared-core';
 import { customTheme } from '../../theme';
 import SlotSelector from './SlotSelector';
 import { getInterestDisplayName } from '../../utils/candidateHelpers';
+
+const chemisttaskerBadge = require('../../../../../../assets/images/chemisttasker-platform.png');
 
 interface PublicLevelViewProps {
     shift: Shift;
@@ -160,7 +162,12 @@ export default function PublicLevelView({
 
             <View style={styles.dividerContainer}>
                 <Divider style={styles.dividerLine} />
-                <Chip mode="outlined" style={styles.dividerChip}>Public Candidates</Chip>
+                <Surface style={[styles.dividerChip, styles.publicDividerChip]} elevation={2}>
+                    <Image source={chemisttaskerBadge} style={styles.publicDividerLogo} resizeMode="contain" />
+                    <Text style={[styles.dividerChipText, styles.publicDividerText]}>
+                        ChemistTasker Public Candidates
+                    </Text>
+                </Surface>
                 <Divider style={styles.dividerLine} />
             </View>
 
@@ -202,7 +209,15 @@ export default function PublicLevelView({
                         return (
                             <Surface key={offer.id} style={styles.candidateCard} elevation={1}>
                                 <View style={styles.candidateRow}>
-                                    <Text style={styles.candidateName}>{title}</Text>
+                                    <Text
+                                        style={styles.candidateName}
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.72}
+                                    >
+                                        {title}
+                                    </Text>
                                     <Button
                                         mode={isRevealLabel ? 'contained' : 'outlined'}
                                         compact
@@ -230,7 +245,13 @@ export default function PublicLevelView({
                         return (
                             <Surface key={interest.id} style={styles.candidateCard} elevation={1}>
                                 <View style={styles.candidateRow}>
-                                    <Text style={styles.candidateName}>
+                                    <Text
+                                        style={styles.candidateName}
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.72}
+                                    >
                                         {interest.revealed
                                             ? getInterestDisplayName(interest, interest.user)
                                             : 'Anonymous Interest User'}
@@ -271,6 +292,32 @@ const styles = StyleSheet.create({
     },
     dividerChip: {
         backgroundColor: customTheme.colors.greyLight,
+        borderRadius: 999,
+        paddingHorizontal: customTheme.spacing.md,
+        paddingVertical: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    publicDividerChip: {
+        backgroundColor: '#F5F0FF',
+        borderWidth: 1,
+        borderColor: '#C4B5FD',
+        shadowColor: '#6D28D9',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.16,
+        shadowRadius: 12,
+    },
+    publicDividerLogo: {
+        width: 24,
+        height: 24,
+    },
+    dividerChipText: {
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    publicDividerText: {
+        color: '#4C1D95',
     },
     grid: {
         gap: customTheme.spacing.md,
@@ -295,9 +342,11 @@ const styles = StyleSheet.create({
         paddingTop: customTheme.spacing.xs,
     },
     candidateList: {
+        width: '100%',
         gap: customTheme.spacing.sm,
     },
     candidateCard: {
+        width: '100%',
         padding: customTheme.spacing.sm,
         borderRadius: 14,
         backgroundColor: '#fff',
@@ -307,13 +356,15 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         gap: customTheme.spacing.sm,
+        minWidth: 0,
     },
     candidateName: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 'bold',
         color: customTheme.colors.text,
         flex: 1,
         flexShrink: 1,
+        minWidth: 0,
     },
     candidateButton: {
         alignSelf: 'flex-start',

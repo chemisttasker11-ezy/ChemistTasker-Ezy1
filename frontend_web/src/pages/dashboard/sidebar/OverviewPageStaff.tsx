@@ -191,6 +191,11 @@ export default function OverviewPageStaff() {
   const openShiftActionTitle = isInternalWorkspace ? "Community Shifts" : "Public Shifts";
   const openShiftActionDescription = isInternalWorkspace ? "View this pharmacy's open shifts" : "View open platform shifts";
   const openShiftPath = `/dashboard/${roleSegment}/shifts/${isInternalWorkspace ? "community" : "public"}`;
+  const publishAvailabilityPath = (() => {
+    const params = new URLSearchParams(searchParams);
+    params.set("publish_availability", "1");
+    return `/dashboard/${roleSegment}/interests?${params.toString()}`;
+  })();
 
   const actions: DashboardAction[] = isExplorer
     ? [
@@ -201,6 +206,7 @@ export default function OverviewPageStaff() {
       ]
     : [
         { title: openShiftActionTitle, description: openShiftActionDescription, icon: <WorkOutlineIcon />, onClick: () => navigate(openShiftPath), tone: "blue" },
+        { title: "Publish Availability", description: "Post your available times", icon: <AccessTimeIcon />, onClick: () => navigate(publishAvailabilityPath), tone: "pink" },
         { title: "My Roster", description: "Review internal assignments", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/roster`), tone: "purple" },
         { title: "Confirmed Shifts", description: "Track your booked work", icon: <ShieldOutlinedIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/confirmed`), tone: "cyan" },
         { title: "Availability", description: "Update your working times", icon: <AccessTimeIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/availability`), tone: "pink" },
@@ -226,7 +232,7 @@ export default function OverviewPageStaff() {
       heroTitle={`Welcome back, ${displayName}!`}
       heroSubtitle={isExplorer ? data?.message || "Discover open roles and finish onboarding to unlock personalised matches." : "Review your upcoming shifts, update availability, and keep an eye on community opportunities."}
       primaryAction={{ label: isExplorer ? "Browse community shifts" : `View ${openShiftActionTitle.toLowerCase()}`, icon: <WorkOutlineIcon />, onClick: () => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath) }}
-      secondaryAction={{ label: isExplorer ? "Complete profile" : "Update availability", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/${isExplorer ? "onboarding" : "availability"}`) }}
+      secondaryAction={{ label: isExplorer ? "Complete profile" : "Publish Availability", icon: <CalendarMonthIcon />, onClick: () => navigate(isExplorer ? `/dashboard/${roleSegment}/onboarding` : publishAvailabilityPath) }}
       actions={actions}
       upcoming={upcoming}
       upcomingTitle={isExplorer ? "Job Snapshot" : "My Shifts"}

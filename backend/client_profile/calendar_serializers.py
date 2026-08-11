@@ -12,6 +12,27 @@ from .models import (
 )
 
 
+MEMBERSHIP_ROLE_LABELS = dict(Membership.ROLE_CHOICES)
+MEMBERSHIP_EMPLOYMENT_TYPE_LABELS = dict(Membership.EMPLOYMENT_TYPE_CHOICES)
+
+
+def format_membership_display_name(membership):
+    user = getattr(membership, 'user', None)
+    invited_name = (getattr(membership, 'invited_name', '') or '').strip()
+    user_name = user.get_full_name() if user else ''
+    base_name = invited_name or user_name or (user.email if user else None)
+
+    role = MEMBERSHIP_ROLE_LABELS.get(getattr(membership, 'role', None), getattr(membership, 'role', '') or '')
+    job_title = (getattr(membership, 'job_title', '') or '').strip()
+    employment_type = MEMBERSHIP_EMPLOYMENT_TYPE_LABELS.get(
+        getattr(membership, 'employment_type', None),
+        getattr(membership, 'employment_type', '') or '',
+    )
+
+    parts = [base_name, role, job_title, employment_type]
+    return ' | '.join(str(part).strip() for part in parts if part)
+
+
 class WorkNoteAssigneeSerializer(serializers.ModelSerializer):
     """Serializer for work note assignees."""
     membership_id = serializers.IntegerField(source='membership.id', read_only=True)
@@ -24,10 +45,7 @@ class WorkNoteAssigneeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'notified_at', 'created_at']
     
     def get_user_name(self, obj):
-        user = getattr(obj.membership, 'user', None)
-        if user:
-            return user.get_full_name() or user.email
-        return None
+        return format_membership_display_name(obj.membership) or None
 
 
 class WorkNoteSerializer(serializers.ModelSerializer):

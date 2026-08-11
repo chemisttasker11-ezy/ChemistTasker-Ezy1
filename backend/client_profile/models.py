@@ -1291,6 +1291,7 @@ class MembershipApplication(models.Model):
     role = models.CharField(max_length=20, choices=Membership.ROLE_CHOICES)
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
+    username = models.CharField(max_length=150, blank=True)
     mobile_number = models.CharField(max_length=32)
     job_title = models.CharField(max_length=255, blank=True)
 

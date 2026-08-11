@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Checkbox, Chip, Modal, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, Checkbox, Chip, IconButton, Modal, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 
 type PitchAvailabilityEntry = {
@@ -31,12 +31,61 @@ export type PitchFormState = {
 
 const radiusOptions = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 500, 1000];
 const stateOptions = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
+const weekDayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const titleCase = (value: string) =>
   value
     .toLowerCase()
     .replace(/_/g, ' ')
     .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
+
+const toIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const fromIsoDate = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+};
+
+const formatDisplayDate = (value: string) =>
+  fromIsoDate(value).toLocaleDateString('en-AU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+const buildMonthCells = (anchor: Date) => {
+  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return {
+      iso: toIsoDate(date),
+      day: date.getDate(),
+      inMonth: date.getMonth() === anchor.getMonth(),
+    };
+  });
+};
+
+const expandRecurringDates = (startDates: string[], recurringDays: number[], recurringEndDate: string) => {
+  if (!startDates.length || !recurringDays.length || !recurringEndDate) return [];
+  const start = fromIsoDate([...startDates].sort()[0]);
+  const end = fromIsoDate(recurringEndDate);
+  const dates: string[] = [];
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    if (recurringDays.includes(cursor.getDay())) {
+      dates.push(toIsoDate(cursor));
+    }
+  }
+  return dates;
+};
 
 export default function PitchDialog(props: {
   open: boolean;
@@ -66,7 +115,13 @@ export default function PitchDialog(props: {
   const [tabIndex, setTabIndex] = useState(0);
   const [availabilityEntries, setAvailabilityEntries] = useState<PitchAvailabilityEntry[]>([]);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [selectedDateTimes, setSelectedDateTimes] = useState<Record<string, { startTime: string; endTime: string }>>({});
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
+  const [recurringEndDate, setRecurringEndDate] = useState('');
+  const [recurringEndPickerOpen, setRecurringEndPickerOpen] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<PitchAvailabilityEntry>({
     date: '',
     startTime: '09:00',
@@ -93,9 +148,34 @@ export default function PitchDialog(props: {
 
   const validateTimeRange = (start: string, end: string) => new Date(`2025-01-01T${end}`) > new Date(`2025-01-01T${start}`);
 
+  const monthCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
+  const selectedDateSet = useMemo(() => new Set(selectedDates), [selectedDates]);
+  const entryDateSet = useMemo(() => new Set(availabilityEntries.map((entry) => entry.date)), [availabilityEntries]);
+
+  const toggleSelectedDate = (iso: string) => {
+    setSelectedDates((prev) => (prev.includes(iso) ? prev.filter((date) => date !== iso) : [...prev, iso].sort()));
+    setSelectedDateTimes((prev) => {
+      const next = { ...prev };
+      if (selectedDateSet.has(iso)) {
+        delete next[iso];
+      } else if (!next[iso]) {
+        next[iso] = { startTime: currentEntry.startTime, endTime: currentEntry.endTime };
+      }
+      return next;
+    });
+  };
+
+  const clearSelectedDates = () => {
+    setSelectedDates([]);
+    setSelectedDateTimes({});
+  };
+
   const handleAddAvailability = async () => {
-    if (!currentEntry.date) {
-      setAvailabilityError('Please select a date.');
+    const targetDates = isRecurring
+      ? expandRecurringDates(selectedDates, recurringDays, recurringEndDate)
+      : selectedDates;
+    if (!targetDates.length) {
+      setAvailabilityError(isRecurring ? 'Please select a start date, recurring days, and an end date.' : 'Please select at least one date.');
       return;
     }
     if (!currentEntry.startTime || !currentEntry.endTime) {
@@ -107,16 +187,31 @@ export default function PitchDialog(props: {
       return;
     }
     setAvailabilityError(null);
-    const nextEntry = {
-      date: currentEntry.date,
-      startTime: currentEntry.startTime,
-      endTime: currentEntry.endTime,
-      isAllDay: currentEntry.isAllDay,
-      notes: currentEntry.notes,
-    };
-    setAvailabilityEntries((prev) => [...prev, nextEntry]);
-    setPitchForm((prev) => ({ ...prev, availabilitySlots: [...(prev.availabilitySlots || []), nextEntry] }));
+    const existingKeys = new Set(availabilityEntries.map((entry) => `${entry.date}-${entry.startTime}-${entry.endTime}`));
+    const nextEntries = targetDates
+      .map((date) => {
+        const times = selectedDateTimes[date] || { startTime: currentEntry.startTime, endTime: currentEntry.endTime };
+        return {
+          date,
+          startTime: currentEntry.isAllDay ? '00:00' : times.startTime,
+          endTime: currentEntry.isAllDay ? '23:59' : times.endTime,
+          isAllDay: currentEntry.isAllDay,
+          notes: currentEntry.notes,
+        };
+      })
+      .filter((entry) => !existingKeys.has(`${entry.date}-${entry.startTime}-${entry.endTime}`));
+    if (!nextEntries.length) {
+      setAvailabilityError('Those availability slots are already added.');
+      return;
+    }
+    const mergedEntries = [...availabilityEntries, ...nextEntries].sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+    setAvailabilityEntries(mergedEntries);
+    setPitchForm((prev) => ({ ...prev, availabilitySlots: mergedEntries }));
     setCurrentEntry({ date: '', startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' });
+    clearSelectedDates();
+    setIsRecurring(false);
+    setRecurringDays([]);
+    setRecurringEndDate('');
   };
 
   const handleDeleteAvailability = (index: number) => {
@@ -320,10 +415,41 @@ export default function PitchDialog(props: {
               ) : (
                 <>
               {availabilityError ? <Text style={styles.errorText}>{availabilityError}</Text> : null}
-              <Text style={styles.label}>Pick your available day</Text>
-              <Button mode="outlined" onPress={() => setDatePickerOpen(true)}>
-                {currentEntry.date || 'Select date'}
-              </Button>
+              <View style={styles.calendarPanel}>
+                <View style={styles.calendarHeader}>
+                  <IconButton icon="chevron-left" size={18} onPress={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} />
+                  <Text style={styles.calendarTitle}>
+                    {calendarMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                  </Text>
+                  <IconButton icon="chevron-right" size={18} onPress={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} />
+                </View>
+                <View style={styles.calendarWeekHead}>
+                  {weekDayLabels.map((day) => (
+                    <Text key={day} style={styles.calendarWeekText}>{day.slice(0, 1)}</Text>
+                  ))}
+                </View>
+                <View style={styles.calendarGrid}>
+                  {monthCells.map((cell, index) => {
+                    const selected = selectedDateSet.has(cell.iso);
+                    const hasEntry = entryDateSet.has(cell.iso);
+                    return (
+                      <TouchableOpacity
+                        key={`${cell.iso}-${index}`}
+                        style={[
+                          styles.calendarCell,
+                          !cell.inMonth && styles.calendarCellMuted,
+                          selected && styles.calendarCellSelected,
+                          hasEntry && !selected && styles.calendarCellWithEntry,
+                        ]}
+                        onPress={() => toggleSelectedDate(cell.iso)}
+                      >
+                        <Text style={[styles.calendarCellText, selected && styles.calendarCellTextSelected]}>{cell.day}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.hint}>Blue: selected dates. Purple border: availability already added.</Text>
+              </View>
 
               <Checkbox.Item
                 label="All Day"
@@ -364,7 +490,74 @@ export default function PitchDialog(props: {
                 value={currentEntry.notes}
                 onChangeText={(value) => setCurrentEntry((prev) => ({ ...prev, notes: value }))}
               />
-              <Button mode="contained" onPress={handleAddAvailability}>Add Time Slot</Button>
+              <Checkbox.Item
+                label="Repeats"
+                status={isRecurring ? 'checked' : 'unchecked'}
+                onPress={() => setIsRecurring((value) => !value)}
+                position="leading"
+              />
+              {isRecurring ? (
+                <>
+                  <View style={styles.chipsWrap}>
+                    {weekDayLabels.map((day, index) => (
+                      <Chip
+                        key={day}
+                        selected={recurringDays.includes(index)}
+                        onPress={() =>
+                          setRecurringDays((prev) =>
+                            prev.includes(index) ? prev.filter((item) => item !== index) : [...prev, index].sort()
+                          )
+                        }
+                      >
+                        {day}
+                      </Chip>
+                    ))}
+                  </View>
+                  <TextInput
+                    mode="outlined"
+                    label="Repeat until"
+                    value={recurringEndDate}
+                    placeholder="YYYY-MM-DD"
+                    right={<TextInput.Icon icon="calendar" onPress={() => setRecurringEndPickerOpen(true)} />}
+                    editable={false}
+                  />
+                </>
+              ) : null}
+              {selectedDates.length > 0 ? (
+                <View style={styles.selectedDaysPanel}>
+                  <View style={styles.selectedDaysHeader}>
+                    <Text style={styles.label}>Selected days</Text>
+                    <Button mode="text" onPress={clearSelectedDates}>Clear</Button>
+                  </View>
+                  {selectedDates.map((date) => {
+                    const times = selectedDateTimes[date] || { startTime: currentEntry.startTime, endTime: currentEntry.endTime };
+                    return (
+                      <View key={date} style={styles.selectedDayCard}>
+                        <Chip onClose={() => toggleSelectedDate(date)}>{formatDisplayDate(date)}</Chip>
+                        <View style={styles.row}>
+                          <TextInput
+                            mode="outlined"
+                            label="Start"
+                            value={times.startTime}
+                            onChangeText={(value) => setSelectedDateTimes((prev) => ({ ...prev, [date]: { startTime: value, endTime: times.endTime } }))}
+                            style={styles.flex}
+                            disabled={currentEntry.isAllDay}
+                          />
+                          <TextInput
+                            mode="outlined"
+                            label="End"
+                            value={times.endTime}
+                            onChangeText={(value) => setSelectedDateTimes((prev) => ({ ...prev, [date]: { startTime: times.startTime, endTime: value } }))}
+                            style={styles.flex}
+                            disabled={currentEntry.isAllDay}
+                          />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+              <Button mode="contained" onPress={handleAddAvailability}>Add Selected Availability</Button>
 
               <Text style={styles.label}>Your Time Slots</Text>
               {availabilityEntries.length === 0 ? (
@@ -394,7 +587,7 @@ export default function PitchDialog(props: {
           ) : <View />}
           <Button onPress={handleBackTab} disabled={pitchSaving || tabIndex === 0}>Back</Button>
           <Button mode="contained" onPress={handleNextTab} disabled={pitchSaving}>
-            {pitchSaving ? 'Saving...' : tabIndex === lastTabIndex ? (existingPostId ? 'Update Pitch' : 'Create Pitch') : 'Next'}
+            {pitchSaving ? 'Saving...' : tabIndex === lastTabIndex ? (existingPostId ? 'Update Availability' : 'Post Availability') : 'Next'}
           </Button>
           <Button onPress={onClose} disabled={pitchSaving}>Cancel</Button>
         </View>
@@ -402,12 +595,12 @@ export default function PitchDialog(props: {
         <DatePickerModal
           mode="single"
           locale="en"
-          visible={datePickerOpen}
-          onDismiss={() => setDatePickerOpen(false)}
-          date={currentEntry.date ? new Date(`${currentEntry.date}T00:00:00`) : new Date()}
+          visible={recurringEndPickerOpen}
+          onDismiss={() => setRecurringEndPickerOpen(false)}
+          date={recurringEndDate ? fromIsoDate(recurringEndDate) : new Date()}
           onConfirm={({ date }) => {
-            setCurrentEntry((prev) => ({ ...prev, date: date ? date.toISOString().split('T')[0] : '' }));
-            setDatePickerOpen(false);
+            setRecurringEndDate(date ? toIsoDate(date) : '');
+            setRecurringEndPickerOpen(false);
           }}
         />
       </Modal>
@@ -435,6 +628,69 @@ const styles = StyleSheet.create({
   label: { fontWeight: '600', color: '#111827' },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   smallMuted: { color: '#6B7280', fontSize: 12 },
+  hint: { color: '#6B7280', fontSize: 11 },
+  calendarPanel: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  calendarTitle: { fontWeight: '700', color: '#111827' },
+  calendarWeekHead: {
+    flexDirection: 'row',
+  },
+  calendarWeekText: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  calendarCell: {
+    width: '13.65%',
+    aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  calendarCellMuted: { opacity: 0.35 },
+  calendarCellSelected: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+  calendarCellWithEntry: { borderColor: '#7C3AED', borderWidth: 2 },
+  calendarCellText: { color: '#111827', fontWeight: '600', fontSize: 12 },
+  calendarCellTextSelected: { color: '#FFFFFF' },
+  selectedDaysPanel: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  selectedDaysHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedDayCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 8,
+    gap: 8,
+  },
   slotItem: {
     borderWidth: 1,
     borderColor: '#E5E7EB',

@@ -18,6 +18,7 @@ const tabTitles: Record<string, string> = {
   calendar: 'Calendar',
   'talent-board': 'Talent Board',
   availability: 'Availability',
+  'publish-availability': 'Publish Availability',
   'profile-basic-info': 'Profile',
   'profile-identity': 'Profile',
   'profile-regulatory': 'Profile',
@@ -30,6 +31,7 @@ const tabTitles: Record<string, string> = {
 const sidebarItems = [
   { label: 'Home', icon: 'home', route: '/otherstaff/dashboard' },
   { label: 'Shifts', icon: 'calendar-range', route: '/otherstaff/shifts' },
+  { label: 'Publish Availability', icon: 'calendar-plus', route: '/otherstaff/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/otherstaff/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/otherstaff/calendar' },
   { label: 'Chat', icon: 'message', route: '/otherstaff/chat' },
@@ -374,6 +376,16 @@ export default function OtherStaffTabs() {
             tabBarAccessibilityLabel: 'Invoices tab',
             tabBarIcon: ({ color, size }) => (
               <IconButton icon="file-document-multiple" iconColor={color} size={size} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="publish-availability"
+          options={{
+            title: 'Publish',
+            tabBarAccessibilityLabel: 'Publish availability tab',
+            tabBarIcon: ({ color, size }) => (
+              <IconButton icon="calendar-plus" iconColor={color} size={size} />
             ),
           }}
         />

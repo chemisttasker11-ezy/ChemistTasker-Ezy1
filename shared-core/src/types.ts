@@ -1140,6 +1140,9 @@ export interface MembershipApplicationApi {
     email?: string | null;
     first_name?: string | null;
     last_name?: string | null;
+    username?: string | null;
+    mobile_number?: string | null;
+    job_title?: string | null;
     submitted_at?: string | null;
     pharmacist_award_level?: string | null;
     otherstaff_classification_level?: string | null;

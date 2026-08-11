@@ -96,6 +96,28 @@ const formatTimeRange = (start?: string | null, end?: string | null) => {
   return [trim(start), trim(end)].filter(Boolean).join(' - ');
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  PHARMACIST: 'Pharmacist',
+  INTERN: 'Intern Pharmacist',
+  TECHNICIAN: 'Dispensary Technician',
+  ASSISTANT: 'Pharmacy Assistant',
+  STUDENT: 'Pharmacy Student',
+  CONTACT: 'Contact',
+};
+
+const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
+  FULL_TIME: 'Full-time',
+  PART_TIME: 'Part-time',
+  LOCUM: 'Locum',
+  CASUAL: 'Casual',
+  SHIFT_HERO: 'Shift Hero',
+};
+
+const formatChoiceLabel = (value: any, labels: Record<string, string>) => {
+  const key = String(value ?? '').trim().toUpperCase();
+  return key ? labels[key] ?? key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()) : '';
+};
+
 const parseTime = (value?: string | null) => {
   if (!value) return { hours: 9, minutes: 0 };
   const [h, m] = value.split(':').map((v) => Number(v));
@@ -615,12 +637,29 @@ export default function SharedCalendarScreen() {
     }
   };
 
-  const getMemberLabel = (member: any) =>
-    member?.userDetails?.fullName ||
-    member?.userDetails?.full_name ||
-    member?.userDetails?.email ||
-    member?.invitedName ||
-    `Member ${member?.id ?? ''}`;
+  const getMemberLabel = (member: any) => {
+    const userDetails = member?.userDetails ?? member?.user_details ?? member?.user ?? {};
+    const fullName =
+      userDetails?.fullName ||
+      userDetails?.full_name ||
+      [userDetails?.firstName ?? userDetails?.first_name, userDetails?.lastName ?? userDetails?.last_name]
+        .filter(Boolean)
+        .join(' ');
+    const name =
+      member?.invitedName ||
+      member?.invited_name ||
+      member?.name ||
+      fullName ||
+      userDetails?.email ||
+      member?.email ||
+      `Member ${member?.id ?? ''}`;
+    const details = [
+      formatChoiceLabel(member?.role, ROLE_LABELS),
+      member?.jobTitle ?? member?.job_title,
+      formatChoiceLabel(member?.employmentType ?? member?.employment_type, EMPLOYMENT_TYPE_LABELS),
+    ].filter(Boolean);
+    return [name, ...details].join(' | ');
+  };
 
   const getPharmacyId = (m: any) =>
     m?.pharmacyId ?? m?.pharmacy_id ?? m?.pharmacyDetail?.id ?? m?.pharmacy?.id ?? null;

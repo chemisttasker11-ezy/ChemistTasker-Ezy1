@@ -2835,7 +2835,7 @@ class MagicLinkInfoView(APIView):
 class SubmitMembershipApplication(APIView):
     """
     POST /magic/memberships/<token>/apply
-    Body: { role, first_name, last_name, mobile_number, (level fields), (email optional) }
+    Body: { role, first_name, last_name, username, mobile_number, (level fields), (email optional) }
     """
     permission_classes = [permissions.AllowAny]
 
@@ -2940,6 +2940,8 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         if not email:
             return Response({'detail': 'email is required to approve (existing vs new user).'}, status=400)
 
+        user_existed_before_approval = User.objects.filter(email__iexact=email).exists()
+
         # Build payload for your existing helper:
 
         # Decide employment_type from category (+ optional override from request)
@@ -2971,6 +2973,14 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         membership, error = MembershipViewSet()._create_membership_invite(data, inviter=request.user)
         if error:
             return Response({'detail': error}, status=400)
+
+        if not user_existed_before_approval:
+            worker_user = membership.user
+            worker_user.first_name = app.first_name.strip()
+            worker_user.last_name = app.last_name.strip()
+            worker_user.username = (app.username or '').strip()
+            worker_user.mobile_number = (app.mobile_number or '').strip()
+            worker_user.save(update_fields=['first_name', 'last_name', 'username', 'mobile_number'])
 
         app.status = 'APPROVED'
         app.decided_at = timezone.now()

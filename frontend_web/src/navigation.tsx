@@ -378,6 +378,7 @@ export function getOtherStaffNavDynamic(_progress_percent: number, workspace: 'i
     },
     { segment: 'dashboard/pharmacy-hub', title: 'Pharmacy Hub', icon: <ForumIcon /> },
     { segment: 'dashboard/otherstaff/calendar', title: 'Calendar', icon: <CalendarMonthIcon /> },
+    { segment: 'dashboard/otherstaff/interests?publish_availability=1', title: 'Publish Availability', icon: <PostAddIcon /> },
     { segment: 'dashboard/otherstaff/availability', title: 'Set Availability', icon: <EventAvailableIcon /> },
     { segment: 'dashboard/otherstaff/memberships', title: 'Manage Memberships', icon: <StoreIcon /> },
 
@@ -438,6 +439,7 @@ export function getPharmacistNavDynamic(_progress_percent: number, workspace: 'i
     },
     { segment: 'dashboard/pharmacy-hub', title: 'Pharmacy Hub', icon: <ForumIcon /> },
     { segment: 'dashboard/pharmacist/calendar', title: 'Calendar', icon: <CalendarMonthIcon /> },
+    { segment: 'dashboard/pharmacist/interests?publish_availability=1', title: 'Publish Availability', icon: <PostAddIcon /> },
     { segment: 'dashboard/pharmacist/availability', title: 'Set Availability', icon: <EventAvailableIcon /> },
     { segment: 'dashboard/pharmacist/memberships', title: 'Manage Memberships', icon: <StoreIcon /> },
     { kind: 'divider' as const },

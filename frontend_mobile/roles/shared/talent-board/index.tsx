@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Chip, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/constants/api';
@@ -107,6 +108,7 @@ type TalentBoardProps = {
   postShiftRoute?: '/owner/post-shift' | '/organization/post-shift' | '/admin/post-shift';
   canRequestBookingOverride?: boolean;
   hidePitchButton?: boolean;
+  openPitchOnMount?: boolean;
 };
 
 export default function TalentBoard({
@@ -118,6 +120,7 @@ export default function TalentBoard({
   postShiftRoute = '/owner/post-shift',
   canRequestBookingOverride,
   hidePitchButton = false,
+  openPitchOnMount = false,
 }: TalentBoardProps) {
   const feed = useTalentFeed({ enabled: !publicMode });
   const posts = externalPosts ?? feed.posts;
@@ -522,9 +525,12 @@ export default function TalentBoard({
         ? []
         : (pitchForm.availabilitySlots || []).map((entry: any) => ({
             date: String(entry.date),
-            start_time: entry.startTime || null,
-            end_time: entry.endTime || null,
-            is_all_day: Boolean(entry.isAllDay),
+            start_time: entry.startTime || entry.start_time || null,
+            end_time: entry.endTime || entry.end_time || null,
+            is_all_day: Boolean(entry.isAllDay ?? entry.is_all_day),
+            startTime: entry.startTime || entry.start_time || null,
+            endTime: entry.endTime || entry.end_time || null,
+            isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
           }));
       const payload: Record<string, any> = {
         headline: pitchForm.headline || '',
@@ -556,6 +562,13 @@ export default function TalentBoard({
   };
 
   const showPitchButton = !publicMode && !hidePitchButton && canPitch;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!openPitchOnMount || publicMode || !canPitch) return;
+      setPitchOpen(true);
+    }, [canPitch, openPitchOnMount, publicMode])
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>

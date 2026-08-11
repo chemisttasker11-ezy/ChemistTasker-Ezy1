@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { SyntheticEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -144,6 +144,9 @@ export default function RosterOwnerPage() {
   const { activePersona, activeAdminPharmacyId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const calendarDragScrollFrameRef = useRef<number | null>(null);
+  const calendarDragPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const isCalendarDragScrollingRef = useRef(false);
   const scopedPharmacyId =
     activePersona === 'admin' && typeof activeAdminPharmacyId === 'number'
       ? activeAdminPharmacyId
@@ -242,11 +245,78 @@ export default function RosterOwnerPage() {
   // --- Snackbar ---
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
+  const stopCalendarDragScroll = useCallback(() => {
+    isCalendarDragScrollingRef.current = false;
+    calendarDragPointerRef.current = null;
+    if (calendarDragScrollFrameRef.current != null) {
+      window.cancelAnimationFrame(calendarDragScrollFrameRef.current);
+      calendarDragScrollFrameRef.current = null;
+    }
+  }, []);
+  const runCalendarDragScroll = useCallback(() => {
+    if (!isCalendarDragScrollingRef.current) {
+      calendarDragScrollFrameRef.current = null;
+      return;
+    }
+
+    const pointer = calendarDragPointerRef.current;
+    if (pointer) {
+      const edgeSize = 120;
+      const maxStep = 28;
+      const viewportHeight = window.innerHeight;
+      let deltaY = 0;
+
+      if (pointer.clientY < edgeSize) {
+        deltaY = -Math.ceil(((edgeSize - pointer.clientY) / edgeSize) * maxStep);
+      } else if (pointer.clientY > viewportHeight - edgeSize) {
+        deltaY = Math.ceil(((pointer.clientY - (viewportHeight - edgeSize)) / edgeSize) * maxStep);
+      }
+
+      if (deltaY !== 0) {
+        window.scrollBy({ top: deltaY, behavior: 'auto' });
+        document.dispatchEvent(new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: pointer.clientX,
+          clientY: pointer.clientY,
+          buttons: 1,
+        }));
+      }
+    }
+
+    calendarDragScrollFrameRef.current = window.requestAnimationFrame(runCalendarDragScroll);
+  }, []);
+  const startCalendarDragScroll = useCallback((target: EventTarget | null, clientX: number, clientY: number) => {
+    if (!(target instanceof Element) || !target.closest('.rbc-time-content')) {
+      return;
+    }
+    calendarDragPointerRef.current = { clientX, clientY };
+    isCalendarDragScrollingRef.current = true;
+    if (calendarDragScrollFrameRef.current == null) {
+      calendarDragScrollFrameRef.current = window.requestAnimationFrame(runCalendarDragScroll);
+    }
+  }, [runCalendarDragScroll]);
+  const updateCalendarDragPointer = useCallback((event: MouseEvent) => {
+    if (!isCalendarDragScrollingRef.current) {
+      return;
+    }
+    calendarDragPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
+  }, []);
   const showSnackbar = (msg: string) => {
     setSnackbarMsg(msg);
     setSnackbarOpen(true);
   };
   const closeSnackbar = () => setSnackbarOpen(false);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', updateCalendarDragPointer);
+    window.addEventListener('mouseup', stopCalendarDragScroll);
+    return () => {
+      window.removeEventListener('mousemove', updateCalendarDragPointer);
+      window.removeEventListener('mouseup', stopCalendarDragScroll);
+      stopCalendarDragScroll();
+    };
+  }, [stopCalendarDragScroll, updateCalendarDragPointer]);
 
   // --- DATA LOADING ---
   useEffect(() => {
@@ -901,12 +971,13 @@ export default function RosterOwnerPage() {
         position: 'relative',
         width: '100%',
         minWidth: 0,
-        overflowX: 'auto',
+        overflowX: { xs: 'auto', md: 'visible' },
+        overflowY: 'visible',
         pb: 1,
         '.rbc-calendar': {
           minWidth: { xs: 900, md: 0 },
-          height: { xs: 'calc(100vh - 330px)', md: 'calc(100vh - 310px)' },
-          minHeight: { xs: 620, md: 720 },
+          height: { xs: 1500, md: 1600 },
+          minHeight: { xs: 1500, md: 1600 },
         },
         '.rbc-toolbar': {
           alignItems: 'center',
@@ -925,9 +996,19 @@ export default function RosterOwnerPage() {
           display: 'inline-flex',
           whiteSpace: 'nowrap',
         },
-        '.rbc-time-view': { minHeight: 0 },
-        '.rbc-time-content': { minHeight: 0 },
-        '.rbc-month-view': { minHeight: 0 },
+        '.rbc-time-view': {
+          minHeight: 0,
+          overflow: 'visible',
+        },
+        '.rbc-time-content': {
+          minHeight: 0,
+          overflowY: 'visible !important',
+          overflowX: 'visible',
+        },
+        '.rbc-month-view': {
+          minHeight: 0,
+          overflow: 'visible',
+        },
         '.rbc-event': { minWidth: 0 },
         '.rbc-event-content': {
           minWidth: 0,
@@ -935,7 +1016,9 @@ export default function RosterOwnerPage() {
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         },
-      }}>
+      }}
+        onMouseDownCapture={(event) => startCalendarDragScroll(event.target, event.clientX, event.clientY)}
+      >
         {isAssignmentsLoading && (
             <Box sx={{
                 position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

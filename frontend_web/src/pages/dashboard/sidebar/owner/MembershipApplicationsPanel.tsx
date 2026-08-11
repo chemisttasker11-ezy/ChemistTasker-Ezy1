@@ -294,6 +294,7 @@ export default function MembershipApplicationsPanel({
             const selectedType = approveTypeById[app.id] || defaultEmploymentType;
             const classification = formatClassification(app);
             const jobTitle = readValue(app, "jobTitle", "job_title");
+            const username = readValue(app, "username", "username");
             const mobileNumber = readValue(app, "mobileNumber", "mobile_number");
 
             return (
@@ -346,6 +347,11 @@ export default function MembershipApplicationsPanel({
                       {mobileNumber ? (
                         <Typography variant="body2">
                           Mobile: {mobileNumber}
+                        </Typography>
+                      ) : null}
+                      {username ? (
+                        <Typography variant="body2">
+                          Username: {username}
                         </Typography>
                       ) : null}
                       {classification ? (

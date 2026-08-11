@@ -5,6 +5,7 @@ import {
     PersonAdd as UserCheck,
     PersonRemove as UserX,
     HourglassEmpty as Clock,
+    Store,
 } from '@mui/icons-material';
 import { Shift, ShiftMemberStatus } from '@chemisttasker/shared-core';
 import { StatusCard } from './StatusCard';
@@ -69,7 +70,27 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
             )}
 
             <Divider>
-                <Chip label="Community Candidates" />
+                <Chip
+                    icon={<Store />}
+                    label="Community Candidates"
+                    sx={{
+                        height: 38,
+                        px: 0.75,
+                        bgcolor: '#ECFDF5',
+                        color: '#065F46',
+                        border: '1px solid #A7F3D0',
+                        boxShadow: '0 10px 22px rgba(16,185,129,.14)',
+                        fontWeight: 950,
+                        '& .MuiChip-icon': {
+                            color: '#059669',
+                            fontSize: 20,
+                        },
+                        '& .MuiChip-label': {
+                            px: 1,
+                            fontSize: { xs: 12, sm: 14 },
+                        },
+                    }}
+                />
             </Divider>
 
             <Box

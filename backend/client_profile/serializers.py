@@ -4004,7 +4004,7 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
         model = MembershipApplication
         fields = [
             'id', 'invite_link', 'pharmacy', 'pharmacy_name', 'category',
-            'role', 'first_name', 'last_name', 'mobile_number', 'job_title',
+            'role', 'first_name', 'last_name', 'username', 'mobile_number', 'job_title',
             'pharmacist_award_level', 'otherstaff_classification_level',
             'intern_half', 'student_year', 'email',
             'submitted_by', 'status', 'submitted_at', 'decided_at', 'decided_by'
@@ -4015,8 +4015,62 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        request = self.context.get('request')
+        authenticated_user = request.user if request and request.user.is_authenticated else None
         invite_link = attrs.get('invite_link')
         role = attrs.get('role')
+        email_value = (attrs.get('email') or '').strip().lower()
+
+        if authenticated_user:
+            user_role = getattr(authenticated_user, 'role', None)
+            if user_role not in ('PHARMACIST', 'OTHER_STAFF'):
+                raise serializers.ValidationError({
+                    'email': 'Only pharmacist and other staff accounts can submit an authenticated membership application.'
+                })
+
+            if email_value and email_value != (authenticated_user.email or '').strip().lower():
+                raise serializers.ValidationError({
+                    'email': 'Use the email address on your signed-in account.'
+                })
+
+            required_user_role = required_user_role_for_membership(role)
+            if required_user_role and user_role != required_user_role:
+                role_label = dict(Membership.ROLE_CHOICES).get(role, role)
+                actual_label = dict(User.ROLE_CHOICES).get(user_role, user_role)
+                raise serializers.ValidationError({
+                    'role': f'Your account is registered as {actual_label} and cannot apply as {role_label}.'
+                })
+
+            otherstaff_onboard = getattr(authenticated_user, 'otherstaffonboarding', None)
+            if user_role == 'OTHER_STAFF' and otherstaff_onboard:
+                onboard_role = getattr(otherstaff_onboard, 'role_type', None)
+                if onboard_role in ('INTERN', 'TECHNICIAN', 'ASSISTANT') and role != onboard_role:
+                    role_label = dict(Membership.ROLE_CHOICES).get(onboard_role, onboard_role)
+                    raise serializers.ValidationError({
+                        'role': f'Your account is onboarded as {role_label} and cannot apply as another role.'
+                    })
+
+            identity_checks = {
+                'first_name': authenticated_user.first_name,
+                'last_name': authenticated_user.last_name,
+                'username': authenticated_user.username,
+                'mobile_number': authenticated_user.mobile_number,
+            }
+            for field_name, current_value in identity_checks.items():
+                submitted_value = (attrs.get(field_name) or '').strip()
+                current_value = (current_value or '').strip()
+                if current_value and submitted_value and submitted_value != current_value:
+                    raise serializers.ValidationError({
+                        field_name: 'Use the value on your signed-in account.'
+                    })
+
+        username_value = (attrs.get('username') or '').strip()
+        if not username_value:
+            raise serializers.ValidationError({
+                'username': 'Username is required.'
+            })
+        attrs['username'] = username_value
+
         job_title_value = (attrs.get('job_title') or '').strip()
         if invite_link and invite_link.category == 'FULL_PART_TIME':
             if not job_title_value:

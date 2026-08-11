@@ -73,7 +73,6 @@ export const MessageBubble: FC<Props> = ({
     user.profile_photo_url || fallbackDetails?.profile_photo_url || null;
   const effectiveFirstName = user.first_name || fallbackDetails?.first_name;
   const effectiveLastName = user.last_name || fallbackDetails?.last_name;
-  const effectiveEmail = user.email || fallbackDetails?.email || null;
   const effectiveFullName = ((effectiveFirstName || '') + (effectiveLastName ? ` ${effectiveLastName}` : '')).trim();
   
   const fullName = effectiveFullName || `Member ${msg.sender.id}`;

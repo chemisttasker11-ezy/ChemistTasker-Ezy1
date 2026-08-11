@@ -161,6 +161,12 @@ export default function OtherStaffOverviewScreen() {
       route: '/otherstaff/shifts',
     },
     {
+      title: 'Publish Availability',
+      description: 'Post available times',
+      icon: 'calendar-plus-outline',
+      route: '/otherstaff/publish-availability',
+    },
+    {
       title: 'Availability',
       description: 'Set schedule',
       icon: 'calendar-clock-outline',

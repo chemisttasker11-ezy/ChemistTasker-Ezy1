@@ -1538,6 +1538,19 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.78)' : 'background.paper',
       },
     };
+    const embeddedPanelSx = isEmbedded
+      ? {
+          p: 1.5,
+          borderRadius: 2,
+          borderColor: 'rgba(15, 23, 42, 0.08)',
+          bgcolor: 'transparent',
+          boxShadow: 'none',
+        }
+      : {
+          p: 2,
+          borderRadius: 3,
+          borderColor: 'grey.200',
+        };
     const VISIBILITY_META: Record<string, { eyebrow: string; description: string; accent: string }> = {
       FULL_PART_TIME: {
         eyebrow: 'Internal first',
@@ -1668,11 +1681,11 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
             />
           </Grid>
           <Grid size={12}>
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'grey.200' }}>
+            <Paper variant="outlined" sx={embeddedPanelSx}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Shift Flags
               </Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isEmbedded ? 1.5 : 2}>
                 <FormControlLabel
                   control={<Checkbox checked={hasTravel} onChange={(_, checked) => setHasTravel(checked)} />}
                   label="Travel allowance"
@@ -2180,21 +2193,27 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         );
       case 'timetable': {
         return (
-          <Grid container rowSpacing={2} columnSpacing={{ xs: 0, md: 0 }}>
+          <Grid
+            container
+            rowSpacing={isEmbedded ? 1.5 : 2}
+            columnSpacing={{ xs: 0, lg: isEmbedded ? 2 : 0 }}
+            sx={isEmbedded ? { alignItems: 'stretch' } : undefined}
+          >
             <Grid size={{ xs: 12 }}>
               <Paper
                 variant="outlined"
                 sx={{
-                  p: { xs: 1.5, sm: 2 },
-                  borderRadius: 3,
-                  borderColor: 'grey.200',
-                  bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.84)' : 'grey.50',
+                  p: isEmbedded ? { xs: 0.5, sm: 1 } : { xs: 1.5, sm: 2 },
+                  borderRadius: isEmbedded ? 0 : 3,
+                  borderColor: isEmbedded ? 'transparent' : 'grey.200',
+                  bgcolor: isEmbedded ? 'transparent' : isDarkMode ? 'rgba(15, 23, 42, 0.84)' : 'grey.50',
                   mx: 0,
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1,
-                  alignItems: 'flex-start',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: { xs: 0.5, sm: 2 },
+                  alignItems: { xs: 'flex-start', sm: 'center' },
                   width: '100%',
+                  boxShadow: 'none',
                 }}
               >
                 <FormControlLabel
@@ -2208,9 +2227,17 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
               </Paper>
             </Grid>
 
-            <Grid size={{ xs: 12, lg: 5 }} sx={{ order: { xs: 1, lg: 0 } }}>
-              <Stack spacing={2.5}>
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, borderColor: 'grey.200' }}>
+            <Grid size={{ xs: 12, lg: isEmbedded ? 4.5 : 5 }} sx={{ order: { xs: 1, lg: 0 }, minWidth: 0 }}>
+              <Stack spacing={isEmbedded ? 1.5 : 2.5}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: isEmbedded ? 1.75 : 2.5,
+                    borderRadius: isEmbedded ? 2 : 3,
+                    borderColor: isEmbedded ? 'rgba(15, 23, 42, 0.10)' : 'grey.200',
+                    boxShadow: isEmbedded ? 'none' : undefined,
+                  }}
+                >
                   <Stack spacing={2}>
                     <Typography variant="subtitle1" fontWeight={600}>
                       Add schedule entry
@@ -2355,7 +2382,12 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                 {selectedDates.length > 0 && (
                   <Paper
                     variant="outlined"
-                    sx={{ p: 2, borderRadius: 3, borderColor: 'grey.200' }}
+                    sx={{
+                      p: isEmbedded ? 1.5 : 2,
+                      borderRadius: isEmbedded ? 2 : 3,
+                      borderColor: isEmbedded ? 'rgba(15, 23, 42, 0.10)' : 'grey.200',
+                      boxShadow: isEmbedded ? 'none' : undefined,
+                    }}
                   >
                     <Stack spacing={1.5}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -2465,7 +2497,15 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                   </Paper>
                 )}
 
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, borderColor: 'grey.200' }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: isEmbedded ? 1.5 : 2.5,
+                    borderRadius: isEmbedded ? 2 : 3,
+                    borderColor: isEmbedded ? 'rgba(15, 23, 42, 0.10)' : 'grey.200',
+                    boxShadow: isEmbedded ? 'none' : undefined,
+                  }}
+                >
                   {slots.length === 0 ? (
                     <Alert severity="info">No schedule entries added yet.</Alert>
                   ) : (
@@ -2535,21 +2575,31 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
               </Stack>
             </Grid>
 
-            <Grid size={{ xs: 12, lg: 7 }} sx={{ order: { xs: 0, lg: 1 } }}>
+            <Grid size={{ xs: 12, lg: isEmbedded ? 7.5 : 7 }} sx={{ order: { xs: 0, lg: 1 }, minWidth: 0 }}>
               <Paper
                 variant="outlined"
                 sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  borderColor: 'grey.200',
-                  height: { xs: 420, sm: 460, md: 540 },
+                  p: isEmbedded ? { xs: 1, md: 1.5 } : 2,
+                  borderRadius: isEmbedded ? 2 : 3,
+                  borderColor: isEmbedded ? 'rgba(15, 23, 42, 0.10)' : 'grey.200',
+                  height: isEmbedded ? { xs: 420, sm: 480, md: 560 } : { xs: 420, sm: 460, md: 540 },
                   display: 'flex',
                   flexDirection: 'column',
+                  boxShadow: isEmbedded ? 'none' : undefined,
                   '& .rbc-calendar': {
                     fontFamily: "'Inter', sans-serif",
                   },
+                  '& .rbc-toolbar': {
+                    gap: 0.75,
+                    mb: isEmbedded ? 1 : undefined,
+                  },
+                  '& .rbc-toolbar button': {
+                    px: isEmbedded ? 1 : undefined,
+                    py: isEmbedded ? 0.5 : undefined,
+                  },
                   '& .rbc-toolbar-label': {
                     fontWeight: 600,
+                    fontSize: isEmbedded ? '0.95rem' : undefined,
                   },
                   '& .rbc-event': {
                     fontSize: '0.75rem',
@@ -2609,6 +2659,15 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
 
                       if (calendarView === 'week' || calendarView === 'day') {
                         const dateStr = startMoment.format('YYYY-MM-DD');
+                        if (selectedDateSet.has(dateStr)) {
+                          setSelectedDates((prev) => prev.filter((date) => date !== dateStr));
+                          setSelectedDateTimes((prev) => {
+                            const next = { ...prev };
+                            delete next[dateStr];
+                            return next;
+                          });
+                          return;
+                        }
                         setSlotStartTime(startMoment.format('HH:mm'));
                         let endCandidate = endMoment;
                         if (!endMoment.isAfter(startMoment)) {
@@ -2639,7 +2698,36 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                         return;
                       }
 
-                      mergeSelectedDates([...uniqueDates].sort());
+                      setSelectedDates((prev) => {
+                        const next = new Set(prev);
+                        uniqueDates.forEach((date) => {
+                          if (next.has(date)) {
+                            next.delete(date);
+                          } else {
+                            next.add(date);
+                          }
+                        });
+                        return [...next].sort();
+                      });
+                      setSelectedDateTimes((prev) => {
+                        const next = { ...prev };
+                        uniqueDates.forEach((date) => {
+                          if (selectedDateSet.has(date)) {
+                            delete next[date];
+                          } else if (!next[date]) {
+                            const hours = getDefaultTimesForDate(date);
+                            next[date] = { startTime: hours.startTime, endTime: hours.endTime };
+                          }
+                        });
+                        return next;
+                      });
+                      const latestSelected = uniqueDates.find((date) => !selectedDateSet.has(date));
+                      if (latestSelected) {
+                        const hours = getDefaultTimesForDate(latestSelected);
+                        setSlotDate(latestSelected);
+                        setSlotStartTime(hours.startTime);
+                        setSlotEndTime(hours.endTime);
+                      }
                       setIsRecurring(false);
                       setRecurringDays([]);
                       setRecurringEndDate('');
@@ -3225,7 +3313,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         maxWidth={false}
         sx={{
           px: isEmbedded ? { xs: 1, sm: 2, md: 3 } : { xs: 1.5, sm: 2.5, md: 4 },
-          py: isEmbedded ? 2 : 4,
+          py: isEmbedded ? { xs: 1, sm: 1.5 } : 4,
           bgcolor: isEmbedded ? 'transparent' : 'background.default',
           minHeight: isEmbedded ? 'auto' : '100vh',
           maxWidth: isEmbedded ? '100%' : { xs: '100%', lg: 1200, xl: 1400 },
@@ -3233,27 +3321,37 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       >
         <Paper
           sx={{
-            p: { xs: 2, md: 4 },
-            borderRadius: 4,
-            boxShadow: '0 8px 32px 0 rgba(0,0,0,0.1)',
+            p: isEmbedded ? 0 : { xs: 2, md: 4 },
+            borderRadius: isEmbedded ? 0 : 4,
+            boxShadow: isEmbedded ? 'none' : '0 8px 32px 0 rgba(0,0,0,0.1)',
+            bgcolor: isEmbedded ? 'transparent' : 'background.paper',
             width: '100%',
           }}
         >
-          <Typography variant="h4" gutterBottom align="center" fontWeight={600}>
-            {editingShiftId ? 'Edit Shift' : (isEmbedded ? 'Request a Booking' : 'Create a New Shift')}
-          </Typography>
-          <Typography variant="body1" color="text.secondary" align="center" mb={4}>
-            {isEmbedded
-              ? 'Review the details and submit a direct booking request for this worker.'
-              : 'Follow the steps to post a new shift opportunity.'}
-          </Typography>
+          {!isEmbedded && (
+            <>
+              <Typography variant="h4" gutterBottom align="center" fontWeight={600}>
+                {editingShiftId ? 'Edit Shift' : 'Create a New Shift'}
+              </Typography>
+              <Typography variant="body1" color="text.secondary" align="center" mb={4}>
+                Follow the steps to post a new shift opportunity.
+              </Typography>
+            </>
+          )}
 
           <Stepper
             activeStep={activeStep}
             alternativeLabel={!isMobile}
             orientation={isMobile ? 'vertical' : 'horizontal'}
             connector={<StepConnectorStyled />}
-            sx={{ mb: 3, px: { xs: 1, sm: 4 } }}
+            sx={{
+              mb: isEmbedded ? 1.5 : 3,
+              px: isEmbedded ? { xs: 0, sm: 1 } : { xs: 1, sm: 4 },
+              ...(isEmbedded && {
+                '& .MuiStepLabel-label': { fontSize: '0.78rem' },
+                '& .MuiStepIcon-root, & [class*="StepIconRoot"]': { transform: 'scale(0.9)' },
+              }),
+            }}
           >
             {steps.map((step, index) => (
               <Step key={step.label}>
@@ -3274,8 +3372,10 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
             ))}
           </Stepper>
 
-          <Box sx={{ minHeight: 350, px: { xs: 0, md: 2.5 }, pt: 0.5 }}>
-            <Typography variant="h5" fontWeight={500} gutterBottom>{steps[activeStep].label}</Typography>
+          <Box sx={{ minHeight: isEmbedded ? 0 : 350, px: isEmbedded ? 0 : { xs: 0, md: 2.5 }, pt: isEmbedded ? 0 : 0.5 }}>
+            {!isEmbedded && (
+              <Typography variant="h5" fontWeight={500} gutterBottom>{steps[activeStep].label}</Typography>
+            )}
             {renderStepContent(activeStep)}
           </Box>
 
@@ -3284,7 +3384,12 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
             spacing={{ xs: 2, sm: 3 }}
             justifyContent="space-between"
             alignItems={{ xs: 'stretch', sm: 'center' }}
-            sx={{ mt: 5, pt: 3, borderTop: '1px solid #eee' }}
+            sx={{
+              mt: isEmbedded ? 1.5 : 5,
+              pt: isEmbedded ? 1.5 : 3,
+              borderTop: '1px solid',
+              borderColor: isEmbedded ? 'rgba(15, 23, 42, 0.08)' : '#eee',
+            }}
           >
             <Button
               onClick={() => setActiveStep(p => p - 1)}

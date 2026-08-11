@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Box,
   Card,
@@ -7,6 +8,9 @@ import {
   Stack,
   Typography,
   Button,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -20,9 +24,29 @@ import {
   SchoolOutlined as SchoolOutlinedIcon,
   LocalPharmacyOutlined as LocalPharmacyOutlinedIcon,
   PersonOutline as PersonOutlineIcon,
+  ExpandMore as ExpandMoreIcon,
+  AccessTime as AccessTimeIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { Candidate } from "../types";
+
+const formatAuSlotDate = (date: string) => {
+  const parsed = dayjs(date);
+  return parsed.isValid() ? parsed.format("ddd, D MMM YYYY") : date;
+};
+
+const formatAuSlotTime = (time?: string | null) => {
+  if (!time) return "";
+  const parsed = dayjs(`2000-01-01T${String(time).slice(0, 5)}`);
+  return parsed.isValid() ? parsed.format("h:mm A") : String(time);
+};
+
+const formatSlotTimeRange = (slot: { startTime?: string | null; endTime?: string | null; isAllDay?: boolean }) => {
+  if (slot.isAllDay) return "All day";
+  const start = formatAuSlotTime(slot.startTime);
+  const end = formatAuSlotTime(slot.endTime);
+  return start && end ? `${start} - ${end}` : "Time not set";
+};
 
 export default function TalentCard({
   candidate,
@@ -53,11 +77,12 @@ export default function TalentCard({
     RoleIcon = PersonOutlineIcon;
   }
 
-  const availableDateLabels = (candidate.availableDates || [])
-    .map((date) => dayjs(date).format("D MMM"))
-    .filter(Boolean);
-  const visibleDateLabels = availableDateLabels.slice(0, 3);
-  const remainingDates = Math.max(availableDateLabels.length - visibleDateLabels.length, 0);
+  const availabilitySlots = (candidate.availableSlots || [])
+    .filter((slot) => slot?.date)
+    .sort((a, b) => `${a.date}T${a.startTime || ""}`.localeCompare(`${b.date}T${b.startTime || ""}`));
+  const [availabilityExpanded, setAvailabilityExpanded] = useState(false);
+  const displayedAvailabilitySlots = availabilityExpanded ? availabilitySlots : availabilitySlots.slice(0, 2);
+  const remainingSlots = Math.max(availabilitySlots.length - 2, 0);
   const showCalendarButton = (candidate.availableDates || []).length > 0;
   const isFullTimeApplication = Boolean(candidate.isFullTimeApplication || candidate.postKind === "FULL_TIME_APPLICATION");
   const travelStateLabel =
@@ -216,11 +241,50 @@ export default function TalentCard({
                   </>
                 )}
               </Stack>
-              {!isFullTimeApplication && visibleDateLabels.length > 0 && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-                  Dates: {visibleDateLabels.join(", ")}
-                  {remainingDates > 0 ? ` +${remainingDates}` : ""}
-                </Typography>
+              {!isFullTimeApplication && availabilitySlots.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Accordion
+                    disableGutters
+                    elevation={0}
+                    expanded={availabilityExpanded}
+                    onChange={(_, expanded) => setAvailabilityExpanded(expanded)}
+                    sx={{
+                      bgcolor: "transparent",
+                      border: 0,
+                      "&:before": { display: "none" },
+                      "& .MuiAccordionSummary-root": { minHeight: 34, px: 0 },
+                      "& .MuiAccordionSummary-content": { my: 0.5 },
+                      "& .MuiAccordionDetails-root": { px: 0, pt: 0.5, pb: 0 },
+                    }}
+                  >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                        {availabilitySlots.length} available slot{availabilitySlots.length === 1 ? "" : "s"}
+                        {remainingSlots > 0 ? ` (${remainingSlots} more)` : ""}
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Stack spacing={0.75}>
+                        {displayedAvailabilitySlots.map((slot, index) => (
+                          <Stack key={`${slot.date}-${slot.startTime}-${index}`} direction="row" spacing={1} alignItems="flex-start">
+                            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "primary.main", mt: 0.15 }} />
+                            <Box>
+                              <Typography variant="caption" fontWeight={700} color="text.primary" display="block">
+                                {formatAuSlotDate(slot.date)}
+                              </Typography>
+                              <Stack direction="row" spacing={0.5} alignItems="center">
+                                <AccessTimeIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                                <Typography variant="caption" color="text.secondary">
+                                  {formatSlotTimeRange(slot)}
+                                </Typography>
+                              </Stack>
+                            </Box>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </AccordionDetails>
+                  </Accordion>
+                </Box>
               )}
             </Box>
           </Box>

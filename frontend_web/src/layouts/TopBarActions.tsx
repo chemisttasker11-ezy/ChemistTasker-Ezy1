@@ -290,6 +290,11 @@ const pharmacistOptions: SearchOption[] = [
     keywords: ["availability", "calendar", "schedule"],
   },
   {
+    label: "Publish Availability",
+    path: "/dashboard/pharmacist/interests?publish_availability=1",
+    keywords: ["publish availability", "pitch", "talent board", "post availability"],
+  },
+  {
     label: "Invoices",
     path: "/dashboard/pharmacist/invoice",
     keywords: ["invoice", "billing", "payments"],
@@ -357,6 +362,11 @@ const otherStaffOptions: SearchOption[] = [
     label: "Set Availability",
     path: "/dashboard/otherstaff/availability",
     keywords: ["availability", "calendar"],
+  },
+  {
+    label: "Publish Availability",
+    path: "/dashboard/otherstaff/interests?publish_availability=1",
+    keywords: ["publish availability", "pitch", "talent board", "post availability"],
   },
   {
     label: "Invoices",

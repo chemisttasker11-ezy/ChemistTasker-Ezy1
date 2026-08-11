@@ -18,6 +18,8 @@ import { Shift, ShiftInterest } from '@chemisttasker/shared-core';
 import { SlotSelector } from './SlotSelector';
 import { getInterestDisplayName } from '../../utils/candidateHelpers';
 
+const chemisttaskerBadge = '/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png';
+
 interface PublicLevelViewProps {
     shift: Shift;
     slotId: number | null;
@@ -235,7 +237,29 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                 />
             )}
             <Divider>
-                <Chip label="Public Candidates" />
+                <Chip
+                    avatar={
+                        <Avatar
+                            src={chemisttaskerBadge}
+                            alt="ChemistTasker"
+                            sx={{ bgcolor: '#fff', '& img': { objectFit: 'contain' } }}
+                        />
+                    }
+                    label="ChemistTasker Public Candidates"
+                    sx={{
+                        height: 40,
+                        px: 0.75,
+                        bgcolor: '#F5F0FF',
+                        color: '#4C1D95',
+                        border: '1px solid #C4B5FD',
+                        boxShadow: '0 10px 24px rgba(109,40,217,.16)',
+                        fontWeight: 950,
+                        '& .MuiChip-label': {
+                            px: 1,
+                            fontSize: { xs: 12, sm: 14 },
+                        },
+                    }}
+                />
             </Divider>
             <Box
                 sx={{
@@ -290,14 +314,30 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                     p: 1.25,
                                     borderRadius: 2,
                                     bgcolor: '#fff',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
                                     minWidth: 0,
                                     boxShadow: '0 8px 18px rgba(15,23,42,.04)',
                                 }}
                             >
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                                    <Typography fontWeight={800} sx={{ lineHeight: 1.2, overflowWrap: 'anywhere', minWidth: 0 }}>
-                                        {title}
-                                    </Typography>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ width: '100%', minWidth: 0 }}>
+                                <Typography
+                                    noWrap
+                                    title={title}
+                                    sx={{
+                                        fontWeight: 800,
+                                        lineHeight: 1.2,
+                                        fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                        flex: '1 1 auto',
+                                        minWidth: 0,
+                                        maxWidth: '100%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {title}
+                                </Typography>
                                     <Button
                                         size="small"
                                         variant={isRevealLabel ? 'contained' : 'outlined'}
@@ -329,12 +369,28 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                 p: 1.25,
                                 borderRadius: 2,
                                 bgcolor: '#fff',
+                                width: '100%',
+                                boxSizing: 'border-box',
                                 minWidth: 0,
                                 boxShadow: '0 8px 18px rgba(15,23,42,.04)',
                             }}
                         >
-                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                                <Typography fontWeight={800} sx={{ lineHeight: 1.2, overflowWrap: 'anywhere', minWidth: 0 }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ width: '100%', minWidth: 0 }}>
+                                <Typography
+                                    noWrap
+                                    title={interest.revealed ? getInterestDisplayName(interest, interest.user) : 'Anonymous Interest User'}
+                                    sx={{
+                                        fontWeight: 800,
+                                        lineHeight: 1.2,
+                                        fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                        flex: '1 1 auto',
+                                        minWidth: 0,
+                                        maxWidth: '100%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
                                     {interest.revealed
                                         ? getInterestDisplayName(interest, interest.user)
                                         : 'Anonymous Interest User'}

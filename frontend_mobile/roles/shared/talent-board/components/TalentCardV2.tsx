@@ -1,13 +1,33 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Candidate } from '../types';
 
-const formatDate = (date: string) => {
-  const d = new Date(date);
+const formatAuSlotDate = (date: string) => {
+  const d = new Date(`${date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return date;
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('en-AU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const formatAuSlotTime = (time?: string | null) => {
+  if (!time) return '';
+  const [hourRaw, minuteRaw] = String(time).slice(0, 5).split(':').map(Number);
+  if (!Number.isFinite(hourRaw) || !Number.isFinite(minuteRaw)) return String(time);
+  const d = new Date(2000, 0, 1, hourRaw, minuteRaw);
+  return d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+const formatSlotTimeRange = (slot: { startTime?: string | null; endTime?: string | null; isAllDay?: boolean }) => {
+  if (slot.isAllDay) return 'All day';
+  const start = formatAuSlotTime(slot.startTime);
+  const end = formatAuSlotTime(slot.endTime);
+  return start && end ? `${start} - ${end}` : 'Time not set';
 };
 
 export default function TalentCardV2({
@@ -25,9 +45,12 @@ export default function TalentCardV2({
   canViewAvailability?: boolean;
   canRequestBooking?: boolean;
 }) {
-  const availableDateLabels = (candidate.availableDates || []).map(formatDate).filter(Boolean);
-  const visibleDateLabels = availableDateLabels.slice(0, 3);
-  const remainingDates = Math.max(availableDateLabels.length - visibleDateLabels.length, 0);
+  const [availabilityExpanded, setAvailabilityExpanded] = useState(false);
+  const availabilitySlots = (candidate.availableSlots || [])
+    .filter((slot) => slot?.date)
+    .sort((a, b) => `${a.date}T${a.startTime || ''}`.localeCompare(`${b.date}T${b.startTime || ''}`));
+  const availabilityPreview = availabilitySlots.slice(0, 2);
+  const remainingSlots = Math.max(availabilitySlots.length - availabilityPreview.length, 0);
   const showCalendarButton = (candidate.availableDates || []).length > 0;
   const isFullTimeApplication = Boolean(candidate.isFullTimeApplication || candidate.postKind === 'FULL_TIME_APPLICATION');
   const travelStateLabel =
@@ -97,9 +120,29 @@ export default function TalentCardV2({
             {isFullTimeApplication ? (
               <Text variant="bodySmall" style={styles.subtle}>Open anytime</Text>
             ) : showCalendarButton ? (
-              <Text variant="bodySmall" style={styles.subtle}>
-                Dates: {visibleDateLabels.join(', ')}{remainingDates > 0 ? ` +${remainingDates}` : ''}
-              </Text>
+              <View style={styles.availabilityList}>
+                <TouchableOpacity style={styles.accordionToggle} onPress={() => setAvailabilityExpanded((value) => !value)}>
+                  <Text style={styles.slotCount}>
+                    {availabilitySlots.length} available slot{availabilitySlots.length === 1 ? '' : 's'}
+                    {remainingSlots > 0 ? ` (${remainingSlots} more)` : ''}
+                  </Text>
+                  <MaterialCommunityIcons name={availabilityExpanded ? 'chevron-up' : 'chevron-down'} size={20} color="#4F46E5" />
+                </TouchableOpacity>
+                {(availabilityExpanded ? availabilitySlots : availabilityPreview).map((slot, index) => (
+                  <View key={`${slot.date}-${slot.startTime}-${index}`} style={styles.slotRow}>
+                    <MaterialCommunityIcons name="map-marker-outline" size={16} color="#4F46E5" style={{ marginTop: 1 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.slotDate}>{formatAuSlotDate(slot.date)}</Text>
+                      <View style={styles.slotTimeRow}>
+                        <MaterialCommunityIcons name="clock-outline" size={13} color="#6B7280" />
+                        <Text style={styles.slotTime}>
+                          {formatSlotTimeRange(slot)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
             ) : (
               <Text variant="bodySmall" style={styles.subtle}>No dates shared yet</Text>
             )}
@@ -185,6 +228,13 @@ const styles = StyleSheet.create({
   engagementChip: { backgroundColor: '#EEF2FF' },
   availabilityBox: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 10, gap: 4 },
   availabilityHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  availabilityList: { gap: 6 },
+  accordionToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  slotCount: { color: '#4B5563', fontSize: 12, fontWeight: '700' },
+  slotRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
+  slotDate: { color: '#111827', fontSize: 12, fontWeight: '700' },
+  slotTimeRow: { flexDirection: 'row', gap: 4, alignItems: 'center', marginTop: 2 },
+  slotTime: { color: '#6B7280', fontSize: 12 },
   bookingRow: { marginTop: 4, alignItems: 'flex-end' },
   skillsBlock: { gap: 4 },
   skillTitle: { color: '#4B5563', fontSize: 12 },

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Divider, Chip } from 'react-native-paper';
+import { Divider, Surface, Text, Icon } from 'react-native-paper';
 import { Shift, ShiftMemberStatus } from '@chemisttasker/shared-core';
 import { customTheme } from '../../theme';
 import StatusCard from './StatusCard';
@@ -66,7 +66,10 @@ export default function CommunityLevelView({
 
             <View style={styles.dividerContainer}>
                 <Divider style={styles.divider} />
-                <Chip mode="outlined" style={styles.dividerChip}>Community Candidates</Chip>
+                <Surface style={styles.dividerChip} elevation={2}>
+                    <Icon source="storefront" size={20} color="#059669" />
+                    <Text style={styles.dividerChipText}>Community Candidates</Text>
+                </Surface>
                 <Divider style={styles.divider} />
             </View>
 
@@ -131,7 +134,24 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     dividerChip: {
-        backgroundColor: customTheme.colors.greyLight,
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        borderRadius: 999,
+        paddingHorizontal: customTheme.spacing.md,
+        paddingVertical: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.14,
+        shadowRadius: 12,
+    },
+    dividerChipText: {
+        color: '#065F46',
+        fontSize: 13,
+        fontWeight: '900',
     },
     grid: {
         gap: customTheme.spacing.md,

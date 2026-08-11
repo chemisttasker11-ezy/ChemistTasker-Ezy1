@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput as RNTextInput, View } from 'react-native';
 import { Text, TextInput, Button, Surface } from 'react-native-paper';
 import { useRouter } from 'expo-router';
@@ -24,6 +24,14 @@ export default function MobileVerifyScreen() {
     const [error, setError] = useState('');
     const [identityLocked, setIdentityLocked] = useState(false);
     const otpInputRef = useRef<RNTextInput | null>(null);
+
+    useEffect(() => {
+        if (!user) return;
+        setFirstName(user.first_name || '');
+        setLastName(user.last_name || '');
+        setUsername(user.username || '');
+        setMobile(user.mobile_number || '');
+    }, [user]);
 
     const getRoleHome = (role?: string | null): string => {
         const normalized = String(role || '').toUpperCase();

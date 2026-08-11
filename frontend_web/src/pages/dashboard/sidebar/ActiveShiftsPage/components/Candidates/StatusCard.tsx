@@ -222,6 +222,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                             spacing={1}
                             sx={{
                                 flex: 1,
+                                width: '100%',
                                 minWidth: 0,
                                 minHeight: 0,
                                 maxHeight: 245,
@@ -259,18 +260,54 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                             p: 1.25,
                                             borderRadius: 2,
                                             bgcolor: '#fff',
+                                            width: '100%',
+                                            boxSizing: 'border-box',
                                             minWidth: 0,
                                             boxShadow: '0 8px 18px rgba(15,23,42,.04)',
                                         }}
                                     >
-                                        <Stack spacing={1}>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-                                                <Stack sx={{ minWidth: 0 }}>
-                                                    <Typography fontWeight={800} sx={{ lineHeight: 1.2, overflowWrap: 'anywhere' }}>
+                                        <Stack
+                                            direction={{ xs: 'column', sm: 'row' }}
+                                            spacing={1}
+                                            alignItems={{ xs: 'stretch', sm: 'center' }}
+                                            justifyContent="space-between"
+                                            sx={{ width: '100%', minWidth: 0 }}
+                                        >
+                                            <Stack
+                                                direction="row"
+                                                alignItems="center"
+                                                spacing={1}
+                                                sx={{ minWidth: 0, flex: '1 1 auto' }}
+                                            >
+                                                <Stack sx={{ minWidth: 0, flex: '1 1 auto', maxWidth: '100%', textAlign: 'left' }}>
+                                                    <Typography
+                                                        noWrap
+                                                        title={memberAny.name || `${memberAny.first_name} ${memberAny.last_name}`}
+                                                        sx={{
+                                                            fontWeight: 800,
+                                                            lineHeight: 1.2,
+                                                            fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                                            maxWidth: '100%',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap',
+                                                        }}
+                                                    >
                                                         {memberAny.name || `${memberAny.first_name} ${memberAny.last_name}`}
                                                     </Typography>
                                                     {memberAny.employmentType && (
-                                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                            noWrap
+                                                            sx={{
+                                                                display: 'block',
+                                                                fontWeight: 600,
+                                                                maxWidth: '100%',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                            }}
+                                                        >
                                                             {memberAny.employmentType}
                                                         </Typography>
                                                     )}
@@ -286,63 +323,71 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                     />
                                                 ) : null}
                                             </Stack>
-                                            {title === 'Interested' && hasOffer && (
-                                                <Chip
-                                                    label="Counter offer"
-                                                    size="small"
-                                                    color="info"
-                                                    sx={{
-                                                        alignSelf: 'flex-start',
-                                                        maxWidth: '100%',
-                                                        '& .MuiChip-label': {
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                        },
-                                                    }}
-                                                />
-                                            )}
-                                            {showOrganizationLabel && (
-                                                <Chip
-                                                    label={organizationName}
-                                                    size="small"
-                                                    variant="outlined"
-                                                    sx={{
-                                                        alignSelf: 'flex-start',
-                                                        maxWidth: '100%',
-                                                        bgcolor: '#fff',
-                                                        '& .MuiChip-label': {
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                        },
-                                                    }}
-                                                />
-                                            )}
-                                        {title === 'Interested' && (
-                                            <Button
-                                                size="small"
-                                                variant="contained"
-                                                color="secondary"
-                                                fullWidth
-                                                sx={{
-                                                    minHeight: 36,
-                                                    borderRadius: 1.5,
-                                                    fontWeight: 800,
-                                                    whiteSpace: 'normal',
-                                                    lineHeight: 1.2,
-                                                }}
-                                                onClick={() => {
-                                                    onReviewCandidate(member, shiftId, match.offer, match.slotId);
-                                                }}
-                                                disabled={reviewLoadingId === memberAny.userId}
-                                                startIcon={
-                                                    reviewLoadingId === memberAny.userId ? (
-                                                        <CircularProgress size={16} color="inherit" />
-                                                    ) : undefined
-                                                }
+                                            <Stack
+                                                direction="row"
+                                                spacing={0.75}
+                                                alignItems="center"
+                                                justifyContent={{ xs: 'flex-start', sm: 'flex-end' }}
+                                                sx={{ flexShrink: 0, flexWrap: 'nowrap', minWidth: 0 }}
                                             >
-                                                {hasOffer ? 'Review offer' : 'Review Candidate'}
-                                            </Button>
-                                        )}
+                                                {title === 'Interested' && hasOffer && (
+                                                    <Chip
+                                                        label="Counter offer"
+                                                        size="small"
+                                                        color="info"
+                                                        sx={{
+                                                            maxWidth: 120,
+                                                            '& .MuiChip-label': {
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                            },
+                                                        }}
+                                                    />
+                                                )}
+                                                {showOrganizationLabel && (
+                                                    <Chip
+                                                        label={organizationName}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{
+                                                            maxWidth: 130,
+                                                            bgcolor: '#fff',
+                                                            '& .MuiChip-label': {
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                            },
+                                                        }}
+                                                    />
+                                                )}
+                                                {title === 'Interested' && (
+                                                    <Button
+                                                        size="small"
+                                                        variant="contained"
+                                                        color="secondary"
+                                                        sx={{
+                                                            minHeight: 34,
+                                                            px: 1.5,
+                                                            borderRadius: 1.5,
+                                                            fontWeight: 800,
+                                                            whiteSpace: 'nowrap',
+                                                            lineHeight: 1.2,
+                                                            flexShrink: 0,
+                                                            '& .MuiButton-startIcon': { flexShrink: 0 },
+                                                        }}
+                                                        onClick={() => {
+                                                            onReviewCandidate(member, shiftId, match.offer, match.slotId);
+                                                        }}
+                                                        disabled={reviewLoadingId === memberAny.userId}
+                                                        startIcon={
+                                                            reviewLoadingId === memberAny.userId ? (
+                                                                <CircularProgress size={16} color="inherit" />
+                                                            ) : undefined
+                                                        }
+                                                    >
+                                                        {hasOffer ? 'Review offer' : 'Review Candidate'}
+                                                    </Button>
+                                                )}
+                                            </Stack>
                                         </Stack>
                                     </Paper>
                                 );

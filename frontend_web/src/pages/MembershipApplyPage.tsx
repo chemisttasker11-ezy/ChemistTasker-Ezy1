@@ -16,6 +16,8 @@ import {
 } from '@mui/material';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
+import { useAuth } from '../contexts/AuthContext';
+import apiClient from '../utils/apiClient';
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 
 interface MagicInfo {
@@ -42,6 +44,8 @@ const ROLE_OPTIONS = [
   { value: 'INTERN', label: 'Intern' },
   { value: 'STUDENT', label: 'Pharmacy Student' },
 ];
+
+const OTHER_STAFF_ROLE_VALUES = ['TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 
 const PHARMACIST_AWARD_LEVEL_OPTIONS = [
   { value: 'PHARMACIST', label: 'Pharmacist' },
@@ -71,6 +75,7 @@ const STUDENT_YEAR_OPTIONS = [
 
 export default function MembershipApplyPage() {
   const { token } = useParams<{ token: string }>();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [loadingInfo, setLoadingInfo] = useState(true);
   const [info, setInfo] = useState<MagicInfo | null>(null);
@@ -82,6 +87,7 @@ export default function MembershipApplyPage() {
   const [role, setRole] = useState<string>('PHARMACIST');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -90,6 +96,18 @@ export default function MembershipApplyPage() {
   const [otherStaffLevel, setOtherStaffLevel] = useState('');
   const [internHalf, setInternHalf] = useState('');
   const [studentYear, setStudentYear] = useState('');
+
+  const isAuthenticatedWorker = user?.role === 'PHARMACIST' || user?.role === 'OTHER_STAFF';
+  const authenticatedRoleBlocked = Boolean(user && !isAuthenticatedWorker);
+  const roleOptions = useMemo(() => {
+    if (user?.role === 'PHARMACIST') {
+      return ROLE_OPTIONS.filter((option) => option.value === 'PHARMACIST');
+    }
+    if (user?.role === 'OTHER_STAFF') {
+      return ROLE_OPTIONS.filter((option) => OTHER_STAFF_ROLE_VALUES.includes(option.value));
+    }
+    return ROLE_OPTIONS;
+  }, [user?.role]);
 
   const activeLevelField = useMemo(() => {
     switch (role) {
@@ -154,6 +172,21 @@ export default function MembershipApplyPage() {
     };
   }, [token]);
 
+  useEffect(() => {
+    if (!user || !isAuthenticatedWorker) return;
+    setFirstName(user.first_name || user.firstName || '');
+    setLastName(user.last_name || user.lastName || '');
+    setUsername(user.username || '');
+    setMobile(user.mobile_number || '');
+    setEmail(user.email || '');
+    setRole((currentRole) => {
+      if (user.role === 'PHARMACIST') {
+        return 'PHARMACIST';
+      }
+      return OTHER_STAFF_ROLE_VALUES.includes(currentRole) ? currentRole : 'TECHNICIAN';
+    });
+  }, [isAuthenticatedWorker, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -177,8 +210,26 @@ export default function MembershipApplyPage() {
         return;
       }
 
+      if (authenticatedRoleBlocked) {
+        setSubmitError('Only pharmacist and other staff accounts can submit this application while signed in.');
+        setSubmitting(false);
+        return;
+      }
+
       if (!email.trim()) {
         setSubmitError('Please enter your email address.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (user?.email && email.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
+        setSubmitError('Use the email address on your signed-in account.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (!username.trim()) {
+        setSubmitError('Please enter your username.');
         setSubmitting(false);
         return;
       }
@@ -187,6 +238,7 @@ export default function MembershipApplyPage() {
         role,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
+        username: username.trim(),
         mobile_number: mobile.trim(),
         email: email.trim().toLowerCase(),
         pharmacist_award_level: pharmacistLevel || null,
@@ -199,7 +251,11 @@ export default function MembershipApplyPage() {
         payload.job_title = trimmedJobTitle;
       }
 
-      await axios.post(`${API_BASE_URL}${API_ENDPOINTS.magicMembershipApply(token)}`, payload);
+      if (user) {
+        await apiClient.post(API_ENDPOINTS.magicMembershipApply(token), payload);
+      } else {
+        await axios.post(`${API_BASE_URL}${API_ENDPOINTS.magicMembershipApply(token)}`, payload);
+      }
       setSubmitted(true);
     } catch (err: any) {
       const data = err?.response?.data;
@@ -285,6 +341,16 @@ export default function MembershipApplyPage() {
         ) : (
           <>
             <Divider sx={{ my: 2 }} />
+            {user && isAuthenticatedWorker && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                We prefilled this application from your signed-in account. Use your account email and role.
+              </Alert>
+            )}
+            {authenticatedRoleBlocked && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This application can only be submitted by pharmacist or other staff accounts while signed in.
+              </Alert>
+            )}
             {submitError && <Alert severity="error" sx={{ mb: 2 }}>{submitError}</Alert>}
 
             <form onSubmit={handleSubmit}>
@@ -296,8 +362,9 @@ export default function MembershipApplyPage() {
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 required
+                disabled={authLoading || user?.role === 'PHARMACIST' || authenticatedRoleBlocked}
               >
-                {ROLE_OPTIONS.map((option) => (
+                {roleOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
                   </MenuItem>
@@ -325,6 +392,15 @@ export default function MembershipApplyPage() {
               <TextField
                 fullWidth
                 margin="normal"
+                label="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+
+              <TextField
+                fullWidth
+                margin="normal"
                 label="Mobile Number"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
@@ -340,6 +416,7 @@ export default function MembershipApplyPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={Boolean(user?.email) || authenticatedRoleBlocked}
               />
 
               {info?.category === 'FULL_PART_TIME' && (
@@ -376,7 +453,7 @@ export default function MembershipApplyPage() {
                   fullWidth
                   type="submit"
                   variant="contained"
-                  disabled={submitting}
+                  disabled={submitting || authenticatedRoleBlocked}
                   sx={{ py: 1.5, backgroundColor: '#00a99d', '&:hover': { backgroundColor: '#00877d' } }}
                 >
                   {submitting ? <CircularProgress size={24} color="inherit" /> : 'Submit Application'}

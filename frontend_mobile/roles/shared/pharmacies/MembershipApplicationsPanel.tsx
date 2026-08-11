@@ -221,6 +221,7 @@ export default function MembershipApplicationsPanel({
                 {applications.map((app) => {
                     const applicantName =
                         [app.firstName, app.lastName].filter(Boolean).join(' ') || 'Applicant';
+                    const username = readValue(app, 'username', 'username');
                     const jobTitle = readValue(app, 'jobTitle', 'job_title');
                     const mobileNumber = readValue(app, 'mobileNumber', 'mobile_number');
                     const classification =
@@ -241,6 +242,7 @@ export default function MembershipApplicationsPanel({
 
                                 <View style={styles.details}>
                                     <Text style={styles.detailText}>Role: {app.role || 'N/A'}</Text>
+                                    {username ? <Text style={styles.detailText}>Username: {username}</Text> : null}
                                     {jobTitle ? <Text style={styles.detailText}>Job title: {jobTitle}</Text> : null}
                                     {mobileNumber ? <Text style={styles.detailText}>Mobile: {mobileNumber}</Text> : null}
                                     {classification ? <Text style={styles.detailText}>Classification: {classification}</Text> : null}

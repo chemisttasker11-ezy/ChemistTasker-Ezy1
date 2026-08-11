@@ -113,11 +113,21 @@ export default function StatusCard({
                                 <Surface key={userId} style={styles.memberCard} elevation={1}>
                                     <View style={styles.memberRow}>
                                         <View style={styles.memberInfo}>
-                                            <Text style={styles.memberName}>
+                                            <Text
+                                                style={styles.memberName}
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                                adjustsFontSizeToFit
+                                                minimumFontScale={0.72}
+                                            >
                                                 {memberAny.name || getCandidateDisplayName(member)}
                                             </Text>
                                             {memberAny.employmentType && (
-                                                <Text style={styles.employmentType}>
+                                                <Text
+                                                    style={styles.employmentType}
+                                                    numberOfLines={1}
+                                                    ellipsizeMode="tail"
+                                                >
                                                     {memberAny.employmentType}
                                                 </Text>
                                             )}
@@ -206,28 +216,31 @@ const styles = StyleSheet.create({
     },
     membersList: {
         flex: 1,
+        width: '100%',
         gap: customTheme.spacing.sm,
     },
     memberCard: {
+        width: '100%',
         padding: customTheme.spacing.sm,
         borderRadius: 14,
         backgroundColor: '#fff',
     },
     memberRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        flexDirection: 'column',
+        alignItems: 'stretch',
         gap: customTheme.spacing.sm,
         marginBottom: customTheme.spacing.xs,
     },
     memberInfo: {
         flex: 1,
         flexShrink: 1,
+        minWidth: 0,
     },
     memberName: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 'bold',
         color: customTheme.colors.text,
+        flexShrink: 1,
     },
     employmentType: {
         fontSize: 12,
@@ -239,6 +252,7 @@ const styles = StyleSheet.create({
         gap: customTheme.spacing.xs,
         flexWrap: 'wrap',
         alignItems: 'flex-start',
+        maxWidth: '100%',
     },
     reviewButton: {
         marginTop: customTheme.spacing.xs,

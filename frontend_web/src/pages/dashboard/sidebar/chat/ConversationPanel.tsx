@@ -20,6 +20,12 @@ type Membership = {
   user: { id: number };
 };
 
+type ShiftContactUser = Omit<UserLite, 'first_name' | 'last_name' | 'email'> & {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+};
+
 type MentionOption = { label: string; membershipId: number };
 type MentionState = {
   options: MentionOption[];
@@ -37,7 +43,7 @@ type Props = {
   currentUserId?: number;
   participantCache: Record<number, { details: UserLite; invited_name?: string }>;
   memberCache: MemberCache;
-  shiftContacts?: Array<{ user?: UserLite | null }>;
+  shiftContacts?: Array<{ user?: ShiftContactUser | null }>;
   onSendText: (body: string) => void;
   onSendAttachment: (files: File[], body?: string) => void;
   isLoadingMessages: boolean;

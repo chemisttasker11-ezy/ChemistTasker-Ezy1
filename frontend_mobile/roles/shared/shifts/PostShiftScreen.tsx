@@ -2170,23 +2170,27 @@ export default function PostShiftScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
-            <ScrollView contentContainerStyle={styles.content} style={{ flex: 1 }}>
-                <Text variant="headlineMedium" style={styles.title}>
-                    {editingId ? 'Edit Shift' : (isEmbedded ? 'Request a Booking' : 'Create a New Shift')}
-                </Text>
-                <Text variant="bodyMedium" style={styles.subtitle}>
-                    {isEmbedded ? 'Review the details and submit a direct booking request for this worker.' : 'Follow the steps to post a new shift opportunity.'}
-                </Text>
+            <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }}>
+                {!isEmbedded ? (
+                    <>
+                        <Text variant="headlineMedium" style={styles.title}>
+                            {editingId ? 'Edit Shift' : 'Create a New Shift'}
+                        </Text>
+                        <Text variant="bodyMedium" style={styles.subtitle}>
+                            Follow the steps to post a new shift opportunity.
+                        </Text>
+                    </>
+                ) : null}
 
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.stepper}
+                    contentContainerStyle={[styles.stepper, isEmbedded && styles.stepperEmbedded]}
                 >
                     {stepOrder.map((step) => (
                         <TouchableOpacity
                             key={step}
-                            style={[styles.stepPill, activeStep === step && styles.stepPillActive]}
+                            style={[styles.stepPill, isEmbedded && styles.stepPillEmbedded, activeStep === step && styles.stepPillActive]}
                             onPress={() => setActiveStep(step)}
                         >
                             <Text style={[styles.stepPillText, activeStep === step && styles.stepPillTextActive]}>
@@ -2280,6 +2284,7 @@ export default function PostShiftScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     content: { padding: 16, paddingBottom: 32, gap: 16 },
+    contentEmbedded: { padding: 10, paddingBottom: 18, gap: 10 },
     title: { fontWeight: '700', color: '#111827' },
     subtitle: { color: '#6B7280', marginTop: 4 },
     stepper: {
@@ -2289,11 +2294,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         flexWrap: 'nowrap',
     },
+    stepperEmbedded: {
+        paddingVertical: 4,
+        justifyContent: 'flex-start',
+    },
     stepPill: {
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 999,
         backgroundColor: '#EEF2FF',
+    },
+    stepPillEmbedded: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
     },
     stepPillActive: {
         backgroundColor: PRIMARY,

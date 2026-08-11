@@ -19,6 +19,7 @@ const tabTitles: Record<string, string> = {
   calendar: 'Calendar',
   'talent-board': 'Talent Board',
   availability: 'Availability',
+  'publish-availability': 'Publish Availability',
   'profile-basic-info': 'Profile',
   'profile-identity': 'Profile',
   'profile-skills': 'Profile',
@@ -31,6 +32,7 @@ const tabTitles: Record<string, string> = {
 const sidebarItems = [
   { label: 'Home', icon: 'home', route: '/pharmacist/dashboard' },
   { label: 'Shifts', icon: 'calendar-range', route: '/pharmacist/shifts' },
+  { label: 'Publish Availability', icon: 'calendar-plus', route: '/pharmacist/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/pharmacist/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/pharmacist/calendar' },
   { label: 'Chat', icon: 'message', route: '/pharmacist/chat' },
@@ -388,6 +390,16 @@ export default function PharmacistTabs() {
             tabBarAccessibilityLabel: 'Invoices tab',
             tabBarIcon: ({ color, size }) => (
               <IconButton icon="file-document-multiple" iconColor={color} size={size} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="publish-availability"
+          options={{
+            title: 'Publish',
+            tabBarAccessibilityLabel: 'Publish availability tab',
+            tabBarIcon: ({ color, size }) => (
+              <IconButton icon="calendar-plus" iconColor={color} size={size} />
             ),
           }}
         />
