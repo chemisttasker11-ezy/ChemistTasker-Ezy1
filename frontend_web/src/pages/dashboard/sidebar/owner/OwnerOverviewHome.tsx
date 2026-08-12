@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../../../../utils/apiClient";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { dashboardGreetingName } from "../../../../utils/displayName";
+import RecentActivityDialog from "../../../../components/dashboard/RecentActivityDialog";
 import type { PharmacyDTO } from "./types";
 
 const DNA = {
@@ -126,6 +127,8 @@ export default function OwnerOverviewHome({
   const navigate = useNavigate();
   const [pillBalance, setPillBalance] = useState<number | null>(null);
   const [shiftPostCost, setShiftPostCost] = useState<number | null>(null);
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityDialogLoading, setActivityDialogLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -239,14 +242,9 @@ export default function OwnerOverviewHome({
     }
   };
   const handleOpenActivity = () => {
-    const firstActionUrl = activityItems
-      .map((event) => event.actionUrl || event.action_url)
-      .find(Boolean);
-    if (firstActionUrl) {
-      navigate(firstActionUrl);
-      return;
-    }
-    onOpenShifts();
+    setActivityDialogLoading(true);
+    setActivityDialogOpen(true);
+    window.setTimeout(() => setActivityDialogLoading(false), 250);
   };
 
   return (
@@ -607,6 +605,13 @@ export default function OwnerOverviewHome({
           );
         })}
       </Paper>
+      <RecentActivityDialog
+        open={activityDialogOpen}
+        onClose={() => setActivityDialogOpen(false)}
+        activity={activityItems}
+        loading={activityDialogLoading}
+        onActivityClick={handleActivityClick}
+      />
     </Box>
   );
 }

@@ -462,6 +462,9 @@ export default function OwnerLayout() {
         <Tabs.Screen name="shifts/create" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]/applications" options={{ href: null }} />
+        <Tabs.Screen name="invoice" options={{ href: null }} />
+        <Tabs.Screen name="invoice/new" options={{ href: null }} />
+        <Tabs.Screen name="invoice/[id]" options={{ href: null }} />
         <Tabs.Screen name="staff/index" options={{ href: null }} />
         <Tabs.Screen name="locums/index" options={{ href: null }} />
         <Tabs.Screen

@@ -82,6 +82,8 @@ export default function AdminOverview() {
         action_url:
           typeof item?.action_url === "string" && item.action_url.startsWith("/dashboard/owner/shifts/")
             ? item.action_url.replace("/dashboard/owner", adminBasePath)
+            : typeof item?.action_url === "string" && item.action_url.startsWith("/dashboard/owner/invoice/")
+              ? item.action_url.replace("/dashboard/owner", adminBasePath)
             : item?.action_url,
       }))
     : [];

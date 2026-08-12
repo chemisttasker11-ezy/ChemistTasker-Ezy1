@@ -25,6 +25,14 @@ const CATEGORY_CHOICES = [
 ];
 const UNIT_CHOICES = ['Hours', 'Lump Sum'];
 
+const dashboardRoleSegment = (role?: string | null) => {
+  const normalized = String(role || '').toUpperCase();
+  if (normalized === 'OTHER_STAFF') return 'otherstaff';
+  if (normalized === 'PHARMACIST') return 'pharmacist';
+  if (normalized === 'OWNER') return 'owner';
+  return normalized.toLowerCase();
+};
+
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -322,7 +330,7 @@ export default function InvoiceDetailPage() {
   setTimeout(() => {
     if (user && user.role) {
       // Go to the correct invoice management page for both PHARMACIST and OTHER_STAFF
-      navigate(`/dashboard/${user.role.toLowerCase()}/invoice`);
+      navigate(`/dashboard/${dashboardRoleSegment(user.role)}/invoice`);
     } else {
       // Fallback: If user is null (shouldn't happen, but for safety)
       navigate('/dashboard/invoice');

@@ -1194,9 +1194,12 @@ def _dashboard_invoice_action_url(invoice, dashboard_role):
     if role == "otherstaff":
         return f"/dashboard/otherstaff/invoice/{invoice.id}"
     if role == "organization":
-        return "/dashboard/organization/shift-center"
+        return f"/dashboard/organization/invoice/{invoice.id}"
     if role == "owner":
-        return "/dashboard/owner/shift-center"
+        return f"/dashboard/owner/invoice/{invoice.id}"
+    if role == "admin":
+        pharmacy_id = getattr(invoice, "pharmacy_id", None)
+        return f"/dashboard/admin/{pharmacy_id}/invoice/{invoice.id}" if pharmacy_id else ""
     return ""
 
 
@@ -7378,6 +7381,27 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def _resolve_shift_role_for_request(self, req):
+        role = _normalized_role_code(req.role)
+        if role == "OTHER_STAFF":
+            if req.shift_id and getattr(req.shift, "shift", None):
+                assignment_role = _normalized_role_code(req.shift.shift.role_needed)
+                if assignment_role in dict(Shift.ROLE_CHOICES):
+                    return assignment_role
+
+            requester_role = _otherstaff_onboarding_role(req.requested_by)
+            if requester_role in dict(Shift.ROLE_CHOICES):
+                return requester_role
+
+            raise ValidationError({
+                "role": "Other staff cover requests must resolve to a specific shift role before approval."
+            })
+
+        if role not in dict(Shift.ROLE_CHOICES):
+            raise ValidationError({"role": "Invalid shift role."})
+
+        return role
+
     # ---------------------------
     # APPROVE (Admin action)
     # ---------------------------
@@ -7392,20 +7416,24 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
             return Response({"detail": f"Already {req.status.lower()}."}, status=status.HTTP_400_BAD_REQUEST)
 
         pharmacy = req.pharmacy
+        role_needed = self._resolve_shift_role_for_request(req)
         
         # Check the pharmacy setting for auto-publishing
         # --- NEW LOGIC: Always create an open shift on approval ---
         # Create a new community shift based on the request details
-        new_shift = Shift.objects.create(
-            pharmacy=pharmacy,
-            role_needed=req.role,
-            employment_type='LOCUM',
-            visibility='LOCUM_CASUAL',
-            single_user_only=True,
-            created_by=request.user,
-            rate_type='FLEXIBLE',
-            description=f"This shift was created from a cover request by {req.requested_by.get_full_name()} for {req.slot_date}. Note: {req.note or 'No note provided.'}"
-        )
+        shift_data = {
+            "pharmacy": pharmacy,
+            "role_needed": role_needed,
+            "employment_type": "LOCUM",
+            "visibility": "LOCUM_CASUAL",
+            "single_user_only": True,
+            "created_by": request.user,
+            "description": f"This shift was created from a cover request by {req.requested_by.get_full_name()} for {req.slot_date}. Note: {req.note or 'No note provided.'}",
+        }
+        if role_needed == "PHARMACIST":
+            shift_data["rate_type"] = "FLEXIBLE"
+
+        new_shift = Shift.objects.create(**shift_data)
 
         ShiftSlot.objects.create(
             shift=new_shift,
@@ -8216,12 +8244,28 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
 
 
 # Invoices
+def _invoice_queryset_for_user(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return Invoice.objects.none()
+
+    owned_pharmacy_ids = Pharmacy.objects.filter(owner__user=user).values_list("id", flat=True)
+    admin_pharmacy_ids = pharmacies_user_admins(user).values_list("id", flat=True)
+    org_pharmacy_ids = _get_org_pharmacies_queryset(user).values_list("id", flat=True)
+
+    return Invoice.objects.filter(
+        Q(user=user)
+        | Q(pharmacy_id__in=owned_pharmacy_ids)
+        | Q(pharmacy_id__in=admin_pharmacy_ids)
+        | Q(pharmacy_id__in=org_pharmacy_ids)
+    ).distinct()
+
+
 class InvoiceListView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = InvoiceSerializer
 
     def get_queryset(self):
-        return Invoice.objects.filter(user=self.request.user)
+        return _invoice_queryset_for_user(self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -8233,7 +8277,7 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return Invoice.objects.filter(user=self.request.user)
+        return _invoice_queryset_for_user(self.request.user)
 
 
 class GenerateInvoiceView(APIView):
@@ -8322,37 +8366,7 @@ from django.http import HttpResponse, Http404
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def invoice_pdf_view(request, invoice_id):
-    invoice = get_object_or_404(Invoice, pk=invoice_id)
-
-    can_access = invoice.user_id == request.user.id
-    if not can_access and invoice.pharmacy_id:
-        can_access = Membership.objects.filter(
-            user=request.user,
-            pharmacy_id=invoice.pharmacy_id,
-            is_active=True,
-        ).exists()
-
-    if not can_access and invoice.pharmacy_id:
-        pharmacy_org_id = invoice.pharmacy.organization_id
-        org_membership = (
-            OrganizationMembership.objects.filter(
-                user=request.user,
-                organization_id=pharmacy_org_id,
-            )
-            .prefetch_related("pharmacies")
-            .first()
-        )
-        if org_membership:
-            can_access = invoice.pharmacy_id in membership_visible_pharmacy_ids(org_membership)
-
-    if not can_access and invoice.pharmacy_id:
-        can_access = Pharmacy.objects.filter(
-            id=invoice.pharmacy_id,
-            owner__user=request.user,
-        ).exists()
-
-    if not can_access:
-        raise Http404("Invoice not found")
+    invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
 
     pdf_bytes = render_invoice_to_pdf(invoice)
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
@@ -8363,11 +8377,7 @@ def invoice_pdf_view(request, invoice_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_invoice_email(request, invoice_id):
-    # Ensure invoice belongs to the current user
-    try:
-        invoice = Invoice.objects.get(pk=invoice_id, user=request.user)
-    except Invoice.DoesNotExist:
-        raise Http404("Invoice not found")
+    invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
 
     # Basic recipient validation
     to_email = (invoice.bill_to_email or "").strip()

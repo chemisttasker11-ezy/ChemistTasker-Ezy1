@@ -442,6 +442,9 @@ export default function OrganizationLayout() {
         <Tabs.Screen name="talent-board" options={{ href: null }} />
         <Tabs.Screen name="messages/[id]" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
+        <Tabs.Screen name="invoice" options={{ href: null }} />
+        <Tabs.Screen name="invoice/new" options={{ href: null }} />
+        <Tabs.Screen name="invoice/[id]" options={{ href: null }} />
       </Tabs>
     </>
   );

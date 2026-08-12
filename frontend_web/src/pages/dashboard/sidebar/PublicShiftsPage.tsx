@@ -364,11 +364,12 @@ export default function PublicShiftsPage({
   const loadOffers = useCallback(async () => {
     setOffersLoading(true);
     try {
-      const [pending, accepted] = await Promise.all([
+      const [pending, accepted, awaitingPayment] = await Promise.all([
         fetchShiftOffersService({ status: 'PENDING' }),
         fetchShiftOffersService({ status: 'ACCEPTED' }),
+        fetchShiftOffersService({ status: 'ACCEPTED_AWAITING_PAYMENT' }),
       ]);
-      const merged = [...(pending as ShiftOffer[]), ...(accepted as ShiftOffer[])];
+      const merged = [...(pending as ShiftOffer[]), ...(accepted as ShiftOffer[]), ...(awaitingPayment as ShiftOffer[])];
       const deduped = Array.from(new Map(merged.map((offer) => [offer.id, offer])).values());
       setOffers(deduped);
     } catch (err) {
@@ -425,6 +426,11 @@ export default function PublicShiftsPage({
       })
       .filter(Boolean) as Shift[];
   }, [offersByShift]);
+
+  const hasAwaitingPaymentOffer = useMemo(
+    () => offers.some((offer) => String(offer.status ?? '').toUpperCase() === 'ACCEPTED_AWAITING_PAYMENT'),
+    [offers]
+  );
 
   const handleConfirmOfferShift = async (targetShift: Shift) => {
     const list = (offersByShift.get(targetShift.id) ?? []).filter(
@@ -483,32 +489,39 @@ export default function PublicShiftsPage({
               <Typography color="text.secondary">No offers yet.</Typography>
             </>
           ) : (
-            <ShiftsBoard
-              title="Offers"
-              shifts={offerShifts}
-              loading={offersLoading}
-              onApplyAll={handleConfirmOfferShift}
-              onApplySlot={handleConfirmOfferShift}
-              onSubmitCounterOffer={handleSubmitCounterOffer}
-              onRejectShift={handleDeclineOfferShift}
-              onRejectSlot={undefined}
-              enableSaved={false}
-              hideSaveToggle
-              hideFiltersAndSort
-              hideTabs
-              disableLocalPersistence
-              applyLabel="Confirm"
-              disableSlotActions
-              disableActionGuards
-              actionDisabledGuard={(shift) =>
-                !(offersByShift.get(shift.id) ?? []).some(
-                  (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
-                )
-              }
-              onRefresh={loadOffers}
-              fallbackToAllShiftsWhenEmpty
-              showAllSlots
-            />
+            <Stack spacing={2}>
+              {hasAwaitingPaymentOffer && (
+                <Typography color="warning.main" fontWeight={700}>
+                  ACCEPTED_AWAITING_PAYMENT - This offer has been accepted and is waiting for the owner to complete payment.
+                </Typography>
+              )}
+              <ShiftsBoard
+                title="Offers"
+                shifts={offerShifts}
+                loading={offersLoading}
+                onApplyAll={handleConfirmOfferShift}
+                onApplySlot={handleConfirmOfferShift}
+                onSubmitCounterOffer={handleSubmitCounterOffer}
+                onRejectShift={handleDeclineOfferShift}
+                onRejectSlot={undefined}
+                enableSaved={false}
+                hideSaveToggle
+                hideFiltersAndSort
+                hideTabs
+                disableLocalPersistence
+                applyLabel="Confirm"
+                disableSlotActions
+                disableActionGuards
+                actionDisabledGuard={(shift) =>
+                  !(offersByShift.get(shift.id) ?? []).some(
+                    (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+                  )
+                }
+                onRefresh={loadOffers}
+                fallbackToAllShiftsWhenEmpty
+                showAllSlots
+              />
+            </Stack>
           )}
         </Paper>
       );

@@ -326,11 +326,12 @@ export default function PublicShiftsView({
     const loadOffers = useCallback(async () => {
         setOffersLoading(true);
         try {
-            const [pending, accepted] = await Promise.all([
+            const [pending, accepted, awaitingPayment] = await Promise.all([
                 fetchShiftOffersService({ status: 'PENDING' }),
                 fetchShiftOffersService({ status: 'ACCEPTED' }),
+                fetchShiftOffersService({ status: 'ACCEPTED_AWAITING_PAYMENT' }),
             ]);
-            const merged = [...(pending as ShiftOffer[]), ...(accepted as ShiftOffer[])];
+            const merged = [...(pending as ShiftOffer[]), ...(accepted as ShiftOffer[]), ...(awaitingPayment as ShiftOffer[])];
             const deduped = Array.from(new Map(merged.map((offer) => [offer.id, offer])).values());
             setOffers(deduped);
         } catch (err) {
@@ -388,6 +389,11 @@ export default function PublicShiftsView({
                 })
                 .filter(Boolean) as Shift[],
         [offersByShift]
+    );
+
+    const hasAwaitingPaymentOffer = useMemo(
+        () => offers.some((offer) => String(offer.status ?? '').toUpperCase() === 'ACCEPTED_AWAITING_PAYMENT'),
+        [offers]
     );
 
     const handleConfirmOfferShift = async (targetShift: Shift) => {
@@ -478,6 +484,12 @@ export default function PublicShiftsView({
                             </Text>
                         </>
                     ) : (
+                        <>
+                        {hasAwaitingPaymentOffer && (
+                            <Text variant="bodyMedium" style={styles.awaitingPaymentText}>
+                                ACCEPTED_AWAITING_PAYMENT - This offer has been accepted and is waiting for the owner to complete payment.
+                            </Text>
+                        )}
                         <ShiftsBoard
                             title="Offers"
                             shifts={offerShifts}
@@ -505,6 +517,7 @@ export default function PublicShiftsView({
                             fallbackToAllShiftsWhenEmpty
                             showAllSlots
                         />
+                        </>
                     )}
                 </View>
             ) : (
@@ -575,6 +588,12 @@ const styles = StyleSheet.create({
     },
     placeholderText: {
         color: '#6B7280',
+        textAlign: 'center',
+    },
+    awaitingPaymentText: {
+        color: '#B45309',
+        fontWeight: '700',
+        marginBottom: 12,
         textAlign: 'center',
     },
     placeholderLoader: {

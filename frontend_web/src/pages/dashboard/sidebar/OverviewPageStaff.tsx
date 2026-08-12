@@ -51,7 +51,7 @@ type DashboardData = {
 };
 
 export default function OverviewPageStaff() {
-  const { user } = useAuth() as { user: User };
+  const { user, activePersona } = useAuth() as { user: User; activePersona?: string };
   const { selectedPharmacyId, workspace } = useWorkspace();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -238,7 +238,7 @@ export default function OverviewPageStaff() {
       upcomingTitle={isExplorer ? "Job Snapshot" : "My Shifts"}
       activity={activityItems}
       metrics={metrics}
-      invoicePanel={isExplorer ? undefined : {
+      invoicePanel={isExplorer || activePersona === "admin" ? undefined : {
         title: "Invoices",
         total: data?.invoice_summary?.total_billed ?? data?.bills_summary?.total_billed ?? "$0.00",
         totalLabel: "Total income this month",

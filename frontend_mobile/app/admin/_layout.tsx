@@ -162,6 +162,9 @@ export default function AdminLayout() {
         <Stack.Screen name="pharmacies/add" options={{ headerTitle: 'Add Pharmacy' }} />
         <Stack.Screen name="pharmacies/[id]/edit" options={{ headerTitle: 'Edit Pharmacy' }} />
         <Stack.Screen name="shifts/index" options={{ headerTitle: 'Shift Centre' }} />
+        <Stack.Screen name="invoice" options={{ headerTitle: 'Invoices' }} />
+        <Stack.Screen name="invoice/new" options={{ headerTitle: 'New Invoice' }} />
+        <Stack.Screen name="invoice/[id]" options={{ headerTitle: 'Invoice' }} />
         <Stack.Screen name="post-shift" options={{ headerTitle: 'Post Shift' }} />
         <Stack.Screen name="[pharmacyId]/post-shift" options={{ headerTitle: 'Post Shift' }} />
         <Stack.Screen name="pills" options={{ headerTitle: 'Pills' }} />

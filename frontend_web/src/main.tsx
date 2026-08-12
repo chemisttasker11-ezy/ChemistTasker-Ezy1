@@ -168,6 +168,15 @@ const router = createBrowserRouter([
           { path: 'shift-center', element: <Navigate to="active" replace /> },
           { path: 'shift-center/:section', element: <OrganizationShiftCenterPage /> },
           {
+            path: 'invoice',
+            element: <Outlet />,
+            children: [
+              { index: true, element: <InvoiceManagePage /> },
+              { path: 'new', element: <InvoiceGeneratePage /> },
+              { path: ':id', element: <InvoiceDetailPage /> },
+            ],
+          },
+          {
             path: 'shifts',
             children: [
               { index: true, element: <PublicShiftsPage /> },
@@ -219,6 +228,15 @@ const router = createBrowserRouter([
           { path: 'post-shift', element: <AdminPostShiftPage /> },
           { path: 'shift-center', element: <Navigate to="active" replace /> },
           { path: 'shift-center/:section', element: <AdminShiftCenterPage /> },
+          {
+            path: 'invoice',
+            element: <Outlet />,
+            children: [
+              { index: true, element: <InvoiceManagePage /> },
+              { path: 'new', element: <InvoiceGeneratePage /> },
+              { path: ':id', element: <InvoiceDetailPage /> },
+            ],
+          },
           {
             path: 'shifts',
             children: [
@@ -312,6 +330,15 @@ const router = createBrowserRouter([
           { path: 'post-shift', element: <PostShiftPage /> },
           { path: 'shift-center', element: <Navigate to="active" replace /> },
           { path: 'shift-center/:section', element: <OwnerShiftCenterPage /> },
+          {
+            path: 'invoice',
+            element: <Outlet />,
+            children: [
+              { index: true, element: <InvoiceManagePage /> },
+              { path: 'new', element: <InvoiceGeneratePage /> },
+              { path: ':id', element: <InvoiceDetailPage /> },
+            ],
+          },
           {
             path: 'shifts',
             children: [

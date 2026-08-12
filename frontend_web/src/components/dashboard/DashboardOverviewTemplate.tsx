@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Button,
@@ -19,6 +19,7 @@ import StoreIcon from "@mui/icons-material/Store";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { alpha } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
+import RecentActivityDialog from "./RecentActivityDialog";
 
 const DNA = {
   ink: "#06123A",
@@ -148,6 +149,8 @@ export default function DashboardOverviewTemplate({
   onOpenActivity?: () => void;
 }) {
   const navigate = useNavigate();
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityDialogLoading, setActivityDialogLoading] = useState(false);
   const handleActivityClick = (event: DashboardActivity) => {
     const url = event.actionUrl || event.action_url;
     if (url) {
@@ -155,14 +158,9 @@ export default function DashboardOverviewTemplate({
     }
   };
   const handleOpenActivity = () => {
-    const firstActionUrl = activity
-      .map((event) => event.actionUrl || event.action_url)
-      .find(Boolean);
-    if (firstActionUrl) {
-      navigate(firstActionUrl);
-      return;
-    }
-    onOpenActivity?.();
+    setActivityDialogLoading(true);
+    setActivityDialogOpen(true);
+    window.setTimeout(() => setActivityDialogLoading(false), 250);
   };
 
   return (
@@ -443,6 +441,13 @@ export default function DashboardOverviewTemplate({
           );
         })}
       </Paper>
+      <RecentActivityDialog
+        open={activityDialogOpen}
+        onClose={() => setActivityDialogOpen(false)}
+        activity={activity}
+        loading={activityDialogLoading}
+        onActivityClick={handleActivityClick}
+      />
     </Box>
   );
 }

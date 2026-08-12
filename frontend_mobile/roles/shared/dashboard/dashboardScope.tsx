@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
 import apiClient from '@/utils/apiClient';
@@ -36,6 +36,8 @@ export type DashboardPayload = {
     created_at?: string;
     timestamp?: string;
     time?: string;
+    action_url?: string;
+    actionUrl?: string;
   }>;
   shifts?: any[];
   bills_summary?: { total_billed?: string | number; points?: string | number };
@@ -345,35 +347,107 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
 }
 
 export function DashboardActivity({ data }: { data: DashboardPayload | null }) {
+  const router = useRouter();
+  const [visible, setVisible] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
   const activity = Array.isArray(data?.activity) ? data.activity : [];
   if (activity.length === 0) return null;
+  const resolveActivityRoute = (item: NonNullable<DashboardPayload['activity']>[number]) => {
+    const raw = item.actionUrl || item.action_url;
+    if (!raw) return null;
+    const path = raw.replace(/^https?:\/\/[^/]+/i, '');
+    const adminInvoiceMatch = path.match(/^\/dashboard\/admin\/[^/]+\/invoice(\/.*)?$/);
+    if (adminInvoiceMatch) return `/admin/invoice${adminInvoiceMatch[1] || ''}`;
+    if (path.startsWith('/dashboard/owner/')) return path.replace('/dashboard/owner', '/owner');
+    if (path.startsWith('/dashboard/organization/')) return path.replace('/dashboard/organization', '/organization');
+    if (path.startsWith('/dashboard/pharmacist/')) return path.replace('/dashboard/pharmacist', '/pharmacist');
+    if (path.startsWith('/dashboard/otherstaff/')) return path.replace('/dashboard/otherstaff', '/otherstaff');
+    return path.startsWith('/') ? path : null;
+  };
+  const renderActivityItem = (item: NonNullable<DashboardPayload['activity']>[number], index: number) => (
+    <View key={`${item.title ?? item.message ?? 'activity'}-${index}`}>
+      <TouchableOpacity
+        style={styles.activityItem}
+        activeOpacity={resolveActivityRoute(item) ? 0.78 : 1}
+        onPress={() => {
+          const route = resolveActivityRoute(item);
+          if (route) router.push(route as any);
+        }}
+        disabled={!resolveActivityRoute(item)}
+      >
+        <View style={styles.activityIcon}>
+          <IconButton icon="pulse" size={18} iconColor="#4338CA" />
+        </View>
+        <View style={styles.activityCopy}>
+          <Text style={styles.activityTitle} numberOfLines={1}>
+            {item.title || item.message || 'Dashboard activity'}
+          </Text>
+          {!!(item.description || item.time || item.created_at || item.timestamp) && (
+            <Text style={styles.activityText} numberOfLines={2}>
+              {item.description || item.time || item.created_at || item.timestamp}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+      {index < activity.length - 1 && <Divider />}
+    </View>
+  );
+
   return (
     <View style={styles.activitySection}>
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Recent Activity
-      </Text>
+      <View style={styles.activityHeaderRow}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Recent Activity
+        </Text>
+        <Button
+          mode="text"
+          compact
+          onPress={() => {
+            setModalLoading(true);
+            setVisible(true);
+            setTimeout(() => setModalLoading(false), 250);
+          }}
+        >
+          View all activity
+        </Button>
+      </View>
       <Surface style={styles.activityCard}>
-        {activity.slice(0, 5).map((item, index) => (
-          <View key={`${item.title ?? item.message ?? 'activity'}-${index}`}>
-            <View style={styles.activityItem}>
-              <View style={styles.activityIcon}>
-                <IconButton icon="pulse" size={18} iconColor="#4338CA" />
-              </View>
-              <View style={styles.activityCopy}>
-                <Text style={styles.activityTitle} numberOfLines={1}>
-                  {item.title || item.message || 'Dashboard activity'}
-                </Text>
-                {!!(item.description || item.time || item.created_at || item.timestamp) && (
-                  <Text style={styles.activityText} numberOfLines={2}>
-                    {item.description || item.time || item.created_at || item.timestamp}
-                  </Text>
-                )}
-              </View>
-            </View>
-            {index < activity.length - 1 && <Divider />}
-          </View>
-        ))}
+        {activity.slice(0, 5).map(renderActivityItem)}
       </Surface>
+      <Portal>
+        <Modal visible={visible} onDismiss={() => setVisible(false)} contentContainerStyle={styles.activityModal}>
+          <View style={styles.activityModalHeader}>
+            <Text variant="titleMedium" style={styles.modalTitle}>
+              Recent Activity
+            </Text>
+            <IconButton icon="close" size={20} onPress={() => setVisible(false)} />
+          </View>
+          <ScrollView style={styles.activityModalScroll} showsVerticalScrollIndicator>
+            {modalLoading ? (
+              <Surface style={styles.activityCard}>
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <View key={index} style={styles.activitySkeletonRow}>
+                    <View style={styles.activitySkeletonIcon} />
+                    <View style={styles.activitySkeletonCopy}>
+                      <View style={styles.activitySkeletonTitle} />
+                      <View style={styles.activitySkeletonText} />
+                    </View>
+                  </View>
+                ))}
+              </Surface>
+            ) : (
+              <>
+                <Surface style={styles.activityCard}>
+                  {activity.map(renderActivityItem)}
+                </Surface>
+                <Button disabled style={styles.activityModalFooter}>
+                  Older activity is not loaded yet
+                </Button>
+              </>
+            )}
+          </ScrollView>
+        </Modal>
+      </Portal>
     </View>
   );
 }
@@ -459,6 +533,7 @@ const styles = StyleSheet.create({
   personaButtonText: { color: '#4F46E5', fontWeight: '800' },
   personaButtonTextActive: { color: '#FFFFFF' },
   activitySection: { paddingHorizontal: 20, marginBottom: 20 },
+  activityHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   sectionTitle: { color: '#111827', fontWeight: '800', marginBottom: 10 },
   activityCard: { borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', elevation: 1 },
   activityItem: { flexDirection: 'row', alignItems: 'center', padding: 12 },
@@ -466,6 +541,15 @@ const styles = StyleSheet.create({
   activityCopy: { flex: 1, minWidth: 0, marginLeft: 10 },
   activityTitle: { color: '#111827', fontWeight: '700' },
   activityText: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  activityModal: { marginHorizontal: 18, borderRadius: 18, backgroundColor: '#FFFFFF', padding: 0, maxHeight: '78%' },
+  activityModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 18, paddingRight: 6, paddingVertical: 8 },
+  activityModalScroll: { paddingHorizontal: 14, paddingBottom: 14 },
+  activityModalFooter: { marginTop: 12, marginBottom: 8 },
+  activitySkeletonRow: { flexDirection: 'row', alignItems: 'center', padding: 12 },
+  activitySkeletonIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#E5E7EB' },
+  activitySkeletonCopy: { flex: 1, marginLeft: 10, gap: 8 },
+  activitySkeletonTitle: { width: '58%', height: 14, borderRadius: 8, backgroundColor: '#E5E7EB' },
+  activitySkeletonText: { width: '86%', height: 12, borderRadius: 8, backgroundColor: '#EEF2F7' },
   errorCard: { margin: 20, borderRadius: 16, padding: 16, alignItems: 'center', backgroundColor: '#FFFFFF', gap: 8 },
   errorTitle: { color: '#111827', fontWeight: '800', fontSize: 16 },
   errorText: { color: '#6B7280', textAlign: 'center' },

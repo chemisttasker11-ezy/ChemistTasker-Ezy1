@@ -7,12 +7,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
-import { DashboardPersonaSwitcher } from '@/roles/shared/dashboard/dashboardScope';
+import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
 
 export default function AdminHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
+  const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
   const assignment = useMemo(() => {
     const assignments = Array.isArray((user as any)?.admin_assignments)
       ? (user as any).admin_assignments
@@ -24,21 +25,28 @@ export default function AdminHomeScreen() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient.get('/client-profile/pill-rewards/balance/')
-      .then(({ data }) => {
-        if (!mounted) return;
+    const dashboardParams = pharmacyId
+      ? { workspace: 'internal', pharmacy_id: pharmacyId }
+      : { workspace: 'internal' };
+    Promise.all([
+      apiClient.get('/client-profile/pill-rewards/balance/').catch(() => null),
+      apiClient.get('/client-profile/dashboard/owner/', { params: dashboardParams }).catch(() => null),
+    ]).then(([pillRes, dashboardRes]) => {
+      if (!mounted) return;
+      if (pillRes?.data) {
         setPillSummary({
-          balance: Number(data?.balance ?? 0),
-          shift_post_cost: Number(data?.shift_post_cost ?? 0),
+          balance: Number(pillRes.data?.balance ?? 0),
+          shift_post_cost: Number(pillRes.data?.shift_post_cost ?? 0),
         });
-      })
-      .catch(() => {
-        if (mounted) setPillSummary({ balance: 0, shift_post_cost: 0 });
-      });
+      } else {
+        setPillSummary({ balance: 0, shift_post_cost: 0 });
+      }
+      setDashboardData((dashboardRes?.data ?? null) as DashboardPayload | null);
+    });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [pharmacyId]);
 
   const adminPath = (path: string) => {
     if (pharmacyId) {
@@ -101,6 +109,8 @@ export default function AdminHomeScreen() {
           ]}
           onNavigate={(route) => router.push(route as any)}
         />
+
+        <DashboardActivity data={dashboardData} />
       </ScrollView>
     </SafeAreaView>
   );

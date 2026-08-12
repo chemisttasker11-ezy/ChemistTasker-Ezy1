@@ -15,8 +15,11 @@ from client_profile.models import (
     OtherStaffOnboarding,
     OwnerOnboarding,
     PharmacistOnboarding,
+    Pharmacy,
     PillLedgerEntry,
     PillReferralEvent,
+    Shift,
+    WorkerShiftRequest,
 )
 from client_profile.rewards import (
     RewardError,
@@ -26,7 +29,8 @@ from client_profile.rewards import (
     get_pill_balance,
     seed_default_reward_rules,
 )
-from client_profile.serializers import OwnerOnboardingV2Serializer
+from client_profile.serializers import OwnerOnboardingV2Serializer, WorkerShiftRequestSerializer
+from client_profile.views import WorkerShiftRequestViewSet
 
 
 class OnboardingRoleInvariantTests(TestCase):
@@ -164,6 +168,69 @@ class OwnerOnboardingV2SerializerTests(TestCase):
 
         self.assertTrue(onboarding.submitted_for_verification)
         self.assertTrue(OwnerOnboardingV2Serializer(onboarding).data["submitted_for_verification"])
+
+
+class WorkerShiftRequestRoleResolutionTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.worker = User.objects.create_user(
+            email="otherstaff-cover@example.com",
+            password="password",
+            role="OTHER_STAFF",
+        )
+        self.owner = User.objects.create_user(
+            email="owner-cover@example.com",
+            password="password",
+            role="OWNER",
+        )
+        self.pharmacy = Pharmacy.objects.create(name="Cover Pharmacy")
+        OtherStaffOnboarding.objects.create(user=self.worker, role_type="TECHNICIAN")
+
+    def test_serializer_resolves_other_staff_to_specific_onboarding_role(self):
+        request = RequestFactory().post("/")
+        request.user = self.worker
+        serializer = WorkerShiftRequestSerializer(
+            data={
+                "pharmacy": self.pharmacy.id,
+                "role": "OTHER_STAFF",
+                "slot_date": "2026-08-13",
+                "start_time": "09:00:00",
+                "end_time": "17:00:00",
+            },
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        cover_request = serializer.save()
+
+        self.assertEqual(cover_request.role, "TECHNICIAN")
+
+    def test_approval_role_resolution_keeps_other_staff_rate_fields_off_shift(self):
+        cover_request = WorkerShiftRequest.objects.create(
+            pharmacy=self.pharmacy,
+            requested_by=self.worker,
+            role="OTHER_STAFF",
+            slot_date="2026-08-13",
+            start_time="09:00:00",
+            end_time="17:00:00",
+        )
+        viewset = WorkerShiftRequestViewSet()
+
+        role_needed = viewset._resolve_shift_role_for_request(cover_request)
+        shift_data = {
+            "pharmacy": self.pharmacy,
+            "role_needed": role_needed,
+            "employment_type": "LOCUM",
+            "visibility": "LOCUM_CASUAL",
+            "single_user_only": True,
+            "created_by": self.owner,
+        }
+        if role_needed == "PHARMACIST":
+            shift_data["rate_type"] = "FLEXIBLE"
+        shift = Shift.objects.create(**shift_data)
+
+        self.assertEqual(shift.role_needed, "TECHNICIAN")
+        self.assertIsNone(shift.rate_type)
 
 
 class PillRewardsTests(TestCase):
