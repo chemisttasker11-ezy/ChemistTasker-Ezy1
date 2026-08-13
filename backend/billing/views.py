@@ -280,7 +280,43 @@ def _current_account_for_user(user, pharmacy_id=None):
     )
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None):
+def _normalize_slot_ids(raw_slot_ids=None, raw_slot_id=None):
+    values = raw_slot_ids if raw_slot_ids is not None else raw_slot_id
+    if values in (None, '', []):
+        return []
+    if isinstance(values, str):
+        values = [part.strip() for part in values.split(',') if part.strip()]
+    elif not isinstance(values, (list, tuple, set)):
+        values = [values]
+
+    slot_ids = []
+    for value in values:
+        try:
+            slot_ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return sorted(set(slot_ids))
+
+
+def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
+    values = raw_offer_ids if raw_offer_ids is not None else raw_offer_id
+    if values in (None, '', []):
+        return []
+    if isinstance(values, str):
+        values = [part.strip() for part in values.split(',') if part.strip()]
+    elif not isinstance(values, (list, tuple, set)):
+        values = [values]
+
+    offer_ids = []
+    for value in values:
+        try:
+            offer_ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return sorted(set(offer_ids))
+
+
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
@@ -295,13 +331,26 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
 
     if candidate_id:
         offers = offers.filter(user_id=candidate_id)
-    if slot_id:
-        offers = offers.filter(slot_id=slot_id)
+    target_offer_ids = _normalize_offer_ids(offer_ids)
+    if target_offer_ids:
+        offers = offers.filter(id__in=target_offer_ids)
+    target_slot_ids = _normalize_slot_ids(slot_ids, slot_id)
+    if target_slot_ids:
+        offers = offers.filter(slot_id__in=target_slot_ids)
 
     finalized = 0
+    selected_slot_ids = set()
     for offer in offers:
         finalize_shift_offer(offer)
+        if offer.slot_id:
+            selected_slot_ids.add(offer.slot_id)
         finalized += 1
+    if selected_slot_ids:
+        ShiftOffer.objects.filter(
+            shift=shift,
+            slot_id__in=selected_slot_ids,
+            status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+        ).exclude(id__in=list(target_offer_ids)).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
     return finalized
 
 @api_view(['POST'])
@@ -507,22 +556,38 @@ def charge_shift_fulfillment(request, shift_id):
 
     candidate_id = request.data.get('candidate_id')
     slot_id = request.data.get('slot_id')
+    slot_ids = _normalize_slot_ids(request.data.get('slot_ids') or request.data.get('slotIds'), slot_id)
+    offer_ids = _normalize_offer_ids(request.data.get('offer_ids') or request.data.get('offerIds'), request.data.get('offer_id') or request.data.get('offerId'))
 
-    if slot_id:
+    if offer_ids:
         from client_profile.models import ShiftOffer
-        if not ShiftOffer.objects.filter(
+        selected_offers = list(ShiftOffer.objects.filter(
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            slot_id=slot_id,
-        ).exists():
-            return Response({'error': 'This selected slot does not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+            id__in=offer_ids,
+        ))
+        if len(selected_offers) != len(offer_ids):
+            return Response({'error': 'One or more selected offers do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+        selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
+        if len(selected_slot_ids) != len(set(selected_slot_ids)):
+            return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
+    elif slot_ids:
+        from client_profile.models import ShiftOffer
+        matching_count = ShiftOffer.objects.filter(
+            shift=shift,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            slot_id__in=slot_ids,
+        ).values('slot_id').distinct().count()
+        if matching_count != len(slot_ids):
+            return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
         finalized_count = _finalize_pending_offers_for_shift(
             shift,
             candidate_id=candidate_id,
-            slot_id=slot_id,
+            slot_ids=slot_ids,
+            offer_ids=offer_ids,
         )
         from client_profile.models import ShiftOffer
         has_pending_payment = ShiftOffer.objects.filter(
@@ -564,9 +629,9 @@ def charge_shift_fulfillment(request, shift_id):
     is_locum = shift.employment_type == 'LOCUM'
 
     if is_locum:
-        price_id = 'price_1T52jFBQXaySV5ukkXOKPHSV' if is_subscriber else 'price_1T52jFBQXaySV5ukezd5JmzS'
+        price_id = 'price_1T52jFBQXaySV5ukezd5JmzS'
     else:
-        price_id = 'price_1T52imBQXaySV5ukuwLH3ikI' if is_subscriber else 'price_1T52ilBQXaySV5uksvQy2RTk'
+        price_id = 'price_1T52ilBQXaySV5uksvQy2RTk'
 
     success_url, cancel_url = _shift_checkout_return_urls(
         shift,
@@ -580,7 +645,7 @@ def charge_shift_fulfillment(request, shift_id):
             'payment_method_types': ['card'],
             'line_items': [{
                 'price': price_id,
-                'quantity': 1,
+                'quantity': max(1, len(offer_ids) or len(slot_ids)),
             }],
             'mode': 'payment',
             'success_url': success_url,
@@ -594,7 +659,9 @@ def charge_shift_fulfillment(request, shift_id):
                 'billing_scope': account['scope'],
                 'type': 'fulfillment',
                 'candidate_id': candidate_id,
-                'slot_id': slot_id
+                'slot_id': slot_ids[0] if len(slot_ids) == 1 else '',
+                'slot_ids': ','.join(str(value) for value in slot_ids),
+                'offer_ids': ','.join(str(value) for value in offer_ids),
             }
         }
         if sub and sub.stripe_customer_id:
@@ -800,6 +867,8 @@ def stripe_webhook(request):
                             shift_obj,
                             candidate_id=metadata.get('candidate_id'),
                             slot_id=metadata.get('slot_id'),
+                            slot_ids=metadata.get('slot_ids'),
+                            offer_ids=metadata.get('offer_ids'),
                         )
                         from client_profile.models import ShiftOffer
                         has_pending_payment = ShiftOffer.objects.filter(

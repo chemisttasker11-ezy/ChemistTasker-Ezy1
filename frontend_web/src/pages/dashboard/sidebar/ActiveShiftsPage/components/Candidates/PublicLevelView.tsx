@@ -25,6 +25,7 @@ interface PublicLevelViewProps {
     slotId: number | null;
     slotHasUpdates?: Record<number, boolean>;
     slotCandidateCounts?: Record<number, number>;
+    slotStatusCounts?: Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>;
     interestsAll: any[];
     counterOffers: any[];
     counterOffersLoaded: boolean;
@@ -32,6 +33,8 @@ interface PublicLevelViewProps {
     onReviewOffer: (shift: Shift, offer: any, slotId: number | null) => void;
     onSelectSlot?: (slotId: number) => void;
     revealingInterestId: number | null;
+    onBuzzWorker?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 const publicCardPalettes = {
@@ -164,6 +167,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
     slotId,
     slotHasUpdates,
     slotCandidateCounts,
+    slotStatusCounts,
     interestsAll,
     counterOffers,
     counterOffersLoaded,
@@ -171,6 +175,8 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
     onReviewOffer,
     onSelectSlot,
     revealingInterestId,
+    onBuzzWorker,
+    buzzLoadingOfferId,
 }) => {
     const slots = (shift as any).slots || [];
     const multiSlots = !(shift as any).singleUserOnly && slots.length > 0;
@@ -234,6 +240,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                     onSelectSlot={onSelectSlot}
                     slotHasUpdates={slotHasUpdates}
                     slotCandidateCounts={slotCandidateCounts}
+                    slotStatusCounts={slotStatusCounts}
                 />
             )}
             <Divider>
@@ -361,58 +368,85 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                     emptyTitle="No matches yet."
                     emptySubtitle="When public candidates show interest, they'll appear here."
                 >
-                    {slotInterestsFiltered.map((interest) => (
-                        <Paper
-                            key={interest.id}
-                            variant="outlined"
-                            sx={{
-                                p: 1.25,
-                                borderRadius: 2,
-                                bgcolor: '#fff',
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                minWidth: 0,
-                                boxShadow: '0 8px 18px rgba(15,23,42,.04)',
-                            }}
-                        >
-                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ width: '100%', minWidth: 0 }}>
-                                <Typography
-                                    noWrap
-                                    title={interest.revealed ? getInterestDisplayName(interest, interest.user) : 'Anonymous Interest User'}
-                                    sx={{
-                                        fontWeight: 800,
-                                        lineHeight: 1.2,
-                                        fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
-                                        flex: '1 1 auto',
-                                        minWidth: 0,
-                                        maxWidth: '100%',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                    }}
-                                >
-                                    {interest.revealed
-                                        ? getInterestDisplayName(interest, interest.user)
-                                        : 'Anonymous Interest User'}
-                                </Typography>
-                                <Button
-                                    size="small"
-                                    variant={interest.revealed ? 'outlined' : 'contained'}
-                                    color="secondary"
-                                    sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
-                                    onClick={() => onReveal(shift, interest)}
-                                    disabled={revealingInterestId === interest.id}
-                                    startIcon={
-                                        revealingInterestId === interest.id ? (
-                                            <CircularProgress size={16} color="inherit" />
-                                        ) : undefined
-                                    }
-                                >
-                                    {interest.revealed ? 'Review' : 'Reveal'}
-                                </Button>
-                            </Stack>
-                        </Paper>
-                    ))}
+                    {slotInterestsFiltered.map((interest) => {
+                        const isPendingConfirmation = Boolean(interest.pendingConfirmation ?? interest.pending_confirmation);
+                        const isAwaitingPayment = Boolean(interest.awaitingPayment ?? interest.awaiting_payment);
+                        const pendingOfferId = interest.pendingOfferId ?? interest.pending_offer_id ?? null;
+                        return (
+                            <Paper
+                                key={interest.id}
+                                variant="outlined"
+                                sx={{
+                                    p: 1.25,
+                                    borderRadius: 2,
+                                    bgcolor: '#fff',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    minWidth: 0,
+                                    boxShadow: '0 8px 18px rgba(15,23,42,.04)',
+                                }}
+                            >
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ width: '100%', minWidth: 0 }}>
+                                    <Typography
+                                        noWrap
+                                        title={interest.revealed ? getInterestDisplayName(interest, interest.user) : 'Anonymous Interest User'}
+                                        sx={{
+                                            fontWeight: 800,
+                                            lineHeight: 1.2,
+                                            fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                            flex: '1 1 auto',
+                                            minWidth: 0,
+                                            maxWidth: '100%',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        {interest.revealed
+                                            ? getInterestDisplayName(interest, interest.user)
+                                            : 'Anonymous Interest User'}
+                                    </Typography>
+                                    {isAwaitingPayment ? (
+                                        <Chip label="Awaiting payment" size="small" color="error" sx={{ flexShrink: 0, fontWeight: 800 }} />
+                                    ) : isPendingConfirmation && (
+                                        <Chip label="Pending" size="small" color="warning" sx={{ flexShrink: 0, fontWeight: 800 }} />
+                                    )}
+                                    <Button
+                                        size="small"
+                                        variant={interest.revealed ? 'outlined' : 'contained'}
+                                        color="secondary"
+                                        sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
+                                        onClick={() => onReveal(shift, interest)}
+                                        disabled={revealingInterestId === interest.id}
+                                        startIcon={
+                                            revealingInterestId === interest.id ? (
+                                                <CircularProgress size={16} color="inherit" />
+                                            ) : undefined
+                                        }
+                                    >
+                                        {isPendingConfirmation || isAwaitingPayment ? 'View' : interest.revealed ? 'Review' : 'Reveal'}
+                                    </Button>
+                                    {isPendingConfirmation && !isAwaitingPayment && pendingOfferId != null && onBuzzWorker && (
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            color="warning"
+                                            sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
+                                            onClick={() => onBuzzWorker(Number(pendingOfferId))}
+                                            disabled={buzzLoadingOfferId === Number(pendingOfferId)}
+                                            startIcon={
+                                                buzzLoadingOfferId === Number(pendingOfferId) ? (
+                                                    <CircularProgress size={16} color="inherit" />
+                                                ) : undefined
+                                            }
+                                        >
+                                            Buzz
+                                        </Button>
+                                    )}
+                                </Stack>
+                            </Paper>
+                        );
+                    })}
                 </PublicCandidateCard>
             </Box>
         </Stack>

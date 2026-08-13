@@ -18,11 +18,14 @@ interface CommunityLevelViewProps {
     selectedSlotId: number | null;
     slotHasUpdates?: Record<number, boolean>;
     slotCandidateCounts?: Record<number, number>;
+    slotStatusCounts?: Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>;
     offers: any[];
     showSlotSelector?: boolean;
     onSelectSlot: (slotId: number) => void;
     onReviewCandidate: (member: ShiftMemberStatus, shiftId: number, offer: any | null, slotId: number | null) => void;
     reviewLoadingId?: number | null;
+    onBuzzWorker?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
@@ -31,11 +34,14 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
     selectedSlotId,
     slotHasUpdates,
     slotCandidateCounts,
+    slotStatusCounts,
     offers,
     showSlotSelector = true,
     onSelectSlot,
     onReviewCandidate,
     reviewLoadingId,
+    onBuzzWorker,
+    buzzLoadingOfferId,
 }) => {
     const slots = (shift as any).slots || [];
     const multiSlots = !(shift as any).singleUserOnly && slots.length > 0;
@@ -66,6 +72,7 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
                     onSelectSlot={onSelectSlot}
                     slotHasUpdates={slotHasUpdates}
                     slotCandidateCounts={slotCandidateCounts}
+                    slotStatusCounts={slotStatusCounts}
                 />
             )}
 
@@ -115,6 +122,8 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
                     onReviewCandidate={onReviewCandidate}
                     getOfferForMember={getOfferForMember}
                     reviewLoadingId={reviewLoadingId}
+                    onBuzzWorker={onBuzzWorker}
+                    buzzLoadingOfferId={buzzLoadingOfferId}
                 />
                 <StatusCard
                     title="Assigned"

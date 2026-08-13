@@ -75,16 +75,35 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
     onAssign,
     onPageChange,
 }) => {
+    const awaitingPayment = Boolean(
+        candidate?.awaitingPayment ?? candidate?.awaiting_payment
+    );
+    const pendingConfirmation = !awaitingPayment && Boolean(
+        candidate?.pendingConfirmation ?? candidate?.pending_confirmation
+    );
+    const offerStatus = String(offer?.status ?? '').toUpperCase();
+    const isActionableCounterOffer = Boolean(offer) && !pendingConfirmation && !awaitingPayment && offerStatus === 'PENDING';
+    const counterOfferDetails =
+        offer ||
+        candidate?.pendingConfirmationCounterOffer ||
+        candidate?.pending_confirmation_counter_offer ||
+        candidate?.awaitingPaymentCounterOffer ||
+        candidate?.awaiting_payment_counter_offer ||
+        null;
     const rawOrigin =
-        (offer as any)?.travel_origin ??
-        (offer as any)?.travelOrigin ??
+        (counterOfferDetails as any)?.travel_origin ??
+        (counterOfferDetails as any)?.travelOrigin ??
         null;
     const travelSuburb = extractSuburb(rawOrigin);
+    const requestTravel = Boolean(
+        (counterOfferDetails as any)?.requestTravel ??
+        (counterOfferDetails as any)?.request_travel
+    );
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
             <DialogTitle sx={{ fontWeight: 'bold' }}>
-                {offer ? 'Counter Offer' : 'Candidate Review'}
+                {awaitingPayment ? 'Awaiting Payment' : pendingConfirmation ? 'Pending Confirmation' : isActionableCounterOffer ? 'Counter Offer' : 'Candidate Review'}
             </DialogTitle>
             <DialogContent dividers>
                 {candidate || offer ? (
@@ -101,15 +120,33 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                         {candidate.shortBio}
                                     </Typography>
                                 )}
+                                {pendingConfirmation && (
+                                    <Chip
+                                        label="Offer sent. Waiting for worker confirmation."
+                                        size="small"
+                                        color="warning"
+                                        sx={{ mt: 1, fontWeight: 700 }}
+                                    />
+                                )}
+                                {awaitingPayment && (
+                                    <Chip
+                                        label="Worker confirmed. Payment is required to finalize."
+                                        size="small"
+                                        color="error"
+                                        sx={{ mt: 1, fontWeight: 700 }}
+                                    />
+                                )}
                             </Box>
                         )}
 
-                        {/* Only show offer details if there is an offer */}
-                        {offer && (
+                        {/* Counter-offer details: worker proposed time/rate/travel before owner accepts. */}
+                        {counterOfferDetails && (
                             <>
-                                {/* Offer Slots */}
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    Proposed Shift Terms
+                                </Typography>
                                 {(() => {
-                                    const rawSlots = offer._mappedSlots || offer.slots || [];
+                                    const rawSlots = counterOfferDetails._mappedSlots || counterOfferDetails.slots || [];
                                     const filterId = slotId;
                                     const visible =
                                         filterId == null
@@ -118,7 +155,17 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                 (s: any) =>
                                                     (s.slotId ?? s.slot_id ?? s.slot?.id ?? s.id) === filterId
                                             );
-                                    return (visible.length ? visible : rawSlots).map((slot: any, idx: number) => (
+                                    const slotsToRender = visible.length ? visible : rawSlots;
+                                    if (!slotsToRender.length) {
+                                        return (
+                                            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    No proposed slot details were attached to this counter offer.
+                                                </Typography>
+                                            </Paper>
+                                        );
+                                    }
+                                    return slotsToRender.map((slot: any, idx: number) => (
                                         <Paper
                                             key={`${slot.slotId ?? slot.id ?? idx}-${slot.slotDate ?? slot.slot?.date ?? slot.date ?? idx
                                                 }`}
@@ -133,13 +180,14 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                     : 'Shift-wide'}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
+                                                Proposed time:{' '}
                                                 {(
                                                     slot.proposedStart ??
                                                     slot.proposedStartTime ??
                                                     slot.proposed_start_time ??
                                                     slot.startTime ??
                                                     slot.start_time
-                                                )?.slice(0, 5)}{' '}
+                                                )?.slice(0, 5) || 'N/A'}{' '}
                                                 -{' '}
                                                 {(
                                                     slot.proposedEnd ??
@@ -147,7 +195,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                     slot.proposed_end_time ??
                                                     slot.endTime ??
                                                     slot.end_time
-                                                )?.slice(0, 5)}
+                                                )?.slice(0, 5) || 'N/A'}
                                             </Typography>
                                             {slot.proposedRate != null ? (
                                                 <Typography variant="body2" color="text.secondary">
@@ -162,17 +210,21 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                     ));
                                 })()}
 
-                                {/* Travel Support */}
-                                {offer.requestTravel && (
-                                    <Stack spacing={0.5}>
-                                        <Chip size="small" color="info" label="Requested travel support" />
-                                        {travelSuburb && (
+                                <Stack spacing={0.5}>
+                                    <Typography variant="subtitle2">Travel</Typography>
+                                    {requestTravel ? (
+                                        <>
+                                            <Chip size="small" color="info" label="Requested travel support" sx={{ alignSelf: 'flex-start' }} />
                                             <Typography variant="body2" color="text.secondary">
-                                                Traveling from: {travelSuburb}
+                                                Traveling from: {travelSuburb || rawOrigin || 'Location not provided'}
                                             </Typography>
-                                        )}
-                                    </Stack>
-                                )}
+                                        </>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary">
+                                            No travel support requested.
+                                        </Typography>
+                                    )}
+                                </Stack>
 
                                 <Divider sx={{ my: 2 }} />
                             </>
@@ -245,7 +297,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Close</Button>
-                {!offer && onAssign && candidate?.userId != null && (
+                {!offer && !pendingConfirmation && !awaitingPayment && onAssign && candidate?.userId != null && (
                     <Button
                         variant="contained"
                         color="success"
@@ -260,7 +312,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                         {assignLabel || 'Assign to Shift'}
                     </Button>
                 )}
-                {offer && (
+                {isActionableCounterOffer && (
                     <>
                         <Button
                             variant="contained"

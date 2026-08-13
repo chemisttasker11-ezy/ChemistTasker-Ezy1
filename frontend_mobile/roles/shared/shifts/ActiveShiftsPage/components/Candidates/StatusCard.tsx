@@ -17,6 +17,8 @@ interface StatusCardProps {
     onReviewCandidate: (member: ShiftMemberStatus, shiftId: number, offer: any | null, slotId: number | null) => void;
     getOfferForMember?: (member: ShiftMemberStatus) => { offer: any | null; slotId: number | null };
     reviewLoadingId?: number | null;
+    onBuzzWorker?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 const colorMap = {
@@ -67,6 +69,8 @@ export default function StatusCard({
     onReviewCandidate,
     getOfferForMember,
     reviewLoadingId,
+    onBuzzWorker,
+    buzzLoadingOfferId,
 }: StatusCardProps) {
     const colors = colorMap[color];
 
@@ -104,6 +108,22 @@ export default function StatusCard({
                                 ? getOfferForMember(member)
                                 : { offer: null, slotId: null };
                             const hasOffer = Boolean(match.offer);
+                            const pendingConfirmation = Boolean(
+                                memberAny.pendingConfirmation ?? memberAny.pending_confirmation
+                            );
+                            const awaitingPayment = Boolean(
+                                memberAny.awaitingPayment ?? memberAny.awaiting_payment
+                            );
+                            const isCounterOffer = hasOffer && Boolean(
+                                match.offer?.counterOffer ??
+                                match.offer?.counter_offer ??
+                                match.offer?.slots
+                            );
+                            const offerStatus = String(match.offer?.status ?? '').toUpperCase();
+                            const isPendingConfirmation = !awaitingPayment && !isCounterOffer && (
+                                pendingConfirmation || (hasOffer && offerStatus === 'PENDING')
+                            );
+                            const pendingOfferId = memberAny.pendingOfferId ?? memberAny.pending_offer_id ?? match.offer?.id ?? null;
                             const userId = memberAny.userId || memberAny.user_id || memberAny.id;
                             const sourceVisibility = memberAny.sourceVisibility ?? memberAny.visibilityLevel ?? memberAny.visibility_level;
                             const organizationName = memberAny.organizationName ?? memberAny.organization_name;
@@ -115,10 +135,8 @@ export default function StatusCard({
                                         <View style={styles.memberInfo}>
                                             <Text
                                                 style={styles.memberName}
-                                                numberOfLines={1}
+                                                numberOfLines={2}
                                                 ellipsizeMode="tail"
-                                                adjustsFontSizeToFit
-                                                minimumFontScale={0.72}
                                             >
                                                 {memberAny.name || getCandidateDisplayName(member)}
                                             </Text>
@@ -133,11 +151,32 @@ export default function StatusCard({
                                             )}
                                         </View>
                                         <View style={styles.memberBadges}>
-                                            {title === 'Interested' && hasOffer && (
+                                            {title === 'Interested' && isPendingConfirmation && (
                                                 <Chip
                                                     mode="flat"
                                                     compact
-                                                    style={{ backgroundColor: customTheme.colors.infoLight }}
+                                                    style={styles.pendingChip}
+                                                    textStyle={styles.statusChipText}
+                                                >
+                                                    Pending
+                                                </Chip>
+                                            )}
+                                            {title === 'Interested' && awaitingPayment && (
+                                                <Chip
+                                                    mode="flat"
+                                                    compact
+                                                    style={styles.awaitingPaymentChip}
+                                                    textStyle={styles.statusChipText}
+                                                >
+                                                    Awaiting payment
+                                                </Chip>
+                                            )}
+                                            {title === 'Interested' && isCounterOffer && !isPendingConfirmation && (
+                                                <Chip
+                                                    mode="flat"
+                                                    compact
+                                                    style={styles.counterChip}
+                                                    textStyle={styles.statusChipText}
                                                 >
                                                     Counter offer
                                                 </Chip>
@@ -158,21 +197,49 @@ export default function StatusCard({
                                                     {organizationName}
                                                 </Chip>
                                             )}
+                                            {title === 'Interested' && (
+                                                <Button
+                                                    mode="contained"
+                                                    onPress={() => {
+                                                const reviewMember = isPendingConfirmation && match.offer?.id != null
+                                                    ? {
+                                                        ...memberAny,
+                                                        pendingConfirmation: true,
+                                                        pendingOfferId: match.offer.id,
+                                                        pendingConfirmationCounterOffer: match.offer,
+                                                    }
+                                                    : member;
+                                                onReviewCandidate(
+                                                    reviewMember,
+                                                    shiftId,
+                                                    isPendingConfirmation || awaitingPayment ? null : match.offer,
+                                                    match.slotId
+                                                );
+                                                    }}
+                                                    disabled={reviewLoadingId === userId}
+                                                    loading={reviewLoadingId === userId}
+                                                    style={styles.reviewButton}
+                                                    contentStyle={styles.compactButtonContent}
+                                                    labelStyle={styles.compactButtonLabel}
+                                                >
+                                                    {isPendingConfirmation || awaitingPayment ? 'View' : hasOffer ? 'Review' : 'Review'}
+                                                </Button>
+                                            )}
+                                            {isPendingConfirmation && pendingOfferId != null && onBuzzWorker && (
+                                                <Button
+                                                    mode="contained"
+                                                    onPress={() => onBuzzWorker(Number(pendingOfferId))}
+                                                    disabled={buzzLoadingOfferId === Number(pendingOfferId)}
+                                                    loading={buzzLoadingOfferId === Number(pendingOfferId)}
+                                                    style={styles.buzzButton}
+                                                    contentStyle={styles.compactButtonContent}
+                                                    labelStyle={styles.compactButtonLabel}
+                                                >
+                                                    Buzz
+                                                </Button>
+                                            )}
                                         </View>
                                     </View>
-                                    {title === 'Interested' && (
-                                        <Button
-                                            mode="contained"
-                                            onPress={() => {
-                                                onReviewCandidate(member, shiftId, match.offer, match.slotId);
-                                            }}
-                                            disabled={reviewLoadingId === userId}
-                                            loading={reviewLoadingId === userId}
-                                            style={styles.reviewButton}
-                                        >
-                                            {hasOffer ? 'Review offer' : 'Review Candidate'}
-                                        </Button>
-                                    )}
                                 </Surface>
                             );
                         })}
@@ -237,26 +304,55 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     memberName: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 'bold',
         color: customTheme.colors.text,
         flexShrink: 1,
+        lineHeight: 15,
     },
     employmentType: {
-        fontSize: 12,
+        fontSize: 10.5,
         color: customTheme.colors.textMuted,
         marginTop: 2,
     },
     memberBadges: {
         flexDirection: 'row',
         gap: customTheme.spacing.xs,
-        flexWrap: 'wrap',
-        alignItems: 'flex-start',
+        flexWrap: 'nowrap',
+        alignItems: 'center',
         maxWidth: '100%',
     },
     reviewButton: {
-        marginTop: customTheme.spacing.xs,
         alignSelf: 'flex-start',
+        minWidth: 50,
+    },
+    buzzButton: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#D99A00',
+        minWidth: 50,
+    },
+    compactButtonContent: {
+        minHeight: 26,
+        paddingHorizontal: 3,
+    },
+    compactButtonLabel: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        marginHorizontal: 2,
+    },
+    pendingChip: {
+        backgroundColor: customTheme.colors.warningLight,
+        maxWidth: 74,
+    },
+    awaitingPaymentChip: {
+        backgroundColor: customTheme.colors.errorLight,
+    },
+    counterChip: {
+        backgroundColor: customTheme.colors.infoLight,
+    },
+    statusChipText: {
+        fontSize: 9.5,
+        fontWeight: '800',
     },
     emptyText: {
         color: customTheme.colors.text,

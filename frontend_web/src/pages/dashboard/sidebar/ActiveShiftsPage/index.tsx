@@ -18,6 +18,11 @@ import {
     Pagination,
     alpha,
     useTheme,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+    Checkbox,
+    FormControlLabel,
 } from '@mui/material';
 import {
     Close as X,
@@ -29,6 +34,7 @@ import {
     FavoriteBorder,
     Groups,
     LocationOn,
+    ExpandMore,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../../utils/apiClient';
@@ -99,16 +105,59 @@ const getSlotIds = (shift: Shift): number[] => {
         .filter((id: number | null): id is number => id != null);
 };
 
+const slotHasAwaitingPayment = (slot: any): boolean => {
+    return Boolean(slot?.awaitingPayment ?? slot?.awaiting_payment);
+};
+
+const getSlotAwaitingPaymentOfferId = (slot: any): number | null => {
+    return toFiniteNumber(slot?.awaitingPaymentOfferId ?? slot?.awaiting_payment_offer_id);
+};
+
+const formatAuSlotDateTime = (slot: any): string => {
+    const date = slot?.date ? new Date(`${slot.date}T00:00:00`) : null;
+    const dateLabel = date && !Number.isNaN(date.getTime())
+        ? new Intl.DateTimeFormat('en-AU', {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        }).format(date)
+        : 'Date not set';
+    const time = [slot?.startTime ?? slot?.start_time, slot?.endTime ?? slot?.end_time]
+        .filter(Boolean)
+        .map((value: string) => String(value).slice(0, 5))
+        .join(' - ');
+    return time ? `${dateLabel} | ${time}` : dateLabel;
+};
+
+const getCandidateNameForPaymentSlot = (shift: Shift, slotId: number): string => {
+    const offers = ((shift as any).offers ?? (shift as any).shiftOffers ?? []) as any[];
+    const match = offers.find((offer) => {
+        const status = String(offer?.status ?? '').toUpperCase();
+        const offerSlotId = toFiniteNumber(offer?.slotId ?? offer?.slot_id ?? offer?.slot?.id ?? offer?.slot);
+        return status === 'ACCEPTED_AWAITING_PAYMENT' && offerSlotId === slotId;
+    });
+    const user = match?.userDetail ?? match?.user_detail ?? (typeof match?.user === 'object' ? match.user : null);
+    const name = user?.name || user?.displayName || user?.display_name ||
+        [user?.firstName ?? user?.first_name, user?.lastName ?? user?.last_name].filter(Boolean).join(' ');
+    return name || 'Participant';
+};
+
 const shouldShowPaymentRequired = (shift: Shift, selectedSlotId: number | null): boolean => {
     const shiftAny = shift as any;
-    if (shiftAny.paymentStatus !== 'PENDING') return false;
+    const paymentStatus = shiftAny.paymentStatus ?? shiftAny.payment_status;
+    if (paymentStatus !== 'PENDING') return false;
 
     const slots = Array.isArray(shiftAny.slots) ? shiftAny.slots : [];
     const isSingleUserShift = Boolean(shiftAny.singleUserOnly ?? shiftAny.single_user_only);
-    if (isSingleUserShift || slots.length <= 1) return true;
+    if (selectedSlotId != null) {
+        const selectedSlot = slots.find((slot: any) => resolveSlotId(slot) === selectedSlotId);
+        if (selectedSlot && slotHasAwaitingPayment(selectedSlot)) return true;
+        if (selectedSlot && ('awaiting_payment' in selectedSlot || 'awaitingPayment' in selectedSlot)) return false;
+    }
 
     const rawPendingSlotIds = shiftAny.pendingPaymentSlotIds ?? shiftAny.pending_payment_slot_ids;
-    if (!Array.isArray(rawPendingSlotIds)) return true;
+    if (!Array.isArray(rawPendingSlotIds)) return isSingleUserShift || slots.length <= 1;
     if (selectedSlotId == null) return false;
 
     const pendingSlotIds = rawPendingSlotIds
@@ -256,6 +305,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
     const itemsPerPage = 6;
     const [page, setPage] = useState(1);
+    const [paymentSlotSelection, setPaymentSlotSelection] = useState<Record<number, number[]>>({});
 
     const showSnackbar = useCallback((msg: string) => {
         setSnackbarMessage(msg);
@@ -276,6 +326,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         open: false,
         shiftId: null,
     });
+    const [buzzLoadingOfferId, setBuzzLoadingOfferId] = useState<number | null>(null);
     const [reviewOfferDialog, setReviewOfferDialog] = useState<ReviewOfferDialogState>({
         open: false,
         shiftId: null,
@@ -299,12 +350,12 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     // Data hooks
     const { shifts, setShifts, loading: shiftsLoading, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
-    const handlePayWithPills = useCallback(async (shift: Shift, slotId: number | null = null) => {
+    const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         setPillPayingShiftId(shift.id);
         try {
             const { data: res } = await apiClient.post('/client-profile/pill-rewards/pay-shift/', {
                 shift_id: shift.id,
-                ...(slotId != null ? { slot_id: slotId } : {}),
+                ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
             });
             showSnackbar(res?.detail || 'Shift paid with pills.');
             await loadShifts();
@@ -318,6 +369,25 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             showSnackbar(message);
         } finally {
             setPillPayingShiftId(null);
+        }
+    }, [loadShifts, showSnackbar]);
+
+    const handlePayWithStripe = useCallback(async (shift: Shift, offerIds: number[] = []) => {
+        try {
+            const { data: res } = await apiClient.post(`/billing/charge-fulfillment/${shift.id}/`, {
+                ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
+            });
+            if (res?.url) {
+                window.location.href = res.url;
+            } else if (res?.free) {
+                showSnackbar(res?.message || 'Shift finalized without payment.');
+                await loadShifts();
+            } else {
+                showSnackbar('Payment session was not returned.');
+            }
+        } catch (err) {
+            console.error(err);
+            showSnackbar('Failed to initiate payment.');
         }
     }, [loadShifts, showSnackbar]);
     const {
@@ -479,6 +549,10 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                         || 'Candidate',
             email: userObj?.email || interestAny?.email || '',
             shortBio: userObj?.shortBio || userObj?.short_bio || interestAny?.shortBio || interestAny?.short_bio || '',
+            pendingConfirmation: Boolean(interestAny?.pendingConfirmation ?? interestAny?.pending_confirmation),
+            pendingOfferId: interestAny?.pendingOfferId ?? interestAny?.pending_offer_id ?? null,
+            awaitingPayment: Boolean(interestAny?.awaitingPayment ?? interestAny?.awaiting_payment),
+            awaitingPaymentOfferId: interestAny?.awaitingPaymentOfferId ?? interestAny?.awaiting_payment_offer_id ?? null,
         };
 
         // Load ratings
@@ -620,7 +694,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             if (interest && !(interest as any).revealed) {
                 try {
                     revealedUser = await revealInterest(shift, interest, levelKey);
-                    await loadTabDataForShift(shift.id, levelKey);
+                    await loadTabDataForShift(shift, levelKey);
                 } catch (error) {
                     console.error('Failed to reveal reviewed candidate', error);
                 }
@@ -631,6 +705,15 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 (typeof (interest as any)?.user === 'object' ? (interest as any).user : null) ||
                 (interest as any)?.user_detail ||
                 (interest as any)?.userDetail ||
+                null;
+
+            const pendingConfirmationCounterOffer =
+                (member as any).pendingConfirmationCounterOffer ??
+                (member as any).pending_confirmation_counter_offer ??
+                null;
+            const awaitingPaymentCounterOffer =
+                (member as any).awaitingPaymentCounterOffer ??
+                (member as any).awaiting_payment_counter_offer ??
                 null;
 
             const candidate = {
@@ -645,6 +728,12 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                         : revealedUserObj?.name || revealedUserObj?.displayName || revealedUserObj?.display_name || member.displayName || (member as any).email || 'Candidate',
                 email: revealedUserObj?.email || (member as any).email || '',
                 shortBio: revealedUserObj?.shortBio || revealedUserObj?.short_bio || (member as any).shortBio || '',
+                pendingConfirmation: !offer && Boolean((member as any).pendingConfirmation ?? (member as any).pending_confirmation),
+                pendingOfferId: (member as any).pendingOfferId ?? (member as any).pending_offer_id ?? null,
+                pendingConfirmationCounterOffer,
+                awaitingPayment: !offer && Boolean((member as any).awaitingPayment ?? (member as any).awaiting_payment),
+                awaitingPaymentOfferId: (member as any).awaitingPaymentOfferId ?? (member as any).awaiting_payment_offer_id ?? null,
+                awaitingPaymentCounterOffer,
             };
 
             // Load ratings
@@ -675,12 +764,22 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
             // Map slots if offer exists
             const mappedSlots = offer ? mapOfferSlotsWithShift(offer, shift, resolvedSlotId) : [];
+            const pendingCounterWithSlots = pendingConfirmationCounterOffer
+                ? { ...pendingConfirmationCounterOffer, _mappedSlots: mapOfferSlotsWithShift(pendingConfirmationCounterOffer, shift, resolvedSlotId) }
+                : null;
+            const awaitingCounterWithSlots = awaitingPaymentCounterOffer
+                ? { ...awaitingPaymentCounterOffer, _mappedSlots: mapOfferSlotsWithShift(awaitingPaymentCounterOffer, shift, resolvedSlotId) }
+                : null;
 
             setReviewOfferDialog({
                 open: true,
                 shiftId: shift.id,
                 offer: offer ? { ...offer, _mappedSlots: mappedSlots } : null,
-                candidate,
+                candidate: {
+                    ...candidate,
+                    pendingConfirmationCounterOffer: pendingCounterWithSlots,
+                    awaitingPaymentCounterOffer: awaitingCounterWithSlots,
+                },
                 slotId: resolvedSlotId,
             });
         },
@@ -719,13 +818,21 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 resolvedSlotId,
                 requiresSlot,
             });
-            await acceptOffer({ offer, shiftId, slotId: resolvedSlotId }, async () => {
-                showSnackbar('Counter offer accepted');
+            const result = await acceptOffer({ offer, shiftId, slotId: resolvedSlotId }, async () => {
+                showSnackbar('Offer sent. Waiting for worker confirmation.');
                 setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null });
                 await loadShifts();
+                if (targetShift) {
+                    const levelKey = selectedLevelByShift[shiftId] ?? getCurrentLevelKey(targetShift);
+                    await loadTabDataForShift(targetShift, levelKey);
+                    await loadCounterOffers(shiftId);
+                }
             });
+            if (result && !result.ok) {
+                showSnackbar(result.detail || 'Failed to accept offer');
+            }
         },
-        [acceptOffer, showSnackbar, loadShifts, shifts, getOfferSlotIds]
+        [acceptOffer, showSnackbar, loadShifts, shifts, getOfferSlotIds, selectedLevelByShift, loadTabDataForShift, loadCounterOffers]
     );
 
     const handleRejectOffer = useCallback(
@@ -743,13 +850,88 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const handleAssignCandidate = useCallback(
         async (userId: number, shiftId: number | null, slotId: number | null) => {
             if (!userId || shiftId == null) return;
-            const success = await handleAccept(shiftId, userId, slotId);
-            if (success) {
-                setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null });
+            const result = await handleAccept(shiftId, userId, slotId);
+            if (result) {
+                const targetShift = shifts.find((s) => s.id === shiftId);
+                const offerId = (result as any)?.offerId ?? (result as any)?.offer_id ?? null;
+                setReviewOfferDialog((prev) => ({
+                    ...prev,
+                    candidate: prev.candidate
+                        ? {
+                            ...prev.candidate,
+                            pendingConfirmation: true,
+                            pendingOfferId: offerId ?? prev.candidate.pendingOfferId,
+                        }
+                        : prev.candidate,
+                }));
+                setTabData((prev) => {
+                    const next = { ...prev };
+                    Object.entries(next).forEach(([key, value]) => {
+                        if (!key.startsWith(`${shiftId}_`) || !value) return;
+                        const patchRecord = (record: any) => {
+                            const recordUserId = getCandidateUserId(record);
+                            if (recordUserId !== userId) return record;
+                            return {
+                                ...record,
+                                pendingConfirmation: true,
+                                pending_confirmation: true,
+                                pendingOfferId: offerId ?? record.pendingOfferId ?? record.pending_offer_id,
+                                pending_offer_id: offerId ?? record.pending_offer_id ?? record.pendingOfferId,
+                            };
+                        };
+                        const updated: any = { ...value };
+                        if (Array.isArray(updated.interestsAll)) {
+                            updated.interestsAll = updated.interestsAll.map(patchRecord);
+                        }
+                        if (updated.interestsBySlot) {
+                            updated.interestsBySlot = Object.fromEntries(
+                                Object.entries(updated.interestsBySlot).map(([sid, list]) => [
+                                    sid,
+                                    Array.isArray(list) ? list.map(patchRecord) : list,
+                                ])
+                            );
+                        }
+                        if (Array.isArray(updated.members)) {
+                            updated.members = updated.members.map(patchRecord);
+                        }
+                        if (updated.membersBySlot) {
+                            updated.membersBySlot = Object.fromEntries(
+                                Object.entries(updated.membersBySlot).map(([sid, list]) => [
+                                    sid,
+                                    Array.isArray(list) ? list.map(patchRecord) : list,
+                                ])
+                            );
+                        }
+                        next[key] = updated;
+                    });
+                    return next;
+                });
                 await loadShifts();
+                if (targetShift) {
+                    const levelKey = selectedLevelByShift[shiftId] ?? getCurrentLevelKey(targetShift);
+                    await loadTabDataForShift(targetShift, levelKey);
+                }
             }
         },
-        [handleAccept, loadShifts]
+        [handleAccept, loadShifts, loadTabDataForShift, selectedLevelByShift, shifts]
+    );
+
+    const handleBuzzWorker = useCallback(
+        async (offerId: number) => {
+            if (!offerId) return;
+            setBuzzLoadingOfferId(offerId);
+            try {
+                const response = await apiClient.post(`/client-profile/shift-offers/${offerId}/buzz/`);
+                const result = response.data;
+                showSnackbar(result?.detail || 'Worker buzzed');
+            } catch (error) {
+                console.error('Failed to buzz worker', error);
+                showSnackbar((error as any)?.data?.detail || (error as any)?.message || 'Failed to buzz worker');
+            } finally {
+                setBuzzLoadingOfferId(null);
+            }
+        },
+        [showSnackbar]
     );
 
     // Toggle shift expansion
@@ -885,7 +1067,6 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         const employmentType = (shift as any).employmentType ?? (shift as any).employment_type;
         const isUrgent = Boolean((shift as any).isUrgent ?? (shift as any).is_urgent);
         const slotsCount = Array.isArray((shift as any).slots) ? (shift as any).slots.length : 0;
-        const showPaymentRequired = shouldShowPaymentRequired(shift, selectedSlotId);
         const allMembers = isSingleUserShift
             ? consolidatedMembers
             : Object.values(consolidatedMembersBySlot || {}).flatMap((slotMembers: any) => (
@@ -893,6 +1074,74 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             ));
         const allInterests = publicInterests;
         const allOffers = publicOffers;
+        const slotById = new Map<number, any>();
+        (((shift as any).slots || []) as any[]).forEach((slot) => {
+            const slotId = resolveSlotId(slot);
+            if (slotId != null) slotById.set(slotId, slot);
+        });
+        const directPaymentOptions = (((shift as any).paymentOptions ?? (shift as any).payment_options ?? []) as any[])
+            .map((option) => {
+                const offerId = toFiniteNumber(option.offerId ?? option.offer_id);
+                const slotId = toFiniteNumber(option.slotId ?? option.slot_id);
+                if (!offerId || !slotId) return null;
+                const slot = slotById.get(slotId) || {
+                    id: slotId,
+                    date: option.slotDate ?? option.slot_date,
+                    start_time: option.startTime ?? option.start_time,
+                    end_time: option.endTime ?? option.end_time,
+                };
+                return {
+                    offerId,
+                    slotId,
+                    slot,
+                    name: option.candidateName ?? option.candidate_name ?? option.candidateEmail ?? option.candidate_email ?? 'Participant',
+                };
+            })
+            .filter(Boolean) as Array<{ offerId: number; slotId: number; slot: any; name: string }>;
+        const memberPaymentOptions = dedupeMembers(allMembers)
+            .map((member: any) => {
+                const offerId = toFiniteNumber(member.awaitingPaymentOfferId ?? member.awaiting_payment_offer_id);
+                const slotId = toFiniteNumber(member.slotId ?? member.slot_id) ?? selectedSlotId;
+                if (!offerId || (!slotId && !isSingleUserShift)) return null;
+                const slot = slotById.get(slotId);
+                return {
+                    offerId,
+                    slotId: slotId ?? 0,
+                    slot: slot || ((shift as any).slots || [])[0] || null,
+                    name: member.displayName || member.display_name || member.name || member.email || 'Participant',
+                };
+            })
+            .filter(Boolean) as Array<{ offerId: number; slotId: number; slot: any; name: string }>;
+        const publicInterestPaymentOptions = dedupeMembers(allInterests)
+            .map((interest: any) => {
+                const offerId = toFiniteNumber(interest.awaitingPaymentOfferId ?? interest.awaiting_payment_offer_id);
+                const slotId = toFiniteNumber(interest.slotId ?? interest.slot_id) ?? selectedSlotId;
+                if (!offerId || (!slotId && !isSingleUserShift)) return null;
+                return {
+                    offerId,
+                    slotId: slotId ?? 0,
+                    slot: slotById.get(slotId) || ((shift as any).slots || [])[0] || null,
+                    name: interest.displayName || interest.display_name || interest.userName || interest.user_name || interest.email || 'Participant',
+                };
+            })
+            .filter(Boolean) as Array<{ offerId: number; slotId: number; slot: any; name: string }>;
+        const paymentRequiredOffers = directPaymentOptions.length > 0
+            ? directPaymentOptions
+            : [...memberPaymentOptions, ...publicInterestPaymentOptions].filter((item, index, list) => (
+                list.findIndex((candidate) => candidate.offerId === item.offerId) === index
+            ));
+        const payableOfferIds = paymentRequiredOffers.map((item) => item.offerId);
+        const defaultPaymentOfferIds = Array.from(
+            paymentRequiredOffers.reduce((map, item) => {
+                if (!map.has(item.slotId)) map.set(item.slotId, item.offerId);
+                return map;
+            }, new Map<number, number>()).values()
+        );
+        const rawSelectedPaymentOfferIds = paymentSlotSelection[shift.id];
+        const selectedPaymentOfferIds = (rawSelectedPaymentOfferIds ?? defaultPaymentOfferIds).filter((offerId) => payableOfferIds.includes(offerId));
+        const effectivePaymentOfferIds = selectedPaymentOfferIds;
+        const paymentUnitCount = effectivePaymentOfferIds.length;
+        const showPaymentRequired = paymentRequiredOffers.length > 0;
         const candidatesCount = countUniquePeople([
             ...dedupeMembers(allMembers),
             ...allInterests,
@@ -914,6 +1163,37 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             ]);
             return acc;
         }, {});
+        const slotStatusCounts = slotIds.reduce<Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>>((acc, slotId) => {
+            const slotMembers = dedupeMembers(consolidatedMembersBySlot[slotId] || []);
+            const slotInterests = allInterests.filter((interest: any) => interestBelongsToSlot(interest, slotId));
+            const slotOffers = allOffers.filter((offer: any) => offerBelongsToSlot(offer, slotId));
+            const slotNoResponse = countUniquePeople(slotMembers.filter((member: any) => member?.status === 'no_response'));
+            const shiftNoResponse = countUniquePeople(dedupeMembers(consolidatedMembers).filter((member: any) => member?.status === 'no_response'));
+            acc[slotId] = {
+                interested: countUniquePeople([
+                    ...slotMembers.filter((member: any) => member?.status === 'interested'),
+                    ...slotInterests,
+                    ...slotOffers.filter(isActiveCounterOffer),
+                ]),
+                assigned: countUniquePeople(slotMembers.filter((member: any) => member?.status === 'accepted')),
+                rejected: countUniquePeople(slotMembers.filter((member: any) => member?.status === 'rejected')),
+                noResponse: slotNoResponse || shiftNoResponse,
+            };
+            return acc;
+        }, {});
+        if (selectedSlotId != null) {
+            const selectedMembers = dedupeMembers(membersForView);
+            slotStatusCounts[selectedSlotId] = {
+                interested: countUniquePeople([
+                    ...selectedMembers.filter((member: any) => member?.status === 'interested'),
+                    ...allInterests.filter((interest: any) => interestBelongsToSlot(interest, selectedSlotId)),
+                    ...allOffers.filter((offer: any) => offerBelongsToSlot(offer, selectedSlotId) && isActiveCounterOffer(offer)),
+                ]),
+                assigned: countUniquePeople(selectedMembers.filter((member: any) => member?.status === 'accepted')),
+                rejected: countUniquePeople(selectedMembers.filter((member: any) => member?.status === 'rejected')),
+                noResponse: countUniquePeople(selectedMembers.filter((member: any) => member?.status === 'no_response')),
+            };
+        }
         const metricItems = [
             { label: 'Slots', value: slotsCount || '-', icon: <CalendarDays fontSize="small" /> },
             { label: 'Candidates', value: candidatesCount, icon: <Groups fontSize="small" /> },
@@ -1204,52 +1484,112 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                             />
 
                             {showPaymentRequired && (
-                                <Box sx={{ mt: 3, p: 2.5, bgcolor: '#FEF2F2', borderRadius: 2, border: '1px solid #FCA5A5' }}>
-                                    <Typography variant="h6" color="error.main" gutterBottom>
-                                        Payment Required
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ mb: 2 }}>
-                                        A candidate has accepted the shift, but payment is required to finalize the assignment.
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                        <Button
-                                            variant="contained"
-                                            color="error"
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                try {
-                                                    const payload = !isSingleUserShift && slotsCount > 1 && selectedSlotId != null
-                                                        ? { slot_id: selectedSlotId }
-                                                        : {};
-                                                    const { data: res } = await apiClient.post(`/billing/charge-fulfillment/${shift.id}/`, payload);
-                                                    if (res?.url) {
-                                                        window.location.href = res.url;
-                                                    } else if (res?.free) {
-                                                        showSnackbar(res?.message || 'Shift finalized without payment.');
-                                                        await loadShifts();
-                                                    } else {
-                                                        showSnackbar('Payment session was not returned.');
-                                                    }
-                                                } catch (err) {
-                                                    console.error(err);
-                                                    showSnackbar('Failed to initiate payment.');
-                                                }
-                                            }}
-                                        >
-                                            Pay with Stripe
-                                        </Button>
-                                        <Button
-                                            variant="contained"
-                                            disabled={pillPayingShiftId === shift.id}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                void handlePayWithPills(shift, !isSingleUserShift && slotsCount > 1 ? selectedSlotId : null);
-                                            }}
-                                        >
-                                            {pillPayingShiftId === shift.id ? 'Paying...' : 'Pay with Pills'}
-                                        </Button>
-                                    </Box>
-                                </Box>
+                                <Accordion
+                                    defaultExpanded
+                                    sx={{ mt: 3, border: '1px solid #FCA5A5', bgcolor: '#FEF2F2', boxShadow: 'none', borderRadius: 2, '&:before': { display: 'none' } }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMore />}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
+                                            <Box>
+                                                <Typography variant="h6" color="error.main">
+                                                    Payments Required
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {isSingleUserShift
+                                                        ? `${paymentRequiredOffers.length} bundle payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`
+                                                        : `${paymentUnitCount} selected from ${paymentRequiredOffers.length} payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`}
+                                                </Typography>
+                                            </Box>
+                                            <Chip label={`$${paymentUnitCount * 30} AUD`} color="error" sx={{ fontWeight: 800 }} />
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Stack spacing={1.25}>
+                                            {paymentRequiredOffers.map((item) => {
+                                                const checked = selectedPaymentOfferIds.includes(item.offerId);
+                                                const bundleSlots = isSingleUserShift ? (((shift as any).slots || []) as any[]) : [];
+                                                return (
+                                                    <Box
+                                                        key={`${shift.id}-${item.offerId}`}
+                                                        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 1.25, bgcolor: 'background.paper', borderRadius: 1.5, border: '1px solid #FECACA' }}
+                                                    >
+                                                        {isSingleUserShift ? (
+                                                            <Box>
+                                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                                                    {item.name} | Offer #{item.offerId}
+                                                                </Typography>
+                                                                <Stack spacing={0.25} sx={{ mt: 0.75 }}>
+                                                                    {(bundleSlots.length > 0 ? bundleSlots : [item.slot]).filter(Boolean).map((slot: any, idx: number) => (
+                                                                        <Typography key={resolveSlotId(slot) ?? idx} variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                                            {formatAuSlotDateTime(slot)}
+                                                                        </Typography>
+                                                                    ))}
+                                                                </Stack>
+                                                            </Box>
+                                                        ) : (
+                                                            <FormControlLabel
+                                                                control={
+                                                                    <Checkbox
+                                                                        checked={checked}
+                                                                        onChange={(event) => {
+                                                                            const isChecked = event.target.checked;
+                                                                            setPaymentSlotSelection((prev) => {
+                                                                                const current = new Set(prev[shift.id] ?? defaultPaymentOfferIds);
+                                                                                if (isChecked) {
+                                                                                    paymentRequiredOffers
+                                                                                        .filter((candidate) => candidate.slotId === item.slotId)
+                                                                                        .forEach((candidate) => current.delete(candidate.offerId));
+                                                                                    current.add(item.offerId);
+                                                                                } else {
+                                                                                    current.delete(item.offerId);
+                                                                                }
+                                                                                return { ...prev, [shift.id]: Array.from(current) };
+                                                                            });
+                                                                        }}
+                                                                    />
+                                                                }
+                                                                label={
+                                                                    <Box>
+                                                                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                                                            {formatAuSlotDateTime(item.slot)}
+                                                                        </Typography>
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            {item.name} | Offer #{item.offerId}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                }
+                                                            />
+                                                        )}
+                                                        <Chip label="Payment pending" color="error" size="small" />
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Stack>
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                                            <Button
+                                                variant="contained"
+                                                color="error"
+                                                disabled={paymentUnitCount === 0}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void handlePayWithStripe(shift, effectivePaymentOfferIds);
+                                                }}
+                                            >
+                                                {isSingleUserShift ? 'Pay with Stripe' : 'Pay selected with Stripe'}
+                                            </Button>
+                                            <Button
+                                                variant="contained"
+                                                disabled={paymentUnitCount === 0 || pillPayingShiftId === shift.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void handlePayWithPills(shift, effectivePaymentOfferIds);
+                                                }}
+                                            >
+                                                {pillPayingShiftId === shift.id ? 'Paying...' : isSingleUserShift ? 'Pay with Pills' : 'Pay selected with Pills'}
+                                            </Button>
+                                        </Box>
+                                    </AccordionDetails>
+                                </Accordion>
                             )}
 
                             <Divider sx={{ my: 2.5 }} />
@@ -1269,6 +1609,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                         slotId={selectedSlotId}
                                         slotHasUpdates={slotHasUpdatesByShift[shift.id] || {}}
                                         slotCandidateCounts={slotCandidateCounts}
+                                        slotStatusCounts={slotStatusCounts}
                                         interestsAll={publicInterests}
                                         counterOffers={publicOffers}
                                         counterOffersLoaded={counterOffersLoaded}
@@ -1278,6 +1619,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                             handleReviewOffer(s, o, currentTabData, slotId)
                                         }
                                         revealingInterestId={revealingInterestId}
+                                        onBuzzWorker={handleBuzzWorker}
+                                        buzzLoadingOfferId={buzzLoadingOfferId}
                                     />
                                 )
                             ) : (
@@ -1292,12 +1635,15 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                         selectedSlotId={selectedSlotId}
                                         slotHasUpdates={slotHasUpdatesByShift[shift.id] || {}}
                                         slotCandidateCounts={slotCandidateCounts}
+                                        slotStatusCounts={slotStatusCounts}
                                         offers={offers || []}
                                         onSelectSlot={(slotId) => handleSlotSelection(shift.id, slotId)}
                                         onReviewCandidate={(member, _shiftId, offer, slotId) =>
                                             handleReviewCandidate(shift, member, offer, slotId)
                                         }
                                         reviewLoadingId={reviewLoadingId}
+                                        onBuzzWorker={handleBuzzWorker}
+                                        buzzLoadingOfferId={buzzLoadingOfferId}
                                     />
                                 )
                             )}
@@ -1314,6 +1660,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                             selectedSlotId={selectedSlotId}
                                             slotHasUpdates={slotHasUpdatesByShift[shift.id] || {}}
                                             slotCandidateCounts={slotCandidateCounts}
+                                            slotStatusCounts={slotStatusCounts}
                                             offers={offers || []}
                                             showSlotSelector={false}
                                             onSelectSlot={(slotId) => handleSlotSelection(shift.id, slotId)}
@@ -1321,6 +1668,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                                 handleReviewCandidate(shift, member, offer, slotId)
                                             }
                                             reviewLoadingId={reviewLoadingId}
+                                            onBuzzWorker={handleBuzzWorker}
+                                            buzzLoadingOfferId={buzzLoadingOfferId}
                                         />
                                     )}
                                 </Box>

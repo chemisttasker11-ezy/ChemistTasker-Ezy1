@@ -326,14 +326,8 @@ export default function PublicShiftsView({
     const loadOffers = useCallback(async () => {
         setOffersLoading(true);
         try {
-            const [pending, accepted, awaitingPayment] = await Promise.all([
-                fetchShiftOffersService({ status: 'PENDING' }),
-                fetchShiftOffersService({ status: 'ACCEPTED' }),
-                fetchShiftOffersService({ status: 'ACCEPTED_AWAITING_PAYMENT' }),
-            ]);
-            const merged = [...(pending as ShiftOffer[]), ...(accepted as ShiftOffer[]), ...(awaitingPayment as ShiftOffer[])];
-            const deduped = Array.from(new Map(merged.map((offer) => [offer.id, offer])).values());
-            setOffers(deduped);
+            const pending = await fetchShiftOffersService({ status: 'PENDING' });
+            setOffers((pending as ShiftOffer[]).filter((offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'));
         } catch (err) {
             console.error('Failed to load offers', err);
             showError('Failed to load offers.');
@@ -351,6 +345,7 @@ export default function PublicShiftsView({
     const offersByShift = useMemo(() => {
         const map = new Map<number, ShiftOffer[]>();
         offers.forEach((offer) => {
+            if (String(offer.status ?? '').toUpperCase() !== 'PENDING') return;
             const shift = offer.shiftDetail;
             if (!shift) return;
             const list = map.get(shift.id) ?? [];
@@ -367,15 +362,20 @@ export default function PublicShiftsView({
                     const shift = shiftOffers[0]?.shiftDetail as Shift | undefined;
                     if (!shift) return null;
 
-                    const offerSlotIds = new Set<number>(
-                        shiftOffers
-                            .map((offer) => {
-                                const raw = offer.slot ?? (offer as any).slotId ?? offer.slotDetail?.id ?? null;
-                                const n = Number(raw);
-                                return Number.isFinite(n) ? n : null;
-                            })
-                            .filter((id): id is number => id != null)
-                    );
+                    const offerSlotIds = new Set<number>();
+                    const offerStatusBySlot: Record<number, string> = {};
+                    const pendingOfferIdBySlot: Record<number, number> = {};
+                    const shiftLevelOfferStatus = String(shiftOffers[0]?.status ?? '').toUpperCase();
+                    shiftOffers.forEach((offer) => {
+                        const raw = offer.slot ?? (offer as any).slotId ?? offer.slotDetail?.id ?? null;
+                        const n = Number(raw);
+                        if (!Number.isFinite(n)) return;
+                        const slotId = n;
+                        offerSlotIds.add(slotId);
+                        const status = String(offer.status ?? '').toUpperCase();
+                        offerStatusBySlot[slotId] = status;
+                        if (status === 'PENDING') pendingOfferIdBySlot[slotId] = offer.id;
+                    });
 
                     if (offerSlotIds.size === 0) {
                         return shift;
@@ -385,15 +385,16 @@ export default function PublicShiftsView({
                         const n = Number(slot?.id);
                         return Number.isFinite(n) && offerSlotIds.has(n);
                     });
-                    return slots.length > 0 ? ({ ...shift, slots } as Shift) : shift;
+                    return ({
+                        ...shift,
+                        slots: slots.length > 0 ? slots : shift.slots,
+                        __offerStatusBySlot: offerStatusBySlot,
+                        __pendingOfferIdBySlot: pendingOfferIdBySlot,
+                        __shiftOfferStatus: shiftLevelOfferStatus,
+                    } as Shift);
                 })
                 .filter(Boolean) as Shift[],
         [offersByShift]
-    );
-
-    const hasAwaitingPaymentOffer = useMemo(
-        () => offers.some((offer) => String(offer.status ?? '').toUpperCase() === 'ACCEPTED_AWAITING_PAYMENT'),
-        [offers]
     );
 
     const handleConfirmOfferShift = async (targetShift: Shift) => {
@@ -402,6 +403,19 @@ export default function PublicShiftsView({
         );
         if (list.length == 0) return;
         await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id)));
+        await loadOffers();
+    };
+
+    const handleConfirmOfferSlot = async (targetShift: Shift, slotId: number) => {
+        const offer = (offersByShift.get(targetShift.id) ?? []).find((item) => {
+            const raw = item.slot ?? (item as any).slotId ?? item.slotDetail?.id ?? null;
+            const offerSlotId = Number(raw);
+            return Number.isFinite(offerSlotId)
+                && offerSlotId === slotId
+                && String(item.status ?? '').toUpperCase() === 'PENDING';
+        });
+        if (!offer) return;
+        await acceptShiftOfferService(offer.id);
         await loadOffers();
     };
 
@@ -485,17 +499,12 @@ export default function PublicShiftsView({
                         </>
                     ) : (
                         <>
-                        {hasAwaitingPaymentOffer && (
-                            <Text variant="bodyMedium" style={styles.awaitingPaymentText}>
-                                ACCEPTED_AWAITING_PAYMENT - This offer has been accepted and is waiting for the owner to complete payment.
-                            </Text>
-                        )}
                         <ShiftsBoard
                             title="Offers"
                             shifts={offerShifts}
                             loading={offersLoading}
                             onApplyAll={handleConfirmOfferShift}
-                            onApplySlot={handleConfirmOfferShift}
+                            onApplySlot={handleConfirmOfferSlot}
                             onSubmitCounterOffer={handleSubmitCounterOffer}
                             onRejectShift={handleDeclineOfferShift}
                             onRejectSlot={undefined}
@@ -505,7 +514,6 @@ export default function PublicShiftsView({
                             hideTabs
                             disableLocalPersistence
                             applyLabel="Confirm"
-                            disableSlotActions
                             disableActionGuards
                             actionDisabledGuard={(shift) =>
                                 !(offersByShift.get(shift.id) ?? []).some(

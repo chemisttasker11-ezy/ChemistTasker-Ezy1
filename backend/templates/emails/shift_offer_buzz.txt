@@ -1,0 +1,19 @@
+Please confirm your shift offer
+
+Hi{% if user_first_name %} {{ user_first_name }}{% endif %},
+
+{{ pharmacy_name }} is waiting for you to confirm your {{ role_label }} shift offer.
+
+{% if slots_display %}
+Dates:
+{% for line in slots_display %}- {{ line }}
+{% endfor %}
+{% endif %}
+{% if offered_rate %}Rate: ${{ offered_rate }}/hr
+{% endif %}
+{% if expires_at %}Confirm by: {{ expires_at }}
+{% endif %}
+
+Confirm your offer: {{ shift_link }}
+
+Please confirm this offer in ChemistTasker so the owner can finalize the shift.

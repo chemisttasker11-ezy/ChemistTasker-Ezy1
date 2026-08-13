@@ -4,6 +4,22 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useMemo, useState } from "react";
 import { Candidate } from "../types";
 
+const weekDayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+
+const toIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const startOfMondayWeek = (date: Date) => {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const mondayOffset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  return start;
+};
+
 export default function AvailabilitySidebar({
   candidate,
   onClose,
@@ -20,15 +36,16 @@ export default function AvailabilitySidebar({
   if (!candidate) return null;
 
   const today = new Date();
+  const calendarStart = startOfMondayWeek(today);
   const daysInView = 28;
   const calendarGrid: Array<{ dayNum: number; isAvailable: boolean; date: Date }> = [];
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const isOwnPost = currentUserId != null && candidate.authorUserId === currentUserId;
 
   for (let i = 0; i < daysInView; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + i);
-    const dateStr = date.toISOString().split("T")[0];
+    const date = new Date(calendarStart);
+    date.setDate(calendarStart.getDate() + i);
+    const dateStr = toIsoDate(date);
     const isAvailable = candidate.availableDates.includes(dateStr);
     calendarGrid.push({ date, dayNum: date.getDate(), isAvailable });
   }
@@ -122,8 +139,8 @@ export default function AvailabilitySidebar({
           )}
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5, mt: 1 }}>
-            {["S", "M", "T", "W", "T", "F", "S"].map((d) => (
-              <Typography key={d} variant="caption" color="text.disabled" textAlign="center" fontWeight={700}>
+            {weekDayLabels.map((d, index) => (
+              <Typography key={`${d}-${index}`} variant="caption" color="text.disabled" textAlign="center" fontWeight={700}>
                 {d}
               </Typography>
             ))}
@@ -131,7 +148,7 @@ export default function AvailabilitySidebar({
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5, mt: 0.5 }}>
             {calendarGrid.map((day, idx) => {
-              const dateStr = day.date.toISOString().split("T")[0];
+              const dateStr = toIsoDate(day.date);
               const isSelected = selectedDates.includes(dateStr);
               return (
                 <Box

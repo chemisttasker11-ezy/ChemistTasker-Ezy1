@@ -24,6 +24,8 @@ interface StatusCardProps {
     onReviewCandidate: (member: ShiftMemberStatus, shiftId: number, offer: any | null, slotId: number | null) => void;
     getOfferForMember?: (member: ShiftMemberStatus) => { offer: any | null; slotId: number | null };
     reviewLoadingId?: number | null;
+    onBuzzWorker?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 const StatusIllustration = ({ title, color }: { title: string; color: StatusCardProps['color'] }) => {
@@ -146,6 +148,8 @@ export const StatusCard: React.FC<StatusCardProps> = ({
     onReviewCandidate,
     getOfferForMember,
     reviewLoadingId,
+    onBuzzWorker,
+    buzzLoadingOfferId,
 }) => {
     return (
         <Card
@@ -249,6 +253,22 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                     ? getOfferForMember(member)
                                     : { offer: null, slotId: null };
                                 const hasOffer = Boolean(match.offer);
+                                const pendingConfirmation = Boolean(
+                                    memberAny.pendingConfirmation ?? memberAny.pending_confirmation
+                                );
+                                const awaitingPayment = Boolean(
+                                    memberAny.awaitingPayment ?? memberAny.awaiting_payment
+                                );
+                                const isCounterOffer = hasOffer && Boolean(
+                                    match.offer?.counterOffer ??
+                                    match.offer?.counter_offer ??
+                                    match.offer?.slots
+                                );
+                                const offerStatus = String(match.offer?.status ?? '').toUpperCase();
+                                const isPendingConfirmation = !awaitingPayment && !isCounterOffer && (
+                                    pendingConfirmation || (hasOffer && offerStatus === 'PENDING')
+                                );
+                                const pendingOfferId = memberAny.pendingOfferId ?? memberAny.pending_offer_id ?? match.offer?.id ?? null;
                                 const sourceVisibility = memberAny.sourceVisibility ?? memberAny.visibilityLevel ?? memberAny.visibility_level;
                                 const organizationName = memberAny.organizationName ?? memberAny.organization_name;
                                 const showOrganizationLabel = sourceVisibility === 'ORG_CHAIN' && Boolean(organizationName);
@@ -267,30 +287,31 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                         }}
                                     >
                                         <Stack
-                                            direction={{ xs: 'column', sm: 'row' }}
-                                            spacing={1}
-                                            alignItems={{ xs: 'stretch', sm: 'center' }}
+                                            direction="column"
+                                            spacing={0.75}
+                                            alignItems="stretch"
                                             justifyContent="space-between"
                                             sx={{ width: '100%', minWidth: 0 }}
                                         >
                                             <Stack
-                                                direction="row"
-                                                alignItems="center"
-                                                spacing={1}
-                                                sx={{ minWidth: 0, flex: '1 1 auto' }}
+                                                direction="column"
+                                                spacing={0.5}
+                                                sx={{ minWidth: 0, width: '100%' }}
                                             >
-                                                <Stack sx={{ minWidth: 0, flex: '1 1 auto', maxWidth: '100%', textAlign: 'left' }}>
+                                                <Stack sx={{ minWidth: 0, maxWidth: '100%', textAlign: 'left' }}>
                                                     <Typography
-                                                        noWrap
                                                         title={memberAny.name || `${memberAny.first_name} ${memberAny.last_name}`}
                                                         sx={{
                                                             fontWeight: 800,
-                                                            lineHeight: 1.2,
-                                                            fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                                            lineHeight: 1.12,
+                                                            fontSize: { xs: 11.5, sm: 12.5 },
                                                             maxWidth: '100%',
                                                             overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            whiteSpace: 'nowrap',
+                                                            display: '-webkit-box',
+                                                            WebkitBoxOrient: 'vertical',
+                                                            WebkitLineClamp: 2,
+                                                            whiteSpace: 'normal',
+                                                            overflowWrap: 'anywhere',
                                                         }}
                                                     >
                                                         {memberAny.name || `${memberAny.first_name} ${memberAny.last_name}`}
@@ -303,6 +324,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                             sx={{
                                                                 display: 'block',
                                                                 fontWeight: 600,
+                                                                fontSize: 10.5,
                                                                 maxWidth: '100%',
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis',
@@ -324,22 +346,71 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                 ) : null}
                                             </Stack>
                                             <Stack
-                                                direction="row"
-                                                spacing={0.75}
-                                                alignItems="center"
-                                                justifyContent={{ xs: 'flex-start', sm: 'flex-end' }}
-                                                sx={{ flexShrink: 0, flexWrap: 'nowrap', minWidth: 0 }}
+                                                spacing={0.5}
+                                                sx={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: title === 'Interested' && isPendingConfirmation
+                                                        ? 'minmax(0, 1fr) auto auto'
+                                                        : 'auto auto auto',
+                                                    gap: 0.5,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'flex-start',
+                                                    flexShrink: 0,
+                                                    minWidth: 0,
+                                                    width: '100%',
+                                                }}
                                             >
-                                                {title === 'Interested' && hasOffer && (
+                                                {title === 'Interested' && isPendingConfirmation && (
+                                                    <Chip
+                                                        label="Pending"
+                                                        size="small"
+                                                        color="warning"
+                                                        sx={{
+                                                            maxWidth: '100%',
+                                                            height: 22,
+                                                            '& .MuiChip-label': {
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                                fontSize: 9.5,
+                                                                fontWeight: 800,
+                                                                px: 0.75,
+                                                            },
+                                                        }}
+                                                    />
+                                                )}
+                                                {title === 'Interested' && awaitingPayment && (
+                                                    <Chip
+                                                        label="Awaiting payment"
+                                                        size="small"
+                                                        color="error"
+                                                        sx={{
+                                                            maxWidth: '100%',
+                                                            height: 22,
+                                                            '& .MuiChip-label': {
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                fontSize: 9.5,
+                                                                fontWeight: 800,
+                                                                px: 0.75,
+                                                            },
+                                                        }}
+                                                    />
+                                                )}
+                                                {title === 'Interested' && isCounterOffer && !isPendingConfirmation && (
                                                     <Chip
                                                         label="Counter offer"
                                                         size="small"
                                                         color="info"
                                                         sx={{
                                                             maxWidth: 120,
+                                                            height: 22,
                                                             '& .MuiChip-label': {
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis',
+                                                                fontSize: 9.5,
+                                                                fontWeight: 800,
+                                                                px: 0.75,
                                                             },
                                                         }}
                                                     />
@@ -352,9 +423,12 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                         sx={{
                                                             maxWidth: 130,
                                                             bgcolor: '#fff',
+                                                            height: 22,
                                                             '& .MuiChip-label': {
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis',
+                                                                fontSize: 9.5,
+                                                                px: 0.75,
                                                             },
                                                         }}
                                                     />
@@ -365,17 +439,32 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                         variant="contained"
                                                         color="secondary"
                                                         sx={{
-                                                            minHeight: 34,
-                                                            px: 1.5,
+                                                            minWidth: 52,
+                                                            minHeight: 26,
+                                                            px: 0.7,
                                                             borderRadius: 1.5,
                                                             fontWeight: 800,
                                                             whiteSpace: 'nowrap',
                                                             lineHeight: 1.2,
                                                             flexShrink: 0,
+                                                            fontSize: 9.5,
                                                             '& .MuiButton-startIcon': { flexShrink: 0 },
                                                         }}
                                                         onClick={() => {
-                                                            onReviewCandidate(member, shiftId, match.offer, match.slotId);
+                                                            const reviewMember = isPendingConfirmation && match.offer?.id != null
+                                                                ? {
+                                                                    ...memberAny,
+                                                                    pendingConfirmation: true,
+                                                                    pendingOfferId: match.offer.id,
+                                                                    pendingConfirmationCounterOffer: match.offer,
+                                                                }
+                                                                : member;
+                                                            onReviewCandidate(
+                                                                reviewMember,
+                                                                shiftId,
+                                                                isPendingConfirmation || awaitingPayment ? null : match.offer,
+                                                                match.slotId
+                                                            );
                                                         }}
                                                         disabled={reviewLoadingId === memberAny.userId}
                                                         startIcon={
@@ -384,7 +473,37 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                             ) : undefined
                                                         }
                                                     >
-                                                        {hasOffer ? 'Review offer' : 'Review Candidate'}
+                                                        {isPendingConfirmation || awaitingPayment ? 'View' : hasOffer ? 'Review' : 'Review'}
+                                                    </Button>
+                                                )}
+                                                {title === 'Interested' && isPendingConfirmation && pendingOfferId != null && onBuzzWorker && (
+                                                    <Button
+                                                        size="small"
+                                                        variant="contained"
+                                                        color="warning"
+                                                        sx={{
+                                                            minWidth: 50,
+                                                            minHeight: 26,
+                                                            px: 0.7,
+                                                            borderRadius: 1.5,
+                                                            fontWeight: 800,
+                                                            whiteSpace: 'nowrap',
+                                                            lineHeight: 1.2,
+                                                            flexShrink: 0,
+                                                            fontSize: 9.5,
+                                                            bgcolor: '#D99A00',
+                                                            color: '#111827',
+                                                            '&:hover': { bgcolor: '#C18400' },
+                                                        }}
+                                                        onClick={() => onBuzzWorker(Number(pendingOfferId))}
+                                                        disabled={buzzLoadingOfferId === Number(pendingOfferId)}
+                                                        startIcon={
+                                                            buzzLoadingOfferId === Number(pendingOfferId) ? (
+                                                                <CircularProgress size={16} color="inherit" />
+                                                            ) : undefined
+                                                        }
+                                                    >
+                                                        Buzz
                                                     </Button>
                                                 )}
                                             </Stack>

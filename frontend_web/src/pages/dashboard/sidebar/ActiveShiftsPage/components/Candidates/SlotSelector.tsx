@@ -2,12 +2,20 @@ import React from 'react';
 import { Stack, Box, Button, Typography } from '@mui/material';
 import { Groups } from '@mui/icons-material';
 
+type SlotStatusCounts = {
+    interested: number;
+    assigned: number;
+    rejected: number;
+    noResponse: number;
+};
+
 interface SlotSelectorProps {
     slots: any[];
     selectedSlotId: number | null;
     onSelectSlot: (slotId: number) => void;
     slotHasUpdates?: Record<number, boolean>;
     slotCandidateCounts?: Record<number, number>;
+    slotStatusCounts?: Record<number, SlotStatusCounts>;
 }
 
 export const SlotSelector: React.FC<SlotSelectorProps> = ({
@@ -16,6 +24,7 @@ export const SlotSelector: React.FC<SlotSelectorProps> = ({
     onSelectSlot,
     slotHasUpdates,
     slotCandidateCounts,
+    slotStatusCounts,
 }) => {
     const formatTime = (time?: string | null) => (time ? time.slice(0, 5) : '');
 
@@ -60,7 +69,7 @@ export const SlotSelector: React.FC<SlotSelectorProps> = ({
                             position: 'relative',
                             justifyContent: 'flex-start',
                             alignItems: 'stretch',
-                            minHeight: { xs: 84, sm: 92 },
+                            minHeight: { xs: 108, sm: 118 },
                             minWidth: 0,
                             p: { xs: 0.9, sm: 1.5 },
                             borderRadius: 2,
@@ -89,6 +98,20 @@ export const SlotSelector: React.FC<SlotSelectorProps> = ({
                                             <Groups sx={{ fontSize: 14 }} />
                                             {getSlotCandidateCount(slot)}
                                         </Typography>
+                                        {slot.id != null && (
+                                            <Box component="span" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.8, pr: 5 }}>
+                                                {[
+                                                    ['Int', slotStatusCounts?.[slot.id]?.interested ?? 0, '#047857'],
+                                                    ['Asg', slotStatusCounts?.[slot.id]?.assigned ?? 0, '#0284C7'],
+                                                    ['Rej', slotStatusCounts?.[slot.id]?.rejected ?? 0, '#B91C1C'],
+                                                    ['No', slotStatusCounts?.[slot.id]?.noResponse ?? 0, '#B45309'],
+                                                ].map(([label, value, bg]) => (
+                                                    <Box key={String(label)} component="span" sx={{ px: 0.65, py: 0.2, borderRadius: 999, bgcolor: bg, color: '#fff', fontSize: { xs: 9, sm: 10 }, fontWeight: 900, lineHeight: 1.35 }}>
+                                                        {label} {value}
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        )}
                                     </>
                                 );
                             })()}

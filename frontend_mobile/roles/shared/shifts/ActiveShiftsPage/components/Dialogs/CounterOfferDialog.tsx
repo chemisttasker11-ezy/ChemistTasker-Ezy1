@@ -64,12 +64,31 @@ export default function CounterOfferDialog({
 }: CounterOfferDialogProps) {
     if (!offer && !candidate) return null;
 
+    const awaitingPayment = Boolean(
+        candidate?.awaitingPayment ?? candidate?.awaiting_payment
+    );
+    const pendingConfirmation = !awaitingPayment && Boolean(
+        candidate?.pendingConfirmation ?? candidate?.pending_confirmation
+    );
+    const offerStatus = String(offer?.status ?? '').toUpperCase();
+    const isActionableCounterOffer = Boolean(offer) && !pendingConfirmation && !awaitingPayment && offerStatus === 'PENDING';
+    const counterOfferDetails =
+        offer ||
+        candidate?.pendingConfirmationCounterOffer ||
+        candidate?.pending_confirmation_counter_offer ||
+        candidate?.awaitingPaymentCounterOffer ||
+        candidate?.awaiting_payment_counter_offer ||
+        null;
     const rawOrigin =
-        (offer as any)?.travel_origin ??
-        (offer as any)?.travelOrigin ??
+        (counterOfferDetails as any)?.travel_origin ??
+        (counterOfferDetails as any)?.travelOrigin ??
         null;
     const travelSuburb = extractSuburb(rawOrigin);
-    const rawSlots = offer?._mappedSlots || offer?.slots || offer?.offer_slots || [];
+    const requestTravel = Boolean(
+        (counterOfferDetails as any)?.requestTravel ??
+        (counterOfferDetails as any)?.request_travel
+    );
+    const rawSlots = counterOfferDetails?._mappedSlots || counterOfferDetails?.slots || counterOfferDetails?.offer_slots || [];
     const visibleSlots =
         slotId == null
             ? rawSlots
@@ -82,7 +101,7 @@ export default function CounterOfferDialog({
     return (
         <Portal>
             <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
-                <Dialog.Title>{isOffer ? 'Counter Offer' : 'Candidate Review'}</Dialog.Title>
+                <Dialog.Title>{awaitingPayment ? 'Awaiting Payment' : pendingConfirmation ? 'Pending Confirmation' : isActionableCounterOffer ? 'Counter Offer' : 'Candidate Review'}</Dialog.Title>
                 <Dialog.ScrollArea>
                     <ScrollView contentContainerStyle={styles.content}>
                         {candidate && (
@@ -97,33 +116,51 @@ export default function CounterOfferDialog({
                                 {candidate.email && (
                                     <Text style={styles.detail}>{candidate.email}</Text>
                                 )}
+                                {pendingConfirmation && (
+                                    <Chip style={styles.pendingChip}>Offer sent. Waiting for worker confirmation.</Chip>
+                                )}
+                                {awaitingPayment && (
+                                    <Chip style={styles.awaitingPaymentChip}>Worker confirmed. Payment is required to finalize.</Chip>
+                                )}
                             </Surface>
                         )}
 
-                        {isOffer && slotsToShow.length > 0 && (
+                        {counterOfferDetails && slotsToShow.length > 0 && (
                             <Surface style={styles.section} elevation={1}>
-                                <Text style={styles.sectionTitle}>Proposed Rates</Text>
+                                <Text style={styles.sectionTitle}>Proposed Shift Terms</Text>
                                 {slotsToShow.map((slot: any, idx: number) => (
-                                    <View key={`${slot.slotId ?? slot.id ?? idx}`} style={styles.slotRow}>
+                                    <View key={`${slot.slotId ?? slot.id ?? idx}`} style={styles.offerSlotBlock}>
                                         <Text style={styles.slotDate}>
                                             {slot.date || slot.slotDate
                                                 ? new Date(slot.date || slot.slotDate).toLocaleDateString()
                                                 : `Slot ${idx + 1}`}
                                         </Text>
+                                        <Text style={styles.detail}>
+                                            Proposed time:{' '}
+                                            {(slot.proposedStart ?? slot.proposedStartTime ?? slot.proposed_start_time ?? slot.startTime ?? slot.start_time)?.slice(0, 5) || 'N/A'}
+                                            {' - '}
+                                            {(slot.proposedEnd ?? slot.proposedEndTime ?? slot.proposed_end_time ?? slot.endTime ?? slot.end_time)?.slice(0, 5) || 'N/A'}
+                                        </Text>
                                         <Text style={styles.slotRate}>
-                                            {slot.proposedRate != null ? `$${slot.proposedRate}` : 'N/A'}
+                                            Proposed rate: {slot.proposedRate != null ? `$${slot.proposedRate}` : 'N/A'}
                                         </Text>
                                     </View>
                                 ))}
                             </Surface>
                         )}
 
-                        {isOffer && offer?.requestTravel && (
+                        {counterOfferDetails && (
                             <Surface style={styles.section} elevation={1}>
-                                <Text style={styles.sectionTitle}>Travel Support</Text>
-                                <Chip icon="airplane" style={styles.travelChip}>Requested travel support</Chip>
-                                {travelSuburb && (
-                                    <Text style={styles.detail}>Traveling from: {travelSuburb}</Text>
+                                <Text style={styles.sectionTitle}>Travel</Text>
+                                {requestTravel ? (
+                                    <>
+                                        <Chip icon="airplane" style={styles.travelChip}>Requested travel support</Chip>
+                                        <Text style={styles.detail}>
+                                            Traveling from: {travelSuburb || rawOrigin || 'Location not provided'}
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <Text style={styles.detail}>No travel support requested.</Text>
                                 )}
                             </Surface>
                         )}
@@ -176,7 +213,7 @@ export default function CounterOfferDialog({
                 <Divider />
                 <Dialog.Actions>
                     <Button onPress={onDismiss} disabled={isLoading || assignLoading}>Close</Button>
-                    {isOffer ? (
+                    {isActionableCounterOffer ? (
                         <>
                             <Button onPress={() => onReject(offer)} disabled={isLoading} textColor={customTheme.colors.error}>
                                 Reject
@@ -190,7 +227,7 @@ export default function CounterOfferDialog({
                                 Accept
                             </Button>
                         </>
-                    ) : onAssign && candidate ? (
+                    ) : !pendingConfirmation && !awaitingPayment && onAssign && candidate ? (
                         <Button
                             mode="contained"
                             loading={assignLoading}
@@ -238,9 +275,17 @@ const styles = StyleSheet.create({
         color: customTheme.colors.textMuted,
         marginTop: 4,
     },
-    slotRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    pendingChip: {
+        alignSelf: 'flex-start',
+        marginTop: customTheme.spacing.sm,
+        backgroundColor: customTheme.colors.warningLight,
+    },
+    awaitingPaymentChip: {
+        alignSelf: 'flex-start',
+        marginTop: customTheme.spacing.sm,
+        backgroundColor: customTheme.colors.errorLight,
+    },
+    offerSlotBlock: {
         paddingVertical: 8,
         borderBottomWidth: 1,
         borderBottomColor: customTheme.colors.border,

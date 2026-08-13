@@ -50,7 +50,16 @@ export type PitchFormState = {
 
 const radiusOptions = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 500, 1000];
 const stateOptions = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
-const weekDayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const recurringDayOptions = [
+  { label: "Mon", value: 1 },
+  { label: "Tue", value: 2 },
+  { label: "Wed", value: 3 },
+  { label: "Thu", value: 4 },
+  { label: "Fri", value: 5 },
+  { label: "Sat", value: 6 },
+  { label: "Sun", value: 0 },
+];
 
 const titleCase = (value: string) =>
   value
@@ -81,7 +90,8 @@ const formatDisplayDate = (value: string) =>
 const buildMonthCells = (anchor: Date) => {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const start = new Date(first);
-  start.setDate(first.getDate() - first.getDay());
+  const mondayOffset = (first.getDay() + 6) % 7;
+  start.setDate(first.getDate() - mondayOffset);
   return Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
@@ -664,17 +674,17 @@ export default function PitchDialog(props: {
             {isRecurring && (
               <Stack spacing={1}>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {weekDayLabels.map((day, index) => {
-                    const selected = recurringDays.includes(index);
+                  {recurringDayOptions.map(({ label, value }) => {
+                    const selected = recurringDays.includes(value);
                     return (
                       <Chip
-                        key={day}
-                        label={day}
+                        key={label}
+                        label={label}
                         color={selected ? "primary" : "default"}
                         variant={selected ? "filled" : "outlined"}
                         onClick={() =>
                           setRecurringDays((prev) =>
-                            prev.includes(index) ? prev.filter((item) => item !== index) : [...prev, index].sort()
+                            prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value].sort()
                           )
                         }
                       />

@@ -3743,6 +3743,144 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                     **({'slot_date': slot_date} if slot_obj and slot_obj.is_recurring and slot_date else {})
                 ).exists()
 
+            pending_offer_qs = ShiftOffer.objects.filter(
+                shift=shift,
+                user=user,
+                status=ShiftOffer.Status.PENDING,
+            )
+            if shift.single_user_only:
+                pending_offer_qs = pending_offer_qs.filter(slot__isnull=True)
+            else:
+                pending_offer_qs = pending_offer_qs.filter(slot=slot_obj)
+                if slot_obj and slot_obj.is_recurring and slot_date:
+                    pending_offer_qs = pending_offer_qs.filter(
+                        Q(offered_slot_date=slot_date) | Q(offered_slot_date__isnull=True)
+                    )
+            pending_offer = pending_offer_qs.order_by('-created_at').first()
+            pending_confirmation = pending_offer is not None
+            pending_confirmation_counter_offer_data = None
+            if pending_offer and pending_offer.counter_offer_id:
+                pending_confirmation_counter_offer_data = ShiftCounterOfferSerializer(
+                    pending_offer.counter_offer,
+                    context={
+                        'request': request,
+                        'shift': shift,
+                        'include_user_detail': True,
+                    },
+                ).data
+            if pending_offer and pending_confirmation_counter_offer_data is None:
+                accepted_counter_offer_qs = ShiftCounterOffer.objects.filter(
+                    shift=shift,
+                    user=user,
+                    status=ShiftCounterOffer.Status.ACCEPTED,
+                    slots__isnull=False,
+                )
+                if not shift.single_user_only and slot_obj:
+                    accepted_counter_offer_qs = accepted_counter_offer_qs.filter(slots__slot=slot_obj)
+                    if slot_obj.is_recurring and slot_date:
+                        accepted_counter_offer_qs = accepted_counter_offer_qs.filter(
+                            Q(slots__slot_date=slot_date) | Q(slots__slot_date__isnull=True)
+                        )
+                accepted_counter_offer = accepted_counter_offer_qs.order_by('-updated_at').first()
+                if accepted_counter_offer:
+                    pending_confirmation_counter_offer_data = ShiftCounterOfferSerializer(
+                        accepted_counter_offer,
+                        context={
+                            'request': request,
+                            'shift': shift,
+                            'include_user_detail': True,
+                        },
+                    ).data
+            if pending_offer and pending_confirmation_counter_offer_data is None:
+                pending_confirmation_counter_offer_data = {
+                    'id': None,
+                    'shift': shift.id,
+                    'user': user.id,
+                    'user_detail': UserProfileSerializer(user, context={'request': request}).data,
+                    'travel_origin': None,
+                    'request_travel': False,
+                    'status': 'ACCEPTED',
+                    'slots': [{
+                        'id': None,
+                        'slot_id': pending_offer.slot_id,
+                        'slot_date': pending_offer.offered_slot_date,
+                        'slot': ShiftSlotSerializer(pending_offer.slot, context={'request': request}).data if pending_offer.slot_id else None,
+                        'proposed_start_time': pending_offer.offered_start_time,
+                        'proposed_end_time': pending_offer.offered_end_time,
+                        'proposed_rate': pending_offer.offered_rate,
+                    }],
+                    'created_at': pending_offer.created_at,
+                    'updated_at': pending_offer.updated_at,
+                }
+
+            active_counter_offer_qs = ShiftCounterOffer.objects.filter(
+                shift=shift,
+                user=user,
+                status=ShiftCounterOffer.Status.PENDING,
+                slots__isnull=False,
+            )
+            if not shift.single_user_only and slot_obj:
+                active_counter_offer_qs = active_counter_offer_qs.filter(slots__slot=slot_obj)
+                if slot_obj.is_recurring and slot_date:
+                    active_counter_offer_qs = active_counter_offer_qs.filter(
+                        Q(slots__slot_date=slot_date) | Q(slots__slot_date__isnull=True)
+                    )
+            active_counter_offer_exists = active_counter_offer_qs.exists()
+
+            awaiting_payment_qs = ShiftOffer.objects.filter(
+                shift=shift,
+                user=user,
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            )
+            if shift.single_user_only:
+                awaiting_payment_qs = awaiting_payment_qs.filter(slot__isnull=True)
+            else:
+                awaiting_payment_qs = awaiting_payment_qs.filter(slot=slot_obj)
+                if slot_obj and slot_obj.is_recurring and slot_date:
+                    awaiting_payment_qs = awaiting_payment_qs.filter(
+                        Q(offered_slot_date=slot_date) | Q(offered_slot_date__isnull=True)
+                    )
+            awaiting_payment_offer = awaiting_payment_qs.order_by('-updated_at').first()
+            awaiting_payment = awaiting_payment_offer is not None
+            awaiting_payment_counter_offer_data = None
+            if awaiting_payment_offer and awaiting_payment_offer.counter_offer_id:
+                awaiting_payment_counter_offer_data = ShiftCounterOfferSerializer(
+                    awaiting_payment_offer.counter_offer,
+                    context={
+                        'request': request,
+                        'shift': shift,
+                        'include_user_detail': True,
+                    },
+                ).data
+            if awaiting_payment_offer and awaiting_payment_counter_offer_data is None:
+                awaiting_payment_counter_offer_data = {
+                    'id': None,
+                    'shift': shift.id,
+                    'user': user.id,
+                    'user_detail': UserProfileSerializer(user, context={'request': request}).data,
+                    'travel_origin': None,
+                    'request_travel': False,
+                    'status': 'ACCEPTED',
+                    'slots': [{
+                        'id': None,
+                        'slot_id': awaiting_payment_offer.slot_id,
+                        'slot_date': awaiting_payment_offer.offered_slot_date,
+                        'slot': ShiftSlotSerializer(awaiting_payment_offer.slot, context={'request': request}).data if awaiting_payment_offer.slot_id else None,
+                        'proposed_start_time': awaiting_payment_offer.offered_start_time,
+                        'proposed_end_time': awaiting_payment_offer.offered_end_time,
+                        'proposed_rate': awaiting_payment_offer.offered_rate,
+                    }],
+                    'created_at': awaiting_payment_offer.created_at,
+                    'updated_at': awaiting_payment_offer.updated_at,
+                }
+            if active_counter_offer_exists:
+                pending_confirmation = False
+                pending_offer = None
+                pending_confirmation_counter_offer_data = None
+                awaiting_payment = False
+                awaiting_payment_offer = None
+                awaiting_payment_counter_offer_data = None
+
             if is_assigned:
                 member_interaction_status = 'accepted'
             elif user.id in interested_user_ids:
@@ -3767,6 +3905,12 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                     else None
                 ),
                 'visibility_level': requested_visibility,
+                'pending_confirmation': pending_confirmation,
+                'pending_offer_id': pending_offer.id if pending_offer else None,
+                'pending_confirmation_counter_offer': pending_confirmation_counter_offer_data,
+                'awaiting_payment': awaiting_payment,
+                'awaiting_payment_offer_id': awaiting_payment_offer.id if awaiting_payment_offer else None,
+                'awaiting_payment_counter_offer': awaiting_payment_counter_offer_data,
             })
 
         return Response(data)
@@ -4148,6 +4292,15 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         slot_obj = None
         if not shift.single_user_only and slot_id is not None:
             slot_obj = get_object_or_404(shift.slots, pk=slot_id)
+            if _slot_locked_for_shift_offer(shift=shift, slot=slot_obj):
+                return Response({'detail': 'This slot is already locked or awaiting payment.'}, status=status.HTTP_400_BAD_REQUEST)
+        elif shift.single_user_only:
+            locked_slot = next(
+                (slot for slot in shift.slots.all() if _slot_locked_for_shift_offer(shift=shift, slot=slot)),
+                None,
+            )
+            if locked_slot:
+                return Response({'detail': 'This shift is already locked or awaiting payment.'}, status=status.HTTP_400_BAD_REQUEST)
 
         now = timezone.now()
         existing_offer = ShiftOffer.objects.filter(
@@ -4178,7 +4331,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 "offered_rate",
                 "updated_at",
             ])
-            offer = existing_offer
+            return Response({
+                'status': 'Offer is already pending worker confirmation.',
+                'offer_id': existing_offer.id,
+                'worker_confirmation_required': True,
+            }, status=status.HTTP_200_OK)
         else:
             offer = ShiftOffer.objects.create(
                 shift=shift,
@@ -4227,7 +4384,10 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 .select_related('user', 'decided_by')
                 .prefetch_related('slots__slot')
                 .annotate(slot_count=Count('slots'))
-                .filter(slot_count__gt=0)
+                .filter(
+                    slot_count__gt=0,
+                    status=ShiftCounterOffer.Status.PENDING,
+                )
             )
             if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
                 offers = offers.filter(user=request.user)
@@ -4328,11 +4488,6 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/accept')
     def accept_counter_offer(self, request, pk=None, offer_id=None):
-        from billing.utils import (
-            BILLING_STATE_PAYMENT_REQUIRED,
-            get_billing_state_for_pharmacy,
-        )
-
         shift = self.get_object()
         if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
@@ -4395,33 +4550,13 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         for offer_slot in offer_slots:
             slot = offer_slot.slot
             slot_date = offer_slot.slot_date or slot.date
-            if ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date).exists():
+            if _slot_locked_for_shift_offer(shift=shift, slot=slot, slot_date=slot_date, ignore_user=offer.user):
                 return Response({'detail': 'One or more slots are no longer available.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            for offer_slot in offer_slots:
-                slot = offer_slot.slot
-                if shift.flexible_timing:
-                    if offer_slot.proposed_start_time != slot.start_time or offer_slot.proposed_end_time != slot.end_time:
-                        slot.start_time = offer_slot.proposed_start_time
-                        slot.end_time = offer_slot.proposed_end_time
-                        slot.save(update_fields=['start_time', 'end_time'])
-
-                if shift.rate_type == 'FLEXIBLE' and offer_slot.proposed_rate is not None:
-                    slot.rate = offer_slot.proposed_rate
-                    slot.save(update_fields=['rate'])
-
-        if slot_id is None:
-            # Accepting the whole offer (all slots)
-            offer.status = ShiftCounterOffer.Status.ACCEPTED
-            offer.decided_by = request.user
-            offer.decided_at = timezone.now()
-            offer.save(update_fields=['status', 'decided_by', 'decided_at', 'updated_at'])
-        else:
-            # Per-slot acceptance: keep offer pending so remaining slots can be processed.
-            offer.decided_by = request.user
-            offer.decided_at = timezone.now()
-            offer.save(update_fields=['decided_by', 'decided_at', 'updated_at'])
+        offer.status = ShiftCounterOffer.Status.ACCEPTED
+        offer.decided_by = request.user
+        offer.decided_at = timezone.now()
+        offer.save(update_fields=['status', 'decided_by', 'decided_at', 'updated_at'])
 
         created_offers = []
         now = timezone.now()
@@ -4439,9 +4574,9 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 existing_offer = None
 
             effective_date = offer_slot.slot_date or slot.date
-            effective_start = slot.start_time
-            effective_end = slot.end_time
-            effective_rate = slot.rate
+            effective_start = offer_slot.proposed_start_time or slot.start_time
+            effective_end = offer_slot.proposed_end_time or slot.end_time
+            effective_rate = offer_slot.proposed_rate if offer_slot.proposed_rate is not None else slot.rate
 
             if existing_offer:
                 existing_offer.offered_slot_date = effective_date
@@ -4472,40 +4607,21 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 )
             created_offers.append(shift_offer)
 
-        billing_state = get_billing_state_for_pharmacy(shift.pharmacy, acting_user=request.user)
-        requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
-        assignment_ids = []
-        with transaction.atomic():
-            if requires_payment:
-                for shift_offer in created_offers:
-                    shift_offer.status = ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
-                    shift_offer.save(update_fields=["status", "updated_at"])
-                if shift.payment_status != 'PENDING':
-                    shift.payment_status = 'PENDING'
-                    shift.save(update_fields=['payment_status'])
-            else:
-                if shift.payment_status != 'PAID':
-                    shift.payment_status = 'PAID'
-                    shift.save(update_fields=['payment_status'])
-                for shift_offer in created_offers:
-                    ids, _rates = finalize_shift_offer(shift_offer)
-                    assignment_ids.extend(ids)
-
         if offer.user and offer.user.email:
             ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)
-            ctx["payment_required"] = requires_payment
+            ctx["payment_required"] = False
+            ctx["worker_confirmation_required"] = True
             notify_shift_users(
                 [offer.user],
                 shift=shift,
                 title="Counter offer accepted",
-                body="Your counter offer was accepted.",
+                body="Your counter offer was accepted. Please confirm the shift offer to lock it in.",
                 kind="shift_counter_offer_accepted",
                 payload={
                     "shift_id": shift.id,
                     "offer_id": offer.id,
                     "generated_offer_ids": [o.id for o in created_offers],
-                    "payment_required": requires_payment,
-                    "billing_state": billing_state,
+                    "worker_confirmation_required": True,
                 },
             )
             async_task(
@@ -4519,12 +4635,12 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             )
 
         return Response({
-            'detail': 'Counter offer accepted.',
+            'detail': 'Offer sent to worker for confirmation.',
             'offer_ids': [o.id for o in created_offers],
-            'assignment_ids': assignment_ids,
-            'payment_required': requires_payment,
+            'assignment_ids': [],
+            'payment_required': False,
             'payment_status': shift.payment_status,
-            'billing_state': billing_state,
+            'worker_confirmation_required': True,
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/reject')
@@ -5281,8 +5397,71 @@ def _shift_has_past_slot_exists(*, now, today):
     slots = ShiftSlot.objects.filter(shift_id=OuterRef('pk')).filter(_past_slot_q(now, today))
     return Exists(slots)
 
+
+def _slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None):
+    if not slot:
+        return False
+    target_date = slot_date or getattr(slot, "date", None)
+    assignment_qs = ShiftSlotAssignment.objects.filter(shift=shift, slot=slot)
+    if target_date:
+        assignment_qs = assignment_qs.filter(slot_date=target_date)
+    if assignment_qs.exists():
+        return True
+    pending_qs = ShiftOffer.objects.filter(
+        shift=shift,
+        slot=slot,
+        status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+    )
+    if ignore_user is not None:
+        ignore_user_id = getattr(ignore_user, "id", ignore_user)
+        pending_qs = pending_qs.exclude(user_id=ignore_user_id)
+    if target_date:
+        pending_qs = pending_qs.filter(
+            Q(offered_slot_date=target_date) | Q(offered_slot_date__isnull=True)
+        )
+    return pending_qs.exists()
+
+
 class ActiveShiftViewSet(BaseShiftViewSet):
     """Upcoming & unassigned shifts (no slot has an assignment)."""
+    @staticmethod
+    def _has_open_active_occurrence(shift, *, now, today):
+        if shift.employment_type in ['FULL_TIME', 'PART_TIME'] and not shift.slots.exists():
+            return True
+
+        assigned_pairs = {
+            (assignment.slot_id, assignment.slot_date)
+            for assignment in shift.slot_assignments.all()
+        }
+        pending_pairs = {
+            (offer.slot_id, offer.offered_slot_date)
+            for offer in shift.offers.filter(
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                slot_id__isnull=False,
+            )
+        }
+
+        try:
+            entries = expand_shift_slots(shift)
+        except Exception:
+            entries = []
+
+        for entry in entries:
+            slot = entry.get("slot")
+            slot_date = entry.get("date")
+            if not slot or not slot_date:
+                continue
+            if slot_date < today:
+                continue
+            if slot_date == today and slot.end_time < now.time():
+                continue
+            key = (slot.id, slot_date)
+            if key in assigned_pairs:
+                continue
+            return True
+
+        return bool(pending_pairs)
+
     def get_queryset(self):
         user = self.request.user
         now  = timezone.now()
@@ -5301,10 +5480,17 @@ class ActiveShiftViewSet(BaseShiftViewSet):
             ),
         ).filter(
             Q(employment_type__in=['FULL_TIME', 'PART_TIME'], slot_count=0) |
+            Q(slots__is_recurring=True, slots__recurring_end_date__gte=today) |
             Q(has_active_slot=True)
         )
 
-        qs = qs.distinct()
+        qs = qs.distinct().prefetch_related('slots', 'slot_assignments', 'offers')
+        open_ids = [
+            shift.id
+            for shift in qs
+            if self._has_open_active_occurrence(shift, now=now, today=today)
+        ]
+        qs = Shift.objects.filter(id__in=open_ids).prefetch_related('slots', 'slot_assignments', 'offers')
         try:
             ids = list(qs.values_list('id', flat=True))
             # print(
@@ -5815,6 +6001,54 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
             return f"${Decimal(str(only)):.0f} package"
 
         return "N/A"
+
+    @action(detail=True, methods=['post'])
+    def buzz(self, request, pk=None):
+        offer = self.get_object()
+        shift = offer.shift
+        if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+            return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        if offer.status != ShiftOffer.Status.PENDING:
+            return Response({'detail': 'Only pending offers can be buzzed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pharmacy_display = shift.pharmacy.name
+        if getattr(shift, "post_anonymously", False):
+            suburb = getattr(shift.pharmacy, "suburb", None)
+            pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
+
+        worker_name = offer.user.get_full_name() or offer.user.email
+        ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
+        ctx["pharmacy_name"] = pharmacy_display
+        ctx["offered_rate"] = offer.offered_rate
+        ctx["expires_at"] = offer.expires_at
+
+        notify_shift_users(
+            [offer.user],
+            shift=shift,
+            title="Reminder: confirm your shift offer",
+            body=f"{pharmacy_display} is waiting for you to confirm this shift offer.",
+            kind="shift_offer_buzz",
+            payload={
+                "offer_id": offer.id,
+                "status": offer.status,
+                "worker_confirmation_required": True,
+            },
+        )
+        if offer.user and offer.user.email:
+            async_task(
+                'users.tasks.send_async_email',
+                subject=f"Reminder: confirm your shift offer at {pharmacy_display}",
+                recipient_list=[offer.user.email],
+                template_name="emails/shift_offer_buzz.html",
+                context=ctx,
+                text_template="emails/shift_offer_buzz.txt",
+                suppress_auto_notification=True,
+            )
+
+        return Response({
+            'detail': f'Reminder sent to {worker_name}.',
+            'offer_id': offer.id,
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
@@ -8202,20 +8436,65 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
         if shift.payment_status != "PENDING":
             raise DRFValidationError({"detail": "This shift does not require payment."})
         slot_id = request.data.get("slot_id") or request.data.get("slotId")
-        if slot_id and not ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            slot_id=slot_id,
-        ).exists():
-            raise DRFValidationError({"detail": "This selected slot does not require payment."})
+        raw_slot_ids = request.data.get("slot_ids") or request.data.get("slotIds")
+        raw_offer_ids = request.data.get("offer_ids") or request.data.get("offerIds") or request.data.get("offer_id") or request.data.get("offerId")
+        if raw_offer_ids is None:
+            raw_offer_ids = []
+        if isinstance(raw_offer_ids, str):
+            raw_offer_ids = [part.strip() for part in raw_offer_ids.split(",") if part.strip()]
+        elif not isinstance(raw_offer_ids, list):
+            raw_offer_ids = [raw_offer_ids]
+        offer_ids = []
+        for value in raw_offer_ids:
+            try:
+                offer_ids.append(int(value))
+            except (TypeError, ValueError):
+                raise DRFValidationError({"offer_ids": f"Invalid offer id: {value}"})
+        offer_ids = sorted(set(offer_ids))
+
+        if raw_slot_ids is None:
+            raw_slot_ids = [slot_id] if slot_id else []
+        if isinstance(raw_slot_ids, str):
+            raw_slot_ids = [part.strip() for part in raw_slot_ids.split(",") if part.strip()]
+        elif not isinstance(raw_slot_ids, list):
+            raw_slot_ids = [raw_slot_ids]
+        slot_ids = []
+        for value in raw_slot_ids:
+            try:
+                slot_ids.append(int(value))
+            except (TypeError, ValueError):
+                raise DRFValidationError({"slot_ids": f"Invalid slot id: {value}"})
+        slot_ids = sorted(set(slot_ids))
+        if offer_ids:
+            selected_offers = list(ShiftOffer.objects.filter(
+                shift=shift,
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                id__in=offer_ids,
+            ))
+            if len(selected_offers) != len(offer_ids):
+                raise DRFValidationError({"detail": "One or more selected offers do not require payment."})
+            selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
+            if len(selected_slot_ids) != len(set(selected_slot_ids)):
+                raise DRFValidationError({"detail": "Select only one candidate per slot."})
+        elif slot_ids:
+            matching_count = ShiftOffer.objects.filter(
+                shift=shift,
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                slot_id__in=slot_ids,
+            ).values("slot_id").distinct().count()
+            if matching_count != len(slot_ids):
+                raise DRFValidationError({"detail": "One or more selected slots do not require payment."})
+        payment_units = max(1, len(offer_ids) or len(slot_ids))
+        ledgers = []
         try:
-            ledger = spend_pills_for_shift_post(user=request.user, shift=shift)
+            for _ in range(payment_units):
+                ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
         except RewardError as exc:
             raise DRFValidationError({
                 "detail": str(exc),
                 "code": "insufficient_pills" if "Insufficient" in str(exc) else "pill_payment_failed",
                 "balance": get_pill_balance(request.user),
-                "required": get_shift_post_pill_cost(),
+                "required": get_shift_post_pill_cost() * payment_units,
             })
         finalized_count = 0
         with transaction.atomic():
@@ -8223,11 +8502,22 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 shift=shift,
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
             ).order_by("created_at")
-            if slot_id:
-                pending_offers = pending_offers.filter(slot_id=slot_id)
+            if offer_ids:
+                pending_offers = pending_offers.filter(id__in=offer_ids)
+            elif slot_ids:
+                pending_offers = pending_offers.filter(slot_id__in=slot_ids)
+            selected_slot_ids = set()
             for offer in pending_offers:
                 finalize_shift_offer(offer)
+                if offer.slot_id:
+                    selected_slot_ids.add(offer.slot_id)
                 finalized_count += 1
+            if selected_slot_ids:
+                ShiftOffer.objects.filter(
+                    shift=shift,
+                    slot_id__in=selected_slot_ids,
+                    status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+                ).exclude(id__in=offer_ids).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
             has_pending_payment = ShiftOffer.objects.filter(
                 shift=shift,
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -8239,7 +8529,8 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             "balance": get_pill_balance(request.user),
             "payment_status": shift.payment_status,
             "finalized_offers": finalized_count,
-            "ledger_entry": PillLedgerEntrySerializer(ledger).data,
+            "ledger_entries": PillLedgerEntrySerializer(ledgers, many=True).data,
+            "ledger_entry": PillLedgerEntrySerializer(ledgers[-1]).data if ledgers else None,
         })
 
 

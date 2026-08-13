@@ -5,13 +5,13 @@ import { useAuth } from '../../../contexts/AuthContext';
 import {
   Shift,
   expressInterestInShiftService,
-  submitShiftCounterOfferService,
   fetchShiftInterests,
   fetchShiftRejections,
   fetchWorkerShiftDetailService,
   rejectShiftService,
 } from '@chemisttasker/shared-core';
 import ShiftsBoard from './ShiftsBoard';
+import { submitCounterOfferDirect } from './ShiftsBoard/utils/submitCounterOffer';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   const detail = (error as any)?.response?.data?.detail;
@@ -159,7 +159,7 @@ const WorkerShiftDetailPage: React.FC = () => {
 
   const handleSubmitCounterOffer = async (payload: any) => {
     try {
-      await submitShiftCounterOfferService(payload);
+      await submitCounterOfferDirect(payload);
     } catch (err) {
       setSnackbar({ open: true, message: getErrorMessage(err, 'Failed to submit counter offer.'), severity: 'error' });
       throw err;

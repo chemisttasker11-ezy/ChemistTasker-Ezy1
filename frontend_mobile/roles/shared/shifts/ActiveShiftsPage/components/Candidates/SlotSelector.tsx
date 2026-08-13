@@ -11,9 +11,11 @@ interface SlotSelectorProps {
     selectedSlotId: number | null;
     onSelectSlot: (slotId: number) => void;
     slotHasUpdates?: Record<number, boolean>;
+    slotCandidateCounts?: Record<number, number>;
+    slotStatusCounts?: Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>;
 }
 
-export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slotHasUpdates }: SlotSelectorProps) {
+export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slotHasUpdates, slotCandidateCounts, slotStatusCounts }: SlotSelectorProps) {
     const getSlotId = (slot: any): number | null =>
         (slot?.id ?? slot?.slotId ?? slot?.slot_id ?? null);
 
@@ -36,7 +38,7 @@ export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slot
         };
     };
     const getSlotCandidateCount = (slot: any) =>
-        slot?.candidateCount ?? slot?.candidate_count ?? slot?.assignedCount ?? slot?.assigned_count ?? 0;
+        slotCandidateCounts?.[slot._slotId] ?? slot?.candidateCount ?? slot?.candidate_count ?? slot?.assignedCount ?? slot?.assigned_count ?? 0;
 
     return (
         <Surface style={styles.container} elevation={0}>
@@ -66,6 +68,12 @@ export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slot
                                 <View style={styles.slotCandidateCount}>
                                     <IconButton icon="account-group-outline" size={14} iconColor="#64748B" style={styles.slotCandidateIcon} />
                                     <Text style={styles.slotCandidateText}>{getSlotCandidateCount(slot)}</Text>
+                                </View>
+                                <View style={styles.statusSummary}>
+                                    <Text style={[styles.statusPill, styles.interestedPill]}>Int {slotStatusCounts?.[slot._slotId]?.interested ?? 0}</Text>
+                                    <Text style={[styles.statusPill, styles.assignedPill]}>Asg {slotStatusCounts?.[slot._slotId]?.assigned ?? 0}</Text>
+                                    <Text style={[styles.statusPill, styles.rejectedPill]}>Rej {slotStatusCounts?.[slot._slotId]?.rejected ?? 0}</Text>
+                                    <Text style={[styles.statusPill, styles.noResponsePill]}>No {slotStatusCounts?.[slot._slotId]?.noResponse ?? 0}</Text>
                                 </View>
                                 {Boolean(slotHasUpdates?.[slot._slotId]) && <View style={styles.updateDot} />}
                             </TouchableOpacity>
@@ -122,7 +130,7 @@ const styles = StyleSheet.create({
     },
     slotButton: {
         width: '31.5%',
-        minHeight: 86,
+        minHeight: 112,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#E5E7EB',
@@ -201,6 +209,26 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         backgroundColor: '#DC2626',
     },
+    statusSummary: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 3,
+        marginTop: 5,
+        paddingRight: 26,
+    },
+    statusPill: {
+        color: '#FFFFFF',
+        fontSize: 8,
+        fontWeight: '900',
+        borderRadius: 999,
+        overflow: 'hidden',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+    },
+    interestedPill: { backgroundColor: '#047857' },
+    assignedPill: { backgroundColor: '#0284C7' },
+    rejectedPill: { backgroundColor: '#B91C1C' },
+    noResponsePill: { backgroundColor: '#B45309' },
     navButton: {
         margin: 0,
     },

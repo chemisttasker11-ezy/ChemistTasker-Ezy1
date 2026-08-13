@@ -222,6 +222,19 @@ const ShiftList: React.FC<ShiftListProps> = ({
       const isRejectedShift = isShiftRejected;
       const isFullOrPartTime = ['FULL_TIME', 'PART_TIME'].includes(shift.employmentType ?? '');
       const isPharmacistProvided = shift.rateType === 'PHARMACIST_PROVIDED';
+      const offerStatusBySlot = ((shift as any).__offerStatusBySlot ?? {}) as Record<number, string>;
+      const shiftOfferStatus = String((shift as any).__shiftOfferStatus ?? '').toUpperCase();
+      const isOffersMode = applyLabel === 'Confirm';
+      const hasPendingOffer = !isOffersMode || shiftOfferStatus === 'PENDING' || Object.values(offerStatusBySlot).some(
+        (status) => String(status).toUpperCase() === 'PENDING'
+      );
+      const awaitingPaymentSlotIds = new Set(
+        Object.entries(offerStatusBySlot)
+          .filter(([, status]) => String(status).toUpperCase() === 'ACCEPTED_AWAITING_PAYMENT')
+          .map(([slotId]) => Number(slotId))
+          .filter((slotId) => Number.isFinite(slotId))
+      );
+      const hasAwaitingPaymentSlots = awaitingPaymentSlotIds.size > 0 || shiftOfferStatus === 'ACCEPTED_AWAITING_PAYMENT';
       const hasSlots = slots.length > 0;
       const firstSlot = slots[0];
       const uniformSlotTimes =
@@ -266,7 +279,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
       const hasRejectedSlots = allSlots.some((slot) => rejectedSlotIds.has(slot.id));
       const slotRejected = (slotId: number) => rejectedSlotIds.has(slotId) || isRejectedShift;
       const allowPartial = getShiftAllowPartial(shift);
-      const hasActiveSlotSelection = isMulti && allowPartial && !disableSlotActions && selection.size > 0;
+      const canSelectSlots = !shift.singleUserOnly && isMulti && (allowPartial || isOffersMode) && !disableSlotActions;
+      const hasActiveSlotSelection = canSelectSlots && selection.size > 0;
       const shiftLevelLocked = isShiftApplied || isRejectedShift || hasShiftLevelCounter;
       const slotLevelLocked = isShiftApplied || isRejectedShift;
       const interactionLocked = shiftLevelLocked || hasSlotActions;
@@ -438,10 +452,10 @@ const ShiftList: React.FC<ShiftListProps> = ({
                   <Stack spacing={1} sx={{ mt: 1 }}>
                     <Button
                       variant="contained"
-                      disabled={shiftActionsDisabled || (!shift.singleUserOnly && hasRejectedSlots)}
+                      disabled={shiftActionsDisabled || (!shift.singleUserOnly && hasRejectedSlots) || (isOffersMode && (!hasPendingOffer || hasAwaitingPaymentSlots))}
                       onClick={() => handleApplyAll(shift)}
                     >
-                      {isApplied ? 'Applied' : (applyLabel ?? 'Apply Now')}
+                      {isApplied && !isOffersMode ? 'Applied' : (applyLabel ?? 'Apply Now')}
                     </Button>
                     {showCounter && onSubmitCounterOffer && (
                       <Button
@@ -531,6 +545,9 @@ const ShiftList: React.FC<ShiftListProps> = ({
                             const isSlotRejected = slotRejected(slotId);
                             const offerSlot = counterInfo?.slots?.[slotId];
                             const isCountered = !!offerSlot;
+                            const offerStatus = String(offerStatusBySlot[slotId] ?? shiftOfferStatus).toUpperCase();
+                            const isPendingOfferSlot = offerStatus === 'PENDING';
+                            const isAwaitingPaymentSlot = offerStatus === 'ACCEPTED_AWAITING_PAYMENT';
                             return (
                               <Paper
                                 key={slotKey}
@@ -555,11 +572,11 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                   alignItems={{ xs: 'stretch', sm: 'center' }}
                                 >
                                   <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-                                    {isMulti && allowPartial && !disableSlotActions && (
+                                    {canSelectSlots && isPendingOfferSlot && (
                       <Checkbox
-                        checked={isSelected || isSlotApplied || isCountered || isSlotRejected}
+                        checked={isSelected}
                         onChange={() => toggleSlotSelection(shift.id, slotId)}
-                        disabled={slotActionsDisabled || isSlotRejected || isSlotApplied || isCountered}
+                        disabled={slotActionsDisabled}
                       />
                                     )}
                                     <Box sx={{ minWidth: 0 }}>
@@ -582,6 +599,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                   >
                                     {isSlotRejected ? (
                                       <Chip label="Rejected" color="error" size="small" />
+                                    ) : isAwaitingPaymentSlot ? (
+                                      <Chip label="Waiting for owner payment" color="warning" size="small" />
                                     ) : (
                                       <Chip
                                         label={isSlotApplied ? 'Applied' : `$${getSlotRate(slot, shift, userRatePreference)}/hr`}
@@ -595,6 +614,16 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                         size="small"
                                         variant="outlined"
                                       />
+                                    )}
+                                    {isOffersMode && !shift.singleUserOnly && isPendingOfferSlot && (
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        onClick={() => handleApplySlot(shift, slotId)}
+                                        disabled={slotActionsDisabled}
+                                      >
+                                        Confirm
+                                      </Button>
                                     )}
                                     {!disableSlotActions && !shift.singleUserOnly && onRejectSlot && rejectAllowed && !isSlotRejected && (
                                       <Button
@@ -615,7 +644,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                         )}
                       </Stack>
 
-                      {isMulti && allowPartial && selection.size > 0 && !disableSlotActions && (
+                      {hasActiveSlotSelection && (
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
                           {showCounter && onSubmitCounterOffer && (
                             <Button
@@ -638,7 +667,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                               clearSelection(shift.id);
                             }}
                           >
-                            Apply to {selection.size} Selected
+                            {isOffersMode ? 'Confirm' : 'Apply to'} {selection.size} Selected
                           </Button>
                           {(onRejectSlots || onRejectSlot) && rejectAllowed && (
                             <Button

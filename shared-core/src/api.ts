@@ -691,6 +691,9 @@ export function acceptShiftOffer(offerId) {
 export function declineShiftOffer(offerId) {
     return fetchApi(`/client-profile/shift-offers/${offerId}/decline/`, { method: 'POST' });
 }
+export function buzzShiftOffer(offerId) {
+    return fetchApi(`/client-profile/shift-offers/${offerId}/buzz/`, { method: 'POST' });
+}
 export function getCommunityShiftDetail(id) {
     return fetchApi(`/client-profile/community-shifts/${id}`);
 }
@@ -900,7 +903,7 @@ export async function fetchWorkerShiftDetailService(shiftId) {
     return mapShift(data);
 }
 export async function fetchPosterShiftDetailService(shiftId) {
-    const data = await getWorkerShiftDetail(shiftId);
+    const data = await getActiveShiftDetail(shiftId);
     return mapShift(data);
 }
 export async function fetchShiftInterests(filters) {
@@ -933,6 +936,7 @@ export async function fetchShiftCounterOffersService(shiftId) {
 export async function submitShiftCounterOfferService(payload) {
     const body = {
         request_travel: payload.requestTravel ?? false,
+        travel_origin_input: payload.travelOrigin ?? payload.travel_origin ?? '',
         slots: (payload.slots || []).map((slot) => ({
             slot_id: slot.slotId,
             // Carry per-occurrence date so recurring shifts capture every instance.
@@ -964,6 +968,9 @@ export async function acceptShiftOfferService(offerId: number) {
 export async function declineShiftOfferService(offerId: number) {
     await declineShiftOffer(offerId);
 }
+export async function buzzShiftOfferService(offerId: number) {
+    return camelCaseKeysDeep(await buzzShiftOffer(offerId));
+}
 export async function fetchShiftMemberStatus(shiftId, options) {
     const params = {
         slot_id: options?.slotId,
@@ -986,7 +993,8 @@ export async function deleteActiveShiftService(shiftId) {
     await deleteActiveShift(shiftId);
 }
 export async function acceptShiftCandidateService(shiftId, payload) {
-    await acceptUserToShift(shiftId, { user_id: payload.userId, slot_id: payload.slotId });
+    const data = await acceptUserToShift(shiftId, { user_id: payload.userId, slot_id: payload.slotId });
+    return camelCaseKeysDeep(data);
 }
 export async function revealShiftInterestService(shiftId, payload) {
     const data = await revealProfile(shiftId, { user_id: payload.userId, slot_id: payload.slotId });

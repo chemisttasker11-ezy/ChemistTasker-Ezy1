@@ -1,0 +1,48 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Reminder: Confirm Your Shift Offer{% endblock %}
+
+{% block content %}
+<h2>Please confirm your shift offer</h2>
+<p>Hi{% if user_first_name %} {{ user_first_name }}{% endif %},</p>
+<p>
+    <strong>{{ pharmacy_name }}</strong> is waiting for you to confirm your
+    <strong>{{ role_label }}</strong> shift offer.
+</p>
+
+{% if slots_display_details %}
+<div class="slot-list">
+    {% for s in slots_display_details %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="slot-row">
+        <tr>
+            <td>
+                <div class="slot-date">{{ s.date }}</div>
+                <div class="slot-time">{{ s.time_range }}</div>
+            </td>
+            {% if s.rate %}
+            <td align="right" width="90">
+                <span class="rate-pill">${{ s.rate }}/hr</span>
+            </td>
+            {% endif %}
+        </tr>
+    </table>
+    {% endfor %}
+</div>
+{% elif slots_display %}
+<div class="meta">
+    <strong>Dates</strong>
+    <ul>
+        {% for line in slots_display %}
+        <li>{{ line }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if slots_extra_count %}<p>+ {{ slots_extra_count }} more slot{% if slots_extra_count > 1 %}s{% endif %}</p>{% endif %}
+{% if offered_rate and not slots_display_details %}<p><strong>Rate:</strong> ${{ offered_rate }}/hr</p>{% endif %}
+{% if expires_at %}<p><strong>Confirm by:</strong> {{ expires_at }}</p>{% endif %}
+
+<a class="btn" href="{{ shift_link }}">Confirm offer</a>
+<p>Please confirm this offer in ChemistTasker so the owner can finalize the shift.</p>
+{% endblock %}

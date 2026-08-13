@@ -4230,18 +4230,61 @@ class ShiftSlotSerializer(serializers.ModelSerializer):
     )
     recurring_end_date = serializers.DateField(required=False, allow_null=True)
     start_hour = serializers.SerializerMethodField()
+    awaiting_payment = serializers.SerializerMethodField()
+    awaiting_payment_offer_id = serializers.SerializerMethodField()
+    is_locked = serializers.SerializerMethodField()
+    locked_by_offer_id = serializers.SerializerMethodField()
+    confirmed_assignment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = ShiftSlot
         fields = [
             'id', 'date', 'start_time', 'end_time', 'rate', 'start_hour',
             'is_recurring', 'recurring_days', 'recurring_end_date',
+            'awaiting_payment', 'awaiting_payment_offer_id',
+            'is_locked', 'locked_by_offer_id', 'confirmed_assignment_id',
         ]
 
     def get_start_hour(self, obj):
         if not obj.start_time:
             return None
         return obj.start_time.hour
+
+    def _pending_payment_offer(self, obj):
+        return ShiftOffer.objects.filter(
+            shift_id=obj.shift_id,
+            slot_id=obj.id,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        ).order_by('-updated_at').first()
+
+    def _confirmed_assignment(self, obj):
+        return ShiftSlotAssignment.objects.filter(
+            shift_id=obj.shift_id,
+            slot_id=obj.id,
+        ).order_by('-assigned_at').first()
+
+    def get_awaiting_payment(self, obj):
+        return self._pending_payment_offer(obj) is not None
+
+    def get_awaiting_payment_offer_id(self, obj):
+        offer = self._pending_payment_offer(obj)
+        return offer.id if offer else None
+
+    def get_confirmed_assignment_id(self, obj):
+        assignment = self._confirmed_assignment(obj)
+        return assignment.id if assignment else None
+
+    def get_locked_by_offer_id(self, obj):
+        payment_offer = self._pending_payment_offer(obj)
+        if payment_offer:
+            return payment_offer.id
+        return None
+
+    def get_is_locked(self, obj):
+        return (
+            self.get_confirmed_assignment_id(obj) is not None
+            or self.get_locked_by_offer_id(obj) is not None
+        )
 
 class ShiftSerializer(serializers.ModelSerializer):
     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -4250,7 +4293,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
-    slots = ShiftSlotSerializer(many=True)
+    slots = serializers.SerializerMethodField()
     interested_users_count = serializers.IntegerField(read_only=True)
     pharmacy = serializers.PrimaryKeyRelatedField(
         write_only=True,
@@ -4263,6 +4306,7 @@ class ShiftSerializer(serializers.ModelSerializer):
     # for multi-slot shifts
     slot_assignments = serializers.SerializerMethodField()
     pending_payment_slot_ids = serializers.SerializerMethodField()
+    payment_options = serializers.SerializerMethodField()
 
     role_label = serializers.SerializerMethodField()
     ui_is_negotiable = serializers.SerializerMethodField()
@@ -4293,7 +4337,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             'post_anonymously',
             'escalate_to_locum_casual',
             'interested_users_count', 'reveal_quota', 'reveal_count', 'workload_tags','slot_assignments',
-            'pending_payment_slot_ids',
+            'pending_payment_slot_ids', 'payment_options',
             'allowed_escalation_levels','is_single_user', 'description',
             'flexible_timing',
             'min_hourly_rate', 'max_hourly_rate', 'min_annual_salary', 'max_annual_salary', 'super_percent',
@@ -4516,6 +4560,12 @@ class ShiftSerializer(serializers.ModelSerializer):
 
             normalized.append(slot)
         return normalized
+
+    def _initial_slots_payload(self):
+        initial_data = getattr(self, 'initial_data', {}) or {}
+        if 'slots' not in initial_data:
+            return None
+        return initial_data.get('slots') or []
 
     def _sync_pharmacy_rate_defaults(self, pharmacy, *, shift=None, request_data=None):
         if not pharmacy:
@@ -5079,7 +5129,10 @@ class ShiftSerializer(serializers.ModelSerializer):
         notify_favorite_staff = validated_data.pop('notify_favorite_staff', False)
         notify_chain_members = validated_data.pop('notify_chain_members', False)
         apply_rates_to_pharmacy = validated_data.pop('apply_rates_to_pharmacy', False)
-        slots_data = self._normalize_slots_payload(validated_data.pop('slots'))
+        slots_payload = self._initial_slots_payload()
+        if slots_payload is None:
+            raise serializers.ValidationError({'slots': 'This field is required.'})
+        slots_data = self._normalize_slots_payload(slots_payload)
         user        = self.context['request'].user
         pharmacy    = validated_data['pharmacy']
         rate_type   = validated_data.get('rate_type')
@@ -5231,10 +5284,12 @@ class ShiftSerializer(serializers.ModelSerializer):
                 setattr(instance, attr, val)
         instance.save()
 
+        slots_payload = self._initial_slots_payload()
+
         # Replace slots if provided
-        if 'slots' in validated_data:
+        if slots_payload is not None:
             instance.slots.all().delete()
-            for slot in validated_data['slots']:
+            for slot in self._normalize_slots_payload(slots_payload):
                 ShiftSlot.objects.create(shift=instance, **slot)
 
         if apply_rates_to_pharmacy and instance.role_needed == 'PHARMACIST':
@@ -5248,34 +5303,76 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     def get_slots(self, obj): # NEW METHOD
         """
-        Filters and returns only relevant slots for the shift (future and unassigned).
-        This mirrors the logic from ActiveShiftViewSet's get_queryset.
+        Active shifts expose only future/unassigned slots. Other shift endpoints
+        need the full slot list, especially confirmed/history views.
         """
+        request = self.context.get('request')
+        path = getattr(request, 'path', '') if request else ''
+        resolver_match = getattr(request, 'resolver_match', None) if request else None
+        basename = getattr(resolver_match, 'kwargs', {}).get('basename') if resolver_match else None
+        is_active_endpoint = basename == 'active-shifts' or '/shifts/active/' in path
+        if not is_active_endpoint:
+            return ShiftSlotSerializer(obj.slots.all(), many=True).data
+
         now = timezone.now()
         today = date.today()
 
         # Get all slots for this shift
-        all_slots = obj.slots.all()
+        assigned_pairs = {
+            (assignment.slot_id, assignment.slot_date)
+            for assignment in obj.slot_assignments.all()
+        }
+        assignment_by_pair = {
+            (assignment.slot_id, assignment.slot_date): assignment.id
+            for assignment in obj.slot_assignments.all()
+        }
+        pending_payment_offers = list(obj.offers.filter(
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            slot_id__isnull=False,
+        ))
+        pending_payment_by_pair = {}
+        pending_payment_by_slot = {}
+        for offer in pending_payment_offers:
+            pending_payment_by_pair.setdefault((offer.slot_id, offer.offered_slot_date), offer.id)
+            pending_payment_by_slot.setdefault(offer.slot_id, offer.id)
 
-        # Filter out past slots and assigned slots
         filtered_slots = []
-        for slot in all_slots:
+        for entry in expand_shift_slots(obj):
+            slot = entry.get('slot')
+            slot_date = entry.get('date')
+            if not slot or not slot_date:
+                continue
             slot_is_future = (
-                slot.date > today
-                or (slot.date == today and slot.end_time >= now.time()) # Use >= now.time() for active shifts
+                slot_date > today
+                or (slot_date == today and slot.end_time >= now.time())
             )
-
-            # Check if this specific slot has any assignments
-            # Note: This checks if ANY assignment exists for this slot, regardless of date.
-            # If you need to check for assignments on a specific date for recurring slots,
-            # the logic would need to be more complex, potentially involving expand_shift_slots.
-            # For simplicity for an 'unassigned' shift, this assumes the whole slot is unassigned.
-            slot_is_assigned = ShiftSlotAssignment.objects.filter(slot=slot).exists()
-
-            if slot_is_future and not slot_is_assigned:
-                filtered_slots.append(slot)
+            if not slot_is_future:
+                continue
+            if (slot.id, slot_date) in assigned_pairs:
+                continue
+            pending_payment_offer_id = (
+                pending_payment_by_pair.get((slot.id, slot_date))
+                or pending_payment_by_slot.get(slot.id)
+            )
+            locked_by_offer_id = pending_payment_offer_id
+            filtered_slots.append({
+                'id': slot.id,
+                'date': slot_date.isoformat(),
+                'start_time': slot.start_time.isoformat() if slot.start_time else None,
+                'end_time': slot.end_time.isoformat() if slot.end_time else None,
+                'start_hour': slot.start_time.hour if slot.start_time else None,
+                'rate': str(slot.rate) if slot.rate is not None else None,
+                'is_recurring': False,
+                'recurring_days': [],
+                'recurring_end_date': None,
+                'awaiting_payment': pending_payment_offer_id is not None,
+                'awaiting_payment_offer_id': pending_payment_offer_id,
+                'is_locked': locked_by_offer_id is not None,
+                'locked_by_offer_id': locked_by_offer_id,
+                'confirmed_assignment_id': assignment_by_pair.get((slot.id, slot_date)),
+            })
         
-        return ShiftSlotSerializer(filtered_slots, many=True).data
+        return filtered_slots
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_slot_assignments(self, shift) -> list[dict]:
@@ -5292,6 +5389,28 @@ class ShiftSerializer(serializers.ModelSerializer):
         ).values_list('slot_id', flat=True)
         return sorted(set(qs))
 
+    def get_payment_options(self, shift) -> list[dict]:
+        offers = ShiftOffer.objects.filter(
+            shift=shift,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        ).select_related('slot', 'user').order_by('offered_slot_date', 'offered_start_time', 'created_at')
+
+        options = []
+        for offer in offers:
+            user = offer.user
+            name = user.get_full_name() or user.email or getattr(user, 'username', '') or 'Participant'
+            options.append({
+                'offer_id': offer.id,
+                'slot_id': offer.slot_id,
+                'slot_date': offer.offered_slot_date.isoformat() if offer.offered_slot_date else None,
+                'start_time': offer.offered_start_time.isoformat() if offer.offered_start_time else None,
+                'end_time': offer.offered_end_time.isoformat() if offer.offered_end_time else None,
+                'candidate_user_id': user.id,
+                'candidate_name': name,
+                'candidate_email': user.email,
+            })
+        return options
+
 class ShiftInterestSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     user_id  = serializers.IntegerField(source='user.id', read_only=True)
@@ -5300,6 +5419,10 @@ class ShiftInterestSerializer(serializers.ModelSerializer):
     short_bio = serializers.SerializerMethodField()
     user_detail = serializers.SerializerMethodField()
     revealed = serializers.BooleanField(read_only=True)
+    pending_confirmation = serializers.SerializerMethodField()
+    pending_offer_id = serializers.SerializerMethodField()
+    awaiting_payment = serializers.SerializerMethodField()
+    awaiting_payment_offer_id = serializers.SerializerMethodField()
 
     class Meta:
         model  = ShiftInterest
@@ -5315,10 +5438,41 @@ class ShiftInterestSerializer(serializers.ModelSerializer):
             'user_detail',
             'revealed',
             'expressed_at',
+            'pending_confirmation',
+            'pending_offer_id',
+            'awaiting_payment',
+            'awaiting_payment_offer_id',
         ]
         read_only_fields = [
-            'id','user','user_id','slot_time','short_bio','user_detail','revealed','expressed_at'
+            'id','user','user_id','slot_time','short_bio','user_detail','revealed','expressed_at',
+            'pending_confirmation','pending_offer_id','awaiting_payment','awaiting_payment_offer_id'
         ]
+
+    def _matching_offer(self, obj, status_value):
+        qs = ShiftOffer.objects.filter(
+            shift=obj.shift,
+            user=obj.user,
+            status=status_value,
+        )
+        if obj.shift.single_user_only:
+            qs = qs.filter(slot__isnull=True)
+        else:
+            qs = qs.filter(slot=obj.slot)
+        return qs.order_by('-updated_at').first()
+
+    def get_pending_confirmation(self, obj):
+        return self._matching_offer(obj, ShiftOffer.Status.PENDING) is not None
+
+    def get_pending_offer_id(self, obj):
+        offer = self._matching_offer(obj, ShiftOffer.Status.PENDING)
+        return offer.id if offer else None
+
+    def get_awaiting_payment(self, obj):
+        return self._matching_offer(obj, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT) is not None
+
+    def get_awaiting_payment_offer_id(self, obj):
+        offer = self._matching_offer(obj, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        return offer.id if offer else None
 
     def get_user(self, obj):
         request = self.context.get('request')
@@ -5387,13 +5541,14 @@ class ShiftCounterOfferSlotSerializer(serializers.ModelSerializer):
             'proposed_rate',
         ]
 
-from client_profile.utils import extract_travel_origin_from_message, extract_suburb_from_travel_origin
+from client_profile.utils import TRAVEL_ORIGIN_PREFIX, extract_travel_origin_from_message, extract_suburb_from_travel_origin
 
 class ShiftCounterOfferSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     user_detail = serializers.SerializerMethodField()
     slots = ShiftCounterOfferSlotSerializer(many=True)
     travel_origin = serializers.SerializerMethodField()
+    travel_origin_input = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = ShiftCounterOffer
@@ -5403,6 +5558,7 @@ class ShiftCounterOfferSerializer(serializers.ModelSerializer):
             'user',
             'user_detail',
             'travel_origin',
+            'travel_origin_input',
             'request_travel',
             'status',
             'slots',
@@ -5501,7 +5657,13 @@ class ShiftCounterOfferSerializer(serializers.ModelSerializer):
         shift = self.context['shift']
         user = self.context['request'].user
         slots_data = validated_data.pop('slots', [])
+        travel_origin = (validated_data.pop('travel_origin_input', '') or '').strip()
         validated_data.setdefault('message', '')
+        if travel_origin:
+            message = (validated_data.get('message') or '').strip()
+            validated_data['message'] = "\n".join(
+                part for part in [message, f"{TRAVEL_ORIGIN_PREFIX} {travel_origin}"] if part
+            )
 
         offer = ShiftCounterOffer.objects.create(
             shift=shift,

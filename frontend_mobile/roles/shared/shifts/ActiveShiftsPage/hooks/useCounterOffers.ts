@@ -25,7 +25,10 @@ export function useCounterOffers() {
         setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: true }));
         try {
             const offers = await fetchShiftCounterOffersService(shiftId);
-            setCounterOffersByShift(prev => ({ ...prev, [shiftId]: offers }));
+            const pendingOffers = (offers || []).filter(
+                (offer: any) => String(offer?.status ?? '').toUpperCase() === 'PENDING'
+            );
+            setCounterOffersByShift(prev => ({ ...prev, [shiftId]: pendingOffers }));
         } catch (error) {
             console.error('Failed to load counter offers', error);
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: [] }));
@@ -52,9 +55,16 @@ export function useCounterOffers() {
                     offerId: payload.offer.id,
                     slotId: resolvedSlotId,
                 });
+                setCounterOffersByShift(prev => ({
+                    ...prev,
+                    [payload.shiftId]: (prev[payload.shiftId] || []).filter((offer: any) => offer.id !== payload.offer.id),
+                }));
                 if (onSuccess) onSuccess();
+                return { ok: true };
             } catch (error) {
                 console.error('Failed to accept counter offer', error);
+                const detail = (error as any)?.data?.detail || (error as any)?.message || 'Failed to accept offer';
+                return { ok: false, detail };
             } finally {
                 setCounterActionLoading(null);
             }

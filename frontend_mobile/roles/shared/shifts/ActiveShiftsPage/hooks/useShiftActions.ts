@@ -60,9 +60,9 @@ export function useShiftActions(
         async (shiftId: number, userId: number, slotId: number | null) => {
             setActionLoading(prev => ({ ...prev, [`accept_${shiftId}_${userId}`]: true }));
             try {
-                await acceptShiftCandidateService(shiftId, { userId, slotId });
-                showSnackbar('Candidate assigned successfully');
-                return true;
+                const result = await acceptShiftCandidateService(shiftId, { userId, slotId });
+                showSnackbar('Offer sent. Waiting for worker confirmation.');
+                return result || true;
             } catch (error) {
                 console.error('Failed to accept candidate', error);
                 showSnackbar('Failed to assign candidate');

@@ -15,6 +15,8 @@ interface PublicLevelViewProps {
     shift: Shift;
     slotId: number | null;
     slotHasUpdates?: Record<number, boolean>;
+    slotCandidateCounts?: Record<number, number>;
+    slotStatusCounts?: Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>;
     interestsAll: any[];
     counterOffers: any[];
     counterOffersLoaded: boolean;
@@ -22,6 +24,8 @@ interface PublicLevelViewProps {
     onReviewOffer: (shift: Shift, offer: any, slotId: number | null) => void;
     onSelectSlot?: (slotId: number) => void;
     revealingInterestId: number | null;
+    onBuzzWorker?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 const colorMap = {
@@ -88,6 +92,8 @@ export default function PublicLevelView({
     shift,
     slotId,
     slotHasUpdates,
+    slotCandidateCounts,
+    slotStatusCounts,
     interestsAll,
     counterOffers,
     counterOffersLoaded,
@@ -95,6 +101,8 @@ export default function PublicLevelView({
     onReviewOffer,
     onSelectSlot,
     revealingInterestId,
+    onBuzzWorker,
+    buzzLoadingOfferId,
 }: PublicLevelViewProps) {
     const slots = (shift as any).slots || [];
     const multiSlots = !(shift as any).singleUserOnly && slots.length > 0;
@@ -157,6 +165,8 @@ export default function PublicLevelView({
                     selectedSlotId={slotId}
                     onSelectSlot={onSelectSlot}
                     slotHasUpdates={slotHasUpdates}
+                    slotCandidateCounts={slotCandidateCounts}
+                    slotStatusCounts={slotStatusCounts}
                 />
             )}
 
@@ -242,6 +252,9 @@ export default function PublicLevelView({
                 >
                     {slotInterestsFiltered.map(interest => {
                         const isRevealing = revealingInterestId === interest.id;
+                        const isPendingConfirmation = Boolean(interest.pendingConfirmation ?? interest.pending_confirmation);
+                        const isAwaitingPayment = Boolean(interest.awaitingPayment ?? interest.awaiting_payment);
+                        const pendingOfferId = interest.pendingOfferId ?? interest.pending_offer_id ?? null;
                         return (
                             <Surface key={interest.id} style={styles.candidateCard} elevation={1}>
                                 <View style={styles.candidateRow}>
@@ -256,6 +269,11 @@ export default function PublicLevelView({
                                             ? getInterestDisplayName(interest, interest.user)
                                             : 'Anonymous Interest User'}
                                     </Text>
+                                    {isAwaitingPayment ? (
+                                        <Chip compact style={styles.awaitingPaymentChip}>Awaiting payment</Chip>
+                                    ) : isPendingConfirmation ? (
+                                        <Chip compact style={styles.pendingChip}>Pending</Chip>
+                                    ) : null}
                                     <Button
                                         mode={interest.revealed ? 'outlined' : 'contained'}
                                         compact
@@ -264,8 +282,20 @@ export default function PublicLevelView({
                                         loading={isRevealing}
                                         style={styles.candidateButton}
                                     >
-                                        {interest.revealed ? 'Review' : 'Reveal'}
+                                        {isPendingConfirmation || isAwaitingPayment ? 'View' : interest.revealed ? 'Review' : 'Reveal'}
                                     </Button>
+                                    {isPendingConfirmation && !isAwaitingPayment && pendingOfferId != null && onBuzzWorker && (
+                                        <Button
+                                            mode="contained"
+                                            compact
+                                            loading={buzzLoadingOfferId === Number(pendingOfferId)}
+                                            disabled={buzzLoadingOfferId === Number(pendingOfferId)}
+                                            onPress={() => onBuzzWorker(Number(pendingOfferId))}
+                                            style={styles.candidateButton}
+                                        >
+                                            Buzz
+                                        </Button>
+                                    )}
                                 </View>
                             </Surface>
                         );
@@ -367,6 +397,14 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     candidateButton: {
+        alignSelf: 'flex-start',
+    },
+    pendingChip: {
+        backgroundColor: '#F59E0B',
+        alignSelf: 'flex-start',
+    },
+    awaitingPaymentChip: {
+        backgroundColor: '#EF4444',
         alignSelf: 'flex-start',
     },
     emptyCopy: {

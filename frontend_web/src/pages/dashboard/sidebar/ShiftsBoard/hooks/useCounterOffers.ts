@@ -24,7 +24,7 @@ import {
 } from '../types';
 import { normalizeCounterOffers } from '../utils/counterOffers';
 import { formatDateLong } from '../utils/date';
-import { normalizeOnboardingLocation } from '../utils/location';
+import { formatTravelLocation, normalizeOnboardingLocation } from '../utils/location';
 import { getSlotRate } from '../utils/rates';
 import { getUpcomingSlotsForDisplay, getShiftNegotiable } from '../utils/shift';
 
@@ -446,6 +446,7 @@ export const useCounterOffers = ({
     const payload: ShiftCounterOfferPayload = {
       shiftId: counterOfferShift.id,
       requestTravel: counterOfferTravel,
+      travelOrigin: counterOfferTravel ? formatTravelLocation(counterOfferTravelLocation) : undefined,
       slots: dedupedSlots.map(
         (slot): ShiftCounterOfferSlotPayloadWithDate => ({
           slotId: slot.slotId != null ? (slot.slotId as number) : undefined,

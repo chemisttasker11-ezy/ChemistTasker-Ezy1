@@ -163,9 +163,7 @@ export default function ConfirmedShiftsPage() {
                   </ul>
                 </Box>
               )}
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                Profile access is logged for audit purposes.
-              </Typography>
+
             </>
           ) : (
             <Typography>No profile data available.</Typography>

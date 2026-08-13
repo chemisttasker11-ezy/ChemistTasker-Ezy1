@@ -868,6 +868,8 @@ export interface ShiftCounterOfferSlotPayload {
 export interface ShiftCounterOfferPayload {
     shiftId: number;
     requestTravel?: boolean;
+    travelOrigin?: string;
+    travel_origin?: string;
     slots: ShiftCounterOfferSlotPayload[];
 }
 
