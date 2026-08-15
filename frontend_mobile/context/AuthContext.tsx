@@ -11,6 +11,7 @@ import {
   getNetworkDiagnosticsSnapshot,
   networkDiagnosticsEnabled,
 } from '../utils/networkDiagnostics';
+import { authenticateWithBiometrics, disableBiometricLogin, getBiometricAvailability, getSavedBiometricUser } from '../utils/biometricAuth';
 
 // --- Types ---
 export interface OrgMembership {
@@ -59,6 +60,7 @@ type AuthContextType = {
   hasCapability: (capability: string, pharmacyId?: number | string | null) => boolean;
   login: (access: string, refresh: string, user: User) => Promise<void>;
   loginWithCredentials: (email: string, password: string) => Promise<User>;
+  loginWithStoredSession: () => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   verifyOTP: (code: string, email?: string) => Promise<void>;
@@ -77,6 +79,7 @@ const AuthContext = createContext<AuthContextType>({
   hasCapability: () => false,
   login: async () => { },
   loginWithCredentials: async () => ({ id: 0, username: '', role: '' }),
+  loginWithStoredSession: async () => ({ id: 0, username: '', role: '' }),
   register: async () => { },
   logout: async () => { },
   verifyOTP: async () => { },
@@ -112,6 +115,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const nextRefresh = session?.refresh || session?.tokens?.refresh || null;
         const nextUser = session?.user ? normalizeUser(session.user) : null;
         primeInMemorySession(session);
+
+        if ((nextAccess || nextRefresh) && nextUser) {
+          const [availability, biometricUser] = await Promise.all([
+            getBiometricAvailability(),
+            getSavedBiometricUser(),
+          ]);
+          const savedUserMatches =
+            biometricUser &&
+            ((biometricUser.id != null && nextUser.id != null && String(biometricUser.id) === String(nextUser.id)) ||
+              (biometricUser.email && nextUser.email && biometricUser.email.toLowerCase() === nextUser.email.toLowerCase()));
+
+          if (availability.available && savedUserMatches) {
+            const passed = await authenticateWithBiometrics(availability.label);
+            if (!passed) {
+              primeInMemorySession(null);
+              setAccess(null);
+              setRefresh(null);
+              setUser(null);
+              setIsLoading(false);
+              return;
+            }
+          } else if (biometricUser && !savedUserMatches) {
+            await disableBiometricLogin();
+          }
+        }
 
         if (nextUser) {
           setUser(nextUser);
@@ -157,10 +185,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      await clearStoredSession();
-      setAccess(null);
-      setRefresh(null);
-      setUser(null);
+      if (latestAccess || latestRefresh || latestUser) {
+        primeInMemorySession(latestSession);
+        setAccess(latestAccess);
+        setRefresh(latestRefresh);
+        setUser(latestUser);
+      } else {
+        await clearStoredSession();
+        setAccess(null);
+        setRefresh(null);
+        setUser(null);
+      }
       setIsLoading(false);
     };
     loadStoredAuth();
@@ -284,6 +319,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error(error?.message || directError?.message || 'Login failed');
       }
     }
+  };
+
+  const loginWithStoredSession = async () => {
+    const baseURL = process.env.EXPO_PUBLIC_API_URL?.trim();
+    if (!baseURL) {
+      throw new Error('API URL is not configured.');
+    }
+
+    const token = await getValidAccessToken(baseURL);
+    if (!token) {
+      throw new Error('Your saved session has expired. Please sign in again.');
+    }
+
+    const session = await readStoredSession();
+    const response = await apiClient.get('/users/me/');
+    const userData = normalizeUser(response?.data);
+    const refreshedSession = await readStoredSession();
+    const nextAccess = refreshedSession?.access || refreshedSession?.tokens?.access || token;
+    const nextRefresh =
+      refreshedSession?.refresh ||
+      refreshedSession?.tokens?.refresh ||
+      session?.refresh ||
+      session?.tokens?.refresh ||
+      null;
+
+    await writeStoredSession({
+      access: nextAccess,
+      refresh: nextRefresh,
+      user: userData,
+    });
+    setAccess(nextAccess);
+    setRefresh(nextRefresh);
+    setUser(userData);
+    return userData;
   };
 
   const register = async (data: RegisterData) => {
@@ -448,6 +517,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         hasCapability,
         login,
         loginWithCredentials,
+        loginWithStoredSession,
         register,
         logout,
         verifyOTP,

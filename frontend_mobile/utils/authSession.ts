@@ -13,6 +13,7 @@ type StoredUserSession = {
 
 const ACCESS_STORAGE_KEY = 'ACCESS_KEY';
 const REFRESH_STORAGE_KEY = 'REFRESH_KEY';
+const USER_STORAGE_KEY = 'AUTH_USER';
 const LEGACY_SESSION_STORAGE_KEY = 'user';
 const TOKEN_REFRESH_PATH = '/users/token/refresh/';
 
@@ -66,6 +67,23 @@ async function readLegacyAsyncSession(): Promise<StoredUserSession | null> {
   }
 }
 
+async function readStoredUser(): Promise<unknown | null> {
+  try {
+    const raw = await AsyncStorage.getItem(USER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function persistStoredUser(user: unknown): Promise<void> {
+  if (user) {
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  } else {
+    await AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => null);
+  }
+}
+
 async function removeLegacyAsyncSession(): Promise<void> {
   await AsyncStorage.removeItem(LEGACY_SESSION_STORAGE_KEY).catch(() => null);
 }
@@ -98,10 +116,12 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
     const existingRefresh = normalizeToken(storedRefresh);
 
     if (existingAccess || existingRefresh) {
+      const storedUser = await readStoredUser();
       return {
         access: existingAccess,
         refresh: existingRefresh,
         tokens: { access: existingAccess, refresh: existingRefresh },
+        user: storedUser,
       };
     }
 
@@ -115,6 +135,7 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
     }
 
     await persistSecureTokens(legacyAccess, legacyRefresh);
+    await persistStoredUser(legacySession?.user ?? null);
     await removeLegacyAsyncSession();
 
     return {
@@ -141,9 +162,10 @@ export async function readStoredSession(): Promise<StoredUserSession | null> {
     return migrated;
   }
 
-  const [storedAccess, storedRefresh] = await Promise.all([
+  const [storedAccess, storedRefresh, storedUser] = await Promise.all([
     secureGet(ACCESS_STORAGE_KEY),
     secureGet(REFRESH_STORAGE_KEY),
+    readStoredUser(),
   ]);
   const access = normalizeToken(storedAccess);
   const refresh = normalizeToken(storedRefresh);
@@ -156,6 +178,7 @@ export async function readStoredSession(): Promise<StoredUserSession | null> {
     access,
     refresh,
     tokens: { access, refresh },
+    user: storedUser,
   };
   return inMemorySession;
 }
@@ -175,6 +198,7 @@ export async function writeStoredSession(next: StoredUserSession): Promise<void>
 
   inMemorySession = merged;
   await persistSecureTokens(access, refresh);
+  await persistStoredUser(merged.user ?? null);
   await removeLegacyAsyncSession();
 }
 
@@ -183,6 +207,7 @@ export async function clearStoredSession(): Promise<void> {
   await Promise.all([
     secureRemove(ACCESS_STORAGE_KEY).catch(() => null),
     secureRemove(REFRESH_STORAGE_KEY).catch(() => null),
+    AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => null),
     removeLegacyAsyncSession(),
   ]);
 }
@@ -229,7 +254,6 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
 
       return nextAccess;
     } catch {
-      await clearStoredSession();
       return null;
     } finally {
       refreshPromise = null;

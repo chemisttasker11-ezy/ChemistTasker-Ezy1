@@ -2,13 +2,13 @@
   "expo": {
     "name": "ChemistTasker",
     "slug": "chemisttasker",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "orientation": "default",
     "icon": "./assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png",
     "scheme": "frontendmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "runtimeVersion": "1.0.10",
+    "runtimeVersion": "1.0.11",
     "updates": {
       "url": "https://u.expo.dev/75fa2fa5-e9ed-47af-a012-86967b951c5b",
       "checkAutomatically": "ON_LOAD",
@@ -23,6 +23,7 @@
         "NSLocationWhenInUseUsageDescription": "Allow location access while using the app to improve map-based address selection and travel radius preview.",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to upload profile photos and attachments.",
         "NSPhotoLibraryAddUsageDescription": "Allow saving images to your photo library.",
+        "NSFaceIDUsageDescription": "Use Face ID to sign in to ChemistTasker.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
@@ -83,6 +84,12 @@
       ],
       "expo-notifications",
       "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to sign in to ChemistTasker."
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
       [
