@@ -1,24 +1,43 @@
 {% extends "emails/base.html" %}
 
-{% block title %}You’ve Been Accepted!{% endblock %}
+{% block title %}{% if payment_required %}Shift Confirmation Received{% else %}You Have Been Accepted{% endif %}{% endblock %}
 
 {% block content %}
-<div class="wave">🎉📝</div>
-        <h2>Congratulations—you’re in!</h2>
+<h2>{% if payment_required %}Thanks for confirming your shift{% else %}Congratulations, your shift is confirmed{% endif %}</h2>
 
-        <p>
-            Hi {{ user_first_name }},
-        </p>
-        <p>
-            Great news! You’ve been <b>accepted</b> for a shift at <b>{{ pharmacy_name }}</b> (<b>{{ role_needed }}</b>).
-        </p>
-        <a class="btn" href="{{ shift_link }}">View Shift Details</a>
-        <p>
-            Please review the shift details and confirm your attendance in your ChemistTasker portal.<br>
-            If you have any questions, we’re always here for you.
-        </p>
-        <p>
-            Wishing you an amazing shift ahead! 🚀
-        </p>
-        <p class="emoji">— The ChemistTasker Team 💚</p>
+<p>Hi {{ user_first_name }},</p>
+
+{% if payment_required %}
+<p>
+    Thanks for confirming the shift offer at <b>{{ pharmacy_name }}</b>.
+    The owner still needs to complete payment before you are locked in for this shift.
+</p>
+{% else %}
+<p>
+    Great news. You have been accepted and locked in for a shift at <b>{{ pharmacy_name }}</b>.
+</p>
+{% endif %}
+
+<p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
+<p class="meta"><b>Role:</b> {{ role_needed }}</p>
+{% for slot in slot_details %}
+<p class="meta">
+    <b>Shift:</b> {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+    {% if slot.rate %}<br><b>Rate:</b> ${{ slot.rate }}/hr{% endif %}
+</p>
+{% endfor %}
+
+<a class="btn" href="{{ shift_link }}">View Shift Details</a>
+
+{% if payment_required %}
+<p>
+    We will notify you again once the owner has paid and the shift is locked in.
+</p>
+{% else %}
+<p>
+    If anything changes, contact the owner as soon as possible. If something may affect the owner or the shift, contact ChemistTasker support.
+</p>
+{% endif %}
+
+<p>Thanks,<br>The ChemistTasker Team</p>
 {% endblock %}

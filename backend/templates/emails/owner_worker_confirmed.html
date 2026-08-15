@@ -4,33 +4,37 @@
 
 {% block content %}
 <h2>Worker confirmed your shift offer</h2>
-        <p>Hi {{ owner_name }},</p>
-        <p><b>{{ worker_name }}</b> has confirmed the shift offer.</p>
 
-        <p class="meta"><b>Pharmacist:</b> {{ worker_name }}</p>
-        <p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
-        <p class="meta"><b>Role:</b> {{ role_needed }}</p>
-        <p class="meta"><b>Date:</b> {{ shift_date|default:"N/A" }}</p>
-        <p class="meta"><b>Rate:</b> {{ rate|default:"N/A" }}</p>
+<p>Hi {{ owner_name }},</p>
+<p><b>{{ worker_name }}</b> has confirmed the shift offer.</p>
 
-        {% if billing_state == "PAYMENT_REQUIRED" %}
-        <div
-            style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #ffeeba;">
-            <strong>Payment Required:</strong> To finalize this shift confirmation, please complete the shift
-            fulfillment payment from your ChemistTasker Dashboard.
-        </div>
-        {% elif billing_state == "FREE_TRIAL" %}
-        <div
-            style="background: #e8f6ec; color: #1f6d3b; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #b7e4c7;">
-            <strong>Free Trial:</strong> This shift is covered by your free trial. No payment is required.
-        </div>
-        {% elif billing_state == "PRE_LIVE" %}
-        <div
-            style="background: #e8f0fe; color: #1b4f9c; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #c6dafc;">
-            <strong>Billing Not Live:</strong> Payments are not active yet. No payment is required.
-        </div>
-        {% endif %}
+<p class="meta"><b>Worker:</b> {{ worker_name }}</p>
+<p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
+<p class="meta"><b>Role:</b> {{ role_needed }}</p>
+{% for slot in slot_details %}
+<p class="meta">
+    <b>Shift:</b> {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+    {% if slot.rate %}<br><b>Rate:</b> ${{ slot.rate }}/hr{% endif %}
+</p>
+{% empty %}
+<p class="meta"><b>Date:</b> {{ shift_date|default:"N/A" }}</p>
+<p class="meta"><b>Rate:</b> {{ rate|default:"N/A" }}</p>
+{% endfor %}
 
-        <a class="btn" href="{{ shift_link }}">View Shift Dashboard</a>
-        <p>Thanks,<br>The ChemistTasker Team</p>
+{% if billing_state == "PAYMENT_REQUIRED" %}
+<div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #ffeeba;">
+    <strong>Payment required:</strong> Complete payment from the active shift page to finalize and lock in this worker.
+</div>
+{% elif billing_state == "FREE_TRIAL" %}
+<div style="background: #e8f6ec; color: #1f6d3b; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #b7e4c7;">
+    <strong>Free trial:</strong> This shift is covered by your free trial. No payment is required.
+</div>
+{% elif billing_state == "PRE_LIVE" %}
+<div style="background: #e8f0fe; color: #1b4f9c; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #c6dafc;">
+    <strong>Billing not live:</strong> Payments are not active yet. No payment is required.
+</div>
+{% endif %}
+
+<a class="btn" href="{{ shift_link }}">Open Active Shift</a>
+<p>Thanks,<br>The ChemistTasker Team</p>
 {% endblock %}

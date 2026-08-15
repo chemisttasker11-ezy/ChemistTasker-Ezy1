@@ -139,6 +139,183 @@ def build_shift_email_context(shift, user=None, extra=None, role=None, shift_typ
     return ctx
 
 
+def active_shift_url_for_user(user, shift) -> str:
+    base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
+    role = str(getattr(user, "role", "") or "").upper()
+
+    if role == "OWNER":
+        return f"{base}/dashboard/owner/shifts/{shift.id}"
+    if hasattr(user, "organization_memberships") and user.organization_memberships.filter(
+        role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"]
+    ).exists():
+        return f"{base}/dashboard/organization/shifts/{shift.id}"
+    if is_admin_of(user, getattr(shift, "pharmacy_id", None)):
+        return f"{base}/dashboard/admin/{shift.pharmacy_id}/shifts/{shift.id}"
+    if role == "PHARMACIST":
+        return f"{base}/dashboard/pharmacist/shifts/{shift.id}"
+    if role == "OTHER_STAFF":
+        return f"{base}/dashboard/otherstaff/shifts/{shift.id}"
+    if role == "EXPLORER":
+        return f"{base}/dashboard/explorer/shifts/{shift.id}"
+    return f"{base}/dashboard/owner/shifts/{shift.id}"
+
+
+def worker_offer_url(user, shift, offer=None) -> str:
+    base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
+    role_value = str(getattr(user, "role", "") or "").upper()
+    role_route_map = {
+        "PHARMACIST": "pharmacist",
+        "OTHER_STAFF": "otherstaff",
+        "EXPLORER": "explorer",
+    }
+    role_path = role_route_map.get(role_value, "pharmacist")
+    offer_id = getattr(offer, "id", "")
+    return f"{base}/dashboard/{role_path}/shifts?tab=accepted&shift_id={shift.id}&offer_id={offer_id}"
+
+
+def build_offer_shift_details(shift, offer=None):
+    slots = []
+    if offer and getattr(offer, "offered_slot_date", None):
+        slots.append({
+            "pharmacy_name": shift.pharmacy.name,
+            "date": _format_slot_date(offer.offered_slot_date),
+            "start_time": _format_slot_time(offer.offered_start_time),
+            "end_time": _format_slot_time(offer.offered_end_time),
+            "time_range": _format_slot_time_range(offer.offered_start_time, offer.offered_end_time),
+            "rate": _format_rate(getattr(offer, "offered_rate", None)),
+        })
+    elif offer and getattr(offer, "slot_id", None):
+        slot = offer.slot
+        slots.append({
+            "pharmacy_name": shift.pharmacy.name,
+            "date": _format_slot_date(slot.date),
+            "start_time": _format_slot_time(slot.start_time),
+            "end_time": _format_slot_time(slot.end_time),
+            "time_range": _format_slot_time_range(slot.start_time, slot.end_time),
+            "rate": _format_rate(getattr(offer, "offered_rate", None) or getattr(slot, "rate", None)),
+        })
+    else:
+        for entry in expand_shift_slots(shift):
+            slot = entry.get("slot")
+            slots.append({
+                "pharmacy_name": shift.pharmacy.name,
+                "date": _format_slot_date(entry.get("date")),
+                "start_time": _format_slot_time(entry.get("start_time")),
+                "end_time": _format_slot_time(entry.get("end_time")),
+                "time_range": _format_slot_time_range(entry.get("start_time"), entry.get("end_time")),
+                "rate": _format_rate(getattr(slot, "rate", None) if slot else getattr(shift, "fixed_rate", None)),
+            })
+
+    summary_parts = []
+    for slot in slots[:3]:
+        if slot.get("date") and slot.get("time_range"):
+            summary_parts.append(f"{shift.pharmacy.name} | {slot['date']} {slot['time_range']}")
+    if len(slots) > 3:
+        summary_parts.append(f"+ {len(slots) - 3} more")
+
+    return {
+        "pharmacy_name": shift.pharmacy.name,
+        "shift_summary": "; ".join(summary_parts) or shift.pharmacy.name,
+        "slot_details": slots,
+    }
+
+
+def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, payment_method="payment"):
+    from client_profile.shift_notifications import notify_shift_users
+
+    finalized_offers = [offer for offer in offers if offer and getattr(offer, "user_id", None)]
+    if not finalized_offers:
+        return
+
+    owner_user = paid_by or getattr(shift, "created_by", None) or getattr(getattr(shift.pharmacy, "owner", None), "user", None)
+    payment_label = "Pills" if str(payment_method).lower() == "pills" else "Stripe"
+
+    for offer in finalized_offers:
+        worker = offer.user
+        details = build_offer_shift_details(shift, offer)
+        worker_link = active_shift_url_for_user(worker, shift)
+        notify_shift_users(
+            [worker],
+            shift=shift,
+            title=f"Shift locked in: {shift.pharmacy.name}",
+            body=f"Congratulations, your shift is now locked in. {details['shift_summary']}",
+            kind="shift_payment_finalized_worker",
+            payload={
+                "offer_id": offer.id,
+                "status": offer.status,
+                "payment_method": payment_label,
+                **details,
+            },
+        )
+        if worker.email:
+            ctx = build_shift_email_context(shift, user=worker, role=worker.role.lower())
+            ctx.update(details)
+            ctx.update({
+                "shift_link": worker_link,
+                "payment_method": payment_label,
+                "rate": details["slot_details"][0].get("rate") if details["slot_details"] else "",
+            })
+            async_task(
+                "users.tasks.send_async_email",
+                subject=f"Your shift is locked in at {shift.pharmacy.name}",
+                recipient_list=[worker.email],
+                template_name="emails/shift_payment_finalized_worker.html",
+                context=ctx,
+                text_template="emails/shift_payment_finalized_worker.txt",
+                suppress_auto_notification=True,
+            )
+
+    if owner_user and getattr(owner_user, "email", None):
+        owner_slot_details = []
+        for offer in finalized_offers:
+            owner_slot_details.extend(build_offer_shift_details(shift, offer)["slot_details"])
+        owner_summary_parts = []
+        for slot in owner_slot_details[:3]:
+            if slot.get("date") and slot.get("time_range"):
+                owner_summary_parts.append(f"{shift.pharmacy.name} | {slot['date']} {slot['time_range']}")
+        if len(owner_slot_details) > 3:
+            owner_summary_parts.append(f"+ {len(owner_slot_details) - 3} more")
+        details = {
+            "pharmacy_name": shift.pharmacy.name,
+            "shift_summary": "; ".join(owner_summary_parts) or shift.pharmacy.name,
+            "slot_details": owner_slot_details,
+        }
+        owner_link = active_shift_url_for_user(owner_user, shift)
+        worker_names = ", ".join(
+            offer.user.get_full_name() or offer.user.email for offer in finalized_offers
+        )
+        notify_shift_users(
+            [owner_user],
+            shift=shift,
+            title=f"Payment complete: {shift.pharmacy.name}",
+            body=f"Payment received and the shift is locked in for {worker_names}.",
+            kind="shift_payment_finalized_owner",
+            payload={
+                "offer_ids": [offer.id for offer in finalized_offers],
+                "worker_names": worker_names,
+                "payment_method": payment_label,
+                **details,
+            },
+        )
+        ctx = build_shift_email_context(shift, user=owner_user)
+        ctx.update(details)
+        ctx.update({
+            "shift_link": owner_link,
+            "worker_names": worker_names,
+            "payment_method": payment_label,
+            "rate": details["slot_details"][0].get("rate") if details["slot_details"] else "",
+        })
+        async_task(
+            "users.tasks.send_async_email",
+            subject=f"Payment complete for your shift at {shift.pharmacy.name}",
+            recipient_list=[owner_user.email],
+            template_name="emails/shift_payment_finalized_owner.html",
+            context=ctx,
+            text_template="emails/shift_payment_finalized_owner.txt",
+            suppress_auto_notification=True,
+        )
+
+
 def build_shift_counter_offer_context(shift, offer, recipient=None):
     """
     Build context for counter-offer notifications. Reuses the shift link logic so owners/admins land on the shift page.

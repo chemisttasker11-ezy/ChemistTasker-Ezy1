@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Payment Complete{% endblock %}
+
+{% block content %}
+<h2>Payment complete</h2>
+
+<p>Hi {{ user_first_name }},</p>
+<p>
+    Thanks for completing payment. The shift at <b>{{ pharmacy_name }}</b> is now locked in for <b>{{ worker_names }}</b>.
+</p>
+
+<p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
+<p class="meta"><b>Worker:</b> {{ worker_names }}</p>
+<p class="meta"><b>Role:</b> {{ role_needed }}</p>
+{% for slot in slot_details %}
+<p class="meta">
+    <b>Shift:</b> {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+    {% if slot.rate %}<br><b>Rate:</b> ${{ slot.rate }}/hr{% endif %}
+</p>
+{% endfor %}
+
+<a class="btn" href="{{ shift_link }}">View Confirmed Shift</a>
+
+<p>
+    If anything changes, contact the worker as soon as possible.
+    If something happens that may require the worker to be informed, contact ChemistTasker support.
+</p>
+
+<p>Thanks,<br>The ChemistTasker Team</p>
+{% endblock %}

@@ -1,11 +1,26 @@
 Hi {{ user_first_name }},
 
-Great news! You’ve been accepted for a shift at {{ pharmacy_name }} ({{ role_needed }}).
+{% if payment_required %}
+Thanks for confirming the shift offer at {{ pharmacy_name }}.
+The owner still needs to complete payment before you are locked in for this shift.
+{% else %}
+Congratulations. You have been accepted and locked in for a shift at {{ pharmacy_name }}.
+{% endif %}
+
+Pharmacy: {{ pharmacy_name }}
+Role: {{ role_needed }}
+{% for slot in slot_details %}
+Shift: {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+{% if slot.rate %}Rate: ${{ slot.rate }}/hr{% endif %}
+{% endfor %}
 
 View Shift Details: {{ shift_link }}
 
-Please review the shift details and confirm your attendance in your ChemistTasker portal.
+{% if payment_required %}
+We will notify you again once the owner has paid and the shift is locked in.
+{% else %}
+If anything changes, contact the owner as soon as possible. If something may affect the owner or the shift, contact ChemistTasker support.
+{% endif %}
 
-Wishing you an amazing shift ahead!
-
-— The ChemistTasker Team 💚
+Thanks,
+The ChemistTasker Team

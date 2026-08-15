@@ -18,9 +18,10 @@ import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import AssignmentIndRoundedIcon from '@mui/icons-material/AssignmentIndRounded';
+import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
 
-type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number };
+type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
 
 type Props = {
   emptyText: string;
@@ -113,6 +114,38 @@ const formatTimeRange = (slot: any) => {
   return `${start} - ${end}`;
 };
 
+const formatLockedRate = (slot: any) => {
+  const rawRate = slot?.rate ?? slot?.hourlyRate ?? slot?.hourly_rate;
+  if (rawRate == null || rawRate === '') return 'Rate locked';
+  const numeric = Number(rawRate);
+  const value = Number.isFinite(numeric)
+    ? numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : String(rawRate);
+  return `$${value}/hr locked`;
+};
+
+const getAssignedMember = (shift: Shift, userId?: number | null) => {
+  if (userId == null) return null;
+  const members = ((shift as any).assignedMembers ?? (shift as any).assigned_members ?? []) as any[];
+  return members.find((member) => Number(member.userId ?? member.user_id) === Number(userId)) ?? null;
+};
+
+const getAssignedName = (assignment?: AssignmentLike | null, member?: any) => {
+  const user = (assignment as any)?.user ?? {};
+  const firstName = user.firstName ?? user.first_name ?? '';
+  const lastName = user.lastName ?? user.last_name ?? '';
+  const fullName = `${firstName} ${lastName}`.trim();
+  const memberFirstName = member?.userFirstName ?? member?.user_first_name ?? '';
+  const memberLastName = member?.userLastName ?? member?.user_last_name ?? '';
+  const memberFullName = `${memberFirstName} ${memberLastName}`.trim();
+  return fullName || user.name || user.displayName || memberFullName || member?.name || user.email || 'Assigned candidate';
+};
+
+const getAssignedDetails = (assignment?: AssignmentLike | null, member?: any) => {
+  const user = (assignment as any)?.user ?? {};
+  return user.email || user.phoneNumber || user.phone_number || member?.role || member?.employmentType || member?.employment_type || 'Profile locked to this slot';
+};
+
 const getAssignedEntries = (shift: Shift) => {
   const assignments = ((shift as any).slotAssignments ?? (shift as any).slot_assignments ?? []) as AssignmentLike[];
   const slots = (shift.slots ?? []) as any[];
@@ -123,6 +156,7 @@ const getAssignedEntries = (shift: Shift) => {
       .map((slot) => ({
         slot,
         userId: firstAssignedUserId,
+        assignment: assignments[0] ?? null,
       }))
       .filter((entry) => entry.userId != null);
   }
@@ -133,6 +167,7 @@ const getAssignedEntries = (shift: Shift) => {
       return {
         slot,
         userId: assignment ? getAssignmentUserId(assignment) : null,
+        assignment: assignment ?? null,
       };
     })
     .filter((entry) => entry.userId != null);
@@ -147,6 +182,7 @@ const getSlotEntries = (shift: Shift) => {
     return slots.map((slot) => ({
       slot,
       userId: firstAssignedUserId,
+      assignment: assignments[0] ?? null,
       assigned: firstAssignedUserId != null,
     }));
   }
@@ -157,6 +193,7 @@ const getSlotEntries = (shift: Shift) => {
     return {
       slot,
       userId,
+      assignment: assignment ?? null,
       assigned: userId != null,
     };
   });
@@ -415,8 +452,12 @@ export default function OwnerAssignedShiftBoard({
                   </Typography>
 
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: 1.75 }}>
-                    {slotEntries.map(({ slot, userId, assigned }) => {
+                    {slotEntries.map(({ slot, userId, assigned, assignment }) => {
                       const dateBits = formatDateLabel(slot?.date);
+                      const assignedMember = getAssignedMember(shift, userId);
+                      const assignedName = getAssignedName(assignment, assignedMember);
+                      const assignedDetails = getAssignedDetails(assignment, assignedMember);
+                      const lockedRate = formatLockedRate(slot);
                       return (
                         <Paper
                           key={`${shift.id}_${slot?.id}`}
@@ -487,11 +528,25 @@ export default function OwnerAssignedShiftBoard({
                             }}
                           >
                             <Typography variant="body2" sx={{ color: palette.text, fontWeight: 800 }}>
-                              {assigned ? 'Assigned Chemist' : 'Unassigned Slot'}
+                              {assigned ? assignedName : 'Unassigned Slot'}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: palette.muted }}>
-                              {assigned ? 'Slot-linked profile and rate tools' : 'No one was assigned to this slot'}
-                            </Typography>
+                            {assigned ? (
+                              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                <Typography variant="caption" sx={{ color: palette.muted }}>
+                                  {assignedDetails}
+                                </Typography>
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                  <LockRoundedIcon sx={{ fontSize: 14, color: mode === 'history' ? palette.amber : palette.cyan }} />
+                                  <Typography variant="caption" sx={{ color: palette.text, fontWeight: 800 }}>
+                                    {lockedRate}
+                                  </Typography>
+                                </Stack>
+                              </Stack>
+                            ) : (
+                              <Typography variant="caption" sx={{ color: palette.muted }}>
+                                No one was assigned to this slot
+                              </Typography>
+                            )}
                           </Paper>
 
                           <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1.75 }}>

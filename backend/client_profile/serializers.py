@@ -9,7 +9,7 @@ from users.serializers import UserProfileSerializer
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from decimal import Decimal
-from client_profile.utils import q6, send_referee_emails, clean_email, enforce_public_shift_daily_limit, build_shift_email_context, build_shift_offer_context
+from client_profile.utils import q6, send_referee_emails, clean_email, enforce_public_shift_daily_limit, build_shift_email_context, build_shift_offer_context, build_offer_shift_details
 from client_profile.services import expand_shift_slots
 from client_profile.admin_helpers import has_admin_capability, CAPABILITY_MANAGE_ROSTER
 from client_profile.shift_notifications import notify_shift_users
@@ -5237,13 +5237,15 @@ class ShiftSerializer(serializers.ModelSerializer):
                             recipient=dedicated_user,
                             ignore_slot_filter=True,
                         )
+                        offer_details = build_offer_shift_details(shift, offer_for_email)
+                        ctx.update(offer_details)
                         notify_shift_users(
                             [dedicated_user],
                             shift=shift,
                             title="Shift offer received",
-                            body="You have received a shift offer. Please confirm to lock it in.",
+                            body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
                             kind="shift_offer_received",
-                            payload={"offer_id": offer_for_email.id},
+                            payload={"offer_id": offer_for_email.id, **offer_details},
                         )
                         async_task(
                             'users.tasks.send_async_email',
@@ -5376,10 +5378,22 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_slot_assignments(self, shift) -> list[dict]:
-        return [
-        {'slot_id': a.slot.id, 'user_id': a.user.id}
-            for a in shift.slot_assignments.all()
-        ]
+        assignments = []
+        for assignment in shift.slot_assignments.all():
+            user = assignment.user
+            user_name = user.get_full_name() or user.email or getattr(user, 'username', '') or 'Assigned candidate'
+            assignments.append({
+                'slot_id': assignment.slot.id,
+                'user_id': user.id,
+                'user': {
+                    'id': user.id,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'name': user_name,
+                    'email': user.email,
+                },
+            })
+        return assignments
 
     def get_pending_payment_slot_ids(self, shift) -> list[int]:
         qs = ShiftOffer.objects.filter(

@@ -2,19 +2,26 @@ Hi {{ owner_name }},
 
 {{ worker_name }} has confirmed your shift offer.
 
+Worker: {{ worker_name }}
 Pharmacy: {{ pharmacy_name }}
 Role: {{ role_needed }}
+{% for slot in slot_details %}
+Shift: {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+{% if slot.rate %}Rate: ${{ slot.rate }}/hr{% endif %}
+{% empty %}
 Date: {{ shift_date|default:"N/A" }}
 Rate: {{ rate|default:"N/A" }}
+{% endfor %}
+
 {% if billing_state == "PAYMENT_REQUIRED" %}
-Payment Required: To finalize this shift confirmation, please complete the shift fulfillment payment from your ChemistTasker Dashboard.
+Payment required: Complete payment from the active shift page to finalize and lock in this worker.
 {% elif billing_state == "FREE_TRIAL" %}
-Free Trial: This shift is covered by your free trial. No payment is required.
+Free trial: This shift is covered by your free trial. No payment is required.
 {% elif billing_state == "PRE_LIVE" %}
-Billing Not Live: Payments are not active yet. No payment is required.
+Billing not live: Payments are not active yet. No payment is required.
 {% endif %}
 
-View Shift: {{ shift_link }}
+Open Active Shift: {{ shift_link }}
 
 Thanks,
 The ChemistTasker Team

@@ -1,0 +1,18 @@
+Hi {{ user_first_name }},
+
+Congratulations. The owner has completed payment and you are now locked in for the shift at {{ pharmacy_name }}.
+
+Pharmacy: {{ pharmacy_name }}
+Role: {{ role_needed }}
+{% for slot in slot_details %}
+Shift: {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+{% if slot.rate %}Rate: ${{ slot.rate }}/hr{% endif %}
+{% endfor %}
+
+View Confirmed Shift: {{ shift_link }}
+
+If anything changes, contact the owner as soon as possible.
+If something happens that may require the owner to be informed, contact ChemistTasker support.
+
+Thanks,
+The ChemistTasker Team

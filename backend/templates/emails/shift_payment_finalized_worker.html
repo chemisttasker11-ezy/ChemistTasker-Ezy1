@@ -1,0 +1,30 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Your Shift Is Locked In{% endblock %}
+
+{% block content %}
+<h2>Congratulations, your shift is locked in</h2>
+
+<p>Hi {{ user_first_name }},</p>
+<p>
+    The owner has completed payment and you are now locked in for the shift at <b>{{ pharmacy_name }}</b>.
+</p>
+
+<p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
+<p class="meta"><b>Role:</b> {{ role_needed }}</p>
+{% for slot in slot_details %}
+<p class="meta">
+    <b>Shift:</b> {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+    {% if slot.rate %}<br><b>Rate:</b> ${{ slot.rate }}/hr{% endif %}
+</p>
+{% endfor %}
+
+<a class="btn" href="{{ shift_link }}">View Confirmed Shift</a>
+
+<p>
+    If anything changes, contact the owner as soon as possible.
+    If something happens that may require the owner to be informed, contact ChemistTasker support.
+</p>
+
+<p>Thanks,<br>The ChemistTasker Team</p>
+{% endblock %}

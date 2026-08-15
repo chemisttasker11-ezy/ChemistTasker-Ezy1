@@ -33,6 +33,8 @@ from django.db.models import Q, Count, F, Avg, Exists, OuterRef, Max, Sum
 from django.utils import timezone
 from client_profile.services import get_locked_rate_for_slot, expand_shift_slots, generate_invoice_from_shifts, render_invoice_to_pdf, generate_preview_invoice_lines
 from client_profile.utils import (
+    active_shift_url_for_user,
+    build_offer_shift_details,
     build_shift_email_context,
     clean_email,
     build_roster_email_link,
@@ -45,6 +47,8 @@ from client_profile.utils import (
     finalize_shift_offer,
     membership_role_label,
     other_staff_role_label,
+    send_shift_payment_finalized_notifications,
+    worker_offer_url,
 )
 from client_profile.notifications import mark_notifications_read, broadcast_message_read, broadcast_message_badge, notify_users
 from client_profile.shift_notifications import notify_shift_managers, notify_shift_users
@@ -4049,9 +4053,10 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             is_public = (shift.visibility == 'PLATFORM')
             applicant_name = "A candidate" if is_public else (user.get_full_name() or user.email)
             title = "New public shift interest" if is_public else "New member shift interest"
+            interest_details = build_offer_shift_details(shift, created_interests[0])
             body = (
                 f"{applicant_name} expressed interest in "
-                f"{len(created_interests)} slot(s) at {shift.pharmacy.name}."
+                f"{len(created_interests)} slot(s) at {shift.pharmacy.name}. {interest_details['shift_summary']}"
             )
             manager_recipients = notify_shift_managers(
                 shift,
@@ -4062,6 +4067,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                     "interest_ids": [interest.id for interest in created_interests],
                     "slot_ids": [interest.slot_id for interest in created_interests if interest.slot_id],
                     "slot_id": next((interest.slot_id for interest in created_interests if interest.slot_id), None),
+                    **interest_details,
                 },
             )
             primary_email_recipient = shift.created_by or (manager_recipients[0] if manager_recipients else None)
@@ -4176,14 +4182,16 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         # Notify only the first time this interest/profile is revealed.
         if not already_revealed_interest:
             ctx = build_shift_email_context(shift, user=candidate, role=candidate.role.lower())
+            reveal_details = build_offer_shift_details(shift, interest)
             notify_shift_users(
                 [candidate],
                 shift=shift,
                 title=f"Profile revealed: {shift.pharmacy.name}",
-                body=f"Your profile was shared with {shift.pharmacy.name} for an upcoming shift.",
+                body=f"Your profile was shared with {shift.pharmacy.name} for an upcoming shift. {reveal_details['shift_summary']}",
                 kind="shift_profile_revealed",
                 payload={
                     "slot_id": slot_id,
+                    **reveal_details,
                 },
             )
 
@@ -4350,13 +4358,15 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
         if candidate.email:
             ctx = build_shift_offer_context(shift, offer, recipient=candidate)
+            offer_details = build_offer_shift_details(shift, offer)
+            ctx.update(offer_details)
             notify_shift_users(
                 [candidate],
                 shift=shift,
                 title="Shift offer received",
-                body="You have received a shift offer. Please confirm to lock it in.",
+                body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
                 kind="shift_offer_received",
-                payload={"offer_id": offer.id},
+                payload={"offer_id": offer.id, **offer_details},
             )
             async_task(
                 'users.tasks.send_async_email',
@@ -4424,12 +4434,13 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         notify_shift_managers(
             shift,
             title=f"New counter offer: {shift.pharmacy.name}",
-            body=f"{sender_name} sent a counter offer for your shift.",
+            body=f"{sender_name} sent a counter offer for your shift. {build_offer_shift_details(shift, None)['shift_summary']}",
             kind="shift_counter_offer_received",
             payload={
                 "offer_id": offer.id,
                 "slot_id": primary_slot_id,
                 "slot_ids": offer_slot_ids,
+                **build_offer_shift_details(shift, None),
             },
         )
 
@@ -4611,17 +4622,21 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)
             ctx["payment_required"] = False
             ctx["worker_confirmation_required"] = True
+            offer_details = build_offer_shift_details(shift, created_offers[0] if created_offers else None)
+            ctx.update(offer_details)
+            ctx["shift_link"] = worker_offer_url(offer.user, shift, created_offers[0] if created_offers else None)
             notify_shift_users(
                 [offer.user],
                 shift=shift,
                 title="Counter offer accepted",
-                body="Your counter offer was accepted. Please confirm the shift offer to lock it in.",
+                body=f"Your counter offer was accepted. Please confirm the shift offer to lock it in. {offer_details['shift_summary']}",
                 kind="shift_counter_offer_accepted",
                 payload={
                     "shift_id": shift.id,
                     "offer_id": offer.id,
                     "generated_offer_ids": [o.id for o in created_offers],
                     "worker_confirmation_required": True,
+                    **offer_details,
                 },
             )
             async_task(
@@ -4660,15 +4675,18 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
         if offer.user and offer.user.email:
             ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)
+            offer_details = build_offer_shift_details(shift, None)
+            ctx.update(offer_details)
             notify_shift_users(
                 [offer.user],
                 shift=shift,
                 title=f"Counter offer declined: {shift.pharmacy.name}",
-                body="Your counter offer was declined.",
+                body=f"Your counter offer was declined. {offer_details['shift_summary']}",
                 kind="shift_counter_offer_declined",
                 payload={
                     "offer_id": offer.id,
                     "slot_ids": list(offer.slots.values_list('slot_id', flat=True)),
+                    **offer_details,
                 },
             )
             async_task(
@@ -6021,17 +6039,21 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         ctx["pharmacy_name"] = pharmacy_display
         ctx["offered_rate"] = offer.offered_rate
         ctx["expires_at"] = offer.expires_at
+        offer_details = build_offer_shift_details(shift, offer)
+        ctx.update(offer_details)
+        ctx["shift_link"] = worker_offer_url(offer.user, shift, offer)
 
         notify_shift_users(
             [offer.user],
             shift=shift,
             title="Reminder: confirm your shift offer",
-            body=f"{pharmacy_display} is waiting for you to confirm this shift offer.",
+            body=f"{pharmacy_display} is waiting for you to confirm this shift offer. {offer_details['shift_summary']}",
             kind="shift_offer_buzz",
             payload={
                 "offer_id": offer.id,
                 "status": offer.status,
                 "worker_confirmation_required": True,
+                **offer_details,
             },
         )
         if offer.user and offer.user.email:
@@ -6099,17 +6121,38 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         if offer.user and offer.user.email:
             ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
             ctx["pharmacy_name"] = pharmacy_display
+            offer_details = build_offer_shift_details(shift, offer)
+            ctx.update(offer_details)
+            ctx["shift_link"] = worker_offer_url(offer.user, shift, offer) if requires_payment else active_shift_url_for_user(offer.user, shift)
+            ctx["payment_required"] = requires_payment
+            ctx["rate"] = offer_details["slot_details"][0].get("rate") if offer_details["slot_details"] else ""
+            worker_title = "Offer accepted - owner payment pending" if requires_payment else "Shift confirmed"
+            worker_body = (
+                f"Thanks for confirming. The owner must complete payment before you are locked in. {offer_details['shift_summary']}"
+                if requires_payment
+                else f"You are confirmed for a shift at {pharmacy_display}. {offer_details['shift_summary']}"
+            )
             notify_shift_users(
                 [offer.user],
                 shift=shift,
-                title="Shift confirmed",
-                body=f"You are confirmed for a shift at {pharmacy_display}.",
+                title=worker_title,
+                body=worker_body,
                 kind="shift_confirmed",
-                payload={"offer_id": offer.id, "assignment_ids": assignment_ids},
+                payload={
+                    "offer_id": offer.id,
+                    "assignment_ids": assignment_ids,
+                    "status": offer.status,
+                    "payment_required": requires_payment,
+                    **offer_details,
+                },
             )
             async_task(
                 'users.tasks.send_async_email',
-                subject=f"You've been accepted for a shift at {pharmacy_display}",
+                subject=(
+                    f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
+                    if requires_payment
+                    else f"You've been accepted for a shift at {pharmacy_display}"
+                ),
                 recipient_list=[offer.user.email],
                 template_name="emails/shift_accept.html",
                 context=ctx,
@@ -6121,8 +6164,9 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         if owner_user and owner_user.email:
             worker_name = offer.user.get_full_name() or offer.user.email
             shift_date = self._first_offer_date(shift, offer)
-            shift_link = build_roster_email_link(owner_user, shift.pharmacy)
+            shift_link = active_shift_url_for_user(owner_user, shift)
             rate_label = self._format_rate_label(shift, assignment_rates=assignment_rates, offer=offer)
+            offer_details = build_offer_shift_details(shift, offer)
             owner_ctx = {
                 "owner_name": owner_user.get_full_name() or owner_user.email,
                 "worker_name": worker_name,
@@ -6133,6 +6177,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
                 "rate": rate_label,
                 "billing_state": billing_state,
                 "payment_required": requires_payment,
+                **offer_details,
             }
             notify_shift_users(
                 [owner_user],
@@ -6140,7 +6185,13 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
                 title=f"Worker confirmed: {pharmacy_display}",
                 body=f"{worker_name} confirmed your shift offer." + (" Payment is required to finalize." if requires_payment else ""),
                 kind="shift_worker_confirmed",
-                payload={"offer_id": offer.id, "status": offer.status, "payment_required": requires_payment, "billing_state": billing_state},
+                payload={
+                    "offer_id": offer.id,
+                    "status": offer.status,
+                    "payment_required": requires_payment,
+                    "billing_state": billing_state,
+                    **offer_details,
+                },
             )
             async_task(
                 'users.tasks.send_async_email',
@@ -8497,6 +8548,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 "required": get_shift_post_pill_cost() * payment_units,
             })
         finalized_count = 0
+        finalized_offers = []
         with transaction.atomic():
             pending_offers = ShiftOffer.objects.filter(
                 shift=shift,
@@ -8509,6 +8561,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             selected_slot_ids = set()
             for offer in pending_offers:
                 finalize_shift_offer(offer)
+                finalized_offers.append(offer)
                 if offer.slot_id:
                     selected_slot_ids.add(offer.slot_id)
                 finalized_count += 1
@@ -8524,6 +8577,12 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             ).exists()
             shift.payment_status = "PENDING" if has_pending_payment else "PAID"
             shift.save(update_fields=["payment_status"])
+        send_shift_payment_finalized_notifications(
+            shift=shift,
+            offers=finalized_offers,
+            paid_by=request.user,
+            payment_method="pills",
+        )
         return Response({
             "detail": "Shift paid with pills.",
             "balance": get_pill_balance(request.user),

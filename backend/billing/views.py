@@ -316,7 +316,7 @@ def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
     return sorted(set(offer_ids))
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None):
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
@@ -339,9 +339,11 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
         offers = offers.filter(slot_id__in=target_slot_ids)
 
     finalized = 0
+    finalized_offers = []
     selected_slot_ids = set()
     for offer in offers:
         finalize_shift_offer(offer)
+        finalized_offers.append(offer)
         if offer.slot_id:
             selected_slot_ids.add(offer.slot_id)
         finalized += 1
@@ -351,6 +353,8 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
             slot_id__in=selected_slot_ids,
             status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
         ).exclude(id__in=list(target_offer_ids)).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
+    if return_offers:
+        return finalized, finalized_offers
     return finalized
 
 @api_view(['POST'])
@@ -863,12 +867,22 @@ def stripe_webhook(request):
                     from client_profile.models import Shift as ShiftModel
                     shift_obj = ShiftModel.objects.filter(id=shift_id).first()
                     if shift_obj:
-                        _finalize_pending_offers_for_shift(
+                        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
                             shift_obj,
                             candidate_id=metadata.get('candidate_id'),
                             slot_id=metadata.get('slot_id'),
                             slot_ids=metadata.get('slot_ids'),
                             offer_ids=metadata.get('offer_ids'),
+                            return_offers=True,
+                        )
+                        from client_profile.utils import send_shift_payment_finalized_notifications
+                        from users.models import User
+                        paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
+                        send_shift_payment_finalized_notifications(
+                            shift=shift_obj,
+                            offers=finalized_offers,
+                            paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
+                            payment_method='stripe',
                         )
                         from client_profile.models import ShiftOffer
                         has_pending_payment = ShiftOffer.objects.filter(
