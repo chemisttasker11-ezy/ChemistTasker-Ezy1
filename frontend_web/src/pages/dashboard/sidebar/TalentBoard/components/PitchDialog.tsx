@@ -5,6 +5,8 @@ import {
   DialogContent,
   DialogTitle,
   Button,
+  ToggleButton,
+  ToggleButtonGroup,
   TextField,
   FormControl,
   InputLabel,
@@ -50,7 +52,7 @@ export type PitchFormState = {
 
 const radiusOptions = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 500, 1000];
 const stateOptions = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
-const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const engagementOptions = ["FULL_TIME", "PART_TIME", "CASUAL", "VOLUNTEERING", "PLACEMENT"];
 const recurringDayOptions = [
   { label: "Mon", value: 1 },
   { label: "Tue", value: 2 },
@@ -74,18 +76,12 @@ const toIsoDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const todayIso = () => toIsoDate(new Date());
+
 const fromIsoDate = (value: string) => {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, (month || 1) - 1, day || 1);
 };
-
-const formatDisplayDate = (value: string) =>
-  fromIsoDate(value).toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
 const buildMonthCells = (anchor: Date) => {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -99,7 +95,6 @@ const buildMonthCells = (anchor: Date) => {
       iso: toIsoDate(date),
       day: date.getDate(),
       inMonth: date.getMonth() === anchor.getMonth(),
-      date,
     };
   });
 };
@@ -161,7 +156,7 @@ export default function PitchDialog(props: {
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [selectedDateTimes, setSelectedDateTimes] = useState<Record<string, { startTime: string; endTime: string }>>({});
+  const [dragSelecting, setDragSelecting] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [recurringEndDate, setRecurringEndDate] = useState("");
@@ -199,10 +194,8 @@ export default function PitchDialog(props: {
 
   useEffect(() => {
     if (!open) return;
-    if (availabilityEntries.length > 0) return;
-    if (!pitchForm.availabilitySlots || pitchForm.availabilitySlots.length === 0) return;
-    setAvailabilityEntries(pitchForm.availabilitySlots);
-  }, [open, availabilityEntries.length, pitchForm.availabilitySlots]);
+    setAvailabilityEntries((pitchForm.availabilitySlots || []).filter((slot) => slot.date >= todayIso()));
+  }, [open, pitchForm.availabilitySlots]);
 
   useEffect(() => {
     if (pitchForm.postKind === "FULL_TIME_APPLICATION") {
@@ -215,37 +208,46 @@ export default function PitchDialog(props: {
 
   const validateTimeRange = (start: string, end: string) =>
     new Date(`2025-01-01T${end}`) > new Date(`2025-01-01T${start}`);
-
   const monthCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
   const selectedDateSet = useMemo(() => new Set(selectedDates), [selectedDates]);
-  const entryDateSet = useMemo(() => new Set(availabilityEntries.map((entry) => entry.date)), [availabilityEntries]);
-
-  const toggleSelectedDate = (iso: string) => {
-    setSelectedDates((prev) => {
-      const exists = prev.includes(iso);
-      return exists ? prev.filter((date) => date !== iso) : [...prev, iso].sort();
-    });
-    setSelectedDateTimes((prev) => {
-      const next = { ...prev };
-      if (selectedDateSet.has(iso)) {
-        delete next[iso];
-      } else if (!next[iso]) {
-        next[iso] = { startTime: currentEntry.startTime, endTime: currentEntry.endTime };
-      }
-      return next;
-    });
+  const savedAvailabilityDateSet = useMemo(
+    () => new Set(availabilityEntries.map((entry) => entry.date).filter(Boolean)),
+    [availabilityEntries]
+  );
+  const recurringPreviewDateSet = useMemo(() => {
+    if (!isRecurring || !currentEntry.date || !recurringEndDate || !recurringDays.length) return new Set<string>();
+    const dates = new Set<string>();
+    const end = new Date(`${recurringEndDate}T00:00:00`);
+    for (let cursor = new Date(`${currentEntry.date}T00:00:00`), count = 0; cursor <= end && count < 366; cursor.setDate(cursor.getDate() + 1), count += 1) {
+      if (recurringDays.includes(cursor.getDay())) dates.add(toIsoDate(cursor));
+    }
+    return dates;
+  }, [currentEntry.date, isRecurring, recurringDays, recurringEndDate]);
+  const syncSelectedDates = (dates: string[]) => {
+    const sorted = [...new Set(dates)].sort();
+    setSelectedDates(sorted);
+    setCurrentEntry((prev) => ({ ...prev, date: sorted[0] || "" }));
+    if (isRecurring) setRecurringEndDate(sorted[sorted.length - 1] || "");
   };
-
-  const clearSelectedDates = () => {
-    setSelectedDates([]);
-    setSelectedDateTimes({});
+  const toggleCalendarDate = (date: string) => {
+    syncSelectedDates(selectedDateSet.has(date) ? selectedDates.filter((item) => item !== date) : [...selectedDates, date]);
+  };
+  const addCalendarDate = (date: string) => {
+    setSelectedDates((prevDates) => {
+      if (prevDates.includes(date)) return prevDates;
+      const sorted = [...prevDates, date].sort();
+      setCurrentEntry((prev) => ({ ...prev, date: sorted[0] || "" }));
+      if (isRecurring) setRecurringEndDate(sorted[sorted.length - 1] || "");
+      return sorted;
+    });
   };
 
   const handleAddAvailability = async () => {
     const targetDates = isRecurring
-      ? expandRecurringDates(selectedDates, recurringDays, recurringEndDate)
-      : selectedDates;
-    if (!targetDates.length) {
+      ? expandRecurringDates([currentEntry.date].filter(Boolean), recurringDays, recurringEndDate)
+      : (selectedDates.length ? selectedDates : [currentEntry.date].filter(Boolean));
+    const futureTargetDates = targetDates.filter((date) => date >= todayIso());
+    if (!futureTargetDates.length) {
       setAvailabilityError(isRecurring ? "Please select a start date, recurring days, and an end date." : "Please select at least one date.");
       return;
     }
@@ -261,13 +263,12 @@ export default function PitchDialog(props: {
     const existingKeys = new Set(
       availabilityEntries.map((entry) => `${entry.date}-${entry.startTime}-${entry.endTime}`)
     );
-    const nextEntries = targetDates
+    const nextEntries = futureTargetDates
       .map((date) => {
-        const times = selectedDateTimes[date] || { startTime: currentEntry.startTime, endTime: currentEntry.endTime };
         return {
           date,
-          startTime: currentEntry.isAllDay ? "00:00" : times.startTime,
-          endTime: currentEntry.isAllDay ? "23:59" : times.endTime,
+          startTime: currentEntry.isAllDay ? "00:00" : currentEntry.startTime,
+          endTime: currentEntry.isAllDay ? "23:59" : currentEntry.endTime,
           isAllDay: currentEntry.isAllDay,
           notes: currentEntry.notes,
         };
@@ -287,7 +288,7 @@ export default function PitchDialog(props: {
       isAllDay: false,
       notes: "",
     });
-    clearSelectedDates();
+    setSelectedDates([]);
     setIsRecurring(false);
     setRecurringDays([]);
     setRecurringEndDate("");
@@ -487,6 +488,7 @@ export default function PitchDialog(props: {
                 >
                   {stateOptions.map((state) => (
                     <MenuItem key={state} value={state}>
+                      <Checkbox checked={pitchForm.travelStates.includes(state)} />
                       {state}
                     </MenuItem>
                   ))}
@@ -510,8 +512,9 @@ export default function PitchDialog(props: {
                   }))
                 }
               >
-                {["FULL_TIME", "PART_TIME", "CASUAL", "VOLUNTEERING", "PLACEMENT"].map((value) => (
+                {engagementOptions.map((value) => (
                   <MenuItem key={value} value={value}>
+                    <Checkbox checked={pitchForm.workTypes.includes(value)} />
                     {titleCase(value)}
                   </MenuItem>
                 ))}
@@ -568,7 +571,49 @@ export default function PitchDialog(props: {
                 {availabilityError}
               </Box>
             )}
-            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.5 }}>
+            <ToggleButtonGroup
+              exclusive
+              value={isRecurring ? "recurring" : "single"}
+              onChange={(_, value) => {
+                if (!value) return;
+                setIsRecurring(value === "recurring");
+                setRecurringDays([]);
+                setRecurringEndDate(value === "recurring" ? selectedDates[selectedDates.length - 1] || "" : "");
+              }}
+              sx={{
+                alignSelf: "center",
+                flexWrap: "wrap",
+                gap: 1,
+                "& .MuiToggleButton-root": {
+                  borderRadius: "12px !important",
+                  px: 2,
+                  minHeight: 44,
+                  fontWeight: 800,
+                },
+              }}
+            >
+              <ToggleButton value="recurring">Recurring availability</ToggleButton>
+              <ToggleButton value="single">Pick specific dates</ToggleButton>
+            </ToggleButtonGroup>
+            <Typography variant="body2" color="text.secondary" sx={{ alignSelf: "center", maxWidth: 520, textAlign: "center", fontWeight: 600 }}>
+              {isRecurring
+                ? "Select the start and end date on the calendar, then choose the weekdays you are available before publishing."
+                : "Pick the dates you are available on the calendar. Click again to deselect, or drag across dates to select multiple days."}
+            </Typography>
+            <Box
+              onMouseLeave={() => setDragSelecting(false)}
+              onMouseUp={() => setDragSelecting(false)}
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 2,
+                p: 1.5,
+                userSelect: "none",
+                width: "100%",
+                maxWidth: 520,
+                alignSelf: "center",
+              }}
+            >
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                 <IconButton size="small" onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}>
                   <ChevronLeft fontSize="small" />
@@ -581,29 +626,40 @@ export default function PitchDialog(props: {
                 </IconButton>
               </Stack>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.75, mb: 0.75 }}>
-                {weekDayLabels.map((day) => (
-                  <Typography key={day} variant="caption" color="text.secondary" textAlign="center" fontWeight={700}>
-                    {day.slice(0, 1)}
+                {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => (
+                  <Typography key={`${day}-${index}`} variant="caption" color="text.secondary" textAlign="center" fontWeight={700}>
+                    {day}
                   </Typography>
                 ))}
               </Box>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.75 }}>
-                {monthCells.map((cell) => {
+                {monthCells.map((cell, index) => {
                   const selected = selectedDateSet.has(cell.iso);
-                  const hasEntry = entryDateSet.has(cell.iso);
+                  const saved = savedAvailabilityDateSet.has(cell.iso);
+                  const recurringPreview = recurringPreviewDateSet.has(cell.iso);
                   return (
                     <Button
-                      key={cell.iso}
+                      key={`${cell.iso}-${index}`}
                       variant={selected ? "contained" : "outlined"}
                       size="small"
-                      onClick={() => toggleSelectedDate(cell.iso)}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setDragSelecting(true);
+                        toggleCalendarDate(cell.iso);
+                      }}
+                      onMouseEnter={() => {
+                        if (dragSelecting) addCalendarDate(cell.iso);
+                      }}
                       sx={{
                         minWidth: 0,
-                        aspectRatio: "1 / 1",
+                        height: 36,
                         p: 0,
                         opacity: cell.inMonth ? 1 : 0.35,
-                        borderColor: hasEntry ? "primary.main" : "divider",
-                        boxShadow: hasEntry && !selected ? "inset 0 0 0 1px" : undefined,
+                        borderColor: selected ? "primary.main" : saved ? "secondary.main" : undefined,
+                        borderWidth: saved && !selected ? 2 : 1,
+                        bgcolor: !selected && recurringPreview ? "success.light" : !selected && saved ? "secondary.light" : undefined,
+                        color: !selected && recurringPreview ? "success.dark" : !selected && saved ? "secondary.dark" : undefined,
+                        fontWeight: recurringPreview || saved ? 900 : 700,
                       }}
                     >
                       {cell.day}
@@ -611,10 +667,52 @@ export default function PitchDialog(props: {
                   );
                 })}
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                Select one or more dates, then add them with the time below. Outlined purple dates already have availability.
-              </Typography>
             </Box>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <TextField
+                label={isRecurring ? "Start Date" : "Date"}
+                type="date"
+                value={currentEntry.date}
+                onChange={(event) => syncSelectedDates(event.target.value ? [event.target.value] : [])}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+              {isRecurring && (
+                <TextField
+                  label="End Date"
+                  type="date"
+                  value={recurringEndDate}
+                  onChange={(event) => setRecurringEndDate(event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+              )}
+            </Stack>
+            {selectedDates.length > 0 && (
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                Selected dates: {selectedDates.join(", ")}
+              </Typography>
+            )}
+            {isRecurring && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {recurringDayOptions.map(({ label, value }) => {
+                  const selected = recurringDays.includes(value);
+                  return (
+                    <Chip
+                      key={label}
+                      label={label}
+                      color={selected ? "primary" : "default"}
+                      variant={selected ? "filled" : "outlined"}
+                      onClick={() =>
+                        setRecurringDays((prev) =>
+                          prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value].sort()
+                        )
+                      }
+                    />
+                  );
+                })}
+              </Stack>
+            )}
             <FormControlLabel
               control={
                 <Checkbox
@@ -662,87 +760,8 @@ export default function PitchDialog(props: {
               value={currentEntry.notes ?? ""}
               onChange={(e) => setCurrentEntry({ ...currentEntry, notes: e.target.value })}
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isRecurring}
-                  onChange={(event) => setIsRecurring(event.target.checked)}
-                />
-              }
-              label="Repeats"
-            />
-            {isRecurring && (
-              <Stack spacing={1}>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {recurringDayOptions.map(({ label, value }) => {
-                    const selected = recurringDays.includes(value);
-                    return (
-                      <Chip
-                        key={label}
-                        label={label}
-                        color={selected ? "primary" : "default"}
-                        variant={selected ? "filled" : "outlined"}
-                        onClick={() =>
-                          setRecurringDays((prev) =>
-                            prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value].sort()
-                          )
-                        }
-                      />
-                    );
-                  })}
-                </Stack>
-                <TextField
-                  label="Repeat until"
-                  type="date"
-                  value={recurringEndDate}
-                  onChange={(event) => setRecurringEndDate(event.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-              </Stack>
-            )}
-            {selectedDates.length > 0 && (
-              <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.5 }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-                  <Typography variant="subtitle2">Selected days</Typography>
-                  <Button size="small" onClick={clearSelectedDates}>Clear</Button>
-                </Stack>
-                <Stack spacing={1}>
-                  {selectedDates.map((date) => {
-                    const times = selectedDateTimes[date] || { startTime: currentEntry.startTime, endTime: currentEntry.endTime };
-                    return (
-                      <Stack key={date} direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                        <Chip label={formatDisplayDate(date)} onDelete={() => toggleSelectedDate(date)} />
-                        <TextField
-                          label="Start"
-                          type="time"
-                          size="small"
-                          value={times.startTime}
-                          disabled={currentEntry.isAllDay}
-                          onChange={(event) =>
-                            setSelectedDateTimes((prev) => ({ ...prev, [date]: { startTime: event.target.value, endTime: times.endTime } }))
-                          }
-                          InputLabelProps={{ shrink: true }}
-                        />
-                        <TextField
-                          label="End"
-                          type="time"
-                          size="small"
-                          value={times.endTime}
-                          disabled={currentEntry.isAllDay}
-                          onChange={(event) =>
-                            setSelectedDateTimes((prev) => ({ ...prev, [date]: { startTime: times.startTime, endTime: event.target.value } }))
-                          }
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Stack>
-                    );
-                  })}
-                </Stack>
-              </Box>
-            )}
             <Button variant="contained" onClick={handleAddAvailability}>
-              Add Selected Availability
+              Add Availability
             </Button>
 
             <Typography variant="subtitle2">Your Time Slots</Typography>

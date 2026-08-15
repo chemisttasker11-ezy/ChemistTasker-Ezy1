@@ -20,7 +20,7 @@ import {
   alpha,
 } from '@mui/material';
 import { keyframes } from '@mui/system';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { ChevronLeft, ChevronRight, Close as CloseIcon } from '@mui/icons-material';
 import {
   UserAvailability,
   UserAvailabilityPayload,
@@ -100,12 +100,37 @@ const inputSx = {
   },
 };
 
+const toIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const buildMonthCells = (anchor: Date) => {
+  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const start = new Date(first);
+  const mondayOffset = (first.getDay() + 6) % 7;
+  start.setDate(first.getDate() - mondayOffset);
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return {
+      iso: toIsoDate(date),
+      day: date.getDate(),
+      inMonth: date.getMonth() === anchor.getMonth(),
+    };
+  });
+};
+
 export default function SetAvailabilityPage() {
   const { user, token } = useAuth();
   const [availabilityEntries, setAvailabilityEntries] = useState<AvailabilityEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<AvailabilityDraft>(createEmptyEntry());
   const [notifyNewShifts, setNotifyNewShifts] = useState(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [dragSelecting, setDragSelecting] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
   const [locationForm, setLocationForm] = useState({
@@ -137,6 +162,58 @@ export default function SetAvailabilityPage() {
   ];
   const radiusOptions = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 500, 1000];
   const stateOptions = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
+  const monthCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
+  const selectedDateSet = useMemo(() => new Set(selectedDates), [selectedDates]);
+  const savedAvailabilityDateSet = useMemo(() => {
+    const dates = new Set<string>();
+    availabilityEntries.forEach((entry) => {
+      if (!entry.date) return;
+      if (!entry.isRecurring || !entry.recurringEndDate || !entry.recurringDays?.length) {
+        dates.add(entry.date);
+        return;
+      }
+      const end = new Date(`${entry.recurringEndDate}T00:00:00`);
+      for (let cursor = new Date(`${entry.date}T00:00:00`), count = 0; cursor <= end && count < 366; cursor.setDate(cursor.getDate() + 1), count += 1) {
+        if (entry.recurringDays.includes(cursor.getDay())) dates.add(toIsoDate(cursor));
+      }
+    });
+    return dates;
+  }, [availabilityEntries]);
+  const recurringPreviewDateSet = useMemo(() => {
+    if (!currentEntry.isRecurring || !currentEntry.date || !currentEntry.recurringEndDate || !currentEntry.recurringDays.length) {
+      return new Set<string>();
+    }
+    const dates = new Set<string>();
+    const end = new Date(`${currentEntry.recurringEndDate}T00:00:00`);
+    for (let cursor = new Date(`${currentEntry.date}T00:00:00`), count = 0; cursor <= end && count < 366; cursor.setDate(cursor.getDate() + 1), count += 1) {
+      if (currentEntry.recurringDays.includes(cursor.getDay())) dates.add(toIsoDate(cursor));
+    }
+    return dates;
+  }, [currentEntry.date, currentEntry.isRecurring, currentEntry.recurringDays, currentEntry.recurringEndDate]);
+  const syncSelectedDates = (dates: string[]) => {
+    const sorted = [...new Set(dates)].sort();
+    setSelectedDates(sorted);
+    setCurrentEntry((prev) => ({
+      ...prev,
+      date: sorted[0] || '',
+      recurringEndDate: prev.isRecurring ? sorted[sorted.length - 1] || '' : prev.recurringEndDate,
+    }));
+  };
+  const toggleCalendarDate = (date: string) => {
+    syncSelectedDates(selectedDateSet.has(date) ? selectedDates.filter((item) => item !== date) : [...selectedDates, date]);
+  };
+  const addCalendarDate = (date: string) => {
+    setSelectedDates((prevDates) => {
+      if (prevDates.includes(date)) return prevDates;
+      const sorted = [...prevDates, date].sort();
+      setCurrentEntry((prev) => ({
+        ...prev,
+        date: sorted[0] || '',
+        recurringEndDate: prev.isRecurring ? sorted[sorted.length - 1] || '' : prev.recurringEndDate,
+      }));
+      return sorted;
+    });
+  };
   const mapCenter = useMemo(() => {
     if (locationForm.latitude != null && locationForm.longitude != null) {
       return { lat: locationForm.latitude, lng: locationForm.longitude };
@@ -154,6 +231,9 @@ export default function SetAvailabilityPage() {
       try {
         const entries = await fetchUserAvailabilityService();
         setAvailabilityEntries(entries as AvailabilityEntry[]);
+        setNotifyNewShifts(
+          (entries as any[]).some((entry) => Boolean(entry?.notifyNewShifts ?? entry?.notify_new_shifts))
+        );
       } catch {
         showSnackbar('Failed to load availability', 'error');
       }
@@ -267,7 +347,7 @@ export default function SetAvailabilityPage() {
   const handleAddEntry = async () => {
     const datesToAdd = currentEntry.isRecurring
       ? [currentEntry.date].filter(Boolean)
-      : (selectedDates.length > 0 ? selectedDates : [currentEntry.date].filter(Boolean));
+      : (selectedDates.length ? selectedDates : [currentEntry.date].filter(Boolean));
 
     if (!datesToAdd.length) return showSnackbar('Please select a date', 'error');
     if (!currentEntry.startTime || !currentEntry.endTime)
@@ -340,6 +420,33 @@ export default function SetAvailabilityPage() {
       >
         Set Your Availability
       </Typography>
+
+      <Paper
+        sx={{
+          ...cardSx,
+          mb: 3,
+          p: 2.5,
+          background: `linear-gradient(180deg, ${alpha(DNA.mint, 0.10)} 0%, ${DNA.surface} 100%)`,
+        }}
+      >
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={notifyNewShifts}
+              onChange={(e) => setNotifyNewShifts(e.target.checked)}
+            />
+          }
+          label="Notify me when new public shifts match my availability"
+          sx={{
+            alignItems: 'flex-start',
+            m: 0,
+            '& .MuiFormControlLabel-label': { fontWeight: 900, color: DNA.ink },
+          }}
+        />
+        <Typography variant="body2" sx={{ mt: 0.75, ml: 4, color: DNA.muted, fontWeight: 700 }}>
+          By checking this box, you will get an instant notification when a public shift matches any availability dates and times you add.
+        </Typography>
+      </Paper>
 
       <Paper sx={cardSx}>
         <Typography variant="h6" gutterBottom sx={{ fontWeight: 900, color: DNA.ink }}>
@@ -450,6 +557,7 @@ export default function SetAvailabilityPage() {
               >
                 {stateOptions.map((state) => (
                   <MenuItem key={state} value={state}>
+                    <Checkbox checked={locationForm.travelStates.includes(state)} />
                     {state}
                   </MenuItem>
                 ))}
@@ -504,61 +612,175 @@ export default function SetAvailabilityPage() {
         <Typography variant="h6" gutterBottom sx={{ fontWeight: 900, color: DNA.ink }}>
           Add dates
         </Typography>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={notifyNewShifts}
-              onChange={(e) => setNotifyNewShifts(e.target.checked)}
-            />
-          }
-          label="Notify me when new public shifts match my availability"
-          sx={{
-            mb: 1,
-            borderRadius: '14px',
-            px: 1,
-            py: 0.5,
-            backgroundColor: alpha(DNA.mint, 0.07),
-            '& .MuiFormControlLabel-label': { fontWeight: 700, color: DNA.ink },
-          }}
-        />
         <Box component="form" noValidate autoComplete="off" sx={{ display: 'grid', gap: 2 }}>
+          <ToggleButtonGroup
+            exclusive
+            value={currentEntry.isRecurring ? 'recurring' : 'single'}
+            onChange={(_, value) => {
+              if (!value) return;
+              setCurrentEntry((prev) => ({
+                ...prev,
+                isRecurring: value === 'recurring',
+                recurringDays: [],
+                recurringEndDate: value === 'recurring' ? selectedDates[selectedDates.length - 1] || '' : '',
+              }));
+            }}
+            sx={{
+              justifySelf: 'center',
+              flexWrap: 'wrap',
+              gap: 1,
+              '& .MuiToggleButton-root': {
+                borderRadius: '12px !important',
+                border: `1px solid ${alpha(DNA.blue, 0.12)} !important`,
+                px: 2.5,
+                minHeight: 48,
+                fontWeight: 900,
+                color: DNA.ink,
+              },
+              '& .Mui-selected': {
+                bgcolor: `${alpha(DNA.blue, 0.10)} !important`,
+                color: `${DNA.blue} !important`,
+              },
+            }}
+          >
+            <ToggleButton value="recurring">Recurring availability</ToggleButton>
+            <ToggleButton value="single">Pick specific dates</ToggleButton>
+          </ToggleButtonGroup>
+          <Typography variant="body2" sx={{ justifySelf: 'center', maxWidth: 640, textAlign: 'center', color: DNA.muted, fontWeight: 700 }}>
+            {currentEntry.isRecurring
+              ? 'Select the start and end date on the calendar, then choose the weekdays you are available. Matching recurring dates will be highlighted before you add them.'
+              : 'Pick the dates you are available on the calendar. Click a date again to deselect it, or drag across dates to select multiple days.'}
+          </Typography>
+
+          <Box
+            onMouseLeave={() => setDragSelecting(false)}
+            onMouseUp={() => setDragSelecting(false)}
+            sx={{
+              border: `1px solid ${alpha(DNA.blue, 0.10)}`,
+              borderRadius: 3,
+              p: 1.5,
+              backgroundColor: '#fff',
+              userSelect: 'none',
+              width: '100%',
+              maxWidth: 560,
+              justifySelf: 'center',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <IconButton size="small" onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}>
+                <ChevronLeft fontSize="small" />
+              </IconButton>
+              <Typography variant="subtitle2" sx={{ fontWeight: 900, color: DNA.ink }}>
+                {calendarMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+              </Typography>
+              <IconButton size="small" onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}>
+                <ChevronRight fontSize="small" />
+              </IconButton>
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.75, mb: 0.75 }}>
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+                <Typography key={`${day}-${index}`} variant="caption" sx={{ textAlign: 'center', color: DNA.muted, fontWeight: 900 }}>
+                  {day}
+                </Typography>
+              ))}
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.75 }}>
+              {monthCells.map((cell, index) => {
+                const selected = selectedDateSet.has(cell.iso);
+                const saved = savedAvailabilityDateSet.has(cell.iso);
+                const recurringPreview = recurringPreviewDateSet.has(cell.iso);
+                return (
+                  <Button
+                    key={`${cell.iso}-${index}`}
+                    variant={selected ? 'contained' : 'outlined'}
+                    size="small"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      setDragSelecting(true);
+                      toggleCalendarDate(cell.iso);
+                    }}
+                    onMouseEnter={() => {
+                      if (dragSelecting) addCalendarDate(cell.iso);
+                    }}
+                    sx={{
+                      minWidth: 0,
+                      height: 38,
+                      p: 0,
+                      opacity: cell.inMonth ? 1 : 0.35,
+                      borderColor: selected ? DNA.blue : saved ? DNA.violet : alpha(DNA.blue, 0.14),
+                      borderWidth: saved && !selected ? 2 : 1,
+                      bgcolor: selected
+                        ? undefined
+                        : recurringPreview
+                          ? alpha(DNA.mint, 0.14)
+                          : saved
+                            ? alpha(DNA.violet, 0.10)
+                            : undefined,
+                      color: !selected && recurringPreview ? DNA.mint : !selected && saved ? DNA.violet : undefined,
+                      fontWeight: recurringPreview || saved ? 900 : 700,
+                    }}
+                  >
+                    {cell.day}
+                  </Button>
+                );
+              })}
+            </Box>
+          </Box>
+
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' } }}>
             <TextField
               label={currentEntry.isRecurring ? 'Start date' : 'Date'}
               type="date"
               value={currentEntry.date}
-              onChange={(event) => setCurrentEntry((prev) => ({ ...prev, date: event.target.value }))}
+              onChange={(event) => syncSelectedDates(event.target.value ? [event.target.value] : [])}
               InputLabelProps={{ shrink: true }}
               sx={{ ...inputSx, flex: 1 }}
             />
-            {!currentEntry.isRecurring && (
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  const formatted = currentEntry.date;
-                  if (!formatted) return showSnackbar('Please select a date', 'error');
-                  setSelectedDates((prev) =>
-                    prev.includes(formatted)
-                      ? prev.filter((date) => date !== formatted)
-                      : [...prev, formatted]
-                  );
-                }}
-                sx={{
-                  minHeight: 54,
-                  borderRadius: '14px',
-                  fontWeight: 900,
-                  borderColor: alpha(DNA.blue, 0.22),
-                  color: DNA.blue,
-                  boxShadow: '0 12px 28px rgba(6, 18, 58, 0.05)',
-                }}
-              >
-                {currentEntry.date && selectedDates.includes(currentEntry.date) ? 'Remove date' : 'Add selected date'}
-              </Button>
+            {currentEntry.isRecurring && (
+              <TextField
+                label="End date"
+                type="date"
+                value={currentEntry.recurringEndDate}
+                onChange={e => setCurrentEntry({ ...currentEntry, recurringEndDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                sx={{ ...inputSx, flex: 1 }}
+              />
             )}
           </Box>
-          {!currentEntry.isRecurring && selectedDates.length > 0 && (
+          {currentEntry.isRecurring && (
+            <ToggleButtonGroup
+              value={currentEntry.recurringDays}
+              onChange={(_, days) =>
+                setCurrentEntry({ ...currentEntry, recurringDays: days as number[] })
+              }
+              aria-label="weekday selection"
+              sx={{
+                flexWrap: 'wrap',
+                gap: 1,
+                '& .MuiToggleButton-root': {
+                  borderRadius: '12px !important',
+                  border: `1px solid ${alpha(DNA.blue, 0.12)} !important`,
+                  px: 1.6,
+                  fontWeight: 800,
+                  color: DNA.ink,
+                  backgroundColor: '#fff',
+                },
+                '& .Mui-selected': {
+                  bgcolor: `${alpha(DNA.blue, 0.10)} !important`,
+                  color: `${DNA.blue} !important`,
+                },
+              }}
+            >
+              {weekDays.map(d => (
+                <ToggleButton key={d.value} value={d.value} aria-label={d.label}>
+                  {d.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          )}
+          {selectedDates.length > 0 && (
             <Typography variant="caption" sx={{ color: DNA.muted, fontWeight: 700 }}>
-              Selected: {selectedDates.join(', ')}
+              Selected dates: {selectedDates.join(', ')}
             </Typography>
           )}
           <FormControlLabel
@@ -604,71 +826,6 @@ export default function SetAvailabilityPage() {
               sx={{ ...inputSx, flex: 1 }}
             />
           </Box>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={currentEntry.isRecurring}
-                onChange={e =>
-                  setCurrentEntry({
-                    ...currentEntry,
-                    isRecurring: e.target.checked,
-                    recurringDays: [],
-                    recurringEndDate: '',
-                  })
-                }
-              />
-            }
-            label="Repeat Weekly"
-            sx={{
-              borderRadius: '14px',
-              px: 1,
-              py: 0.5,
-              backgroundColor: alpha(DNA.magenta, 0.05),
-              '& .MuiFormControlLabel-label': { fontWeight: 700, color: DNA.ink },
-            }}
-          />
-          {currentEntry.isRecurring && (
-            <>
-              <TextField
-                label="Repeat Until"
-                type="date"
-                value={currentEntry.recurringEndDate}
-                onChange={e => setCurrentEntry({ ...currentEntry, recurringEndDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                sx={inputSx}
-              />
-              <ToggleButtonGroup
-                value={currentEntry.recurringDays}
-                onChange={(_, days) =>
-                  setCurrentEntry({ ...currentEntry, recurringDays: days as number[] })
-                }
-                aria-label="weekday selection"
-                sx={{
-                  flexWrap: 'wrap',
-                  gap: 1,
-                  '& .MuiToggleButton-root': {
-                    borderRadius: '12px !important',
-                    border: `1px solid ${alpha(DNA.blue, 0.12)} !important`,
-                    px: 1.6,
-                    fontWeight: 800,
-                    color: DNA.ink,
-                    backgroundColor: '#fff',
-                    boxShadow: '0 10px 20px rgba(6, 18, 58, 0.04)',
-                  },
-                  '& .Mui-selected': {
-                    bgcolor: `${alpha(DNA.blue, 0.10)} !important`,
-                    color: `${DNA.blue} !important`,
-                  },
-                }}
-              >
-                {weekDays.map(d => (
-                  <ToggleButton key={d.value} value={d.value} aria-label={d.label}>
-                    {d.label}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-            </>
-          )}
           <TextField
             label="Notes"
             multiline

@@ -35,20 +35,16 @@ export default function AvailabilitySidebar({
 }) {
   if (!candidate) return null;
 
-  const today = new Date();
-  const calendarStart = startOfMondayWeek(today);
-  const daysInView = 28;
-  const calendarGrid: Array<{ dayNum: number; isAvailable: boolean; date: Date }> = [];
+  const availableDateSet = useMemo(() => new Set(candidate.availableDates || []), [candidate.availableDates]);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const isOwnPost = currentUserId != null && candidate.authorUserId === currentUserId;
-
-  for (let i = 0; i < daysInView; i++) {
+  const today = new Date();
+  const calendarStart = startOfMondayWeek(today);
+  const calendarGrid = Array.from({ length: 28 }, (_, index) => {
     const date = new Date(calendarStart);
-    date.setDate(calendarStart.getDate() + i);
-    const dateStr = toIsoDate(date);
-    const isAvailable = candidate.availableDates.includes(dateStr);
-    calendarGrid.push({ date, dayNum: date.getDate(), isAvailable });
-  }
+    date.setDate(calendarStart.getDate() + index);
+    return { iso: toIsoDate(date), dayNum: date.getDate(), date };
+  });
 
   const slotsForSelected = useMemo(() => {
     if (selectedDates.length === 0) return [];
@@ -148,14 +144,15 @@ export default function AvailabilitySidebar({
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5, mt: 0.5 }}>
             {calendarGrid.map((day, idx) => {
-              const dateStr = toIsoDate(day.date);
+              const dateStr = day.iso;
+              const isAvailable = availableDateSet.has(dateStr);
               const isSelected = selectedDates.includes(dateStr);
               return (
                 <Box
                   key={idx}
                   title={day.date.toDateString()}
                   onClick={() => {
-                    if (!day.isAvailable) return;
+                    if (!isAvailable) return;
                     toggleSelectedDate(dateStr);
                   }}
                   sx={(theme) => ({
@@ -168,19 +165,19 @@ export default function AvailabilitySidebar({
                     border: 1,
                     borderColor: isSelected
                       ? theme.palette.primary.main
-                      : day.isAvailable
+                      : isAvailable
                         ? alpha(theme.palette.success.main, 0.6)
                         : theme.palette.divider,
                     bgcolor: isSelected
                       ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.25 : 0.18)
-                      : day.isAvailable
+                      : isAvailable
                         ? alpha(theme.palette.success.main, theme.palette.mode === "dark" ? 0.22 : 0.16)
                         : theme.palette.mode === "dark"
                           ? alpha(theme.palette.common.white, 0.03)
                           : theme.palette.action.hover,
-                    color: day.isAvailable ? theme.palette.success.main : theme.palette.text.disabled,
-                    fontWeight: day.isAvailable ? 700 : 400,
-                    cursor: day.isAvailable ? "pointer" : "default",
+                    color: isAvailable ? theme.palette.success.main : theme.palette.text.disabled,
+                    fontWeight: isAvailable ? 700 : 400,
+                    cursor: isAvailable ? "pointer" : "default",
                   })}
                 >
                   {day.dayNum}

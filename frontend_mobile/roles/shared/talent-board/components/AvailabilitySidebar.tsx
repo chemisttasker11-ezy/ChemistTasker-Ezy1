@@ -34,6 +34,7 @@ export default function AvailabilitySidebar({
 }) {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const availableSlots = candidate?.availableSlots || [];
+  const availableDateSet = useMemo(() => new Set(candidate?.availableDates || []), [candidate?.availableDates]);
 
   useEffect(() => {
     setSelectedDates([]);
@@ -46,22 +47,14 @@ export default function AvailabilitySidebar({
 
   if (!candidate) return null;
 
+  const isOwnPost = currentUserId != null && candidate.authorUserId === currentUserId;
   const today = new Date();
   const calendarStart = startOfMondayWeek(today);
-  const daysInView = 28;
-  const calendarGrid: Array<{ dayNum: number; isAvailable: boolean; iso: string }> = [];
-  const isOwnPost = currentUserId != null && candidate.authorUserId === currentUserId;
-
-  for (let i = 0; i < daysInView; i++) {
+  const calendarGrid = Array.from({ length: 28 }, (_, index) => {
     const date = new Date(calendarStart);
-    date.setDate(calendarStart.getDate() + i);
-    const iso = toIsoDate(date);
-    calendarGrid.push({
-      dayNum: date.getDate(),
-      iso,
-      isAvailable: (candidate.availableDates || []).includes(iso),
-    });
-  }
+    date.setDate(calendarStart.getDate() + index);
+    return { iso: toIsoDate(date), dayNum: date.getDate() };
+  });
 
   const toggleSelectedDate = (dateStr: string) => {
     setSelectedDates((prev) =>
@@ -114,18 +107,19 @@ export default function AvailabilitySidebar({
         <View style={styles.grid}>
           {calendarGrid.map((day, idx) => {
             const isSelected = selectedDates.includes(day.iso);
+            const isAvailable = availableDateSet.has(day.iso);
             return (
               <TouchableOpacity
                 key={`${day.iso}-${idx}`}
-                disabled={!day.isAvailable}
+                disabled={!isAvailable}
                 onPress={() => toggleSelectedDate(day.iso)}
                 style={[
                   styles.cell,
-                  day.isAvailable ? styles.available : styles.unavailable,
+                  isAvailable ? styles.available : styles.unavailable,
                   isSelected ? styles.selected : null,
                 ]}
               >
-                <Text style={[styles.cellText, !day.isAvailable ? styles.unavailableText : null]}>{day.dayNum}</Text>
+                <Text style={[styles.cellText, !isAvailable ? styles.unavailableText : null]}>{day.dayNum}</Text>
               </TouchableOpacity>
             );
           })}

@@ -9,6 +9,7 @@ import { API_BASE_URL } from '@/constants/api';
 import {
   createExplorerPost,
   deleteExplorerPost,
+  fetchUserAvailabilityService,
   getOnboarding,
   getRatingsSummary,
   likeExplorerPost,
@@ -60,6 +61,39 @@ const mapRoleToShiftRole = (value?: string | null) => {
 };
 
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+const toIsoDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const todayIso = () => toIsoDate(new Date());
+
+const expandAvailabilityEntryDates = (entry: any) => {
+  const startDate = String(entry?.date || '');
+  if (!isIsoDate(startDate)) return [];
+  const isRecurring = Boolean(entry?.isRecurring ?? entry?.is_recurring);
+  const recurringDays = entry?.recurringDays ?? entry?.recurring_days ?? [];
+  const recurringEndDate = String(entry?.recurringEndDate ?? entry?.recurring_end_date ?? '');
+  if (!isRecurring || !Array.isArray(recurringDays) || !recurringDays.length || !isIsoDate(recurringEndDate)) {
+    return [startDate];
+  }
+  const dates: string[] = [];
+  const end = new Date(`${recurringEndDate}T00:00:00`);
+  for (let cursor = new Date(`${startDate}T00:00:00`), count = 0; cursor <= end && count < 366; cursor.setDate(cursor.getDate() + 1), count += 1) {
+    if (recurringDays.includes(cursor.getDay())) dates.push(toIsoDate(cursor));
+  }
+  return dates;
+};
+
+const mapAvailabilityToPitchSlots = (entries: any[]) =>
+  entries.flatMap((entry) =>
+    expandAvailabilityEntryDates(entry).map((date) => ({
+      date,
+      startTime: entry?.startTime || entry?.start_time || '09:00',
+      endTime: entry?.endTime || entry?.end_time || '17:00',
+      isAllDay: Boolean(entry?.isAllDay ?? entry?.is_all_day),
+      notes: entry?.notes || '',
+    }))
+  ).filter((slot) => slot.date >= todayIso());
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
 
 type SkillItem = {
@@ -217,7 +251,8 @@ export default function TalentBoard({
             return null;
           })
           .filter((entry: any) => Boolean(entry && isIsoDate(entry.date)));
-        const availableDates = availableSlots.map((slot: any) => slot.date);
+        const futureAvailableSlots = availableSlots.filter((entry: any) => entry.date >= todayIso());
+        const availableDates = futureAvailableSlots.map((slot: any) => slot.date);
         const rawSkills = Array.from(new Set([...(post.software ?? []), ...(post.skills ?? [])])).filter(Boolean) as string[];
         const clinicalServices: string[] = [];
         const dispenseSoftware: string[] = [];
@@ -261,7 +296,7 @@ export default function TalentBoard({
           isFullTimeApplication,
           showCalendar: !isFullTimeApplication && availableDates.length > 0,
           availableDates,
-          availableSlots: availableSlots as any,
+          availableSlots: futureAvailableSlots as any,
           isInternshipSeeker:
             roleLabel.includes('Student') ||
             roleLabel.includes('Intern') ||
@@ -432,7 +467,9 @@ export default function TalentBoard({
     setPitchError(null);
     resetPitchForm();
     let onboardingSkills: string[] = [];
+    let inheritedAvailabilitySlots: PitchFormState['availabilitySlots'] = [];
     try {
+      inheritedAvailabilitySlots = mapAvailabilityToPitchSlots(await fetchUserAvailabilityService().catch(() => []));
       if (isExplorer) {
         const onboarding: any = await getOnboarding('explorer');
         setRoleTitle((onboarding?.role_type || 'Explorer').replace('_', ' '));
@@ -466,7 +503,7 @@ export default function TalentBoard({
             availabilitySlots:
               minePostKind === 'FULL_TIME_APPLICATION'
                 ? []
-                : Array.isArray(mine.availabilityDays)
+                : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0
                   ? mine.availabilityDays.map((entry: any) => {
                       if (typeof entry === 'string') {
                         return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
@@ -478,8 +515,14 @@ export default function TalentBoard({
                         isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
                         notes: entry?.notes || '',
                       };
-                    })
-                  : prev.availabilitySlots,
+                    }).filter((slot: any) => slot.date >= todayIso())
+                  : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
+          }));
+        } else if (inheritedAvailabilitySlots.length > 0) {
+          setPitchForm((prev) => ({
+            ...prev,
+            postKind: 'AVAILABILITY',
+            availabilitySlots: inheritedAvailabilitySlots,
           }));
         }
         if (mine && Array.isArray(mine.skills) && mine.skills.length > 0) setPitchSkills(mine.skills);
@@ -521,9 +564,14 @@ export default function TalentBoard({
       const normalizedWorkTypes = isFullTimeApplication
         ? Array.from(new Set([...(pitchForm.workTypes || []), 'FULL_TIME']))
         : pitchForm.workTypes;
+      const normalizedHeadline =
+        pitchForm.headline.trim() ||
+        (isFullTimeApplication ? `${roleTitle || 'Talent'} profile` : `${roleTitle || 'Talent'} availability`);
       const availabilityDays = isFullTimeApplication
         ? []
-        : (pitchForm.availabilitySlots || []).map((entry: any) => ({
+        : (pitchForm.availabilitySlots || [])
+          .filter((entry: any) => entry && entry.date && String(entry.date) >= todayIso())
+          .map((entry: any) => ({
             date: String(entry.date),
             start_time: entry.startTime || entry.start_time || null,
             end_time: entry.endTime || entry.end_time || null,
@@ -533,7 +581,7 @@ export default function TalentBoard({
             isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
           }));
       const payload: Record<string, any> = {
-        headline: pitchForm.headline || '',
+        headline: normalizedHeadline,
         body: pitchForm.body || '',
         role_category: isExplorer ? 'EXPLORER' : isPharmacist ? 'PHARMACIST' : 'OTHER_STAFF',
         role_title: roleTitle || '',
@@ -555,7 +603,15 @@ export default function TalentBoard({
       await reload();
       setPitchOpen(false);
     } catch (err: any) {
-      setPitchError(err?.message || 'Failed to save pitch.');
+      const detail = err?.response?.data || err?.data || err;
+      if (detail && typeof detail === 'object') {
+        const fieldMessages = Object.entries(detail)
+          .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
+          .join(' ');
+        setPitchError(fieldMessages || 'Failed to save pitch.');
+      } else {
+        setPitchError(err?.message || 'Failed to save pitch.');
+      }
     } finally {
       setPitchSaving(false);
     }
