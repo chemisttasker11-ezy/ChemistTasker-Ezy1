@@ -9,8 +9,7 @@
     "dev:5174": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5174",
     "dev:5175": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5175",
     "dev:5176": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5176",
-    "build": "node ../scripts/run-with-env.mjs ../env/web.prod.env vite build",
-    "validate:staticwebapp-config": "node -e \"JSON.parse(require('fs').readFileSync('public/staticwebapp.config.json','utf8')); console.log('staticwebapp.config.json is valid JSON')\""
+    "build": "node ../scripts/run-with-env.mjs ../env/web.prod.env vite build"
   },
   "dependencies": {
     "@chemisttasker/shared-core": "file:../shared-core/chemisttasker-shared-core-1.0.0.tgz",
