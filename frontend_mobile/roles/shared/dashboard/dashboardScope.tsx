@@ -322,6 +322,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
   if (!isWorker || assignments.length === 0) return null;
 
   const workerRoute = normalizedRole === 'OTHER_STAFF' ? '/otherstaff/dashboard' : '/pharmacist/dashboard';
+  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Other Staff' : 'Pharmacist';
   const activeAdmin = String(pathname || '').startsWith('/admin');
 
   return (
@@ -332,7 +333,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
         activeOpacity={0.82}
       >
         <IconButton icon="account-outline" size={18} iconColor={!activeAdmin ? '#FFFFFF' : '#4F46E5'} />
-        <Text style={[styles.personaButtonText, !activeAdmin && styles.personaButtonTextActive]}>Worker</Text>
+        <Text style={[styles.personaButtonText, !activeAdmin && styles.personaButtonTextActive]}>{roleLabel}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.personaButton, activeAdmin && styles.personaButtonActive]}

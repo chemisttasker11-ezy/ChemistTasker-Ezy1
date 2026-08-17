@@ -63,7 +63,7 @@ export default function PharmacyDetailView({
             <View style={styles.automationSection}>
                 <View style={styles.automationHeader}>
                     <View style={styles.automationCopy}>
-                        <Text style={styles.automationTitle}>Worker Request Publishing</Text>
+                        <Text style={styles.automationTitle}>Staff Request Publishing</Text>
                         <Text style={styles.automationDescription}>
                             Allow pharmacy staff shift cover requests and swap requests to be published to your team automatically?
                         </Text>

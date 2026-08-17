@@ -1,0 +1,15 @@
+Hi {{ user_first_name }},
+
+A shift you interacted with has been changed. Please review the updated details and make sure it still matches you.
+
+Pharmacy: {{ pharmacy_name }}
+Role: {{ role_needed }}
+{% for slot in slot_details %}
+Shift: {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+{% if slot.rate %}Rate: ${{ slot.rate }}/hr{% endif %}
+{% endfor %}
+
+Review shift: {{ shift_link }}
+
+Thanks,
+The ChemistTasker Team

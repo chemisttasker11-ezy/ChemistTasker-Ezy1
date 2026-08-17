@@ -29,7 +29,7 @@ export function useWorkerRatings() {
             const totalPages = pageData.count ? Math.ceil(pageData.count / 10) : 1;
             setPageCount(totalPages);
         } catch (error) {
-            console.error('Failed to load worker ratings', error);
+            console.error('Failed to load candidate ratings', error);
             setSummary(null);
             setComments([]);
         }

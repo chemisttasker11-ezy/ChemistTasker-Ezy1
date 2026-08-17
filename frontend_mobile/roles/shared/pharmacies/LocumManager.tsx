@@ -1,5 +1,5 @@
 // Locum Manager - Mobile
-// Manages locum/casual workers (LOCUM, SHIFT_HERO employment types)
+// Manages locum/casual pharmacy staff (LOCUM, SHIFT_HERO employment types)
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View, ScrollView } from 'react-native';

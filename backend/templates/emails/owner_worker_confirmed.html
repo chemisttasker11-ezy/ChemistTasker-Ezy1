@@ -1,14 +1,14 @@
 {% extends "emails/base.html" %}
 
-{% block title %}Worker Confirmed Shift Offer{% endblock %}
+{% block title %}{{ worker_role_label|default:"Candidate" }} Confirmed Shift Offer{% endblock %}
 
 {% block content %}
-<h2>Worker confirmed your shift offer</h2>
+<h2>{{ worker_role_label|default:"Candidate" }} confirmed your shift offer</h2>
 
 <p>Hi {{ owner_name }},</p>
 <p><b>{{ worker_name }}</b> has confirmed the shift offer.</p>
 
-<p class="meta"><b>Worker:</b> {{ worker_name }}</p>
+<p class="meta"><b>{{ worker_role_label|default:"Candidate" }}:</b> {{ worker_name }}</p>
 <p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
 <p class="meta"><b>Role:</b> {{ role_needed }}</p>
 {% for slot in slot_details %}
@@ -23,7 +23,7 @@
 
 {% if billing_state == "PAYMENT_REQUIRED" %}
 <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #ffeeba;">
-    <strong>Payment required:</strong> Complete payment from the active shift page to finalize and lock in this worker.
+    <strong>Payment required:</strong> Complete payment from the active shift page to finalize and lock in this {{ worker_role_label|default:"candidate"|lower }}.
 </div>
 {% elif billing_state == "FREE_TRIAL" %}
 <div style="background: #e8f6ec; color: #1f6d3b; padding: 12px; border-radius: 6px; margin: 16px 0; border: 1px solid #b7e4c7;">

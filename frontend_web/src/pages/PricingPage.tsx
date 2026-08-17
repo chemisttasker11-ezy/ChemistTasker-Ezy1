@@ -172,7 +172,7 @@ function PricingPage() {
                             Clear, transparent pricing
                         </Typography>
                         <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, mb: 4, px: { xs: 2, md: 8 } }}>
-                            No hidden fees. Built for pharmacy owners and growing organizations. Staff and workers use ChemistTasker for free.
+                            No hidden fees. Built for pharmacy owners and growing organizations. Pharmacy staff use ChemistTasker for free.
                         </Typography>
                     </Container>
                 </Box>

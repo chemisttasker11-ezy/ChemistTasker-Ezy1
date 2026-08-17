@@ -587,19 +587,27 @@ def charge_shift_fulfillment(request, shift_id):
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
-        finalized_count = _finalize_pending_offers_for_shift(
+        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
             shift,
             candidate_id=candidate_id,
             slot_ids=slot_ids,
             offer_ids=offer_ids,
+            return_offers=True,
         )
         from client_profile.models import ShiftOffer
+        from client_profile.utils import send_shift_payment_finalized_notifications
         has_pending_payment = ShiftOffer.objects.filter(
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         ).exists()
         shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
         shift.save(update_fields=['payment_status'])
+        send_shift_payment_finalized_notifications(
+            shift=shift,
+            offers=finalized_offers,
+            paid_by=request.user,
+            payment_method="free",
+        )
         if billing_state == BILLING_STATE_PRE_LIVE:
             return Response({
                 'free': True,

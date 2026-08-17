@@ -2,7 +2,7 @@
 // Mobile implementation aligned with web logic and hooks
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { Alert, View, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { Text, Button, IconButton, Snackbar, ActivityIndicator, Card, Divider, Chip, Checkbox } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -502,7 +502,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             try {
                 await loadWorkerRatings(ratingsUserId, 1);
             } catch (error) {
-                console.error('Failed to load worker ratings', error);
+                console.error('Failed to load candidate ratings', error);
             }
         }
 
@@ -578,7 +578,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 try {
                     await loadWorkerRatings(ratingsUserId, 1);
                 } catch (error) {
-                    console.error('Failed to load worker ratings', error);
+                    console.error('Failed to load candidate ratings', error);
                 }
             }
 
@@ -669,7 +669,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 try {
                     await loadWorkerRatings((member as any).userId, 1);
                 } catch (error) {
-                    console.error('Failed to load worker ratings', error);
+                    console.error('Failed to load candidate ratings', error);
                 }
             }
 
@@ -729,7 +729,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 return;
             }
             const result = await acceptOffer({ offer, shiftId, slotId: resolvedSlotId }, async () => {
-                showSnackbar('Offer sent. Waiting for worker confirmation.');
+                showSnackbar('Offer sent. Waiting for candidate confirmation.');
                 setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null });
                 await loadShifts();
                 if (targetShift) {
@@ -821,15 +821,25 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             try {
                 const response = await apiClient.post(`/client-profile/shift-offers/${offerId}/buzz/`);
                 const result = response.data;
-                showSnackbar(result?.detail || 'Worker buzzed');
+                Alert.alert(
+                    'Buzz reminder',
+                    result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
+                    [{ text: 'Close' }]
+                );
             } catch (error) {
-                console.error('Failed to buzz worker', error);
-                showSnackbar((error as any)?.data?.detail || (error as any)?.message || 'Failed to buzz worker');
+                console.error('Failed to send confirmation reminder', error);
+                const message =
+                    (error as any)?.response?.data?.detail ||
+                    (error as any)?.data?.detail ||
+                    (error as any)?.message ||
+                    'Failed to send confirmation reminder';
+                Alert.alert('Buzz reminder', message, [{ text: 'Close' }]);
+                await loadShifts();
             } finally {
                 setBuzzLoadingOfferId(null);
             }
         },
-        [showSnackbar]
+        [loadShifts]
     );
 
     const toggleShiftExpansion = useCallback((shiftId: number) => {
@@ -1111,10 +1121,11 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                             const offerId = toFiniteNumber(member.awaitingPaymentOfferId ?? member.awaiting_payment_offer_id);
                             const slotId = toFiniteNumber(member.slotId ?? member.slot_id) ?? selectedSlotId;
                             if (!offerId || (!slotId && !isSingleUserShift)) return null;
+                            const resolvedSlotId = slotId ?? 0;
                             return {
                                 offerId,
-                                slotId: slotId ?? 0,
-                                slot: slotById.get(slotId) || ((shift as any).slots || [])[0] || null,
+                                slotId: resolvedSlotId,
+                                slot: slotById.get(resolvedSlotId) || ((shift as any).slots || [])[0] || null,
                                 name: member.displayName || member.display_name || member.name || member.email || 'Participant',
                             };
                         })
@@ -1124,10 +1135,11 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                             const offerId = toFiniteNumber(interest.awaitingPaymentOfferId ?? interest.awaiting_payment_offer_id);
                             const slotId = toFiniteNumber(interest.slotId ?? interest.slot_id) ?? selectedSlotId;
                             if (!offerId || (!slotId && !isSingleUserShift)) return null;
+                            const resolvedSlotId = slotId ?? 0;
                             return {
                                 offerId,
-                                slotId: slotId ?? 0,
-                                slot: slotById.get(slotId) || ((shift as any).slots || [])[0] || null,
+                                slotId: resolvedSlotId,
+                                slot: slotById.get(resolvedSlotId) || ((shift as any).slots || [])[0] || null,
                                 name: interest.displayName || interest.display_name || interest.userName || interest.user_name || interest.email || 'Participant',
                             };
                         })

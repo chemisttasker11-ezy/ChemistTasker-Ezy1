@@ -1,0 +1,25 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Shift Details Changed{% endblock %}
+
+{% block content %}
+<h2>Shift details changed</h2>
+
+<p>Hi {{ user_first_name }},</p>
+<p>
+    A shift you interacted with has been changed. Please review the updated details and make sure it still matches you.
+</p>
+
+<p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
+<p class="meta"><b>Role:</b> {{ role_needed }}</p>
+{% for slot in slot_details %}
+<p class="meta">
+    <b>Shift:</b> {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+    {% if slot.rate %}<br><b>Rate:</b> ${{ slot.rate }}/hr{% endif %}
+</p>
+{% endfor %}
+
+<a class="btn" href="{{ shift_link }}">Review Shift</a>
+
+<p>Thanks,<br>The ChemistTasker Team</p>
+{% endblock %}

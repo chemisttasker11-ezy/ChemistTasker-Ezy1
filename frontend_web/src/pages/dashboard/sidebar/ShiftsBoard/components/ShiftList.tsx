@@ -572,12 +572,15 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                   alignItems={{ xs: 'stretch', sm: 'center' }}
                                 >
                                   <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-                                    {canSelectSlots && isPendingOfferSlot && (
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={() => toggleSlotSelection(shift.id, slotId)}
-                        disabled={slotActionsDisabled}
-                      />
+                                    {canSelectSlots && (!isOffersMode || isPendingOfferSlot) && (
+                                      <Checkbox
+                                        checked={isSelected || (!isOffersMode && (isSlotApplied || isCountered))}
+                                        onChange={() => toggleSlotSelection(shift.id, slotId)}
+                                        disabled={
+                                          slotActionsDisabled ||
+                                          (!isOffersMode && (isSlotRejected || isSlotApplied || isCountered))
+                                        }
+                                      />
                                     )}
                                     <Box sx={{ minWidth: 0 }}>
                                       <Typography variant="body2" fontWeight={600} sx={{ overflowWrap: 'anywhere' }}>
@@ -654,7 +657,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                               onClick={() => openCounterOffer(shift, selection)}
                               disabled={slotActionsDisabled}
                             >
-                              Counter Selected
+                              {isOffersMode ? 'Counter Selected' : 'Send counter offer for selected'}
                             </Button>
                           )}
                           <Button
@@ -667,7 +670,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                               clearSelection(shift.id);
                             }}
                           >
-                            {isOffersMode ? 'Confirm' : 'Apply to'} {selection.size} Selected
+                            {isOffersMode ? `Confirm ${selection.size} Selected` : 'Apply for selected slots'}
                           </Button>
                           {(onRejectSlots || onRejectSlot) && rejectAllowed && (
                             <Button
@@ -677,7 +680,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                               disabled={slotActionsDisabled || isRejectedShift}
                               onClick={() => handleRejectSlots(shift, Array.from(selection))}
                             >
-                              Reject {selection.size} Selected
+                              {isOffersMode ? `Reject ${selection.size} Selected` : 'Reject selected'}
                             </Button>
                           )}
                         </Stack>

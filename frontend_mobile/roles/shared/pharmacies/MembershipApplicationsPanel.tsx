@@ -42,7 +42,7 @@ const membershipDisplayName = (membership: MembershipDTO) => {
         readMembershipValue(membership, 'invitedName', 'invited_name') ||
         (membership as any).name ||
         [first, last].filter(Boolean).join(' ') ||
-        'Invited worker'
+        'Invited team member'
     );
 };
 
@@ -84,7 +84,7 @@ export function PendingDirectInvitationsPanel({
                                 {role ? <Text style={styles.detailText}>Role: {role}</Text> : null}
                                 {workType ? <Text style={styles.detailText}>Work type: {workType}</Text> : null}
                                 {jobTitle ? <Text style={styles.detailText}>Job title: {jobTitle}</Text> : null}
-                                <Text style={styles.detailText}>Waiting for worker response</Text>
+                                <Text style={styles.detailText}>Waiting for team member response</Text>
                             </View>
                         </Card.Content>
                     </Card>

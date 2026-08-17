@@ -3,6 +3,7 @@ Hi {{ owner_name }},
 {{ worker_name }} has rejected your shift offer.
 
 Pharmacy: {{ pharmacy_name }}
+{{ worker_role_label|default:"Candidate" }}: {{ worker_name }}
 Role: {{ role_needed }}
 Date: {{ shift_date|default:"N/A" }}
 Rate: {{ rate|default:"N/A" }}

@@ -430,8 +430,20 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                         <Button
                                             size="small"
                                             variant="contained"
-                                            color="warning"
-                                            sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
+                                            sx={{
+                                                flexShrink: 0,
+                                                minHeight: 36,
+                                                borderRadius: 1.5,
+                                                fontWeight: 800,
+                                                bgcolor: '#F9F295',
+                                                backgroundImage: 'linear-gradient(90deg, #F9F295 0%, #E0AA3E 55%, #B88A44 100%)',
+                                                color: '#111827',
+                                                boxShadow: '0 8px 16px rgba(184,138,68,.24)',
+                                                '&:hover': {
+                                                    bgcolor: '#E0AA3E',
+                                                    backgroundImage: 'linear-gradient(90deg, #FAF398 0%, #D2AC47 55%, #926F34 100%)',
+                                                },
+                                            }}
                                             onClick={() => onBuzzWorker(Number(pendingOfferId))}
                                             disabled={buzzLoadingOfferId === Number(pendingOfferId)}
                                             startIcon={

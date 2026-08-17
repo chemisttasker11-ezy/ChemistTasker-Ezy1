@@ -124,10 +124,10 @@ export default function HistoryShiftsView() {
                 stars: currentStars,
                 comment: currentComment,
             });
-            setSnackbar('Worker rating saved successfully!');
+            setSnackbar('Rating saved successfully!');
             setRatingDialog(false);
         } catch {
-            setSnackbar('Failed to save worker rating');
+            setSnackbar('Failed to save rating');
         } finally {
             setSavingRating(false);
         }
@@ -137,7 +137,7 @@ export default function HistoryShiftsView() {
         <>
             <View style={styles.pageHeader}>
                 <Text style={styles.pageTitle}>Shift History</Text>
-                <Text style={styles.pageSubtitle}>Review completed shifts and rate assigned workers</Text>
+                <Text style={styles.pageSubtitle}>Review completed shifts and rate assigned team members</Text>
             </View>
 
             <OwnerAssignedShiftBoard
@@ -187,7 +187,7 @@ export default function HistoryShiftsView() {
 
             <Portal>
                 <Dialog visible={ratingDialog} onDismiss={() => setRatingDialog(false)}>
-                    <Dialog.Title>Review Assigned Worker</Dialog.Title>
+                    <Dialog.Title>Review Assigned Team Member</Dialog.Title>
                     <Dialog.Content>
                         {loadingRating ? (
                             <View style={styles.centered}>

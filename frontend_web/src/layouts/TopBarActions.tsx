@@ -1237,6 +1237,12 @@ export default function TopBarActions({
     (item: NotificationItem) => {
       const payload: any = item.payload ?? {};
       const shiftId = payload.shift_id ?? payload.shiftId ?? null;
+      const slotId =
+        payload.slot_id ??
+        payload.slotId ??
+        (Array.isArray(payload.slot_ids) ? payload.slot_ids[0] : null) ??
+        (Array.isArray(payload.slotIds) ? payload.slotIds[0] : null) ??
+        null;
       const offerId = payload.offer_id ?? payload.offerId ?? null;
       const conversationId =
         payload.conversation_id ??
@@ -1248,12 +1254,20 @@ export default function TopBarActions({
       const navigateToActionUrl = (actionUrl: string) => {
         try {
           const target = new URL(actionUrl, window.location.origin);
+          target.searchParams.set("notification_id", String(item.id));
+          target.searchParams.set("_ntf", String(Date.now()));
+          if (shiftId != null) target.searchParams.set("shift_id", String(shiftId));
+          if (slotId != null) target.searchParams.set("slot_id", String(slotId));
+          if (offerId != null) target.searchParams.set("offer_id", String(offerId));
           if (target.origin === window.location.origin) {
             const ownerPharmacyId = payload.pharmacy_id ?? payload.pharmacyId ?? null;
             const adminMembershipPathMatch = target.pathname.match(/^\/dashboard\/admin\/(\d+)\/manage-pharmacies\/my-pharmacies\/?$/);
             if (String(user?.role || "").toUpperCase() === "OWNER" && adminMembershipPathMatch) {
               const pharmacyId = ownerPharmacyId ?? adminMembershipPathMatch[1];
-              navigate(`/dashboard/owner/manage-pharmacies/my-pharmacies?view=detail&pharmacyId=${pharmacyId}`);
+              target.pathname = "/dashboard/owner/manage-pharmacies/my-pharmacies";
+              target.searchParams.set("view", "detail");
+              target.searchParams.set("pharmacyId", String(pharmacyId));
+              navigate(`${target.pathname}${target.search}${target.hash}`);
               return;
             }
             navigate(`${target.pathname}${target.search}${target.hash}`);
@@ -1264,7 +1278,15 @@ export default function TopBarActions({
           const normalized = actionUrl.startsWith('/')
             ? actionUrl
             : `/${actionUrl}`;
-          navigate(normalized);
+          const [pathAndSearch, hash = ""] = normalized.split("#");
+          const [path, search = ""] = pathAndSearch.split("?");
+          const params = new URLSearchParams(search);
+          params.set("notification_id", String(item.id));
+          params.set("_ntf", String(Date.now()));
+          if (shiftId != null) params.set("shift_id", String(shiftId));
+          if (slotId != null) params.set("slot_id", String(slotId));
+          if (offerId != null) params.set("offer_id", String(offerId));
+          navigate(`${path}?${params.toString()}${hash ? `#${hash}` : ""}`);
         }
       };
       if (conversationId) {
@@ -1283,20 +1305,32 @@ export default function TopBarActions({
             const params = new URLSearchParams();
             params.set("tab", "accepted");
             if (shiftId != null) params.set("shift_id", String(shiftId));
+            if (slotId != null) params.set("slot_id", String(slotId));
             params.set("offer_id", String(offerId));
+            params.set("notification_id", String(item.id));
+            params.set("_ntf", String(Date.now()));
             navigate(`/dashboard/${rolePath}/shifts?${params.toString()}`);
           } else if (shiftId != null) {
-            navigate(`/dashboard/${rolePath}/shifts/${shiftId}`);
+            const params = new URLSearchParams();
+            if (slotId != null) params.set("slot_id", String(slotId));
+            params.set("notification_id", String(item.id));
+            params.set("_ntf", String(Date.now()));
+            navigate(`/dashboard/${rolePath}/shifts/${shiftId}?${params.toString()}`);
           } else if (item.actionUrl) {
             navigateToActionUrl(item.actionUrl);
           }
         } else if (shiftId != null) {
+          const params = new URLSearchParams();
+          if (slotId != null) params.set("slot_id", String(slotId));
+          if (offerId != null) params.set("offer_id", String(offerId));
+          params.set("notification_id", String(item.id));
+          params.set("_ntf", String(Date.now()));
           if (activePersona === "admin" && activeAdminAssignment?.pharmacy_id) {
-            navigate(`/dashboard/admin/${activeAdminAssignment.pharmacy_id}/shifts/${shiftId}`);
+            navigate(`/dashboard/admin/${activeAdminAssignment.pharmacy_id}/shifts/${shiftId}?${params.toString()}`);
           } else if (role === "OWNER") {
-            navigate(`/dashboard/owner/shifts/${shiftId}`);
+            navigate(`/dashboard/owner/shifts/${shiftId}?${params.toString()}`);
           } else {
-            navigate(`/dashboard/organization/shifts/${shiftId}`);
+            navigate(`/dashboard/organization/shifts/${shiftId}?${params.toString()}`);
           }
         } else if (item.actionUrl) {
           navigateToActionUrl(item.actionUrl);

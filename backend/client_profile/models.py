@@ -2089,6 +2089,7 @@ class ShiftOffer(models.Model):
         related_name="generated_shift_offers",
     )
     expires_at = models.DateTimeField(null=True, blank=True)
+    last_buzzed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

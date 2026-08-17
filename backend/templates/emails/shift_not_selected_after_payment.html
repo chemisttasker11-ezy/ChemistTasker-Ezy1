@@ -1,0 +1,43 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Shift Filled{% endblock %}
+
+{% block content %}
+<h2>This shift has been filled</h2>
+
+<p>Hi {{ user_first_name }},</p>
+<p>
+    Thanks for confirming your availability for <b>{{ pharmacy_name }}</b>.
+    This shift was finalized with another candidate, so no action is needed from you.
+</p>
+
+
+<p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
+<p class="meta"><b>Role:</b> {{ role_needed }}</p>
+{% for slot in slot_details %}
+<p class="meta">
+    <b>Shift:</b> {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+    {% if slot.rate %}<br><b>Rate:</b> ${{ slot.rate }}/hr{% endif %}
+</p>
+{% endfor %}
+<p>
+    Keep an eye on other roles and new shifts here.
+</p>
+<p>
+    <a class="btn" href="{{ shift_board_link }}">Browse Shifts</a>
+</p>
+<p>
+    To get instant notifications when a new shift matches your availability, update your availability.
+</p>
+<p>
+    <a class="btn" href="{{ availability_link }}">Update Availability</a>
+</p>
+<p>
+    You can also publish your availability so pharmacies can find you.
+</p>
+<p>
+    <a class="btn" href="{{ interests_link }}">Publish Availability</a>
+</p>
+
+<p>Thanks,<br>The ChemistTasker Team</p>
+{% endblock %}

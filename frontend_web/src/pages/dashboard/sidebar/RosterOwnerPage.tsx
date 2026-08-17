@@ -407,7 +407,7 @@ export default function RosterOwnerPage() {
   const loadAssignments = async (pharmacyId: number, startDate?: string, endDate?: string) => {
     setIsAssignmentsLoading(true);
     try {
-      // Fetch both assignments and worker requests in parallel
+      // Fetch both assignments and staff requests in parallel
       const [assignmentsData, requestsData, openShiftData] = await Promise.all([
         fetchRosterOwnerAssignments({ pharmacyId, startDate, endDate }),
         fetchWorkerShiftRequestsService({ pharmacyId, startDate, endDate }),
@@ -804,7 +804,7 @@ export default function RosterOwnerPage() {
         });
     });
 
-    // NEW: Map worker cover requests
+    // NEW: Map staff cover requests
     const requestEvents = workerRequests
       .filter(req => Number(req.pharmacy) === Number(selectedPharmacyId))
       .filter(req => req.status === 'PENDING') // Only show pending requests
@@ -1203,7 +1203,7 @@ export default function RosterOwnerPage() {
                         <ListItem><ListItemText primary="Shift Date" secondary={moment(selectedAssignment.slotDate).format('dddd, MMMM Do YYYY')} /></ListItem>
                         <ListItem><ListItemText primary="Leave Type" secondary={LEAVE_TYPES_MAP[selectedAssignment.leaveRequest.leaveType] || selectedAssignment.leaveRequest.leaveType} /></ListItem>
                     </List>
-                    <Typography variant="subtitle2" sx={{ mt: 2, color: 'text.secondary' }}>Worker's Note:</Typography>
+                    <Typography variant="subtitle2" sx={{ mt: 2, color: 'text.secondary' }}>Team Member's Note:</Typography>
                     <Paper variant="outlined" sx={{ p: 2, mt: 1, minHeight: '60px', bgcolor: 'grey.100' }}>
                         <Typography variant="body2" sx={{ fontStyle: selectedAssignment.leaveRequest.note ? 'normal' : 'italic', color: selectedAssignment.leaveRequest.note ? 'text.primary' : 'text.secondary' }}>
                             {selectedAssignment.leaveRequest.note || "No note provided."}
@@ -1235,7 +1235,7 @@ export default function RosterOwnerPage() {
                         <ListItem><ListItemText primary="Time" secondary={`${moment(selectedCoverRequest.startTime, "HH:mm:ss").format("h:mm A")} - ${moment(selectedCoverRequest.endTime, "HH:mm:ss").format("h:mm A")}`} /></ListItem>
                         <ListItem><ListItemText primary="Role" secondary={selectedCoverRequest.role} /></ListItem>
                     </List>
-                    <Typography variant="subtitle2" sx={{ mt: 2, color: 'text.secondary' }}>Worker's Note:</Typography>
+                    <Typography variant="subtitle2" sx={{ mt: 2, color: 'text.secondary' }}>Team Member's Note:</Typography>
                     <Paper variant="outlined" sx={{ p: 2, mt: 1, minHeight: '60px', bgcolor: 'grey.100' }}>
                         <Typography variant="body2" sx={{ fontStyle: selectedCoverRequest.note ? 'normal' : 'italic', color: selectedCoverRequest.note ? 'text.primary' : 'text.secondary' }}>
                             {selectedCoverRequest.note || "No note provided."}

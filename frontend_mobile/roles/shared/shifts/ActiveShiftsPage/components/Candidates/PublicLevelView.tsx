@@ -291,7 +291,8 @@ export default function PublicLevelView({
                                             loading={buzzLoadingOfferId === Number(pendingOfferId)}
                                             disabled={buzzLoadingOfferId === Number(pendingOfferId)}
                                             onPress={() => onBuzzWorker(Number(pendingOfferId))}
-                                            style={styles.candidateButton}
+                                            style={styles.buzzButton}
+                                            labelStyle={styles.buzzButtonLabel}
                                         >
                                             Buzz
                                         </Button>
@@ -398,6 +399,14 @@ const styles = StyleSheet.create({
     },
     candidateButton: {
         alignSelf: 'flex-start',
+    },
+    buzzButton: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#F9F295',
+    },
+    buzzButtonLabel: {
+        color: '#111827',
+        fontWeight: '800',
     },
     pendingChip: {
         backgroundColor: '#F59E0B',

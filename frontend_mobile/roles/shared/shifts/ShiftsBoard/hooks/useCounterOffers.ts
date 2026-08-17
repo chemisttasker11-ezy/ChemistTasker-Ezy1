@@ -165,7 +165,7 @@ export const useCounterOffers = ({
             try {
                 const remote = await fetchShiftCounterOffersService(reviewOfferShiftId);
                 let offers = Array.isArray(remote) ? remote : [];
-                // Workers should only see their own offers; filter defensively.
+                // Candidates should only see their own offers; filter defensively.
                 if (currentUserId != null) {
                     offers = offers.filter((o: any) => getOfferUserId(o) === currentUserId);
                 }

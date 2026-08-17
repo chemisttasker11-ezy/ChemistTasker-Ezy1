@@ -97,12 +97,30 @@ export function findOfferForMemberInShift(
 ): any | null {
     if (!offers || offers.length === 0) return null;
 
+    const getUserId = (record: any): number | null => {
+        const raw =
+            record?.userId ??
+            record?.user_id ??
+            record?.userDetail?.id ??
+            record?.user_detail?.id ??
+            (typeof record?.user === 'object' ? record.user?.id : record?.user) ??
+            null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const getSlotId = (record: any): number | null => {
+        const raw = record?.slotId ?? record?.slot_id ?? record?.slot?.id ?? record?.slot ?? null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+
     const memberAny = member as any;
-    const userId = memberAny.userId ?? memberAny.user?.id ?? null;
-    const memberSlotId = memberAny.slotId ?? null;
+    const userId = getUserId(memberAny);
+    const memberSlotId = getSlotId(memberAny);
 
     return offers.find((offer: any) => {
-        const offerUserId = typeof offer.user === 'object' ? offer.user?.id : (offer.user ?? offer.userId ?? offer.user_id);
+        const offerUserId = getUserId(offer);
         if (offerUserId !== userId) return false;
 
         const effectiveSlotId = selectedSlotId ?? memberSlotId;
@@ -110,10 +128,10 @@ export function findOfferForMemberInShift(
 
         const offerSlots = offer.slots || offer.offer_slots || [];
         if (offerSlots.length === 0) {
-            const offerSlotId = offer.slotId ?? offer.slot_id ?? null;
+            const offerSlotId = getSlotId(offer);
             return offerSlotId == null || offerSlotId === effectiveSlotId;
         }
 
-        return offerSlots.some((s: any) => (s.slot_id ?? s.slotId ?? s.slot?.id) === effectiveSlotId);
+        return offerSlots.some((s: any) => getSlotId(s) === effectiveSlotId);
     }) || null;
 }

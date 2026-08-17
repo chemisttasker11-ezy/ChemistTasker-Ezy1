@@ -117,10 +117,10 @@ export default function CounterOfferDialog({
                                     <Text style={styles.detail}>{candidate.email}</Text>
                                 )}
                                 {pendingConfirmation && (
-                                    <Chip style={styles.pendingChip}>Offer sent. Waiting for worker confirmation.</Chip>
+                                    <Chip style={styles.pendingChip}>Offer sent. Waiting for candidate confirmation.</Chip>
                                 )}
                                 {awaitingPayment && (
-                                    <Chip style={styles.awaitingPaymentChip}>Worker confirmed. Payment is required to finalize.</Chip>
+                                    <Chip style={styles.awaitingPaymentChip}>Candidate confirmed. Payment is required to finalize.</Chip>
                                 )}
                             </Surface>
                         )}

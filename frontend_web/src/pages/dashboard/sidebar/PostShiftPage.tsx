@@ -1941,7 +1941,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
                     {isEmbedded
-                      ? 'This booking stays private and is only visible to the selected worker.'
+                      ? 'This booking stays private and is only visible to the selected team member.'
                       : 'Choose the first audience, then optionally schedule when the shift should expand to broader groups.'}
                   </Typography>
                 </Stack>

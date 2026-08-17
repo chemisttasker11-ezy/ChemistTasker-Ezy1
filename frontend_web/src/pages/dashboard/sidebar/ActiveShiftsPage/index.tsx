@@ -23,6 +23,10 @@ import {
     AccordionDetails,
     Checkbox,
     FormControlLabel,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
 } from '@mui/material';
 import {
     Close as X,
@@ -36,7 +40,7 @@ import {
     LocationOn,
     ExpandMore,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import apiClient from '../../../../utils/apiClient';
 import {
     Shift,
@@ -290,6 +294,7 @@ type ActiveShiftsPageProps = {
 
 const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Active Shifts' }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const outerTheme = useTheme();
     const isDarkMode = outerTheme.palette.mode === 'dark';
     const { user, activePersona, activeAdminPharmacyId } = useAuth();
@@ -298,10 +303,15 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         activePersona === 'admin' && typeof activeAdminPharmacyId === 'number'
             ? activeAdminPharmacyId
             : null;
+    const routeParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    const routeShiftId = toFiniteNumber(routeParams.get('shift_id')) ?? shiftId;
+    const routeSlotId = toFiniteNumber(routeParams.get('slot_id'));
+    const routeNotificationId = routeParams.get('notification_id') ?? routeParams.get('_ntf');
 
     // Snackbar
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [buzzDialog, setBuzzDialog] = useState({ open: false, message: '' });
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
     const itemsPerPage = 6;
     const [page, setPage] = useState(1);
@@ -348,8 +358,51 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     );
 
     // Data hooks
-    const { shifts, setShifts, loading: shiftsLoading, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId });
+    const { shifts, setShifts, loading: shiftsLoading, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId: routeShiftId });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
+    const lastNotificationNavigationRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => {
+        if (!routeNotificationId) return;
+        const signature = `${location.pathname}${location.search}`;
+        if (lastNotificationNavigationRef.current === signature) return;
+        lastNotificationNavigationRef.current = signature;
+        void loadShifts();
+    }, [loadShifts, location.pathname, location.search, routeNotificationId]);
+
+    React.useEffect(() => {
+        if (routeShiftId == null) return;
+        const targetShift = shifts.find((shift) => shift.id === routeShiftId);
+        if (!targetShift) return;
+
+        setExpandedShifts((prev) => {
+            if (prev.has(routeShiftId)) return prev;
+            const next = new Set(prev);
+            next.add(routeShiftId);
+            return next;
+        });
+
+        const isSingleUserShift = Boolean((targetShift as any).singleUserOnly ?? (targetShift as any).single_user_only);
+        if (!isSingleUserShift) {
+            const fallbackSlotId = resolveSlotId((targetShift as any).slots?.[0]);
+            const targetSlotId = routeSlotId ?? fallbackSlotId;
+            if (targetSlotId != null) {
+                setSelectedSlotByShift((prev) => (
+                    prev[routeShiftId] === targetSlotId
+                        ? prev
+                        : { ...prev, [routeShiftId]: targetSlotId }
+                ));
+            }
+        }
+
+        const timeout = window.setTimeout(() => {
+            document.getElementById(`active-shift-card-${routeShiftId}`)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+            });
+        }, 120);
+        return () => window.clearTimeout(timeout);
+    }, [routeShiftId, routeSlotId, shifts]);
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         setPillPayingShiftId(shift.id);
         try {
@@ -565,7 +618,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             try {
                 await loadWorkerRatings(ratingsUserId, 1);
             } catch (error) {
-                console.error('Failed to load worker ratings', error);
+                console.error('Failed to load candidate ratings', error);
             }
         }
 
@@ -639,7 +692,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 try {
                     await loadWorkerRatings(ratingsUserId, 1);
                 } catch (error) {
-                    console.error('Failed to load worker ratings', error);
+                    console.error('Failed to load candidate ratings', error);
                 }
             }
 
@@ -741,7 +794,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 try {
                     await loadWorkerRatings(member.userId, 1);
                 } catch (error) {
-                    console.error('Failed to load worker ratings', error);
+                    console.error('Failed to load candidate ratings', error);
                 }
             }
 
@@ -819,7 +872,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 requiresSlot,
             });
             const result = await acceptOffer({ offer, shiftId, slotId: resolvedSlotId }, async () => {
-                showSnackbar('Offer sent. Waiting for worker confirmation.');
+                showSnackbar('Offer sent. Waiting for candidate confirmation.');
                 setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null });
                 await loadShifts();
                 if (targetShift) {
@@ -923,15 +976,24 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             try {
                 const response = await apiClient.post(`/client-profile/shift-offers/${offerId}/buzz/`);
                 const result = response.data;
-                showSnackbar(result?.detail || 'Worker buzzed');
+                setBuzzDialog({
+                    open: true,
+                    message: result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
+                });
             } catch (error) {
-                console.error('Failed to buzz worker', error);
-                showSnackbar((error as any)?.data?.detail || (error as any)?.message || 'Failed to buzz worker');
+                console.error('Failed to send confirmation reminder', error);
+                const message =
+                    (error as any)?.response?.data?.detail ||
+                    (error as any)?.data?.detail ||
+                    (error as any)?.message ||
+                    'Failed to send confirmation reminder';
+                setBuzzDialog({ open: true, message });
+                await loadShifts();
             } finally {
                 setBuzzLoadingOfferId(null);
             }
         },
-        [showSnackbar]
+        [loadShifts]
     );
 
     // Toggle shift expansion
@@ -1279,6 +1341,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
         return (
             <Card
+                id={`active-shift-card-${shift.id}`}
                 key={shift.id}
                 onClick={() => toggleShiftExpansion(shift.id)}
                 role="button"
@@ -1898,6 +1961,33 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                         </IconButton>
                     }
                 />
+                <Dialog
+                    open={buzzDialog.open}
+                    onClose={() => setBuzzDialog({ open: false, message: '' })}
+                    fullWidth
+                    maxWidth="xs"
+                >
+                    <DialogTitle sx={{ fontWeight: 900 }}>Buzz reminder</DialogTitle>
+                    <DialogContent>
+                        <Typography sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+                            {buzzDialog.message}
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            variant="contained"
+                            onClick={() => setBuzzDialog({ open: false, message: '' })}
+                            sx={{
+                                bgcolor: '#E0AA3E',
+                                color: '#111827',
+                                fontWeight: 900,
+                                '&:hover': { bgcolor: '#B88A44' },
+                            }}
+                        >
+                            Close
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </ThemeProvider>
     );

@@ -491,9 +491,14 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                             lineHeight: 1.2,
                                                             flexShrink: 0,
                                                             fontSize: 9.5,
-                                                            bgcolor: '#D99A00',
+                                                            bgcolor: '#F9F295',
+                                                            backgroundImage: 'linear-gradient(90deg, #F9F295 0%, #E0AA3E 55%, #B88A44 100%)',
                                                             color: '#111827',
-                                                            '&:hover': { bgcolor: '#C18400' },
+                                                            boxShadow: '0 8px 16px rgba(184,138,68,.24)',
+                                                            '&:hover': {
+                                                                bgcolor: '#E0AA3E',
+                                                                backgroundImage: 'linear-gradient(90deg, #FAF398 0%, #D2AC47 55%, #926F34 100%)',
+                                                            },
                                                         }}
                                                         onClick={() => onBuzzWorker(Number(pendingOfferId))}
                                                         disabled={buzzLoadingOfferId === Number(pendingOfferId)}

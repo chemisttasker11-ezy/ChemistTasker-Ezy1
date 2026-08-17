@@ -22,7 +22,7 @@ import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { getOnboardingDetail } from "@chemisttasker/shared-core";
-import { dashboardTitleForRole } from "../utils/roleLabels";
+import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
 
 const DNA = {
   navy: "#061A3D",
@@ -730,7 +730,7 @@ export default function DashboardTopShell({
                   bgcolor: activePersona === "admin" ? "transparent" : "var(--ct-soft-primary)",
                 }}
               >
-                <PersonIcon sx={{ fontSize: 16, mr: 0.75 }} /> Worker
+                <PersonIcon sx={{ fontSize: 16, mr: 0.75 }} /> {userRoleLabel(user?.role, otherStaffRoleType)}
               </Button>
               <Button
                 onClick={(event) => setAdminAnchor(event.currentTarget)}

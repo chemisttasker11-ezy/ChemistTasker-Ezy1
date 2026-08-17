@@ -234,7 +234,7 @@ export default function OwnerPharmacyDetailPage({
           >
             <Box>
               <Typography sx={{ mb: 0.75, color: DASHBOARD_INK, fontSize: { xs: 22, md: 26 }, fontWeight: 950, lineHeight: 1.12 }}>
-                Worker Request Publishing
+                Staff Request Publishing
               </Typography>
               <Typography variant="body2" sx={{ color: DASHBOARD_MUTED, maxWidth: 720, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.45 }}>
                 Allow pharmacy staff shift cover requests and swap requests to be published to your team automatically?

@@ -11,7 +11,7 @@
 </p>
 
 <p class="meta"><b>Pharmacy:</b> {{ pharmacy_name }}</p>
-<p class="meta"><b>Worker:</b> {{ worker_names }}</p>
+<p class="meta"><b>{{ worker_role_label|default:"Team member" }}:</b> {{ worker_names }}</p>
 <p class="meta"><b>Role:</b> {{ role_needed }}</p>
 {% for slot in slot_details %}
 <p class="meta">
@@ -23,8 +23,8 @@
 <a class="btn" href="{{ shift_link }}">View Confirmed Shift</a>
 
 <p>
-    If anything changes, contact the worker as soon as possible.
-    If something happens that may require the worker to be informed, contact ChemistTasker support.
+    If anything changes, contact the {{ worker_role_label|default:"team member"|lower }} as soon as possible.
+    If something happens that may require the {{ worker_role_label|default:"team member"|lower }} to be informed, contact ChemistTasker support.
 </p>
 
 <p>Thanks,<br>The ChemistTasker Team</p>

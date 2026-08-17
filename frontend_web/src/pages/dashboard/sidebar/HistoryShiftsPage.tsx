@@ -122,7 +122,7 @@ export default function HistoryShiftsPage() {
           Shift History
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
-          Review completed shifts and rate assigned workers
+          Review completed shifts and rate assigned team members
         </Typography>
       </Box>
 
@@ -149,7 +149,7 @@ export default function HistoryShiftsPage() {
       />
 
       <Dialog open={rateModalOpen} onClose={() => setRateModalOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Review Assigned Worker</DialogTitle>
+        <DialogTitle>Review Assigned Team Member</DialogTitle>
         <DialogContent>
           {loadingExistingWorkerRating ? (
             <Box display="flex" justifyContent="center" py={3}>
@@ -159,7 +159,7 @@ export default function HistoryShiftsPage() {
             <Box display="flex" flexDirection="column" gap={2} mt={1}>
               <Typography>Select a star rating:</Typography>
               <Rating
-                name="worker-rating"
+                name="assigned-team-member-rating"
                 value={currentStars}
                 size="large"
                 onChange={(_, value) => setCurrentStars(value || 0)}
@@ -188,10 +188,10 @@ export default function HistoryShiftsPage() {
                   stars: currentStars,
                   comment: currentComment,
                 });
-                setSnackbar({ open: true, msg: 'Worker rating saved successfully!' });
+                setSnackbar({ open: true, msg: 'Rating saved successfully!' });
                 setRateModalOpen(false);
               } catch {
-                setSnackbar({ open: true, msg: 'Failed to save worker rating' });
+                setSnackbar({ open: true, msg: 'Failed to save rating' });
               } finally {
                 setSavingWorkerRating(false);
               }

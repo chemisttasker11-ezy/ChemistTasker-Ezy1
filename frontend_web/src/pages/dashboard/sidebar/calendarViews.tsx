@@ -47,7 +47,7 @@ const resolveGroupForEvent = (event: any) => {
   const userDetails = resource.user_detail ?? resource.user_details;
   if (userDetails) {
     const key = `user-${userDetails.id ?? resource.user ?? userDetails.email ?? userDetails.first_name ?? 'unknown'}`;
-    const label = [userDetails.first_name, userDetails.last_name].filter(Boolean).join(' ') || userDetails.email || 'Unnamed Worker';
+    const label = [userDetails.first_name, userDetails.last_name].filter(Boolean).join(' ') || userDetails.email || 'Unnamed Team Member';
     return { key, label };
   }
 
@@ -208,7 +208,7 @@ const WorkerDayView: any = (props: any) => {
       <Box sx={{ display: 'grid', gridTemplateColumns: '220px 1fr', borderBottom: 1, borderColor: 'divider', backgroundColor: 'background.paper', position: 'sticky', top: 0, zIndex: 2 }}>
         <Box sx={{ p: 1.5 }}>
           <Typography variant="caption" sx={{ fontWeight: 600, textTransform: 'uppercase', color: 'text.secondary' }}>
-            Worker
+            Team Member
           </Typography>
         </Box>
         <Box sx={{ position: 'relative', p: 1.5, borderLeft: 1, borderColor: 'divider' }}>

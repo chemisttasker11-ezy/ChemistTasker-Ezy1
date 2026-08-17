@@ -9,7 +9,7 @@ from users.serializers import UserProfileSerializer
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from decimal import Decimal
-from client_profile.utils import q6, send_referee_emails, clean_email, enforce_public_shift_daily_limit, build_shift_email_context, build_shift_offer_context, build_offer_shift_details
+from client_profile.utils import q6, send_referee_emails, clean_email, enforce_public_shift_daily_limit, build_shift_email_context, build_shift_offer_context, build_offer_shift_details, send_shift_updated_notifications
 from client_profile.services import expand_shift_slots
 from client_profile.admin_helpers import has_admin_capability, CAPABILITY_MANAGE_ROSTER
 from client_profile.shift_notifications import notify_shift_users
@@ -5301,6 +5301,7 @@ class ShiftSerializer(serializers.ModelSerializer):
                 request_data=getattr(self.context.get('request'), 'data', {}),
             )
 
+        transaction.on_commit(lambda: send_shift_updated_notifications(instance))
         return instance
 
     def get_slots(self, obj): # NEW METHOD

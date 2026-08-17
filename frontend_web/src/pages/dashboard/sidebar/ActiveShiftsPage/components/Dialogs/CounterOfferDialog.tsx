@@ -122,7 +122,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                 )}
                                 {pendingConfirmation && (
                                     <Chip
-                                        label="Offer sent. Waiting for worker confirmation."
+                                        label="Offer sent. Waiting for candidate confirmation."
                                         size="small"
                                         color="warning"
                                         sx={{ mt: 1, fontWeight: 700 }}
@@ -130,7 +130,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                 )}
                                 {awaitingPayment && (
                                     <Chip
-                                        label="Worker confirmed. Payment is required to finalize."
+                                        label="Candidate confirmed. Payment is required to finalize."
                                         size="small"
                                         color="error"
                                         sx={{ mt: 1, fontWeight: 700 }}
@@ -139,7 +139,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                             </Box>
                         )}
 
-                        {/* Counter-offer details: worker proposed time/rate/travel before owner accepts. */}
+                        {/* Counter-offer details: candidate proposed time/rate/travel before owner accepts. */}
                         {counterOfferDetails && (
                             <>
                                 <Typography variant="subtitle1" fontWeight="bold">

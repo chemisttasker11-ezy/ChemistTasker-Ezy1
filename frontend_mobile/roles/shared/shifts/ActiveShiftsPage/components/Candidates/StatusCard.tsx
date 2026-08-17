@@ -233,7 +233,7 @@ export default function StatusCard({
                                                     loading={buzzLoadingOfferId === Number(pendingOfferId)}
                                                     style={styles.buzzButton}
                                                     contentStyle={styles.compactButtonContent}
-                                                    labelStyle={styles.compactButtonLabel}
+                                                    labelStyle={styles.buzzButtonLabel}
                                                 >
                                                     Buzz
                                                 </Button>
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     },
     buzzButton: {
         alignSelf: 'flex-start',
-        backgroundColor: '#D99A00',
+        backgroundColor: '#F9F295',
         minWidth: 50,
     },
     compactButtonContent: {
@@ -339,6 +339,12 @@ const styles = StyleSheet.create({
         fontSize: 9.5,
         fontWeight: '800',
         marginHorizontal: 2,
+    },
+    buzzButtonLabel: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        marginHorizontal: 2,
+        color: '#111827',
     },
     pendingChip: {
         backgroundColor: customTheme.colors.warningLight,

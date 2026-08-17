@@ -75,20 +75,47 @@ export function mapOfferSlotsWithShift(
 }
 
 export function findOfferForMemberInShift(offers: any[], member: any, slotId: number | null): any | null {
+    const getUserId = (record: any): number | null => {
+        const raw =
+            record?.userId ??
+            record?.user_id ??
+            record?.userDetail?.id ??
+            record?.user_detail?.id ??
+            (typeof record?.user === 'object' ? record.user?.id : record?.user) ??
+            null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+    const getSlotId = (record: any): number | null => {
+        const raw = record?.slotId ?? record?.slot_id ?? record?.slot?.id ?? record?.slot ?? null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+
     return offers.find(o => {
-        const offerUserId = typeof o.user === 'object' ? o.user?.id : o.user;
-        const memberUserId = member.userId ?? member.user?.id;
+        const offerUserId = getUserId(o);
+        const memberUserId = getUserId(member);
         if (offerUserId !== memberUserId) return false;
         if (slotId == null) return true;
         const offerSlots = o.slots || o.offer_slots || [];
-        return offerSlots.some((s: any) => (s.slot_id ?? s.slotId ?? s.slot?.id) === slotId);
+        if (offerSlots.length === 0) {
+            const offerSlotId = getSlotId(o);
+            return offerSlotId == null || offerSlotId === slotId;
+        }
+        return offerSlots.some((s: any) => getSlotId(s) === slotId);
     });
 }
 
 export function filterOffersBySlot(offers: any[], slotId: number | null): any[] {
     if (slotId == null) return offers;
     return offers.filter(o => {
+        const getSlotId = (record: any): number | null => {
+            const raw = record?.slotId ?? record?.slot_id ?? record?.slot?.id ?? record?.slot ?? null;
+            const parsed = Number(raw);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
         const offerSlots = o.slots || o.offer_slots || [];
-        return offerSlots.some((s: any) => (s.slot_id ?? s.slotId ?? s.slot?.id) === slotId);
+        if (offerSlots.length === 0) return getSlotId(o) === slotId;
+        return offerSlots.some((s: any) => getSlotId(s) === slotId);
     });
 }

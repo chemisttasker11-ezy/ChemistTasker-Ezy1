@@ -1,11 +1,12 @@
 {% extends "emails/base.html" %}
 
-{% block title %}Worker Rejected Shift Offer{% endblock %}
+{% block title %}{{ worker_role_label|default:"Candidate" }} Rejected Shift Offer{% endblock %}
 
 {% block content %}
 <p>Hi {{ owner_name }},</p>
         <p>{{ worker_name }} has rejected your shift offer.</p>
         <p class="meta">Pharmacy: {{ pharmacy_name }}</p>
+        <p class="meta">{{ worker_role_label|default:"Candidate" }}: {{ worker_name }}</p>
         <p class="meta">Role: {{ role_needed }}</p>
         <p class="meta">Date: {{ shift_date|default:"N/A" }}</p>
         <p class="meta">Rate: {{ rate|default:"N/A" }}</p>

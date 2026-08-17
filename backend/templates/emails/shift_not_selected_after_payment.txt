@@ -1,0 +1,24 @@
+Hi {{ user_first_name }},
+
+Thanks for confirming your availability for {{ pharmacy_name }}.
+
+This shift was finalized with another candidate, so no action is needed from you.
+
+Pharmacy: {{ pharmacy_name }}
+Role: {{ role_needed }}
+{% for slot in slot_details %}
+Shift: {{ slot.date|default:"Date TBC" }}{% if slot.time_range %} {{ slot.time_range }}{% endif %}
+{% if slot.rate %}Rate: ${{ slot.rate }}/hr{% endif %}
+{% endfor %}
+
+Keep an eye on other roles and new shifts here:
+{{ shift_board_link }}
+
+To get instant notifications when a new shift matches your availability, update your availability:
+{{ availability_link }}
+
+You can also publish your availability so pharmacies can find you:
+{{ interests_link }}
+
+Thanks,
+The ChemistTasker Team

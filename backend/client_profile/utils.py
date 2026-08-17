@@ -13,7 +13,16 @@ from django.db.models import Q
 from django.utils.html import strip_tags
 from rest_framework.exceptions import ValidationError
 
-from client_profile.models import Membership, Shift, ShiftOffer, ShiftSlotAssignment
+from client_profile.models import (
+    Membership,
+    Notification,
+    OtherStaffOnboarding,
+    Shift,
+    ShiftCounterOffer,
+    ShiftInterest,
+    ShiftOffer,
+    ShiftSlotAssignment,
+)
 from client_profile.services import expand_shift_slots, get_locked_rate_for_slot
 from client_profile.admin_helpers import is_admin_of
 
@@ -31,6 +40,27 @@ OTHER_STAFF_ROLE_LABELS = {
 def other_staff_role_label(role_type, fallback="Other Staff"):
     normalized = str(role_type or "").strip().upper()
     return OTHER_STAFF_ROLE_LABELS.get(normalized, fallback)
+
+
+def user_work_role_label(user, fallback="candidate"):
+    role = str(getattr(user, "role", "") or "").strip().upper()
+    if role == "PHARMACIST":
+        return "Pharmacist"
+    if role == "OTHER_STAFF":
+        role_type = None
+        profile = getattr(user, "otherstaffonboarding", None)
+        if profile:
+            role_type = getattr(profile, "role_type", None)
+        if not role_type and getattr(user, "id", None):
+            role_type = (
+                OtherStaffOnboarding.objects.filter(user=user)
+                .values_list("role_type", flat=True)
+                .first()
+            )
+        return other_staff_role_label(role_type, "Other Staff")
+    if role == "EXPLORER":
+        return "Candidate"
+    return fallback
 
 
 def membership_role_label(role):
@@ -173,6 +203,42 @@ def worker_offer_url(user, shift, offer=None) -> str:
     return f"{base}/dashboard/{role_path}/shifts?tab=accepted&shift_id={shift.id}&offer_id={offer_id}"
 
 
+def worker_shift_board_url(user) -> str:
+    base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
+    role_value = str(getattr(user, "role", "") or "").upper()
+    role_route_map = {
+        "PHARMACIST": "pharmacist",
+        "OTHER_STAFF": "otherstaff",
+        "EXPLORER": "explorer",
+    }
+    role_path = role_route_map.get(role_value, "pharmacist")
+    return f"{base}/dashboard/shifts/public-board"
+
+
+def worker_availability_url(user) -> str:
+    base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
+    role_value = str(getattr(user, "role", "") or "").upper()
+    role_route_map = {
+        "PHARMACIST": "pharmacist",
+        "OTHER_STAFF": "otherstaff",
+        "EXPLORER": "explorer",
+    }
+    role_path = role_route_map.get(role_value, "pharmacist")
+    return f"{base}/dashboard/{role_path}/availability"
+
+
+def worker_interests_url(user) -> str:
+    base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
+    role_value = str(getattr(user, "role", "") or "").upper()
+    role_route_map = {
+        "PHARMACIST": "pharmacist",
+        "OTHER_STAFF": "otherstaff",
+        "EXPLORER": "explorer",
+    }
+    role_path = role_route_map.get(role_value, "pharmacist")
+    return f"{base}/dashboard/{role_path}/interests"
+
+
 def build_offer_shift_details(shift, offer=None):
     slots = []
     if offer and getattr(offer, "offered_slot_date", None):
@@ -220,6 +286,99 @@ def build_offer_shift_details(shift, offer=None):
     }
 
 
+def _worker_display_name(user):
+    if not user:
+        return "A candidate"
+    return user.get_full_name() or user.email or getattr(user, "username", "") or "A candidate"
+
+
+def send_shift_not_selected_after_payment_notifications(*, shift, selected_offers):
+    from client_profile.notifications import notify_users
+
+    selected_offers = [offer for offer in selected_offers if offer and getattr(offer, "id", None)]
+    if not selected_offers:
+        return
+
+    login_link = f"{getattr(settings, 'FRONTEND_BASE_URL', '').rstrip('/')}/login"
+    selected_user_ids = {offer.user_id for offer in selected_offers if getattr(offer, "user_id", None)}
+    notified_user_ids = set(selected_user_ids)
+
+    selected_slot_ids = {offer.slot_id for offer in selected_offers if getattr(offer, "slot_id", None)}
+    selected_slots = [offer.slot for offer in selected_offers if getattr(offer, "slot_id", None)]
+
+    if getattr(shift, "single_user_only", False):
+        candidate_user_ids = set(
+            ShiftInterest.objects.filter(shift=shift).values_list("user_id", flat=True)
+        )
+        candidate_user_ids.update(
+            ShiftOffer.objects.filter(shift=shift).values_list("user_id", flat=True)
+        )
+        detail_offer = selected_offers[0]
+        details = build_offer_shift_details(shift, detail_offer)
+        notification_items = [(user_id, details, detail_offer.id) for user_id in candidate_user_ids]
+    else:
+        notification_items = []
+        for slot in selected_slots:
+            candidate_user_ids = set(
+                ShiftInterest.objects.filter(shift=shift, slot=slot).values_list("user_id", flat=True)
+            )
+            candidate_user_ids.update(
+                ShiftOffer.objects.filter(shift=shift, slot=slot).values_list("user_id", flat=True)
+            )
+            detail_offer = next((offer for offer in selected_offers if offer.slot_id == slot.id), None)
+            details = build_offer_shift_details(shift, detail_offer)
+            notification_items.extend((user_id, details, getattr(detail_offer, "id", None)) for user_id in candidate_user_ids)
+
+    users_by_id = {
+        user.id: user
+        for user in get_user_model().objects.filter(
+            id__in={user_id for user_id, _details, _offer_id in notification_items if user_id},
+            is_active=True,
+        )
+    }
+
+    for user_id, details, selected_offer_id in notification_items:
+        if user_id in notified_user_ids:
+            continue
+        worker = users_by_id.get(user_id)
+        if not worker:
+            continue
+        notified_user_ids.add(user_id)
+        notified_user_ids.add(worker.id)
+        notify_users(
+            [worker.id],
+            title=f"Shift filled: {shift.pharmacy.name}",
+            body=f"Thanks for confirming. This shift was finalized with another candidate. {details['shift_summary']}",
+            notification_type=Notification.Type.ALERT,
+            action_url="",
+            payload={
+                "shift_id": shift.id,
+                "selected_offer_id": selected_offer_id,
+                "notification_kind": "shift_not_selected_after_payment",
+                **details,
+            },
+        )
+        if worker.email:
+            ctx = build_shift_email_context(shift, user=worker, role=worker.role.lower())
+            ctx.update(details)
+            ctx.update({
+                "login_link": login_link,
+                "shift_link": login_link,
+                "shift_board_link": worker_shift_board_url(worker),
+                "availability_link": worker_availability_url(worker),
+                "interests_link": worker_interests_url(worker),
+            })
+            async_task(
+                "users.tasks.send_async_email",
+                subject=f"Shift filled at {shift.pharmacy.name}",
+                recipient_list=[worker.email],
+                template_name="emails/shift_not_selected_after_payment.html",
+                context=ctx,
+                text_template="emails/shift_not_selected_after_payment.txt",
+                suppress_auto_notification=True,
+            )
+
+
 def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, payment_method="payment"):
     from client_profile.shift_notifications import notify_shift_users
 
@@ -228,7 +387,8 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
         return
 
     owner_user = paid_by or getattr(shift, "created_by", None) or getattr(getattr(shift.pharmacy, "owner", None), "user", None)
-    payment_label = "Pills" if str(payment_method).lower() == "pills" else "Stripe"
+    method_key = str(payment_method).lower()
+    payment_label = "Pills" if method_key == "pills" else ("Free period" if method_key == "free" else "Stripe")
 
     for offer in finalized_offers:
         worker = offer.user
@@ -265,6 +425,11 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
                 suppress_auto_notification=True,
             )
 
+    send_shift_not_selected_after_payment_notifications(
+        shift=shift,
+        selected_offers=finalized_offers,
+    )
+
     if owner_user and getattr(owner_user, "email", None):
         owner_slot_details = []
         for offer in finalized_offers:
@@ -284,11 +449,21 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
         worker_names = ", ".join(
             offer.user.get_full_name() or offer.user.email for offer in finalized_offers
         )
+        owner_title = (
+            f"Shift finalized: {shift.pharmacy.name}"
+            if method_key == "free"
+            else f"Payment complete: {shift.pharmacy.name}"
+        )
+        owner_body = (
+            f"The shift is locked in for {worker_names}. No payment was required."
+            if method_key == "free"
+            else f"Payment received and the shift is locked in for {worker_names}."
+        )
         notify_shift_users(
             [owner_user],
             shift=shift,
-            title=f"Payment complete: {shift.pharmacy.name}",
-            body=f"Payment received and the shift is locked in for {worker_names}.",
+            title=owner_title,
+            body=owner_body,
             kind="shift_payment_finalized_owner",
             payload={
                 "offer_ids": [offer.id for offer in finalized_offers],
@@ -302,18 +477,81 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
         ctx.update({
             "shift_link": owner_link,
             "worker_names": worker_names,
+            "worker_role_label": user_work_role_label(finalized_offers[0].user, "team member"),
             "payment_method": payment_label,
             "rate": details["slot_details"][0].get("rate") if details["slot_details"] else "",
         })
         async_task(
             "users.tasks.send_async_email",
-            subject=f"Payment complete for your shift at {shift.pharmacy.name}",
+            subject=(
+                f"Shift finalized at {shift.pharmacy.name}"
+                if method_key == "free"
+                else f"Payment complete for your shift at {shift.pharmacy.name}"
+            ),
             recipient_list=[owner_user.email],
             template_name="emails/shift_payment_finalized_owner.html",
             context=ctx,
             text_template="emails/shift_payment_finalized_owner.txt",
             suppress_auto_notification=True,
         )
+
+
+def send_shift_updated_notifications(shift):
+    from client_profile.notifications import notify_users
+
+    user_ids = set()
+    user_ids.update(
+        ShiftInterest.objects.filter(shift=shift, user__is_active=True).values_list("user_id", flat=True)
+    )
+    user_ids.update(
+        ShiftCounterOffer.objects.filter(shift=shift, user__is_active=True).values_list("user_id", flat=True)
+    )
+    user_ids.update(
+        ShiftOffer.objects.filter(
+            shift=shift,
+            user__is_active=True,
+            status__in=[
+                ShiftOffer.Status.PENDING,
+                ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                ShiftOffer.Status.ACCEPTED,
+            ],
+        ).values_list("user_id", flat=True)
+    )
+    user_ids.discard(getattr(shift, "created_by_id", None))
+    if not user_ids:
+        return
+
+    users = list(get_user_model().objects.filter(id__in=user_ids, is_active=True))
+    details = build_offer_shift_details(shift, None)
+    for worker in users:
+        shift_link = active_shift_url_for_user(worker, shift)
+        notify_users(
+            [worker.id],
+            title=f"Shift updated: {shift.pharmacy.name}",
+            body=f"This shift has changed. Please review if it still matches you. {details['shift_summary']}",
+            notification_type=Notification.Type.ALERT,
+            action_url=shift_link,
+            payload={
+                "shift_id": shift.id,
+                "notification_kind": "shift_updated",
+                **details,
+            },
+        )
+        if worker.email:
+            ctx = build_shift_email_context(shift, user=worker, role=worker.role.lower())
+            ctx.update(details)
+            ctx.update({
+                "shift_link": shift_link,
+            })
+            async_task(
+                "users.tasks.send_async_email",
+                subject=f"Shift details changed at {shift.pharmacy.name}",
+                recipient_list=[worker.email],
+                template_name="emails/shift_updated.html",
+                context=ctx,
+                text_template="emails/shift_updated.txt",
+                suppress_auto_notification=True,
+            )
 
 
 def build_shift_counter_offer_context(shift, offer, recipient=None):
@@ -527,6 +765,45 @@ def build_shift_offer_context(shift, offer, recipient=None, *, ignore_slot_filte
         "offered_rate": getattr(offer, "offered_rate", None),
     })
     return base_ctx
+
+
+def build_counter_offer_shift_details(shift, counter_offer):
+    pharmacy_name = getattr(getattr(shift, "pharmacy", None), "name", "") or "Pharmacy"
+    slot_details = []
+    counter_slots = list(counter_offer.slots.select_related("slot")) if counter_offer else []
+
+    for counter_slot in counter_slots:
+        slot = getattr(counter_slot, "slot", None)
+        date_value = getattr(counter_slot, "slot_date", None) or getattr(slot, "date", None)
+        start_value = getattr(counter_slot, "proposed_start_time", None) or getattr(slot, "start_time", None)
+        end_value = getattr(counter_slot, "proposed_end_time", None) or getattr(slot, "end_time", None)
+        rate_value = getattr(counter_slot, "proposed_rate", None)
+        if rate_value in (None, "") and slot is not None:
+            rate_value = getattr(slot, "rate", None)
+        slot_details.append({
+            "pharmacy_name": pharmacy_name,
+            "date": _format_slot_date(date_value),
+            "start_time": _format_slot_time(start_value),
+            "end_time": _format_slot_time(end_value),
+            "time_range": _format_slot_time_range(start_value, end_value),
+            "rate": _format_rate(rate_value),
+            "slot_id": getattr(slot, "id", None),
+        })
+
+    if not slot_details:
+        return build_offer_shift_details(shift, None)
+
+    summary_parts = []
+    for item in slot_details:
+        date_text = item.get("date") or "date not set"
+        time_text = item.get("time_range") or "time not set"
+        summary_parts.append(f"{pharmacy_name} | {date_text} {time_text}")
+
+    return {
+        "pharmacy_name": pharmacy_name,
+        "shift_summary": "; ".join(summary_parts),
+        "slot_details": slot_details,
+    }
 
 def enforce_public_shift_daily_limit(pharmacy, *, max_per_day: int = MAX_PUBLIC_SHIFTS_PER_DAY, on_date=None):
     """

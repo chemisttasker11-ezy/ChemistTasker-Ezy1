@@ -91,7 +91,7 @@ const formatMembershipName = (membership: MembershipDTO) => {
     readMembershipValue(membership, "invitedName", "invited_name") ||
     (membership as any).name ||
     [userDetails.firstName ?? userDetails.first_name, userDetails.lastName ?? userDetails.last_name].filter(Boolean).join(" ") ||
-    "Invited worker"
+    "Invited team member"
   );
 };
 
@@ -146,7 +146,7 @@ export function PendingDirectInvitationsPanel({
                       {jobTitle ? <Chip size="small" label={jobTitle} variant="outlined" /> : null}
                     </Stack>
                   </Box>
-                  <Chip label="Waiting for worker response" color="warning" sx={{ alignSelf: { xs: "flex-start", md: "center" }, fontWeight: 800 }} />
+                  <Chip label="Waiting for team member response" color="warning" sx={{ alignSelf: { xs: "flex-start", md: "center" }, fontWeight: 800 }} />
                 </Stack>
               </CardContent>
             </Card>

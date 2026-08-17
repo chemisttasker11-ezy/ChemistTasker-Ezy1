@@ -2254,8 +2254,8 @@ export default function PharmacyPage({
         );
         showSnackbar(
           nextValue
-            ? "Automatic worker request publishing enabled."
-            : "Automatic worker request publishing disabled.",
+            ? "Automatic staff request publishing enabled."
+            : "Automatic staff request publishing disabled.",
           "success"
         );
       } catch (err: any) {

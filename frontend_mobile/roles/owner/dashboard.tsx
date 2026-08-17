@@ -128,7 +128,7 @@ export default function OwnerDashboard() {
         { title: 'Roster', description: 'Shift centre', icon: 'calendar-month-outline', route: '/owner/shifts' },
         { title: 'Calendar', description: 'Schedule view', icon: 'calendar-outline', route: '/owner/calendar' },
         { title: 'Staff', description: 'Team members', icon: 'account-group-outline', route: '/owner/staff' },
-        { title: 'Locums', description: 'Casual workers', icon: 'account-heart-outline', route: '/owner/locums' },
+        { title: 'Locums', description: 'Casual pharmacy staff', icon: 'account-heart-outline', route: '/owner/locums' },
         { title: 'Talent Board', description: 'Find talent', icon: 'account-search-outline', route: '/owner/talent-board' },
         { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/owner/hub' },
         { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/owner/chat' },

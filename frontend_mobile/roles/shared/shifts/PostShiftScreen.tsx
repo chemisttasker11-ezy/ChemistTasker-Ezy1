@@ -1551,7 +1551,7 @@ export default function PostShiftScreen() {
                     </Text>
                     <Text style={styles.helper}>
                         {isEmbedded
-                            ? 'This booking stays private and is only visible to the selected worker.'
+                            ? 'This booking stays private and is only visible to the selected team member.'
                             : 'Choose the first audience, then optionally schedule when the shift should expand to broader groups.'}
                     </Text>
                     {!isEmbedded && initialAudience ? (

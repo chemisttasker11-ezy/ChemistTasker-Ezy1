@@ -42,12 +42,14 @@ from client_profile.utils import (
     sanitize_chat_text,
     enforce_public_shift_daily_limit,
     build_shift_counter_offer_context,
+    build_counter_offer_shift_details,
     build_shift_interest_context,
     build_shift_offer_context,
     finalize_shift_offer,
     membership_role_label,
     other_staff_role_label,
     send_shift_payment_finalized_notifications,
+    user_work_role_label,
     worker_offer_url,
 )
 from client_profile.notifications import mark_notifications_read, broadcast_message_read, broadcast_message_badge, notify_users
@@ -148,6 +150,7 @@ import logging
 
 log = logging.getLogger("client_profile.views")
 import re
+SHIFT_OFFER_BUZZ_COOLDOWN = timedelta(hours=1)
 # import logging
 # logger = logging.getLogger("roster.debug")
 
@@ -317,8 +320,8 @@ def _membership_controller_users(pharmacy, invited_by=None):
 
 def _format_membership_person(user):
     if not user:
-        return "A worker"
-    return user.get_full_name() or user.email or getattr(user, "username", "") or "A worker"
+        return "A candidate"
+    return user.get_full_name() or user.email or getattr(user, "username", "") or "A candidate"
 
 
 def _notify_membership_invitation_sent(membership):
@@ -4340,7 +4343,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 "updated_at",
             ])
             return Response({
-                'status': 'Offer is already pending worker confirmation.',
+                'status': 'Offer is already pending candidate confirmation.',
                 'offer_id': existing_offer.id,
                 'worker_confirmation_required': True,
             }, status=status.HTTP_200_OK)
@@ -4431,16 +4434,17 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         primary_slot_id = offer_slot_ids[0] if offer_slot_ids else None
         is_public = (shift.visibility == 'PLATFORM')
         sender_name = "A candidate" if is_public else (offer.user.get_full_name() if offer.user else "A candidate")
+        offer_details = build_counter_offer_shift_details(shift, offer)
         notify_shift_managers(
             shift,
             title=f"New counter offer: {shift.pharmacy.name}",
-            body=f"{sender_name} sent a counter offer for your shift. {build_offer_shift_details(shift, None)['shift_summary']}",
+            body=f"{sender_name} sent a counter offer for your shift. {offer_details['shift_summary']}",
             kind="shift_counter_offer_received",
             payload={
                 "offer_id": offer.id,
                 "slot_id": primary_slot_id,
                 "slot_ids": offer_slot_ids,
-                **build_offer_shift_details(shift, None),
+                **offer_details,
             },
         )
 
@@ -4650,7 +4654,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             )
 
         return Response({
-            'detail': 'Offer sent to worker for confirmation.',
+            'detail': 'Offer sent for candidate confirmation.',
             'offer_ids': [o.id for o in created_offers],
             'assignment_ids': [],
             'payment_required': False,
@@ -4675,7 +4679,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
         if offer.user and offer.user.email:
             ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)
-            offer_details = build_offer_shift_details(shift, None)
+            offer_details = build_counter_offer_shift_details(shift, offer)
             ctx.update(offer_details)
             notify_shift_users(
                 [offer.user],
@@ -6022,12 +6026,43 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def buzz(self, request, pk=None):
-        offer = self.get_object()
-        shift = offer.shift
-        if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
-            return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        if offer.status != ShiftOffer.Status.PENDING:
-            return Response({'detail': 'Only pending offers can be buzzed.'}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            offer = (
+                ShiftOffer.objects
+                .select_for_update(of=("self",))
+                .select_related("shift__pharmacy", "user")
+                .get(pk=pk)
+            )
+            shift = offer.shift
+            if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+                return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+            if offer.status != ShiftOffer.Status.PENDING:
+                return Response({
+                    'detail': 'This offer no longer needs a reminder.',
+                    'offer_id': offer.id,
+                    'status': offer.status,
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            now = timezone.now()
+            if offer.last_buzzed_at:
+                next_buzz_at = offer.last_buzzed_at + SHIFT_OFFER_BUZZ_COOLDOWN
+                if next_buzz_at > now:
+                    seconds_remaining = int((next_buzz_at - now).total_seconds())
+                    minutes_remaining = max(1, (seconds_remaining + 59) // 60)
+                    wait_label = (
+                        "about 1 hour"
+                        if minutes_remaining >= 60
+                        else f"about {minutes_remaining} minute{'s' if minutes_remaining != 1 else ''}"
+                    )
+                    return Response({
+                        'detail': f'A reminder was already sent recently. You can send another confirmation reminder in {wait_label}.',
+                        'offer_id': offer.id,
+                        'next_buzz_at': next_buzz_at.isoformat(),
+                        'seconds_remaining': seconds_remaining,
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+            offer.last_buzzed_at = now
+            offer.save(update_fields=['last_buzzed_at', 'updated_at'])
 
         pharmacy_display = shift.pharmacy.name
         if getattr(shift, "post_anonymously", False):
@@ -6112,6 +6147,26 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
                     shift.payment_status = 'PAID'
                     shift.save(update_fields=['payment_status'])
                 assignment_ids, assignment_rates = finalize_shift_offer(offer)
+                if slot_obj:
+                    ShiftOffer.objects.filter(
+                        shift=shift,
+                        slot=slot_obj,
+                        status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+                    ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
+                elif shift.single_user_only:
+                    ShiftOffer.objects.filter(
+                        shift=shift,
+                        slot__isnull=True,
+                        status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+                    ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
+
+        if not requires_payment:
+            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                shift=shift,
+                offers=[offer],
+                paid_by=self._resolve_owner_recipient(shift),
+                payment_method="free",
+            ))
 
         pharmacy_display = shift.pharmacy.name
         if getattr(shift, "post_anonymously", False):
@@ -6163,6 +6218,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         owner_user = self._resolve_owner_recipient(shift)
         if owner_user and owner_user.email:
             worker_name = offer.user.get_full_name() or offer.user.email
+            worker_role_label = user_work_role_label(offer.user, "candidate")
             shift_date = self._first_offer_date(shift, offer)
             shift_link = active_shift_url_for_user(owner_user, shift)
             rate_label = self._format_rate_label(shift, assignment_rates=assignment_rates, offer=offer)
@@ -6170,6 +6226,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
             owner_ctx = {
                 "owner_name": owner_user.get_full_name() or owner_user.email,
                 "worker_name": worker_name,
+                "worker_role_label": worker_role_label,
                 "pharmacy_name": pharmacy_display,
                 "role_needed": shift.role_needed,
                 "shift_date": shift_date,
@@ -6182,7 +6239,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
             notify_shift_users(
                 [owner_user],
                 shift=shift,
-                title=f"Worker confirmed: {pharmacy_display}",
+                title=f"{worker_role_label} confirmed: {pharmacy_display}",
                 body=f"{worker_name} confirmed your shift offer." + (" Payment is required to finalize." if requires_payment else ""),
                 kind="shift_worker_confirmed",
                 payload={
@@ -6195,7 +6252,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
             )
             async_task(
                 'users.tasks.send_async_email',
-                subject=f"Worker confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
+                subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
                 recipient_list=[owner_user.email],
                 template_name="emails/owner_worker_confirmed.html",
                 context=owner_ctx,
@@ -6231,12 +6288,14 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         owner_user = self._resolve_owner_recipient(shift)
         if owner_user and owner_user.email:
             worker_name = offer.user.get_full_name() or offer.user.email
+            worker_role_label = user_work_role_label(offer.user, "candidate")
             shift_date = self._first_offer_date(shift, offer)
             shift_link = build_roster_email_link(owner_user, shift.pharmacy)
             rate_label = self._format_rate_label(shift, offer=offer)
             owner_ctx = {
                 "owner_name": owner_user.get_full_name() or owner_user.email,
                 "worker_name": worker_name,
+                "worker_role_label": worker_role_label,
                 "pharmacy_name": pharmacy_display,
                 "role_needed": shift.role_needed,
                 "shift_date": shift_date,
@@ -6246,14 +6305,14 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
             notify_shift_users(
                 [owner_user],
                 shift=shift,
-                title=f"Worker rejected: {pharmacy_display}",
+                title=f"{worker_role_label} rejected: {pharmacy_display}",
                 body=f"{worker_name} rejected your shift offer.",
                 kind="shift_worker_rejected",
                 payload={"offer_id": offer.id, "status": "DECLINED"},
             )
             async_task(
                 'users.tasks.send_async_email',
-                subject=f"Worker rejected shift offer at {pharmacy_display}",
+                subject=f"{worker_role_label} rejected shift offer at {pharmacy_display}",
                 recipient_list=[owner_user.email],
                 template_name="emails/owner_worker_rejected.html",
                 context=owner_ctx,
@@ -8003,7 +8062,7 @@ class RatingViewSet(viewsets.GenericViewSet):
             # eligibility: rater controls at least one pharmacy where this worker completed >=1 assignment
             if not self._has_completed_relationship_owner_to_worker(user, worker):
                 return Response(
-                    {"detail": "You can only rate workers who completed an assignment at your pharmacy."},
+                    {"detail": "You can only rate team members who completed an assignment at your pharmacy."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             obj, created = Rating.objects.get_or_create(

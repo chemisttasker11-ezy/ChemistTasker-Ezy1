@@ -61,7 +61,7 @@ export function useShiftActions(
             setActionLoading(prev => ({ ...prev, [`accept_${shiftId}_${userId}`]: true }));
             try {
                 const result = await acceptShiftCandidateService(shiftId, { userId, slotId });
-                showSnackbar('Offer sent. Waiting for worker confirmation.');
+                showSnackbar('Offer sent. Waiting for candidate confirmation.');
                 return result || true;
             } catch (error) {
                 console.error('Failed to accept candidate', error);
