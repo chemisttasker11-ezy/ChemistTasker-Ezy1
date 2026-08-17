@@ -6679,8 +6679,13 @@ class SharedShiftDetailView(APIView):
 
         if token:
             try:
-                shift = base_qs.get(share_token=token)
-            except (Shift.DoesNotExist, ValueError):
+                share_token = uuid.UUID(str(token))
+            except (TypeError, ValueError):
+                return Response({"error": "Invalid share token."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                shift = base_qs.get(share_token=share_token)
+            except Shift.DoesNotExist:
                 raise NotFound("This share link is invalid or has expired.")
         else:
             return Response({"error": "A share token is required."}, status=status.HTTP_400_BAD_REQUEST)

@@ -5836,15 +5836,67 @@ class MyShiftSerializer(serializers.ModelSerializer):
 class SharedShiftSerializer(serializers.ModelSerializer):
     """
     Public/shared shift serializer that reuses the full ShiftSerializer output
-    (including UI helper fields) while still honoring anonymization rules.
+    for UI compatibility, then removes private user/payment/internal fields.
     """
+
+    SENSITIVE_TOP_LEVEL_FIELDS = {
+        'created_by',
+        'dedicated_user',
+        'slot_assignments',
+        'pending_payment_slot_ids',
+        'payment_options',
+        'reveal_quota',
+        'reveal_count',
+    }
+    SENSITIVE_PHARMACY_FIELDS = {
+        'email',
+        'owner',
+        'organization',
+        'abn',
+        'abn_entity_name',
+        'abn_entity_type',
+        'abn_status',
+        'abn_gst_registered',
+        'abn_gst_from',
+        'abn_gst_to',
+        'abn_last_checked',
+        'abn_entity_confirmed',
+        'abn_verification_note',
+        'methadone_s8_protocols',
+        'qld_sump_docs',
+        'sops',
+        'induction_guides',
+        'claim_request_id',
+    }
+    SENSITIVE_SLOT_FIELDS = {
+        'awaiting_payment',
+        'awaiting_payment_offer_id',
+        'is_locked',
+        'locked_by_offer_id',
+        'confirmed_assignment_id',
+    }
 
     class Meta:
         model = Shift
         fields = ['id']
 
     def to_representation(self, instance):
-        return ShiftSerializer(instance, context=self.context).data
+        data = ShiftSerializer(instance, context=self.context).data
+
+        for field in self.SENSITIVE_TOP_LEVEL_FIELDS:
+            data.pop(field, None)
+
+        pharmacy_detail = data.get('pharmacy_detail')
+        if isinstance(pharmacy_detail, dict):
+            for field in self.SENSITIVE_PHARMACY_FIELDS:
+                pharmacy_detail.pop(field, None)
+
+        for slot in data.get('slots') or []:
+            if isinstance(slot, dict):
+                for field in self.SENSITIVE_SLOT_FIELDS:
+                    slot.pop(field, None)
+
+        return data
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
     class Meta:
