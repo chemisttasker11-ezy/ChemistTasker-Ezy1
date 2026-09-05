@@ -4541,12 +4541,24 @@ class ShiftSerializer(serializers.ModelSerializer):
             if field and not getattr(shift, field):
                 setattr(shift, field, stamp_time)
 
+    @staticmethod
+    def _normalize_money_value(value, *, field_name, slot_index):
+        if value in (None, ''):
+            return None
+        try:
+            return Decimal(str(value)).quantize(Decimal('0.01'))
+        except Exception:
+            raise serializers.ValidationError({
+                'slots': [f"Slot #{slot_index} has an invalid {field_name}."]
+            })
+
     def _normalize_slots_payload(self, slots_data):
         normalized = []
         for idx, raw_slot in enumerate(slots_data, start=1):
             slot = dict(raw_slot)
             recurring_days = slot.get('recurring_days') or []
             slot['recurring_days'] = sorted({int(day) for day in recurring_days if day is not None})
+            slot['rate'] = self._normalize_money_value(slot.get('rate'), field_name='rate', slot_index=idx)
 
             if slot.get('is_recurring'):
                 if not slot['recurring_days']:

@@ -1427,7 +1427,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       const raw = slotRateRows[idx]?.rate;
       if (raw === undefined || raw === null || raw === '') return null;
       const num = Number(raw);
-      return Number.isFinite(num) ? num : null;
+      return Number.isFinite(num) ? num.toFixed(2) : null;
     };
 
     const payload: any = {
