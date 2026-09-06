@@ -6197,7 +6197,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'bill_to_first_name', 'bill_to_last_name', 'bill_to_abn',
 
             # Issuer snapshot
-            'issuer_first_name', 'issuer_last_name', 'issuer_abn',
+            'issuer_first_name', 'issuer_last_name', 'issuer_abn', 'issuer_email',
         ]
         read_only_fields = [
             'subtotal', 'gst_amount', 'super_amount', 'total', 'created_at'

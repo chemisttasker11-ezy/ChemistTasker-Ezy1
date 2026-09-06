@@ -8693,6 +8693,29 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return _invoice_queryset_for_user(self.request.user)
 
+    def perform_update(self, serializer):
+        invoice = self.get_object()
+        user = self.request.user
+
+        if invoice.user_id == user.id:
+            serializer.save()
+            return
+
+        requested_fields = set(self.request.data.keys())
+        if requested_fields != {"status"}:
+            raise PermissionDenied("Received invoices can only have their payment status updated.")
+
+        next_status = self.request.data.get("status")
+        if next_status not in {"sent", "paid"}:
+            raise PermissionDenied("Received invoices can only be marked as paid or unpaid.")
+
+        serializer.save(status=next_status)
+
+    def perform_destroy(self, instance):
+        if instance.user_id != self.request.user.id:
+            raise PermissionDenied("Only the invoice issuer can delete this invoice.")
+        instance.delete()
+
 
 class GenerateInvoiceView(APIView):
     permission_classes = [IsAuthenticated]
@@ -8792,6 +8815,8 @@ def invoice_pdf_view(request, invoice_id):
 @permission_classes([IsAuthenticated])
 def send_invoice_email(request, invoice_id):
     invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
+    if invoice.user_id != request.user.id:
+        return Response({"detail": "Only the invoice issuer can send this invoice."}, status=403)
 
     # Basic recipient validation
     to_email = (invoice.bill_to_email or "").strip()
@@ -8842,6 +8867,39 @@ def send_invoice_email(request, invoice_id):
     invoice.save(update_fields=['status'])
 
     return Response({"status": "sent"})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def report_invoice_issue(request, invoice_id):
+    invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
+    if invoice.user_id == request.user.id:
+        return Response({"detail": "You cannot report an issue on your own invoice."}, status=400)
+
+    reporter_name = (
+        f"{getattr(request.user, 'first_name', '')} {getattr(request.user, 'last_name', '')}".strip()
+        or getattr(request.user, "email", "")
+        or "The invoice recipient"
+    )
+    note = str(request.data.get("message") or "").strip()
+    body = f"{reporter_name} reported an issue with invoice #{invoice.id}."
+    if note:
+        body = f"{body} {note}"
+
+    notify_users(
+        [invoice.user_id],
+        title=f"Issue reported on invoice #{invoice.id}",
+        body=body,
+        notification_type=Notification.Type.ALERT,
+        action_url=_dashboard_invoice_action_url(invoice, None),
+        payload={
+            "kind": "invoice_issue",
+            "invoice_id": invoice.id,
+            "reported_by_user_id": request.user.id,
+        },
+    )
+
+    return Response({"status": "reported"})
 
 
 

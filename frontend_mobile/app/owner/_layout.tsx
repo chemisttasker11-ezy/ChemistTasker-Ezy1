@@ -29,6 +29,7 @@ const sidebarItems = [
   { label: 'Staff', icon: 'account-group', route: '/owner/staff' },
   { label: 'Locums', icon: 'account-heart', route: '/owner/locums' },
   { label: 'Shifts', icon: 'calendar-month', route: '/owner/shifts' },
+  { label: 'Invoices', icon: 'receipt', route: '/owner/invoice' },
   { label: 'Calendar', icon: 'calendar', route: '/owner/calendar' },
   { label: 'Messages', icon: 'message', route: '/owner/chat' },
   { label: 'Talent Board', icon: 'account-search', route: '/owner/talent-board' },

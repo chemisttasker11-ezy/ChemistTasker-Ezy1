@@ -194,6 +194,13 @@ export default function OwnerOverviewHome({
       tone: "cyan",
     },
     {
+      title: "Invoices",
+      description: "Review received invoices",
+      icon: <CreditCardIcon />,
+      onClick: () => navigate("/dashboard/owner/invoice"),
+      tone: "purple",
+    },
+    {
       title: "Talent Hub",
       description: "Training & recommended topics",
       icon: <AppsIcon />,
@@ -564,9 +571,12 @@ export default function OwnerOverviewHome({
       >
         {stats.map((item, index) => {
           const tone = toneStyles[item.tone];
+          const isInvoiceStat = item.label === "Unpaid Invoices";
           return (
             <Box
               key={item.label}
+              role={isInvoiceStat ? "button" : undefined}
+              onClick={isInvoiceStat ? () => navigate("/dashboard/owner/invoice") : undefined}
               sx={{
                 display: "flex",
                 alignItems: "center",
@@ -576,6 +586,9 @@ export default function OwnerOverviewHome({
                 py: { xs: 2, md: 2.5 },
                 borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` },
                 borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" },
+                cursor: isInvoiceStat ? "pointer" : "default",
+                transition: "background-color 0.18s ease",
+                "&:hover": isInvoiceStat ? { bgcolor: alpha("#6D28D9", 0.04) } : undefined,
               }}
             >
               <Box

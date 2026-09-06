@@ -27,14 +27,17 @@ import EditIcon from '@mui/icons-material/Edit';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SendIcon from '@mui/icons-material/Send';
+import UndoIcon from '@mui/icons-material/Undo';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../../contexts/AuthContext';
+import apiClient from '../../../../utils/apiClient';
 import {
   deleteInvoice,
-  getInvoicePdfUrl,
   getInvoices,
+  reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
@@ -56,6 +59,10 @@ interface Invoice {
   total?: number | string;
   total_amount?: number | string;
   status?: string;
+  user?: number;
+  issuer_first_name?: string;
+  issuer_last_name?: string;
+  issuer_email?: string;
 }
 
 const ITEMS_PER_PAGE = 8;
@@ -82,6 +89,7 @@ const getInvoiceAmount = (invoice: Invoice) => {
 export default function InvoiceManagePage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const isOwner = auth?.user?.role === 'OWNER';
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<InvoiceTimeframe>('this_year');
@@ -176,6 +184,62 @@ export default function InvoiceManagePage() {
     }
   };
 
+  const handleMarkUnpaid = async () => {
+    if (!menuInvoiceId) return;
+    try {
+      await updateInvoice(menuInvoiceId, { status: 'sent' } as any);
+      updateLocalStatus(menuInvoiceId, 'sent');
+      setSnackbar({ open: true, msg: `Invoice #${menuInvoiceId} marked as unpaid.` });
+    } catch {
+      setSnackbar({ open: true, msg: 'Failed to update invoice.' });
+    } finally {
+      handleMenuClose();
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!menuInvoiceId) return;
+    try {
+      const response = await apiClient.get(`/client-profile/invoices/${menuInvoiceId}/pdf/`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `invoice_${menuInvoiceId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setSnackbar({ open: true, msg: 'Failed to download invoice PDF.' });
+    } finally {
+      handleMenuClose();
+    }
+  };
+
+  const handleReportIssue = async () => {
+    if (!menuInvoiceId) return;
+    try {
+      await reportInvoiceIssue(menuInvoiceId);
+      setSnackbar({ open: true, msg: `Issue reported for invoice #${menuInvoiceId}.` });
+    } catch {
+      setSnackbar({ open: true, msg: 'Failed to report invoice issue.' });
+    } finally {
+      handleMenuClose();
+    }
+  };
+
+  const handleReportIssueFor = async (id: number) => {
+    try {
+      await reportInvoiceIssue(id);
+      setSnackbar({ open: true, msg: `Issue reported for invoice #${id}.` });
+    } catch {
+      setSnackbar({ open: true, msg: 'Failed to report invoice issue.' });
+    }
+  };
+
   const handleDelete = async () => {
     if (!menuInvoiceId) return;
     try {
@@ -217,17 +281,22 @@ export default function InvoiceManagePage() {
               Invoices
             </Typography>
             <Typography color="text.secondary">
-              Draft invoices are created first, sending moves them to sent, and you can mark sent invoices as paid from the action menu.
+              {isOwner
+                ? 'Review and track invoices received from pharmacists across your network.'
+                : 'Draft invoices are created first, sending moves them to sent, and you can mark sent invoices as paid from the action menu.'}
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('new')}>
-            New Invoice
-          </Button>
+          {!isOwner && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('new')}>
+              New Invoice
+            </Button>
+          )}
         </Box>
 
         <InvoiceStatsCards
           invoices={invoices}
           timeframe={timeframe}
+          mode={isOwner ? 'received' : 'sent'}
           onTimeframeChange={(value) => {
             setPage(1);
             setTimeframe(value);
@@ -239,7 +308,7 @@ export default function InvoiceManagePage() {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>Client</TableCell>
+                <TableCell>{isOwner ? 'Sender' : 'Client'}</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Total</TableCell>
                 <TableCell>Status</TableCell>
@@ -258,7 +327,11 @@ export default function InvoiceManagePage() {
                     onClick={() => navigate(`${invoice.id}`)}
                   >
                     <TableCell>{invoice.id}</TableCell>
-                    <TableCell>{invoice.pharmacy_name_snapshot || invoice.custom_bill_to_name || 'Client'}</TableCell>
+                    <TableCell>
+                      {isOwner
+                        ? `${invoice.issuer_first_name || ''} ${invoice.issuer_last_name || ''}`.trim() || invoice.issuer_email || 'Sender'
+                        : invoice.pharmacy_name_snapshot || invoice.custom_bill_to_name || 'Client'}
+                    </TableCell>
                     <TableCell>
                       {dayjs.utc(invoice.invoice_date || invoice.created_at).local().format('YYYY-MM-DD')}
                     </TableCell>
@@ -275,9 +348,26 @@ export default function InvoiceManagePage() {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton onClick={(event) => handleMenuOpen(event, invoice.id)}>
-                        <MoreVertIcon />
-                      </IconButton>
+                      <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                        {isOwner && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            startIcon={<ReportProblemIcon />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleReportIssueFor(invoice.id);
+                            }}
+                            sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+                          >
+                            Report Issue
+                          </Button>
+                        )}
+                        <IconButton onClick={(event) => handleMenuOpen(event, invoice.id)}>
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 );
@@ -291,7 +381,9 @@ export default function InvoiceManagePage() {
                         No invoices found
                       </Typography>
                       <Typography color="text.secondary">
-                        Adjust the time frame or create a new invoice.
+                        {isOwner
+                          ? 'Received invoices from pharmacists will appear here.'
+                          : 'Adjust the time frame or create a new invoice.'}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -309,42 +401,55 @@ export default function InvoiceManagePage() {
       </Stack>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem
-          onClick={() => {
-            if (menuInvoiceId) navigate(`${menuInvoiceId}`);
-            handleMenuClose();
-          }}
-        >
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Edit
-        </MenuItem>
-        <MenuItem
-          onClick={handleSend}
-          disabled={String(selectedInvoice?.status || '').toLowerCase() !== 'draft'}
-        >
-          <SendIcon fontSize="small" sx={{ mr: 1 }} />
-          Send
-        </MenuItem>
-        <MenuItem
-          onClick={handleMarkPaid}
-          disabled={!['sent', 'pending'].includes(String(selectedInvoice?.status || '').toLowerCase())}
-        >
-          <CheckCircleOutlineIcon fontSize="small" sx={{ mr: 1 }} />
-          Mark as Paid
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            if (menuInvoiceId) window.open(getInvoicePdfUrl(menuInvoiceId), '_blank');
-            handleMenuClose();
-          }}
-        >
+        {!isOwner && (
+          <MenuItem
+            onClick={() => {
+              if (menuInvoiceId) navigate(`${menuInvoiceId}`);
+              handleMenuClose();
+            }}
+          >
+            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+            Edit
+          </MenuItem>
+        )}
+        {!isOwner && (
+          <MenuItem
+            onClick={handleSend}
+            disabled={String(selectedInvoice?.status || '').toLowerCase() !== 'draft'}
+          >
+            <SendIcon fontSize="small" sx={{ mr: 1 }} />
+            Send
+          </MenuItem>
+        )}
+        {String(selectedInvoice?.status || '').toLowerCase() === 'paid' ? (
+          <MenuItem onClick={handleMarkUnpaid}>
+            <UndoIcon fontSize="small" sx={{ mr: 1 }} />
+            Mark as Unpaid
+          </MenuItem>
+        ) : (
+          <MenuItem
+            onClick={handleMarkPaid}
+            disabled={!['sent', 'pending'].includes(String(selectedInvoice?.status || '').toLowerCase())}
+          >
+            <CheckCircleOutlineIcon fontSize="small" sx={{ mr: 1 }} />
+            Mark as Paid
+          </MenuItem>
+        )}
+        <MenuItem onClick={handleDownloadPdf}>
           <PictureAsPdfIcon fontSize="small" sx={{ mr: 1 }} />
           Download PDF
         </MenuItem>
-        <MenuItem onClick={handleDelete}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Delete
-        </MenuItem>
+        {isOwner ? (
+          <MenuItem onClick={handleReportIssue}>
+            <ReportProblemIcon fontSize="small" sx={{ mr: 1 }} />
+            Report Issue to Sender
+          </MenuItem>
+        ) : (
+          <MenuItem onClick={handleDelete}>
+            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       <Snackbar

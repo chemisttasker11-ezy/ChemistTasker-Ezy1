@@ -10,7 +10,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { getInvoiceDetail, updateInvoice } from '@chemisttasker/shared-core';
+import { getInvoiceDetail, reportInvoiceIssue, updateInvoice } from '@chemisttasker/shared-core';
+import apiClient from '../../../utils/apiClient';
 
 dayjs.extend(utc);
 
@@ -37,6 +38,7 @@ export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isOwner = user?.role === 'OWNER';
 
   // Main state
   const [loading, setLoading] = useState(true);
@@ -341,6 +343,45 @@ export default function InvoiceDetailPage() {
 .finally(() => setSubmitting(false));
   };
 
+  const handleStatusChange = (status: 'sent' | 'paid') => {
+    if (!invoice) return;
+    setSubmitting(true);
+    updateInvoice(Number(id), { status } as any)
+      .then((updated: any) => {
+        setInvoice(updated || { ...invoice, status });
+        setSnackbar({ open: true, msg: status === 'paid' ? 'Invoice marked as paid' : 'Invoice marked as unpaid' });
+      })
+      .catch(() => setSnackbar({ open: true, msg: 'Status update failed' }))
+      .finally(() => setSubmitting(false));
+  };
+
+  const handleDownloadPdf = () => {
+    if (!id) return;
+    apiClient
+      .get(`/client-profile/invoices/${Number(id)}/pdf/`, { responseType: 'blob' })
+      .then((response) => {
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `invoice_${id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(() => setSnackbar({ open: true, msg: 'Failed to download invoice PDF' }));
+  };
+
+  const handleReportIssue = () => {
+    if (!invoice) return;
+    setSubmitting(true);
+    reportInvoiceIssue(invoice.id)
+      .then(() => setSnackbar({ open: true, msg: 'Issue reported to sender' }))
+      .catch(() => setSnackbar({ open: true, msg: 'Failed to report invoice issue' }))
+      .finally(() => setSubmitting(false));
+  };
+
   
   // --- UI ---
   if (loading) {
@@ -357,7 +398,31 @@ export default function InvoiceDetailPage() {
         <Typography variant="h5" gutterBottom>
           Invoice #{id}
         </Typography>
+        {isOwner && (
+          <Box display="flex" gap={1} flexWrap="wrap" mt={2}>
+            {String(invoice?.status || '').toLowerCase() === 'paid' ? (
+              <Button variant="outlined" onClick={() => handleStatusChange('sent')} disabled={submitting}>
+                Mark as Unpaid
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                onClick={() => handleStatusChange('paid')}
+                disabled={submitting || !['sent', 'pending'].includes(String(invoice?.status || '').toLowerCase())}
+              >
+                Mark as Paid
+              </Button>
+            )}
+            <Button variant="outlined" onClick={handleDownloadPdf}>
+              Download PDF
+            </Button>
+            <Button variant="outlined" color="warning" onClick={handleReportIssue} disabled={submitting}>
+              Report Issue to Sender
+            </Button>
+          </Box>
+        )}
 
+        <Box component="fieldset" disabled={isOwner} sx={{ border: 0, m: 0, p: 0 }}>
         {/* Dates */}
         <Box mt={3} display="flex" gap={2}>
           <TextField
@@ -734,9 +799,11 @@ export default function InvoiceDetailPage() {
 
           {/* Delete */}
           <TableCell align="center">
-            <IconButton onClick={() => removeRow(idx)} size="small">
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            {!isOwner && (
+              <IconButton onClick={() => removeRow(idx)} size="small">
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            )}
           </TableCell>
         </TableRow>
       ))}
@@ -745,9 +812,11 @@ export default function InvoiceDetailPage() {
 </TableContainer>
 
           <Box mt={1}>
-            <Button startIcon={<AddIcon />} onClick={addRow} size="small">
-              Add Line Item
-            </Button>
+            {!isOwner && (
+              <Button startIcon={<AddIcon />} onClick={addRow} size="small">
+                Add Line Item
+              </Button>
+            )}
           </Box>
         </Box>
 
@@ -760,16 +829,19 @@ export default function InvoiceDetailPage() {
           <Typography>Super ({superRateSnapshot}%): ${Number(superAmount).toFixed(2)}</Typography>
           <Typography variant="h6">Grand Total: ${Number(grandTotal).toFixed(2)}</Typography>
         </Box>
+        </Box>
 
         {/* Save button */}
         <Box mt={2} textAlign="right">
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={submitting}
-          >
-            {submitting ? 'Saving...' : 'Save Changes'}
-          </Button>
+          {!isOwner && (
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              disabled={submitting}
+            >
+              {submitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          )}
         </Box>
 
         {/* Snackbar */}

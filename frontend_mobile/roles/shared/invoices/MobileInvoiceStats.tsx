@@ -14,6 +14,7 @@ type Props = {
   invoices: InvoiceSummaryItem[];
   timeframe: InvoiceTimeframe;
   onTimeframeChange: (value: InvoiceTimeframe) => void;
+  mode?: 'sent' | 'received';
 };
 
 const CARD_COPY = [
@@ -22,9 +23,15 @@ const CARD_COPY = [
   { key: 'revenueTotal', title: 'Revenue T.Y.', accent: '#059669' },
 ] as const;
 
-export default function MobileInvoiceStats({ invoices, timeframe, onTimeframeChange }: Props) {
+export default function MobileInvoiceStats({ invoices, timeframe, onTimeframeChange, mode = 'sent' }: Props) {
   const filtered = filterInvoicesByTimeframe(invoices, timeframe);
   const stats = buildInvoiceStats(filtered);
+  const cards = mode === 'received'
+    ? [
+        { key: 'paidTotal', title: 'Paid', accent: '#059669' },
+        { key: 'unpaidTotal', title: 'Unpaid', accent: '#D97706' },
+      ] as const
+    : CARD_COPY;
 
   return (
     <View style={styles.wrapper}>
@@ -34,7 +41,9 @@ export default function MobileInvoiceStats({ invoices, timeframe, onTimeframeCha
             Invoice Snapshot
           </Text>
           <Text variant="bodySmall" style={styles.subtitle}>
-            Responsive totals for the selected period
+            {mode === 'received'
+              ? 'Payment status for invoices sent to you'
+              : 'Responsive totals for the selected period'}
           </Text>
         </View>
       </View>
@@ -56,7 +65,7 @@ export default function MobileInvoiceStats({ invoices, timeframe, onTimeframeCha
       </ScrollView>
 
       <View style={styles.grid}>
-        {CARD_COPY.map((card) => (
+        {cards.map((card) => (
           <Card key={card.key} style={styles.card} mode="contained">
             <Card.Content>
               <Text variant="bodySmall" style={styles.cardLabel}>

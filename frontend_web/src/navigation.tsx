@@ -208,6 +208,7 @@ export function getOwnerNav(progressPercent: number, hasUnreadMessages: boolean)
         { segment: "history", title: "Shifts History", icon: <HistoryIcon /> },
       ],
     },
+    { segment: "dashboard/owner/invoice", title: "Invoices", icon: <ReceiptIcon /> },
     { kind: "divider" as const },
     { kind: "header" as const, title: "Learning & Explorer Hub" },
     { segment: "dashboard/owner/interests", title: "Talent Hub", icon: <PersonSearchIcon /> },

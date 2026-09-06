@@ -145,6 +145,7 @@ urlpatterns = [
     path('invoices/generate/', GenerateInvoiceView.as_view(), name='generate-invoice'),
     path('invoices/<int:invoice_id>/pdf/', invoice_pdf_view, name='invoice_pdf'),
     path('invoices/<int:invoice_id>/send/', send_invoice_email, name='send-invoice-email'),
+    path('invoices/<int:invoice_id>/report-issue/', report_invoice_issue, name='report-invoice-issue'),
 
 
     path('messages/<int:message_id>/react/', MessageReactionView.as_view(), name='message-react'),

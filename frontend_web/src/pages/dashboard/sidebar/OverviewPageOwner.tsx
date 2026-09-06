@@ -13,9 +13,11 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ReceiptIcon from "@mui/icons-material/Receipt";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
-import { getOwnerDashboard } from "@chemisttasker/shared-core";
+import { getOwnerDashboard, getInvoices, getInvoicePdfUrl } from "@chemisttasker/shared-core";
 import { dashboardGreetingName } from "../../../utils/displayName";
 
 const formatShiftDate = (value?: string | null) => {
@@ -49,6 +51,7 @@ export default function OverviewPageOwner() {
   const primary = "var(--ct-dashboard-accent, #4A16B8)";
 
   const [data, setData] = useState<DashboardData | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,27 +59,34 @@ export default function OverviewPageOwner() {
     let active = true;
     setLoading(true);
 
-    getOwnerDashboard({ workspace: "platform" })
-      .then((dashboard) => {
-        if (!active) {
-          return;
-        }
+    Promise.allSettled([
+      getOwnerDashboard({ workspace: "platform" }),
+      getInvoices(),
+    ]).then(([dashResult, invResult]) => {
+      if (!active) return;
 
-        setData(dashboard as any);
+      if (dashResult.status === "fulfilled") {
+        setData(dashResult.value as any);
         setError(null);
-      })
-      .catch(() => {
-        if (!active) {
-          return;
-        }
+      } else {
         setData(null);
         setError("Error loading dashboard.");
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
+      }
+
+      if (invResult.status === "fulfilled") {
+        const res = invResult.value;
+        const list = Array.isArray((res as any)?.results)
+          ? (res as any).results
+          : Array.isArray(res)
+          ? (res as any)
+          : [];
+        setInvoices(list);
+      }
+    }).finally(() => {
+      if (active) {
+        setLoading(false);
+      }
+    });
 
     return () => {
       active = false;
@@ -308,6 +318,110 @@ export default function OverviewPageOwner() {
               </Button>
             </Stack>
           ))}
+        </Stack>
+      </Paper>
+
+      {/* Received Invoices Box */}
+      <Paper
+        sx={{
+          borderRadius: { xs: "20px", md: "28px" },
+          bgcolor: "var(--ct-dashboard-card-bg, #FFFFFF)",
+          border: "1px solid var(--ct-dashboard-card-border, #E5ECF7)",
+          boxShadow: "var(--ct-dashboard-card-shadow, 0 8px 24px rgba(6, 18, 58, 0.04))",
+          p: { xs: 2, md: 3 },
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          spacing={2}
+        >
+          <Box flex={1}>
+            <Typography variant="h6" fontWeight={900} color="var(--ct-dashboard-title, #06123A)">
+              Received Invoices
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Review and manage invoices submitted by pharmacists for completed shifts.
+            </Typography>
+          </Box>
+          <Button
+            component={RouterLink}
+            to="/dashboard/owner/invoice"
+            endIcon={<ArrowForwardIcon />}
+          >
+            All Invoices
+          </Button>
+        </Stack>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Stack spacing={1.5}>
+          {invoices.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No received invoices yet. When pharmacists submit an invoice for your pharmacy, it will appear here.
+            </Typography>
+          ) : (
+            invoices.slice(0, 5).map((inv) => {
+              const status = String(inv.status || "sent").toLowerCase();
+              const isPaid = status === "paid";
+              return (
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  key={inv.id}
+                  spacing={1.5}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    transition: "all 0.2s",
+                    bgcolor: "var(--ct-dashboard-soft, #EFE7FF)",
+                    "&:hover": { bgcolor: "var(--ct-dashboard-icon-bg, #EFE7FF)" },
+                  }}
+                >
+                  <Box flex={1}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography fontWeight={700}>
+                        Invoice #{inv.id}
+                      </Typography>
+                      <Chip
+                        label={isPaid ? "Paid" : "Sent"}
+                        size="small"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.75rem",
+                          bgcolor: isPaid ? "#DCFCE7" : "#FEF3C7",
+                          color: isPaid ? "#166534" : "#92400E",
+                        }}
+                      />
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {inv.pharmacy_name_snapshot || "Pharmacy"} • Total: ${Number(inv.total || inv.total_amount || 0).toFixed(2)} • Date: {inv.invoice_date || "N/A"}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => window.open(getInvoicePdfUrl(inv.id), "_blank")}
+                      startIcon={<PictureAsPdfIcon fontSize="small" />}
+                      sx={{ borderRadius: "10px", fontWeight: 700 }}
+                    >
+                      PDF
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      component={RouterLink}
+                      to="/dashboard/owner/invoice"
+                      sx={{ borderRadius: "10px", fontWeight: 700, bgcolor: primary }}
+                    >
+                      Manage
+                    </Button>
+                  </Stack>
+                </Stack>
+              );
+            })
+          )}
         </Stack>
       </Paper>
     </Box>

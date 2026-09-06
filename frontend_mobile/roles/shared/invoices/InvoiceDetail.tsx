@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import {
   getInvoiceDetail,
   getInvoicePdfUrl,
+  reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
@@ -91,6 +92,7 @@ export default function InvoiceDetail({ basePath }: Props) {
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
+  const isReceivedMode = role === 'owner';
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -241,10 +243,34 @@ export default function InvoiceDetail({ basePath }: Props) {
     }
   };
 
+  const handleMarkUnpaid = async () => {
+    if (!invoice) return;
+    setUpdatingStatus(true);
+    try {
+      await updateInvoice(invoice.id, { status: 'sent' } as any);
+      setInvoice((current) => (current ? { ...current, status: 'sent' } : current));
+      setSnackbar('Invoice marked as unpaid');
+    } catch (err: any) {
+      setSnackbar(err?.message || 'Failed to update invoice');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const handleOpenPdf = () => {
     if (!invoice?.id) return;
     const url = getInvoicePdfUrl(invoice.id);
     Linking.openURL(url).catch(() => setSnackbar('Unable to open PDF'));
+  };
+
+  const handleReportIssue = async () => {
+    if (!invoice) return;
+    try {
+      await reportInvoiceIssue(invoice.id);
+      setSnackbar('Issue reported to sender');
+    } catch (err: any) {
+      setSnackbar(err?.message || 'Failed to report invoice issue');
+    }
   };
 
   if (loading) {
@@ -499,13 +525,15 @@ export default function InvoiceDetail({ basePath }: Props) {
               <Text variant="titleMedium" style={styles.sectionTitle}>
                 Line items
               </Text>
-              <IconButton icon="plus" onPress={addItem} />
+              {!isReceivedMode ? <IconButton icon="plus" onPress={addItem} /> : null}
             </View>
             {lineItems.map(li => (
               <View key={li.id} style={styles.lineItem}>
                 <View style={styles.lineHeaderRow}>
                   <Chip compact>{li.category_code}</Chip>
-                  <IconButton icon="delete" size={18} onPress={() => removeItem(li.id!)} />
+                  {!isReceivedMode ? (
+                    <IconButton icon="delete" size={18} onPress={() => removeItem(li.id!)} />
+                  ) : null}
                 </View>
                 <TextInput
                   label="Description"
@@ -590,24 +618,28 @@ export default function InvoiceDetail({ basePath }: Props) {
         </Card>
 
         <View style={styles.actions}>
-          <Button
-            mode="contained"
-            icon="content-save"
-            onPress={handleSave}
-            loading={saving}
-            style={styles.actionBtn}
-          >
-            Save
-          </Button>
-          <Button
-            mode="outlined"
-            icon="email-outline"
-            onPress={handleSendEmail}
-            loading={sending}
-            style={styles.actionBtn}
-          >
-            Send email
-          </Button>
+          {!isReceivedMode ? (
+            <>
+              <Button
+                mode="contained"
+                icon="content-save"
+                onPress={handleSave}
+                loading={saving}
+                style={styles.actionBtn}
+              >
+                Save
+              </Button>
+              <Button
+                mode="outlined"
+                icon="email-outline"
+                onPress={handleSendEmail}
+                loading={sending}
+                style={styles.actionBtn}
+              >
+                Send email
+              </Button>
+            </>
+          ) : null}
           {['sent', 'pending'].includes(String(invoice.status || '').toLowerCase()) ? (
             <Button
               mode="outlined"
@@ -619,9 +651,25 @@ export default function InvoiceDetail({ basePath }: Props) {
               Mark as paid
             </Button>
           ) : null}
+          {String(invoice.status || '').toLowerCase() === 'paid' ? (
+            <Button
+              mode="outlined"
+              icon="undo"
+              onPress={handleMarkUnpaid}
+              loading={updatingStatus}
+              style={styles.actionBtn}
+            >
+              Mark as unpaid
+            </Button>
+          ) : null}
           <Button mode="outlined" icon="file-pdf-box" onPress={handleOpenPdf} style={styles.actionBtn}>
             Open PDF
           </Button>
+          {isReceivedMode ? (
+            <Button mode="outlined" icon="alert-circle-outline" onPress={handleReportIssue} style={styles.actionBtn}>
+              Report issue to sender
+            </Button>
+          ) : null}
         </View>
       </ScrollView>
 

@@ -1310,6 +1310,9 @@ export function getInvoicePdfUrl(id) {
 export function sendInvoiceEmail(id) {
     return fetchApi(`/client-profile/invoices/${id}/send/`, { method: 'POST' });
 }
+export function reportInvoiceIssue(id, data = {}) {
+    return fetchApi(`/client-profile/invoices/${id}/report-issue/`, { method: 'POST', body: JSON.stringify(data) });
+}
 export async function fetchMyMemberships(params) {
     const data = await getMyMemberships(params);
     const list = Array.isArray(data?.results)

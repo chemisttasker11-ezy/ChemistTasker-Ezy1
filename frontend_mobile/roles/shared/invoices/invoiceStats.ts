@@ -68,4 +68,13 @@ export const buildInvoiceStats = (invoices: InvoiceSummaryItem[]) => ({
   revenueTotal: invoices
     .filter((invoice) => normalizeStatus(invoice.status) === 'paid')
     .reduce((sum, invoice) => sum + getInvoiceAmount(invoice), 0),
+  paidTotal: invoices
+    .filter((invoice) => normalizeStatus(invoice.status) === 'paid')
+    .reduce((sum, invoice) => sum + getInvoiceAmount(invoice), 0),
+  unpaidTotal: invoices
+    .filter((invoice) => ['sent', 'pending'].includes(normalizeStatus(invoice.status)))
+    .reduce((sum, invoice) => sum + getInvoiceAmount(invoice), 0),
+  issueCount: invoices
+    .filter((invoice) => ['issue', 'issue_reported', 'disputed'].includes(normalizeStatus(invoice.status)))
+    .length,
 });

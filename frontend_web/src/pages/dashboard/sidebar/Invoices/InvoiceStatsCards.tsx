@@ -12,6 +12,7 @@ type Props = {
   invoices: InvoiceSummaryItem[];
   timeframe: InvoiceTimeframe;
   onTimeframeChange: (value: InvoiceTimeframe) => void;
+  mode?: 'sent' | 'received';
 };
 
 const CARD_COPY = [
@@ -36,11 +37,18 @@ export default function InvoiceStatsCards({
   invoices,
   timeframe,
   onTimeframeChange,
+  mode = 'sent',
 }: Props) {
   const filtered = filterInvoicesByTimeframe(invoices, timeframe);
   const stats = buildInvoiceStats(filtered);
   const timeframeLabel =
     INVOICE_TIMEFRAME_OPTIONS.find((option) => option.value === timeframe)?.label ?? 'This Year';
+  const cards = mode === 'received'
+    ? [
+        { key: 'paidTotal', title: 'Paid', accent: '#10B981' },
+        { key: 'unpaidTotal', title: 'Unpaid', accent: '#F59E0B' },
+      ] as const
+    : CARD_COPY;
 
   return (
     <Stack spacing={2.5} mb={3}>
@@ -55,7 +63,9 @@ export default function InvoiceStatsCards({
             Invoice Snapshot
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Totals update from the selected time frame.
+            {mode === 'received'
+              ? 'Review payment status for invoices sent to you.'
+              : 'Totals update from the selected time frame.'}
           </Typography>
         </Box>
         <Stack direction="row" flexWrap="wrap" gap={1}>
@@ -88,11 +98,11 @@ export default function InvoiceStatsCards({
           gridTemplateColumns: {
             xs: '1fr',
             sm: 'repeat(2, minmax(0, 1fr))',
-            lg: 'repeat(3, minmax(0, 1fr))',
+            lg: mode === 'received' ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))',
           },
         }}
       >
-        {CARD_COPY.map((card) => (
+        {cards.map((card) => (
           <Paper
             key={card.key}
             elevation={0}

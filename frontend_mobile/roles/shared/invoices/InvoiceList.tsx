@@ -15,6 +15,7 @@ import {
   deleteInvoice,
   getInvoices,
   getInvoicePdfUrl,
+  reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
@@ -33,6 +34,9 @@ type Invoice = {
   total_amount?: number | string;
   status?: string;
   reference?: string;
+  issuer_first_name?: string;
+  issuer_last_name?: string;
+  issuer_email?: string;
 };
 
 const PAGE_SIZE = 10;
@@ -44,6 +48,7 @@ export default function InvoiceList({ basePath }: Props) {
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
+  const isReceivedMode = role === 'owner';
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -146,6 +151,18 @@ export default function InvoiceList({ basePath }: Props) {
     }
   };
 
+  const onMarkUnpaid = async (id: number) => {
+    try {
+      await updateInvoice(id, { status: 'sent' } as any);
+      setInvoices((prev) => prev.map((invoice) => (
+        invoice.id === id ? { ...invoice, status: 'sent' } : invoice
+      )));
+      setSnackbar('Invoice marked as unpaid');
+    } catch (err: any) {
+      setSnackbar(err?.message || 'Failed to update invoice');
+    }
+  };
+
   const canMarkPaid = (status?: string) => {
     const normalized = String(status || '').toLowerCase();
     return normalized === 'sent' || normalized === 'pending';
@@ -170,6 +187,15 @@ export default function InvoiceList({ basePath }: Props) {
     ]);
   };
 
+  const onReportIssue = async (id: number) => {
+    try {
+      await reportInvoiceIssue(id);
+      setSnackbar('Issue reported to sender');
+    } catch (err: any) {
+      setSnackbar(err?.message || 'Failed to report invoice issue');
+    }
+  };
+
   const renderItem = ({ item }: { item: Invoice }) => (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -188,6 +214,11 @@ export default function InvoiceList({ basePath }: Props) {
               <Text variant="bodySmall" style={styles.sub}>
                 {formatDate(item.invoice_date || item.created_at)}
               </Text>
+              {isReceivedMode ? (
+                <Text variant="bodySmall" style={styles.ref}>
+                  From: {`${item.issuer_first_name || ''} ${item.issuer_last_name || ''}`.trim() || item.issuer_email || 'Sender'}
+                </Text>
+              ) : null}
               {item.reference ? (
                 <Text variant="bodySmall" style={styles.ref}>
                   Ref: {item.reference}
@@ -213,30 +244,38 @@ export default function InvoiceList({ basePath }: Props) {
                 />
               }
             >
+              {!isReceivedMode ? (
+                <>
+                  <Menu.Item
+                    leadingIcon="pencil"
+                    title="Edit"
+                    onPress={() => {
+                      setMenuFor(null);
+                      router.push(`${resolvedBase}/${item.id}` as any);
+                    }}
+                  />
+                  <Menu.Item
+                    leadingIcon="email-send"
+                    title="Send email"
+                    disabled={String(item.status || '').toLowerCase() !== 'draft'}
+                    onPress={() => {
+                      setMenuFor(null);
+                      void onSendEmail(item.id);
+                    }}
+                  />
+                </>
+              ) : null}
               <Menu.Item
-                leadingIcon="pencil"
-                title="Edit"
+                leadingIcon={String(item.status || '').toLowerCase() === 'paid' ? 'undo' : 'cash-check'}
+                title={String(item.status || '').toLowerCase() === 'paid' ? 'Mark as unpaid' : 'Mark as paid'}
+                disabled={String(item.status || '').toLowerCase() !== 'paid' && !canMarkPaid(item.status)}
                 onPress={() => {
                   setMenuFor(null);
-                  router.push(`${resolvedBase}/${item.id}` as any);
-                }}
-              />
-              <Menu.Item
-                leadingIcon="email-send"
-                title="Send email"
-                disabled={String(item.status || '').toLowerCase() !== 'draft'}
-                onPress={() => {
-                  setMenuFor(null);
-                  void onSendEmail(item.id);
-                }}
-              />
-              <Menu.Item
-                leadingIcon="cash-check"
-                title="Mark as paid"
-                disabled={!canMarkPaid(item.status)}
-                onPress={() => {
-                  setMenuFor(null);
-                  void onMarkPaid(item.id);
+                  if (String(item.status || '').toLowerCase() === 'paid') {
+                    void onMarkUnpaid(item.id);
+                  } else {
+                    void onMarkPaid(item.id);
+                  }
                 }}
               />
               <Menu.Item
@@ -247,14 +286,25 @@ export default function InvoiceList({ basePath }: Props) {
                   onOpenPdf(item.id);
                 }}
               />
-              <Menu.Item
-                leadingIcon="delete"
-                title="Delete"
-                onPress={() => {
-                  setMenuFor(null);
-                  onDelete(item.id);
-                }}
-              />
+              {isReceivedMode ? (
+                <Menu.Item
+                  leadingIcon="alert-circle-outline"
+                  title="Report issue to sender"
+                  onPress={() => {
+                    setMenuFor(null);
+                    void onReportIssue(item.id);
+                  }}
+                />
+              ) : (
+                <Menu.Item
+                  leadingIcon="delete"
+                  title="Delete"
+                  onPress={() => {
+                    setMenuFor(null);
+                    onDelete(item.id);
+                  }}
+                />
+              )}
             </Menu>
           </View>
         </Card.Content>
@@ -270,15 +320,19 @@ export default function InvoiceList({ basePath }: Props) {
             Invoices
           </Text>
           <Text variant="bodyMedium" style={styles.headerSubtitle}>
-            Manage draft, sent, and paid invoices
+            {isReceivedMode
+              ? 'Review invoices received from pharmacists'
+              : 'Manage draft, sent, and paid invoices'}
           </Text>
         </View>
-        <IconButton
-          icon="plus-circle"
-          size={28}
-          iconColor="#4F46E5"
-          onPress={() => router.push(`${resolvedBase}/new` as any)}
-        />
+        {!isReceivedMode ? (
+          <IconButton
+            icon="plus-circle"
+            size={28}
+            iconColor="#4F46E5"
+            onPress={() => router.push(`${resolvedBase}/new` as any)}
+          />
+        ) : null}
       </View>
 
       {loading && !refreshing ? (
@@ -295,6 +349,7 @@ export default function InvoiceList({ basePath }: Props) {
             <MobileInvoiceStats
               invoices={sorted}
               timeframe={timeframe}
+              mode={isReceivedMode ? 'received' : 'sent'}
               onTimeframeChange={(value: InvoiceTimeframe) => {
                 setPage(1);
                 setTimeframe(value);
@@ -312,7 +367,9 @@ export default function InvoiceList({ basePath }: Props) {
             <View style={styles.empty}>
               <Text variant="titleMedium">No invoices yet</Text>
               <Text variant="bodyMedium" style={styles.sub}>
-                Generated invoices will appear here.
+                {isReceivedMode
+                  ? 'Received invoices from pharmacists will appear here.'
+                  : 'Generated invoices will appear here.'}
               </Text>
             </View>
           }
