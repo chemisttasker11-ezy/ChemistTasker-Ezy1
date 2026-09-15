@@ -11,6 +11,8 @@ import './index.css';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import App from './App';
+import PublicRouteBridge from './components/PublicRouteBridge';
+function WebRoot(){return <PublicRouteBridge><App/></PublicRouteBridge>;}
 import LandingPage from './pages/LandingPage';
 import PricingPage from './pages/PricingPage';
 import OrganizationPricingPage from './pages/OrganizationPricingPage';
@@ -43,6 +45,9 @@ import RefereeQuestionnairePage from './pages/onboarding/RefereeQuestionnairePag
 import RefereeRejectPage from './pages/onboarding/RefereeRejectPage';
 import RosterOwnerPage from './pages/dashboard/sidebar/RosterOwnerPage';
 import RosterWorkerPage from './pages/dashboard/sidebar/RosterWorkerPage';
+import KioskPage from './pages/attendance/KioskPage';
+import WorkerAttendancePage from './pages/attendance/WorkerAttendancePage';
+import ManagerAttendanceReviewPage from './pages/attendance/ManagerAttendanceReviewPage';
 
 
 
@@ -111,7 +116,7 @@ import OwnerSetupPharmaciesPage from './pages/setup/OwnerSetupPharmaciesPage';
 
 const router = createBrowserRouter([
   {
-    Component: App,
+    Component: WebRoot,
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'pricing', element: <PricingPage /> },
@@ -141,6 +146,27 @@ const router = createBrowserRouter([
       // Password reset confirm route
       { path: 'reset-password/:uid/:token', element: <ResetPasswordPage /> },
 
+      // Standalone Kiosk Route (Counter Tablet PWA)
+      { path: 'kiosk', element: <KioskPage /> },
+
+      // Direct Attendance Routes
+      {
+        path: 'dashboard/attendance',
+        element: (
+          <ProtectedRoute>
+            <WorkerAttendancePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'dashboard/attendance/reviews',
+        element: (
+          <ProtectedRoute>
+            <ManagerAttendanceReviewPage />
+          </ProtectedRoute>
+        ),
+      },
+
       // Orgnization
       {
         path: 'dashboard/organization',
@@ -161,9 +187,10 @@ const router = createBrowserRouter([
               { path: 'my-pharmacies', element: <PharmacyPage /> },
               { path: 'my-chain', element: <ChainPage /> },
               { path: 'roster', element: <RosterOwnerPage /> },
-
+              { path: 'attendance-reviews', element: <ManagerAttendanceReviewPage /> },
             ],
           },
+          { path: 'attendance-reviews', element: <ManagerAttendanceReviewPage /> },
           { path: 'post-shift', element: <PostShiftPage /> },
           { path: 'shift-center', element: <Navigate to="active" replace /> },
           { path: 'shift-center/:section', element: <OrganizationShiftCenterPage /> },
@@ -225,6 +252,7 @@ const router = createBrowserRouter([
           { path: 'manage-pharmacies', element: <AdminManagePharmaciesPage /> },
           { path: 'manage-pharmacies/my-pharmacies', element: <AdminManagePharmaciesPage /> },
           { path: 'manage-pharmacies/roster', element: <AdminRosterPage /> },
+          { path: 'attendance-reviews', element: <ManagerAttendanceReviewPage /> },
           { path: 'post-shift', element: <AdminPostShiftPage /> },
           { path: 'shift-center', element: <Navigate to="active" replace /> },
           { path: 'shift-center/:section', element: <AdminShiftCenterPage /> },
@@ -325,8 +353,11 @@ const router = createBrowserRouter([
               { path: 'my-pharmacies', element: <PharmacyPage /> },
               { path: 'my-chain', element: <ChainPage /> },
               { path: 'roster', element: <RosterOwnerPage /> },
+              { path: 'attendance-reviews', element: <ManagerAttendanceReviewPage /> },
             ],
           },
+          { path: 'attendance-reviews', element: <ManagerAttendanceReviewPage /> },
+          { path: 'attendance', element: <WorkerAttendancePage /> },
           { path: 'post-shift', element: <PostShiftPage /> },
           { path: 'shift-center', element: <Navigate to="active" replace /> },
           { path: 'shift-center/:section', element: <OwnerShiftCenterPage /> },
@@ -388,6 +419,7 @@ const router = createBrowserRouter([
               { path: 'roster', element: <RosterWorkerPage /> },
             ],
           },
+          { path: 'attendance', element: <WorkerAttendancePage /> },
           { path: 'availability', element: <SetAvailabilityPage /> },
           { path: 'memberships', element: <ManageMembershipsPage /> },
           {
@@ -433,6 +465,7 @@ const router = createBrowserRouter([
               { path: 'roster', element: <RosterWorkerPage /> },
             ],
           },
+          { path: 'attendance', element: <WorkerAttendancePage /> },
           { path: 'availability', element: <SetAvailabilityPage /> },
           { path: 'memberships', element: <ManageMembershipsPage /> },
           {

@@ -1,0 +1,14 @@
+# Ignore everything by default
+*
+
+# Keep the mobile app and the shared-core tarball dependency
+!frontend_mobile
+!frontend_mobile/**
+!shared-core
+!shared-core/chemisttasker-shared-core-1.0.0.tgz
+
+# Never upload local env/caches
+frontend_mobile/.env*
+!frontend_mobile/.env.production
+frontend_mobile/node_modules/
+frontend_mobile/.expo/

@@ -1,0 +1,55 @@
+﻿role_catalog,category,code,label,requires_certificate,description,icon_status
+pharmacist,clinical_services,VACCINATION,Vaccination,True,,To design in Step 2; no verification inferred
+pharmacist,clinical_services,CANNABIS,Cannabis dispensing,False,,To design in Step 2; no verification inferred
+pharmacist,clinical_services,COMPOUNDING,Compounding,True,,To design in Step 2; no verification inferred
+pharmacist,clinical_services,CRED_PHARM,Credentialed Pharmacist,True,,To design in Step 2; no verification inferred
+pharmacist,clinical_services,FIRST_AID,First Aid/CPR,True,,To design in Step 2; no verification inferred
+pharmacist,clinical_services,PDL,PDL Insurance Certificate,True,,To design in Step 2; no verification inferred
+pharmacist,clinical_services,PHARMACOTHERAPY_METHADONE_SUBOXONE,Pharmacotherapy (Methadone/Suboxone),False,Willing to dose,To design in Step 2; no verification inferred
+pharmacist,clinical_services,WEBSTER_PACKING_DAA,Webster Packing / DAA,False,Manual checking,To design in Step 2; no verification inferred
+pharmacist,clinical_services,ROBOT_DISPENSING,Robot,False,Dispensing (Rowa / Alpaca),To design in Step 2; no verification inferred
+pharmacist,clinical_services,STAGED_SUPPLY,Staged Supply,False,Daily/Weekly pickups,To design in Step 2; no verification inferred
+pharmacist,clinical_services,NDSS,NDSS,False,Diabetes Support,To design in Step 2; no verification inferred
+pharmacist,clinical_services,PI_INSURANCE,Professional Indemnity (PI) Insurance,False,Do you have current PI Insurance?,To design in Step 2; no verification inferred
+pharmacist,clinical_services,VACCINATOR,Vaccinator,False,Valid First Aid + CPR required,To design in Step 2; no verification inferred
+pharmacist,dispense_software,FRED,FRED / FRED NXT,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,MINFOS,Minfos,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,Z_DISPENSE,Z Dispense,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,CORUM_LOTS,Corum LOTS,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,DISPENSE_WORKS,Dispense Works,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,RXONE,RxOne,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,AQUARIUS,Aquarius,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,POSWORKS,PosWorks,False,,To design in Step 2; no verification inferred
+pharmacist,dispense_software,OTHER,Other,False,,To design in Step 2; no verification inferred
+pharmacist,expanded_scope,UTI_PRESCRIBER,Uncomplicated UTI Prescriber,False,,To design in Step 2; no verification inferred
+pharmacist,expanded_scope,ORAL_CONTRACEPTIVE_RESUPPLY,Oral Contraceptive Resupply,False,,To design in Step 2; no verification inferred
+pharmacist,expanded_scope,TRAVEL_HEALTH_YELLOW_FEVER,Travel Health / Yellow Fever,False,,To design in Step 2; no verification inferred
+pharmacist,expanded_scope,HMR_ACCREDITED_MRN,HMR Accredited (MRN),False,,To design in Step 2; no verification inferred
+pharmacist,expanded_scope,MEDSCHECK,MedsCheck,False,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,VACCINATION,Vaccination,True,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,CANNABIS,Cannabis dispensing,False,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,COMPOUNDING,Compounding,True,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,CRED_PHARM,Credentialed Pharmacist,True,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,FIRST_AID,First Aid/CPR,True,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,PDL,PDL Insurance Certificate,True,,To design in Step 2; no verification inferred
+otherstaff,clinical_services,PHARMACOTHERAPY_METHADONE_SUBOXONE,Pharmacotherapy (Methadone/Suboxone),False,Willing to dose,To design in Step 2; no verification inferred
+otherstaff,clinical_services,WEBSTER_PACKING_DAA,Webster Packing / DAA,False,Manual checking,To design in Step 2; no verification inferred
+otherstaff,clinical_services,ROBOT_DISPENSING,Robot,False,Dispensing (Rowa / Alpaca),To design in Step 2; no verification inferred
+otherstaff,clinical_services,STAGED_SUPPLY,Staged Supply,False,Daily/Weekly pickups,To design in Step 2; no verification inferred
+otherstaff,clinical_services,NDSS,NDSS,False,Diabetes Support,To design in Step 2; no verification inferred
+otherstaff,clinical_services,PI_INSURANCE,Professional Indemnity (PI) Insurance,False,Do you have current PI Insurance?,To design in Step 2; no verification inferred
+otherstaff,clinical_services,VACCINATOR,Vaccinator,False,Valid First Aid + CPR required,To design in Step 2; no verification inferred
+otherstaff,dispense_software,FRED,FRED / FRED NXT,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,MINFOS,Minfos,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,Z_DISPENSE,Z Dispense,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,CORUM_LOTS,Corum LOTS,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,DISPENSE_WORKS,Dispense Works,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,RXONE,RxOne,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,AQUARIUS,Aquarius,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,POSWORKS,PosWorks,False,,To design in Step 2; no verification inferred
+otherstaff,dispense_software,OTHER,Other,False,,To design in Step 2; no verification inferred
+otherstaff,expanded_scope,UTI_PRESCRIBER,Uncomplicated UTI Prescriber,False,,To design in Step 2; no verification inferred
+otherstaff,expanded_scope,ORAL_CONTRACEPTIVE_RESUPPLY,Oral Contraceptive Resupply,False,,To design in Step 2; no verification inferred
+otherstaff,expanded_scope,TRAVEL_HEALTH_YELLOW_FEVER,Travel Health / Yellow Fever,False,,To design in Step 2; no verification inferred
+otherstaff,expanded_scope,HMR_ACCREDITED_MRN,HMR Accredited (MRN),False,,To design in Step 2; no verification inferred
+otherstaff,expanded_scope,MEDSCHECK,MedsCheck,False,,To design in Step 2; no verification inferred

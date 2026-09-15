@@ -1,3 +1,4 @@
+import {loginHref} from '../../landing_next/shared/browser-session';
 // src/components/ProtectedRoute.tsx
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
@@ -30,13 +31,11 @@ export default function ProtectedRoute({
     return <div>Loading authentication...</div>;
   }
 
-  if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user) {
+    window.location.replace(loginHref(location.pathname+location.search+location.hash));
+    return <div role="status">Opening sign in…</div>;
   }
 
-  if (!user) {
-    return <div>Loading user...</div>;
-  }
 
   const hasBaseRole = user.role === requiredRole;
   const hasOrgRole =

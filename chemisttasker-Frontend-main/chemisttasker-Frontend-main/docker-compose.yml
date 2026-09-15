@@ -1,0 +1,154 @@
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chemisttasker_backend_prod
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file:
+      - path: ./env/backend.prod.env
+        required: false
+    environment:
+      DEBUG: "False"
+      DJANGO_SETTINGS_MODULE: "core.settings"
+      ALLOWED_HOSTS: "chemisttasker.com.au,www.chemisttasker.com.au,backend.chemisttasker.com.au,localhost,127.0.0.1"
+      CORS_ALLOWED_ORIGINS: "https://chemisttasker.com.au,https://www.chemisttasker.com.au"
+      CSRF_TRUSTED_ORIGINS: "https://chemisttasker.com.au,https://www.chemisttasker.com.au,https://backend.chemisttasker.com.au"
+      SECURE_SSL_REDIRECT: "True"
+      SESSION_COOKIE_SECURE: "True"
+      CSRF_COOKIE_SECURE: "True"
+      JWT_COOKIE_SECURE: "True"
+      COLLECT_STATIC: "1"
+      RUN_MIGRATIONS: "1"
+      APP_ENV: "vps"
+      BACKEND_BASE_URL: "https://backend.chemisttasker.com.au"
+      FRONTEND_BASE_URL: "https://chemisttasker.com.au"
+      USE_REDIS_CHANNEL_LAYER: "True"
+      REDIS_URL: "redis://shared_redis:6379/0"
+      CHANNEL_REDIS_URL: "redis://shared_redis:6379/1"
+      CELERY_BROKER_URL: "redis://shared_redis:6379/2"
+      CELERY_RESULT_BACKEND: "redis://shared_redis:6379/3"
+      DJANGO_CACHE_URL: "redis://shared_redis:6379/4"
+      REDIS_KEY_PREFIX: "chemisttasker:prod"
+      CELERY_TASK_DEFAULT_QUEUE: "default"
+      CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+      CELERY_RESULT_EXPIRES: "3600"
+      CELERY_TASK_IGNORE_RESULT: "True"
+      EMAIL_TASK_RATE_LIMIT: "30/m"
+      LOG_LEVEL: "INFO"
+      CELERY_LOG_LEVEL: "INFO"
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "core.asgi:application"]
+    networks:
+      - chemisttasker_network
+      - shared_backend_network
+    volumes:
+      - static_volume:/app/staticfiles
+      - ./backend/media:/app/media
+      - ./backend/verification_outputs:/app/verification_outputs
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "-H", "X-Forwarded-Proto: https", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chemisttasker_celery_prod
+    restart: unless-stopped
+    env_file:
+      - path: ./env/backend.prod.env
+        required: false
+    environment:
+      DEBUG: "False"
+      DJANGO_SETTINGS_MODULE: "core.settings"
+      COLLECT_STATIC: "0"
+      RUN_MIGRATIONS: "0"
+      APP_ENV: "vps"
+      BACKEND_BASE_URL: "https://backend.chemisttasker.com.au"
+      FRONTEND_BASE_URL: "https://chemisttasker.com.au"
+      REDIS_URL: "redis://shared_redis:6379/0"
+      CHANNEL_REDIS_URL: "redis://shared_redis:6379/1"
+      CELERY_BROKER_URL: "redis://shared_redis:6379/2"
+      CELERY_RESULT_BACKEND: "redis://shared_redis:6379/3"
+      DJANGO_CACHE_URL: "redis://shared_redis:6379/4"
+      REDIS_KEY_PREFIX: "chemisttasker:prod"
+      CELERY_TASK_DEFAULT_QUEUE: "default"
+      CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+      CELERY_RESULT_EXPIRES: "3600"
+      CELERY_TASK_IGNORE_RESULT: "True"
+      EMAIL_TASK_RATE_LIMIT: "30/m"
+      LOG_LEVEL: "INFO"
+      CELERY_LOG_LEVEL: "INFO"
+    command: ["celery", "-A", "core", "worker", "-l", "INFO", "-Q", "email,default,notifications,ocr,billing", "--concurrency=2"]
+    depends_on:
+      web:
+        condition: service_started
+    networks:
+      - chemisttasker_network
+      - shared_backend_network
+    volumes:
+      - ./backend/media:/app/media
+      - ./backend/verification_outputs:/app/verification_outputs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping -d celery@$$(hostname)"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chemisttasker_celery_beat_prod
+    restart: unless-stopped
+    env_file:
+      - path: ./env/backend.prod.env
+        required: false
+    environment:
+      DEBUG: "False"
+      DJANGO_SETTINGS_MODULE: "core.settings"
+      COLLECT_STATIC: "0"
+      RUN_MIGRATIONS: "0"
+      APP_ENV: "vps"
+      BACKEND_BASE_URL: "https://backend.chemisttasker.com.au"
+      FRONTEND_BASE_URL: "https://chemisttasker.com.au"
+      REDIS_URL: "redis://shared_redis:6379/0"
+      CHANNEL_REDIS_URL: "redis://shared_redis:6379/1"
+      CELERY_BROKER_URL: "redis://shared_redis:6379/2"
+      CELERY_RESULT_BACKEND: "redis://shared_redis:6379/3"
+      LOG_LEVEL: "INFO"
+      CELERY_LOG_LEVEL: "INFO"
+    command: ["celery", "-A", "core", "beat", "-l", "INFO", "--schedule", "/tmp/celerybeat-schedule"]
+    depends_on:
+      web:
+        condition: service_started
+    networks:
+      - chemisttasker_network
+      - shared_backend_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend_web/Dockerfile
+    container_name: chemisttasker_frontend_prod
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - chemisttasker_network
+      - shared_backend_network
+
+volumes:
+  static_volume:
+
+networks:
+  chemisttasker_network:
+    driver: bridge
+  shared_backend_network:
+    external: true

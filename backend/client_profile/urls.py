@@ -19,6 +19,39 @@ from .hub.api import (
     HubPollCommentViewSet,
     HubPollReactionView,
 )
+from .attendance_views import (
+    KioskActivateView,
+    KioskQRView,
+    KioskPinClockView,
+    WorkerAttendanceStatusView,
+    WorkerClockInView,
+    WorkerBreakStartView,
+    WorkerBreakEndView,
+    WorkerClockOutView,
+    ManagerPendingAttendancesView,
+    ManagerApproveAttendanceView,
+    ManagerRejectAttendanceView,
+    ManagerCreateCorrectionView,
+    ManagerSessionTimelineView,
+    RosterPeriodDetailView,
+    RosterValidateView,
+    RosterPublishView,
+    RosterUnpublishView,
+    WorkerPublishedRosterView,
+    WorkerAcknowledgeRosterView,
+    RosterAcknowledgementStatusView,
+    RosterCopyWeekView,
+    RosterTemplateView,
+    RosterTemplateApplyView,
+    RosterBulkEditView,
+    RosterWorkerSwapRequestView,
+    RosterWorkerCoverRequestView,
+    RosterManagerApproveSwapView,
+    RosterManagerApproveReplacementView,
+    RosterManagerReleaseWorkerView,
+    RosterManagerRejectRequestView,
+    RosterActionAuditListView,
+)
 from rest_framework.routers import DefaultRouter
 
 
@@ -193,6 +226,48 @@ urlpatterns = [
         HubOrganizationProfileView.as_view(),
         name='hub-organization-profile',
     ),
+
+    # Attendance V1 Endpoints
+    # Kiosk
+    path('attendance/kiosk/activate/', KioskActivateView.as_view(), name='attendance-kiosk-activate'),
+    path('attendance/kiosk/qr/', KioskQRView.as_view(), name='attendance-kiosk-qr'),
+    path('attendance/kiosk/pin-clock/', KioskPinClockView.as_view(), name='attendance-kiosk-pin-clock'),
+
+    # Worker
+    path('attendance/worker/status/', WorkerAttendanceStatusView.as_view(), name='attendance-worker-status'),
+    path('attendance/worker/clock-in/', WorkerClockInView.as_view(), name='attendance-worker-clock-in'),
+    path('attendance/worker/break-start/', WorkerBreakStartView.as_view(), name='attendance-worker-break-start'),
+    path('attendance/worker/break-end/', WorkerBreakEndView.as_view(), name='attendance-worker-break-end'),
+    path('attendance/worker/clock-out/', WorkerClockOutView.as_view(), name='attendance-worker-clock-out'),
+
+    # Manager
+    path('attendance/manager/pending/', ManagerPendingAttendancesView.as_view(), name='attendance-manager-pending'),
+    path('attendance/manager/approve/', ManagerApproveAttendanceView.as_view(), name='attendance-manager-approve'),
+    path('attendance/manager/reject/', ManagerRejectAttendanceView.as_view(), name='attendance-manager-reject'),
+    path('attendance/manager/correct/', ManagerCreateCorrectionView.as_view(), name='attendance-manager-correct'),
+    path('attendance/manager/timeline/<int:session_id>/', ManagerSessionTimelineView.as_view(), name='attendance-manager-timeline'),
+
+    # Roster V2 Endpoints
+    path('attendance/roster/period/', RosterPeriodDetailView.as_view(), name='roster-period-detail'),
+    path('attendance/roster/validate/', RosterValidateView.as_view(), name='roster-validate'),
+    path('attendance/roster/publish/', RosterPublishView.as_view(), name='roster-publish'),
+    path('attendance/roster/unpublish/', RosterUnpublishView.as_view(), name='roster-unpublish'),
+    path('attendance/roster/worker/', WorkerPublishedRosterView.as_view(), name='roster-worker-published'),
+    path('attendance/roster/acknowledge/', WorkerAcknowledgeRosterView.as_view(), name='roster-worker-acknowledge'),
+    path('attendance/roster/acknowledgements/<int:period_id>/', RosterAcknowledgementStatusView.as_view(), name='roster-acknowledgement-status'),
+    path('attendance/roster/copy-week/', RosterCopyWeekView.as_view(), name='roster-copy-week'),
+    path('attendance/roster/templates/', RosterTemplateView.as_view(), name='roster-templates'),
+    path('attendance/roster/templates/apply/', RosterTemplateApplyView.as_view(), name='roster-templates-apply'),
+    path('attendance/roster/bulk-edit/', RosterBulkEditView.as_view(), name='roster-bulk-edit'),
+
+    # Worker Actions & Escalation (Checkpoint 12)
+    path('attendance/roster/worker/swap-request/', RosterWorkerSwapRequestView.as_view(), name='roster-worker-swap-request'),
+    path('attendance/roster/worker/cover-request/', RosterWorkerCoverRequestView.as_view(), name='roster-worker-cover-request'),
+    path('attendance/roster/manager/approve-swap/', RosterManagerApproveSwapView.as_view(), name='roster-manager-approve-swap'),
+    path('attendance/roster/manager/approve-replacement/', RosterManagerApproveReplacementView.as_view(), name='roster-manager-approve-replacement'),
+    path('attendance/roster/manager/release-worker/', RosterManagerReleaseWorkerView.as_view(), name='roster-manager-release-worker'),
+    path('attendance/roster/manager/reject-request/', RosterManagerRejectRequestView.as_view(), name='roster-manager-reject-request'),
+    path('attendance/roster/audits/', RosterActionAuditListView.as_view(), name='roster-action-audits'),
 
     # Include the API routes for CRUD operations
     path('', include(router.urls)),

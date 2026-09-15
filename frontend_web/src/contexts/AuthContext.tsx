@@ -1,3 +1,4 @@
+import {logoutSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -15,7 +16,7 @@ import { getRooms } from "@chemisttasker/shared-core";
 import { type PersonaMode, type AdminLevel } from "@chemisttasker/shared-core";
 import { AdminCapability, ALL_ADMIN_CAPABILITIES } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
-import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, isTokenExpired, AUTH_TOKENS_CLEARED_EVENT } from "../utils/tokenService";
+import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, isTokenExpired, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
 export interface OrgMembership {
   organization_id: number;
@@ -74,7 +75,7 @@ type AuthContextType = {
   refresh: string | null;
   user: User | null;
   login: (access: string, refresh: string, user: User, rememberMe?: boolean) => void;
-  logout: () => void;
+  logout: () => Promise<boolean>;
   isLoading: boolean;
   setUser: Dispatch<SetStateAction<User | null>>;
   unreadCount: number;
@@ -97,7 +98,7 @@ export const AuthContext = createContext<AuthContextType>({
   refresh: null,
   user: null,
   login: () => { },
-  logout: () => { },
+  logout: async () => false,
   isLoading: true,
   setUser: () => { },
   unreadCount: 0,
@@ -129,6 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [refresh, setRefresh] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [activePersona, setActivePersonaState] = useState<PersonaMode>("staff");
   const [activeAdminAssignmentId, setActiveAdminAssignmentId] = useState<number | null>(null);
@@ -142,22 +144,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const fetchCurrentUser = useCallback(async (): Promise<User | null> => {
-    try {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const resp = await fetch(`${API_BASE_URL}/users/me/`, {
-        headers,
-      });
-      if (!resp.ok) return null;
-      const data = (await resp.json()) as User;
-      return data;
-    } catch {
-      return null;
-    }
+    const token=getAccessToken();
+    const resp=await fetch(`${API_BASE_URL}/users/me/`,{credentials:'include',headers:token?{Authorization:`Bearer ${token}`}:{}});
+    if(resp.status===401)return null;
+    if(!resp.ok)throw new Error('Your account is temporarily unavailable.');
+    return await resp.json() as User;
   }, []);
 
   const ownedPharmacyIds = useMemo<Set<number>>(() => {
@@ -266,16 +257,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const bootstrap = async () => {
       try {
         await restoreTokensFromStorage();
-        let parsedUser: User | null = null;
-
-        const currentAccess = getAccessToken();
-        if (currentAccess && !isTokenExpired(currentAccess)) {
-          parsedUser = await fetchCurrentUser();
-        }
+        let parsedUser: User | null = await fetchCurrentUser();
 
         if (!parsedUser) {
-          const currentRefresh = getRefreshToken();
-          if (currentRefresh) {
+          {
             const refreshed = await refreshCookieSession(true);
             if (refreshed) {
               parsedUser = await fetchCurrentUser();
@@ -294,8 +279,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRefresh(getRefreshToken());
         setUser(parsedUser);
       } catch {
-        clearTokens();
-        clearLocalAuthState();
+        setSessionError('Unable to connect to your account. Please retry.');
       } finally {
         setIsLoading(false);
       }
@@ -494,20 +478,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(userInfo);
   };
 
-  const logout = useCallback(() => {
-    const previousUserId = user?.id;
-    void fetch(`${API_BASE_URL}/users/logout/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({}),
-    }).catch(() => null);
-    clearLocalAuthState();
-    clearTokens();
-    if (previousUserId) {
-      localStorage.removeItem(personaStorageKey(previousUserId));
-    }
-  }, [clearLocalAuthState, user?.id]);
+  const logout = useCallback(async () => {
+    const previousUserId=user?.id;
+    try {
+      await logoutSession(API_BASE_URL);
+      clearLocalAuthState();clearTokens();
+      if(previousUserId)localStorage.removeItem(personaStorageKey(previousUserId));
+      return true;
+    } catch {setSessionError('Could not log out. Check your connection and retry.');return false;}
+  }, [clearLocalAuthState,user?.id]);
+
+  useEffect(()=>{const sync=()=>{setAccess(getAccessToken());setRefresh(getRefreshToken());};window.addEventListener(AUTH_TOKENS_UPDATED_EVENT,sync);return()=>window.removeEventListener(AUTH_TOKENS_UPDATED_EVENT,sync);},[]);
 
   useEffect(() => {
     const handleTokensCleared = () => {
@@ -548,7 +529,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {children}
+      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:children}
     </AuthContext.Provider>
   );
 }

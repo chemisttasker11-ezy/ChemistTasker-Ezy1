@@ -824,10 +824,9 @@ export default function TopBarActions({
     [activePersonaKey, adminAssignments, navigate, selectAdminPersona, selectRolePersona]
   );
 
-  const handleLogout = React.useCallback(() => {
+  const handleLogout = React.useCallback(async () => {
     handleCloseProfileMenu();
-    logout();
-    navigate("/login", { replace: true });
+    if(await logout())window.location.replace("/login");
   }, [handleCloseProfileMenu, logout, navigate]);
 
   const options = React.useMemo(() => {

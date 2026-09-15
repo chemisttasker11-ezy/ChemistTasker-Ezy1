@@ -1,0 +1,2 @@
+import React from 'react';
+import TalentBoard from './pages/dashboard/sidebar/TalentBoard';

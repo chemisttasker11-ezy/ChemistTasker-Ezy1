@@ -1,0 +1,9 @@
+Hi {{ recipient_name|default:"there" }},
+
+{{ author_name }} mentioned you in {{ context_label }} on the ChemistTasker Hub.
+
+{% if post_body %}{{ post_body }}
+
+{% endif %}Join the conversation: {{ hub_url }}
+
+— The ChemistTasker Team

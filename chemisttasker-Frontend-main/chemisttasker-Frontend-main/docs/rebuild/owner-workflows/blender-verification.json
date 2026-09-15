@@ -1,0 +1,20 @@
+{
+  "package": "blender-mcp 1.9.1",
+  "stdio_initialize": "passed",
+  "tools": 28,
+  "scene": {
+    "meta": null,
+    "content": [
+      {
+        "type": "text",
+        "text": "Error getting scene info: Could not connect to Blender. Make sure the Blender addon is running.",
+        "annotations": null,
+        "meta": null
+      }
+    ],
+    "structuredContent": {
+      "result": "Error getting scene info: Could not connect to Blender. Make sure the Blender addon is running."
+    },
+    "isError": false
+  }
+}

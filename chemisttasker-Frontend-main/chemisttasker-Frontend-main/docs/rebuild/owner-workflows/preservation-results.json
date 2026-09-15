@@ -1,0 +1,48 @@
+{
+  "untouched": 242,
+  "changed": [
+    {
+      "file": "frontend_web/src/pages/dashboard/shiftCenter/ShiftCenterPage.tsx",
+      "counts": {
+        "controls": {
+          "preserved": 1,
+          "added": 0
+        },
+        "hooks": {
+          "preserved": 8,
+          "added": 0
+        },
+        "handlers": {
+          "preserved": 1,
+          "added": 0
+        },
+        "conditions": {
+          "preserved": 5,
+          "added": 0
+        }
+      }
+    },
+    {
+      "file": "frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx",
+      "counts": {
+        "controls": {
+          "preserved": 133,
+          "added": 2
+        },
+        "hooks": {
+          "preserved": 94,
+          "added": 0
+        },
+        "handlers": {
+          "preserved": 9,
+          "added": 0
+        },
+        "conditions": {
+          "preserved": 166,
+          "added": 2
+        }
+      }
+    }
+  ],
+  "failures": []
+}

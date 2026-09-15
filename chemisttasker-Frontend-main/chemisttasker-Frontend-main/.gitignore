@@ -1,0 +1,84 @@
+# ─── Python / Django ──────────────────────────────────────────────
+# virtualenvs
+venv/
+**/venv/
+Admin_codes
+.env.local
+# Bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+chemisttasker-dd2ad-firebase-adminsdk-fbsvc-2747110cf0.json
+# SQLite DB
+db.sqlite3
+openapi.yaml
+# dotenv files
+.env
+.env.production
+env/
+VPS_Setup_Runbook.md
+Docker_Redis_Celery_VPS_Workflow.md
+
+# Django media/static
+backend/media/
+backend/static/
+backend/staticfiles/
+JSM_Global_Security_Audit_ChemistTasker_v1.1.pdf
+Security_Audit_Tracking.md
+
+
+# Django migrations (ignore every migrations/ folder)
+**/migrations/
+
+# Management scripts (if you want to keep these local)
+management/
+
+
+# ─── Frontend (Vite / Node) ────────────────────────────────────────
+node_modules/
+dist/
+build/
+
+# Local env for frontend
+frontend_web/.env
+frontend_web/.env.production
+frontend_web_old/.env
+frontend_web_old/.env.production
+frontend_mobile/.env
+frontend_mobile/.env.local
+frontend_mobile/.env.production
+
+# ─── Miscellaneous ─────────────────────────────────────────────────
+# OS and editor
+.vscode/
+.qwen/
+*.log
+*.tmp
+
+# Trash / docs folders you don’t want in Git
+trash/
+screenshots/
+frontend_web_old/
+Documents/
+verification_outputs/
+ocr_verification
+**/jobs/
+
+# ─── Azure Safe Deploy Additions (DO NOT REMOVE) ───────────────────
+# Prevent accidental GLIBC issues from local builds
+.python_packages/
+**/.python_packages/
+antenv/
+**/antenv/
+.antenv/
+*.whl
+*.egg-info/
+build/
+dist/
+
+
+frontend_mobile/google-services.json
+frontend_mobile/GoogleService-Info.plist
+frontend_mobile/steps.txt
+.expo
+.expo/

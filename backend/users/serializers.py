@@ -310,6 +310,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             from rest_framework.exceptions import AuthenticationFailed
             raise AuthenticationFailed("Please verify your email address (check your inbox for your OTP code).")
 
+        if remember_me is False:
+            refresh = RefreshToken(data['refresh'])
+            refresh['remember_me'] = False
+            data['refresh'] = str(refresh)
         if remember_me is True:
             refresh = RefreshToken(data['refresh'])
             refresh['remember_me'] = True
@@ -398,7 +402,10 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             # Never allow refresh endpoint to 500 on malformed/legacy tokens.
             raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
 
+        if not user.is_active:
+            raise serializers.ValidationError({'detail': 'Account is inactive.'})
         data = super().validate(attrs)
+        data['remember_me'] = original_refresh.get('remember_me')
         if original_refresh.get('remember_me') is True and data.get('refresh'):
             refresh = RefreshToken(data['refresh'])
             refresh['remember_me'] = True

@@ -1,3 +1,4 @@
+import {browserRequest} from '../../../../../landing_next/shared/browser-session';
 ﻿import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -129,6 +130,7 @@ export function HomePageContent({
         emptyMessage={`Invite teammates to ${details.name} to start collaborating.`}
       />
       <Box sx={{ mt: 3 }}>
+
         <ScopeFeed
           key={`${scope.type}:${scope.id}`}
           scope={scope}
@@ -373,6 +375,15 @@ interface ChemistTaskerHubContentProps {
 }
 
 export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPostHandled }: ChemistTaskerHubContentProps) {
+  const [opening,setOpening]=useState(true);
+  useEffect(()=>{let active=true;setOpening(true);
+    browserRequest<{public_community_enabled:boolean}>('/api/users/me/').then(user=>{
+      if(!active)return;
+      if(user.public_community_enabled&&['public','pharmacist','intern','staff','explorer','owner'].includes(hub.key))window.location.assign(targetPostId?`/hubs/posts/${targetPostId}`:`/hubs/${hub.key}`);
+      else setOpening(false);
+    }).catch(()=>{if(active)setOpening(false);});return()=>{active=false;};},[hub.key,targetPostId]);
+  if(opening)return <Box role="status" sx={{p:3}}>Opening your community…</Box>;
+
   const subtitleByAudience: Record<string, string> = {
     PUBLIC: "Platform-wide discussion open to everyone on ChemistTasker.",
     OWNER: "A hub for pharmacy owners across ChemistTasker.",

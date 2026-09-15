@@ -1,0 +1,756 @@
+[
+  {
+    "cover_asset": "pharmacist-priya.jpg",
+    "payload": {
+      "slug": "locum-pharmacist-shift-checklist-australia",
+      "title": "Before your next locum pharmacist shift: a practical checklist",
+      "topic": "career",
+      "excerpt": "Confirm the location, hours, team support and handover before your next locum pharmacy shift in Australia.",
+      "author_name": "ChemistTasker Editorial",
+      "body_document": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Start with the shift, not just the rate"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "A useful locum brief answers four questions: where am I working, when am I needed, what will I be doing, and who can help me on the day? Read the complete shift description before applying. A familiar suburb can still mean a different branch, opening routine or dispensing system."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Confirm the practical details"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Check the pharmacy address, arrival time, shift finish and contact person. Ask about parking, travel and accommodation where relevant. Confirm any arrangements directly rather than assuming they are included. Keep the agreed details somewhere you can find them before travelling."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Match the work to your readiness"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Discuss the dispensing system, services offered, expected responsibilities and team support. Be specific about unfamiliar workflows so the pharmacy can plan an introduction. Ahpra provides a public register for checking a practitioner’s registration; use the current record when confirming registration details rather than relying on an old screenshot."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Make room for a handover"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Ask where the opening checklist and local procedures are kept, who will orient you and who to contact if something needs escalation. At the end of the shift, leave the next person a clear record of outstanding work through the pharmacy’s approved internal process."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Keep your next step simple"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Browse current opportunities on ChemistTasker, compare the date and location, and use your existing account to apply when your profile meets the required verification. If a shift is not a fit, refine your search rather than committing before essential questions are answered."
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Browse locum shifts and pharmacy jobs",
+                "marks": [
+                  {
+                    "type": "link",
+                    "attrs": {
+                      "href": "{site}/shifts/public-board"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Cover image: illustrative pharmacy photography supplied with the ChemistTasker website; the person pictured is not the author."
+              }
+            ]
+          }
+        ]
+      },
+      "cover_alt": "Illustrative portrait of a pharmacy professional in a community pharmacy",
+      "seo_title": "Before your next locum pharmacist shift: a practical checklist",
+      "seo_description": "Confirm the location, hours, team support and handover before your next locum pharmacy shift in Australia.",
+      "featured": true,
+      "source_name": "Ahpra: check a practitioner’s registration",
+      "source_url": "https://www.ahpra.gov.au/"
+    }
+  },
+  {
+    "cover_asset": "pharmacist-david.jpg",
+    "payload": {
+      "slug": "pharmacy-locum-handover-organised-start",
+      "title": "A clearer pharmacy handover for incoming locums",
+      "topic": "practice",
+      "excerpt": "A practical approach to introductions, local workflows and outstanding tasks when a locum joins your pharmacy team.",
+      "author_name": "ChemistTasker Editorial",
+      "body_document": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Make the first few minutes useful"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "An incoming locum needs context, not a pile of disconnected messages. Prepare a short introduction that explains the day’s priorities, the people working alongside them and the local processes they will use. This is a workflow guide, not a clinical protocol."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Introduce people and responsibilities"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Name the person leading the handover and the contact for operational problems. Explain who is covering each work area and how breaks are coordinated. Ask the locum what they need to become familiar with before starting independently."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Point to the source of truth"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Show where current procedures, opening and closing tasks, and approved escalation contacts are kept. Explain how to use the pharmacy’s own systems and access arrangements. Do not place shared passwords in a community post or an informal handover note."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Make outstanding work understandable"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "For each unfinished operational task, record the next action, the person responsible and any agreed timing. Keep patient-specific information in the pharmacy’s approved clinical systems. A task such as arranging a stock follow-up should be clear enough for the next colleague to act on without retracing the whole conversation."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Close the loop"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Before leaving, confirm which tasks were completed and which were handed over. Ask whether the receiving colleague has enough context. Use a private authorised team workspace for internal coordination; the public platform hubs are intended for broader professional discussion."
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Explore pharmacy communities",
+                "marks": [
+                  {
+                    "type": "link",
+                    "attrs": {
+                      "href": "{site}/hubs"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Cover image: illustrative pharmacy photography supplied with the ChemistTasker website; the person pictured is not the author."
+              }
+            ]
+          }
+        ]
+      },
+      "cover_alt": "Illustrative portrait of a pharmacy professional in a community pharmacy",
+      "seo_title": "A clearer pharmacy handover for incoming locums",
+      "seo_description": "A practical approach to introductions, local workflows and outstanding tasks when a locum joins your pharmacy team.",
+      "featured": false
+    }
+  },
+  {
+    "cover_asset": "pharmacist-mina.jpg",
+    "payload": {
+      "slug": "write-a-clear-locum-pharmacy-shift-brief",
+      "title": "How to write a clear locum pharmacy shift brief",
+      "topic": "industry",
+      "excerpt": "Help candidates understand your pharmacy opportunity with a clear location, schedule, responsibilities and support arrangements.",
+      "author_name": "ChemistTasker Editorial",
+      "body_document": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Answer the candidate’s first questions"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "A useful shift brief lets someone decide whether an opportunity fits before they start a long exchange. Begin with the role, pharmacy location, dates and working hours. Distinguish a single locum shift from an ongoing position."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Describe the working day"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Explain the main responsibilities, systems used and team support available. Mention experience that is essential separately from experience that would be helpful. Avoid a long list of generic qualities when a concrete description of the work would be more useful."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Make arrangements explicit"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "State the offered rate or how it will be agreed, and clarify relevant travel, accommodation and invoicing arrangements with the candidate. Keep commitments in the agreed booking or employment documentation. A listing should not leave either side guessing about what has been accepted."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Give applicants a clear next step"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Keep the listing up to date as cover changes. Review applicants against the actual work requirements and confirm the final arrangements directly. Do not describe a shift as filled until the agreed process is complete."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Connect hiring with the team"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "ChemistTasker brings public opportunities, talent discovery and private workspaces into the same account journey. Browse talent to understand available experience, then use your authorised dashboard to manage your pharmacy’s hiring. Public discussion hubs remain separate from private staffing conversations."
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Explore pharmacy talent",
+                "marks": [
+                  {
+                    "type": "link",
+                    "attrs": {
+                      "href": "{site}/talent/public-board"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Cover image: illustrative pharmacy photography supplied with the ChemistTasker website; the person pictured is not the author."
+              }
+            ]
+          }
+        ]
+      },
+      "cover_alt": "Illustrative portrait of a pharmacy professional in a community pharmacy",
+      "seo_title": "How to write a clear locum pharmacy shift brief",
+      "seo_description": "Help candidates understand your pharmacy opportunity with a clear location, schedule, responsibilities and support arrangements.",
+      "featured": false
+    }
+  },
+  {
+    "cover_asset": "pharmacist-rahul.jpg",
+    "payload": {
+      "slug": "public-pharmacy-hubs-and-private-team-spaces",
+      "title": "Public pharmacy communities and private team spaces",
+      "topic": "community",
+      "excerpt": "Understand the six public ChemistTasker hubs, who can participate, and where private pharmacy and organisation discussions belong.",
+      "author_name": "ChemistTasker Editorial",
+      "body_document": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "One account, different spaces"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Your ChemistTasker account connects public reading, community participation and your authorised private workspace. You do not need a separate blog or community account. The difference between spaces is their audience and the permissions attached to your existing account."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Meet the six public hubs"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "ChemistTasker, Pharmacist, Intern, Other Staff, Explorer and Owner are public platform hubs. Anyone can read their available discussions. Verified members can post and interact in the shared ChemistTasker Hub and their eligible role hub. Other Staff includes pharmacy assistants and dispensary technicians; interns have a separate Intern Hub."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Keep internal conversations in private spaces"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "A pharmacy’s own hub, an organisation workspace and internal staff groups are private spaces for authorised members. Creating a group as an owner or administrator does not make it the public Owner Hub. Use the private space for internal scheduling and team coordination."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Choose a helpful public contribution"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Ask a focused question, explain the general context and say what kind of experience would help. Share ideas that can be discussed openly. Keep patient information, private colleague details, access credentials and internal employment matters out of public posts and attachments."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Use the space that fits"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Read across all six communities to discover different perspectives. If you cannot interact in a particular role hub, you can still read it and bring a general question to the shared hub. Official editorial publishing uses separately assigned permissions; an ordinary member post does not require a publishing invitation."
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Find your community",
+                "marks": [
+                  {
+                    "type": "link",
+                    "attrs": {
+                      "href": "{site}/hubs"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Cover image: illustrative pharmacy photography supplied with the ChemistTasker website; the person pictured is not the author."
+              }
+            ]
+          }
+        ]
+      },
+      "cover_alt": "Illustrative portrait of a pharmacy professional in a community pharmacy",
+      "seo_title": "Public pharmacy communities and private team spaces",
+      "seo_description": "Understand the six public ChemistTasker hubs, who can participate, and where private pharmacy and organisation discussions belong.",
+      "featured": false
+    }
+  },
+  {
+    "cover_asset": "pharmacist-david.jpg",
+    "payload": {
+      "slug": "where-to-check-tga-medicine-shortage-updates",
+      "title": "Where to check TGA medicine shortage updates",
+      "topic": "tga",
+      "excerpt": "A source-first guide to finding official medicine shortage information and keeping pharmacy team updates useful.",
+      "author_name": "ChemistTasker Editorial",
+      "body_document": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Go to the current source"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "The TGA’s medicine shortages website links to its reports database, shortage alerts and information about major or ongoing shortages. Use the official resources when checking a specific product rather than treating a social post or saved screenshot as a current supply report."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Check the exact product"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "TGA explains that each listed shortage refers to a single product. Read the details for the medicine in question and follow links to the relevant official information. A general discussion about an ingredient does not establish the availability of every brand, strength or presentation."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Separate the source from the team task"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "When sharing an operational update internally, record the official link and when you checked it. Then describe the next task and who will follow it up. This helps colleagues distinguish the information source from actions agreed locally. Avoid presenting an anticipated supply date as a guarantee."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Keep clinical decisions with the treating team"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "This guide explains where to find information; it does not recommend substitution, dosing or treatment changes. Use the TGA’s health-professional guidance and the pharmacy’s approved clinical process for patient-specific questions. Keep those details out of public community discussions."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Share a useful public update"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "If you discuss shortage information in a public hub, link to the source, identify its date and make clear what it says. A reader should be able to check for later changes without relying on your summary alone. This article is an evergreen navigation guide, not a report that a particular medicine is currently in shortage."
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Open the TGA medicine shortages resources",
+                "marks": [
+                  {
+                    "type": "link",
+                    "attrs": {
+                      "href": "https://www.tga.gov.au/safety/shortages-and-supply-disruptions/medicine-shortages"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Cover image: illustrative pharmacy photography supplied with the ChemistTasker website; the person pictured is not the author."
+              }
+            ]
+          }
+        ]
+      },
+      "cover_alt": "Illustrative portrait of a pharmacy professional in a community pharmacy",
+      "seo_title": "Where to check TGA medicine shortage updates",
+      "seo_description": "A source-first guide to finding official medicine shortage information and keeping pharmacy team updates useful.",
+      "featured": false,
+      "source_name": "Therapeutic Goods Administration: medicine shortages",
+      "source_url": "https://www.tga.gov.au/safety/shortages-and-supply-disruptions/medicine-shortages"
+    }
+  }
+]

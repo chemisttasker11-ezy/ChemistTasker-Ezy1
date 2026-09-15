@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,24882,e=>{"use strict";var t=e.i(43476),i=e.i(55015);e.s(["default",0,function(){return(0,t.jsx)(i.default,{title:"How can we help?",subtitle:"Send a message to the ChemistTasker team.",source:"public-next"})}])},11179,function(e){e.n(e.i(24882))}]);

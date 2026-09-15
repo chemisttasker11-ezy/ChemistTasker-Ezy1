@@ -1,0 +1,29 @@
+{
+    "name": "@chemisttasker/shared-core",
+    "version": "1.0.0",
+    "description": "Shared TypeScript package for ChemistTasker web and mobile apps",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest",
+        "test:ci": "vitest run"
+    },
+    "keywords": [
+        "chemisttasker",
+        "shared",
+        "api",
+        "types"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "typescript": "^5.0.0"
+    },
+    "devDependencies": {
+        "msw": "^2.0.0",
+        "vitest": "^4.1.8"
+    }
+}

@@ -1,0 +1,169 @@
+﻿route,kind,source,implementation_imports,access,runtime_status
+/+not-found,route,frontend_mobile/app/+not-found.tsx,../context/AuthContext,Inspect root/role layouts and screen capability checks,Not tested
+/_layout,layout,frontend_mobile/app/_layout.tsx,../context/AuthContext; ../context/WorkspaceContext; ../constants/theme; ../components/OfflineBanner; ../config/api; ../utils/ownerSetup; ../utils/sslPinning; ../roles/shared/forms/UnsavedChangesDialogProvider; ../roles/shared/forms/UnsavedChangesRegistryProvider; ../utils/appUpdates,Inspect root/role layouts and screen capability checks,Not tested
+/admin/:pharmacyId/pills,route,frontend_mobile/app/admin/[pharmacyId]/pills.tsx,@/roles/shared/pills/PillsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/admin/:pharmacyId/post-shift,route,frontend_mobile/app/admin/[pharmacyId]/post-shift.tsx,@/roles/admin/post-shift,Inspect root/role layouts and screen capability checks,Not tested
+/admin/_layout,layout,frontend_mobile/app/admin/_layout.tsx,@/context/AuthContext,Inspect root/role layouts and screen capability checks,Not tested
+/admin/chat,route,frontend_mobile/app/admin/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/admin,route,frontend_mobile/app/admin/index.tsx,@/context/AuthContext; @/utils/apiClient; @/components/HomeNavigationGrid; @/roles/shared/dashboard/dashboardScope,Inspect root/role layouts and screen capability checks,Not tested
+/admin/invoice/:id,route,frontend_mobile/app/admin/invoice/[id].tsx,@/roles/shared/invoices/InvoiceDetail,Inspect root/role layouts and screen capability checks,Not tested
+/admin/invoice/new,route,frontend_mobile/app/admin/invoice/new.tsx,@/roles/shared/invoices/InvoiceGenerate,Inspect root/role layouts and screen capability checks,Not tested
+/admin/invoice,route,frontend_mobile/app/admin/invoice.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/admin/messages/:id,route,frontend_mobile/app/admin/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/admin/notifications,route,frontend_mobile/app/admin/notifications.tsx,@/features/notifications/NotificationsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pharmacies/:id/edit,route,frontend_mobile/app/admin/pharmacies/[id]/edit.tsx,@/roles/shared/pharmacies/PharmacyForm,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pharmacies/:id/locums,route,frontend_mobile/app/admin/pharmacies/[id]/locums.tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/StaffManager,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pharmacies/:id/staff,route,frontend_mobile/app/admin/pharmacies/[id]/staff.tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/StaffManager,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pharmacies/:id,route,frontend_mobile/app/admin/pharmacies/[id].tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/PharmacyDetailView,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pharmacies/add,route,frontend_mobile/app/admin/pharmacies/add.tsx,@/roles/shared/pharmacies/PharmacyForm,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pharmacies,route,frontend_mobile/app/admin/pharmacies/index.tsx,../../../roles/shared/pharmacies/PharmacyOverviewContainer,Inspect root/role layouts and screen capability checks,Not tested
+/admin/pills,route,frontend_mobile/app/admin/pills.tsx,@/roles/shared/pills/PillsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/admin/post-shift,route,frontend_mobile/app/admin/post-shift.tsx,@/roles/admin/post-shift,Inspect root/role layouts and screen capability checks,Not tested
+/admin/shifts/:id,route,frontend_mobile/app/admin/shifts/[id].tsx,../../../roles/owner/shifts/[id],Inspect root/role layouts and screen capability checks,Not tested
+/admin/shifts,route,frontend_mobile/app/admin/shifts/index.tsx,@/roles/admin/shifts/index,Inspect root/role layouts and screen capability checks,Not tested
+/contact,route,frontend_mobile/app/contact.tsx,../context/AuthContext; @chemisttasker/shared-core,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/_layout,layout,frontend_mobile/app/explorer/_layout.tsx,@chemisttasker/shared-core; ../../context/AuthContext; @/utils/notificationNavigation; @/utils/chatRoutes,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/availability,route,frontend_mobile/app/explorer/availability.tsx,@/roles/explorer/availability,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/calendar,route,frontend_mobile/app/explorer/calendar.tsx,@/roles/shared/calendar,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/chat,route,frontend_mobile/app/explorer/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/dashboard,route,frontend_mobile/app/explorer/dashboard.tsx,@/roles/explorer/dashboard,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/messages/:id,route,frontend_mobile/app/explorer/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/explorer/notifications,route,frontend_mobile/app/explorer/notifications.tsx,@/features/notifications/NotificationsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/profile-basic-info,route,frontend_mobile/app/explorer/profile-basic-info.tsx,@/roles/explorer/profile-tabs/BasicInfoScreen,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/profile-bio,route,frontend_mobile/app/explorer/profile-bio.tsx,@/roles/explorer/profile-tabs/BioScreen,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/profile-identity,route,frontend_mobile/app/explorer/profile-identity.tsx,@/roles/explorer/profile-tabs/IdentityScreen,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/profile-interests,route,frontend_mobile/app/explorer/profile-interests.tsx,@/roles/explorer/profile-tabs/InterestsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/profile-referees,route,frontend_mobile/app/explorer/profile-referees.tsx,@/roles/explorer/profile-tabs/RefereesScreen,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/profile,route,frontend_mobile/app/explorer/profile.tsx,@/roles/explorer/profile,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/shifts/:id,route,frontend_mobile/app/explorer/shifts/[id].tsx,../../../roles/pharmacist/shifts/[id],Inspect root/role layouts and screen capability checks,Not tested
+/explorer/shifts,route,frontend_mobile/app/explorer/shifts.tsx,@/roles/explorer/shifts,Inspect root/role layouts and screen capability checks,Not tested
+/explorer/talent-board,route,frontend_mobile/app/explorer/talent-board.tsx,@/roles/shared/talent-board,Inspect root/role layouts and screen capability checks,Not tested
+/forgot-password,route,frontend_mobile/app/forgot-password.tsx,@chemisttasker/shared-core; ../components/AuthLayout,Inspect root/role layouts and screen capability checks,Not tested
+/,route,frontend_mobile/app/index.tsx,../components/AuthLayout; ../context/AuthContext; ../utils/ownerSetup,Inspect root/role layouts and screen capability checks,Not tested
+/login,route,frontend_mobile/app/login.tsx,../context/AuthContext; ../components/AuthLayout; ../utils/ownerSetup; ../utils/biometricAuth,Inspect root/role layouts and screen capability checks,Not tested
+/mobile-verify,route,frontend_mobile/app/mobile-verify.tsx,@chemisttasker/shared-core; ../context/AuthContext; ../components/AuthLayout,Inspect root/role layouts and screen capability checks,Not tested
+/notifications,route,frontend_mobile/app/notifications.tsx,../features/notifications/NotificationsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/organization/_layout,layout,frontend_mobile/app/organization/_layout.tsx,@chemisttasker/shared-core; ../../context/AuthContext; @/utils/notificationNavigation; @/utils/chatRoutes; ../../roles/shared/forms/UnsavedChangesRegistryProvider,Inspect root/role layouts and screen capability checks,Not tested
+/organization/calendar,route,frontend_mobile/app/organization/calendar.tsx,@/roles/shared/calendar,Inspect root/role layouts and screen capability checks,Not tested
+/organization/chat,route,frontend_mobile/app/organization/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/organization/dashboard,route,frontend_mobile/app/organization/dashboard.tsx,@/roles/organization/dashboard,Inspect root/role layouts and screen capability checks,Not tested
+/organization/hub,route,frontend_mobile/app/organization/hub.tsx,@/roles/shared/hub/HubScreen,Inspect root/role layouts and screen capability checks,Not tested
+/organization,route,frontend_mobile/app/organization/index.tsx,@/roles/organization/dashboard,Inspect root/role layouts and screen capability checks,Not tested
+/organization/invite,route,frontend_mobile/app/organization/invite.tsx,@/roles/organization/invite,Inspect root/role layouts and screen capability checks,Not tested
+/organization/invoice/:id,route,frontend_mobile/app/organization/invoice/[id].tsx,@/roles/shared/invoices/InvoiceDetail,Inspect root/role layouts and screen capability checks,Not tested
+/organization/invoice/new,route,frontend_mobile/app/organization/invoice/new.tsx,@/roles/shared/invoices/InvoiceGenerate,Inspect root/role layouts and screen capability checks,Not tested
+/organization/invoice,route,frontend_mobile/app/organization/invoice.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/organization/messages/:id,route,frontend_mobile/app/organization/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/organization/notifications,route,frontend_mobile/app/organization/notifications.tsx,@/features/notifications/NotificationsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pharmacies/:id/edit,route,frontend_mobile/app/organization/pharmacies/[id]/edit.tsx,@/roles/shared/pharmacies/PharmacyForm,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pharmacies/:id/locums,route,frontend_mobile/app/organization/pharmacies/[id]/locums.tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/StaffManager,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pharmacies/:id/staff,route,frontend_mobile/app/organization/pharmacies/[id]/staff.tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/StaffManager,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pharmacies/:id,route,frontend_mobile/app/organization/pharmacies/[id].tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/PharmacyDetailView,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pharmacies/add,route,frontend_mobile/app/organization/pharmacies/add.tsx,@/roles/shared/pharmacies/PharmacyForm,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pharmacies,route,frontend_mobile/app/organization/pharmacies/index.tsx,@chemisttasker/shared-core; @/roles/shared/pharmacies/membershipApi; @/roles/shared/pharmacies/PharmaciesListView,Inspect root/role layouts and screen capability checks,Not tested
+/organization/pills,route,frontend_mobile/app/organization/pills.tsx,@/roles/shared/pills/PillsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/organization/post-shift,route,frontend_mobile/app/organization/post-shift.tsx,@/roles/organization/post-shift,Inspect root/role layouts and screen capability checks,Not tested
+/organization/profile,route,frontend_mobile/app/organization/profile.tsx,@/roles/organization/profile,Inspect root/role layouts and screen capability checks,Not tested
+/organization/shifts/:id,route,frontend_mobile/app/organization/shifts/[id].tsx,../../../roles/owner/shifts/[id],Inspect root/role layouts and screen capability checks,Not tested
+/organization/shifts,route,frontend_mobile/app/organization/shifts/index.tsx,@/roles/organization/shifts/index,Inspect root/role layouts and screen capability checks,Not tested
+/organization/talent-board,route,frontend_mobile/app/organization/talent-board.tsx,@/roles/organization/talent-board,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/_layout,layout,frontend_mobile/app/otherstaff/_layout.tsx,../../context/AuthContext; @chemisttasker/shared-core; @/utils/notificationNavigation; @/utils/chatRoutes,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/availability,route,frontend_mobile/app/otherstaff/availability.tsx,@/roles/otherstaff/availability,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/calendar,route,frontend_mobile/app/otherstaff/calendar.tsx,@/roles/shared/calendar,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/chat,route,frontend_mobile/app/otherstaff/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/dashboard,route,frontend_mobile/app/otherstaff/dashboard.tsx,@/roles/otherstaff/dashboard,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/hub,route,frontend_mobile/app/otherstaff/hub.tsx,@/roles/shared/hub/HubScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff,route,frontend_mobile/app/otherstaff/index.tsx,,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/interests,route,frontend_mobile/app/otherstaff/interests.tsx,@/roles/pharmacist/interests,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/invoice/:id,route,frontend_mobile/app/otherstaff/invoice/[id].tsx,@/roles/shared/invoices/InvoiceDetail,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/invoice/new,route,frontend_mobile/app/otherstaff/invoice/new.tsx,@/roles/shared/invoices/InvoiceGenerate,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/invoice,route,frontend_mobile/app/otherstaff/invoice.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/invoices,route,frontend_mobile/app/otherstaff/invoices.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/learning,route,frontend_mobile/app/otherstaff/learning.tsx,@/roles/pharmacist/learning,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/memberships,route,frontend_mobile/app/otherstaff/memberships.tsx,@/roles/otherstaff/memberships,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/messages/:id,route,frontend_mobile/app/otherstaff/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/notifications,route,frontend_mobile/app/otherstaff/notifications.tsx,@/features/notifications/NotificationsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-basic-info,route,frontend_mobile/app/otherstaff/profile-basic-info.tsx,@/roles/otherstaff/profile-tabs/BasicInfoScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-bio,route,frontend_mobile/app/otherstaff/profile-bio.tsx,@/roles/otherstaff/profile-tabs/BioScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-identity,route,frontend_mobile/app/otherstaff/profile-identity.tsx,@/roles/otherstaff/profile-tabs/IdentityScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-payment,route,frontend_mobile/app/otherstaff/profile-payment.tsx,@/roles/otherstaff/profile-tabs/PaymentScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-referees,route,frontend_mobile/app/otherstaff/profile-referees.tsx,@/roles/otherstaff/profile-tabs/RefereesScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-regulatory,route,frontend_mobile/app/otherstaff/profile-regulatory.tsx,@/roles/otherstaff/profile-tabs/RegulatoryScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile-skills,route,frontend_mobile/app/otherstaff/profile-skills.tsx,@/roles/otherstaff/profile-tabs/SkillsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/profile,route,frontend_mobile/app/otherstaff/profile.tsx,@/roles/otherstaff/profile,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/publish-availability,route,frontend_mobile/app/otherstaff/publish-availability.tsx,@/roles/otherstaff/publish-availability,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/shifts/:id,route,frontend_mobile/app/otherstaff/shifts/[id].tsx,../../../roles/pharmacist/shifts/[id],Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/shifts,route,frontend_mobile/app/otherstaff/shifts/index.tsx,@/roles/otherstaff/shifts,Inspect root/role layouts and screen capability checks,Not tested
+/otherstaff/talent-board,route,frontend_mobile/app/otherstaff/talent-board.tsx,@/roles/otherstaff/talent-board,Inspect root/role layouts and screen capability checks,Not tested
+/owner/_layout,layout,frontend_mobile/app/owner/_layout.tsx,../../context/AuthContext; @chemisttasker/shared-core; @/utils/notificationNavigation; @/utils/chatRoutes; ../../roles/shared/forms/UnsavedChangesRegistryProvider,Inspect root/role layouts and screen capability checks,Not tested
+/owner/calendar,route,frontend_mobile/app/owner/calendar.tsx,@/roles/shared/calendar,Inspect root/role layouts and screen capability checks,Not tested
+/owner/chat,route,frontend_mobile/app/owner/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/owner/dashboard,route,frontend_mobile/app/owner/dashboard.tsx,@/roles/owner/dashboard,Inspect root/role layouts and screen capability checks,Not tested
+/owner/hub,route,frontend_mobile/app/owner/hub.tsx,@/roles/shared/hub/HubScreen,Inspect root/role layouts and screen capability checks,Not tested
+/owner/invoice/:id,route,frontend_mobile/app/owner/invoice/[id].tsx,@/roles/shared/invoices/InvoiceDetail,Inspect root/role layouts and screen capability checks,Not tested
+/owner/invoice/new,route,frontend_mobile/app/owner/invoice/new.tsx,@/roles/shared/invoices/InvoiceGenerate,Inspect root/role layouts and screen capability checks,Not tested
+/owner/invoice,route,frontend_mobile/app/owner/invoice.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/owner/locums,route,frontend_mobile/app/owner/locums/index.tsx,@/roles/owner/locums/index,Inspect root/role layouts and screen capability checks,Not tested
+/owner/messages/:id,route,frontend_mobile/app/owner/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/owner/notifications,route,frontend_mobile/app/owner/notifications.tsx,@/features/notifications/NotificationsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/owner/onboarding/_context,support-file-review,frontend_mobile/app/owner/onboarding/_context.tsx,@/roles/owner/onboarding/_context,Inspect root/role layouts and screen capability checks,Not tested
+/owner/onboarding/_layout,layout,frontend_mobile/app/owner/onboarding/_layout.tsx,./_context,Inspect root/role layouts and screen capability checks,Not tested
+/owner/onboarding/review,route,frontend_mobile/app/owner/onboarding/review.tsx,@/roles/owner/onboarding/review,Inspect root/role layouts and screen capability checks,Not tested
+/owner/onboarding/step1,route,frontend_mobile/app/owner/onboarding/step1.tsx,@/roles/owner/onboarding/step1,Inspect root/role layouts and screen capability checks,Not tested
+/owner/onboarding/step2,route,frontend_mobile/app/owner/onboarding/step2.tsx,@/roles/owner/onboarding/step2,Inspect root/role layouts and screen capability checks,Not tested
+/owner/onboarding/step3,route,frontend_mobile/app/owner/onboarding/step3.tsx,@/roles/owner/onboarding/step3,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacies/:id/edit,route,frontend_mobile/app/owner/pharmacies/[id]/edit.tsx,@/roles/owner/pharmacies/[id]/edit,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacies/:id/locums,route,frontend_mobile/app/owner/pharmacies/[id]/locums.tsx,@/roles/owner/pharmacies/[id]/locums,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacies/:id/staff,route,frontend_mobile/app/owner/pharmacies/[id]/staff.tsx,@/roles/owner/pharmacies/[id]/staff,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacies/:id,route,frontend_mobile/app/owner/pharmacies/[id].tsx,@/roles/owner/pharmacies/[id],Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacies/add,route,frontend_mobile/app/owner/pharmacies/add.tsx,@/roles/owner/pharmacies/add,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacies,route,frontend_mobile/app/owner/pharmacies/index.tsx,../../../roles/owner/pharmacies/index,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pharmacy,route,frontend_mobile/app/owner/pharmacy.tsx,@/roles/owner/pharmacy,Inspect root/role layouts and screen capability checks,Not tested
+/owner/pills,route,frontend_mobile/app/owner/pills.tsx,@/roles/shared/pills/PillsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/owner/post-shift,route,frontend_mobile/app/owner/post-shift.tsx,@/roles/owner/post-shift,Inspect root/role layouts and screen capability checks,Not tested
+/owner/profile-detail,route,frontend_mobile/app/owner/profile-detail.tsx,@/roles/owner/profile-detail,Inspect root/role layouts and screen capability checks,Not tested
+/owner/profile,route,frontend_mobile/app/owner/profile.tsx,@/roles/owner/profile,Inspect root/role layouts and screen capability checks,Not tested
+/owner/shifts/:id/applications,route,frontend_mobile/app/owner/shifts/[id]/applications.tsx,@/roles/owner/shifts/[id]/applications,Inspect root/role layouts and screen capability checks,Not tested
+/owner/shifts/:id,route,frontend_mobile/app/owner/shifts/[id].tsx,../../../roles/owner/shifts/[id],Inspect root/role layouts and screen capability checks,Not tested
+/owner/shifts/create,route,frontend_mobile/app/owner/shifts/create.tsx,@/roles/owner/shifts/create,Inspect root/role layouts and screen capability checks,Not tested
+/owner/shifts,route,frontend_mobile/app/owner/shifts/index.tsx,@/roles/owner/shifts/index,Inspect root/role layouts and screen capability checks,Not tested
+/owner/staff,route,frontend_mobile/app/owner/staff/index.tsx,@/roles/owner/staff/index,Inspect root/role layouts and screen capability checks,Not tested
+/owner/subscription-seats,route,frontend_mobile/app/owner/subscription-seats.tsx,@/roles/owner/subscription-seats,Inspect root/role layouts and screen capability checks,Not tested
+/owner/talent-board,route,frontend_mobile/app/owner/talent-board.tsx,@/roles/owner/talent-board,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/_layout,layout,frontend_mobile/app/pharmacist/_layout.tsx,../../context/AuthContext; @chemisttasker/shared-core; @/utils/notificationNavigation; @/utils/pushNotifications; @/utils/chatRoutes,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/availability,route,frontend_mobile/app/pharmacist/availability.tsx,@/roles/pharmacist/availability,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/calendar,route,frontend_mobile/app/pharmacist/calendar.tsx,@/roles/shared/calendar,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/chat,route,frontend_mobile/app/pharmacist/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/dashboard,route,frontend_mobile/app/pharmacist/dashboard.tsx,@/roles/pharmacist/dashboard,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/hub,route,frontend_mobile/app/pharmacist/hub.tsx,@/roles/shared/hub/HubScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist,route,frontend_mobile/app/pharmacist/index.tsx,@/roles/pharmacist/index,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/interests,route,frontend_mobile/app/pharmacist/interests.tsx,@/roles/pharmacist/interests,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/invoice/:id,route,frontend_mobile/app/pharmacist/invoice/[id].tsx,@/roles/shared/invoices/InvoiceDetail,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/invoice/new,route,frontend_mobile/app/pharmacist/invoice/new.tsx,@/roles/shared/invoices/InvoiceGenerate,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/invoice,route,frontend_mobile/app/pharmacist/invoice.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/invoices,route,frontend_mobile/app/pharmacist/invoices.tsx,@/roles/shared/invoices/InvoiceList,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/learning,route,frontend_mobile/app/pharmacist/learning.tsx,@/roles/pharmacist/learning,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/memberships,route,frontend_mobile/app/pharmacist/memberships.tsx,@/roles/pharmacist/memberships,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/messages/:id,route,frontend_mobile/app/pharmacist/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/notifications,route,frontend_mobile/app/pharmacist/notifications.tsx,@/roles/pharmacist/notifications,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/onboarding,route,frontend_mobile/app/pharmacist/onboarding.tsx,@/roles/pharmacist/onboarding,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-basic-info,route,frontend_mobile/app/pharmacist/profile-basic-info.tsx,@/roles/pharmacist/profile-tabs/BasicInfoScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-bio,route,frontend_mobile/app/pharmacist/profile-bio.tsx,@/roles/pharmacist/profile-tabs/BioScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-identity,route,frontend_mobile/app/pharmacist/profile-identity.tsx,@/roles/pharmacist/profile-tabs/IdentityScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-payment,route,frontend_mobile/app/pharmacist/profile-payment.tsx,@/roles/pharmacist/profile-tabs/PaymentScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-rate,route,frontend_mobile/app/pharmacist/profile-rate.tsx,@/roles/pharmacist/profile-tabs/RateScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-referees,route,frontend_mobile/app/pharmacist/profile-referees.tsx,@/roles/pharmacist/profile-tabs/RefereesScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile-skills,route,frontend_mobile/app/pharmacist/profile-skills.tsx,@/roles/pharmacist/profile-tabs/SkillsScreen,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/profile,route,frontend_mobile/app/pharmacist/profile.tsx,@/roles/pharmacist/profile,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/publish-availability,route,frontend_mobile/app/pharmacist/publish-availability.tsx,@/roles/pharmacist/publish-availability,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/shifts/:id,route,frontend_mobile/app/pharmacist/shifts/[id].tsx,../../../roles/pharmacist/shifts/[id],Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/shifts,route,frontend_mobile/app/pharmacist/shifts/index.tsx,@/roles/pharmacist/shifts/index,Inspect root/role layouts and screen capability checks,Not tested
+/pharmacist/talent-board,route,frontend_mobile/app/pharmacist/talent-board.tsx,@/roles/pharmacist/talent-board,Inspect root/role layouts and screen capability checks,Not tested
+/register,route,frontend_mobile/app/register.tsx,../context/AuthContext; ../components/AuthLayout,Inspect root/role layouts and screen capability checks,Not tested
+/reset-password,route,frontend_mobile/app/reset-password.tsx,@chemisttasker/shared-core; ../components/AuthLayout; ../context/AuthContext,Inspect root/role layouts and screen capability checks,Not tested
+/setup/owner/onboarding,route,frontend_mobile/app/setup/owner/onboarding.tsx,@/roles/owner/setup-onboarding,Inspect root/role layouts and screen capability checks,Not tested
+/setup/owner/pharmacies,route,frontend_mobile/app/setup/owner/pharmacies.tsx,@/roles/owner/setup-pharmacy,Inspect root/role layouts and screen capability checks,Not tested
+/shared/chat,route,frontend_mobile/app/shared/chat.tsx,@/roles/shared/chat,Inspect root/role layouts and screen capability checks,Not tested
+/shared/messages/:id,route,frontend_mobile/app/shared/messages/[id].tsx,../../../roles/shared/messages/[id],Inspect root/role layouts and screen capability checks,Not tested
+/verify-otp,route,frontend_mobile/app/verify-otp.tsx,../context/AuthContext; ../components/AuthLayout,Inspect root/role layouts and screen capability checks,Not tested
+/welcome,route,frontend_mobile/app/welcome.tsx,,Inspect root/role layouts and screen capability checks,Not tested

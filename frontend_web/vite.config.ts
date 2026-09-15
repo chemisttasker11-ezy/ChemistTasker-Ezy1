@@ -39,7 +39,7 @@ export default defineConfig(({ command }) => {
       sourcemap: isDev,
       rollupOptions: {
         output: {
-          assetFileNames: 'assets/[name].[hash][extname]',
+          assetFileNames: 'dashboard-assets/[name].[hash][extname]',
           chunkFileNames:  'js/[name].[hash].js',
           entryFileNames:  'js/[name].[hash].js',
         },

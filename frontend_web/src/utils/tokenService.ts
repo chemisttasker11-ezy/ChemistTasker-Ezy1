@@ -1,12 +1,14 @@
+import {refreshBrowserSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/utils/tokenService.ts
 import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
 
 export const AUTH_TOKENS_CLEARED_EVENT = 'auth:tokens-cleared';
+export const AUTH_TOKENS_UPDATED_EVENT = 'auth:tokens-updated';
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let refreshPromise: Promise<{ access: string; refresh: string } | null> | null = null;
-let authStorage: Storage = localStorage;
+let authStorage: Storage;
 
 const ACCESS_KEY = 'ct_access';
 const REFRESH_KEY = 'ct_refresh';
@@ -65,8 +67,8 @@ export function setTokens(access: string, refresh: string, rememberMe?: boolean)
   localStorage.removeItem(REFRESH_KEY);
   sessionStorage.removeItem(ACCESS_KEY);
   sessionStorage.removeItem(REFRESH_KEY);
-  authStorage.setItem(ACCESS_KEY, access);
-  authStorage.setItem(REFRESH_KEY, refresh);
+  window.dispatchEvent(new Event(AUTH_TOKENS_UPDATED_EVENT));
+  // Browser tokens stay in memory; HttpOnly cookies restore the session after navigation.
 }
 
 export function clearTokens() {
@@ -92,19 +94,7 @@ export async function refreshCookieSession(force = false): Promise<{ access: str
 
   refreshPromise = (async () => {
     try {
-      if (!refreshToken) {
-        clearTokens();
-        return null;
-      }
-
-      const response = await axios.post(
-        `${API_BASE_URL}/users/token/refresh/`,
-        { refresh: refreshToken },
-        {
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-      const data = response?.data ?? {};
+      const data = await refreshBrowserSession(API_BASE_URL);
       if (!data.access) {
         clearTokens();
         return null;
@@ -112,7 +102,8 @@ export async function refreshCookieSession(force = false): Promise<{ access: str
       const nextRefresh = data.refresh ?? refreshToken ?? '';
       setTokens(data.access, nextRefresh);
       return { access: data.access, refresh: nextRefresh };
-    } catch {
+    } catch (error) {
+      if ((error as {status?:number}).status !== 401) throw error;
       clearTokens();
       return null;
     } finally {
@@ -140,3 +131,5 @@ export async function fetchWsTicket(): Promise<string | null> {
     return null;
   }
 }
+
+if(typeof window!=='undefined')watchSession(action=>{if(action==='logout')clearTokens();});

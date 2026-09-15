@@ -1,0 +1,3 @@
+module.exports=[41239,a=>{"use strict";var b=a.i(87924);a.s(["default",0,function({reset:a}){return(0,b.jsxs)("div",{className:"container hub-empty",role:"alert",children:[(0,b.jsx)("h1",{children:"This story couldn’t be loaded."}),(0,b.jsx)("p",{children:"The publishing service may be temporarily unavailable. Please try again."}),(0,b.jsx)("button",{className:"button primary",onClick:a,children:"Try again"})]})}])}];
+
+//# sourceMappingURL=app_%28hub%29_error_tsx_0r6tdlk._.js.map

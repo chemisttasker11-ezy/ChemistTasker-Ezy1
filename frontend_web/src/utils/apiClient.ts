@@ -1,4 +1,5 @@
 // src/utils/apiClient.ts
+import {csrfToken,loginHref} from '../../landing_next/shared/browser-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { clearTokens, refreshCookieSession, getAccessToken } from './tokenService';
@@ -14,11 +15,13 @@ const apiClient = axios.create({
  * - Injects the JWT Bearer token from localStorage.
  */
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     config.withCredentials = true;
     const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if(!['get','head','options'].includes((config.method||'get').toLowerCase())) {
+      config.headers['X-CSRFToken']=await csrfToken(API_BASE_URL);
     }
     return config;
   },
@@ -61,14 +64,14 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshErr) {
         // fall through to logout behaviour
-        console.error('Token refresh failed', refreshErr);
+        if((refreshErr as {status?:number}).status!==401) return Promise.reject(refreshErr);
       }
     }
 
     if (error.response?.status === 401) {
       clearTokens();
       if (window.location.pathname !== '/login') {
-        window.location.replace('/login');
+        window.location.replace(loginHref(window.location.pathname+window.location.search));
       }
     }
     return Promise.reject(error);

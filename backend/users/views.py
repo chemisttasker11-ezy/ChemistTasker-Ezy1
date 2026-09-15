@@ -358,9 +358,13 @@ def _build_authenticated_user_payload(user):
     ]
 
     from billing.utils import is_billing_active, is_in_free_trial
+    from public_hub.permissions import capabilities, member_hubs
 
     return {
         "id": user.id,
+        "content_capabilities": capabilities(user),
+        "eligible_hubs": member_hubs(user),
+        "public_community_enabled": bool(getattr(settings, "PUBLIC_COMMUNITY_ENABLED", False)),
         "username": user.username,
         "email": user.email,
         "first_name": user.first_name,
@@ -1020,6 +1024,8 @@ class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
+        from .authentication import enforce_browser_csrf
+        enforce_browser_csrf(request)
         email = (request.data.get("email") or "").strip().lower()
         remember_me = request.data.get("remember_me")
         remember_me = remember_me if isinstance(remember_me, bool) else None
@@ -1048,6 +1054,8 @@ class CustomTokenRefreshView(TokenRefreshView):
     serializer_class = CustomTokenRefreshSerializer
 
     def post(self, request, *args, **kwargs):
+        from .authentication import enforce_browser_csrf
+        enforce_browser_csrf(request)
         mutable_data = request.data.copy()
         if not mutable_data.get("refresh"):
             cookie_refresh = request.COOKIES.get(getattr(settings, "JWT_REFRESH_COOKIE", "ct_refresh"))
@@ -1070,14 +1078,25 @@ class CustomTokenRefreshView(TokenRefreshView):
         access = serializer.validated_data.get("access")
         refresh = serializer.validated_data.get("refresh")
         if access and refresh:
-            _set_auth_cookies(response, access_token=access, refresh_token=refresh)
+            _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=serializer.validated_data.get('remember_me'))
         return response
 
 
 class LogoutView(APIView):
+    authentication_classes = []  # Expired access cookies must not prevent logout.
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
+        from .authentication import enforce_browser_csrf
+        enforce_browser_csrf(request)
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from rest_framework_simplejwt.exceptions import TokenError
+        token = request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE', 'ct_refresh')) or request.data.get('refresh')
+        if token:
+            try:
+                RefreshToken(token).blacklist()
+            except TokenError:
+                pass
         response = Response({"detail": "Logged out successfully."}, status=200)
         _clear_auth_cookies(response)
         return response

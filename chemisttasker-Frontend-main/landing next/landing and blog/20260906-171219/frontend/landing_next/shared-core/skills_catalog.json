@@ -1,0 +1,72 @@
+{
+  "pharmacist": {
+    "clinical_services": [
+      {"code": "VACCINATION", "label": "Vaccination", "requires_certificate": true},
+      {"code": "CANNABIS", "label": "Cannabis dispensing", "requires_certificate": false},
+      {"code": "COMPOUNDING", "label": "Compounding", "requires_certificate": true},
+      {"code": "CRED_PHARM", "label": "Credentialed Pharmacist", "requires_certificate": true},
+      {"code": "FIRST_AID", "label": "First Aid/CPR", "requires_certificate": true},
+      {"code": "PDL", "label": "PDL Insurance Certificate", "requires_certificate": true},
+      {"code": "PHARMACOTHERAPY_METHADONE_SUBOXONE", "label": "Pharmacotherapy (Methadone/Suboxone)", "description": "Willing to dose", "requires_certificate": false},
+      {"code": "WEBSTER_PACKING_DAA", "label": "Webster Packing / DAA", "description": "Manual checking", "requires_certificate": false},
+      {"code": "ROBOT_DISPENSING", "label": "Robot", "description": "Dispensing (Rowa / Alpaca)", "requires_certificate": false},
+      {"code": "STAGED_SUPPLY", "label": "Staged Supply", "description": "Daily/Weekly pickups", "requires_certificate": false},
+      {"code": "NDSS", "label": "NDSS", "description": "Diabetes Support", "requires_certificate": false},
+      {"code": "PI_INSURANCE", "label": "Professional Indemnity (PI) Insurance", "description": "Do you have current PI Insurance?", "requires_certificate": false},
+      {"code": "VACCINATOR", "label": "Vaccinator", "description": "Valid First Aid + CPR required", "requires_certificate": false}
+    ],
+    "dispense_software": [
+      {"code": "FRED", "label": "FRED / FRED NXT", "requires_certificate": false},
+      {"code": "MINFOS", "label": "Minfos", "requires_certificate": false},
+      {"code": "Z_DISPENSE", "label": "Z Dispense", "requires_certificate": false},
+      {"code": "CORUM_LOTS", "label": "Corum LOTS", "requires_certificate": false},
+      {"code": "DISPENSE_WORKS", "label": "Dispense Works", "requires_certificate": false},
+      {"code": "RXONE", "label": "RxOne", "requires_certificate": false},
+      {"code": "AQUARIUS", "label": "Aquarius", "requires_certificate": false},
+      {"code": "POSWORKS", "label": "PosWorks", "requires_certificate": false},
+      {"code": "OTHER", "label": "Other", "requires_certificate": false}
+    ],
+    "expanded_scope": [
+      {"code": "UTI_PRESCRIBER", "label": "Uncomplicated UTI Prescriber", "requires_certificate": false},
+      {"code": "ORAL_CONTRACEPTIVE_RESUPPLY", "label": "Oral Contraceptive Resupply", "requires_certificate": false},
+      {"code": "TRAVEL_HEALTH_YELLOW_FEVER", "label": "Travel Health / Yellow Fever", "requires_certificate": false},
+      {"code": "HMR_ACCREDITED_MRN", "label": "HMR Accredited (MRN)", "requires_certificate": false},
+      {"code": "MEDSCHECK", "label": "MedsCheck", "requires_certificate": false}
+    ]
+  },
+  "otherstaff": {
+    "clinical_services": [
+      {"code": "VACCINATION", "label": "Vaccination", "requires_certificate": true},
+      {"code": "CANNABIS", "label": "Cannabis dispensing", "requires_certificate": false},
+      {"code": "COMPOUNDING", "label": "Compounding", "requires_certificate": true},
+      {"code": "CRED_PHARM", "label": "Credentialed Pharmacist", "requires_certificate": true},
+      {"code": "FIRST_AID", "label": "First Aid/CPR", "requires_certificate": true},
+      {"code": "PDL", "label": "PDL Insurance Certificate", "requires_certificate": true},
+      {"code": "PHARMACOTHERAPY_METHADONE_SUBOXONE", "label": "Pharmacotherapy (Methadone/Suboxone)", "description": "Willing to dose", "requires_certificate": false},
+      {"code": "WEBSTER_PACKING_DAA", "label": "Webster Packing / DAA", "description": "Manual checking", "requires_certificate": false},
+      {"code": "ROBOT_DISPENSING", "label": "Robot", "description": "Dispensing (Rowa / Alpaca)", "requires_certificate": false},
+      {"code": "STAGED_SUPPLY", "label": "Staged Supply", "description": "Daily/Weekly pickups", "requires_certificate": false},
+      {"code": "NDSS", "label": "NDSS", "description": "Diabetes Support", "requires_certificate": false},
+      {"code": "PI_INSURANCE", "label": "Professional Indemnity (PI) Insurance", "description": "Do you have current PI Insurance?", "requires_certificate": false},
+      {"code": "VACCINATOR", "label": "Vaccinator", "description": "Valid First Aid + CPR required", "requires_certificate": false}
+    ],
+    "dispense_software": [
+      {"code": "FRED", "label": "FRED / FRED NXT", "requires_certificate": false},
+      {"code": "MINFOS", "label": "Minfos", "requires_certificate": false},
+      {"code": "Z_DISPENSE", "label": "Z Dispense", "requires_certificate": false},
+      {"code": "CORUM_LOTS", "label": "Corum LOTS", "requires_certificate": false},
+      {"code": "DISPENSE_WORKS", "label": "Dispense Works", "requires_certificate": false},
+      {"code": "RXONE", "label": "RxOne", "requires_certificate": false},
+      {"code": "AQUARIUS", "label": "Aquarius", "requires_certificate": false},
+      {"code": "POSWORKS", "label": "PosWorks", "requires_certificate": false},
+      {"code": "OTHER", "label": "Other", "requires_certificate": false}
+    ],
+    "expanded_scope": [
+      {"code": "UTI_PRESCRIBER", "label": "Uncomplicated UTI Prescriber", "requires_certificate": false},
+      {"code": "ORAL_CONTRACEPTIVE_RESUPPLY", "label": "Oral Contraceptive Resupply", "requires_certificate": false},
+      {"code": "TRAVEL_HEALTH_YELLOW_FEVER", "label": "Travel Health / Yellow Fever", "requires_certificate": false},
+      {"code": "HMR_ACCREDITED_MRN", "label": "HMR Accredited (MRN)", "requires_certificate": false},
+      {"code": "MEDSCHECK", "label": "MedsCheck", "requires_certificate": false}
+    ]
+  }
+}

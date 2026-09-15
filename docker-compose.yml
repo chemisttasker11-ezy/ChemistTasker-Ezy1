@@ -1,4 +1,26 @@
 services:
+  landing:
+    build:
+      context: ./frontend_web/landing_next
+      args:
+        NEXT_PUBLIC_SITE_URL: "https://chemisttasker.com.au"
+    container_name: chemisttasker_public_prod
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      PLATFORM_API_URL: "http://web:8000/api"
+      HUB_API_URL: "http://web:8000/api"
+      NEXT_PUBLIC_SITE_URL: "https://chemisttasker.com.au"
+      DASHBOARD_INTERNAL_URL: "http://frontend:80"
+    networks:
+      - chemisttasker_network
+      - shared_backend_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
   web:
     build:
       context: ./backend
@@ -12,8 +34,9 @@ services:
         required: false
     environment:
       DEBUG: "False"
+      PUBLIC_COMMUNITY_ENABLED: "${PUBLIC_COMMUNITY_ENABLED:-False}"
       DJANGO_SETTINGS_MODULE: "core.settings"
-      ALLOWED_HOSTS: "chemisttasker.com.au,www.chemisttasker.com.au,backend.chemisttasker.com.au,localhost,127.0.0.1"
+      ALLOWED_HOSTS: "chemisttasker.com.au,www.chemisttasker.com.au,backend.chemisttasker.com.au,localhost,127.0.0.1,web"
       CORS_ALLOWED_ORIGINS: "https://chemisttasker.com.au,https://www.chemisttasker.com.au"
       CSRF_TRUSTED_ORIGINS: "https://chemisttasker.com.au,https://www.chemisttasker.com.au,https://backend.chemisttasker.com.au"
       SECURE_SSL_REDIRECT: "True"
@@ -136,6 +159,8 @@ services:
     build:
       context: .
       dockerfile: frontend_web/Dockerfile
+      args:
+        VITE_PUBLIC_SITE_ENABLED: "${PUBLIC_SITE_ENABLED:-0}"
     container_name: chemisttasker_frontend_prod
     restart: unless-stopped
     expose:

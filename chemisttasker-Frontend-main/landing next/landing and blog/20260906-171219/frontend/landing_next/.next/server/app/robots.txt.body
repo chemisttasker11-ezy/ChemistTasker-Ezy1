@@ -1,0 +1,6 @@
+User-Agent: *
+Allow: /
+Disallow: /api/
+Disallow: /community/sign-in
+
+Sitemap: https://chemisttasker.com.au/sitemap.xml

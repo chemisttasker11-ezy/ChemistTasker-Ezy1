@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChemistTasker Frontend Refinement"
+  short_description: "Preserve workflows while refining the frontend"
+  default_prompt: "Use $chemisttasker-frontend-refinement to refine the existing application without losing visual richness or business behaviour."

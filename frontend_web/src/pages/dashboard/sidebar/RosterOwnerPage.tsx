@@ -44,6 +44,7 @@ import { calendarViews, calendarMessages, getDateRangeForView, CalendarViewKey }
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
+import RosterPlanningToolbar from '../../../components/roster/RosterPlanningToolbar';
 import {
   PharmacySummary,
   RosterAssignment,
@@ -930,6 +931,14 @@ export default function RosterOwnerPage() {
           <Tab key={p.id} label={p.name} value={Number(p.id)} />
         ))}
       </Tabs>
+
+      {/* Roster V2 Weekly Planning, Draft/Publish, Validation & Templates Toolbar */}
+      <RosterPlanningToolbar
+        pharmacyId={selectedPharmacyId}
+        calendarDate={calendarDate}
+        onRosterUpdated={reloadAssignments}
+        onNavigateWeek={(targetDate) => setCalendarDate(targetDate)}
+      />
       
       <Box sx={{
         display: 'flex',

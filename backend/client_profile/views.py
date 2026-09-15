@@ -7256,7 +7256,27 @@ class RosterWorkerViewSet(viewsets.ReadOnlyModelViewSet):
                 pass  # Ignore invalid date format
                 
         # --- END OF FIX (The user-specific filter was here) ---
-        
+
+        # 3. Exclude draft roster period assignments:
+        # Workers can view shifts for published roster periods only.
+        # Legacy assignments and marketplace shifts (is_rostered=False) remain visible.
+        try:
+            draft_periods = list(RosterPeriod.objects.filter(status=RosterPeriod.Status.DRAFT))
+            draft_q = Q()
+            for dp in draft_periods:
+                draft_q |= Q(
+                    is_rostered=True,
+                    shift__pharmacy_id=dp.pharmacy_id,
+                    slot_date__gte=dp.week_start,
+                    slot_date__lte=dp.week_start + timedelta(days=6),
+                )
+            if draft_q:
+                qs = qs.exclude(draft_q)
+        except Exception:
+            # If RosterPeriod table is missing (e.g. unmigrated database) or query fails,
+            # preserve original queryset to guarantee legacy worker roster continuity.
+            pass
+
         return qs
 
     @action(detail=False, methods=['get'])
@@ -7767,41 +7787,50 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
         pharmacy = req.pharmacy
         role_needed = self._resolve_shift_role_for_request(req)
         
-        # Check the pharmacy setting for auto-publishing
-        # --- NEW LOGIC: Always create an open shift on approval ---
-        # Create a new community shift based on the request details
-        shift_data = {
-            "pharmacy": pharmacy,
-            "role_needed": role_needed,
-            "employment_type": "LOCUM",
-            "visibility": "LOCUM_CASUAL",
-            "single_user_only": True,
-            "created_by": request.user,
-            "description": f"This shift was created from a cover request by {req.requested_by.get_full_name()} for {req.slot_date}. Note: {req.note or 'No note provided.'}",
-        }
-        if role_needed == "PHARMACIST":
-            shift_data["rate_type"] = "FLEXIBLE"
-
-        new_shift = Shift.objects.create(**shift_data)
-
-        ShiftSlot.objects.create(
-            shift=new_shift,
-            date=req.slot_date,
-            start_time=req.start_time,
-            end_time=req.end_time,
-            is_recurring=False,
-        )
-
-        # If the original request was for an existing assignment, un-assign the worker
+        # Check if this request is linked to an existing ShiftSlotAssignment
         if req.shift:
-            # req.shift is a ShiftSlotAssignment instance
-            req.shift.delete()
+            from client_profile.roster_worker_actions import release_worker_from_assignment
+            try:
+                release_worker_from_assignment(
+                    req,
+                    manager=request.user,
+                    escalate_to_visibility="LOCUM_CASUAL",
+                )
+            except DjangoValidationError as e:
+                return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Update the request status to show it was auto-published
-        req.status = "AUTO_PUBLISHED"
-        req.resolved_at = timezone.now()
-        req.resolved_by = request.user
-        req.save(update_fields=["status", "resolved_at", "resolved_by"])
+            # Preserve backward-compatible status
+            req.status = "AUTO_PUBLISHED"
+            req.save(update_fields=["status"])
+        else:
+            # Request was for an unassigned shift; create open community shift
+            shift_data = {
+                "pharmacy": pharmacy,
+                "role_needed": role_needed,
+                "employment_type": "LOCUM",
+                "visibility": "LOCUM_CASUAL",
+                "single_user_only": True,
+                "created_by": request.user,
+                "description": f"This shift was created from a cover request by {req.requested_by.get_full_name()} for {req.slot_date}. Note: {req.note or 'No note provided.'}",
+            }
+            if role_needed == "PHARMACIST":
+                shift_data["rate_type"] = "FLEXIBLE"
+
+            new_shift = Shift.objects.create(**shift_data)
+
+            ShiftSlot.objects.create(
+                shift=new_shift,
+                date=req.slot_date,
+                start_time=req.start_time,
+                end_time=req.end_time,
+                is_recurring=False,
+            )
+
+            # Update the request status to show it was auto-published
+            req.status = "AUTO_PUBLISHED"
+            req.resolved_at = timezone.now()
+            req.resolved_by = request.user
+            req.save(update_fields=["status", "resolved_at", "resolved_by"])
         
         approval_status_message = "approved and a new community shift has been published"
 

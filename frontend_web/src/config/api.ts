@@ -11,7 +11,8 @@ const normalizeApiBaseUrl = (value: string) => {
 
 export function initSharedCoreApi() {
   if (configured) return;
-  const baseURL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
+  const configuredBase = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
+  const baseURL = configuredBase ? new URL(configuredBase, window.location.origin).href : '';
   if (!baseURL) {
     throw new Error('VITE_API_URL is not defined');
   }

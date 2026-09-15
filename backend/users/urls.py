@@ -1,5 +1,6 @@
 from django.urls import path, include
 from .views import *
+from .browser_session import csrf_token
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.routers import DefaultRouter
 from django.contrib.auth import views as auth_views
@@ -18,6 +19,7 @@ organization_membership_detail = OrganizationMembershipViewSet.as_view({
 })
 
 urlpatterns = [
+    path('csrf/', csrf_token, name='browser-csrf'),
     path('register/', RegisterView.as_view()),
     path('login/', CustomLoginView.as_view(), name='custom_token_obtain_pair'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),

@@ -9,6 +9,8 @@ from two_factor.urls import urlpatterns as two_factor_urlpatterns
 from .two_factor_views import AdminAwareLoginView
 from django.http import JsonResponse
 from django.db import connection
+from public_hub.attachment_access import HubMediaAccess
+from public_hub.media import deny_raw_media
 
 def health_check(request):
     try:
@@ -24,11 +26,15 @@ two_factor_patterns = list(two_factor_patterns)
 two_factor_patterns[0] = path('account/login/', AdminAwareLoginView.as_view(), name='login')
 
 urlpatterns = [
+    path('media/public_content/<path:filename>', deny_raw_media),
+    path('media/pharmacy_hub/attachments/<path:filename>', HubMediaAccess.as_view()),
     path('', include((two_factor_patterns, two_factor_app_name), namespace='two_factor')),
     path(settings.ADMIN_URL, otp_admin_site.urls),
     path('sitemap.xml', sitemap_web, name='sitemap-web'),
     path('health/', health_check, name='health'),
     path('api/users/', include('users.urls')),
+    path('api/public-hub/', include('public_hub.urls')),
+    path('api/content/', include('public_hub.content_urls')),
     path('api/client-profile/', include(('client_profile.urls', 'client_profile'), namespace='client_profile')),
     path('api/billing/', include('billing.urls', namespace='billing')),
     path('api/account/', DeleteAccountView.as_view(), name='delete-account'),

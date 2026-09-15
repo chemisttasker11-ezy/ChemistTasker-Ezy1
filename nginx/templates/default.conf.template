@@ -6,6 +6,15 @@ upstream chemisttasker_frontend {
     server chemisttasker_frontend_prod:80;
 }
 
+upstream chemisttasker_public {
+    server chemisttasker_public_prod:3000;
+}
+
+map "${PUBLIC_SITE_ENABLED}" $public_site_target {
+    default chemisttasker_frontend;
+    "1" chemisttasker_public;
+}
+
 map $http_upgrade $connection_upgrade {
     default upgrade;
     '' close;
@@ -48,6 +57,7 @@ server {
     http2 on;
 
     server_name ${DOMAIN} www.${DOMAIN};
+    if ($host = www.${DOMAIN}) { return 301 https://${DOMAIN}$request_uri; }
 
     ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
@@ -67,6 +77,42 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
+
+    location /api/hub/ {
+        proxy_pass http://chemisttasker_public;
+    }
+
+    location /api/platform/ {
+        proxy_pass http://chemisttasker_public;
+    }
+
+    location ~ ^/onboarding/(owner|pharmacist|otherstaff|explorer)(/|$) {
+        proxy_pass http://chemisttasker_frontend;
+    }
+
+    location /setup/ {
+        proxy_pass http://chemisttasker_frontend;
+    }
+
+    location /dashboard/ {
+        proxy_pass http://chemisttasker_frontend;
+    }
+
+    location = /dashboard {
+        proxy_pass http://$public_site_target;
+    }
+
+    location /dashboard-assets/ {
+        proxy_pass http://chemisttasker_frontend;
+    }
+
+    location /js/ {
+        proxy_pass http://chemisttasker_frontend;
+    }
+
+    location /_next/ {
+        proxy_pass http://chemisttasker_public;
+    }
 
     location /api/ {
         proxy_pass http://chemisttasker_backend;
@@ -98,7 +144,7 @@ server {
     }
 
     location / {
-        proxy_pass http://chemisttasker_frontend;
+        proxy_pass http://$public_site_target;
     }
 }
 

@@ -10,8 +10,7 @@ export default function LogoutPage() {
   const { logout } = useAuth();
 
   React.useEffect(() => {
-    logout();
-    nav('/login', { replace: true });
+    void logout().then(done=>{if(done)window.location.replace('/login');});
   }, [logout, nav]);
 
   return <Typography>Logging out…</Typography>;

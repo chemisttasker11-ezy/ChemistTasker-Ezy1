@@ -1,0 +1,251 @@
+services:
+  redis:
+    image: redis:8-alpine
+    container_name: chemisttasker_redis_dev
+    restart: "no"
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    networks:
+      - chemisttasker_network
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: chemisttasker_backend_dev
+    restart: "no"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./env/backend.dev.env
+    environment:
+      DEBUG: "True"
+      DJANGO_SETTINGS_MODULE: "core.settings"
+      COLLECT_STATIC: "0"
+      RUN_MIGRATIONS: "1"
+      APP_ENV: "local"
+      LOCAL_DB_HOST: "host.docker.internal"
+      USE_PROD_DB: "False"
+      USE_AZURE_STORAGE: "False"
+      REDIS_URL: "redis://redis:6379/0"
+      CHANNEL_REDIS_URL: "redis://redis:6379/1"
+      CELERY_BROKER_URL: "redis://redis:6379/2"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/3"
+      DJANGO_CACHE_URL: "redis://redis:6379/4"
+      REDIS_KEY_PREFIX: "chemisttasker:dev"
+      USE_REDIS_CHANNEL_LAYER: "True"
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./backend/billing:/app/billing
+      - ./backend/client_profile:/app/client_profile
+      - ./backend/core:/app/core
+      - ./backend/templates:/app/templates
+      - ./backend/users:/app/users
+      - ./backend/manage.py:/app/manage.py
+      - ./backend/media:/app/media
+      - ./backend/verification_outputs:/app/verification_outputs
+      - static_volume:/app/staticfiles
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: chemisttasker_celery_dev
+    restart: "no"
+    env_file:
+      - ./env/backend.dev.env
+    environment:
+      DEBUG: "True"
+      DJANGO_SETTINGS_MODULE: "core.settings"
+      COLLECT_STATIC: "0"
+      RUN_MIGRATIONS: "0"
+      APP_ENV: "local"
+      LOCAL_DB_HOST: "host.docker.internal"
+      USE_PROD_DB: "False"
+      USE_AZURE_STORAGE: "False"
+      REDIS_URL: "redis://redis:6379/0"
+      CHANNEL_REDIS_URL: "redis://redis:6379/1"
+      CELERY_BROKER_URL: "redis://redis:6379/2"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/3"
+      DJANGO_CACHE_URL: "redis://redis:6379/4"
+      REDIS_KEY_PREFIX: "chemisttasker:dev"
+    command: ["celery", "-A", "core", "worker", "-l", "INFO", "-Q", "email,default,notifications,ocr,billing", "--pool=solo"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./backend/billing:/app/billing
+      - ./backend/client_profile:/app/client_profile
+      - ./backend/core:/app/core
+      - ./backend/templates:/app/templates
+      - ./backend/users:/app/users
+      - ./backend/manage.py:/app/manage.py
+      - ./backend/media:/app/media
+      - ./backend/verification_outputs:/app/verification_outputs
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: chemisttasker_celery_beat_dev
+    restart: "no"
+    env_file:
+      - ./env/backend.dev.env
+    environment:
+      DEBUG: "True"
+      DJANGO_SETTINGS_MODULE: "core.settings"
+      COLLECT_STATIC: "0"
+      RUN_MIGRATIONS: "0"
+      APP_ENV: "local"
+      LOCAL_DB_HOST: "host.docker.internal"
+      USE_PROD_DB: "False"
+      USE_AZURE_STORAGE: "False"
+      REDIS_URL: "redis://redis:6379/0"
+      CHANNEL_REDIS_URL: "redis://redis:6379/1"
+      CELERY_BROKER_URL: "redis://redis:6379/2"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/3"
+    command: ["celery", "-A", "core", "beat", "-l", "INFO", "--schedule", "/app/celerybeat/celerybeat-schedule"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./backend/billing:/app/billing
+      - ./backend/client_profile:/app/client_profile
+      - ./backend/core:/app/core
+      - ./backend/templates:/app/templates
+      - ./backend/users:/app/users
+      - ./backend/manage.py:/app/manage.py
+      - celerybeat_dev_data:/app/celerybeat
+
+  stripe:
+    image: stripe/stripe-cli:latest
+    container_name: chemisttasker_stripe_dev
+    restart: "no"
+    env_file:
+      - ./env/backend.dev.env
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["stripe listen --api-key \"$${STRIPE_SECRET_KEY}\" --events checkout.session.completed,invoice.paid,customer.subscription.deleted --forward-to http://web:8000/api/billing/webhook/"]
+    depends_on:
+      web:
+        condition: service_started
+    networks:
+      - chemisttasker_network
+
+  frontend_5173:
+    image: node:22-alpine
+    container_name: chemisttasker_frontend_5173_dev
+    restart: "no"
+    working_dir: /app
+    env_file:
+      - ./env/web.dev.env
+    environment:
+      VITE_DEV_PROXY_TARGET: "http://web:8000"
+      VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
+    command: ["sh", "-c", "npm install && npx vite --port 5173 --host 0.0.0.0"]
+    ports:
+      - "5173:5173"
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./frontend_web:/app
+      - ./shared-core:/shared-core
+      - frontend_5173_node_modules:/app/node_modules
+
+  frontend_5174:
+    image: node:22-alpine
+    container_name: chemisttasker_frontend_5174_dev
+    restart: "no"
+    working_dir: /app
+    env_file:
+      - ./env/web.dev.env
+    environment:
+      VITE_DEV_PROXY_TARGET: "http://web:8000"
+      VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
+    command: ["sh", "-c", "npm install && npx vite --port 5174 --host 0.0.0.0"]
+    ports:
+      - "5174:5174"
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./frontend_web:/app
+      - ./shared-core:/shared-core
+      - frontend_5174_node_modules:/app/node_modules
+
+  frontend_5175:
+    image: node:22-alpine
+    container_name: chemisttasker_frontend_5175_dev
+    restart: "no"
+    working_dir: /app
+    env_file:
+      - ./env/web.dev.env
+    environment:
+      VITE_DEV_PROXY_TARGET: "http://web:8000"
+      VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
+    command: ["sh", "-c", "npm install && npx vite --port 5175 --host 0.0.0.0"]
+    ports:
+      - "5175:5175"
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./frontend_web:/app
+      - ./shared-core:/shared-core
+      - frontend_5175_node_modules:/app/node_modules
+
+  mobile:
+    image: node:22-alpine
+    container_name: chemisttasker_mobile_dev
+    restart: "no"
+    working_dir: /app
+    env_file:
+      - ./env/mobile.dev.env
+    command: ["sh", "-c", "npm install && npx expo start --dev-client --lan --clear"]
+    ports:
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+    networks:
+      - chemisttasker_network
+    volumes:
+      - ./frontend_mobile:/app
+      - mobile_node_modules:/app/node_modules
+
+volumes:
+  static_volume:
+  redis_dev_data:
+  celerybeat_dev_data:
+  frontend_5173_node_modules:
+  frontend_5174_node_modules:
+  frontend_5175_node_modules:
+  mobile_node_modules:
+
+networks:
+  chemisttasker_network:
+    driver: bridge

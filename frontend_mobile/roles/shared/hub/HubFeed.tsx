@@ -604,6 +604,7 @@ export function HubFeed({ scope, onBack, targetPostId, onTargetPostHandled, head
 
   return (
     <View style={{ flex: 1 }}>
+      {scope?.type === "platform" && <Text accessibilityRole="text" style={{ padding: 16, backgroundColor: "#F5F8FC", color: "#06214A", borderLeftWidth: 3, borderLeftColor: "#5222B8" }}>Posts and discussions in this hub are publicly readable. Share only information intended for a public audience.</Text>}
       {header ? (
         <Animated.View style={[feedStyles.headerContainer, { height: headerHeight }]}>
           {header.cover ? <Image source={{ uri: header.cover }} style={feedStyles.headerImage} /> : null}

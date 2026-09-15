@@ -55,10 +55,11 @@ export default function Login() {
     setError('');
 
     try {
+      const csrfSession = await axios.get(`${API_BASE_URL}/users/csrf/`, { withCredentials: true });
       const { data } = await axios.post(
         `${API_BASE_URL}${API_ENDPOINTS.login}`,
         { email: email.toLowerCase(), password, remember_me: rememberMe },
-        { withCredentials: true }
+        { withCredentials: true, headers: { "X-CSRFToken": csrfSession.data.csrfToken } }
       );
       const { access, refresh, user: userInfo } = data;
       if (!access || !refresh) {

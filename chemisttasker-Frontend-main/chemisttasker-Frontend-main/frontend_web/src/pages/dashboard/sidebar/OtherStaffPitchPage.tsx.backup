@@ -1,0 +1,208 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { useAuth } from '../../../contexts/AuthContext';
+import { createExplorerPost, getExplorerPostFeed, getOnboarding, updateExplorerPost } from '@chemisttasker/shared-core';
+
+const WORK_TYPES = [
+  { value: 'FULL_TIME', label: 'Full Time' },
+  { value: 'PART_TIME', label: 'Part Time' },
+  { value: 'CASUAL', label: 'Casual' },
+  { value: 'VOLUNTEERING', label: 'Volunteering' },
+  { value: 'PLACEMENT', label: 'Placement' },
+] as const;
+
+type WorkType = typeof WORK_TYPES[number]['value'];
+
+type Onboarding = {
+  short_bio?: string | null;
+  suburb?: string | null;
+  state?: string | null;
+  postcode?: string | null;
+  role_type?: string | null;
+};
+
+const formatRoleTitle = (roleType: string | null | undefined) => {
+  if (!roleType) return 'Other Staff';
+  return roleType.replace('_', ' ').toLowerCase().replace(/(^|\s)\S/g, (t) => t.toUpperCase());
+};
+
+export default function OtherStaffPitchPage() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [existingPostId, setExistingPostId] = useState<number | null>(null);
+  const [roleTitle, setRoleTitle] = useState<string>('Other Staff');
+
+  const [form, setForm] = useState({
+    headline: '',
+    body: '',
+    workType: '' as WorkType | '',
+    suburb: '',
+    state: '',
+    postcode: '',
+  });
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const onboarding: Onboarding = await getOnboarding('other_staff');
+      setRoleTitle(formatRoleTitle(onboarding?.role_type));
+      setForm((prev) => ({
+        ...prev,
+        body: onboarding?.short_bio || '',
+        suburb: onboarding?.suburb || '',
+        state: onboarding?.state || '',
+        postcode: onboarding?.postcode || '',
+      }));
+
+      const feed: any = await getExplorerPostFeed({ page: 1, page_size: 200 });
+      const list = Array.isArray(feed) ? feed : Array.isArray(feed?.results) ? feed.results : [];
+      const mine = list.find((post: any) => post.author_user_id === user?.id && post.role_category === 'OTHER_STAFF');
+      if (mine) {
+        setExistingPostId(mine.id);
+        setForm((prev) => ({
+          ...prev,
+          headline: mine.headline || '',
+          body: mine.body || prev.body,
+          workType: mine.work_type || prev.workType,
+          suburb: mine.location_suburb || prev.suburb,
+          state: mine.location_state || prev.state,
+          postcode: mine.location_postcode || prev.postcode,
+        }));
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load profile.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        headline: form.headline,
+        body: form.body,
+        role_category: 'OTHER_STAFF',
+        role_title: roleTitle,
+        work_type: form.workType || null,
+        location_suburb: form.suburb || null,
+        location_state: form.state || null,
+        location_postcode: form.postcode || null,
+        is_anonymous: true,
+      };
+      if (existingPostId) {
+        await updateExplorerPost(existingPostId, payload);
+      } else {
+        await createExplorerPost(payload);
+      }
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save pitch.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const statusLabel = useMemo(() => (existingPostId ? 'Update Pitch' : 'Create Pitch'), [existingPostId]);
+
+  if (loading) {
+    return (
+      <Box sx={{ px: { xs: 2, lg: 3 }, py: 2 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ px: { xs: 2, lg: 3 }, py: 2, width: '100%' }}>
+      <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>My Pitch</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        This is what owners see on the Talent Board. Keep it short and clear.
+      </Typography>
+
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
+      )}
+
+      <Card variant="outlined" sx={{ borderRadius: 3 }}>
+        <CardContent>
+          <Stack spacing={2.5}>
+            <TextField
+              label="Headline"
+              value={form.headline}
+              onChange={(event) => setForm((prev) => ({ ...prev, headline: event.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Short Bio"
+              value={form.body}
+              onChange={(event) => setForm((prev) => ({ ...prev, body: event.target.value }))}
+              fullWidth
+              multiline
+              minRows={4}
+            />
+
+            <FormControl fullWidth>
+              <InputLabel>Engagement Type</InputLabel>
+              <Select
+                label="Engagement Type"
+                value={form.workType}
+                onChange={(event) => setForm((prev) => ({ ...prev, workType: event.target.value as WorkType }))}
+              >
+                {WORK_TYPES.map((item) => (
+                  <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <TextField
+                label="Suburb"
+                value={form.suburb}
+                onChange={(event) => setForm((prev) => ({ ...prev, suburb: event.target.value }))}
+                fullWidth
+              />
+              <TextField
+                label="State"
+                value={form.state}
+                onChange={(event) => setForm((prev) => ({ ...prev, state: event.target.value }))}
+                fullWidth
+              />
+              <TextField
+                label="Postcode"
+                value={form.postcode}
+                onChange={(event) => setForm((prev) => ({ ...prev, postcode: event.target.value }))}
+                fullWidth
+              />
+            </Stack>
+
+            <Button variant="contained" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : statusLabel}
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}

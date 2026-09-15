@@ -1,0 +1,3 @@
+{
+  "/(public)/membership/apply/[token]/page": "app/(public)/membership/apply/[token]/page.js"
+}

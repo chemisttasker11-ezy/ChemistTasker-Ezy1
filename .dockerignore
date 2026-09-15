@@ -23,3 +23,7 @@ screenshots
 trash
 *.log
 *.tmp
+
+.venv
+chemisttasker-Frontend-main
+**/.next

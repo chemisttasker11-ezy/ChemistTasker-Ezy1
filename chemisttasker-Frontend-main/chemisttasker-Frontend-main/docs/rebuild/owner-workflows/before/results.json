@@ -1,0 +1,194 @@
+{
+  "phase": "before",
+  "screenshots": [
+    "post-details-1440.png",
+    "post-skills-1440.png",
+    "post-visibility-1440.png",
+    "post-timetable-1440.png",
+    "post-pay-1440.png",
+    "centre-active-1440.png",
+    "centre-confirmed-1440.png",
+    "centre-history-1440.png",
+    "post-details-390.png",
+    "post-skills-390.png",
+    "post-visibility-390.png",
+    "post-timetable-390.png",
+    "post-pay-390.png",
+    "centre-active-390.png",
+    "centre-confirmed-390.png",
+    "centre-history-390.png"
+  ],
+  "checks": [
+    {
+      "name": "post-details-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-skills-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-visibility-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-timetable-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-pay-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "submit-connected-1440",
+      "pass": true
+    },
+    {
+      "name": "route-active-1440",
+      "pass": true
+    },
+    {
+      "name": "centre-active-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "route-confirmed-1440",
+      "pass": true
+    },
+    {
+      "name": "centre-confirmed-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "route-history-1440",
+      "pass": true
+    },
+    {
+      "name": "centre-history-1440-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-details-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-skills-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-visibility-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-timetable-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "post-pay-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "submit-connected-390",
+      "pass": true
+    },
+    {
+      "name": "route-active-390",
+      "pass": true
+    },
+    {
+      "name": "centre-active-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "route-confirmed-390",
+      "pass": true
+    },
+    {
+      "name": "centre-confirmed-390-page-width",
+      "pass": true
+    },
+    {
+      "name": "route-history-390",
+      "pass": true
+    },
+    {
+      "name": "centre-history-390-page-width",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/client-profile/pharmacies/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/client-profile/shifts/calculate-rates/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shift-description-templates/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/client-profile/shifts/calculate-rates/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/active/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/900010/member_status/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/900010/counter-offers/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/confirmed/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/history/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/pharmacies/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/client-profile/shifts/calculate-rates/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shift-description-templates/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/client-profile/shifts/calculate-rates/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/active/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/900010/member_status/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/900010/counter-offers/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/confirmed/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/client-profile/shifts/history/"
+    }
+  ]
+}

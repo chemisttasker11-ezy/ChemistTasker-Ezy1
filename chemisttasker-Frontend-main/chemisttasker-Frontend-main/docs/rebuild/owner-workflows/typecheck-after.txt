@@ -1,0 +1,17 @@
+frontend_web/src/components/dashboard/DashboardOverviewTemplate.tsx(132,3): error TS6133: 'onOpenActivity' is declared but its value is never read.
+frontend_web/src/components/dashboard/RecentActivityDialog.tsx(17,1): error TS6133: 'FavoriteBorderIcon' is declared but its value is never read.
+frontend_web/src/layouts/CustomAppTitle.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx(116,7): error TS6133: 'getSlotAwaitingPaymentOfferId' is declared but its value is never read.
+frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx(137,7): error TS6133: 'getCandidateNameForPaymentSlot' is declared but its value is never read.
+frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx(150,7): error TS6133: 'shouldShowPaymentRequired' is declared but its value is never read.
+frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx(1168,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx(1185,40): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx(147,17): error TS2345: Argument of type '{ role_type: string; classification_level: any; student_year: any; intern_half: any; ahpra_proof: null; hours_proof: null; certificate: null; university_id: null; cpr_certificate: null; s8_certificate: null; _existing: { ...; }; }' is not assignable to parameter of type 'SetStateAction<FormDataShape>'.
+  Type '{ role_type: string; classification_level: any; student_year: any; intern_half: any; ahpra_proof: null; hours_proof: null; certificate: null; university_id: null; cpr_certificate: null; s8_certificate: null; _existing: { ...; }; }' is not assignable to type 'FormDataShape'.
+    Types of property 'role_type' are incompatible.
+      Type 'string' is not assignable to type 'Role'.
+frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx(148,27): error TS2345: Argument of type '{ role_type: string; classification_level: any; student_year: any; intern_half: any; ahpra_proof: null; hours_proof: null; certificate: null; university_id: null; cpr_certificate: null; s8_certificate: null; _existing: { ...; }; }' is not assignable to parameter of type 'FormDataShape'.
+  Types of property 'role_type' are incompatible.
+    Type 'string' is not assignable to type 'Role'.

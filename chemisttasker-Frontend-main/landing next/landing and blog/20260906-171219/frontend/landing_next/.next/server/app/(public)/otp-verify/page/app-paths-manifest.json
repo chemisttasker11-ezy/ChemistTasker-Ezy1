@@ -1,0 +1,3 @@
+{
+  "/(public)/otp-verify/page": "app/(public)/otp-verify/page.js"
+}

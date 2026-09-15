@@ -1,0 +1,2567 @@
+{
+  "generated_at_utc": "2026-09-14T23:21:47.067702+00:00",
+  "scope": "Configured database only; does not establish other deployment states.",
+  "transaction_read_only": "on",
+  "auth_user_model": "users.User",
+  "source_sha256_by_app": {
+    "users": {},
+    "client_profile": {
+      "0044_roster_v2_and_attendance_v1": "209828f71e7f5f70b20c47bc1c5e9fe8534e9fee922a7497a13f9d5d627c0439"
+    },
+    "billing": {}
+  },
+  "applied_migrations": [
+    {
+      "app": "billing",
+      "name": "0001_initial"
+    },
+    {
+      "app": "billing",
+      "name": "0002_ownersubscription_billing_contact_and_more"
+    },
+    {
+      "app": "billing",
+      "name": "0003_ownersubscription_stripe_extra_seat_subscription_id"
+    },
+    {
+      "app": "client_profile",
+      "name": "0001_initial"
+    },
+    {
+      "app": "client_profile",
+      "name": "0001_state_membership"
+    },
+    {
+      "app": "client_profile",
+      "name": "0002_comment_reactions"
+    },
+    {
+      "app": "client_profile",
+      "name": "0002_create_pharmacy_hub_tables"
+    },
+    {
+      "app": "client_profile",
+      "name": "0002_initial"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_add_slot_date_to_counter_offer_slot"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_legacy_membership_stub"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_pharmacyclaim_pharmacy_email_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_pharmacyhubcomment_is_edited_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_rename_client_pro_comment_6e6d2d_idx_client_prof_comment_fb9876_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_calendar_work_notes"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_pharmacyhubpost_pinning"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_remove_owneronboarding_organization_claimed"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_remove_shiftcounterofferslot_client_pro_counter_c93d28_idx"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_alter_participant_membership_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_alter_shiftcounterofferslot_unique_together"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_backfill_pharmacy_timezone"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_rename_client_pro_is_pin_9a9f96_idx_client_prof_is_pinn_5b7054_idx"
+    },
+    {
+      "app": "client_profile",
+      "name": "0006_alter_pharmacyhubcomment_author_membership"
+    },
+    {
+      "app": "client_profile",
+      "name": "0006_fix_counter_offer_slot_constraint"
+    },
+    {
+      "app": "client_profile",
+      "name": "0006_pharmacyhubpost_organization_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0007_pharmacy_timezone_alter_notification_type_worknote_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0007_pharmacyadmin"
+    },
+    {
+      "app": "client_profile",
+      "name": "0008_add_recurrence_columns"
+    },
+    {
+      "app": "client_profile",
+      "name": "0008_alter_membership_role_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0009_alter_pharmacyadmin_staff_role"
+    },
+    {
+      "app": "client_profile",
+      "name": "0009_worknote_completion"
+    },
+    {
+      "app": "client_profile",
+      "name": "0010_rename_client_prof_work_no_eef97c_idx_client_prof_work_no_ebc9d8_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0010_shift_post_anonymously"
+    },
+    {
+      "app": "client_profile",
+      "name": "0011_explorerpost_author_user_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0011_hub_profile_fields"
+    },
+    {
+      "app": "client_profile",
+      "name": "0012_hub_post_mentions"
+    },
+    {
+      "app": "client_profile",
+      "name": "0012_otherstaffonboarding_open_to_travel_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0013_otherstaffonboarding_coverage_radius_km_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0013_pharmacyhubpoll_pharmacyhubpolloption_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0014_exploreronboarding_coverage_radius_km_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0014_membership_job_title_membershipapplication_job_title"
+    },
+    {
+      "app": "client_profile",
+      "name": "0015_owneronboarding_submitted_for_verification"
+    },
+    {
+      "app": "client_profile",
+      "name": "0015_remove_explorerpost_work_type_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0016_add_ahpra_first_registration_date"
+    },
+    {
+      "app": "client_profile",
+      "name": "0016_pharmacyhubcomment_reaction_summary_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0017_participant_pinned_message"
+    },
+    {
+      "app": "client_profile",
+      "name": "0017_useravailability_notify_new_shifts"
+    },
+    {
+      "app": "client_profile",
+      "name": "0018_conversation_client_prof_updated_6ccea6_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0018_exploreronboarding_travel_states_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0019_shift_dedicated_user"
+    },
+    {
+      "app": "client_profile",
+      "name": "0020_shift_offer"
+    },
+    {
+      "app": "client_profile",
+      "name": "0021_rename_client_prof_shift_i_7c403b_idx_client_prof_shift_i_4cbf78_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0022_delete_explorerpostattachment"
+    },
+    {
+      "app": "client_profile",
+      "name": "0023_shift_payment_status"
+    },
+    {
+      "app": "client_profile",
+      "name": "0024_shiftoffer_terms_and_payment_pending_status"
+    },
+    {
+      "app": "client_profile",
+      "name": "0025_owneronboarding_number_of_pharmacies"
+    },
+    {
+      "app": "client_profile",
+      "name": "0026_encrypt_tfn_numbers"
+    },
+    {
+      "app": "client_profile",
+      "name": "0027_shiftprofileaccessaudit"
+    },
+    {
+      "app": "client_profile",
+      "name": "0028_hub_platform_hubs"
+    },
+    {
+      "app": "client_profile",
+      "name": "0029_pharmacyhubpost_author_user"
+    },
+    {
+      "app": "client_profile",
+      "name": "0030_hub_poll_social_features"
+    },
+    {
+      "app": "client_profile",
+      "name": "0031_hub_platform_user_participation"
+    },
+    {
+      "app": "client_profile",
+      "name": "0031_rename_pharmacist_abn_invoice_issuer_abn"
+    },
+    {
+      "app": "client_profile",
+      "name": "0032_invoice_bill_to_abn_invoice_bill_to_first_name_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0032_rename_client_prof_platf_7d58dd_idx_client_prof_platfor_f17bc7_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0033_otherstaffonboarding_classification_level_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0033_pillreferralcode_pillreferralevent_pillrewardrule_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0034_onboarding_gender_emergency_contact"
+    },
+    {
+      "app": "client_profile",
+      "name": "0034_pharmacy_state"
+    },
+    {
+      "app": "client_profile",
+      "name": "0035_pharmacy_daily_hours"
+    },
+    {
+      "app": "client_profile",
+      "name": "0035_shift_owner_adjusted_rate"
+    },
+    {
+      "app": "client_profile",
+      "name": "0036_explorerpost_post_kind"
+    },
+    {
+      "app": "client_profile",
+      "name": "0036_invoicelineitem_was_modified_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0037_pharmacy_abn_metadata"
+    },
+    {
+      "app": "client_profile",
+      "name": "0037_remove_shift_accepted_user"
+    },
+    {
+      "app": "client_profile",
+      "name": "0038_alter_chain_logo_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0038_shiftslotassignment_slot_date"
+    },
+    {
+      "app": "client_profile",
+      "name": "0039_alter_shiftslotassignment_unique_together"
+    },
+    {
+      "app": "client_profile",
+      "name": "0039_pharmacy_closed_days"
+    },
+    {
+      "app": "client_profile",
+      "name": "0040_alter_shiftslotassignment_slot"
+    },
+    {
+      "app": "client_profile",
+      "name": "0040_membership_invitation_status"
+    },
+    {
+      "app": "client_profile",
+      "name": "0041_alter_invoicelineitem_category_code_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0041_shiftdescriptiontemplate"
+    },
+    {
+      "app": "client_profile",
+      "name": "0042_invoice_issuer_email"
+    },
+    {
+      "app": "client_profile",
+      "name": "0042_membershipapplication_username"
+    },
+    {
+      "app": "client_profile",
+      "name": "0043_remove_owneronboarding_username_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0043_shiftoffer_last_buzzed_at"
+    },
+    {
+      "app": "client_profile",
+      "name": "0044_membership_employment_type_membership_invited_by_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0045_alter_membership_role"
+    },
+    {
+      "app": "client_profile",
+      "name": "0046_alter_membership_employment_type_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0047_remove_pharmacistonboarding_ahpra_number_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0048_pharmacistonboarding_ahpra_number"
+    },
+    {
+      "app": "client_profile",
+      "name": "0049_exploreronboarding_referee1_confirmed_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0050_chain_client_prof_owner_i_1b91da_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0051_shift_escalate_to_locum_casual_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0052_shiftrejection"
+    },
+    {
+      "app": "client_profile",
+      "name": "0053_alter_shiftrejection_slot"
+    },
+    {
+      "app": "client_profile",
+      "name": "0054_shift_share_token"
+    },
+    {
+      "app": "client_profile",
+      "name": "0055_alter_shift_share_token"
+    },
+    {
+      "app": "client_profile",
+      "name": "0056_exploreronboarding_gov_id_verified_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0057_owneronboarding_ahpra_expiry_date_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0058_alter_owneronboarding_ahpra_verification_note_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0059_shiftslotassignment_is_rostered"
+    },
+    {
+      "app": "client_profile",
+      "name": "0060_membership_intern_half_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0061_leaverequest"
+    },
+    {
+      "app": "client_profile",
+      "name": "0062_remove_otherstaffonboarding_ahpra_verified_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0063_onboardingnotification"
+    },
+    {
+      "app": "client_profile",
+      "name": "0064_exploreronboarding_referee1_last_sent_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0065_shift_description"
+    },
+    {
+      "app": "client_profile",
+      "name": "0066_remove_pharmacy_address_pharmacy_google_place_id_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0067_refereeresponse"
+    },
+    {
+      "app": "client_profile",
+      "name": "0068_refereeresponse_compliance_adherence_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0069_remove_pharmacy_asic_number_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0070_pharmacistonboarding_google_place_id_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0071_remove_pharmacistonboarding_gst_file_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0072_pharmacistonboarding_referee1_workplace_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0073_pharmacistonboarding_skill_certificates"
+    },
+    {
+      "app": "client_profile",
+      "name": "0074_remove_pharmacistonboarding_software_experience"
+    },
+    {
+      "app": "client_profile",
+      "name": "0075_alter_membership_role"
+    },
+    {
+      "app": "client_profile",
+      "name": "0076_pharmacistonboarding_government_id_type"
+    },
+    {
+      "app": "client_profile",
+      "name": "0077_membershipinvitelink_membershipapplication_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0078_alter_membership_employment_type"
+    },
+    {
+      "app": "client_profile",
+      "name": "0079_alter_membershipapplication_email_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0080_alter_membershipapplication_intern_half_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0081_conversation_message_participant_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0082_message_is_deleted_message_is_edited_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0083_messagereaction"
+    },
+    {
+      "app": "client_profile",
+      "name": "0084_message_attachment_filename"
+    },
+    {
+      "app": "client_profile",
+      "name": "0085_remove_conversation_uniq_dm_per_pharmacy_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0086_participant_is_pinned"
+    },
+    {
+      "app": "client_profile",
+      "name": "0087_conversation_pharmacy"
+    },
+    {
+      "app": "client_profile",
+      "name": "0088_alter_participant_membership"
+    },
+    {
+      "app": "client_profile",
+      "name": "0089_explorerpostattachment_explorerpostreaction_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0090_conversation_client_prof_pharmac_16fdb4_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0091_alter_membership_role_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0092_conversation_pinned_message"
+    },
+    {
+      "app": "client_profile",
+      "name": "0093_rating"
+    },
+    {
+      "app": "client_profile",
+      "name": "0094_pharmacistonboarding_date_of_birth_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0095_remove_otherstaffonboarding_gst_file_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0096_remove_otherstaffonboarding_rate_preference"
+    },
+    {
+      "app": "client_profile",
+      "name": "0097_remove_exploreronboarding_phone_number_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0098_exploreronboarding_referee1_workplace_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0099_swaprequest"
+    },
+    {
+      "app": "client_profile",
+      "name": "0100_alter_swaprequest_slot_assignment"
+    },
+    {
+      "app": "client_profile",
+      "name": "0101_pharmacy_auto_publish_worker_requests_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0102_workershiftrequest"
+    },
+    {
+      "app": "client_profile",
+      "name": "0103_notification"
+    },
+    {
+      "app": "client_profile",
+      "name": "0104_rename_client_pro_user_id_4542a1_idx_client_prof_user_id_2537cd_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0105_pharmacycommunitygroup_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0106_workershiftrequest_resolved_at_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0123_make_hubpost_pharmacy_nullable"
+    },
+    {
+      "app": "client_profile",
+      "name": "0124_organization_slug"
+    },
+    {
+      "app": "client_profile",
+      "name": "0125_shiftslot_hourly_rate"
+    },
+    {
+      "app": "client_profile",
+      "name": "0126_shift_job_rate_fields"
+    },
+    {
+      "app": "client_profile",
+      "name": "0127_pharmacy_rate_early_morning_pharmacy_rate_late_night_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0128_remove_shift_agreed_rate_early_morning_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0129_shift_flexible_timing"
+    },
+    {
+      "app": "client_profile",
+      "name": "0130_shift_has_accommodation_shift_has_travel_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0131_shiftsaved"
+    },
+    {
+      "app": "client_profile",
+      "name": "0132_rename_client_prof_user_id_c7e8d4_idx_client_prof_user_id_8a973f_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0132_shift_payment_preference"
+    },
+    {
+      "app": "client_profile",
+      "name": "0133_merge_0132"
+    },
+    {
+      "app": "client_profile",
+      "name": "0134_alter_shiftcounterofferslot_slot"
+    },
+    {
+      "app": "users",
+      "name": "0001_initial"
+    },
+    {
+      "app": "users",
+      "name": "0002_alter_user_role"
+    },
+    {
+      "app": "users",
+      "name": "0002_organization_membership"
+    },
+    {
+      "app": "users",
+      "name": "0002_organizationmembership_admin_level_and_more"
+    },
+    {
+      "app": "users",
+      "name": "0003_add_deleted_at"
+    },
+    {
+      "app": "users",
+      "name": "0003_alter_user_managers_alter_user_email_and_more"
+    },
+    {
+      "app": "users",
+      "name": "0003_devicetoken"
+    },
+    {
+      "app": "users",
+      "name": "0004_alter_user_username"
+    },
+    {
+      "app": "users",
+      "name": "0004_contact_message"
+    },
+    {
+      "app": "users",
+      "name": "0005_organizationmembership"
+    },
+    {
+      "app": "users",
+      "name": "0005_user_otp_security_fields"
+    },
+    {
+      "app": "users",
+      "name": "0006_user_is_otp_verified_user_otp_code_and_more"
+    },
+    {
+      "app": "users",
+      "name": "0006_websocketticket"
+    },
+    {
+      "app": "users",
+      "name": "0007_expand_otp_hash_fields"
+    },
+    {
+      "app": "users",
+      "name": "0007_user_accepted_terms_user_accepted_terms_at"
+    },
+    {
+      "app": "users",
+      "name": "0008_user_is_mobile_verified_user_mobile_number_and_more"
+    }
+  ],
+  "applied_names_without_local_source": [
+    {
+      "app": "billing",
+      "name": "0001_initial"
+    },
+    {
+      "app": "billing",
+      "name": "0002_ownersubscription_billing_contact_and_more"
+    },
+    {
+      "app": "billing",
+      "name": "0003_ownersubscription_stripe_extra_seat_subscription_id"
+    },
+    {
+      "app": "client_profile",
+      "name": "0001_initial"
+    },
+    {
+      "app": "client_profile",
+      "name": "0001_state_membership"
+    },
+    {
+      "app": "client_profile",
+      "name": "0002_comment_reactions"
+    },
+    {
+      "app": "client_profile",
+      "name": "0002_create_pharmacy_hub_tables"
+    },
+    {
+      "app": "client_profile",
+      "name": "0002_initial"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_add_slot_date_to_counter_offer_slot"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_legacy_membership_stub"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_pharmacyclaim_pharmacy_email_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_pharmacyhubcomment_is_edited_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0003_rename_client_pro_comment_6e6d2d_idx_client_prof_comment_fb9876_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_calendar_work_notes"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_pharmacyhubpost_pinning"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_remove_owneronboarding_organization_claimed"
+    },
+    {
+      "app": "client_profile",
+      "name": "0004_remove_shiftcounterofferslot_client_pro_counter_c93d28_idx"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_alter_participant_membership_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_alter_shiftcounterofferslot_unique_together"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_backfill_pharmacy_timezone"
+    },
+    {
+      "app": "client_profile",
+      "name": "0005_rename_client_pro_is_pin_9a9f96_idx_client_prof_is_pinn_5b7054_idx"
+    },
+    {
+      "app": "client_profile",
+      "name": "0006_alter_pharmacyhubcomment_author_membership"
+    },
+    {
+      "app": "client_profile",
+      "name": "0006_fix_counter_offer_slot_constraint"
+    },
+    {
+      "app": "client_profile",
+      "name": "0006_pharmacyhubpost_organization_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0007_pharmacy_timezone_alter_notification_type_worknote_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0007_pharmacyadmin"
+    },
+    {
+      "app": "client_profile",
+      "name": "0008_add_recurrence_columns"
+    },
+    {
+      "app": "client_profile",
+      "name": "0008_alter_membership_role_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0009_alter_pharmacyadmin_staff_role"
+    },
+    {
+      "app": "client_profile",
+      "name": "0009_worknote_completion"
+    },
+    {
+      "app": "client_profile",
+      "name": "0010_rename_client_prof_work_no_eef97c_idx_client_prof_work_no_ebc9d8_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0010_shift_post_anonymously"
+    },
+    {
+      "app": "client_profile",
+      "name": "0011_explorerpost_author_user_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0011_hub_profile_fields"
+    },
+    {
+      "app": "client_profile",
+      "name": "0012_hub_post_mentions"
+    },
+    {
+      "app": "client_profile",
+      "name": "0012_otherstaffonboarding_open_to_travel_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0013_otherstaffonboarding_coverage_radius_km_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0013_pharmacyhubpoll_pharmacyhubpolloption_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0014_exploreronboarding_coverage_radius_km_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0014_membership_job_title_membershipapplication_job_title"
+    },
+    {
+      "app": "client_profile",
+      "name": "0015_owneronboarding_submitted_for_verification"
+    },
+    {
+      "app": "client_profile",
+      "name": "0015_remove_explorerpost_work_type_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0016_add_ahpra_first_registration_date"
+    },
+    {
+      "app": "client_profile",
+      "name": "0016_pharmacyhubcomment_reaction_summary_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0017_participant_pinned_message"
+    },
+    {
+      "app": "client_profile",
+      "name": "0017_useravailability_notify_new_shifts"
+    },
+    {
+      "app": "client_profile",
+      "name": "0018_conversation_client_prof_updated_6ccea6_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0018_exploreronboarding_travel_states_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0019_shift_dedicated_user"
+    },
+    {
+      "app": "client_profile",
+      "name": "0020_shift_offer"
+    },
+    {
+      "app": "client_profile",
+      "name": "0021_rename_client_prof_shift_i_7c403b_idx_client_prof_shift_i_4cbf78_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0022_delete_explorerpostattachment"
+    },
+    {
+      "app": "client_profile",
+      "name": "0023_shift_payment_status"
+    },
+    {
+      "app": "client_profile",
+      "name": "0024_shiftoffer_terms_and_payment_pending_status"
+    },
+    {
+      "app": "client_profile",
+      "name": "0025_owneronboarding_number_of_pharmacies"
+    },
+    {
+      "app": "client_profile",
+      "name": "0026_encrypt_tfn_numbers"
+    },
+    {
+      "app": "client_profile",
+      "name": "0027_shiftprofileaccessaudit"
+    },
+    {
+      "app": "client_profile",
+      "name": "0028_hub_platform_hubs"
+    },
+    {
+      "app": "client_profile",
+      "name": "0029_pharmacyhubpost_author_user"
+    },
+    {
+      "app": "client_profile",
+      "name": "0030_hub_poll_social_features"
+    },
+    {
+      "app": "client_profile",
+      "name": "0031_hub_platform_user_participation"
+    },
+    {
+      "app": "client_profile",
+      "name": "0031_rename_pharmacist_abn_invoice_issuer_abn"
+    },
+    {
+      "app": "client_profile",
+      "name": "0032_invoice_bill_to_abn_invoice_bill_to_first_name_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0032_rename_client_prof_platf_7d58dd_idx_client_prof_platfor_f17bc7_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0033_otherstaffonboarding_classification_level_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0033_pillreferralcode_pillreferralevent_pillrewardrule_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0034_onboarding_gender_emergency_contact"
+    },
+    {
+      "app": "client_profile",
+      "name": "0034_pharmacy_state"
+    },
+    {
+      "app": "client_profile",
+      "name": "0035_pharmacy_daily_hours"
+    },
+    {
+      "app": "client_profile",
+      "name": "0035_shift_owner_adjusted_rate"
+    },
+    {
+      "app": "client_profile",
+      "name": "0036_explorerpost_post_kind"
+    },
+    {
+      "app": "client_profile",
+      "name": "0036_invoicelineitem_was_modified_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0037_pharmacy_abn_metadata"
+    },
+    {
+      "app": "client_profile",
+      "name": "0037_remove_shift_accepted_user"
+    },
+    {
+      "app": "client_profile",
+      "name": "0038_alter_chain_logo_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0038_shiftslotassignment_slot_date"
+    },
+    {
+      "app": "client_profile",
+      "name": "0039_alter_shiftslotassignment_unique_together"
+    },
+    {
+      "app": "client_profile",
+      "name": "0039_pharmacy_closed_days"
+    },
+    {
+      "app": "client_profile",
+      "name": "0040_alter_shiftslotassignment_slot"
+    },
+    {
+      "app": "client_profile",
+      "name": "0040_membership_invitation_status"
+    },
+    {
+      "app": "client_profile",
+      "name": "0041_alter_invoicelineitem_category_code_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0041_shiftdescriptiontemplate"
+    },
+    {
+      "app": "client_profile",
+      "name": "0042_invoice_issuer_email"
+    },
+    {
+      "app": "client_profile",
+      "name": "0042_membershipapplication_username"
+    },
+    {
+      "app": "client_profile",
+      "name": "0043_remove_owneronboarding_username_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0043_shiftoffer_last_buzzed_at"
+    },
+    {
+      "app": "client_profile",
+      "name": "0044_membership_employment_type_membership_invited_by_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0045_alter_membership_role"
+    },
+    {
+      "app": "client_profile",
+      "name": "0046_alter_membership_employment_type_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0047_remove_pharmacistonboarding_ahpra_number_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0048_pharmacistonboarding_ahpra_number"
+    },
+    {
+      "app": "client_profile",
+      "name": "0049_exploreronboarding_referee1_confirmed_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0050_chain_client_prof_owner_i_1b91da_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0051_shift_escalate_to_locum_casual_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0052_shiftrejection"
+    },
+    {
+      "app": "client_profile",
+      "name": "0053_alter_shiftrejection_slot"
+    },
+    {
+      "app": "client_profile",
+      "name": "0054_shift_share_token"
+    },
+    {
+      "app": "client_profile",
+      "name": "0055_alter_shift_share_token"
+    },
+    {
+      "app": "client_profile",
+      "name": "0056_exploreronboarding_gov_id_verified_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0057_owneronboarding_ahpra_expiry_date_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0058_alter_owneronboarding_ahpra_verification_note_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0059_shiftslotassignment_is_rostered"
+    },
+    {
+      "app": "client_profile",
+      "name": "0060_membership_intern_half_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0061_leaverequest"
+    },
+    {
+      "app": "client_profile",
+      "name": "0062_remove_otherstaffonboarding_ahpra_verified_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0063_onboardingnotification"
+    },
+    {
+      "app": "client_profile",
+      "name": "0064_exploreronboarding_referee1_last_sent_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0065_shift_description"
+    },
+    {
+      "app": "client_profile",
+      "name": "0066_remove_pharmacy_address_pharmacy_google_place_id_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0067_refereeresponse"
+    },
+    {
+      "app": "client_profile",
+      "name": "0068_refereeresponse_compliance_adherence_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0069_remove_pharmacy_asic_number_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0070_pharmacistonboarding_google_place_id_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0071_remove_pharmacistonboarding_gst_file_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0072_pharmacistonboarding_referee1_workplace_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0073_pharmacistonboarding_skill_certificates"
+    },
+    {
+      "app": "client_profile",
+      "name": "0074_remove_pharmacistonboarding_software_experience"
+    },
+    {
+      "app": "client_profile",
+      "name": "0075_alter_membership_role"
+    },
+    {
+      "app": "client_profile",
+      "name": "0076_pharmacistonboarding_government_id_type"
+    },
+    {
+      "app": "client_profile",
+      "name": "0077_membershipinvitelink_membershipapplication_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0078_alter_membership_employment_type"
+    },
+    {
+      "app": "client_profile",
+      "name": "0079_alter_membershipapplication_email_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0080_alter_membershipapplication_intern_half_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0081_conversation_message_participant_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0082_message_is_deleted_message_is_edited_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0083_messagereaction"
+    },
+    {
+      "app": "client_profile",
+      "name": "0084_message_attachment_filename"
+    },
+    {
+      "app": "client_profile",
+      "name": "0085_remove_conversation_uniq_dm_per_pharmacy_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0086_participant_is_pinned"
+    },
+    {
+      "app": "client_profile",
+      "name": "0087_conversation_pharmacy"
+    },
+    {
+      "app": "client_profile",
+      "name": "0088_alter_participant_membership"
+    },
+    {
+      "app": "client_profile",
+      "name": "0089_explorerpostattachment_explorerpostreaction_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0090_conversation_client_prof_pharmac_16fdb4_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0091_alter_membership_role_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0092_conversation_pinned_message"
+    },
+    {
+      "app": "client_profile",
+      "name": "0093_rating"
+    },
+    {
+      "app": "client_profile",
+      "name": "0094_pharmacistonboarding_date_of_birth_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0095_remove_otherstaffonboarding_gst_file_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0096_remove_otherstaffonboarding_rate_preference"
+    },
+    {
+      "app": "client_profile",
+      "name": "0097_remove_exploreronboarding_phone_number_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0098_exploreronboarding_referee1_workplace_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0099_swaprequest"
+    },
+    {
+      "app": "client_profile",
+      "name": "0100_alter_swaprequest_slot_assignment"
+    },
+    {
+      "app": "client_profile",
+      "name": "0101_pharmacy_auto_publish_worker_requests_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0102_workershiftrequest"
+    },
+    {
+      "app": "client_profile",
+      "name": "0103_notification"
+    },
+    {
+      "app": "client_profile",
+      "name": "0104_rename_client_pro_user_id_4542a1_idx_client_prof_user_id_2537cd_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0105_pharmacycommunitygroup_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0106_workershiftrequest_resolved_at_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0123_make_hubpost_pharmacy_nullable"
+    },
+    {
+      "app": "client_profile",
+      "name": "0124_organization_slug"
+    },
+    {
+      "app": "client_profile",
+      "name": "0125_shiftslot_hourly_rate"
+    },
+    {
+      "app": "client_profile",
+      "name": "0126_shift_job_rate_fields"
+    },
+    {
+      "app": "client_profile",
+      "name": "0127_pharmacy_rate_early_morning_pharmacy_rate_late_night_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0128_remove_shift_agreed_rate_early_morning_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0129_shift_flexible_timing"
+    },
+    {
+      "app": "client_profile",
+      "name": "0130_shift_has_accommodation_shift_has_travel_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0131_shiftsaved"
+    },
+    {
+      "app": "client_profile",
+      "name": "0132_rename_client_prof_user_id_c7e8d4_idx_client_prof_user_id_8a973f_idx_and_more"
+    },
+    {
+      "app": "client_profile",
+      "name": "0132_shift_payment_preference"
+    },
+    {
+      "app": "client_profile",
+      "name": "0133_merge_0132"
+    },
+    {
+      "app": "client_profile",
+      "name": "0134_alter_shiftcounterofferslot_slot"
+    },
+    {
+      "app": "users",
+      "name": "0001_initial"
+    },
+    {
+      "app": "users",
+      "name": "0002_alter_user_role"
+    },
+    {
+      "app": "users",
+      "name": "0002_organization_membership"
+    },
+    {
+      "app": "users",
+      "name": "0002_organizationmembership_admin_level_and_more"
+    },
+    {
+      "app": "users",
+      "name": "0003_add_deleted_at"
+    },
+    {
+      "app": "users",
+      "name": "0003_alter_user_managers_alter_user_email_and_more"
+    },
+    {
+      "app": "users",
+      "name": "0003_devicetoken"
+    },
+    {
+      "app": "users",
+      "name": "0004_alter_user_username"
+    },
+    {
+      "app": "users",
+      "name": "0004_contact_message"
+    },
+    {
+      "app": "users",
+      "name": "0005_organizationmembership"
+    },
+    {
+      "app": "users",
+      "name": "0005_user_otp_security_fields"
+    },
+    {
+      "app": "users",
+      "name": "0006_user_is_otp_verified_user_otp_code_and_more"
+    },
+    {
+      "app": "users",
+      "name": "0006_websocketticket"
+    },
+    {
+      "app": "users",
+      "name": "0007_expand_otp_hash_fields"
+    },
+    {
+      "app": "users",
+      "name": "0007_user_accepted_terms_user_accepted_terms_at"
+    },
+    {
+      "app": "users",
+      "name": "0008_user_is_mobile_verified_user_mobile_number_and_more"
+    }
+  ],
+  "source_recovery_note": "Recover originals and verify squash/replacement history; names alone cannot reconstruct dependencies.",
+  "roster_0044_recorded_applied": false,
+  "new_table_presence": {
+    "client_profile_rosterperiod": false,
+    "client_profile_rostertemplate": false,
+    "client_profile_kioskdevice": false,
+    "client_profile_pharmacyqrsession": false,
+    "client_profile_workerpin": false,
+    "client_profile_attendancesession": false,
+    "client_profile_provisionalattendance": false,
+    "client_profile_attendancecorrection": false
+  },
+  "columns": [
+    {
+      "table": "client_profile_membership",
+      "column": "id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "invited_name",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "role",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "employment_type",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "is_active",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "created_at",
+      "type": "timestamp with time zone",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "updated_at",
+      "type": "timestamp with time zone",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "pharmacist_award_level",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "otherstaff_classification_level",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "intern_half",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "student_year",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "invited_by_id",
+      "type": "bigint",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "user_id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "pharmacy_id",
+      "type": "bigint",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "job_title",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "responded_at",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_membership",
+      "column": "status",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "name",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "street_address",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "suburb",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "postcode",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "google_place_id",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "latitude",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "longitude",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "state",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "verified",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "methadone_s8_protocols",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "qld_sump_docs",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "sops",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "induction_guides",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "weekdays_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "weekdays_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "saturdays_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "saturdays_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "sundays_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "sundays_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "public_holidays_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "public_holidays_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "employment_types",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "roles_needed",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "default_rate_type",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "default_fixed_rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "about",
+      "type": "text",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_verified",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "auto_publish_worker_requests",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "organization_id",
+      "type": "bigint",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "owner_id",
+      "type": "bigint",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "email",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "cover_image",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "rate_early_morning",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "rate_late_night",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "rate_public_holiday",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "rate_saturday",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "rate_sunday",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "rate_weekday",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "timezone",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "friday_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "friday_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "monday_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "monday_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "thursday_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "thursday_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "tuesday_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "tuesday_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "wednesday_end",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "wednesday_start",
+      "type": "time without time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_entity_confirmed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_entity_name",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_entity_type",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_gst_from",
+      "type": "date",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_gst_registered",
+      "type": "boolean",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_gst_to",
+      "type": "date",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_last_checked",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_status",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "abn_verification_note",
+      "type": "text",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "monday_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "tuesday_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "wednesday_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "thursday_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "friday_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "saturdays_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "sundays_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "column": "public_holidays_closed",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "created_at",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "role_needed",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "employment_type",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "workload_tags",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "must_have",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "nice_to_have",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "rate_type",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "fixed_rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "owner_adjusted_rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "visibility",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "reveal_count",
+      "type": "integer",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "reveal_quota",
+      "type": "integer",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "escalate_to_locum_casual",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "escalate_to_owner_chain",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "escalate_to_org_chain",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "escalate_to_platform",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "escalation_level",
+      "type": "integer",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "single_user_only",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "share_token",
+      "type": "uuid",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "description",
+      "type": "text",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "created_by_id",
+      "type": "bigint",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "pharmacy_id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "post_anonymously",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "max_annual_salary",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "max_hourly_rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "min_annual_salary",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "min_hourly_rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "super_percent",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "flexible_timing",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "has_accommodation",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "has_travel",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "is_urgent",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "payment_preference",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "dedicated_user_id",
+      "type": "bigint",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shift",
+      "column": "payment_status",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "date",
+      "type": "date",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "start_time",
+      "type": "time without time zone",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "end_time",
+      "type": "time without time zone",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "is_recurring",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "recurring_days",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "recurring_end_date",
+      "type": "date",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "shift_id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "column": "rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "slot_date",
+      "type": "date",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "assigned_at",
+      "type": "timestamp with time zone",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "unit_rate",
+      "type": "numeric",
+      "nullable": "YES"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "rate_reason",
+      "type": "jsonb",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "is_rostered",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "shift_id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "slot_id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "column": "user_id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "id",
+      "type": "bigint",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "password",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "last_login",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "is_superuser",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "first_name",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "last_name",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "is_staff",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "is_active",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "date_joined",
+      "type": "timestamp with time zone",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "username",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "email",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "role",
+      "type": "character varying",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "otp_code",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "otp_created_at",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "is_otp_verified",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "accepted_terms",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "accepted_terms_at",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "mobile_number",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "mobile_otp_code",
+      "type": "character varying",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "mobile_otp_created_at",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "is_mobile_verified",
+      "type": "boolean",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "deleted_at",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "mobile_otp_failed_attempts",
+      "type": "smallint",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "mobile_otp_locked_until",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    },
+    {
+      "table": "users_user",
+      "column": "otp_failed_attempts",
+      "type": "smallint",
+      "nullable": "NO"
+    },
+    {
+      "table": "users_user",
+      "column": "otp_locked_until",
+      "type": "timestamp with time zone",
+      "nullable": "YES"
+    }
+  ],
+  "constraints": [
+    {
+      "table": "client_profile_membership",
+      "name": "client_profile_membe_invited_by_id_f6ef33da_fk_users_use",
+      "definition": "FOREIGN KEY (invited_by_id) REFERENCES users_user(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_membership",
+      "name": "client_profile_membe_pharmacy_id_677f43b7_fk_client_pr",
+      "definition": "FOREIGN KEY (pharmacy_id) REFERENCES client_profile_pharmacy(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_membership",
+      "name": "client_profile_membership_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "client_profile_membership",
+      "name": "client_profile_membership_user_id_36e57d23_fk_users_user_id",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users_user(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_membership",
+      "name": "client_profile_membership_user_id_pharmacy_id_d29243fe_uniq",
+      "definition": "UNIQUE (user_id, pharmacy_id)"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "name": "client_profile_pharm_organization_id_136ca8d2_fk_client_pr",
+      "definition": "FOREIGN KEY (organization_id) REFERENCES client_profile_organization(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "name": "client_profile_pharm_owner_id_4183e032_fk_client_pr",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES client_profile_owneronboarding(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_pharmacy",
+      "name": "client_profile_pharmacy_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "client_profile_shift",
+      "name": "client_profile_shift_created_by_id_90091219_fk_users_user_id",
+      "definition": "FOREIGN KEY (created_by_id) REFERENCES users_user(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shift",
+      "name": "client_profile_shift_dedicated_user_id_adc86362_fk_users_use",
+      "definition": "FOREIGN KEY (dedicated_user_id) REFERENCES users_user(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shift",
+      "name": "client_profile_shift_pharmacy_id_6d51cbd7_fk_client_pr",
+      "definition": "FOREIGN KEY (pharmacy_id) REFERENCES client_profile_pharmacy(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shift",
+      "name": "client_profile_shift_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "client_profile_shift",
+      "name": "client_profile_shift_share_token_key",
+      "definition": "UNIQUE (share_token)"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "name": "client_profile_shift_shift_id_9addd0b8_fk_client_pr",
+      "definition": "FOREIGN KEY (shift_id) REFERENCES client_profile_shift(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shiftslot",
+      "name": "client_profile_shiftslot_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "name": "client_profile_shift_shift_id_44d833bc_fk_client_pr",
+      "definition": "FOREIGN KEY (shift_id) REFERENCES client_profile_shift(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "name": "client_profile_shift_slot_id_3d37c6af_fk_client_pr",
+      "definition": "FOREIGN KEY (slot_id) REFERENCES client_profile_shiftslot(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "name": "client_profile_shift_user_id_8b2d510c_fk_users_use",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users_user(id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "name": "client_profile_shiftslot_slot_id_slot_date_7bc29919_uniq",
+      "definition": "UNIQUE (slot_id, slot_date)"
+    },
+    {
+      "table": "client_profile_shiftslotassignment",
+      "name": "client_profile_shiftslotassignment_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "users_user",
+      "name": "users_user_email_key",
+      "definition": "UNIQUE (email)"
+    },
+    {
+      "table": "users_user",
+      "name": "users_user_mobile_otp_failed_attempts_check",
+      "definition": "CHECK ((mobile_otp_failed_attempts >= 0))"
+    },
+    {
+      "table": "users_user",
+      "name": "users_user_otp_failed_attempts_check",
+      "definition": "CHECK ((otp_failed_attempts >= 0))"
+    },
+    {
+      "table": "users_user",
+      "name": "users_user_pkey",
+      "definition": "PRIMARY KEY (id)"
+    }
+  ]
+}

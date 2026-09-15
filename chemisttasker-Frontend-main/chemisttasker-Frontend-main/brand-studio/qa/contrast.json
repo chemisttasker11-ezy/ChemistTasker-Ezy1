@@ -1,0 +1,338 @@
+[
+  {
+    "name": "owner solid",
+    "foreground": "#FFFFFF",
+    "background": "#7A2DFF",
+    "ratio": 5.758,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "owner hover",
+    "foreground": "#FFFFFF",
+    "background": "#6520DF",
+    "ratio": 7.432,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "owner light badge",
+    "foreground": "#5C1BC2",
+    "background": "#F1E9FF",
+    "ratio": 7.462,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "owner dark badge",
+    "foreground": "#C9B0FF",
+    "background": "#292040",
+    "ratio": 8.101,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "owner light accent text",
+    "foreground": "#5C1BC2",
+    "background": "#FFFFFF",
+    "ratio": 8.784,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "owner dark accent text",
+    "foreground": "#C9B0FF",
+    "background": "#191D33",
+    "ratio": 8.805,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "pharmacist solid",
+    "foreground": "#FFFFFF",
+    "background": "#1A73E8",
+    "ratio": 4.505,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "pharmacist hover",
+    "foreground": "#FFFFFF",
+    "background": "#155EC0",
+    "ratio": 6.187,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "pharmacist light badge",
+    "foreground": "#1454AE",
+    "background": "#EAF2FF",
+    "ratio": 6.409,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "pharmacist dark badge",
+    "foreground": "#A5C9FF",
+    "background": "#192C46",
+    "ratio": 8.321,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "pharmacist light accent text",
+    "foreground": "#1454AE",
+    "background": "#FFFFFF",
+    "ratio": 7.219,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "pharmacist dark accent text",
+    "foreground": "#A5C9FF",
+    "background": "#191D33",
+    "ratio": 9.802,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "otherstaff solid",
+    "foreground": "#0B0F2B",
+    "background": "#00D4E6",
+    "ratio": 10.345,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "otherstaff hover",
+    "foreground": "#0B0F2B",
+    "background": "#00BDCD",
+    "ratio": 8.198,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "otherstaff light badge",
+    "foreground": "#006570",
+    "background": "#E3FAFC",
+    "ratio": 6.25,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "otherstaff dark badge",
+    "foreground": "#68E6EF",
+    "background": "#11353C",
+    "ratio": 8.855,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "otherstaff light accent text",
+    "foreground": "#006570",
+    "background": "#FFFFFF",
+    "ratio": 6.784,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "otherstaff dark accent text",
+    "foreground": "#68E6EF",
+    "background": "#191D33",
+    "ratio": 11.19,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "explorer solid",
+    "foreground": "#0B0F2B",
+    "background": "#FF2DB2",
+    "ratio": 5.611,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "explorer hover",
+    "foreground": "#0B0F2B",
+    "background": "#FF60C5",
+    "ratio": 6.919,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "explorer light badge",
+    "foreground": "#A6086B",
+    "background": "#FFF0F8",
+    "ratio": 6.649,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "explorer dark badge",
+    "foreground": "#FFABE0",
+    "background": "#3D2034",
+    "ratio": 8.355,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "explorer light accent text",
+    "foreground": "#A6086B",
+    "background": "#FFFFFF",
+    "ratio": 7.321,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "explorer dark accent text",
+    "foreground": "#FFABE0",
+    "background": "#191D33",
+    "ratio": 9.608,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light ink on page",
+    "foreground": "#0B0F2B",
+    "background": "#F6F7FB",
+    "ratio": 17.554,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light ink on surface",
+    "foreground": "#0B0F2B",
+    "background": "#FFFFFF",
+    "ratio": 18.793,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light ink on soft",
+    "foreground": "#0B0F2B",
+    "background": "#F0F2F7",
+    "ratio": 16.778,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light muted on page",
+    "foreground": "#5B637A",
+    "background": "#F6F7FB",
+    "ratio": 5.588,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light muted on surface",
+    "foreground": "#5B637A",
+    "background": "#FFFFFF",
+    "ratio": 5.982,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light muted on soft",
+    "foreground": "#5B637A",
+    "background": "#F0F2F7",
+    "ratio": 5.341,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "light control boundary",
+    "foreground": "#80889C",
+    "background": "#FFFFFF",
+    "ratio": 3.548,
+    "minimum": 3,
+    "passes": true
+  },
+  {
+    "name": "dark ink on page",
+    "foreground": "#F4F5FC",
+    "background": "#101326",
+    "ratio": 16.894,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "dark ink on surface",
+    "foreground": "#F4F5FC",
+    "background": "#191D33",
+    "ratio": 15.269,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "dark ink on soft",
+    "foreground": "#F4F5FC",
+    "background": "#242A43",
+    "ratio": 12.986,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "dark muted on page",
+    "foreground": "#B4BCD1",
+    "background": "#101326",
+    "ratio": 9.67,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "dark muted on surface",
+    "foreground": "#B4BCD1",
+    "background": "#191D33",
+    "ratio": 8.74,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "dark muted on soft",
+    "foreground": "#B4BCD1",
+    "background": "#242A43",
+    "ratio": 7.433,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "dark control boundary",
+    "foreground": "#8790AC",
+    "background": "#191D33",
+    "ratio": 5.23,
+    "minimum": 3,
+    "passes": true
+  },
+  {
+    "name": "success",
+    "foreground": "#146345",
+    "background": "#E8F7EF",
+    "ratio": 6.545,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "warning",
+    "foreground": "#805000",
+    "background": "#FFF3D6",
+    "ratio": 6.213,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "error",
+    "foreground": "#AC263B",
+    "background": "#FFF0F2",
+    "ratio": 6.139,
+    "minimum": 4.5,
+    "passes": true
+  },
+  {
+    "name": "info",
+    "foreground": "#1454AE",
+    "background": "#EAF2FF",
+    "ratio": 6.409,
+    "minimum": 4.5,
+    "passes": true
+  }
+]

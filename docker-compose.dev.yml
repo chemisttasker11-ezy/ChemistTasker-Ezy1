@@ -1,4 +1,21 @@
 services:
+  landing:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
+    ports:
+      - "3000:3000"
+    environment:
+      PLATFORM_API_URL: "http://web:8000/api"
+      HUB_API_URL: "http://web:8000/api"
+      NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+      DASHBOARD_INTERNAL_URL: "http://frontend_5173:5173"
+    volumes:
+      - ./frontend_web/landing_next:/app
+      - landing_node_modules:/app/node_modules
+      - landing_next_cache:/app/.next
+    networks:
+      - chemisttasker_network
   redis:
     image: redis:8-alpine
     container_name: chemisttasker_redis_dev
@@ -28,6 +45,7 @@ services:
       - ./env/backend.dev.env
     environment:
       DEBUG: "True"
+      PUBLIC_COMMUNITY_ENABLED: "${PUBLIC_COMMUNITY_ENABLED:-False}"
       DJANGO_SETTINGS_MODULE: "core.settings"
       COLLECT_STATIC: "0"
       RUN_MIGRATIONS: "1"
@@ -54,6 +72,7 @@ services:
       - ./backend/core:/app/core
       - ./backend/templates:/app/templates
       - ./backend/users:/app/users
+      - ./backend/public_hub:/app/public_hub
       - ./backend/manage.py:/app/manage.py
       - ./backend/media:/app/media
       - ./backend/verification_outputs:/app/verification_outputs
@@ -102,6 +121,7 @@ services:
       - ./backend/core:/app/core
       - ./backend/templates:/app/templates
       - ./backend/users:/app/users
+      - ./backend/public_hub:/app/public_hub
       - ./backend/manage.py:/app/manage.py
       - ./backend/media:/app/media
       - ./backend/verification_outputs:/app/verification_outputs
@@ -141,6 +161,7 @@ services:
       - ./backend/core:/app/core
       - ./backend/templates:/app/templates
       - ./backend/users:/app/users
+      - ./backend/public_hub:/app/public_hub
       - ./backend/manage.py:/app/manage.py
       - celerybeat_dev_data:/app/celerybeat
 
@@ -166,6 +187,8 @@ services:
     env_file:
       - ./env/web.dev.env
     environment:
+      VITE_PUBLIC_SITE_ENABLED: "1"
+      VITE_API_URL: "/api"
       VITE_DEV_PROXY_TARGET: "http://web:8000"
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
     command: ["sh", "-c", "npm install && npx vite --port 5173 --host 0.0.0.0"]
@@ -238,6 +261,8 @@ services:
       - mobile_node_modules:/app/node_modules
 
 volumes:
+  landing_node_modules:
+  landing_next_cache:
   static_volume:
   redis_dev_data:
   celerybeat_dev_data:

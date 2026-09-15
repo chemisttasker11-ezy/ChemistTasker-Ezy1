@@ -1,0 +1,176 @@
+﻿route,kind,components,route_guard,redirect,planned_host,source,line,runtime_status
+/,index,LandingPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,116,Not tested
+/pricing,page,PricingPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,117,Not tested
+/pricing/organization,page,OrganizationPricingPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,118,Not tested
+/login,page,Login,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,119,Not tested
+/otp-verify,page,OTPVerify,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,120,Not tested
+/mobile-verify,page,MobileOTPVerify,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,121,Not tested
+/mobile-checkout-return,page,MobileCheckoutReturnPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,122,Not tested
+/register,page,Register,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,123,Not tested
+/password-reset,page,PasswordResetRequestPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,124,Not tested
+/terms-of-service,page,TermsOfServicePage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,125,Not tested
+/privacy-policy,page,PrivacyPolicyPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,126,Not tested
+/account-deletion,page,AccountDeletionPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,127,Not tested
+/shifts/public-board,page,PublicJobBoardPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,130,Not tested
+/talent/public-board,page,PublicTalentBoardPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,131,Not tested
+/shifts/link,page,SharedShiftLandingPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,132,Not tested
+/organization/:slug,page,PublicOrganizationPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,133,Not tested
+/membership/apply/:token,page,MembershipApplyPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,135,Not tested
+/referee/questionnaire/:token,page,RefereeQuestionnairePage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,138,Not tested
+/onboarding/referee-reject/:pk/:refIndex,page,RefereeRejectPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,139,Not tested
+/reset-password/:uid/:token,page,ResetPasswordPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,142,Not tested
+/dashboard/organization,group,"ProtectedRoute, OrganizationDashboardWrapper",ORG_ADMIN,,Vite,frontend_web/src/main.tsx,146,Not tested
+/dashboard/organization,index,OrganizationOverviewPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,153,Not tested
+/dashboard/organization/overview,page,OrganizationOverviewPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,154,Not tested
+/dashboard/organization/pills,page,PillsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,155,Not tested
+/dashboard/organization/invite,page,InviteStaffPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,156,Not tested
+/dashboard/organization/manage-pharmacies,group,,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,158,Not tested
+/dashboard/organization/manage-pharmacies,index,PharmacyPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,160,Not tested
+/dashboard/organization/manage-pharmacies/my-pharmacies,page,PharmacyPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,161,Not tested
+/dashboard/organization/manage-pharmacies/my-chain,page,ChainPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,162,Not tested
+/dashboard/organization/manage-pharmacies/roster,page,RosterOwnerPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,163,Not tested
+/dashboard/organization/post-shift,page,PostShiftPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,167,Not tested
+/dashboard/organization/shift-center,page,Navigate,ORG_ADMIN,active,Vite,frontend_web/src/main.tsx,168,Not tested
+/dashboard/organization/shift-center/:section,page,OrganizationShiftCenterPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,169,Not tested
+/dashboard/organization/invoice,group,Outlet,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,171,Not tested
+/dashboard/organization/invoice,index,InvoiceManagePage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,174,Not tested
+/dashboard/organization/invoice/new,page,InvoiceGeneratePage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,175,Not tested
+/dashboard/organization/invoice/:id,page,InvoiceDetailPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,176,Not tested
+/dashboard/organization/shifts,group,,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,180,Not tested
+/dashboard/organization/shifts,index,PublicShiftsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,182,Not tested
+/dashboard/organization/shifts/public,page,PublicShiftsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,183,Not tested
+/dashboard/organization/shifts/community,page,CommunityShiftsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,184,Not tested
+/dashboard/organization/shifts/active,page,ActiveShiftsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,185,Not tested
+/dashboard/organization/shifts/confirmed,page,ConfirmedShiftsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,186,Not tested
+/dashboard/organization/shifts/history,page,HistoryShiftsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,187,Not tested
+/dashboard/organization/shifts/:id,page,PosterShiftDetailPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,188,Not tested
+/dashboard/organization/interests,page,TalentBoard,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,192,Not tested
+/dashboard/organization/learning,page,LearningMaterialsPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,193,Not tested
+/dashboard/organization/chat,page,ChatPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,194,Not tested
+/dashboard/organization/pharmacy-hub,page,Navigate,ORG_ADMIN,/dashboard/pharmacy-hub,Vite,frontend_web/src/main.tsx,195,Not tested
+/dashboard/organization/calendar,page,PharmacyCalendarPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,196,Not tested
+/dashboard/organization/logout,page,LogoutPage,ORG_ADMIN,,Vite,frontend_web/src/main.tsx,197,Not tested
+/dashboard/pharmacy-hub,group,"ProtectedRoute, HubDashboardWrapper",authenticated,,Vite,frontend_web/src/main.tsx,204,Not tested
+/dashboard/pharmacy-hub,index,HubPage,authenticated,,Vite,frontend_web/src/main.tsx,210,Not tested
+/dashboard/admin/:pharmacyId,group,"ProtectedRoute, AdminDashboardWrapper",admin assignment,,Vite,frontend_web/src/main.tsx,215,Not tested
+/dashboard/admin/:pharmacyId,index,AdminOverview,admin assignment,,Vite,frontend_web/src/main.tsx,222,Not tested
+/dashboard/admin/:pharmacyId/overview,page,AdminOverview,admin assignment,,Vite,frontend_web/src/main.tsx,223,Not tested
+/dashboard/admin/:pharmacyId/pills,page,PillsPage,admin assignment,,Vite,frontend_web/src/main.tsx,224,Not tested
+/dashboard/admin/:pharmacyId/manage-pharmacies,page,AdminManagePharmaciesPage,admin assignment,,Vite,frontend_web/src/main.tsx,225,Not tested
+/dashboard/admin/:pharmacyId/manage-pharmacies/my-pharmacies,page,AdminManagePharmaciesPage,admin assignment,,Vite,frontend_web/src/main.tsx,226,Not tested
+/dashboard/admin/:pharmacyId/manage-pharmacies/roster,page,AdminRosterPage,admin assignment,,Vite,frontend_web/src/main.tsx,227,Not tested
+/dashboard/admin/:pharmacyId/post-shift,page,AdminPostShiftPage,admin assignment,,Vite,frontend_web/src/main.tsx,228,Not tested
+/dashboard/admin/:pharmacyId/shift-center,page,Navigate,admin assignment,active,Vite,frontend_web/src/main.tsx,229,Not tested
+/dashboard/admin/:pharmacyId/shift-center/:section,page,AdminShiftCenterPage,admin assignment,,Vite,frontend_web/src/main.tsx,230,Not tested
+/dashboard/admin/:pharmacyId/invoice,group,Outlet,admin assignment,,Vite,frontend_web/src/main.tsx,232,Not tested
+/dashboard/admin/:pharmacyId/invoice,index,InvoiceManagePage,admin assignment,,Vite,frontend_web/src/main.tsx,235,Not tested
+/dashboard/admin/:pharmacyId/invoice/new,page,InvoiceGeneratePage,admin assignment,,Vite,frontend_web/src/main.tsx,236,Not tested
+/dashboard/admin/:pharmacyId/invoice/:id,page,InvoiceDetailPage,admin assignment,,Vite,frontend_web/src/main.tsx,237,Not tested
+/dashboard/admin/:pharmacyId/shifts,group,,admin assignment,,Vite,frontend_web/src/main.tsx,241,Not tested
+/dashboard/admin/:pharmacyId/shifts,index,AdminActiveShiftsPage,admin assignment,,Vite,frontend_web/src/main.tsx,243,Not tested
+/dashboard/admin/:pharmacyId/shifts/active,page,AdminActiveShiftsPage,admin assignment,,Vite,frontend_web/src/main.tsx,244,Not tested
+/dashboard/admin/:pharmacyId/shifts/confirmed,page,AdminConfirmedShiftsPage,admin assignment,,Vite,frontend_web/src/main.tsx,245,Not tested
+/dashboard/admin/:pharmacyId/shifts/history,page,AdminHistoryShiftsPage,admin assignment,,Vite,frontend_web/src/main.tsx,246,Not tested
+/dashboard/admin/:pharmacyId/shifts/:id,page,AdminPosterShiftDetailPage,admin assignment,,Vite,frontend_web/src/main.tsx,247,Not tested
+/dashboard/admin/:pharmacyId/chat,page,ChatPage,admin assignment,,Vite,frontend_web/src/main.tsx,250,Not tested
+/dashboard/admin/:pharmacyId/calendar,page,PharmacyCalendarPage,admin assignment,,Vite,frontend_web/src/main.tsx,251,Not tested
+/dashboard/admin/:pharmacyId/logout,page,LogoutPage,admin assignment,,Vite,frontend_web/src/main.tsx,252,Not tested
+/onboarding/owner,page,"ProtectedRoute, OwnerOnboarding",OWNER,,Vite,frontend_web/src/main.tsx,258,Not tested
+/setup/owner/onboarding,page,"ProtectedRoute, OwnerSetupOnboardingPage",OWNER,,Vite,frontend_web/src/main.tsx,266,Not tested
+/setup/owner/pharmacies,page,"ProtectedRoute, OwnerSetupPharmaciesPage",OWNER,,Vite,frontend_web/src/main.tsx,274,Not tested
+/onboarding/pharmacist,page,"ProtectedRoute, PharmacistOnboardingV2Layout",PHARMACIST,,Vite,frontend_web/src/main.tsx,282,Not tested
+/onboarding/otherstaff,page,"ProtectedRoute, OtherStaffOnboardingV2Layout",OTHER_STAFF,,Vite,frontend_web/src/main.tsx,290,Not tested
+/onboarding/explorer,page,"ProtectedRoute, ExplorerOnboardingV2Layout",EXPLORER,,Vite,frontend_web/src/main.tsx,298,Not tested
+/dashboard/owner,group,"ProtectedRoute, OwnerDashboardGate, OwnerDashboardWrapper",OWNER,,Vite,frontend_web/src/main.tsx,308,Not tested
+/dashboard/owner,index,OwnerOverviewContainer,OWNER,,Vite,frontend_web/src/main.tsx,317,Not tested
+/dashboard/owner/overview,page,OwnerOverviewContainer,OWNER,,Vite,frontend_web/src/main.tsx,318,Not tested
+/dashboard/owner/pills,page,PillsPage,OWNER,,Vite,frontend_web/src/main.tsx,319,Not tested
+/dashboard/owner/onboarding,page,OwnerOnboarding,OWNER,,Vite,frontend_web/src/main.tsx,320,Not tested
+/dashboard/owner/manage-pharmacies,group,,OWNER,,Vite,frontend_web/src/main.tsx,322,Not tested
+/dashboard/owner/manage-pharmacies,index,PharmacyPage,OWNER,,Vite,frontend_web/src/main.tsx,324,Not tested
+/dashboard/owner/manage-pharmacies/my-pharmacies,page,PharmacyPage,OWNER,,Vite,frontend_web/src/main.tsx,325,Not tested
+/dashboard/owner/manage-pharmacies/my-chain,page,ChainPage,OWNER,,Vite,frontend_web/src/main.tsx,326,Not tested
+/dashboard/owner/manage-pharmacies/roster,page,RosterOwnerPage,OWNER,,Vite,frontend_web/src/main.tsx,327,Not tested
+/dashboard/owner/post-shift,page,PostShiftPage,OWNER,,Vite,frontend_web/src/main.tsx,330,Not tested
+/dashboard/owner/shift-center,page,Navigate,OWNER,active,Vite,frontend_web/src/main.tsx,331,Not tested
+/dashboard/owner/shift-center/:section,page,OwnerShiftCenterPage,OWNER,,Vite,frontend_web/src/main.tsx,332,Not tested
+/dashboard/owner/invoice,group,Outlet,OWNER,,Vite,frontend_web/src/main.tsx,334,Not tested
+/dashboard/owner/invoice,index,InvoiceManagePage,OWNER,,Vite,frontend_web/src/main.tsx,337,Not tested
+/dashboard/owner/invoice/new,page,InvoiceGeneratePage,OWNER,,Vite,frontend_web/src/main.tsx,338,Not tested
+/dashboard/owner/invoice/:id,page,InvoiceDetailPage,OWNER,,Vite,frontend_web/src/main.tsx,339,Not tested
+/dashboard/owner/shifts,group,,OWNER,,Vite,frontend_web/src/main.tsx,343,Not tested
+/dashboard/owner/shifts,index,PublicShiftsPage,OWNER,,Vite,frontend_web/src/main.tsx,345,Not tested
+/dashboard/owner/shifts/public,page,PublicShiftsPage,OWNER,,Vite,frontend_web/src/main.tsx,346,Not tested
+/dashboard/owner/shifts/community,page,CommunityShiftsPage,OWNER,,Vite,frontend_web/src/main.tsx,347,Not tested
+/dashboard/owner/shifts/active,page,ActiveShiftsPage,OWNER,,Vite,frontend_web/src/main.tsx,348,Not tested
+/dashboard/owner/shifts/confirmed,page,ConfirmedShiftsPage,OWNER,,Vite,frontend_web/src/main.tsx,349,Not tested
+/dashboard/owner/shifts/history,page,HistoryShiftsPage,OWNER,,Vite,frontend_web/src/main.tsx,350,Not tested
+/dashboard/owner/shifts/:id,page,PosterShiftDetailPage,OWNER,,Vite,frontend_web/src/main.tsx,351,Not tested
+/dashboard/owner/interests,page,TalentBoard,OWNER,,Vite,frontend_web/src/main.tsx,354,Not tested
+/dashboard/owner/learning,page,LearningMaterialsPage,OWNER,,Vite,frontend_web/src/main.tsx,355,Not tested
+/dashboard/owner/chat,page,ChatPage,OWNER,,Vite,frontend_web/src/main.tsx,356,Not tested
+/dashboard/owner/pharmacy-hub,page,Navigate,OWNER,/dashboard/pharmacy-hub,Vite,frontend_web/src/main.tsx,357,Not tested
+/dashboard/owner/calendar,page,PharmacyCalendarPage,OWNER,,Vite,frontend_web/src/main.tsx,358,Not tested
+/dashboard/owner/logout,page,LogoutPage,OWNER,,Vite,frontend_web/src/main.tsx,359,Not tested
+/dashboard/pharmacist,group,"ProtectedRoute, PharmacistDashboardWrapper",PHARMACIST,,Vite,frontend_web/src/main.tsx,365,Not tested
+/dashboard/pharmacist,index,OverviewPageStaff,PHARMACIST,,Vite,frontend_web/src/main.tsx,372,Not tested
+/dashboard/pharmacist/overview,page,OverviewPageStaff,PHARMACIST,,Vite,frontend_web/src/main.tsx,373,Not tested
+/dashboard/pharmacist/onboarding,page,PharmacistOnboardingV2Layout,PHARMACIST,,Vite,frontend_web/src/main.tsx,377,Not tested
+/dashboard/pharmacist/shifts,group,,PHARMACIST,,Vite,frontend_web/src/main.tsx,380,Not tested
+/dashboard/pharmacist/shifts,index,PublicShiftsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,382,Not tested
+/dashboard/pharmacist/shifts/public,page,PublicShiftsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,383,Not tested
+/dashboard/pharmacist/shifts/community,page,CommunityShiftsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,384,Not tested
+/dashboard/pharmacist/shifts/confirmed,page,MyConfirmedShiftsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,385,Not tested
+/dashboard/pharmacist/shifts/history,page,MyHistoryShiftsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,386,Not tested
+/dashboard/pharmacist/shifts/:id,page,WorkerShiftDetailPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,387,Not tested
+/dashboard/pharmacist/shifts/roster,page,RosterWorkerPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,388,Not tested
+/dashboard/pharmacist/availability,page,SetAvailabilityPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,391,Not tested
+/dashboard/pharmacist/memberships,page,ManageMembershipsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,392,Not tested
+/dashboard/pharmacist/invoice,group,Outlet,PHARMACIST,,Vite,frontend_web/src/main.tsx,394,Not tested
+/dashboard/pharmacist/invoice,index,InvoiceManagePage,PHARMACIST,,Vite,frontend_web/src/main.tsx,397,Not tested
+/dashboard/pharmacist/invoice/new,page,InvoiceGeneratePage,PHARMACIST,,Vite,frontend_web/src/main.tsx,398,Not tested
+/dashboard/pharmacist/invoice/:id,page,InvoiceDetailPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,399,Not tested
+/dashboard/pharmacist/interests,page,TalentBoard,PHARMACIST,,Vite,frontend_web/src/main.tsx,403,Not tested
+/dashboard/pharmacist/learning,page,LearningMaterialsPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,404,Not tested
+/dashboard/pharmacist/chat,page,ChatPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,405,Not tested
+/dashboard/pharmacist/pharmacy-hub,page,Navigate,PHARMACIST,/dashboard/pharmacy-hub,Vite,frontend_web/src/main.tsx,406,Not tested
+/dashboard/pharmacist/calendar,page,PharmacyCalendarPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,407,Not tested
+/dashboard/pharmacist/logout,page,LogoutPage,PHARMACIST,,Vite,frontend_web/src/main.tsx,408,Not tested
+/dashboard/otherstaff,group,"ProtectedRoute, OtherstaffDashboardWrapper",OTHER_STAFF,,Vite,frontend_web/src/main.tsx,414,Not tested
+/dashboard/otherstaff,index,OverviewPageStaff,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,421,Not tested
+/dashboard/otherstaff/overview,page,OverviewPageStaff,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,422,Not tested
+/dashboard/otherstaff/onboarding,page,OtherStaffOnboardingV2Layout,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,423,Not tested
+/dashboard/otherstaff/shifts,group,,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,425,Not tested
+/dashboard/otherstaff/shifts,index,PublicShiftsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,427,Not tested
+/dashboard/otherstaff/shifts/public,page,PublicShiftsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,428,Not tested
+/dashboard/otherstaff/shifts/community,page,CommunityShiftsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,429,Not tested
+/dashboard/otherstaff/shifts/confirmed,page,MyConfirmedShiftsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,430,Not tested
+/dashboard/otherstaff/shifts/history,page,MyHistoryShiftsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,431,Not tested
+/dashboard/otherstaff/shifts/:id,page,WorkerShiftDetailPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,432,Not tested
+/dashboard/otherstaff/shifts/roster,page,RosterWorkerPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,433,Not tested
+/dashboard/otherstaff/availability,page,SetAvailabilityPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,436,Not tested
+/dashboard/otherstaff/memberships,page,ManageMembershipsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,437,Not tested
+/dashboard/otherstaff/invoice,group,Outlet,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,439,Not tested
+/dashboard/otherstaff/invoice,index,InvoiceManagePage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,442,Not tested
+/dashboard/otherstaff/invoice/new,page,InvoiceGeneratePage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,443,Not tested
+/dashboard/otherstaff/invoice/:id,page,InvoiceDetailPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,444,Not tested
+/dashboard/otherstaff/interests,page,TalentBoard,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,447,Not tested
+/dashboard/otherstaff/learning,page,LearningMaterialsPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,448,Not tested
+/dashboard/otherstaff/chat,page,ChatPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,449,Not tested
+/dashboard/otherstaff/pharmacy-hub,page,Navigate,OTHER_STAFF,/dashboard/pharmacy-hub,Vite,frontend_web/src/main.tsx,450,Not tested
+/dashboard/otherstaff/calendar,page,PharmacyCalendarPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,451,Not tested
+/dashboard/otherstaff/logout,page,LogoutPage,OTHER_STAFF,,Vite,frontend_web/src/main.tsx,452,Not tested
+/dashboard/explorer,group,"ProtectedRoute, ExplorerDashboardWrapper",EXPLORER,,Vite,frontend_web/src/main.tsx,459,Not tested
+/dashboard/explorer,index,OverviewPageStaff,EXPLORER,,Vite,frontend_web/src/main.tsx,466,Not tested
+/dashboard/explorer/overview,page,OverviewPageStaff,EXPLORER,,Vite,frontend_web/src/main.tsx,467,Not tested
+/dashboard/explorer/onboarding,page,ExplorerOnboardingV2Layout,EXPLORER,,Vite,frontend_web/src/main.tsx,468,Not tested
+/dashboard/explorer/shifts,group,,EXPLORER,,Vite,frontend_web/src/main.tsx,470,Not tested
+/dashboard/explorer/shifts,index,PublicShiftsPage,EXPLORER,,Vite,frontend_web/src/main.tsx,472,Not tested
+/dashboard/explorer/shifts/public,page,PublicShiftsPage,EXPLORER,,Vite,frontend_web/src/main.tsx,473,Not tested
+/dashboard/explorer/shifts/community,page,CommunityShiftsPage,EXPLORER,,Vite,frontend_web/src/main.tsx,474,Not tested
+/dashboard/explorer/interests,page,TalentBoard,EXPLORER,,Vite,frontend_web/src/main.tsx,477,Not tested
+/dashboard/explorer/chat,page,ChatPage,EXPLORER,,Vite,frontend_web/src/main.tsx,478,Not tested
+/dashboard/explorer/learning,page,LearningMaterialsPage,EXPLORER,,Vite,frontend_web/src/main.tsx,479,Not tested
+/dashboard/explorer/calendar,page,PharmacyCalendarPage,EXPLORER,,Vite,frontend_web/src/main.tsx,480,Not tested
+/dashboard/explorer/logout,page,LogoutPage,EXPLORER,,Vite,frontend_web/src/main.tsx,481,Not tested
+/*,page,NotFoundPage,No route-level guard; inspect page/session logic,,Next.js,frontend_web/src/main.tsx,484,Not tested

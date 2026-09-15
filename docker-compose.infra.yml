@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: "${DOMAIN:-chemisttasker.com.au}"
+      PUBLIC_SITE_ENABLED: "${PUBLIC_SITE_ENABLED:-0}"
       BACKEND_ADMIN_PATH: "${BACKEND_ADMIN_PATH:-admin/}"
       NGINX_CLIENT_MAX_BODY_SIZE: "${NGINX_CLIENT_MAX_BODY_SIZE:-25m}"
     ports:

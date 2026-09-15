@@ -1,5 +1,6 @@
 # client_profile/models.py
-from django.db import models
+from django.db import models, transaction
+from django.contrib.auth.hashers import check_password, make_password
 from django.db.models import Q
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -2981,6 +2982,7 @@ class PharmacyHubPost(models.Model):
         PHARMACIST = "pharmacist", "Pharmacists Hub"
         INTERN = "intern", "Interns Hub"
         STAFF = "staff", "Staff Hub"
+        EXPLORER = "explorer", "Explorer Hub"
 
     pharmacy = models.ForeignKey(
         "client_profile.Pharmacy",
@@ -3437,6 +3439,7 @@ class PharmacyHubPoll(models.Model):
         PHARMACIST = "pharmacist", "Pharmacists Hub"
         INTERN = "intern", "Interns Hub"
         STAFF = "staff", "Staff Hub"
+        EXPLORER = "explorer", "Explorer Hub"
 
     pharmacy = models.ForeignKey(
         "client_profile.Pharmacy",
@@ -3959,4 +3962,669 @@ class WorkNoteCompletion(models.Model):
         return (
             f"WorkNoteCompletion#{self.pk} note={self.work_note_id} "
             f"membership={self.membership_id} date={self.occurrence_date}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Roster V2 Models
+# ---------------------------------------------------------------------------
+
+class RosterPeriod(models.Model):
+    """
+    Groups a week's worth of ShiftSlotAssignment rows into a manageable
+    period that can be drafted, validated, and published.
+    """
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+        ARCHIVED = "ARCHIVED", "Archived"
+
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.CASCADE,
+        related_name="roster_periods",
+    )
+    week_start = models.DateField(
+        help_text="Monday of the roster week (ISO weekday 1)."
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="published_roster_periods",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_roster_periods",
+    )
+    copied_from = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="copies",
+        help_text="Source period when created via copy-week.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("pharmacy", "week_start")
+        ordering = ["-week_start"]
+        indexes = [
+            models.Index(fields=["pharmacy", "week_start"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def clean(self):
+        if self.week_start and self.week_start.weekday() != 0:
+            raise ValidationError({"week_start": "week_start must be a Monday."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def week_end(self):
+        """Return Sunday of the roster week."""
+        return self.week_start + timedelta(days=6)
+
+    def __str__(self):
+        return f"Roster {self.pharmacy.name} w/c {self.week_start} [{self.status}]"
+
+
+class RosterPublicationAudit(models.Model):
+    """
+    Append-only audit log of each publish action on a RosterPeriod.
+    """
+    roster_period = models.ForeignKey(
+        RosterPeriod,
+        on_delete=models.CASCADE,
+        related_name="publication_audits",
+    )
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roster_publication_audits",
+    )
+    published_at = models.DateTimeField(auto_now_add=True)
+    revision_number = models.PositiveIntegerField(default=1)
+    total_assignments = models.PositiveIntegerField(default=0)
+    validation_snapshot = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-published_at", "-id"]
+        indexes = [
+            models.Index(fields=["roster_period", "published_at"]),
+        ]
+
+    def __str__(self):
+        return f"Rev {self.revision_number} for {self.roster_period} at {self.published_at}"
+
+
+class RosterAcknowledgement(models.Model):
+    """
+    Records worker acknowledgement of their published shifts in a RosterPeriod.
+    """
+    roster_period = models.ForeignKey(
+        RosterPeriod,
+        on_delete=models.CASCADE,
+        related_name="acknowledgements",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="roster_acknowledgements",
+    )
+    acknowledged_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        unique_together = ("roster_period", "user")
+        indexes = [
+            models.Index(fields=["roster_period", "user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user} acknowledged {self.roster_period} at {self.acknowledged_at}"
+
+
+class RosterTemplate(models.Model):
+    """
+    Reusable weekly template that can be applied to generate draft
+    ShiftSlotAssignment rows for a given week.
+    """
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.CASCADE,
+        related_name="roster_templates",
+    )
+    name = models.CharField(max_length=120)
+    template_data = models.JSONField(
+        default=list,
+        help_text=(
+            "Array of objects: "
+            "[{day_of_week: 0-6, start_time, end_time, role, user_id?}, ...]"
+        ),
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_roster_templates",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["pharmacy"]),
+        ]
+
+    def __str__(self):
+        return f"RosterTemplate '{self.name}' @ {self.pharmacy.name}"
+
+
+class RosterActionAudit(models.Model):
+    """
+    Audit log of worker/manager roster actions: swaps, covers, releases, and leave.
+    Tracks state transitions and preserves audit history.
+    """
+    class ActionType(models.TextChoices):
+        SWAP_REQUESTED = "SWAP_REQUESTED", "Swap Requested"
+        SWAP_APPROVED = "SWAP_APPROVED", "Swap Approved"
+        SWAP_REJECTED = "SWAP_REJECTED", "Swap Rejected"
+        COVER_REQUESTED = "COVER_REQUESTED", "Cover Requested"
+        COVER_APPROVED = "COVER_APPROVED", "Cover Approved"
+        COVER_REJECTED = "COVER_REJECTED", "Cover Rejected"
+        WORKER_RELEASED = "WORKER_RELEASED", "Worker Released"
+        LEAVE_REQUESTED = "LEAVE_REQUESTED", "Leave Requested"
+        LEAVE_APPROVED = "LEAVE_APPROVED", "Leave Approved"
+
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.CASCADE,
+        related_name="roster_action_audits",
+    )
+    shift_assignment = models.ForeignKey(
+        "client_profile.ShiftSlotAssignment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roster_action_audits",
+    )
+    action_type = models.CharField(
+        max_length=32,
+        choices=ActionType.choices,
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roster_actions_performed",
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roster_actions_targeted",
+        help_text="Target worker for swap or replacement cover.",
+    )
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["pharmacy", "action_type"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.action_type}] at {self.pharmacy.name} by {self.performed_by} at {self.created_at}"
+
+
+# ---------------------------------------------------------------------------
+# Attendance V1 Models
+# ---------------------------------------------------------------------------
+
+class KioskDevice(models.Model):
+    """
+    Registered pharmacy computer that can display QR codes and accept
+    optional PIN-based clock-in. Uses a restricted device token, not a
+    user JWT.
+    """
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.CASCADE,
+        related_name="kiosk_devices",
+    )
+    device_token = models.CharField(
+        max_length=255,
+        unique=True,
+        db_index=True,
+        help_text="Restricted auth token for this device.",
+    )
+    device_name = models.CharField(
+        max_length=120,
+        help_text="Human-readable label, e.g. 'Front Counter iPad'.",
+    )
+    is_active = models.BooleanField(default=True)
+    activated_at = models.DateTimeField(auto_now_add=True)
+    activated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activated_kiosk_devices",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["pharmacy"]),
+        ]
+
+    def __str__(self):
+        return f"Kiosk '{self.device_name}' @ {self.pharmacy.name}"
+
+
+class PharmacyQRSession(models.Model):
+    """
+    Short-lived rotating QR code used for attendance clock-in/out.
+    Generated by a kiosk device and valid for a configurable TTL.
+    """
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.CASCADE,
+        related_name="qr_sessions",
+    )
+    code = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        help_text="Random short-lived code embedded in QR.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["pharmacy", "expires_at"]),
+            models.Index(fields=["code"]),
+        ]
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        return f"QR {self.code[:8]}… @ {self.pharmacy.name} (exp {self.expires_at})"
+
+
+class WorkerPIN(models.Model):
+    """
+    Optional owner-controlled personal code for kiosk-based clock-in.
+    Hashed, rate-limited, with lockout.
+    """
+    membership = models.OneToOneField(
+        "client_profile.Membership",
+        on_delete=models.CASCADE,
+        related_name="worker_pin",
+    )
+    pin_hash = models.CharField(
+        max_length=255,
+        help_text="bcrypt/argon2 hash of the worker's PIN.",
+    )
+    failed_attempts = models.IntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="Owner can toggle PIN requirement on/off.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    MAX_FAILED_ATTEMPTS = 5
+    LOCKOUT_DURATION = timedelta(minutes=15)
+
+    @property
+    def is_locked(self):
+        if self.locked_until and timezone.now() < self.locked_until:
+            return True
+        return False
+
+    def set_pin(self, raw_pin):
+        """Hash a code without saving; the owner-authorized service saves it."""
+        if not isinstance(raw_pin, str) or not raw_pin.strip():
+            raise ValidationError("A non-empty personal code is required.")
+        self.pin_hash = make_password(raw_pin)
+        self.failed_attempts = 0
+        self.locked_until = None
+
+    def check_pin(self, raw_pin):
+        """Check credentials only; kiosk services must enforce attempt limits."""
+        return (
+            self.is_enabled
+            and not self.is_locked
+            and isinstance(raw_pin, str)
+            and check_password(raw_pin, self.pin_hash)
+        )
+
+    def record_failed_attempt(self):
+        # Serialize attempts against the stored row, not a stale model instance.
+        with transaction.atomic():
+            current = type(self).objects.select_for_update().get(pk=self.pk)
+            now = timezone.now()
+            if not current.is_locked:
+                if current.locked_until is not None:
+                    current.failed_attempts = 0
+                    current.locked_until = None
+                current.failed_attempts += 1
+                if current.failed_attempts >= self.MAX_FAILED_ATTEMPTS:
+                    current.locked_until = now + self.LOCKOUT_DURATION
+                current.save(update_fields=["failed_attempts", "locked_until", "updated_at"])
+            self.failed_attempts = current.failed_attempts
+            self.locked_until = current.locked_until
+
+    def reset_attempts(self):
+        with transaction.atomic():
+            current = type(self).objects.select_for_update().get(pk=self.pk)
+            current.failed_attempts = 0
+            current.locked_until = None
+            current.save(update_fields=["failed_attempts", "locked_until", "updated_at"])
+            self.failed_attempts = 0
+            self.locked_until = None
+
+    def __str__(self):
+        return f"PIN for {self.membership}"
+
+
+class AttendanceSession(models.Model):
+    """
+    One worked attendance interval.
+
+    The linked AttendanceEvent rows are the immutable source record.  These
+    fields make the current/open interval efficient to query while keeping the
+    scheduled assignment separate from actual clock times.
+    """
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.PROTECT,
+        related_name="attendance_sessions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="attendance_sessions",
+    )
+    assignment = models.ForeignKey(
+        "client_profile.ShiftSlotAssignment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_sessions",
+        help_text="Null for unrostered/urgent cover.",
+    )
+    source_membership = models.ForeignKey(
+        "client_profile.Membership",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_sessions_justified",
+        help_text="Membership that established local or cross-site eligibility.",
+    )
+    started_at = models.DateTimeField(
+        help_text="Original actual clock-in time; scheduled time remains on assignment.",
+    )
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Original actual clock-out time; null while the session is open.",
+    )
+    is_provisional = models.BooleanField(
+        default=False,
+        help_text="True for unrostered or cross-site cover, pending approval.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-started_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=Q(ended_at__isnull=True),
+                name="attendance_one_open_session_per_user",
+            ),
+            models.CheckConstraint(
+                condition=Q(ended_at__isnull=True) | Q(ended_at__gte=models.F("started_at")),
+                name="attendance_end_not_before_start",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["pharmacy", "started_at"]),
+            models.Index(fields=["user", "started_at"]),
+            models.Index(fields=["assignment"]),
+        ]
+
+    @property
+    def is_open(self):
+        return self.ended_at is None
+
+    def __str__(self):
+        prov = " [PROVISIONAL]" if self.is_provisional else ""
+        return f"Attendance {self.user} @ {self.pharmacy.name} {self.started_at}{prov}"
+
+
+class ImmutableAttendanceQuerySet(models.QuerySet):
+    """Block ordinary ORM mutation of append-only attendance evidence."""
+
+    def update(self, **kwargs):
+        raise ValidationError("Attendance evidence is append-only and cannot be updated.")
+
+    def delete(self):
+        raise ValidationError("Attendance evidence is append-only and cannot be deleted.")
+
+
+class AttendanceEvent(models.Model):
+    """An immutable clock or break event belonging to a worked session."""
+
+    class EventType(models.TextChoices):
+        CLOCK_IN = "CLOCK_IN", "Clock In"
+        CLOCK_OUT = "CLOCK_OUT", "Clock Out"
+        BREAK_START = "BREAK_START", "Break Start"
+        BREAK_END = "BREAK_END", "Break End"
+
+    class Source(models.TextChoices):
+        QR_KIOSK = "QR_KIOSK", "QR Kiosk"
+        MOBILE_QR = "MOBILE_QR", "Mobile QR"
+        KIOSK_PIN = "KIOSK_PIN", "Kiosk PIN"
+        IN_APP = "IN_APP", "In-App"
+        MANAGER = "MANAGER", "Manager"
+
+    session = models.ForeignKey(
+        AttendanceSession,
+        on_delete=models.PROTECT,
+        related_name="events",
+    )
+    event_type = models.CharField(max_length=16, choices=EventType.choices)
+    occurred_at = models.DateTimeField(help_text="Server-recorded actual event time.")
+    source = models.CharField(max_length=16, choices=Source.choices)
+    qr_session = models.ForeignKey(
+        PharmacyQRSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_events",
+    )
+    device = models.ForeignKey(
+        KioskDevice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_events",
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ImmutableAttendanceQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["occurred_at", "id"]
+        indexes = [
+            models.Index(fields=["session", "occurred_at"]),
+            models.Index(fields=["event_type", "occurred_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Attendance events are append-only and cannot be updated.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Attendance events are append-only and cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.event_type} for session {self.session_id} at {self.occurred_at}"
+
+
+class ProvisionalAttendance(models.Model):
+    """
+    Pending-approval record for unscheduled or cross-site clock-ins.
+    Approval backfills the Shift + ShiftSlotAssignment and preserves
+    actual clock times. Never auto-creates permanent Membership.
+    """
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
+    class CoverType(models.TextChoices):
+        UNROSTERED_LOCAL = "UNROSTERED_LOCAL", "Unrostered Local Staff"
+        CROSS_SITE_CHAIN = "CROSS_SITE_CHAIN", "Cross-Site Same Owner Chain"
+        CROSS_SITE_ORG = "CROSS_SITE_ORG", "Cross-Site Same Organization"
+
+    session = models.OneToOneField(
+        AttendanceSession,
+        on_delete=models.PROTECT,
+        related_name="provisional_review",
+    )
+    cover_type = models.CharField(
+        max_length=30,
+        choices=CoverType.choices,
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="decided_provisional_attendances",
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    backfill_shift = models.ForeignKey(
+        "client_profile.Shift",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="provisional_backfills",
+        help_text="Created on approval to record the actual worked shift.",
+    )
+    backfill_assignment = models.ForeignKey(
+        "client_profile.ShiftSlotAssignment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="provisional_backfills",
+        help_text="Created on approval to record the actual assignment.",
+    )
+    decision_reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(status="PENDING", decided_at__isnull=True)
+                    | Q(status__in=["APPROVED", "REJECTED"], decided_at__isnull=False)
+                ),
+                name="provisional_decision_timestamp_matches_status",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"Provisional {self.cover_type} for session {self.session_id} "
+            f"[{self.status}]"
+        )
+
+
+class AttendanceCorrection(models.Model):
+    """
+    Fully audited manager corrections to attendance events.
+    The original AttendanceSession is never mutated.
+    """
+    original_event = models.ForeignKey(
+        AttendanceEvent,
+        on_delete=models.PROTECT,
+        related_name="corrections",
+    )
+    corrected_timestamp = models.DateTimeField(
+        help_text="The manager-adjusted timestamp.",
+    )
+    reason = models.TextField(
+        help_text="Required justification for the correction.",
+    )
+    corrected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="attendance_corrections_made",
+    )
+    corrected_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ImmutableAttendanceQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-corrected_at"]
+        indexes = [
+            models.Index(fields=["original_event"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Attendance corrections are append-only and cannot be updated.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Attendance corrections are append-only and cannot be deleted.")
+
+    def __str__(self):
+        return (
+            f"Correction on event {self.original_event_id} "
+            f"by {self.corrected_by} at {self.corrected_at}"
         )

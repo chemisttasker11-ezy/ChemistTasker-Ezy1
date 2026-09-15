@@ -68,7 +68,7 @@ def _detect_local_hosts() -> list[str]:
 
 
 def _build_dev_origins(hosts: list[str]) -> list[str]:
-    dev_ports = [5173, 5174, 5175, 5176, 19006, 8081]
+    dev_ports = [3000, 5173, 5174, 5175, 5176, 19006, 8081]
     origins: set[str] = set()
     for host in hosts:
         for port in dev_ports:
@@ -115,6 +115,7 @@ CORS_ALLOW_HEADERS = [
 
 # Application definition
 INSTALLED_APPS = [
+    'public_hub',
 
     'daphne',
 
@@ -166,6 +167,7 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
 CELERY_TASK_DEFAULT_QUEUE = env("CELERY_TASK_DEFAULT_QUEUE", default="default")
 CELERY_WORKER_PREFETCH_MULTIPLIER = env.int("CELERY_WORKER_PREFETCH_MULTIPLIER", default=1)
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=DEBUG)
 CELERY_RESULT_EXPIRES = env.int("CELERY_RESULT_EXPIRES", default=3600)
 CELERY_TASK_IGNORE_RESULT = env.bool("CELERY_TASK_IGNORE_RESULT", default=True)
 CELERY_TASK_TRACK_STARTED = env.bool("CELERY_TASK_TRACK_STARTED", default=True)
@@ -187,6 +189,10 @@ CELERY_TASK_ROUTES = {
     "billing.tasks.*": {"queue": "billing"},
 }
 CELERY_BEAT_SCHEDULE = {
+    'publish-editorial-revisions': {
+        'task': 'public_hub.tasks.publish_scheduled_content',
+        'schedule': 60.0,
+    },
     "calendar-birthdays-daily": {
         "task": "client_profile.calendar_tasks.generate_all_birthday_events",
         "schedule": crontab(hour=0, minute=15),
@@ -246,7 +252,7 @@ AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'users.authentication.CookieJWTAuthentication',
     ),
     'DEFAULT_THROTTLE_CLASSES': (
         'rest_framework.throttling.AnonRateThrottle',
@@ -591,3 +597,6 @@ if not USE_REDIS_CHANNEL_LAYER:
             "BACKEND": "channels.layers.InMemoryChannelLayer",
         }
     }
+
+# Anonymous community publication requires an explicit deployment opt-in.
+PUBLIC_COMMUNITY_ENABLED = env.bool("PUBLIC_COMMUNITY_ENABLED", default=False)

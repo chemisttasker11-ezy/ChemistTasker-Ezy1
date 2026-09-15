@@ -78,6 +78,7 @@ def staff_group_members_prefetch():
 
 
 CHEMISTTASKER_HUB_DEFINITIONS = {
+    PharmacyHubPost.PlatformHub.EXPLORER: {"key": "explorer", "label": "Explorer Hub", "audience_type": "EXPLORER"},
     PharmacyHubPost.PlatformHub.PUBLIC: {
         "key": PharmacyHubPost.PlatformHub.PUBLIC,
         "label": "Public Hub",
@@ -90,17 +91,17 @@ CHEMISTTASKER_HUB_DEFINITIONS = {
     },
     PharmacyHubPost.PlatformHub.PHARMACIST: {
         "key": PharmacyHubPost.PlatformHub.PHARMACIST,
-        "label": "Pharmacists Hub",
+        "label": "Pharmacist Hub",
         "audience_type": "PHARMACIST",
     },
     PharmacyHubPost.PlatformHub.INTERN: {
         "key": PharmacyHubPost.PlatformHub.INTERN,
-        "label": "Interns Hub",
+        "label": "Intern Hub",
         "audience_type": "INTERN",
     },
     PharmacyHubPost.PlatformHub.STAFF: {
         "key": PharmacyHubPost.PlatformHub.STAFF,
-        "label": "Staff Hub",
+        "label": "Other Staff Hub",
         "audience_type": "STAFF",
     },
 }
@@ -179,6 +180,8 @@ def get_user_chemisttasker_hubs(user):
         hubs.append(CHEMISTTASKER_HUB_DEFINITIONS[PharmacyHubPost.PlatformHub.OWNER])
     elif top_role == "PHARMACIST":
         hubs.append(CHEMISTTASKER_HUB_DEFINITIONS[PharmacyHubPost.PlatformHub.PHARMACIST])
+    elif top_role == "EXPLORER":
+        hubs.append(CHEMISTTASKER_HUB_DEFINITIONS[PharmacyHubPost.PlatformHub.EXPLORER])
     elif top_role == "OTHER_STAFF":
         other_staff_role = (
             OtherStaffOnboarding.objects.filter(user=user)
@@ -469,6 +472,8 @@ class HubScopeResolver:
         }
 
     def platform_scope(self, platform_hub):
+        if not self.user.is_active or not getattr(self.user, "is_otp_verified", False):
+            raise PermissionDenied("Verify your email before accessing community interactions.")
         if platform_hub not in CHEMISTTASKER_HUB_DEFINITIONS:
             raise PermissionDenied("Unknown ChemistTasker hub.")
         allowed_hubs = {
@@ -1171,6 +1176,9 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        from public_hub.models import ContentDocument
+        if ContentDocument.objects.filter(hub_post_id=instance.pk).exists():
+            raise PermissionDenied("Use the publishing workspace to revise or archive editorial content.")
         resolver = HubScopeResolver(request.user)
         scope = resolver.from_post(instance)
         self._prepare_serializer_context(scope)
@@ -1222,6 +1230,9 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        from public_hub.models import ContentDocument
+        if ContentDocument.objects.filter(hub_post_id=instance.pk).exists():
+            raise PermissionDenied("Use the publishing workspace to revise or archive editorial content.")
         resolver = HubScopeResolver(self.request.user)
         scope = resolver.from_post(instance)
         self._prepare_serializer_context(scope)
@@ -1254,6 +1265,9 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        from public_hub.models import ContentDocument
+        if ContentDocument.objects.filter(hub_post_id=instance.pk).exists():
+            raise PermissionDenied("Use the publishing workspace to revise or archive editorial content.")
         resolver = HubScopeResolver(request.user)
         scope = resolver.from_post(instance)
         membership = scope.get("request_membership")
@@ -1395,7 +1409,9 @@ class HubPollViewSet(
             data["option_labels"] = labels
         scope = self._resolve_scope_from_params(data)
         resolver = HubScopeResolver(request.user)
-        membership = scope.get("request_membership") or resolver.ensure_author_membership(scope)
+        membership = scope.get("request_membership")
+        if membership is None and scope.get("scope_type") != "platform":
+            membership = resolver.ensure_author_membership(scope)
         scope["request_membership"] = membership
         self._prepare_serializer_context(scope, {"request_user": self.request.user})
         serializer = self.get_serializer(data=data)
@@ -1629,7 +1645,7 @@ class HubCommentViewSet(
         membership = self.scope_context.get("request_membership")
         can_manage = self.scope_context.get("has_admin_permissions")
         is_author = (
-            comment.author_membership_id == getattr(membership, "id", None)
+            (comment.author_membership_id is not None and comment.author_membership_id == getattr(membership, "id", None))
             or comment.author_user_id == getattr(self.request.user, "id", None)
         )
         if not can_manage and not is_author:
@@ -1649,7 +1665,7 @@ class HubCommentViewSet(
         membership = self.scope_context.get("request_membership")
         can_manage = self.scope_context.get("has_admin_permissions")
         is_author = (
-            comment.author_membership_id == getattr(membership, "id", None)
+            (comment.author_membership_id is not None and comment.author_membership_id == getattr(membership, "id", None))
             or comment.author_user_id == getattr(request.user, "id", None)
         )
         if not can_manage and not is_author:
@@ -1885,7 +1901,7 @@ class HubPollCommentViewSet(
         can_manage = self.scope_context.get("has_admin_permissions")
         request_user = getattr(self.request, "user", None)
         is_author = (
-            comment.author_membership_id == getattr(membership, "id", None)
+            (comment.author_membership_id is not None and comment.author_membership_id == getattr(membership, "id", None))
             or comment.author_user_id == getattr(request_user, "id", None)
         )
         if not can_manage and not is_author:
@@ -1905,7 +1921,7 @@ class HubPollCommentViewSet(
         membership = self.scope_context.get("request_membership")
         can_manage = self.scope_context.get("has_admin_permissions")
         is_author = (
-            comment.author_membership_id == getattr(membership, "id", None)
+            (comment.author_membership_id is not None and comment.author_membership_id == getattr(membership, "id", None))
             or comment.author_user_id == request.user.id
         )
         if not can_manage and not is_author:

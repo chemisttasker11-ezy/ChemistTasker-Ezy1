@@ -12,6 +12,8 @@ RUN mkdir -p /env
 COPY env/web.prod.env /env/web.prod.env
 COPY frontend_web/ ./
 
+ARG VITE_PUBLIC_SITE_ENABLED=0
+ENV VITE_PUBLIC_SITE_ENABLED=$VITE_PUBLIC_SITE_ENABLED
 RUN npm run build
 
 FROM nginx:1.27-alpine
