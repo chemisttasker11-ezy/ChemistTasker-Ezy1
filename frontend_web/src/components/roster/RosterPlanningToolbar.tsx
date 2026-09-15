@@ -41,24 +41,35 @@ import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import ViewWeekIcon from '@mui/icons-material/ViewWeek';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
+import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
+import RosterGridViews, { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
 
 export interface RosterPlanningToolbarProps {
   pharmacyId: number | null;
   calendarDate: Date;
   onRosterUpdated?: () => void;
   onNavigateWeek?: (targetDate: Date) => void;
+  activeViewMode?: 'CALENDAR' | 'STAFF' | 'STACKED';
+  onViewModeChange?: (mode: 'CALENDAR' | 'STAFF' | 'STACKED') => void;
 }
 
 interface RosterPeriodData {
-  period_id: number;
+  period_id: number | null;
   week_start: string;
   week_end: string;
-  status: 'DRAFT' | 'PUBLISHED';
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   published_at: string | null;
   published_by: string | null;
   total_assignments: number;
+  assignments?: any[];
+  vacant_slots?: any[];
+  staff_view?: StaffMemberSummary[];
+  stacked_view?: DayStackedBucket[];
 }
 
 interface ValidationResult {
@@ -103,8 +114,18 @@ export default function RosterPlanningToolbar({
   calendarDate,
   onRosterUpdated,
   onNavigateWeek,
+  activeViewMode,
+  onViewModeChange,
 }: RosterPlanningToolbarProps) {
   const [period, setPeriod] = useState<RosterPeriodData | null>(null);
+  const [internalViewMode, setInternalViewMode] = useState<'CALENDAR' | 'STAFF' | 'STACKED'>('STAFF');
+  const viewMode = activeViewMode ?? internalViewMode;
+
+  const handleSetViewMode = (mode: 'CALENDAR' | 'STAFF' | 'STACKED') => {
+    setInternalViewMode(mode);
+    onViewModeChange?.(mode);
+  };
+
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -167,6 +188,7 @@ export default function RosterPlanningToolbar({
     try {
       const res = await apiClient.post('/client-profile/attendance/roster/validate/', {
         period_id: period.period_id,
+        pharmacy_id: pharmacyId, week_start: mondayStr,
       });
       setValidationResult(res.data);
       setValidationDialogOpen(true);
@@ -187,6 +209,7 @@ export default function RosterPlanningToolbar({
     try {
       const res = await apiClient.post('/client-profile/attendance/roster/publish/', {
         period_id: period.period_id,
+        pharmacy_id: pharmacyId, week_start: mondayStr,
         force_warnings: forceWarnings,
       });
       setFeedbackMessage({
@@ -356,158 +379,300 @@ export default function RosterPlanningToolbar({
   const isPublished = period?.status === 'PUBLISHED';
 
   return (
-    <Card
-      elevation={2}
-      sx={{
-        mb: 2.5,
-        borderRadius: 2.5,
-        border: '1px solid',
-        borderColor: isPublished ? 'success.light' : 'warning.light',
-        background: isPublished
-          ? 'linear-gradient(135deg, rgba(237, 247, 237, 0.6) 0%, rgba(255, 255, 255, 0.9) 100%)'
-          : 'linear-gradient(135deg, rgba(255, 248, 225, 0.6) 0%, rgba(255, 255, 255, 0.9) 100%)',
-      }}
-    >
-      <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          alignItems={{ xs: 'flex-start', md: 'center' }}
-          justifyContent="space-between"
-        >
-          {/* Week Info & Status */}
-          <Box>
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: 16, md: 18 } }}>
-                {monday.format('MMM D')} – {sunday.format('MMM D, YYYY')}
-              </Typography>
+    <Box sx={{ mb: 3 }}>
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: '16px',
+          border: `1px solid ${BRAND_COLORS.border}`,
+          bgcolor: BRAND_COLORS.white,
+          boxShadow: BRAND_SHADOWS.card,
+        }}
+      >
+        <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+          <Stack
+            direction={{ xs: 'column', lg: 'row' }}
+            spacing={2}
+            alignItems={{ xs: 'flex-start', lg: 'center' }}
+            justifyContent="space-between"
+          >
+            {/* Left: Week Info, Status & Shift Count */}
+            <Box>
+              <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontFamily: BRAND_FONTS.heading,
+                    fontWeight: 700,
+                    color: BRAND_COLORS.navy,
+                    fontSize: { xs: 17, md: 20 },
+                  }}
+                >
+                  {monday.format('MMM D')} – {sunday.format('MMM D, YYYY')}
+                </Typography>
 
-              {isLoading ? (
-                <CircularProgress size={20} />
-              ) : isPublished ? (
-                <Chip
-                  icon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
-                  label="PUBLISHED"
-                  color="success"
-                  size="small"
-                  sx={{ fontWeight: 700, letterSpacing: 0.5 }}
-                />
-              ) : (
-                <Tooltip title="Draft schedules are strictly hidden from staff until published.">
+                {isLoading ? (
+                  <CircularProgress size={18} sx={{ color: BRAND_COLORS.purple }} />
+                ) : isPublished ? (
                   <Chip
-                    icon={<WarningAmberIcon sx={{ fontSize: 16 }} />}
-                    label="DRAFT (HIDDEN)"
-                    color="warning"
+                    icon={<CheckCircleIcon sx={{ fontSize: 16, color: 'inherit !important' }} />}
+                    label="PUBLISHED"
                     size="small"
-                    sx={{ fontWeight: 700, letterSpacing: 0.5 }}
+                    sx={{
+                      fontWeight: 700,
+                      letterSpacing: 0.5,
+                      bgcolor: BRAND_COLORS.successLight,
+                      color: BRAND_COLORS.success,
+                      borderRadius: '8px',
+                      fontSize: 11,
+                    }}
                   />
-                </Tooltip>
-              )}
+                ) : (
+                  <Tooltip title="Draft schedules are strictly hidden from staff until published.">
+                    <Chip
+                      icon={<WarningAmberIcon sx={{ fontSize: 16, color: 'inherit !important' }} />}
+                      label="DRAFT (HIDDEN)"
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        letterSpacing: 0.5,
+                        bgcolor: BRAND_COLORS.warningLight,
+                        color: BRAND_COLORS.warning,
+                        borderRadius: '8px',
+                        fontSize: 11,
+                      }}
+                    />
+                  </Tooltip>
+                )}
 
-              {period && (
-                <Typography variant="body2" color="text.secondary">
-                  ({period.total_assignments} {period.total_assignments === 1 ? 'shift' : 'shifts'} scheduled)
+                {period && (
+                  <Typography variant="body2" sx={{ color: BRAND_COLORS.body, fontWeight: 500 }}>
+                    ({period.total_assignments} {period.total_assignments === 1 ? 'shift' : 'shifts'} scheduled)
+                  </Typography>
+                )}
+              </Stack>
+
+              {isPublished && period?.published_at && (
+                <Typography variant="caption" sx={{ color: BRAND_COLORS.body, display: 'block', mt: 0.5, fontSize: 12 }}>
+                  Published {moment(period.published_at).format('MMM D, h:mm A')}
+                  {period.published_by ? ` by ${period.published_by}` : ''}
                 </Typography>
               )}
+            </Box>
+
+            {/* Middle: View Mode Switcher (Calendar, Staff, Stacked) */}
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{
+                bgcolor: BRAND_COLORS.mist,
+                p: 0.5,
+                borderRadius: '10px',
+                border: `1px solid ${BRAND_COLORS.border}`,
+              }}
+            >
+              <Button
+                size="small"
+                variant={viewMode === 'STAFF' ? 'contained' : 'text'}
+                startIcon={<PeopleAltIcon sx={{ fontSize: 16 }} />}
+                onClick={() => handleSetViewMode('STAFF')}
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  bgcolor: viewMode === 'STAFF' ? BRAND_COLORS.purple : 'transparent',
+                  color: viewMode === 'STAFF' ? 'white' : BRAND_COLORS.navy,
+                  boxShadow: 'none',
+                  '&:hover': {
+                    bgcolor: viewMode === 'STAFF' ? BRAND_COLORS.purpleHover : 'rgba(0,0,0,0.04)',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                Staff Matrix (Weekly)
+              </Button>
+              <Button
+                size="small"
+                variant={viewMode === 'CALENDAR' ? 'contained' : 'text'}
+                startIcon={<CalendarMonthIcon sx={{ fontSize: 16 }} />}
+                onClick={() => handleSetViewMode('CALENDAR')}
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  bgcolor: viewMode === 'CALENDAR' ? BRAND_COLORS.purple : 'transparent',
+                  color: viewMode === 'CALENDAR' ? 'white' : BRAND_COLORS.navy,
+                  boxShadow: 'none',
+                  '&:hover': {
+                    bgcolor: viewMode === 'CALENDAR' ? BRAND_COLORS.purpleHover : 'rgba(0,0,0,0.04)',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                Calendar View
+              </Button>
+              <Button
+                size="small"
+                variant={viewMode === 'STACKED' ? 'contained' : 'text'}
+                startIcon={<ViewWeekIcon sx={{ fontSize: 16 }} />}
+                onClick={() => handleSetViewMode('STACKED')}
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  bgcolor: viewMode === 'STACKED' ? BRAND_COLORS.purple : 'transparent',
+                  color: viewMode === 'STACKED' ? 'white' : BRAND_COLORS.navy,
+                  boxShadow: 'none',
+                  '&:hover': {
+                    bgcolor: viewMode === 'STACKED' ? BRAND_COLORS.purpleHover : 'rgba(0,0,0,0.04)',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                Daily View
+              </Button>
             </Stack>
 
-            {isPublished && period?.published_at && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                Published {moment(period.published_at).format('MMM D, h:mm A')}
-                {period.published_by ? ` by ${period.published_by}` : ''}
-              </Typography>
-            )}
-          </Box>
-
-          {/* Action Buttons Toolbar */}
-          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
-            {/* 1. Validation */}
-            <Button
-              variant="outlined"
-              size="small"
-              color="primary"
-              startIcon={<FactCheckIcon />}
-              onClick={handleValidate}
-              disabled={actionLoading || !period}
-            >
-              Validate
-            </Button>
-
-            {/* 2. Publish / Unpublish */}
-            {!isPublished ? (
-              <Button
-                variant="contained"
-                size="small"
-                color="success"
-                startIcon={<PublishIcon />}
-                onClick={() => handlePublish(true)}
-                disabled={actionLoading || !period}
-                sx={{ fontWeight: 700 }}
-              >
-                Publish Roster
-              </Button>
-            ) : (
+            {/* Right: Action Buttons Toolbar */}
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+              {/* 1. Validation */}
               <Button
                 variant="outlined"
                 size="small"
-                color="warning"
-                startIcon={<UndoIcon />}
-                onClick={handleUnpublish}
+                startIcon={<FactCheckIcon />}
+                onClick={handleValidate}
                 disabled={actionLoading || !period}
+                sx={{
+                  borderColor: BRAND_COLORS.border,
+                  color: BRAND_COLORS.navy,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  '&:hover': { borderColor: BRAND_COLORS.blue, bgcolor: BRAND_COLORS.blueLight },
+                }}
               >
-                Unpublish to Draft
+                Validate
               </Button>
-            )}
 
-            {/* 3. Acknowledgements (if published) */}
-            {isPublished && (
+              {/* 2. Publish / Unpublish */}
+              {!isPublished ? (
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<PublishIcon />}
+                  onClick={() => handlePublish(true)}
+                  disabled={actionLoading || !period}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: BRAND_COLORS.purple,
+                    borderRadius: '8px',
+                    '&:hover': { bgcolor: BRAND_COLORS.purpleHover },
+                  }}
+                >
+                  Publish Roster
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="warning"
+                  startIcon={<UndoIcon />}
+                  onClick={handleUnpublish}
+                  disabled={actionLoading || !period}
+                  sx={{ fontWeight: 600, borderRadius: '8px' }}
+                >
+                  Unpublish to Draft
+                </Button>
+              )}
+
+              {/* 3. Acknowledgements (if published) */}
+              {isPublished && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<HowToRegIcon />}
+                  onClick={handleViewAcknowledgements}
+                  disabled={actionLoading}
+                  sx={{
+                    borderColor: BRAND_COLORS.cyan,
+                    color: BRAND_COLORS.cyan,
+                    fontWeight: 600,
+                    borderRadius: '8px',
+                    '&:hover': { bgcolor: BRAND_COLORS.cyanLight },
+                  }}
+                >
+                  Staff Status
+                </Button>
+              )}
+
+              {/* 4. Copy Week */}
               <Button
                 variant="outlined"
                 size="small"
-                color="info"
-                startIcon={<HowToRegIcon />}
-                onClick={handleViewAcknowledgements}
+                startIcon={<ContentCopyIcon />}
+                onClick={() => setCopyDialogOpen(true)}
+                disabled={actionLoading || !period}
+                sx={{
+                  borderColor: BRAND_COLORS.border,
+                  color: BRAND_COLORS.navy,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  '&:hover': { borderColor: BRAND_COLORS.purple, bgcolor: BRAND_COLORS.purpleLight },
+                }}
+              >
+                Copy Week
+              </Button>
+
+              {/* 5. Templates */}
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<BookmarkAddIcon />}
+                onClick={handleOpenTemplates}
                 disabled={actionLoading}
+                sx={{
+                  borderColor: BRAND_COLORS.border,
+                  color: BRAND_COLORS.navy,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  '&:hover': { borderColor: BRAND_COLORS.purple, bgcolor: BRAND_COLORS.purpleLight },
+                }}
               >
-                Staff Status
+                Templates
               </Button>
-            )}
-
-            {/* 4. Copy Week */}
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<ContentCopyIcon />}
-              onClick={() => setCopyDialogOpen(true)}
-              disabled={actionLoading || !period}
-            >
-              Copy Week
-            </Button>
-
-            {/* 5. Templates */}
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<BookmarkAddIcon />}
-              onClick={handleOpenTemplates}
-              disabled={actionLoading}
-            >
-              Templates
-            </Button>
+            </Stack>
           </Stack>
-        </Stack>
 
-        {/* Global Feedback Banner */}
-        {feedbackMessage && (
-          <Alert
-            severity={feedbackMessage.type}
-            sx={{ mt: 1.5, py: 0.5 }}
-            onClose={() => setFeedbackMessage(null)}
-          >
-            {feedbackMessage.text}
-          </Alert>
-        )}
-      </CardContent>
+          {/* Global Feedback Banner */}
+          {feedbackMessage && (
+            <Alert
+              severity={feedbackMessage.type}
+              sx={{ mt: 2, borderRadius: '8px' }}
+              onClose={() => setFeedbackMessage(null)}
+            >
+              {feedbackMessage.text}
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Roster Grid Views: Staff Breakdown & Stacked Daily */}
+      {viewMode !== 'CALENDAR' && (
+        <RosterGridViews
+          viewMode={viewMode}
+          staffViewData={period?.staff_view || []}
+          stackedViewData={period?.stacked_view || []}
+          weekStart={mondayStr}
+          weekEnd={sunday.format('YYYY-MM-DD')}
+          periodId={period?.period_id}
+          pharmacyId={pharmacyId}
+          vacantSlots={period?.vacant_slots || []}
+          onRosterUpdated={() => {
+            fetchPeriodData();
+            onRosterUpdated?.();
+          }}
+          isPublished={period?.status === 'PUBLISHED' || period?.status === 'ARCHIVED'}
+        />
+      )}
 
       {/* =================================================================== */}
       {/* DIALOG 1: Validation Diagnostics */}
@@ -911,6 +1076,6 @@ export default function RosterPlanningToolbar({
           <Button onClick={() => setTemplateDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
-    </Card>
+    </Box>
   );
 }

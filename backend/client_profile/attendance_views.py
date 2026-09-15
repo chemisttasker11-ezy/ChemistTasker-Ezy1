@@ -33,9 +33,20 @@ from .attendance_approvals import (
 from .attendance_credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
+    generate_kiosk_pairing_code,
     generate_signed_pharmacy_qr,
+    redeem_kiosk_pairing_code,
+    send_worker_pin_setup_code,
+    setup_worker_kiosk_pin,
     verify_kiosk_worker_pin,
     verify_signed_pharmacy_qr,
+    worker_update_own_pin,
+)
+from .attendance_throttles import (
+    KioskPINRateThrottle,
+    KioskQRRateThrottle,
+    WorkerClockInThrottle,
+    WorkerClockOutThrottle,
 )
 from .attendance_transitions import (
     clock_in,
@@ -48,6 +59,7 @@ from .models import (
     AttendanceEvent,
     AttendanceSession,
     KioskDevice,
+    Membership,
     Pharmacy,
     ProvisionalAttendance,
     RosterPeriod,
@@ -57,6 +69,7 @@ from .models import (
     RosterTemplate,
     Shift,
     ShiftSlotAssignment,
+    WorkerPIN,
     WorkerShiftRequest,
 )
 from .roster_worker_actions import (
@@ -68,6 +81,7 @@ from .roster_worker_actions import (
     submit_cover_request,
 )
 from .roster_services import (
+    archive_roster_period,
     acknowledge_roster_period,
     apply_roster_template,
     bulk_edit_roster_period,
@@ -76,6 +90,7 @@ from .roster_services import (
     get_or_create_roster_period,
     get_roster_acknowledgement_status,
     get_roster_period_assignments,
+    get_roster_period_grid,
     get_worker_published_roster,
     publish_roster_period,
     save_period_as_template,
@@ -119,33 +134,33 @@ def _get_kiosk_device_from_request(request):
 class KioskActivateView(APIView):
     """
     POST /api/attendance/kiosk/activate/
-    Authorized manager activates a physical counter device.
-    Body: {"pharmacy_id": int, "device_name": str}
+    Owner or manager activates a new kiosk terminal for their pharmacy.
+    Returns restricted device token (shown once to store locally).
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         pharmacy_id = request.data.get("pharmacy_id")
-        device_name = request.data.get("device_name", "Counter Kiosk")
+        device_name = request.data.get("device_name", "Pharmacy Counter Terminal")
 
         if not pharmacy_id:
             return Response({"error": "pharmacy_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        pharmacy = get_object_or_404(Pharmacy, pk=int(pharmacy_id))
+        pharmacy = get_object_or_404(Pharmacy, id=pharmacy_id)
 
         try:
             device, raw_token = activate_kiosk_device(
                 user=request.user,
                 pharmacy=pharmacy,
-                device_name=str(device_name),
+                device_name=device_name,
             )
 
             return Response({
                 "device_id": device.id,
-                "device_name": device.device_name,
                 "device_token": raw_token,
-                "pharmacy_id": device.pharmacy_id,
-                "pharmacy_name": device.pharmacy.name,
+                "device_name": device.device_name,
+                "pharmacy_id": pharmacy.id,
+                "pharmacy_name": pharmacy.name,
                 "activated_at": device.activated_at.isoformat(),
             }, status=status.HTTP_201_CREATED)
         except (DjangoPermissionDenied, PermissionDenied) as e:
@@ -156,6 +171,80 @@ class KioskActivateView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class KioskRequestPairingCodeView(APIView):
+    """
+    POST /api/client-profile/attendance/kiosk/pairing/request/
+    Owner or Manager requests a single-use 6-digit pairing code.
+    Dispatches a push notification to their mobile app and records an in-app alert.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        pharmacy_id = request.data.get("pharmacy_id")
+        device_name = request.data.get("device_name", "Pharmacy Counter Terminal")
+
+        if not pharmacy_id:
+            return Response({"error": "pharmacy_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        pharmacy = get_object_or_404(Pharmacy, id=pharmacy_id)
+
+        try:
+            code = generate_kiosk_pairing_code(
+                user=request.user,
+                pharmacy=pharmacy,
+                device_name=device_name,
+            )
+            return Response({
+                "success": True,
+                "message": f"Pairing code sent to your mobile device for {pharmacy.name}.",
+                "expires_in_seconds": 900,
+                "pairing_code": code,
+                "pharmacy_id": pharmacy.id,
+                "pharmacy_name": pharmacy.name,
+            }, status=status.HTTP_200_OK)
+        except (DjangoPermissionDenied, PermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class KioskPairWithCodeView(APIView):
+    """
+    POST /api/client-profile/attendance/kiosk/pairing/pair/
+    Public terminal endpoint: Pairs a physical counter tablet using the 6-digit code.
+    Single-use: The code is consumed immediately upon successful activation.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        pairing_code = request.data.get("pairing_code")
+        device_name = request.data.get("device_name")
+
+        if not pairing_code:
+            return Response({"error": "pairing_code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            device, raw_token = redeem_kiosk_pairing_code(
+                pairing_code=pairing_code,
+                device_name=device_name,
+            )
+            return Response({
+                "device_id": device.id,
+                "device_token": raw_token,
+                "device_name": device.device_name,
+                "pharmacy_id": device.pharmacy.id,
+                "pharmacy_name": device.pharmacy.name,
+                "activated_at": device.activated_at.isoformat(),
+            }, status=status.HTTP_201_CREATED)
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class KioskQRView(APIView):
     """
@@ -163,12 +252,14 @@ class KioskQRView(APIView):
     Device requests a dynamic HMAC-signed QR token with TTL.
     Authenticated via device token.
     """
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [KioskQRRateThrottle]
 
     def post(self, request):
         try:
             device = _get_kiosk_device_from_request(request)
-            qr_data = generate_signed_pharmacy_qr(device)
+            qr_data = generate_signed_pharmacy_qr(device, ttl_seconds=30)
             return Response({
                 "qr_token": qr_data["signed_token"],
                 "expires_at": qr_data["expires_at"].isoformat(),
@@ -188,7 +279,9 @@ class KioskPinClockView(APIView):
     POST /api/attendance/kiosk/pin-clock/
     Staff enters personal PIN and identifier at kiosk to clock in or clock out.
     """
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [KioskPINRateThrottle]
 
     def post(self, request):
         try:
@@ -206,10 +299,14 @@ class KioskPinClockView(APIView):
             )
 
             if not is_valid:
-                is_locked = (reason == "PIN_LOCKED")
+                if reason == "PIN_LOCKED":
+                    return Response({
+                        "error": "Account is temporarily locked due to too many failed attempts. Please try again later.",
+                        "locked": True,
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 return Response({
-                    "error": f"PIN verification failed: {reason}",
-                    "locked": is_locked,
+                    "error": "Invalid worker identifier or PIN.",
+                    "locked": False,
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             worker = membership.user
@@ -262,6 +359,336 @@ class KioskPinClockView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class KioskWorkerPinStatusView(APIView):
+    """
+    POST /api/client-profile/attendance/kiosk/worker-pin/status/
+    Kiosk checks if a worker entering their Email or Staff ID has an active PIN set.
+    If no PIN is set, automatically generates and dispatches an OTP to their email.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            identifier = request.data.get("identifier")
+            if not identifier:
+                return Response({"error": "Staff Email or ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            from .attendance_credentials import _find_kiosk_candidate_membership
+            membership = _find_kiosk_candidate_membership(device, identifier, require_pin=False)
+            if membership is None:
+                return Response({
+                    "error": "Staff member not found. Please check your email or staff ID.",
+                    "found": False,
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            worker = membership.user
+            has_pin = hasattr(membership, "worker_pin") and membership.worker_pin and bool(membership.worker_pin.pin_hash)
+            force_reset = bool(request.data.get("reset") or request.data.get("force_reset"))
+            resend = bool(request.data.get("resend") or request.data.get("force_new"))
+
+            if has_pin and not force_reset:
+                return Response({
+                    "status": "READY_FOR_PIN",
+                    "has_pin": True,
+                    "worker_id": worker.id,
+                    "worker_name": worker.get_full_name() or worker.username,
+                })
+            else:
+                # First time or Reset: check if code already sent or dispatch 6-digit OTP code to email
+                code_data = send_worker_pin_setup_code(device, identifier, force_new=resend)
+                code_already_sent = code_data.get("code_already_sent", False)
+                if code_already_sent:
+                    message = f"An active 6-digit verification code was already sent to {code_data['masked_email']} within the last 10 minutes. Please enter it below, or tap 'Resend Code' to receive a new one."
+                else:
+                    message = f"A 6-digit verification code was sent to {code_data['masked_email']}."
+
+                return Response({
+                    "status": "NEEDS_SETUP",
+                    "has_pin": has_pin,
+                    "worker_id": code_data["worker_id"],
+                    "worker_name": code_data["worker_name"],
+                    "masked_email": code_data["masked_email"],
+                    "code_already_sent": code_already_sent,
+                    "message": message,
+                })
+
+        except (DjangoPermissionDenied, PermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class KioskWorkerSetupPinView(APIView):
+    """
+    POST /api/client-profile/attendance/kiosk/worker-pin/setup/
+    Kiosk verifies email OTP, sets the worker's PIN, and immediately clocks them in.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            identifier = request.data.get("identifier")
+            verification_code = request.data.get("verification_code")
+            new_pin = request.data.get("new_pin")
+
+            if not identifier or not verification_code or not new_pin:
+                return Response({
+                    "error": "Staff identifier, verification code, and new PIN are required.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            membership, worker_pin = setup_worker_kiosk_pin(
+                kiosk_device=device,
+                user_identifier=identifier,
+                verification_code=verification_code,
+                new_pin=new_pin,
+            )
+
+            worker = membership.user
+
+            # Automatically clock in the worker
+            session, in_event = clock_in(
+                user=worker,
+                pharmacy=device.pharmacy,
+                kiosk_device=device,
+                raw_pin=new_pin,
+                user_identifier=identifier,
+            )
+
+            return Response({
+                "success": True,
+                "action": "CLOCKED_IN",
+                "worker_id": worker.id,
+                "worker_name": worker.get_full_name() or worker.username,
+                "session_id": session.id,
+                "started_at": session.started_at.isoformat(),
+                "is_provisional": session.is_provisional,
+                "pharmacy_name": device.pharmacy.name,
+                "message": "PIN created successfully! You are now clocked in.",
+            }, status=status.HTTP_201_CREATED)
+
+        except (DjangoPermissionDenied, PermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class KioskActiveStaffView(APIView):
+    """
+    POST or GET /api/client-profile/attendance/kiosk/active-staff/
+    Returns list of all staff members currently clocked in at this kiosk's pharmacy,
+    including their break status (working vs on-break) and break start time.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def _get_response(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            pharmacy = device.pharmacy
+
+            now = timezone.now()
+            # Fetch all active open sessions at this pharmacy
+            active_sessions = (
+                AttendanceSession.objects.filter(
+                    pharmacy=pharmacy,
+                    ended_at__isnull=True,
+                )
+                .select_related("user")
+                .prefetch_related("events")
+                .order_by("started_at")
+            )
+
+            # Also fetch memberships for roles
+            user_ids = [s.user_id for s in active_sessions]
+            memberships = {
+                m.user_id: m
+                for m in Membership.objects.filter(
+                    pharmacy=pharmacy,
+                    user_id__in=user_ids,
+                    is_active=True,
+                )
+            }
+
+            # Pre-fetch WorkerPIN for whether PIN exists
+            worker_pins = {
+                wp.membership_id: wp
+                for wp in WorkerPIN.objects.filter(
+                    membership_id__in=[m.id for m in memberships.values()],
+                    is_enabled=True,
+                )
+            }
+
+            staff_list = []
+            for session in active_sessions:
+                user = session.user
+                mem = memberships.get(user.id)
+                wpin = worker_pins.get(mem.id) if mem else None
+
+                # Check last event for break status
+                events = sorted(session.events.all(), key=lambda e: (e.occurred_at, e.id), reverse=True)
+                last_event = events[0] if events else None
+
+                is_on_break = (
+                    last_event is not None
+                    and last_event.event_type == AttendanceEvent.EventType.BREAK_START
+                )
+                break_started_at = last_event.occurred_at.isoformat() if is_on_break and last_event else None
+                break_elapsed_seconds = (
+                    int((now - last_event.occurred_at).total_seconds())
+                    if is_on_break and last_event
+                    else 0
+                )
+
+                staff_list.append({
+                    "worker_id": user.id,
+                    "worker_name": user.get_full_name() or user.username,
+                    "email": user.email,
+                    "role": mem.role if mem else "STAFF",
+                    "session_id": session.id,
+                    "started_at": session.started_at.isoformat(),
+                    "is_on_break": is_on_break,
+                    "break_started_at": break_started_at,
+                    "break_elapsed_seconds": break_elapsed_seconds,
+                    "has_pin": bool(wpin and wpin.pin_hash),
+                })
+
+            return Response({
+                "pharmacy_id": pharmacy.id,
+                "pharmacy_name": pharmacy.name,
+                "staff": staff_list,
+                "server_time": now.isoformat(),
+            })
+
+        except (DjangoPermissionDenied, PermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self, request):
+        return self._get_response(request)
+
+    def post(self, request):
+        return self._get_response(request)
+
+
+class KioskStaffBreakActionView(APIView):
+    """
+    POST /api/client-profile/attendance/kiosk/break/
+    Kiosk staff member starts or ends their break (Lunch 30m or Tea 10m).
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            worker_id = request.data.get("worker_id")
+            action = str(request.data.get("action", "")).upper()
+            break_type = str(request.data.get("break_type", "LUNCH_30")).upper()
+            pin = request.data.get("pin")
+
+            if not worker_id or not action:
+                return Response({
+                    "error": "worker_id and action (START or END) are required.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if action not in ("START", "END"):
+                return Response({
+                    "error": "action must be either 'START' or 'END'.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            worker = get_object_or_404(User, id=worker_id)
+
+            # Verify active session at this pharmacy
+            session = (
+                AttendanceSession.objects.filter(
+                    user=worker,
+                    pharmacy=device.pharmacy,
+                    ended_at__isnull=True,
+                ).first()
+            )
+            if not session:
+                return Response({
+                    "error": f"{worker.get_full_name() or worker.username} is not currently clocked in at this pharmacy.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Security: If worker has a PIN, require or verify it
+            membership = (
+                Membership.objects.filter(
+                    pharmacy=device.pharmacy,
+                    user=worker,
+                    is_active=True,
+                ).first()
+            )
+            has_pin = hasattr(membership, "worker_pin") and membership.worker_pin and bool(membership.worker_pin.pin_hash)
+
+            if has_pin:
+                if not pin:
+                    return Response({
+                        "error": "PIN is required to confirm this break action.",
+                        "requires_pin": True,
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                is_valid, _, reason = verify_kiosk_worker_pin(
+                    kiosk_device=device,
+                    user_identifier=str(worker.id),
+                    raw_pin=str(pin),
+                )
+                if not is_valid:
+                    return Response({
+                        "error": "Invalid PIN. Please try again.",
+                        "requires_pin": True,
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            ip_addr = request.META.get("REMOTE_ADDR")
+
+            if action == "START":
+                event = start_break(
+                    user=worker,
+                    source=AttendanceEvent.Source.KIOSK_PIN,
+                    device=device,
+                    ip_address=ip_addr,
+                )
+                label = "Lunch Break (30 mins)" if break_type == "LUNCH_30" else "Tea Break (10 mins)"
+                message = f"{worker.get_full_name() or worker.username} started {label}."
+            else:
+                event = end_break(
+                    user=worker,
+                    source=AttendanceEvent.Source.KIOSK_PIN,
+                    device=device,
+                    ip_address=ip_addr,
+                )
+                message = f"{worker.get_full_name() or worker.username} ended break and resumed shift."
+
+            return Response({
+                "success": True,
+                "action": event.event_type,
+                "worker_id": worker.id,
+                "worker_name": worker.get_full_name() or worker.username,
+                "break_type": break_type,
+                "occurred_at": event.occurred_at.isoformat(),
+                "message": message,
+            })
+
+        except (DjangoPermissionDenied, PermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # ---------------------------------------------------------------------------
 # Worker Attendance Endpoints
 # ---------------------------------------------------------------------------
@@ -305,6 +732,7 @@ class WorkerClockInView(APIView):
     Body: {"qr_token": str}
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [WorkerClockInThrottle]
 
     def post(self, request):
         qr_token = request.data.get("qr_token")
@@ -380,6 +808,7 @@ class WorkerClockOutView(APIView):
     Body: {"qr_token": str}
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [WorkerClockOutThrottle]
 
     def post(self, request):
         qr_token = request.data.get("qr_token")
@@ -404,6 +833,32 @@ class WorkerClockOutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
+class WorkerUpdatePinView(APIView):
+    """
+    POST /api/client-profile/attendance/worker/pin/update/
+    Logged-in worker sets or changes their attendance PIN from the web/mobile app.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        new_pin = request.data.get("new_pin")
+        if not new_pin:
+            return Response({"error": "new_pin is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            worker_pin = worker_update_own_pin(request.user, new_pin)
+            return Response({
+                "success": True,
+                "message": "Attendance PIN updated successfully.",
+            }, status=status.HTTP_200_OK)
+        except (DjangoPermissionDenied, PermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +935,9 @@ class ManagerApproveAttendanceView(APIView):
                 "slot_id": assignment.slot_id,
                 "shift_id": assignment.slot.shift_id,
             })
-        except (PermissionDenied, DjangoPermissionDenied, DjangoValidationError) as e:
+        except (PermissionDenied, DjangoPermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except (DjangoValidationError, ValidationError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -513,7 +970,9 @@ class ManagerRejectAttendanceView(APIView):
                 "reason": provisional.decision_reason,
             })
 
-        except (PermissionDenied, DjangoPermissionDenied, DjangoValidationError) as e:
+        except (PermissionDenied, DjangoPermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except (DjangoValidationError, ValidationError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -557,7 +1016,9 @@ class ManagerCreateCorrectionView(APIView):
                 "corrected_timestamp": correction.corrected_timestamp.isoformat(),
                 "reason": correction.reason,
             })
-        except (PermissionDenied, DjangoValidationError) as e:
+        except (PermissionDenied, DjangoPermissionDenied) as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except (DjangoValidationError, ValidationError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -631,6 +1092,8 @@ class RosterPeriodDetailView(APIView):
             is_rostered=True,
         ).count()
 
+        grid = get_roster_period_grid(pharmacy, week_start, week_end)
+
         if period:
             return Response({
                 "period_id": period.id,
@@ -643,6 +1106,10 @@ class RosterPeriodDetailView(APIView):
                 "published_by": period.published_by.get_full_name() or period.published_by.username if period.published_by else None,
                 "total_assignments": rostered_count,
                 "created": False,
+                "assignments": grid["assignments"],
+                "vacant_slots": grid["vacant_slots"],
+                "staff_view": grid["staff_view"],
+                "stacked_view": grid["stacked_view"],
             })
         else:
             return Response({
@@ -656,6 +1123,10 @@ class RosterPeriodDetailView(APIView):
                 "published_by": None,
                 "total_assignments": rostered_count,
                 "created": False,
+                "assignments": grid["assignments"],
+                "vacant_slots": grid["vacant_slots"],
+                "staff_view": grid["staff_view"],
+                "stacked_view": grid["stacked_view"],
             })
 
     def post(self, request):
@@ -675,6 +1146,7 @@ class RosterPeriodDetailView(APIView):
         try:
             period, created = get_or_create_roster_period(pharmacy, week_start_str, user=request.user)
             assignments = get_roster_period_assignments(period)
+            grid = get_roster_period_grid(pharmacy, period.week_start, period.week_end)
             return Response({
                 "period_id": period.id,
                 "pharmacy_id": period.pharmacy_id,
@@ -686,6 +1158,10 @@ class RosterPeriodDetailView(APIView):
                 "published_by": period.published_by.get_full_name() or period.published_by.username if period.published_by else None,
                 "total_assignments": assignments.count(),
                 "created": created,
+                "assignments": grid["assignments"],
+                "vacant_slots": grid["vacant_slots"],
+                "staff_view": grid["staff_view"],
+                "stacked_view": grid["stacked_view"],
             }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
         except DjangoValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -706,6 +1182,8 @@ class RosterValidateView(APIView):
             week_start_str = request.data.get("week_start")
             if pharmacy_id and week_start_str:
                 pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
+                if not is_authorized_attendance_manager(request.user, pharmacy):
+                    raise PermissionDenied("You are not authorized to validate rosters for this pharmacy.")
                 period, _ = get_or_create_roster_period(pharmacy, week_start_str, user=request.user)
             else:
                 return Response({"error": "period_id or (pharmacy_id and week_start) is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -736,6 +1214,8 @@ class RosterPublishView(APIView):
             week_start_str = request.data.get("week_start")
             if pharmacy_id and week_start_str:
                 pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
+                if not is_authorized_attendance_manager(request.user, pharmacy):
+                    raise PermissionDenied("You are not authorized to publish rosters for this pharmacy.")
                 period, _ = get_or_create_roster_period(pharmacy, week_start_str, user=request.user)
             else:
                 return Response({"error": "period_id or (pharmacy_id and week_start) is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -790,6 +1270,22 @@ class RosterUnpublishView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class RosterArchiveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if not request.data.get("period_id"):
+            return Response({"error": "period_id is required."}, status=400)
+        period = get_object_or_404(RosterPeriod, pk=request.data["period_id"])
+        if not is_authorized_attendance_manager(request.user, period.pharmacy):
+            raise PermissionDenied("You are not authorized to archive this roster.")
+        try:
+            period = archive_roster_period(period, request.user)
+            return Response({"period_id": period.pk, "status": period.status})
+        except DjangoValidationError as exc:
+            return Response({"error": str(exc)}, status=400)
+
+
 class WorkerPublishedRosterView(APIView):
     """
     GET /api/attendance/roster/worker/
@@ -802,21 +1298,43 @@ class WorkerPublishedRosterView(APIView):
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
+        from datetime import timedelta
+        from .models import RosterPeriod, RosterAcknowledgement
+
         shifts = get_worker_published_roster(request.user, start_date=start_date, end_date=end_date)
+        period_ids = set()
+        shift_items = []
+        for a in shifts:
+            monday = a.slot_date - timedelta(days=a.slot_date.weekday())
+            period = RosterPeriod.objects.filter(pharmacy_id=a.shift.pharmacy_id, week_start=monday).first()
+            pid = period.id if period else None
+            if pid:
+                period_ids.add(pid)
+            shift_items.append((a, pid))
+
+        acked_period_ids = set(
+            RosterAcknowledgement.objects.filter(
+                roster_period_id__in=period_ids,
+                user=request.user,
+            ).values_list("roster_period_id", flat=True)
+        )
+
         return Response({
             "worker_id": request.user.id,
             "total_shifts": len(shifts),
             "shifts": [
                 {
                     "assignment_id": a.id,
+                    "period_id": pid,
                     "pharmacy_id": a.shift.pharmacy_id,
                     "pharmacy_name": a.shift.pharmacy.name,
                     "slot_date": str(a.slot_date),
                     "start_time": str(a.slot.start_time),
                     "end_time": str(a.slot.end_time),
                     "role": a.shift.role_needed,
+                    "is_acknowledged": (pid in acked_period_ids) if pid else False,
                 }
-                for a in shifts
+                for a, pid in shift_items
             ],
         })
 
@@ -1335,6 +1853,4 @@ class RosterActionAuditListView(APIView):
             for a in audits
         ]
         return Response({"audits": data})
-
-
 

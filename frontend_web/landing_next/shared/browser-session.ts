@@ -15,7 +15,7 @@ export function watchSession(listener:(action:string)=>void) {
 export function safeNext(value:unknown):string|null {
  if(typeof value!=='string'||!value.startsWith('/')||value.startsWith('//')||/[\\\x00-\x1f]/.test(value))return null;
  try{const u=new URL(value,'https://chemisttasker.invalid');if(u.origin!=='https://chemisttasker.invalid')return null;
- if(!/^\/(dashboard|onboarding|setup|hubs|blog|news|content|calculator|shifts|talent|membership|referee|organization)(\/|$)/.test(u.pathname))return null;
+ if(!/^\/(dashboard|onboarding|setup|kiosk|hubs|blog|news|content|calculator|shifts|talent|membership|referee|organization)(\/|$)/.test(u.pathname))return null;
  return u.pathname+u.search+u.hash;}catch{return null;}
 }
 export function rememberDestination(value:unknown){const path=safeNext(value);if(path)sessionStorage.setItem('ct:return-to',path);return path;}

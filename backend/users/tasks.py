@@ -190,6 +190,26 @@ def send_email_task(self, *args, **kwargs):
 
 def queue_email(*args, **kwargs):
     _dispatch_notification_before_queue(kwargs)
+    # If caller passed plain text message instead of a template
+    if "message" in kwargs and "template_name" not in kwargs:
+        from django.core.mail import send_mail
+        try:
+            return send_mail(
+                subject=kwargs.get("subject", ""),
+                message=kwargs.get("message", ""),
+                from_email=kwargs.get("from_email") or settings.DEFAULT_FROM_EMAIL,
+                recipient_list=kwargs.get("recipient_list", []),
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception("Failed to send plain text email.")
+            return None
+
+    if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False) or getattr(settings, "DEBUG", False):
+        try:
+            return send_email_now(*args, **kwargs)
+        except Exception:
+            logger.exception("Direct email send failed in eager/debug mode, falling back to queue.")
     return send_email_task.apply_async(args=args, kwargs=kwargs, queue="email")
 
 

@@ -53,118 +53,67 @@ from client_profile.roster_services import (
     copy_roster_week,
     get_or_create_roster_period,
     get_roster_period_assignments,
+    get_roster_period_grid,
     publish_roster_period,
 )
-from client_profile.attendance_views import RosterPeriodDetailView
+from client_profile.attendance_views import RosterPeriodDetailView, RosterPublishView, RosterValidateView
 from client_profile.views import RosterWorkerViewSet
 
 User = get_user_model()
 
 
 class RosterSafetyRegressionTests(unittest.TestCase):
+    def test_forbidden_initialization_does_not_create_period(self):
+        for view_class in (RosterPublishView, RosterValidateView):
+            with self.subTest(view=view_class.__name__):
+                request = self.factory.post("/", {
+                    "pharmacy_id": self.pharmacy.pk,
+                    "week_start": self.monday.isoformat(),
+                }, format="json")
+                force_authenticate(request, user=self.locum_worker)
+                response = view_class.as_view()(request)
+                self.assertEqual(response.status_code, 403)
+                self.assertFalse(RosterPeriod.objects.exists())
+
+    def test_all_bulk_slot_mutations_preserve_marketplace_booking(self):
+        period, _ = get_or_create_roster_period(self.pharmacy, self.monday, self.owner_user)
+        shift = Shift.objects.create(pharmacy=self.pharmacy, role_needed="PHARMACIST", visibility="LOCUM_CASUAL")
+        slot = ShiftSlot.objects.create(shift=shift, date=self.monday, start_time=time(9), end_time=time(17))
+        assignment = ShiftSlotAssignment.objects.create(
+            shift=shift, slot=slot, slot_date=self.monday, user=self.locum_worker, is_rostered=False,
+        )
+        for operation in (
+            {"action": "assign_worker", "user_id": self.worker1.pk},
+            {"action": "update_slot_times", "start_time": "10:00", "end_time": "18:00"},
+            {"action": "move_shift", "target_date": (self.monday + timedelta(days=1)).isoformat(), "target_user_id": self.worker1.pk},
+            {"action": "delete_slot"},
+        ):
+            with self.subTest(action=operation["action"]):
+                with self.assertRaises(ValidationError):
+                    bulk_edit_roster_period(period, [dict(operation, slot_id=slot.pk)], self.owner_user)
+                slot.refresh_from_db()
+                assignment.refresh_from_db()
+                self.assertEqual(slot.date, self.monday)
+                self.assertEqual(slot.start_time, time(9))
+                self.assertEqual(assignment.user_id, self.locum_worker.pk)
+                self.assertFalse(assignment.is_rostered)
+
+        grid = get_roster_period_grid(self.pharmacy, self.monday, period.week_end)
+        self.assertNotIn(slot.pk, [item["slot_id"] for item in grid["vacant_slots"]])
+
     @classmethod
     def setUpClass(cls):
-        super().setUpClass()
-        models = [
-            User,
-            OwnerOnboarding,
-            Pharmacy,
-            PharmacyAdmin,
-            Chain,
-            Membership,
-            Shift,
-            ShiftOffer,
-            ShiftSlot,
-            ShiftSlotAssignment,
-            WorkerShiftRequest,
-            RosterActionAudit,
-            AttendanceSession,
-            AttendanceEvent,
-            AttendanceCorrection,
-            ProvisionalAttendance,
-            LeaveRequest,
-            UserAvailability,
-            RosterPeriod,
-            RosterPublicationAudit,
-            RosterAcknowledgement,
-            RosterTemplate,
-        ]
-        connection.disable_constraint_checking()
-        tables = connection.introspection.table_names()
-        with connection.schema_editor() as editor:
-            for m in models:
-                if m._meta.db_table not in tables:
-                    try:
-                        editor.create_model(m)
-                    except Exception:
-                        pass
-        connection.disable_constraint_checking()
+        from attendance_tests.roster_schema import create_schema
+        create_schema()
 
     @classmethod
     def tearDownClass(cls):
-        connection.disable_constraint_checking()
-        models = [
-            ProvisionalAttendance,
-            AttendanceCorrection,
-            AttendanceEvent,
-            AttendanceSession,
-            RosterActionAudit,
-            WorkerShiftRequest,
-            RosterTemplate,
-            RosterAcknowledgement,
-            RosterPublicationAudit,
-            RosterPeriod,
-            UserAvailability,
-            LeaveRequest,
-            ShiftSlotAssignment,
-            ShiftSlot,
-            ShiftOffer,
-            Shift,
-            Membership,
-            Chain,
-            PharmacyAdmin,
-            Pharmacy,
-            OwnerOnboarding,
-            User,
-        ]
-        with connection.schema_editor() as editor:
-            for m in models:
-                try:
-                    editor.delete_model(m)
-                except Exception:
-                    pass
-        connection.disable_constraint_checking()
+        from attendance_tests.roster_schema import drop_schema
+        drop_schema()
 
     def _clean_tables(self):
-        with connection.cursor() as cursor:
-            for table in (
-                "client_profile_provisionalattendance",
-                "client_profile_attendancecorrection",
-                "client_profile_attendanceevent",
-                "client_profile_attendancesession",
-                "client_profile_rosteractionaudit",
-                "client_profile_workershiftrequest",
-                "client_profile_rostertemplate",
-                "client_profile_rosteracknowledgement",
-                "client_profile_rosterpublicationaudit",
-                "client_profile_rosterperiod",
-                "client_profile_useravailability",
-                "client_profile_leaverequest",
-                "client_profile_shiftslotassignment",
-                "client_profile_shiftslot",
-                "client_profile_shiftoffer",
-                "client_profile_shift",
-                "client_profile_membership",
-                "client_profile_chain",
-                "client_profile_pharmacyadmin",
-                "client_profile_pharmacy",
-                "client_profile_owneronboarding",
-                "users_user",
-            ):
-                try:
-                    cursor.execute(f"DELETE FROM {table};")
-                except Exception:
-                    pass
+        from attendance_tests.roster_schema import clear_schema
+        clear_schema()
 
     def setUp(self):
         self._clean_tables()

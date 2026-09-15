@@ -46,70 +46,20 @@ User = get_user_model()
 class RosterCopyTemplatesBulkTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        super().setUpClass()
-        models = [
-            User,
-            Organization,
-            OwnerOnboarding,
-            Pharmacy,
-            PharmacyAdmin,
-            Chain,
-            Membership,
-            Shift,
-            ShiftSlot,
-            ShiftSlotAssignment,
-            LeaveRequest,
-            UserAvailability,
-            RosterPeriod,
-            RosterPublicationAudit,
-            RosterAcknowledgement,
-            RosterTemplate,
-        ]
-        connection.disable_constraint_checking()
-        tables = connection.introspection.table_names()
-        with connection.schema_editor() as editor:
-            for m in models:
-                if m._meta.db_table not in tables:
-                    try:
-                        editor.create_model(m)
-                    except Exception:
-                        pass
-        connection.disable_constraint_checking()
+        from attendance_tests.roster_schema import create_schema
+        create_schema()
 
     @classmethod
     def tearDownClass(cls):
-        connection.disable_constraint_checking()
-        models = [
-            RosterTemplate,
-            RosterAcknowledgement,
-            RosterPublicationAudit,
-            RosterPeriod,
-            UserAvailability,
-            LeaveRequest,
-            ShiftSlotAssignment,
-            ShiftSlot,
-            Shift,
-            Membership,
-            PharmacyAdmin,
-            Pharmacy,
-            Chain,
-            Organization,
-            OwnerOnboarding,
-            User,
-        ]
-        with connection.schema_editor() as editor:
-            for m in models:
-                try:
-                    editor.delete_model(m)
-                except Exception:
-                    pass
+        from attendance_tests.roster_schema import drop_schema
+        drop_schema()
 
     def setUp(self):
         self._clean_tables()
 
         # Pharmacy 1 and Owner
         self.owner_user = User.objects.create_user(
-            username="owner1", email="owner1@pharmacy.com", password="pass", role="PHARMACY_OWNER"
+            username="owner1", email="owner1@pharmacy.com", password="pass", role="OWNER"
         )
         self.owner_onboarding = OwnerOnboarding.objects.create(user=self.owner_user)
         self.pharmacy = Pharmacy.objects.create(
@@ -119,7 +69,7 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
 
         # Pharmacy 2 (for cross-pharmacy isolation tests)
         self.other_owner_user = User.objects.create_user(
-            username="owner2", email="owner2@pharmacy.com", password="pass", role="PHARMACY_OWNER"
+            username="owner2", email="owner2@pharmacy.com", password="pass", role="OWNER"
         )
         self.other_owner_onboarding = OwnerOnboarding.objects.create(user=self.other_owner_user)
         self.other_pharmacy = Pharmacy.objects.create(
@@ -132,7 +82,7 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
             username="pharma_alice", email="alice@test.com", password="pass", role="PHARMACIST"
         )
         self.intern = User.objects.create_user(
-            username="intern_bob", email="bob@test.com", password="pass", role="INTERN"
+            username="intern_bob", email="bob@test.com", password="pass", role="OTHER_STAFF"
         )
 
         # Memberships
@@ -140,14 +90,14 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
             user=self.pharmacist,
             pharmacy=self.pharmacy,
             role="PHARMACIST",
-            status="APPROVED",
+            status=Membership.Status.ACCEPTED,
             is_active=True,
         )
         Membership.objects.create(
             user=self.intern,
             pharmacy=self.pharmacy,
             role="INTERN",
-            status="APPROVED",
+            status=Membership.Status.ACCEPTED,
             is_active=True,
         )
 
@@ -183,29 +133,8 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
         self._clean_tables()
 
     def _clean_tables(self):
-        with connection.cursor() as cursor:
-            for table in (
-                "client_profile_rostertemplate",
-                "client_profile_rosteracknowledgement",
-                "client_profile_rosterpublicationaudit",
-                "client_profile_rosterperiod",
-                "client_profile_useravailability",
-                "client_profile_leaverequest",
-                "client_profile_shiftslotassignment",
-                "client_profile_shiftslot",
-                "client_profile_shift",
-                "client_profile_membership",
-                "client_profile_pharmacyadmin",
-                "client_profile_pharmacy",
-                "client_profile_chain",
-                "client_profile_organization",
-                "client_profile_owneronboarding",
-                "users_user",
-            ):
-                try:
-                    cursor.execute(f"DELETE FROM {table};")
-                except Exception:
-                    pass
+        from attendance_tests.roster_schema import clear_schema
+        clear_schema()
 
     # -----------------------------------------------------------------------
     # 1. Roster Copy Week Tests
@@ -315,12 +244,12 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
         ]
         validate_roster_template_data(valid_data)
 
-        # Invalid: end before start
+        # Invalid: ambiguous zero-length/full-day time pair
         with self.assertRaises(ValidationError) as ctx:
             validate_roster_template_data([
-                {"day_of_week": 0, "start_time": "17:00", "end_time": "09:00", "role": "PHARMACIST"}
+                {"day_of_week": 0, "start_time": "17:00", "end_time": "17:00", "role": "PHARMACIST"}
             ])
-        self.assertIn("start_time must be earlier than end_time", str(ctx.exception))
+        self.assertIn("start_time and end_time must differ", str(ctx.exception))
 
         # Invalid: day out of bounds
         with self.assertRaises(ValidationError) as ctx:

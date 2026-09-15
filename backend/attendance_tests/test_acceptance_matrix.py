@@ -104,117 +104,17 @@ User = get_user_model()
 class FullAcceptanceMatrixTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        super().setUpClass()
-        models = [
-            User,
-            OwnerOnboarding,
-            Pharmacy,
-            PharmacyAdmin,
-            Membership,
-            Shift,
-            ShiftOffer,
-            ShiftSlot,
-            ShiftSlotAssignment,
-            LeaveRequest,
-            UserAvailability,
-            RosterPeriod,
-            RosterPublicationAudit,
-            RosterAcknowledgement,
-            RosterTemplate,
-            WorkerShiftRequest,
-            RosterActionAudit,
-            KioskDevice,
-            AttendanceSession,
-            AttendanceEvent,
-            AttendanceCorrection,
-            ProvisionalAttendance,
-            Chain,
-            PharmacyQRSession,
-            WorkerPIN,
-        ]
-        connection.disable_constraint_checking()
-        tables = connection.introspection.table_names()
-        with connection.schema_editor() as editor:
-            for m in models:
-                if m._meta.db_table not in tables:
-                    try:
-                        editor.create_model(m)
-                    except Exception:
-                        pass
-        connection.disable_constraint_checking()
+        from attendance_tests.roster_schema import create_schema
+        create_schema()
 
     @classmethod
     def tearDownClass(cls):
-        connection.disable_constraint_checking()
-        models = [
-            WorkerPIN,
-            PharmacyQRSession,
-            Chain,
-            ProvisionalAttendance,
-            AttendanceCorrection,
-            AttendanceEvent,
-            AttendanceSession,
-            KioskDevice,
-            RosterActionAudit,
-            WorkerShiftRequest,
-            RosterTemplate,
-            RosterAcknowledgement,
-            RosterPublicationAudit,
-            RosterPeriod,
-            UserAvailability,
-            LeaveRequest,
-            ShiftSlotAssignment,
-            ShiftSlot,
-            ShiftOffer,
-            Shift,
-            Membership,
-            PharmacyAdmin,
-            Pharmacy,
-            OwnerOnboarding,
-            User,
-        ]
-        with connection.schema_editor() as editor:
-            for m in models:
-                try:
-                    editor.delete_model(m)
-                except Exception:
-                    pass
-        super().tearDownClass()
+        from attendance_tests.roster_schema import drop_schema
+        drop_schema()
 
     def _clean_tables(self):
-        with connection.cursor() as cursor:
-            for table in (
-                "client_profile_workerpin",
-                "client_profile_pharmacyqrsession",
-                "client_profile_attendancecorrection",
-                "client_profile_attendanceevent",
-                "client_profile_provisionalattendance",
-                "client_profile_attendancesession",
-                "client_profile_kioskdevice",
-                "client_profile_rosteractionaudit",
-                "client_profile_workershiftrequest",
-                "client_profile_rostertemplate",
-                "client_profile_rosteracknowledgement",
-                "client_profile_rosterpublicationaudit",
-                "client_profile_rosterperiod",
-                "client_profile_useravailability",
-                "client_profile_leaverequest",
-                "client_profile_shiftslotassignment",
-                "client_profile_shiftslot",
-                "client_profile_shiftoffer",
-                "client_profile_shift",
-                "client_profile_membership",
-                "client_profile_pharmacyadmin",
-                "client_profile_chain_pharmacies",
-                "client_profile_chain",
-                "client_profile_pharmacy",
-                "client_profile_owneronboarding",
-                "users_user",
-            ):
-                try:
-                    cursor.execute(f"DELETE FROM {table};")
-                except Exception:
-                    pass
+        from attendance_tests.roster_schema import clear_schema
+        clear_schema()
 
     def tearDown(self):
         self._clean_tables()

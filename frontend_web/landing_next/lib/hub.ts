@@ -20,6 +20,18 @@ export function dateLabel(value: string) {
   return new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Australia/Brisbane' }).format(new Date(value));
 }
 export function articlePath(article: Pick<Article, 'kind' | 'slug'>) { return `/${article.kind}/${article.slug}`; }
-export function safeWebUrl(value: string) {
-  try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : undefined; } catch { return undefined; }
+export function safeWebUrl(value?: string | null) {
+  if (!value) return undefined;
+  if (value.startsWith('/')) return value;
+  const assetIdx = value.indexOf('/assets/');
+  if (assetIdx !== -1) {
+    return value.slice(assetIdx);
+  }
+  try {
+    const url = new URL(value);
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
 }
+

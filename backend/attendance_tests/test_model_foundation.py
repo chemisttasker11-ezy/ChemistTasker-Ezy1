@@ -204,16 +204,19 @@ class CredentialBoundaryTests(unittest.TestCase):
         self.assertFalse(worker_pin.check_pin("12345"))
 
 
-class MigrationQuarantineTests(unittest.TestCase):
-    def test_active_migration_has_no_schema_operation_and_fails_clearly(self):
+class MigrationTests(unittest.TestCase):
+    def test_active_migration_contains_required_models(self):
         migration = importlib.import_module(
             "client_profile.migrations.0044_roster_v2_and_attendance_v1"
         )
-        self.assertEqual(len(migration.Migration.operations), 1)
-        with self.assertRaisesRegex(RuntimeError, "quarantined"):
-            migration.stop_quarantined_migration(None, None)
-        with self.assertRaisesRegex(RuntimeError, "quarantined"):
-            migration.Migration.operations[0].reverse_code(None, None)
+        self.assertGreater(len(migration.Migration.operations), 0)
+        self.assertEqual(
+            migration.Migration.dependencies,
+            [
+                ("client_profile", "0001_squashed_baseline"),
+                ("users", "0001_squashed_baseline"),
+            ],
+        )
 
 
 if __name__ == "__main__":

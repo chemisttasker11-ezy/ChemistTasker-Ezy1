@@ -88,10 +88,12 @@ if DEBUG:
     _dev_hosts = sorted(set(_detect_local_hosts() + ALLOWED_HOSTS))
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOWED_ORIGINS = _build_dev_origins(_dev_hosts)
+    CSRF_TRUSTED_ORIGINS = sorted(set(
+        _clean_env_list("CSRF_TRUSTED_ORIGINS", default=[]) + CORS_ALLOWED_ORIGINS
+    ))
 else:
     CORS_ALLOWED_ORIGINS = _clean_env_list("CORS_ALLOWED_ORIGINS")
-
-CSRF_TRUSTED_ORIGINS = _clean_env_list("CSRF_TRUSTED_ORIGINS", default=CORS_ALLOWED_ORIGINS)
+    CSRF_TRUSTED_ORIGINS = _clean_env_list("CSRF_TRUSTED_ORIGINS", default=CORS_ALLOWED_ORIGINS)
 
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="http://localhost:5173")
 

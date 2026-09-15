@@ -28,7 +28,25 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import moment from "moment";
 import apiClient from "../../utils/apiClient";
+import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from "../../constants/brandTheme";
+
+export interface WorkerRosterShift {
+  assignment_id: number;
+  period_id: number | null;
+  pharmacy_id: number;
+  pharmacy_name: string;
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+  role: string;
+  is_acknowledged: boolean;
+}
 
 export default function WorkerAttendancePage() {
   const [loading, setLoading] = useState(true);
@@ -52,6 +70,45 @@ export default function WorkerAttendancePage() {
   const [qrInputToken, setQrInputToken] = useState("");
   const [submittingAction, setSubmittingAction] = useState(false);
 
+  // Kiosk PIN self-service state
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [confirmNewPin, setConfirmNewPin] = useState("");
+  const [submittingPin, setSubmittingPin] = useState(false);
+  const [pinUpdateError, setPinUpdateError] = useState<string | null>(null);
+
+  // Published Roster Shifts state
+  const [rosterShifts, setRosterShifts] = useState<WorkerRosterShift[]>([]);
+  const [loadingShifts, setLoadingShifts] = useState(false);
+  const [acknowledgingPeriodId, setAcknowledgingPeriodId] = useState<number | null>(null);
+
+  const handleUpdatePin = async () => {
+    if (newPin.length < 4 || newPin.length > 6) {
+      setPinUpdateError("PIN must be between 4 and 6 numeric digits.");
+      return;
+    }
+    if (newPin !== confirmNewPin) {
+      setPinUpdateError("PINs do not match. Please re-enter.");
+      return;
+    }
+
+    setSubmittingPin(true);
+    setPinUpdateError(null);
+    try {
+      await apiClient.post("/client-profile/attendance/worker/pin/update/", {
+        new_pin: newPin,
+      });
+      setSuccessMsg("Kiosk PIN updated successfully! You can now use this PIN on any counter kiosk.");
+      setPinModalOpen(false);
+      setNewPin("");
+      setConfirmNewPin("");
+    } catch (err: any) {
+      setPinUpdateError(err.response?.data?.error || "Failed to update PIN.");
+    } finally {
+      setSubmittingPin(false);
+    }
+  };
+
   // Fetch current session status
   const fetchStatus = async () => {
     try {
@@ -66,8 +123,39 @@ export default function WorkerAttendancePage() {
     }
   };
 
+  // Fetch published roster shifts for the worker
+  const fetchRosterShifts = async () => {
+    try {
+      setLoadingShifts(true);
+      const res = await apiClient.get("/client-profile/attendance/roster/worker/");
+      setRosterShifts(res.data.shifts || []);
+    } catch (err: any) {
+      console.error("Failed to load worker published roster", err);
+    } finally {
+      setLoadingShifts(false);
+    }
+  };
+
+  // Acknowledge a published roster period
+  const handleAcknowledgePeriod = async (periodId: number) => {
+    try {
+      setAcknowledgingPeriodId(periodId);
+      await apiClient.post("/client-profile/attendance/roster/acknowledge/", {
+        period_id: periodId,
+        notes: "Acknowledged via Worker Attendance Dashboard",
+      });
+      setSuccessMsg("Roster shifts acknowledged successfully!");
+      await fetchRosterShifts();
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || "Failed to acknowledge shifts.");
+    } finally {
+      setAcknowledgingPeriodId(null);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
+    fetchRosterShifts();
   }, []);
 
   // Live stopwatch timer
@@ -178,7 +266,26 @@ export default function WorkerAttendancePage() {
   const isOnBreak = statusInfo?.is_on_break;
 
   return (
-    <Box sx={{ maxWidth: 800, mx: "auto", p: { xs: 2, md: 4 } }}>
+    <Box sx={{ maxWidth: 860, mx: "auto", p: { xs: 2, md: 4 } }}>
+      {/* Page Title & Subtitle */}
+      <Box sx={{ mb: 3 }}>
+        <Typography
+          variant="h4"
+          sx={{
+            fontFamily: BRAND_FONTS.heading,
+            fontWeight: 700,
+            color: BRAND_COLORS.navy,
+            fontSize: { xs: 26, md: 32 },
+            letterSpacing: "-0.02em",
+          }}
+        >
+          My Attendance & Rosters
+        </Typography>
+        <Typography variant="body2" sx={{ color: BRAND_COLORS.body, mt: 0.5, fontFamily: BRAND_FONTS.body }}>
+          Clock in at your counter terminal, manage your personal PIN, and review your confirmed rostered shifts.
+        </Typography>
+      </Box>
+
       {/* Notifications */}
       {errorMsg && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setErrorMsg(null)}>
@@ -361,6 +468,250 @@ export default function WorkerAttendancePage() {
         </CardContent>
       </Card>
 
+      {/* Counter Kiosk PIN Management Card */}
+      <Card sx={{ mt: 3, borderRadius: 3, boxShadow: 2, border: "1px solid rgba(0,0,0,0.08)" }}>
+        <CardContent sx={{ p: 3, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                bgcolor: "rgba(168, 85, 247, 0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <VpnKeyIcon sx={{ color: "#a855f7" }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Counter Kiosk Attendance PIN
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your 4–6 digit personal PIN used to clock in or out directly on pharmacy counter terminals.
+              </Typography>
+            </Box>
+          </Stack>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<VpnKeyIcon />}
+            onClick={() => {
+              setNewPin("");
+              setConfirmNewPin("");
+              setPinUpdateError(null);
+              setPinModalOpen(true);
+            }}
+            sx={{ fontWeight: 600, textTransform: "none", borderRadius: 2 }}
+          >
+            Change Kiosk PIN
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Published Shifts & Acknowledgement Section */}
+      <Card
+        sx={{
+          mt: 3,
+          borderRadius: 3,
+          boxShadow: BRAND_SHADOWS.card,
+          border: `1px solid ${BRAND_COLORS.border}`,
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            p: 2.5,
+            px: 3,
+            bgcolor: BRAND_COLORS.mist,
+            borderBottom: `1px solid ${BRAND_COLORS.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1.5,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <CalendarMonthIcon sx={{ color: BRAND_COLORS.purple }} />
+            <Box>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontFamily: BRAND_FONTS.heading,
+                  fontWeight: 700,
+                  color: BRAND_COLORS.navy,
+                  fontSize: 18,
+                }}
+              >
+                My Published Shifts & Acknowledgements
+              </Typography>
+              <Typography variant="caption" sx={{ color: BRAND_COLORS.body }}>
+                Officially published roster assignments. Acknowledge your shifts to confirm your attendance.
+              </Typography>
+            </Box>
+          </Stack>
+          <Chip
+            size="small"
+            label={`${rosterShifts.length} Rostered ${rosterShifts.length === 1 ? "Shift" : "Shifts"}`}
+            sx={{
+              fontWeight: 600,
+              bgcolor: BRAND_COLORS.purpleLight,
+              color: BRAND_COLORS.purple,
+            }}
+          />
+        </Box>
+
+        <CardContent sx={{ p: 3 }}>
+          {loadingShifts ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress size={32} sx={{ color: BRAND_COLORS.purple }} />
+            </Box>
+          ) : rosterShifts.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <EventAvailableIcon sx={{ fontSize: 44, color: BRAND_COLORS.border, mb: 1 }} />
+              <Typography variant="subtitle1" fontWeight={600} sx={{ color: BRAND_COLORS.navy }}>
+                No Published Shifts Yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400, mx: "auto", mt: 0.5 }}>
+                Your confirmed shifts will appear here as soon as your pharmacy manager publishes the roster for the upcoming week.
+              </Typography>
+            </Box>
+          ) : (
+            <Stack spacing={2}>
+              {rosterShifts.map((shift) => {
+                const shiftDateStr = moment(shift.slot_date).format("ddd, D MMM YYYY");
+                const timeBand = `${shift.start_time.slice(0, 5)} – ${shift.end_time.slice(0, 5)}`;
+                const isAck = shift.is_acknowledged;
+
+                return (
+                  <Paper
+                    key={shift.assignment_id}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      borderColor: BRAND_COLORS.border,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 2,
+                      transition: "border-color 0.2s, box-shadow 0.2s",
+                      "&:hover": {
+                        borderColor: BRAND_COLORS.blue,
+                        boxShadow: "0 4px 12px rgba(6, 33, 74, 0.06)",
+                      },
+                    }}
+                  >
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box
+                        sx={{
+                          px: 1.5,
+                          py: 0.8,
+                          borderRadius: 2,
+                          bgcolor: BRAND_COLORS.mist,
+                          border: `1px solid ${BRAND_COLORS.border}`,
+                          textAlign: "center",
+                          minWidth: 90,
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{ color: BRAND_COLORS.navy, display: "block" }}
+                        >
+                          {moment(shift.slot_date).format("ddd").toUpperCase()}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{ color: BRAND_COLORS.purple, fontSize: 13 }}
+                        >
+                          {moment(shift.slot_date).format("D MMM")}
+                        </Typography>
+                      </Box>
+
+                      <Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND_COLORS.navy }}>
+                            {shift.pharmacy_name}
+                          </Typography>
+                          <Chip
+                            label={shift.role}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              bgcolor: BRAND_COLORS.blueLight,
+                              color: BRAND_COLORS.blue,
+                            }}
+                          />
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {shiftDateStr} • <strong>{timeBand}</strong>
+                        </Typography>
+                      </Box>
+                    </Stack>
+
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      {isAck ? (
+                        <Chip
+                          icon={<CheckCircleOutlineIcon fontSize="small" />}
+                          label="ACKNOWLEDGED"
+                          size="small"
+                          color="success"
+                          sx={{ fontWeight: 700, px: 1 }}
+                        />
+                      ) : (
+                        <>
+                          <Chip
+                            label="PENDING"
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              bgcolor: "#fef3c7",
+                              color: "#d97706",
+                              height: 24,
+                            }}
+                          />
+                          {shift.period_id && (
+                            <Button
+                              variant="contained"
+                              size="small"
+                              startIcon={<HowToRegIcon />}
+                              onClick={() => handleAcknowledgePeriod(shift.period_id!)}
+                              disabled={acknowledgingPeriodId === shift.period_id}
+                              sx={{
+                                bgcolor: BRAND_COLORS.purple,
+                                "&:hover": { bgcolor: BRAND_COLORS.purpleHover },
+                                fontWeight: 700,
+                                textTransform: "none",
+                                borderRadius: 1.5,
+                                fontSize: 13,
+                              }}
+                            >
+                              {acknowledgingPeriodId === shift.period_id ? (
+                                <CircularProgress size={16} color="inherit" />
+                              ) : (
+                                "Acknowledge Shifts"
+                              )}
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
+
       {/* QR Code Input / Scanner Modal */}
       <Dialog open={scanModalOpen} onClose={() => setScanModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>
@@ -398,6 +749,57 @@ export default function WorkerAttendancePage() {
             ) : (
               "Confirm Clock Out"
             )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Change Kiosk PIN Modal */}
+      <Dialog open={pinModalOpen} onClose={() => setPinModalOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
+          <VpnKeyIcon sx={{ color: "#a855f7" }} />
+          Change Counter Kiosk PIN
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Set a new 4 to 6-digit numeric PIN for clocking in on physical counter terminals.
+          </Typography>
+          {pinUpdateError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {pinUpdateError}
+            </Alert>
+          )}
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="New PIN (4-6 digits)"
+              type="password"
+              placeholder="e.g. 5678"
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+              fullWidth
+              autoFocus
+              inputProps={{ maxLength: 6 }}
+            />
+            <TextField
+              label="Confirm New PIN"
+              type="password"
+              placeholder="Re-enter PIN"
+              value={confirmNewPin}
+              onChange={(e) => setConfirmNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+              fullWidth
+              inputProps={{ maxLength: 6 }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPinModalOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleUpdatePin}
+            disabled={submittingPin || newPin.length < 4 || newPin !== confirmNewPin}
+            sx={{ bgcolor: "#a855f7", "&:hover": { bgcolor: "#9333ea" }, fontWeight: 700 }}
+          >
+            {submittingPin ? <CircularProgress size={24} color="inherit" /> : "Save PIN"}
           </Button>
         </DialogActions>
       </Dialog>

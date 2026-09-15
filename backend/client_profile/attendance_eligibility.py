@@ -81,6 +81,47 @@ def _get_pharmacy_tz(pharmacy, eval_time: datetime):
     return timezone.get_current_timezone()
 
 
+def is_draft_roster_assignment(assignment: ShiftSlotAssignment) -> bool:
+    """
+    Check if an assignment belongs to an unpublished draft roster period.
+    When an assignment has is_rostered=True, it is part of a planned roster.
+    If the roster period for that pharmacy and week is in DRAFT status (or not published),
+    it has not been published yet and cannot confer normal attendance eligibility.
+    """
+    if not getattr(assignment, "is_rostered", False):
+        return False
+
+    slot_date = assignment.slot_date or getattr(assignment.slot, "date", None)
+    if not slot_date:
+        return False
+
+    monday = slot_date - timedelta(days=slot_date.weekday())
+    pharmacy = getattr(assignment.shift, "pharmacy", None) if assignment.shift else None
+    if not pharmacy:
+        return False
+
+    try:
+        from client_profile.models import RosterPeriod
+        draft_period = RosterPeriod.objects.filter(
+            pharmacy=pharmacy,
+            week_start=monday,
+            status=RosterPeriod.Status.DRAFT,
+        ).exists()
+        if draft_period:
+            return True
+
+        period = RosterPeriod.objects.filter(
+            pharmacy=pharmacy,
+            week_start=monday,
+        ).first()
+        if period and period.status != RosterPeriod.Status.PUBLISHED:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
 def _find_matching_assignment(
     user,
     pharmacy,
@@ -94,7 +135,10 @@ def _find_matching_assignment(
     ).select_related("shift", "slot")
 
     if assignment_id is not None:
-        return base_qs.filter(id=assignment_id).first()
+        cand = base_qs.filter(id=assignment_id).first()
+        if cand and is_draft_roster_assignment(cand):
+            return None
+        return cand
 
     tz = _get_pharmacy_tz(pharmacy, target_time)
     eval_local = target_time.astimezone(tz) if timezone.is_aware(target_time) and tz else target_time
@@ -108,6 +152,9 @@ def _find_matching_assignment(
     )
 
     for assignment in candidates:
+        if is_draft_roster_assignment(assignment):
+            continue
+
         slot = assignment.slot
         slot_date = assignment.slot_date or slot.date
         if not slot_date:

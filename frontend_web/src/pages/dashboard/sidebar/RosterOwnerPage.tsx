@@ -9,6 +9,7 @@ import {
   Stack,
   Skeleton,
   Button,
+  ButtonGroup,
   Box,
   Dialog,
   DialogTitle,
@@ -33,7 +34,7 @@ import {
   IconButton,
 } from '@mui/material';
 
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import PostShiftPage from './PostShiftPage';
 
 // Calendar Imports
@@ -44,7 +45,9 @@ import { calendarViews, calendarMessages, getDateRangeForView, CalendarViewKey }
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
+import { BRAND_COLORS, BRAND_FONTS } from '../../../constants/brandTheme';
 import RosterPlanningToolbar from '../../../components/roster/RosterPlanningToolbar';
+import HorizontalCalendarGrid from '../../../components/roster/HorizontalCalendarGrid';
 import {
   PharmacySummary,
   RosterAssignment,
@@ -177,6 +180,8 @@ export default function RosterOwnerPage() {
   // --- Calendar State ---
   const [calendarView, setCalendarView] = useState<CalendarViewKey>('week');
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  const [calendarSubView, setCalendarSubView] = useState<'TIMELINE' | 'CLASSIC'>('TIMELINE');
+  const [rosterViewMode, setRosterViewMode] = useState<'CALENDAR' | 'STAFF' | 'STACKED'>('STAFF');
   
   // --- Dialogs and Forms State (Updated) ---
   const [isAddAssignmentDialogOpen, setIsAddAssignmentDialogOpen] = useState(false);
@@ -196,6 +201,21 @@ export default function RosterOwnerPage() {
   const [isPostShiftModalOpen, setIsPostShiftModalOpen] = useState(false);
   const [previousSearch, setPreviousSearch] = useState<string>(location.search);
   const [shiftToEdit, setShiftToEdit] = useState<ShiftForEdit | null>(null);
+  
+  // --- Duplicate Shift State ---
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [duplicateTargetDates, setDuplicateTargetDates] = useState<string[]>([]);
+  const [duplicateCustomDate, setDuplicateCustomDate] = useState<string>('');
+  const [duplicateKeepUser, setDuplicateKeepUser] = useState<boolean>(true);
+  const [duplicateShiftData, setDuplicateShiftData] = useState<{
+    id?: string | number;
+    roleNeeded: string;
+    startTime: string;
+    endTime: string;
+    userId: number | null;
+    userName: string;
+    isOpenShift: boolean;
+  } | null>(null);
   const [filteredMembers, setFilteredMembers] = useState<RosterPharmacyMember[]>([]);
   const [escalationLevel, setEscalationLevel] = useState<string>('');
   const handleTabChange = useCallback((_: SyntheticEvent, val: number | boolean) => {
@@ -666,6 +686,72 @@ export default function RosterOwnerPage() {
     }
   };
 
+  // --- DUPLICATION HANDLERS ---
+  const handleOpenDuplicateDialog = (eventOrAssignment: any) => {
+    const res = eventOrAssignment?.resource || eventOrAssignment;
+    if (!res) return;
+    const role = res.shiftDetail?.roleNeeded || res.roleNeeded || res.role || '';
+    const startTime = res.slotDetail?.startTime || (eventOrAssignment?.start ? moment(eventOrAssignment.start).format('HH:mm') : '09:00');
+    const endTime = res.slotDetail?.endTime || (eventOrAssignment?.end ? moment(eventOrAssignment.end).format('HH:mm') : '17:00');
+    const userId = res.user ?? res.userDetail?.id ?? null;
+    const userName = res.userDetail?.firstName
+      ? `${res.userDetail.firstName} ${res.userDetail.lastName || ''}`.trim()
+      : res.isOpenShift ? 'Open Shift' : 'Team Member';
+
+    setDuplicateShiftData({
+      id: res.id,
+      roleNeeded: role,
+      startTime: String(startTime).substring(0, 5),
+      endTime: String(endTime).substring(0, 5),
+      userId: userId,
+      userName: userName,
+      isOpenShift: Boolean(res.isOpenShift),
+    });
+    setDuplicateTargetDates([]);
+    setDuplicateCustomDate('');
+    setDuplicateKeepUser(true);
+    setIsDuplicateDialogOpen(true);
+  };
+
+  const handleExecuteDuplicateShift = async () => {
+    if (!duplicateShiftData || !selectedPharmacyId) return;
+
+    const datesToDuplicate = [...duplicateTargetDates];
+    if (duplicateCustomDate && !datesToDuplicate.includes(duplicateCustomDate)) {
+      datesToDuplicate.push(duplicateCustomDate);
+    }
+
+    if (datesToDuplicate.length === 0) {
+      showSnackbar("Please select at least one target date to duplicate this shift.");
+      return;
+    }
+
+    setIsActionLoading(true);
+    try {
+      let count = 0;
+      for (const targetDate of datesToDuplicate) {
+        await createShiftAndAssignService({
+          pharmacy_id: selectedPharmacyId,
+          role_needed: duplicateShiftData.roleNeeded,
+          slot_date: targetDate,
+          start_time: duplicateShiftData.startTime,
+          end_time: duplicateShiftData.endTime,
+          user_id: duplicateKeepUser ? duplicateShiftData.userId : null,
+        });
+        count += 1;
+      }
+
+      showSnackbar(`Successfully duplicated shift to ${count} date${count > 1 ? 's' : ''}!`);
+      setIsDuplicateDialogOpen(false);
+      setIsOptionsDialogOpen(false);
+      reloadAssignments();
+    } catch (err: any) {
+      showSnackbar(`Error duplicating shift: ${err?.response?.data?.detail || err?.message || 'Failed'}`);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // --- UI HANDLERS (Updated) ---
   const handleSelectSlot = (slotInfo: { start: Date, end: Date }) => {
     setIsAddAssignmentDialogOpen(true);
@@ -904,7 +990,17 @@ export default function RosterOwnerPage() {
   // --- Render Method ---
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: 26, md: 34 }, fontWeight: 800 }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{
+          fontSize: { xs: 26, md: 32 },
+          fontWeight: 700,
+          fontFamily: BRAND_FONTS.heading,
+          color: BRAND_COLORS.navy,
+          letterSpacing: '-0.02em',
+        }}
+      >
         Internal Roster
       </Typography>
 
@@ -919,6 +1015,17 @@ export default function RosterOwnerPage() {
             minWidth: { xs: 170, md: 220 },
             maxWidth: { xs: 220, md: 320 },
             px: { xs: 1.5, md: 2 },
+            fontFamily: BRAND_FONTS.body,
+            fontWeight: 600,
+            color: BRAND_COLORS.body,
+            '&.Mui-selected': {
+              color: BRAND_COLORS.purple,
+            },
+          },
+          '& .MuiTabs-indicator': {
+            backgroundColor: BRAND_COLORS.purple,
+            height: 3,
+            borderRadius: '3px 3px 0 0',
           },
         }}
         textColor="primary"
@@ -938,122 +1045,183 @@ export default function RosterOwnerPage() {
         calendarDate={calendarDate}
         onRosterUpdated={reloadAssignments}
         onNavigateWeek={(targetDate) => setCalendarDate(targetDate)}
+        activeViewMode={rosterViewMode}
+        onViewModeChange={setRosterViewMode}
       />
       
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: { xs: 'stretch', md: 'center' },
-        flexDirection: { xs: 'column', md: 'row' },
-        gap: { xs: 1.5, md: 2 },
-        mb: 2,
-      }}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Typography variant="h5">Roster Calendar</Typography>
-          </Stack>
-          <FormControl sx={{ width: { xs: '100%', sm: 300 }, alignSelf: { xs: 'stretch', md: 'center' } }}>
-              <InputLabel>Filter by Role</InputLabel>
-              <Select
-                  multiple
-                  value={roleFilters}
-                  onChange={handleRoleFilterChange}
-                  input={<OutlinedInput label="Filter by Role" />}
-                  renderValue={(selected) => (selected.includes(ALL_STAFF) ? 'All Staff' : selected.map(s => s.charAt(0) + s.slice(1).toLowerCase()).join(', '))}
-              >
-                  <MenuItem value={ALL_STAFF}>
-                      <Checkbox checked={roleFilters.includes(ALL_STAFF)} />
-                      <ListItemText primary="All Staff" />
-                  </MenuItem>
-                  {ROLES.map((role) => (
-                      <MenuItem key={role} value={role}>
-                          <Checkbox checked={roleFilters.includes(role)} />
-                          <ListItemText primary={role.charAt(0) + role.slice(1).toLowerCase()} />
+      {rosterViewMode === 'CALENDAR' && (
+        <>
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: { xs: 'stretch', md: 'center' },
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: { xs: 1.5, md: 2 },
+            mb: 2,
+          }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                <Typography variant="h5" sx={{ fontFamily: BRAND_FONTS.heading, fontWeight: 700, color: BRAND_COLORS.navy }}>
+                  Roster Calendar
+                </Typography>
+                <ButtonGroup size="small" variant="outlined" sx={{ bgcolor: 'white', borderRadius: '8px' }}>
+                  <Button
+                    variant={calendarSubView === 'TIMELINE' ? 'contained' : 'outlined'}
+                    onClick={() => setCalendarSubView('TIMELINE')}
+                    sx={{
+                      bgcolor: calendarSubView === 'TIMELINE' ? BRAND_COLORS.purple : 'white',
+                      color: calendarSubView === 'TIMELINE' ? 'white' : BRAND_COLORS.navy,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      px: 1.75,
+                      '&:hover': {
+                        bgcolor: calendarSubView === 'TIMELINE' ? BRAND_COLORS.purpleHover : 'rgba(0,0,0,0.04)',
+                      },
+                    }}
+                  >
+                    Horizontal Grid
+                  </Button>
+                  <Button
+                    variant={calendarSubView === 'CLASSIC' ? 'contained' : 'outlined'}
+                    onClick={() => setCalendarSubView('CLASSIC')}
+                    sx={{
+                      bgcolor: calendarSubView === 'CLASSIC' ? BRAND_COLORS.purple : 'white',
+                      color: calendarSubView === 'CLASSIC' ? 'white' : BRAND_COLORS.navy,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      px: 1.75,
+                      '&:hover': {
+                        bgcolor: calendarSubView === 'CLASSIC' ? BRAND_COLORS.purpleHover : 'rgba(0,0,0,0.04)',
+                      },
+                    }}
+                  >
+                    Classic View
+                  </Button>
+                </ButtonGroup>
+              </Stack>
+              <FormControl sx={{ width: { xs: '100%', sm: 300 }, alignSelf: { xs: 'stretch', md: 'center' } }}>
+                  <InputLabel>Filter by Role</InputLabel>
+                  <Select
+                      multiple
+                      value={roleFilters}
+                      onChange={handleRoleFilterChange}
+                      input={<OutlinedInput label="Filter by Role" />}
+                      renderValue={(selected) => (selected.includes(ALL_STAFF) ? 'All Staff' : selected.map(s => s.charAt(0) + s.slice(1).toLowerCase()).join(', '))}
+                  >
+                      <MenuItem value={ALL_STAFF}>
+                          <Checkbox checked={roleFilters.includes(ALL_STAFF)} />
+                          <ListItemText primary="All Staff" />
                       </MenuItem>
-                  ))}
-              </Select>
-          </FormControl>
-      </Box>
-      
-      <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>Click an empty time slot to create a new shift, or click an existing assignment to manage it. Assignments with pending leave requests are highlighted in grey.</Typography>
+                      {ROLES.map((role) => (
+                          <MenuItem key={role} value={role}>
+                              <Checkbox checked={roleFilters.includes(role)} />
+                              <ListItemText primary={role.charAt(0) + role.slice(1).toLowerCase()} />
+                          </MenuItem>
+                      ))}
+                  </Select>
+              </FormControl>
+          </Box>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontFamily: BRAND_FONTS.body }}>
+            Click an empty time slot to create a new shift, or click an existing assignment to manage it. Assignments with pending leave requests are highlighted in grey.
+          </Typography>
 
-      <Box sx={{ 
-        position: 'relative',
-        width: '100%',
-        minWidth: 0,
-        overflowX: { xs: 'auto', md: 'visible' },
-        overflowY: 'visible',
-        pb: 1,
-        '.rbc-calendar': {
-          minWidth: { xs: 900, md: 0 },
-          height: { xs: 1500, md: 1600 },
-          minHeight: { xs: 1500, md: 1600 },
-        },
-        '.rbc-toolbar': {
-          alignItems: 'center',
-          gap: 1,
-          flexWrap: 'wrap',
-          marginBottom: 1.5,
-        },
-        '.rbc-toolbar-label': {
-          flex: { xs: '1 0 100%', sm: '1 1 auto' },
-          order: { xs: -1, sm: 0 },
-          textAlign: { xs: 'left', sm: 'center' },
-          fontWeight: 700,
-          py: { xs: 0.5, sm: 0 },
-        },
-        '.rbc-btn-group': {
-          display: 'inline-flex',
-          whiteSpace: 'nowrap',
-        },
-        '.rbc-time-view': {
-          minHeight: 0,
-          overflow: 'visible',
-        },
-        '.rbc-time-content': {
-          minHeight: 0,
-          overflowY: 'visible !important',
-          overflowX: 'visible',
-        },
-        '.rbc-month-view': {
-          minHeight: 0,
-          overflow: 'visible',
-        },
-        '.rbc-event': { minWidth: 0 },
-        '.rbc-event-content': {
-          minWidth: 0,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        },
-      }}
-        onMouseDownCapture={(event) => startCalendarDragScroll(event.target, event.clientX, event.clientY)}
-      >
-        {isAssignmentsLoading && (
-            <Box sx={{
-                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                display: 'flex', justifyContent: 'center', alignItems: 'center',
-                zIndex: 10
-            }}>
-                <CircularProgress />
+          {calendarSubView === 'TIMELINE' ? (
+            <HorizontalCalendarGrid
+              events={calendarEvents}
+              currentDate={calendarDate}
+              onNavigate={setCalendarDate}
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={handleSelectEvent}
+              onDuplicateShift={handleOpenDuplicateDialog}
+              eventStyleGetter={eventStyleGetter}
+              roleFilters={roleFilters}
+              isLoading={isAssignmentsLoading}
+              pharmacy={pharmacies.find((p) => Number(p.id) === Number(selectedPharmacyId))}
+            />
+          ) : (
+            <Box sx={{ 
+              position: 'relative',
+              width: '100%',
+              minWidth: 0,
+              overflowX: { xs: 'auto', md: 'visible' },
+              overflowY: 'visible',
+              pb: 1,
+              '.rbc-calendar': {
+                minWidth: { xs: 900, md: 0 },
+                height: { xs: 1500, md: 1600 },
+                minHeight: { xs: 1500, md: 1600 },
+              },
+              '.rbc-toolbar': {
+                alignItems: 'center',
+                gap: 1,
+                flexWrap: 'wrap',
+                marginBottom: 1.5,
+              },
+              '.rbc-toolbar-label': {
+                flex: { xs: '1 0 100%', sm: '1 1 auto' },
+                order: { xs: -1, sm: 0 },
+                textAlign: { xs: 'left', sm: 'center' },
+                fontWeight: 700,
+                py: { xs: 0.5, sm: 0 },
+              },
+              '.rbc-btn-group': {
+                display: 'inline-flex',
+                whiteSpace: 'nowrap',
+              },
+              '.rbc-time-view': {
+                minHeight: 0,
+                overflow: 'visible',
+              },
+              '.rbc-time-content': {
+                minHeight: 0,
+                overflowY: 'visible !important',
+                overflowX: 'visible',
+              },
+              '.rbc-month-view': {
+                minHeight: 0,
+                overflow: 'visible',
+              },
+              '.rbc-event': { minWidth: 0 },
+              '.rbc-event-content': {
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              },
+            }}
+              onMouseDownCapture={(event) => startCalendarDragScroll(event.target, event.clientX, event.clientY)}
+            >
+              {isAssignmentsLoading && (
+                  <Box sx={{
+                      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                      display: 'flex', justifyContent: 'center', alignItems: 'center',
+                      zIndex: 10
+                  }}>
+                      <CircularProgress />
+                  </Box>
+              )}
+              <Calendar
+                localizer={localizer}
+                events={calendarEvents}
+                defaultView={calendarView as any}
+                view={calendarView as any}
+                date={calendarDate}
+                onNavigate={setCalendarDate}
+                onView={(nextView: CalendarViewKey | string) => setCalendarView(nextView as CalendarViewKey)}
+                selectable
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={handleSelectEvent}
+                eventPropGetter={eventStyleGetter}
+                views={calendarViews}
+                messages={calendarMessages}
+              />
             </Box>
-        )}
-        <Calendar
-          localizer={localizer}
-          events={calendarEvents}
-          defaultView={calendarView as any}
-          view={calendarView as any}
-          date={calendarDate}
-          onNavigate={setCalendarDate}
-          onView={(nextView: CalendarViewKey | string) => setCalendarView(nextView as CalendarViewKey)}
-          selectable
-          onSelectSlot={handleSelectSlot}
-          onSelectEvent={handleSelectEvent}
-          eventPropGetter={eventStyleGetter}
-          views={calendarViews}
-          messages={calendarMessages}
-        />
-      </Box>
+          )}
+        </>
+      )}
 
       {/* DIALOGS */}
       {/* Add Assignment / Open Shift Dialog */}
@@ -1177,6 +1345,27 @@ export default function RosterOwnerPage() {
             </Button>
             <Button
               variant="outlined"
+              disabled={isActionLoading}
+              startIcon={<ContentCopyIcon />}
+              onClick={() => {
+                if (!selectedAssignment) return;
+                setIsOptionsDialogOpen(false);
+                handleOpenDuplicateDialog(selectedAssignment);
+              }}
+              sx={{
+                borderColor: BRAND_COLORS.purple,
+                color: BRAND_COLORS.purple,
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: BRAND_COLORS.purpleLight,
+                  borderColor: BRAND_COLORS.purpleHover,
+                },
+              }}
+            >
+              Duplicate Shift Slot...
+            </Button>
+            <Button
+              variant="outlined"
               disabled={isActionLoading || !selectableEscalationLevels.length}
               color="secondary"
               onClick={() => {
@@ -1198,6 +1387,166 @@ export default function RosterOwnerPage() {
                 {isActionLoading ? <CircularProgress size={24} color="inherit" /> : 'Delete Assignment'}
             </Button>
             <Button onClick={() => setIsOptionsDialogOpen(false)} sx={{mt: 1}} disabled={isActionLoading}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Duplicate Shift Dialog */}
+      <Dialog
+        open={isDuplicateDialogOpen}
+        onClose={() => !isActionLoading && setIsDuplicateDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle sx={{ fontFamily: BRAND_FONTS.heading, fontWeight: 700, color: BRAND_COLORS.navy, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ContentCopyIcon sx={{ color: BRAND_COLORS.purple }} />
+          Duplicate Shift Slot
+        </DialogTitle>
+        <DialogContent dividers>
+          {duplicateShiftData && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, py: 1 }}>
+              {/* Shift Overview Card */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  bgcolor: BRAND_COLORS.mist,
+                  borderColor: BRAND_COLORS.border,
+                  borderRadius: '10px',
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: BRAND_COLORS.navy, mb: 0.5 }}>
+                  Shift to Duplicate
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Chip
+                    label={duplicateShiftData.roleNeeded || 'Staff'}
+                    size="small"
+                    sx={{
+                      bgcolor: BRAND_COLORS.purpleLight,
+                      color: BRAND_COLORS.purple,
+                      fontWeight: 700,
+                      borderRadius: '4px',
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: BRAND_COLORS.navy }}>
+                    {duplicateShiftData.startTime} – {duplicateShiftData.endTime}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    • Assigned to: <strong>{duplicateShiftData.userName}</strong>
+                  </Typography>
+                </Stack>
+              </Paper>
+
+              {/* Target Days Selection */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: BRAND_COLORS.navy, mb: 1 }}>
+                  Select Target Date(s) within Active Week:
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {(() => {
+                    const weekMon = moment(calendarDate).startOf('isoWeek');
+                    const weekDays = [];
+                    for (let i = 0; i < 7; i++) {
+                      const d = moment(weekMon).add(i, 'days');
+                      const dStr = d.format('YYYY-MM-DD');
+                      const isSelected = duplicateTargetDates.includes(dStr);
+                      weekDays.push(
+                        <Button
+                          key={dStr}
+                          variant={isSelected ? 'contained' : 'outlined'}
+                          size="small"
+                          onClick={() => {
+                            setDuplicateTargetDates((prev) =>
+                              prev.includes(dStr) ? prev.filter((x) => x !== dStr) : [...prev, dStr]
+                            );
+                          }}
+                          sx={{
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: 12,
+                            px: 1.5,
+                            py: 0.75,
+                            bgcolor: isSelected ? BRAND_COLORS.purple : 'white',
+                            color: isSelected ? 'white' : BRAND_COLORS.navy,
+                            borderColor: isSelected ? BRAND_COLORS.purple : BRAND_COLORS.border,
+                            '&:hover': {
+                              bgcolor: isSelected ? BRAND_COLORS.purpleHover : BRAND_COLORS.mist,
+                            },
+                          }}
+                        >
+                          {d.format('ddd D MMM')}
+                        </Button>
+                      );
+                    }
+                    return weekDays;
+                  })()}
+                </Box>
+              </Box>
+
+              {/* Or Select Another Date (Fortnight / Any Date) */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: BRAND_COLORS.navy, mb: 0.75 }}>
+                  Or pick any date (e.g. next week / fortnight):
+                </Typography>
+                <TextField
+                  type="date"
+                  size="small"
+                  fullWidth
+                  value={duplicateCustomDate}
+                  onChange={(e) => setDuplicateCustomDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+
+              {/* Worker Preservation Checkbox */}
+              {!duplicateShiftData.isOpenShift && duplicateShiftData.userId && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={duplicateKeepUser}
+                      onChange={(e) => setDuplicateKeepUser(e.target.checked)}
+                      sx={{ color: BRAND_COLORS.purple, '&.Mui-checked': { color: BRAND_COLORS.purple } }}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      Keep assigned to <strong>{duplicateShiftData.userName}</strong> (uncheck to create as open shift)
+                    </Typography>
+                  }
+                />
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setIsDuplicateDialogOpen(false)} disabled={isActionLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleExecuteDuplicateShift}
+            disabled={
+              isActionLoading ||
+              (duplicateTargetDates.length === 0 && !duplicateCustomDate)
+            }
+            sx={{
+              bgcolor: BRAND_COLORS.purple,
+              color: 'white',
+              fontWeight: 700,
+              textTransform: 'none',
+              px: 2.5,
+              '&:hover': {
+                bgcolor: BRAND_COLORS.purpleHover,
+              },
+            }}
+          >
+            {isActionLoading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              `Duplicate to ${duplicateTargetDates.length + (duplicateCustomDate && !duplicateTargetDates.includes(duplicateCustomDate) ? 1 : 0)} Date(s)`
+            )}
+          </Button>
         </DialogActions>
       </Dialog>
       

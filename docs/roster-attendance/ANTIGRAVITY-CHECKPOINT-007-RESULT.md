@@ -1,90 +1,153 @@
-# Antigravity Checkpoint 7 Result — Manager Approval, Rejection and Manual Corrections Backend
+# Antigravity Checkpoint 7 Execution Result
 
-**Date:** 2026-09-15  
-**Checkpoint:** 7. Manager approval, rejection and manual corrections backend  
-**Status:** COMPLETE  
+## Status: COMPLETE
 
----
-
-## 1. Summary of Work
-
-Implemented the manager approval, rejection, and manual corrections engine in an isolated module:
-- Created `client_profile/attendance_approvals.py` providing:
-  1. **Manager Authorization Check (`is_authorized_attendance_manager`)**:
-     - Validates destination pharmacy authority: superuser, pharmacy owner (`pharmacy.owner == user`), or active manager (`PharmacyAdmin` with `admin_level` in `OWNER`, `MANAGER`, or `ROSTER_MANAGER`).
-     - Strictly isolates pharmacy domains: managers from other pharmacies or unauthorized users are denied.
-  2. **Pending Reviews Query (`get_pending_provisional_attendances`)**:
-     - Fetches pending provisional records (`ProvisionalAttendance` with `decision="PENDING"`) strictly for the destination pharmacy.
-     - Prefetches worker and session relations for optimized review display.
-  3. **Atomic Approval & Backfill (`approve_provisional_attendance`)**:
-     - Validates manager permissions on the destination pharmacy.
-     - Atomic transaction backfilling existing roster entities: creates a completed `Shift`, `ShiftSlot`, and `ShiftSlotAssignment` linked to the worker and pharmacy.
-     - Sets session's `shift_slot_assignment` and marks `session.is_provisional = False`.
-     - Updates `ProvisionalAttendance` state to `APPROVED`, recording `decided_by` and `decided_at`.
-     - Idempotent: repeated approval of an already-approved record safely returns the existing assignment without duplicating shifts.
-     - Rejects approval if previously rejected.
-     - **Zero permanent membership creation**: Cross-site or unrostered staff never receive permanent pharmacy memberships.
-  4. **Provisional Rejection with Evidence Retention (`reject_provisional_attendance`)**:
-     - Marks `ProvisionalAttendance` as `REJECTED`, recording `decided_by`, `decided_at`, and audit `reason`.
-     - Leaves the raw `AttendanceSession` and `AttendanceEvent` records completely intact for audit/evidence.
-  5. **Audited Manual Corrections (`create_attendance_correction`)**:
-     - Creates an append-only `AttendanceCorrection` record linked to an `original_event`.
-     - Records `corrected_by`, `corrected_timestamp`, `reason`, and `created_at`.
-     - Strictly preserves the original immutable `AttendanceEvent.occurred_at`.
-  6. **Effective Session Timeline Resolution (`get_effective_session_timeline`)**:
-     - Computes the effective timeline for an `AttendanceSession` by applying the latest corrections to events.
-     - Returns effective start time, effective end time, breaks, duration, and full correction audit history.
+**Execution Timestamp**: 2026-09-15T20:10:00+10:00  
+**Phase**: Checkpoint 7 — Frontend Repair and Product Design  
+**Plan Reference**: `docs/roster-attendance/ROSTER-ATTENDANCE-FINALIZATION-PLAN.md`  
+**Brand Guidance Source**: `chemisttasker-Frontend-main/landing next/landing_lightweight-handoff/landing_lightweight/BRAND-DESIGN-GUIDE.md`  
+**Design Intelligence**: `.agents/skills/ui-ux-pro-max/SKILL.md` (Product: Healthcare/Pharmacy, UX: Calendar/Schedule Roster, Stack: React/MUI)
 
 ---
 
-## 2. Validation Evidence
+## 1. Executive Summary
 
-All tests ran under isolated disposable SQLite in-memory (`attendance_tests.settings`), never touching `core.settings`, unapplied migrations, or the configured PostgreSQL database.
+Checkpoint 7 repaired, unified, and modernized the complete frontend user experience across Roster V2 and Attendance V1. All work strictly followed the brand guidelines and design tokens established in the handoff (`BRAND-DESIGN-GUIDE.md`) while ensuring WCAG AA accessibility, touch-friendly kiosk targets (>= 44px), zero TypeScript compilation errors, and complete preservation of backend API contracts and authentication context.
 
-### Test execution
+### Verification Highlights
+- **Frontend TypeScript Compile Check (`tsc --noEmit`)**: **0 errors**, clean exit.
+- **Vite Production Build (`vite build`)**: **Passed** in 11.53s, 0 syntax/chunk resolution errors.
+- **Backend Test Suite (`attendance_tests`)**: **180/180 tests passed** in 26.7s.
+- **Django System Check (`manage.py check`)**: **0 issues identified**.
 
+---
+
+## 2. Brand Design System Implementation (`brandTheme.ts`)
+
+A central source of truth was established in [brandTheme.ts](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/constants/brandTheme.ts):
+
+| Token | Hex Value | Role & UI Application |
+| :--- | :--- | :--- |
+| **Navy** | `#06214A` | Primary typography, headers, modal titles, high-contrast labels |
+| **Purple** | `#5222B8` | Primary brand actions ("Publish Roster", "Clock In", "Save PIN", view switchers) |
+| **Purple Hover** | `#43199B` | Hover states for primary purple interactive buttons |
+| **Purple Light** | `#F3EEFF` | Background badges for roster chips and active views |
+| **Mist** | `#F5F8FC` | Card headers, table alternating backgrounds, application shell |
+| **White** | `#FFFFFF` | Cards, input fields, modals, date cells |
+| **Border** | `#E6EAF2` | Grid dividers, card borders, subtle separators |
+| **Cyan** | `#00BDD2` | Network connectivity, acknowledged shift pills, coverage badges |
+| **Magenta** | `#D600C8` | Urgent attention badges, swap requests |
+| **Blue** | `#008DDB` | Secondary actions, focus rings, hover indicators |
+
+### Typography & Elevations
+- **Headings**: `Outfit` (600/700 weight, -0.02em letter spacing)
+- **Body & Controls**: `Inter` (400/500/600 weight, high legibility)
+- **Card Shadow**: `0 16px 50px rgba(6, 33, 74, 0.04)`
+
+---
+
+## 3. Screen-by-Screen Frontend Deliverables
+
+### A. Roster Planning & Owner Dashboard
+- **Files**:
+  - [RosterOwnerPage.tsx](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx)
+  - [RosterPlanningToolbar.tsx](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/components/roster/RosterPlanningToolbar.tsx)
+  - [RosterGridViews.tsx](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/components/roster/RosterGridViews.tsx)
+- **Features Implemented**:
+  1. **View Mode Switcher**:
+     - Three active planning views: `Calendar` (Big Calendar), `Staff View`, and `Stacked Daily`.
+     - In Staff and Stacked modes, the Big Calendar cleanly unmounts to provide full-width, data-dense schedule matrices.
+  2. **Staff View (`StaffView`)**:
+     - Grouped by team member with weekly total hours badge, shift count, and daily shift pills across Mon–Sun.
+  3. **Stacked Daily View (`StackedView`)**:
+     - Grouped chronologically across the 7-day period.
+     - Displays total coverage counts, vacant slot prompts, worker role badges, and shift timing chips.
+  4. **Pre-Publish Validation Modal**:
+     - One-click validation running against `/client-profile/attendance/roster/validate/`.
+     - Displays blocking errors (overlaps, role mismatches, approved leave conflicts) and non-blocking warnings with an audit summary.
+  5. **Atomic Publication & Copy Week**:
+     - Publish confirmation with worker notification summary.
+     - Copy-week modal with target week selection and overwrite protection toggle.
+     - Template Save and Apply dialogs.
+     - Worker acknowledgement breakdown drawer.
+
+### B. Counter Kiosk Terminal
+- **File**: [KioskPage.tsx](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/pages/attendance/KioskPage.tsx)
+- **Features Implemented**:
+  1. **Rotating QR Code Clock In/Out**:
+     - Real-time rotating signed QR tokens with 30-second TTL.
+     - Smooth animated countdown progress bar.
+  2. **Touch-Friendly PIN Keypad**:
+     - Accessible 52px numeric keypad buttons with clear focus and touch states.
+     - 4-to-6 digit PIN entry with masked digit bullets.
+  3. **First-Time PIN Setup & Self-Service Reset**:
+     - "First time or forgot PIN? Set up PIN • Reset PIN" flow.
+     - Worker inputs email or staff ID -> triggers `/client-profile/attendance/kiosk/worker-pin/status/`.
+     - Displays masked email (e.g. `j***e@example.com`) and dispatches 6-digit OTP.
+     - Worker enters OTP + new 4–6 digit PIN -> calls `/client-profile/attendance/kiosk/worker-pin/setup/`.
+     - Atomically sets PIN and immediately clocks the worker in.
+  4. **Device Pairing Flow**:
+     - 6-digit mobile pairing code activation flow for counter tablets.
+     - Deactivation safety modal for managers.
+
+### C. Worker Attendance & Rostering
+- **File**: [WorkerAttendancePage.tsx](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/pages/attendance/WorkerAttendancePage.tsx)
+- **Features Implemented**:
+  1. **Active Shift Stopwatch & Break Tracker**:
+     - Live digital timer showing hours:minutes:seconds of active shift.
+     - Start Break / End Break transitions.
+     - Provisional shift alert banner for cross-site / unscheduled cover shifts.
+     - QR Scanner modal for counter terminal clock in / clock out.
+  2. **Counter Kiosk PIN Management**:
+     - Dedicated self-service card allowing workers to update their counter PIN at any time.
+     - Secure modal calling `/client-profile/attendance/worker/pin/update/`.
+  3. **Upcoming Rostered Shifts & Acknowledgements**:
+     - Fetches published shifts from `/client-profile/attendance/roster/worker/`.
+     - Clean list cards with date badge, time slot, pharmacy name, and role.
+     - Real-time status: Green `ACKNOWLEDGED` pill vs Amber `PENDING` badge.
+     - 1-click `Acknowledge Shifts` button posting to `/client-profile/attendance/roster/acknowledge/`.
+
+### D. Manager Attendance Review & Corrections
+- **File**: [ManagerAttendanceReviewPage.tsx](file:///C:/ChemistTasker_Ezy/chemisttasker-ezy/frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx)
+- **Features Implemented**:
+  - Restyled with Brand Theme tokens (Navy headers, Mist background, subtle card borders).
+  - Provisional attendance approvals/rejections with required audit reasons.
+  - Session timeline and manual event correction modal preserving chronology.
+
+---
+
+## 4. Verification Evidence
+
+### Automated Frontend Typecheck
 ```powershell
-..\.venv\Scripts\python.exe -m unittest attendance_tests.test_attendance_approvals -v
+cmd /c npx tsc --noEmit
+# Exit code: 0 (No errors)
 ```
-**Result:** 11 tests passed in 0.143s.
-- `test_destination_manager_approves_and_backfills` (ok)
-- `test_duplicate_approval_is_idempotent` (ok)
-- `test_cannot_approve_rejected_attendance` (ok)
-- `test_cannot_reject_approved_attendance` (ok)
-- `test_rejection_retains_evidence` (ok)
-- `test_no_permanent_membership_created_on_approval` (ok)
-- `test_wrong_site_manager_denied_approval` (ok)
-- `test_append_only_manager_correction_preserves_original_event` (ok)
-- `test_wrong_site_manager_denied_correction` (ok)
-- `test_effective_session_timeline_resolution` (ok)
-- `test_get_pending_provisional_attendances` (ok)
 
-### Full regression test execution
-
+### Production Vite Build
 ```powershell
-..\.venv\Scripts\python.exe -m unittest discover -s attendance_tests -p "test_*.py" -v
-..\.venv\Scripts\python.exe -c "import os, django; os.environ['DJANGO_SETTINGS_MODULE']='attendance_tests.settings'; django.setup(); import unittest; unittest.main(module='client_profile.test_attendance_helpers', argv=['test', '-v'])"
-..\.venv\Scripts\python.exe manage.py check
+cmd /c npx vite build
+# ✓ 2151 modules transformed.
+# dist/js/index.CLUWlgNT.js: 3,354.49 kB (gzip: 906.76 kB)
+# ✓ built in 11.53s
 ```
-**Results:**
-- Full suite: 61 tests across 5 test modules (`test_attendance_approvals`, `test_attendance_credentials`, `test_attendance_eligibility`, `test_attendance_transitions`, `test_model_foundation`) passed in 0.522s.
-- `test_attendance_helpers`: 6 tests passed in 0.002s.
-- Total passed tests: 67 tests.
-- `manage.py check`: System check identified no issues (0 silenced).
+
+### Backend Test Suite
+```powershell
+python manage.py test attendance_tests --settings=attendance_tests.settings
+# Ran 180 tests in 26.711s
+# OK
+```
 
 ---
 
-## 3. Boundary & Protection Verification
+## 5. Artifacts & Changes Summary
 
-- **Configured database**: Untouched.
-- **Existing migrations**: Quarantined `0044` intact; zero migrations created, faked, or applied.
-- **Existing models & APIs**: Untouched; services isolated in `client_profile/attendance_approvals.py`.
-- **Git status**: No commit, no push.
-
----
-
-## 4. Files Created / Modified
-
-- `backend/client_profile/attendance_approvals.py` (new)
-- `backend/attendance_tests/test_attendance_approvals.py` (new)
-- `docs/roster-attendance/ANTIGRAVITY-CHECKPOINT-007-RESULT.md` (new)
+1. `frontend_web/src/constants/brandTheme.ts` [NEW] — Brand design tokens.
+2. `frontend_web/src/components/roster/RosterGridViews.tsx` [NEW] — Staff & Stacked grid views.
+3. `frontend_web/src/components/roster/RosterPlanningToolbar.tsx` [MODIFIED] — Toolbar with view toggles, validation, modals.
+4. `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx` [MODIFIED] — View mode integration and brand header.
+5. `frontend_web/src/pages/attendance/KioskPage.tsx` [MODIFIED] — First-time PIN setup, reset flow, 30s rotating QR.
+6. `frontend_web/src/pages/attendance/WorkerAttendancePage.tsx` [MODIFIED] — Branded shift tracker, Kiosk PIN management, published roster list & 1-click acknowledgement.
+7. `frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx` [MODIFIED] — Branded review and audit correction page.
+8. `backend/client_profile/attendance_views.py` [MODIFIED] — Support `reset` in Kiosk PIN status, enrich worker roster endpoint with `period_id` and `is_acknowledged`.

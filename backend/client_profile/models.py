@@ -1795,6 +1795,12 @@ class PillLedgerEntry(models.Model):
 
 
 class ShiftSlot(models.Model):
+    roster_period = models.ForeignKey(
+        "RosterPeriod", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="planned_slots",
+        help_text="Explicit ownership of a roster slot, retained when it is vacant.",
+    )
+    planned_break_minutes = models.PositiveSmallIntegerField(default=0)
     shift = models.ForeignKey(
         Shift,
         on_delete=models.CASCADE,
@@ -1822,6 +1828,14 @@ class ShiftSlot(models.Model):
         - recurring_end_date: Required for recurring slots, must be after start date.
         - For non-recurring, recurring_days must be empty.
         """
+        if self.planned_break_minutes:
+            from datetime import datetime, timedelta
+            start = datetime.combine(self.date, self.start_time)
+            end = datetime.combine(self.date, self.end_time)
+            if end <= start:
+                end += timedelta(days=1)
+            if self.planned_break_minutes >= (end - start).total_seconds() / 60:
+                raise ValidationError({'planned_break_minutes': 'Planned break must be shorter than the shift.'})
         if self.is_recurring:
             if not self.recurring_days:
                 raise ValidationError({'recurring_days': 'This field is required for recurring slots.'})

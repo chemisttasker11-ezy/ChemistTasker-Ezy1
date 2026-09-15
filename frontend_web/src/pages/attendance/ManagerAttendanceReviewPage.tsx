@@ -36,6 +36,7 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import apiClient from "../../utils/apiClient";
 import { useAuth } from "../../contexts/AuthContext";
+import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from "../../constants/brandTheme";
 
 type PendingReview = {
   provisional_id: number;
@@ -266,10 +267,19 @@ export default function ManagerAttendanceReviewPage() {
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
-          <Typography variant="h4" fontWeight={800}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontFamily: BRAND_FONTS.heading,
+              fontWeight: 700,
+              color: BRAND_COLORS.navy,
+              fontSize: { xs: 26, md: 32 },
+              letterSpacing: "-0.02em",
+            }}
+          >
             Attendance Review & Corrections
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          <Typography variant="body2" sx={{ color: BRAND_COLORS.body, mt: 0.5, fontFamily: BRAND_FONTS.body }}>
             Review unrostered or cross-site shifts, backfill completed rosters, and adjust audit corrections.
           </Typography>
         </Box>
@@ -301,16 +311,40 @@ export default function ManagerAttendanceReviewPage() {
       )}
 
       {/* Pending Reviews Table */}
-      <Card sx={{ borderRadius: 3, boxShadow: 2, overflow: "hidden" }}>
-        <Box sx={{ p: 2.5, bgcolor: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="h6" fontWeight={700}>
+      <Card
+        sx={{
+          borderRadius: 3,
+          boxShadow: BRAND_SHADOWS.card,
+          border: `1px solid ${BRAND_COLORS.border}`,
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            p: 2.5,
+            bgcolor: BRAND_COLORS.mist,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderBottom: `1px solid ${BRAND_COLORS.border}`,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontFamily: BRAND_FONTS.heading, fontWeight: 700, color: BRAND_COLORS.navy }}>
             Pending Provisional Shifts ({pendingReviews.length})
           </Typography>
-          <Button size="small" onClick={fetchPending} disabled={loadingReviews}>
+          <Button
+            size="small"
+            onClick={fetchPending}
+            disabled={loadingReviews}
+            sx={{
+              color: BRAND_COLORS.purple,
+              fontWeight: 600,
+              "&:hover": { bgcolor: BRAND_COLORS.purpleLight },
+            }}
+          >
             Refresh
           </Button>
         </Box>
-        <Divider />
 
         {loadingReviews ? (
           <Box sx={{ p: 5, textAlign: "center" }}>

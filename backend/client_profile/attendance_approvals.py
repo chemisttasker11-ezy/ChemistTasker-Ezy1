@@ -44,7 +44,7 @@ from client_profile.models import (
 
 def is_authorized_attendance_manager(user, pharmacy: Pharmacy) -> bool:
     """Validate whether user is the owner or an authorized manager for this specific destination pharmacy."""
-    if not user or not pharmacy:
+    if not user or not pharmacy or not user.is_active:
         return False
     if user.is_superuser:
         return True
@@ -54,13 +54,19 @@ def is_authorized_attendance_manager(user, pharmacy: Pharmacy) -> bool:
     if owner and getattr(owner, "user_id", None) == user.id:
         return True
 
-    # PharmacyAdmin check (destination pharmacy only)
-    return PharmacyAdmin.objects.filter(
-        user=user,
-        pharmacy=pharmacy,
-        is_active=True,
-        admin_level__in=[PharmacyAdmin.AdminLevel.OWNER, PharmacyAdmin.AdminLevel.MANAGER],
-    ).exists()
+    # Reuse the existing destination-pharmacy roster capability.
+    from .admin_helpers import can_manage_roster
+    if can_manage_roster(user, pharmacy):
+        return True
+    if pharmacy.organization_id:
+        from users.models import OrganizationMembership
+        membership = OrganizationMembership.objects.filter(
+            user=user, organization_id=pharmacy.organization_id, role="ORG_ADMIN",
+        ).first()
+        if membership:
+            scope = membership.pharmacies.all()
+            return not scope.exists() or scope.filter(pk=pharmacy.pk).exists()
+    return False
 
 
 def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:
@@ -92,6 +98,9 @@ def approve_provisional_attendance(
     """
     Atomically approve a provisional attendance session and backfill Shift/Slot/Assignment.
     Repeat-safe / idempotent. Never creates permanent membership.
+    Requires a closed session (worker must be clocked out).
+    Clears session.is_provisional.
+    Converts actual times using the destination pharmacy's timezone.
     """
     with transaction.atomic():
         provisional = (
@@ -115,16 +124,30 @@ def approve_provisional_attendance(
             )
 
         # Idempotent repeat-safe check
-        if provisional.status == ProvisionalAttendance.Status.APPROVED:
+        if (
+            provisional.status == ProvisionalAttendance.Status.APPROVED
+            or provisional.backfill_assignment_id is not None
+            or session.assignment_id is not None
+        ):
             return provisional
 
         if provisional.status == ProvisionalAttendance.Status.REJECTED:
             raise ValidationError("Cannot approve an attendance record that was already rejected.")
 
-        # Determine shift schedule details from actual worked times
-        shift_date = session.started_at.date()
-        start_time = session.started_at.time()
-        end_time = (session.ended_at or session.started_at).time()
+        # Require a closed attendance session before shift backfill
+        if session.ended_at is None:
+            raise ValidationError("Cannot approve an open attendance session. Worker must clock out first.")
+
+        # Determine shift schedule details from actual worked times in pharmacy timezone
+        from client_profile.timezone_utils import get_pharmacy_timezone
+
+        tz = get_pharmacy_timezone(destination_pharmacy)
+        local_started_at = session.started_at.astimezone(tz)
+        local_ended_at = session.ended_at.astimezone(tz)
+
+        shift_date = local_started_at.date()
+        start_time = local_started_at.time()
+        end_time = local_ended_at.time()
 
         role = (
             session.source_membership.role
@@ -156,9 +179,10 @@ def approve_provisional_attendance(
             is_rostered=False,
         )
 
-        # 4. Link assignment back to session
+        # 4. Link assignment back to session and clear is_provisional
         session.assignment = backfill_assignment
-        session.save(update_fields=["assignment", "updated_at"])
+        session.is_provisional = False
+        session.save(update_fields=["assignment", "is_provisional", "updated_at"])
 
         # 5. Update ProvisionalAttendance record
         now = timezone.now()
@@ -246,6 +270,10 @@ def create_attendance_correction(
     """
     Create an append-only manager correction to an attendance event.
     The original event record is never modified or deleted.
+    Validates that:
+    1. Reason is provided.
+    2. Corrected timestamp is valid and not in the future.
+    3. Chronology within the session is preserved.
     """
     if not reason or not str(reason).strip():
         raise ValidationError("A justification reason is required for attendance corrections.")
@@ -253,27 +281,85 @@ def create_attendance_correction(
     if not corrected_timestamp:
         raise ValidationError("A valid corrected timestamp is required.")
 
-    event = (
-        AttendanceEvent.objects.select_related("session", "session__pharmacy")
-        .get(pk=event_id)
-    )
+    if corrected_timestamp > timezone.now():
+        raise ValidationError("Corrected timestamp cannot be in the future.")
 
-    destination_pharmacy = event.session.pharmacy
-
-    # Destination-pharmacy capability check
-    if not is_authorized_attendance_manager(manager_user, destination_pharmacy):
-        raise PermissionDenied(
-            "Wrong-site manager: only an authorized manager of the destination pharmacy can correct attendance events."
+    with transaction.atomic():
+        event = (
+            AttendanceEvent.objects.select_for_update()
+            .select_related("session", "session__pharmacy")
+            .get(pk=event_id)
         )
 
-    correction = AttendanceCorrection.objects.create(
-        original_event=event,
-        corrected_timestamp=corrected_timestamp,
-        reason=str(reason).strip(),
-        corrected_by=manager_user,
-    )
+        destination_pharmacy = event.session.pharmacy
 
-    return correction
+        # Destination-pharmacy capability check
+        if not is_authorized_attendance_manager(manager_user, destination_pharmacy):
+            raise PermissionDenied(
+                "Wrong-site manager: only an authorized manager of the destination pharmacy can correct attendance events."
+            )
+
+        # Chronology validation within the session
+        session = event.session
+        other_events = session.events.exclude(pk=event.id).prefetch_related("corrections")
+
+        for other in other_events:
+            latest_c = other.corrections.order_by("-corrected_at", "-id").first()
+            other_time = latest_c.corrected_timestamp if latest_c else other.occurred_at
+
+            if event.event_type == AttendanceEvent.EventType.CLOCK_IN:
+                if other.event_type in (
+                    AttendanceEvent.EventType.CLOCK_OUT,
+                    AttendanceEvent.EventType.BREAK_START,
+                    AttendanceEvent.EventType.BREAK_END,
+                ):
+                    if corrected_timestamp > other_time:
+                        raise ValidationError(
+                            f"Clock-in correction cannot be after subsequent {other.event_type} ({other_time.isoformat()})."
+                        )
+            elif event.event_type == AttendanceEvent.EventType.CLOCK_OUT:
+                if other.event_type in (
+                    AttendanceEvent.EventType.CLOCK_IN,
+                    AttendanceEvent.EventType.BREAK_START,
+                    AttendanceEvent.EventType.BREAK_END,
+                ):
+                    if corrected_timestamp < other_time:
+                        raise ValidationError(
+                            f"Clock-out correction cannot be before preceding {other.event_type} ({other_time.isoformat()})."
+                        )
+            elif event.event_type == AttendanceEvent.EventType.BREAK_START:
+                if other.event_type == AttendanceEvent.EventType.CLOCK_IN and corrected_timestamp < other_time:
+                    raise ValidationError(
+                        f"Break-start correction cannot be before clock-in ({other_time.isoformat()})."
+                    )
+                elif other.event_type in (
+                    AttendanceEvent.EventType.BREAK_END,
+                    AttendanceEvent.EventType.CLOCK_OUT,
+                ) and corrected_timestamp > other_time:
+                    raise ValidationError(
+                        f"Break-start correction cannot be after {other.event_type} ({other_time.isoformat()})."
+                    )
+            elif event.event_type == AttendanceEvent.EventType.BREAK_END:
+                if other.event_type in (
+                    AttendanceEvent.EventType.CLOCK_IN,
+                    AttendanceEvent.EventType.BREAK_START,
+                ) and corrected_timestamp < other_time:
+                    raise ValidationError(
+                        f"Break-end correction cannot be before {other.event_type} ({other_time.isoformat()})."
+                    )
+                elif other.event_type == AttendanceEvent.EventType.CLOCK_OUT and corrected_timestamp > other_time:
+                    raise ValidationError(
+                        f"Break-end correction cannot be after clock-out ({other_time.isoformat()})."
+                    )
+
+        correction = AttendanceCorrection.objects.create(
+            original_event=event,
+            corrected_timestamp=corrected_timestamp,
+            reason=str(reason).strip(),
+            corrected_by=manager_user,
+        )
+
+        return correction
 
 
 def get_effective_session_timeline(session: AttendanceSession) -> List[dict]:

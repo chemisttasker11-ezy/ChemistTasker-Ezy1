@@ -5,7 +5,7 @@ export async function platformProxy(request: NextRequest, path: string, method =
   const expected = process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL).origin : `${request.nextUrl.protocol}//${request.headers.get('host')}`;
   if (!['GET','HEAD','OPTIONS'].includes(method) && request.headers.get('origin') !== expected) return Response.json({detail:'Request origin could not be verified.'},{status:403});
   const headers = new Headers();
-  for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform']) { const value=request.headers.get(name); if(value) headers.set(name,value); }
+  for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform','x-device-token']) { const value=request.headers.get(name); if(value) headers.set(name,value); }
   headers.set('x-forwarded-proto',new URL(expected).protocol.replace(':',''));
   const base=(baseOverride || process.env.PLATFORM_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/,'');
   try {

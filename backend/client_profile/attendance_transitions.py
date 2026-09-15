@@ -153,9 +153,11 @@ def clock_in(
 def start_break(
     user,
     *,
+    source: str = AttendanceEvent.Source.IN_APP,
+    device: Optional[KioskDevice] = None,
     ip_address: Optional[str] = None,
 ) -> AttendanceEvent:
-    """Start an in-app break for the worker's active open session."""
+    """Start a break for the worker's active open session."""
     with transaction.atomic():
         session = (
             AttendanceSession.objects.select_for_update()
@@ -174,7 +176,8 @@ def start_break(
             session=session,
             event_type=AttendanceEvent.EventType.BREAK_START,
             occurred_at=now,
-            source=AttendanceEvent.Source.IN_APP,
+            source=source,
+            device=device,
             ip_address=ip_address,
         )
         return break_event
@@ -183,9 +186,11 @@ def start_break(
 def end_break(
     user,
     *,
+    source: str = AttendanceEvent.Source.IN_APP,
+    device: Optional[KioskDevice] = None,
     ip_address: Optional[str] = None,
 ) -> AttendanceEvent:
-    """End an in-app break for the worker's active open session."""
+    """End a break for the worker's active open session."""
     with transaction.atomic():
         session = (
             AttendanceSession.objects.select_for_update()
@@ -204,7 +209,8 @@ def end_break(
             session=session,
             event_type=AttendanceEvent.EventType.BREAK_END,
             occurred_at=now,
-            source=AttendanceEvent.Source.IN_APP,
+            source=source,
+            device=device,
             ip_address=ip_address,
         )
         return end_event

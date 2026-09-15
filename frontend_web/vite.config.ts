@@ -4,14 +4,15 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve'
-  const apiProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:8000'
-  const wsProxyTarget = process.env.VITE_DEV_WS_PROXY_TARGET || 'ws://localhost:8000'
+  const apiProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8000'
+  const wsProxyTarget = process.env.VITE_DEV_WS_PROXY_TARGET || 'ws://127.0.0.1:8000'
 
   return {
     base: '/',
     plugins: [react()],
 
     server: {
+      port: 5173,
       host: 'localhost',
       strictPort: true,
       proxy: {

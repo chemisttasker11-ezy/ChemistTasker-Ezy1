@@ -20,14 +20,21 @@ from .hub.api import (
     HubPollReactionView,
 )
 from .attendance_views import (
+    KioskActiveStaffView,
     KioskActivateView,
-    KioskQRView,
+    KioskPairWithCodeView,
     KioskPinClockView,
+    KioskQRView,
+    KioskRequestPairingCodeView,
+    KioskStaffBreakActionView,
+    KioskWorkerPinStatusView,
+    KioskWorkerSetupPinView,
     WorkerAttendanceStatusView,
     WorkerClockInView,
     WorkerBreakStartView,
     WorkerBreakEndView,
     WorkerClockOutView,
+    WorkerUpdatePinView,
     ManagerPendingAttendancesView,
     ManagerApproveAttendanceView,
     ManagerRejectAttendanceView,
@@ -37,6 +44,7 @@ from .attendance_views import (
     RosterValidateView,
     RosterPublishView,
     RosterUnpublishView,
+    RosterArchiveView,
     WorkerPublishedRosterView,
     WorkerAcknowledgeRosterView,
     RosterAcknowledgementStatusView,
@@ -230,8 +238,14 @@ urlpatterns = [
     # Attendance V1 Endpoints
     # Kiosk
     path('attendance/kiosk/activate/', KioskActivateView.as_view(), name='attendance-kiosk-activate'),
+    path('attendance/kiosk/pairing/request/', KioskRequestPairingCodeView.as_view(), name='attendance-kiosk-pairing-request'),
+    path('attendance/kiosk/pairing/pair/', KioskPairWithCodeView.as_view(), name='attendance-kiosk-pairing-pair'),
     path('attendance/kiosk/qr/', KioskQRView.as_view(), name='attendance-kiosk-qr'),
     path('attendance/kiosk/pin-clock/', KioskPinClockView.as_view(), name='attendance-kiosk-pin-clock'),
+    path('attendance/kiosk/worker-pin/status/', KioskWorkerPinStatusView.as_view(), name='attendance-kiosk-worker-pin-status'),
+    path('attendance/kiosk/worker-pin/setup/', KioskWorkerSetupPinView.as_view(), name='attendance-kiosk-worker-pin-setup'),
+    path('attendance/kiosk/active-staff/', KioskActiveStaffView.as_view(), name='attendance-kiosk-active-staff'),
+    path('attendance/kiosk/break/', KioskStaffBreakActionView.as_view(), name='attendance-kiosk-break'),
 
     # Worker
     path('attendance/worker/status/', WorkerAttendanceStatusView.as_view(), name='attendance-worker-status'),
@@ -239,6 +253,7 @@ urlpatterns = [
     path('attendance/worker/break-start/', WorkerBreakStartView.as_view(), name='attendance-worker-break-start'),
     path('attendance/worker/break-end/', WorkerBreakEndView.as_view(), name='attendance-worker-break-end'),
     path('attendance/worker/clock-out/', WorkerClockOutView.as_view(), name='attendance-worker-clock-out'),
+    path('attendance/worker/pin/update/', WorkerUpdatePinView.as_view(), name='attendance-worker-pin-update'),
 
     # Manager
     path('attendance/manager/pending/', ManagerPendingAttendancesView.as_view(), name='attendance-manager-pending'),
@@ -252,6 +267,7 @@ urlpatterns = [
     path('attendance/roster/validate/', RosterValidateView.as_view(), name='roster-validate'),
     path('attendance/roster/publish/', RosterPublishView.as_view(), name='roster-publish'),
     path('attendance/roster/unpublish/', RosterUnpublishView.as_view(), name='roster-unpublish'),
+    path('attendance/roster/archive/', RosterArchiveView.as_view(), name='roster-archive'),
     path('attendance/roster/worker/', WorkerPublishedRosterView.as_view(), name='roster-worker-published'),
     path('attendance/roster/acknowledge/', WorkerAcknowledgeRosterView.as_view(), name='roster-worker-acknowledge'),
     path('attendance/roster/acknowledgements/<int:period_id>/', RosterAcknowledgementStatusView.as_view(), name='roster-acknowledgement-status'),

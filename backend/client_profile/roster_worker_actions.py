@@ -34,74 +34,17 @@ def validate_worker_replacement_eligibility(
     role_needed: str,
     exclude_assignment_id: int = None,
 ) -> bool:
-    """
-    Validates that target_user is eligible to take a shift at pharmacy:
-    1. Active relationship (active Membership or user assigned to pharmacy).
-    2. Role compatibility (user.role or active membership role matches role_needed).
-    3. No overlapping ShiftSlotAssignment on that slot_date during [start_time, end_time].
-    4. No approved LeaveRequest on that slot_date.
-    """
+    from django.contrib.auth import get_user_model
+    from django.db import connection
+    from .roster_validation import worker_issues
     if not target_user:
         raise ValidationError("Target worker is required.")
-
-    # 1. Role matching
-    user_role = getattr(target_user, "role", None)
-    role_matches = False
-    if user_role and user_role.upper() == role_needed.upper():
-        role_matches = True
-    else:
-        # Check active memberships for role match
-        has_matching_membership = Membership.objects.filter(
-            user=target_user,
-            pharmacy=pharmacy,
-            is_active=True,
-            status=Membership.Status.ACCEPTED,
-            role__iexact=role_needed,
-        ).exists()
-        if has_matching_membership:
-            role_matches = True
-
-    if not role_matches:
-        raise ValidationError(
-            f"Worker {target_user.get_full_name() or target_user.username} role ({user_role}) "
-            f"does not match required role {role_needed}."
-        )
-
-    # 2. Overlap / Double-booking check
-    overlap_qs = ShiftSlotAssignment.objects.filter(
-        user=target_user,
-        slot_date=slot_date,
-    ).select_related("slot", "shift__pharmacy")
-
-    if exclude_assignment_id:
-        overlap_qs = overlap_qs.exclude(pk=exclude_assignment_id)
-
-    for existing_assignment in overlap_qs:
-        slot = getattr(existing_assignment, "slot", None)
-        if slot and slot.start_time and slot.end_time:
-            # max(start1, start2) < min(end1, end2)
-            if max(start_time, slot.start_time) < min(end_time, slot.end_time):
-                pharm_name = (
-                    existing_assignment.shift.pharmacy.name
-                    if existing_assignment.shift and existing_assignment.shift.pharmacy
-                    else "another pharmacy"
-                )
-                raise ValidationError(
-                    f"Worker {target_user.get_full_name() or target_user.username} has an overlapping shift "
-                    f"on {slot_date} ({slot.start_time}-{slot.end_time} at {pharm_name})."
-                )
-
-    # 3. Approved Leave conflict
-    leave_exists = LeaveRequest.objects.filter(
-        user=target_user,
-        status="APPROVED",
-        slot_assignment__slot_date=slot_date,
-    ).exists()
-    if leave_exists:
-        raise ValidationError(
-            f"Worker {target_user.get_full_name() or target_user.username} has approved leave on {slot_date}."
-        )
-
+    if connection.in_atomic_block:
+        target_user = get_user_model().objects.select_for_update().get(pk=target_user.pk)
+    errors, warnings = worker_issues(pharmacy, target_user, slot_date, start_time, end_time,
+                                    role_needed, exclude_assignment_id)
+    if errors or warnings:
+        raise ValidationError([item["message"] for item in errors + warnings])
     return True
 
 
@@ -206,40 +149,24 @@ def approve_direct_swap(
         if assignment.user_id != req.requested_by_id:
             raise ValidationError("Stale request: the requesting worker is no longer assigned to this shift.")
 
-        # Deterministically retrieve target_user
-        if not target_user:
-            # 1. Look for SWAP_REQUESTED audit explicitly linked to this request_id
-            swap_audit = (
-                RosterActionAudit.objects.filter(
-                    details__request_id=req.id,
-                    action_type=RosterActionAudit.ActionType.SWAP_REQUESTED,
-                )
-                .order_by("-created_at")
-                .first()
-            )
-            # 2. Fallback: audit matching assignment and requester
-            if not swap_audit:
-                swap_audit = (
-                    RosterActionAudit.objects.filter(
-                        shift_assignment=assignment,
-                        performed_by=req.requested_by,
-                        action_type=RosterActionAudit.ActionType.SWAP_REQUESTED,
-                    )
-                    .order_by("-created_at")
-                    .first()
-                )
-            if not swap_audit or not swap_audit.target_user:
-                raise ValidationError("Target swap worker could not be determined.")
-            target_user = swap_audit.target_user
+        swap_audit = RosterActionAudit.objects.filter(
+            details__request_id=req.pk, shift_assignment=assignment,
+            performed_by=req.requested_by, action_type=RosterActionAudit.ActionType.SWAP_REQUESTED,
+        ).order_by("-created_at").first()
+        if not swap_audit or not swap_audit.target_user_id:
+            raise ValidationError("Target swap worker could not be determined for this request.")
+        if target_user and target_user.pk != swap_audit.target_user_id:
+            raise ValidationError("Target worker does not match the original swap request.")
+        target_user = swap_audit.target_user
 
         # Re-verify eligibility at decision time
         validate_worker_replacement_eligibility(
             pharmacy=pharmacy,
             target_user=target_user,
-            slot_date=req.slot_date,
-            start_time=req.start_time,
-            end_time=req.end_time,
-            role_needed=req.role,
+            slot_date=assignment.slot_date or assignment.slot.date,
+            start_time=assignment.slot.start_time,
+            end_time=assignment.slot.end_time,
+            role_needed=assignment.shift.role_needed,
             exclude_assignment_id=assignment.id,
         )
 
@@ -248,6 +175,8 @@ def approve_direct_swap(
         # Atomic transfer of assignment
         assignment.user = target_user
         assignment.save(update_fields=["user"])
+        from .roster_services import refresh_assignment_rate
+        refresh_assignment_rate(assignment)
 
         # Mark request approved
         req.status = "APPROVED"
@@ -355,10 +284,10 @@ def approve_cover_replacement(
         validate_worker_replacement_eligibility(
             pharmacy=pharmacy,
             target_user=replacement_user,
-            slot_date=req.slot_date,
-            start_time=req.start_time,
-            end_time=req.end_time,
-            role_needed=req.role,
+            slot_date=assignment.slot_date or assignment.slot.date,
+            start_time=assignment.slot.start_time,
+            end_time=assignment.slot.end_time,
+            role_needed=assignment.shift.role_needed,
             exclude_assignment_id=assignment.id,
         )
 
@@ -367,6 +296,8 @@ def approve_cover_replacement(
         # Atomic reassignment
         assignment.user = replacement_user
         assignment.save(update_fields=["user"])
+        from .roster_services import refresh_assignment_rate
+        refresh_assignment_rate(assignment)
 
         # Mark request approved
         req.status = "APPROVED"
@@ -426,20 +357,22 @@ def release_worker_from_assignment(
 
             shift = assignment.shift
             # Explicit deletion of the filled slot assignment
-            try:
-                assignment.delete()
-            except Exception:
-                from django.db import connection
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        "DELETE FROM client_profile_shiftslotassignment WHERE id = %s",
-                        [assignment.pk],
-                    )
+            from .roster_services import _protect_assignment_history
+            _protect_assignment_history(assignment)
+            assignment.delete()
             req.shift = None
 
         if shift and escalate_to_visibility:
-            shift.visibility = escalate_to_visibility
-            shift.save(update_fields=["visibility"])
+            from .views import BaseShiftViewSet, PUBLIC_LEVEL, enforce_public_shift_daily_limit
+            from .serializers import ShiftSerializer
+            tiers = ShiftSerializer.build_allowed_tiers(shift.pharmacy)
+            if escalate_to_visibility not in tiers:
+                raise ValidationError("Invalid escalation visibility for this pharmacy.")
+            if escalate_to_visibility == PUBLIC_LEVEL:
+                enforce_public_shift_daily_limit(shift.pharmacy)
+            BaseShiftViewSet._apply_escalation(shift, tiers, tiers.index(escalate_to_visibility))
+            # Released work now belongs to the established marketplace workflow.
+            shift.slots.filter(roster_period__isnull=False).update(roster_period=None)
 
         req.status = "APPROVED"
         req.resolved_by = manager

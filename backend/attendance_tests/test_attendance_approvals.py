@@ -53,11 +53,14 @@ from client_profile.models import (
     WorkerPIN,
 )
 
+from users.models import OrganizationMembership
+
 User = get_user_model()
 
 APPROVAL_SCHEMA_MODELS = (
     User,
     Organization,
+    OrganizationMembership,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
@@ -198,6 +201,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_destination_manager_approves_and_backfills(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, in_event = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
         prov = ProvisionalAttendance.objects.get(session=session)
 
         # Manager A of Alpha approves
@@ -225,10 +229,22 @@ class AttendanceApprovalsTests(unittest.TestCase):
 
         session.refresh_from_db()
         self.assertEqual(session.assignment_id, assignment.id)
+        self.assertFalse(session.is_provisional)
+
+    def test_reject_approving_open_session(self):
+        """Cannot approve a provisional attendance session that is still open (worker not clocked out)."""
+        qr = generate_signed_pharmacy_qr(self.kiosk_a)
+        session, in_event = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        prov = ProvisionalAttendance.objects.get(session=session)
+
+        with self.assertRaises(ValidationError) as ctx:
+            approve_provisional_attendance(self.manager_a_user, prov.id)
+        self.assertIn("open attendance session", str(ctx.exception))
 
     def test_wrong_site_manager_denied_approval(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
         prov = ProvisionalAttendance.objects.get(session=session)
 
         # Manager B of Beta attempts to approve Alpha session -> Denied
@@ -239,6 +255,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_duplicate_approval_is_idempotent(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
         prov = ProvisionalAttendance.objects.get(session=session)
 
         p1 = approve_provisional_attendance(self.manager_a_user, prov.id, reason="Initial approval")
@@ -253,6 +270,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
         """Cross-site worker approved at destination pharmacy does NOT receive permanent membership."""
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.cross_worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"])
         prov = ProvisionalAttendance.objects.get(session=session)
 
         self.assertEqual(prov.cover_type, ProvisionalAttendance.CoverType.CROSS_SITE_CHAIN)
@@ -295,6 +313,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_cannot_approve_rejected_attendance(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
         prov = ProvisionalAttendance.objects.get(session=session)
 
         reject_provisional_attendance(self.manager_a_user, prov.id, reason="Rejected")
@@ -306,6 +325,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_cannot_reject_approved_attendance(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
         prov = ProvisionalAttendance.objects.get(session=session)
 
         approve_provisional_attendance(self.manager_a_user, prov.id)

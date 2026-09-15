@@ -327,7 +327,7 @@ class AttendanceAPITests(unittest.TestCase):
         # 4. Manager submits a manual correction
         session = AttendanceSession.objects.get(id=session_id)
         first_event = session.events.first()
-        corrected_time = (first_event.occurred_at + timedelta(minutes=15)).isoformat()
+        corrected_time = (first_event.occurred_at - timedelta(minutes=15)).isoformat()
         corr_resp = mgr_client.post("/attendance/manager/correct/", {
             "event_id": first_event.id,
             "corrected_timestamp": corrected_time,
