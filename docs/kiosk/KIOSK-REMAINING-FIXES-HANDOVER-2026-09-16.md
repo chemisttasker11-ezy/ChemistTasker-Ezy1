@@ -6,6 +6,46 @@
 **Historical checkpoint retained:** `docs/kiosk/KIOSK-REPAIR-HANDOVER-2026-09-16.md`  
 **Current status:** KF02 CORE REPLAY REPAIR IMPLEMENTED AND COMPILED; KF04 ATOMIC CODE REDEMPTION IMPLEMENTED AND FOCUSED TESTED; FULL A–H RELEASE GATE REMAINS OPEN
 
+## Second-review corrections at `6cbe008`
+
+The follow-up reviewer report identified valid gaps in the first implementation. The following corrections were then made:
+
+### PostgreSQL-safe pairing lock
+
+- Removed `select_related("resulting_device")` from the `select_for_update()` authorization lookup. Because `resulting_device` is nullable, the former outer join is incompatible with PostgreSQL row locking.
+- The transaction now locks only the authorization row. Related pharmacy/user objects are resolved normally while the authorization lock remains held.
+- Real PostgreSQL simultaneous-redemption testing is still required; the source-level incompatibility is fixed but not PostgreSQL-certified.
+
+### Screen-level lost-response recovery
+
+- Added the request lifecycle `PREPARED -> COMMITTED -> RECEIPT_CONFIRMED`.
+- `prepare_capture_request` recovers both prepared and committed-but-unconfirmed requests.
+- React confirms the native receipt only after `capture_pin_attendance` returns it to the renderer.
+- A lost response therefore leaves the request `COMMITTED`; after restart and worker re-authentication, the screen recovers the original ID and receipt instead of allocating another attendance request.
+- Added a unique active-request index for each hashed worker identifier/action pair and a process-wide native capture lock covering preparation and local mutation.
+- Network enrollment remains outside the lock; capture reacquires the lock and revalidates local state after enrollment.
+
+The complete four-action restart/fault-injection runtime test is still absent, so KF02 remains `IMPLEMENTED_UNVERIFIED`.
+
+### Device capability enforcement and upgrade handling
+
+- Offline ingestion now requires `client_kind == NATIVE_OFFLINE` in both `KioskOfflineSyncView` and `sync_offline_batch`.
+- Added a regression proving that `WEB_ONLINE` is denied even when the device has a valid signing key.
+- Migration `0048` classifies existing devices as native only when their stored platform is Windows/macOS/Linux and they already have a public signing key. Other existing devices remain `WEB_ONLINE`.
+- This preserves eligible existing installation identities and evidence queues while failing closed for ambiguous devices. Deployment review of the classification set remains required.
+
+### Cache failure isolation
+
+- Pairing authorization remains database-authoritative.
+- Post-commit compatibility-cache deletion is now best effort, so a cache outage cannot turn a committed registration into an apparent failure.
+- Cross-version deployment cutover and proof-bound lost-response token recovery remain open.
+
+### Focused kiosk TypeScript verification
+
+- Added `frontend_web/tsconfig.kiosk.json` covering the kiosk entry, bridge, page and their real import graph.
+- Added `npm run typecheck:kiosk`.
+- The focused kiosk typecheck passes independently from the existing full-application TypeScript failures.
+
 ## Scope preserved
 
 - The existing Django attendance transitions, pharmacy/user authority, roster relationships and signed event evidence remain the source of business truth.
@@ -74,7 +114,9 @@ Limits still open in KF04:
 | `C:\\Users\\semse\\.cargo\\bin\\cargo.exe fmt --all -- --check` | Passed after formatting the new Rust code. |
 | `C:\\Users\\semse\\.cargo\\bin\\cargo.exe check --locked` | Passed. |
 | `npm run build:kiosk-ui` | Passed; 530 modules transformed. Existing chunk-size warning only. |
+| `npm run typecheck:kiosk` | Passed against the kiosk entry, bridge, page and imported dependencies. |
 | `.venv\\Scripts\\python.exe -m unittest attendance_tests.test_kiosk_pairing_code` | Passed: 8 tests. Existing resource warnings and malformed environment-line warning remain. |
+| `.venv\\Scripts\\python.exe -m unittest attendance_tests.test_kiosk_offline_protocol attendance_tests.test_kiosk_pairing_code` | Passed: 18 tests after capability enforcement; existing resource/environment warnings remain. |
 | `python -m compileall` on modified backend modules/migration | Passed. |
 | `git diff --check` | Passed; line-ending notices only. |
 | Full frontend `tsc --noEmit` | Blocked by pre-existing errors in roster, dashboard, attendance review, active shifts and onboarding files. No reported error referenced the modified kiosk files. |

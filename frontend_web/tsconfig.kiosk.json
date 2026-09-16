@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": [
+    "src/vite-env.d.ts",
+    "src/kiosk/main.tsx",
+    "src/kiosk/desktopBridge.ts",
+    "src/pages/attendance/KioskPage.tsx"
+  ]
+}

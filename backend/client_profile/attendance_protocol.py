@@ -301,6 +301,8 @@ def sync_offline_batch(device, events, *, app_version=""):
     device = KioskDevice.objects.select_for_update().select_related("pharmacy").get(pk=device.pk)
     if not device.is_active or device.revoked_at:
         raise ValidationError("Kiosk device is revoked.")
+    if device.client_kind != "NATIVE_OFFLINE":
+        raise ValidationError("This device is not authorized for offline attendance sync.")
 
     results = []
     for raw_event in events:

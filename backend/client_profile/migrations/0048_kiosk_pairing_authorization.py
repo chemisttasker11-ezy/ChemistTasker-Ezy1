@@ -3,6 +3,13 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+def classify_existing_native_devices(apps, schema_editor):
+    KioskDevice = apps.get_model("client_profile", "KioskDevice")
+    KioskDevice.objects.filter(
+        platform__in=["windows", "macos", "linux"],
+    ).exclude(public_signing_key="").update(client_kind="NATIVE_OFFLINE")
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("client_profile", "0047_kiosk_event_preserve_unresolved_worker"),
@@ -15,6 +22,7 @@ class Migration(migrations.Migration):
             name="client_kind",
             field=models.CharField(choices=[("WEB_ONLINE", "Web online"), ("NATIVE_OFFLINE", "Native offline")], default="WEB_ONLINE", max_length=24),
         ),
+        migrations.RunPython(classify_existing_native_devices, migrations.RunPython.noop),
         migrations.CreateModel(
             name="KioskPairingAuthorization",
             fields=[

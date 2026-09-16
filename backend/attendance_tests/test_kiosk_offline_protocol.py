@@ -13,6 +13,7 @@ django.setup()
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient, APIRequestFactory
 
@@ -27,7 +28,7 @@ from client_profile.attendance_protocol import (
     canonical_event_payload,
     sync_offline_batch,
 )
-from client_profile.attendance_views import KioskWorkerEnrolView
+from client_profile.attendance_views import KioskOfflineSyncView, KioskWorkerEnrolView
 from client_profile.models import (
     AttendanceEvent,
     AttendanceSession,
@@ -90,6 +91,7 @@ class KioskOfflineProtocolTests(unittest.TestCase):
             public_signing_key=base64.b64encode(public_bytes).decode("ascii"),
             platform="windows",
             app_version="0.1.0",
+            client_kind="NATIVE_OFFLINE",
         )
 
     def signed_event(self, *, sequence=1, event_type="CLOCK_IN", previous_hash="", employee_id=None):
@@ -132,6 +134,23 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertEqual(second["results"][0]["result"], "already_received")
         self.assertEqual(KioskAttendanceEvent.objects.count(), 1)
         self.assertEqual(AttendanceSession.objects.count(), 1)
+
+    def test_web_device_with_signing_key_is_denied_offline_sync(self):
+        self.device.client_kind = "WEB_ONLINE"
+        self.device.save(update_fields=["client_kind"])
+        event = self.signed_event()
+
+        with self.assertRaises(ValidationError):
+            sync_offline_batch(self.device, [event])
+
+        request = APIRequestFactory().post(
+            "/attendance/kiosk/offline-sync/",
+            {"events": [event]},
+            format="json",
+            HTTP_X_DEVICE_TOKEN=self.raw_token,
+        )
+        response = KioskOfflineSyncView.as_view()(request)
+        self.assertEqual(response.status_code, 401)
 
     def test_tampering_is_rejected_without_creating_attendance(self):
         event = self.signed_event()
@@ -196,6 +215,7 @@ class KioskOfflineProtocolTests(unittest.TestCase):
             other_pharmacy,
             "Other Counter",
             public_signing_key=base64.b64encode(other_public).decode("ascii"),
+            client_kind="NATIVE_OFFLINE",
         )
         event = self.signed_event(event_type="BREAK_START")
         event["device_id"] = str(other_device.installation_id)

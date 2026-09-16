@@ -56,6 +56,9 @@ export const prepareDesktopCaptureRequest = (
   requestedAction: 'CLOCK_IN' | 'CLOCK_OUT' | 'BREAK_START' | 'BREAK_END',
 ) => invoke<string>('prepare_capture_request', { identifier, requestedAction });
 
+export const confirmDesktopCaptureReceipt = (requestId: string, eventId: string) =>
+  invoke<void>('confirm_capture_receipt', { requestId, eventId });
+
 export const captureDesktopPinAttendance = (
   identifier: string,
   pin: string,

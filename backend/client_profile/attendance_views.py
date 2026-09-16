@@ -264,6 +264,8 @@ class KioskOfflineSyncView(APIView):
     def post(self, request):
         try:
             device = _get_kiosk_device_from_request(request)
+            if device.client_kind != "NATIVE_OFFLINE":
+                raise PermissionDenied("This device is not authorized for offline attendance sync.")
             result = sync_offline_batch(
                 device,
                 request.data.get("events"),

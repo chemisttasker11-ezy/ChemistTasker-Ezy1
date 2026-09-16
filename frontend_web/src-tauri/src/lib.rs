@@ -30,6 +30,7 @@ struct RuntimeState {
     boot_session_id: String,
     boot_started: Instant,
     sync_lock: tokio::sync::Mutex<()>,
+    capture_lock: tokio::sync::Mutex<()>,
 }
 
 #[derive(Serialize)]
@@ -269,10 +270,11 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
         )
         .map_err(|error| error.to_string())?;
     connection
-        .execute(
-            "CREATE INDEX IF NOT EXISTS capture_request_pending_lookup
-             ON capture_request(identifier_hash, requested_action, status)",
-            [],
+        .execute_batch(
+            "DROP INDEX IF EXISTS capture_request_pending_lookup;
+             CREATE UNIQUE INDEX capture_request_pending_lookup
+             ON capture_request(identifier_hash, requested_action)
+             WHERE status IN ('PREPARED', 'COMMITTED');",
         )
         .map_err(|error| error.to_string())?;
     Ok(connection)
@@ -283,11 +285,13 @@ fn capture_identifier_hash(identifier: &str) -> String {
 }
 
 #[tauri::command]
-fn prepare_capture_request(
+async fn prepare_capture_request(
     app: AppHandle,
+    runtime: State<'_, RuntimeState>,
     identifier: String,
     requested_action: String,
 ) -> Result<String, String> {
+    let _guard = runtime.capture_lock.lock().await;
     if identifier.trim().is_empty()
         || !["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"]
             .contains(&requested_action.as_str())
@@ -299,7 +303,8 @@ fn prepare_capture_request(
     if let Some(request_id) = connection
         .query_row(
             "SELECT request_id FROM capture_request
-             WHERE identifier_hash = ?1 AND requested_action = ?2 AND status = 'PREPARED'
+             WHERE identifier_hash = ?1 AND requested_action = ?2
+               AND status IN ('PREPARED', 'COMMITTED')
              ORDER BY created_at DESC LIMIT 1",
             params![hash, requested_action],
             |row| row.get::<_, String>(0),
@@ -319,6 +324,26 @@ fn prepare_capture_request(
         )
         .map_err(|error| error.to_string())?;
     Ok(request_id)
+}
+
+#[tauri::command]
+fn confirm_capture_receipt(
+    app: AppHandle,
+    request_id: String,
+    event_id: String,
+) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    let changed = connection
+        .execute(
+            "UPDATE capture_request SET status = 'RECEIPT_CONFIRMED'
+             WHERE request_id = ?1 AND event_id = ?2 AND status = 'COMMITTED'",
+            params![request_id, event_id],
+        )
+        .map_err(|error| error.to_string())?;
+    if changed != 1 {
+        return Err("Capture receipt could not be confirmed".to_string());
+    }
+    Ok(())
 }
 
 fn ensure_column(
@@ -1018,19 +1043,24 @@ async fn capture_pin_attendance(
 ) -> Result<OfflinePinReceipt, String> {
     Uuid::parse_str(&local_request_id)
         .map_err(|_| "Local attendance request identity is invalid".to_string())?;
-    match record_offline_pin_attendance(
-        &app,
-        &runtime,
-        identifier.clone(),
-        pin.clone(),
-        requested_action.clone(),
-        local_request_id.clone(),
-    ) {
+    let first_attempt = {
+        let _guard = runtime.capture_lock.lock().await;
+        record_offline_pin_attendance(
+            &app,
+            &runtime,
+            identifier.clone(),
+            pin.clone(),
+            requested_action.clone(),
+            local_request_id.clone(),
+        )
+    };
+    match first_attempt {
         Ok(receipt) => Ok(receipt),
         Err(error)
             if error.contains("not enrolled for offline use") || error == "Invalid worker PIN" =>
         {
             enrol_worker_from_server(&app, &identifier, &pin).await?;
+            let _guard = runtime.capture_lock.lock().await;
             record_offline_pin_attendance(
                 &app,
                 &runtime,
@@ -1324,6 +1354,7 @@ pub fn run() {
             boot_session_id: Uuid::new_v4().to_string(),
             boot_started: Instant::now(),
             sync_lock: tokio::sync::Mutex::new(()),
+            capture_lock: tokio::sync::Mutex::new(()),
         })
         .setup(|app| {
             let handle = app.handle().clone();
@@ -1347,6 +1378,7 @@ pub fn run() {
             pair_device,
             prepare_capture_request,
             capture_pin_attendance,
+            confirm_capture_receipt,
             verify_dashboard_pin,
             sync_now,
             pending_count,

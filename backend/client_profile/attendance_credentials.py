@@ -235,7 +235,12 @@ def generate_kiosk_pairing_code(
     else:
         raise ValidationError("Unable to reserve a pairing code. Please try again.")
     # Retain the cache entry only as a compatibility hint for older nodes/tests.
-    cache.set(f"{KIOSK_PAIR_CACHE_PREFIX}{code}", payload, timeout=ttl_seconds)
+    try:
+        cache.set(f"{KIOSK_PAIR_CACHE_PREFIX}{code}", payload, timeout=ttl_seconds)
+    except Exception:
+        # New servers redeem from the durable authorization. Cache is retained
+        # only for a controlled mixed-version transition.
+        pass
 
     # Dispatch notification to the user (triggers Expo push + WebSocket + DB in-app notification)
     try:
@@ -289,7 +294,6 @@ def redeem_kiosk_pairing_code(
     with transaction.atomic():
         authorization = (
             KioskPairingAuthorization.objects.select_for_update()
-            .select_related("pharmacy", "authorized_by", "resulting_device")
             .filter(code_digest=_pairing_code_digest(code))
             .first()
         )
@@ -321,7 +325,12 @@ def redeem_kiosk_pairing_code(
         authorization.resulting_device = device
         authorization.save(update_fields=["consumed_at", "resulting_device"])
 
-    cache.delete(f"{KIOSK_PAIR_CACHE_PREFIX}{code}")
+    try:
+        cache.delete(f"{KIOSK_PAIR_CACHE_PREFIX}{code}")
+    except Exception:
+        # The database is authoritative. A compatibility-cache outage must not
+        # turn a committed registration into an apparent pairing failure.
+        pass
 
     # Notify owner that device has been successfully paired
     try:
