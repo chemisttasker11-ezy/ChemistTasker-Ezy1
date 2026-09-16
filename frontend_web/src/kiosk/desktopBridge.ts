@@ -48,7 +48,8 @@ export type OfflinePinResult = {
   action: 'CLOCKED_IN' | 'CLOCKED_OUT' | 'BREAK_START' | 'BREAK_END';
   worker_id: number;
   worker_name: string;
-  event: { event_id: string; device_seq: number; queued: boolean };
+  event: { event_id: string; device_seq: number; queued: boolean; captured_at: string };
+  recovered: boolean;
 };
 
 export const prepareDesktopCaptureRequest = (

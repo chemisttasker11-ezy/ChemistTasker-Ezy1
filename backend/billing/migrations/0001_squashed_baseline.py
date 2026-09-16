@@ -3,6 +3,11 @@
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
+from core.baseline_schema import create_baseline_tables
+
+
+def create_initial_tables(apps, schema_editor):
+    create_baseline_tables(apps, schema_editor, ("billing",))
 
 
 class Migration(migrations.Migration):
@@ -78,4 +83,5 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
+        migrations.RunPython(create_initial_tables),
     ]

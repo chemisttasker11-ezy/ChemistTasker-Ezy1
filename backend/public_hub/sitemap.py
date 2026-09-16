@@ -9,6 +9,6 @@ class Sitemap(APIView):
     authentication_classes = []
 
     def get(self, request):
-        from core.sitemap import _build_content_urls, _build_shift_urls, _build_static_urls
+        from core.sitemap import _build_content_urls, _build_marketplace_urls, _build_shift_urls, _build_static_urls
         base = settings.FRONTEND_BASE_URL
-        return Response([{'loc': loc} for loc in _build_static_urls(base)] + _build_shift_urls(base) + _build_content_urls(base))
+        return Response([{'loc': loc} for loc in _build_static_urls(base)] + _build_shift_urls(base) + _build_content_urls(base) + _build_marketplace_urls(base))

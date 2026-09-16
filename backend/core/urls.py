@@ -34,6 +34,8 @@ urlpatterns = [
     path('health/', health_check, name='health'),
     path('api/users/', include('users.urls')),
     path('api/public-hub/', include('public_hub.urls')),
+    path('api/marketplace/', include('marketplace.urls')),
+    path('api/ethical/', include('ethical_marketplace.urls')),
     path('api/content/', include('public_hub.content_urls')),
     path('api/client-profile/', include(('client_profile.urls', 'client_profile'), namespace='client_profile')),
     path('api/billing/', include('billing.urls', namespace='billing')),

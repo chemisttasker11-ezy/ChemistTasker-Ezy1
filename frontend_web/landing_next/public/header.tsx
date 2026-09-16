@@ -4,8 +4,8 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useEffect,useState} from 'react';
 import {ArrowUpRight,Menu,X} from 'lucide-react';
-const links=[['Find locum shifts','/shifts/public-board'],['Find talent','/talent/public-board'],['Community','/hubs'],['Blog','/blog'],['News','/news'],['Pricing','/pricing']];
-const resources=[['Calculator','/calculator'],['Organisations','/pricing/organization'],['Contact','/contact']];
+const links=[['Marketplace','/marketplace'],['Find shifts','/shifts/public-board'],['Find talent','/talent/public-board'],['Community','/hubs'],['News','/news'],['Pricing','/pricing']];
+const resources=[['Blog','/blog'],['Calculator','/calculator'],['Organisations','/pricing/organization'],['Contact','/contact']];
 export default function PublicHeader({skipTarget='public-content'}:{skipTarget?:string}) {
  const pathname=usePathname();const [open,setOpen]=useState(false);
  useEffect(()=>setOpen(false),[pathname]);

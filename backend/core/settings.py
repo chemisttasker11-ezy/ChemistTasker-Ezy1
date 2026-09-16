@@ -118,6 +118,8 @@ CORS_ALLOW_HEADERS = [
 # Application definition
 INSTALLED_APPS = [
     'public_hub',
+    'marketplace',
+    'ethical_marketplace',
 
     'daphne',
 
@@ -176,8 +178,25 @@ CELERY_TASK_TRACK_STARTED = env.bool("CELERY_TASK_TRACK_STARTED", default=True)
 CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
 CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
 CELERY_ACCEPT_CONTENT = _clean_env_list("CELERY_ACCEPT_CONTENT", default=["json"])
-CELERY_IMPORTS = ("client_profile.calendar_tasks",)
+CELERY_IMPORTS = ("client_profile.calendar_tasks", "marketplace.tasks", "ethical_marketplace.tasks")
 EMAIL_TASK_RATE_LIMIT = env("EMAIL_TASK_RATE_LIMIT", default="30/m")
+
+# Marketplace capabilities are independently reversible. Public reads are safe to
+# enable at deploy; every action still passes object-level policy checks.
+MARKETPLACE_READ_ENABLED = env.bool("MARKETPLACE_READ_ENABLED", default=True)
+MARKETPLACE_NEW_LISTINGS_ENABLED = env.bool("MARKETPLACE_NEW_LISTINGS_ENABLED", default=False)
+MARKETPLACE_CONTACT_ENABLED = env.bool("MARKETPLACE_CONTACT_ENABLED", default=False)
+MARKETPLACE_NEW_COMMITMENTS_ENABLED = env.bool("MARKETPLACE_NEW_COMMITMENTS_ENABLED", default=False)
+MARKETPLACE_ESCALATION_ENABLED = env.bool("MARKETPLACE_ESCALATION_ENABLED", default=False)
+MARKETPLACE_CATALOGUE_LOOKUP_ENABLED = env.bool("MARKETPLACE_CATALOGUE_LOOKUP_ENABLED", default=False)
+MARKETPLACE_ALL_WRITES_ENABLED = env.bool("MARKETPLACE_ALL_WRITES_ENABLED", default=True)
+
+ETHICAL_ACCESS_APPLICATIONS_ENABLED = env.bool("ETHICAL_ACCESS_APPLICATIONS_ENABLED", default=True)
+ETHICAL_PRIVATE_READ_ENABLED = env.bool("ETHICAL_PRIVATE_READ_ENABLED", default=False)
+ETHICAL_INVENTORY_ENABLED = env.bool("ETHICAL_INVENTORY_ENABLED", default=False)
+ETHICAL_NEW_TRANSFERS_ENABLED = env.bool("ETHICAL_NEW_TRANSFERS_ENABLED", default=False)
+ETHICAL_ESCALATION_ENABLED = env.bool("ETHICAL_ESCALATION_ENABLED", default=False)
+ETHICAL_S8_ENABLED = env.bool("ETHICAL_S8_ENABLED", default=False)
 CELERY_TASK_ROUTES = {
     "users.tasks.send_email_task": {"queue": "email"},
     "client_profile.tasks.run_all_verifications": {"queue": "default"},
@@ -274,6 +293,11 @@ REST_FRAMEWORK = {
         'pill_referral_create': '20/hour',
         'pill_referral_claim': '20/hour',
         'pill_payment': '30/hour',
+        'marketplace_enquiry': '20/hour',
+        'marketplace_message': '60/hour',
+        'marketplace_report': '10/hour',
+        'ethical_transfer': '20/hour',
+        'ethical_message': '60/hour',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50

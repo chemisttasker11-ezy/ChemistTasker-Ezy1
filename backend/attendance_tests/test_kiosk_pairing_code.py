@@ -11,6 +11,7 @@ Verifies:
 """
 
 from datetime import date, datetime, time, timedelta
+from concurrent.futures import ThreadPoolExecutor
 import os
 import unittest
 
@@ -19,7 +20,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from django.core.cache import cache
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.utils import timezone
@@ -38,16 +41,23 @@ from client_profile.attendance_credentials import (
 from client_profile.models import (
     KioskDevice,
     KioskPairingAuthorization,
+    Membership,
     Notification,
     OwnerOnboarding,
+    Organization,
     Pharmacy,
     PharmacyAdmin,
 )
 
 PAIRING_SCHEMA_MODELS = (
+    ContentType,
+    Permission,
+    Group,
     User,
+    Organization,
     OwnerOnboarding,
     Pharmacy,
+    Membership,
     PharmacyAdmin,
     KioskDevice,
     KioskPairingAuthorization,
@@ -208,6 +218,25 @@ class KioskPairingCodeTests(unittest.TestCase):
         # Second redemption attempt MUST fail
         with self.assertRaises(ValidationError):
             redeem_kiosk_pairing_code(pairing_code=code)
+
+    def test_simultaneous_redemption_creates_one_device(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("Row-lock concurrency is verified only on PostgreSQL.")
+        code = generate_kiosk_pairing_code(self.owner_user, self.pharmacy)
+
+        def redeem():
+            try:
+                device, _ = redeem_kiosk_pairing_code(pairing_code=code)
+                return ("created", device.id)
+            except ValidationError:
+                return ("consumed", None)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            outcomes = list(executor.map(lambda _: redeem(), range(2)))
+
+        self.assertEqual(sum(result[0] == "created" for result in outcomes), 1)
+        self.assertEqual(sum(result[0] == "consumed" for result in outcomes), 1)
+        self.assertEqual(KioskDevice.objects.count(), 1)
 
     def test_redeem_with_spaces_or_dashes(self):
         """Code entry formats like '849-201' or '849 201' are normalized."""

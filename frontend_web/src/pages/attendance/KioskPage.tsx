@@ -561,13 +561,17 @@ export default function KioskPage() {
           requestedPinAction,
           requestId,
         );
-        await confirmDesktopCaptureReceipt(requestId, local.event.event_id);
         setActionSuccess({
           action: local.action,
           workerName: local.worker_name,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          customMessage: "Recorded locally and queued for secure synchronization.",
+          time: new Date(local.event.captured_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          customMessage: local.recovered
+            ? "Recovered the original local attendance record."
+            : "Recorded locally and queued for secure synchronization.",
         });
+        // Confirmation is delivery bookkeeping. Attendance is already committed
+        // and must not be shown as failed if this response is interrupted.
+        void confirmDesktopCaptureReceipt(requestId, local.event.event_id).catch(() => undefined);
         setPin("");
         setIdentifier("");
         setPinMode(false);

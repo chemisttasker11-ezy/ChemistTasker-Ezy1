@@ -48,6 +48,7 @@ struct LocalEventReceipt {
     device_seq: i64,
     event_hash: String,
     queued: bool,
+    captured_at: String,
 }
 
 #[derive(Serialize)]
@@ -56,6 +57,7 @@ struct OfflinePinReceipt {
     worker_id: i64,
     worker_name: String,
     event: LocalEventReceipt,
+    recovered: bool,
 }
 
 #[derive(Deserialize)]
@@ -164,7 +166,7 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     let database_path = directory.join("kiosk.db");
     let database_key = load_or_initialize_secret("database-key", 32, !database_path.exists())?;
-    let connection = Connection::open(database_path).map_err(|error| error.to_string())?;
+    let mut connection = Connection::open(database_path).map_err(|error| error.to_string())?;
     connection
         .execute_batch(&format!(
             "PRAGMA key = \"x'{}'\"; PRAGMA cipher_memory_security = ON; PRAGMA foreign_keys = ON;",
@@ -250,6 +252,10 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
                 created_at TEXT NOT NULL,
                 completed_at TEXT
             );
+            CREATE TABLE IF NOT EXISTS local_schema_migration (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );
             ",
         )
         .map_err(|error| error.to_string())?;
@@ -269,15 +275,51 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
             [],
         )
         .map_err(|error| error.to_string())?;
-    connection
-        .execute_batch(
-            "DROP INDEX IF EXISTS capture_request_pending_lookup;
-             CREATE UNIQUE INDEX capture_request_pending_lookup
-             ON capture_request(identifier_hash, requested_action)
-             WHERE status IN ('PREPARED', 'COMMITTED');",
+    migrate_local_schema(&mut connection)?;
+    Ok(connection)
+}
+
+fn migrate_local_schema(connection: &mut Connection) -> Result<(), String> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    let applied: bool = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM local_schema_migration WHERE version = 1)",
+            [],
+            |row| row.get(0),
         )
         .map_err(|error| error.to_string())?;
-    Ok(connection)
+    if !applied {
+        // Kiosk 3 had no receipt-confirmed state. Preserve duplicate historical
+        // committed requests as evidence rather than making startup fail.
+        transaction
+            .execute(
+                "UPDATE capture_request SET status = 'LEGACY_COMMITTED'
+                 WHERE status = 'COMMITTED' AND (identifier_hash, requested_action) IN (
+                   SELECT identifier_hash, requested_action FROM capture_request
+                   WHERE status = 'COMMITTED'
+                   GROUP BY identifier_hash, requested_action HAVING COUNT(*) > 1
+                 )",
+                [],
+            )
+            .map_err(|error| error.to_string())?;
+        transaction
+            .execute_batch(
+                "DROP INDEX IF EXISTS capture_request_pending_lookup;
+                 CREATE UNIQUE INDEX capture_request_pending_lookup
+                 ON capture_request(identifier_hash, requested_action)
+                 WHERE status IN ('PREPARED', 'COMMITTED');",
+            )
+            .map_err(|error| error.to_string())?;
+        transaction
+            .execute(
+                "INSERT INTO local_schema_migration(version, applied_at) VALUES (1, ?1)",
+                [Utc::now().to_rfc3339()],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    transaction.commit().map_err(|error| error.to_string())
 }
 
 fn capture_identifier_hash(identifier: &str) -> String {
@@ -304,7 +346,7 @@ async fn prepare_capture_request(
         .query_row(
             "SELECT request_id FROM capture_request
              WHERE identifier_hash = ?1 AND requested_action = ?2
-               AND status IN ('PREPARED', 'COMMITTED')
+               AND status IN ('PREPARED', 'COMMITTED', 'RECEIPT_CONFIRMED')
              ORDER BY created_at DESC LIMIT 1",
             params![hash, requested_action],
             |row| row.get::<_, String>(0),
@@ -333,14 +375,22 @@ fn confirm_capture_receipt(
     event_id: String,
 ) -> Result<(), String> {
     let connection = open_database(&app)?;
-    let changed = connection
-        .execute(
-            "UPDATE capture_request SET status = 'RECEIPT_CONFIRMED'
-             WHERE request_id = ?1 AND event_id = ?2 AND status = 'COMMITTED'",
+    let status: Option<String> = connection
+        .query_row(
+            "SELECT status FROM capture_request WHERE request_id = ?1 AND event_id = ?2",
             params![request_id, event_id],
+            |row| row.get(0),
         )
+        .optional()
         .map_err(|error| error.to_string())?;
-    if changed != 1 {
+    if status.as_deref() == Some("COMMITTED") {
+        connection
+            .execute(
+                "UPDATE capture_request SET status = 'RECEIPT_CONFIRMED' WHERE request_id = ?1",
+                [request_id],
+            )
+            .map_err(|error| error.to_string())?;
+    } else if status.as_deref() != Some("RECEIPT_CONFIRMED") {
         return Err("Capture receipt could not be confirmed".to_string());
     }
     Ok(())
@@ -638,23 +688,25 @@ fn record_attendance_internal(
             "Local request identity conflicts with a different attendance action".to_string(),
         );
     }
-    if let Some((event_id, sequence, payload_json, event_hash, sync_status)) = transaction
-        .query_row(
-            "SELECT event_id, device_seq, payload_json, event_hash, sync_status
+    if let Some((event_id, sequence, payload_json, event_hash, sync_status, captured_at)) =
+        transaction
+            .query_row(
+                "SELECT event_id, device_seq, payload_json, event_hash, sync_status, created_at
              FROM attendance_event WHERE local_request_id = ?1",
-            [&local_request_id],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                ))
-            },
-        )
-        .optional()
-        .map_err(|error| error.to_string())?
+                [&local_request_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|error| error.to_string())?
     {
         let original: Value =
             serde_json::from_str(&payload_json).map_err(|error| error.to_string())?;
@@ -670,6 +722,7 @@ fn record_attendance_internal(
             device_seq: sequence,
             event_hash,
             queued: sync_status == "PENDING",
+            captured_at,
         });
     }
     let sequence: i64 = config_value(&transaction, "device_sequence")?
@@ -701,6 +754,7 @@ fn record_attendance_internal(
             .to_bytes(),
     );
     let event_id = payload["event_id"].as_str().unwrap_or_default().to_string();
+    let captured_at = Utc::now().to_rfc3339();
     transaction
         .execute(
             "INSERT INTO attendance_event
@@ -713,7 +767,7 @@ fn record_attendance_internal(
                 canonical,
                 event_hash,
                 signature,
-                Utc::now().to_rfc3339()
+                captured_at
             ],
         )
         .map_err(|error| error.to_string())?;
@@ -755,6 +809,7 @@ fn record_attendance_internal(
         device_seq: sequence,
         event_hash,
         queued: true,
+        captured_at,
     })
 }
 
@@ -819,7 +874,7 @@ async fn enrol_worker_from_server(
     app: &AppHandle,
     identifier: &str,
     pin: &str,
-) -> Result<(), String> {
+) -> Result<EnrollmentResponse, String> {
     let connection = open_database(app)?;
     let (api_base_url, expected_pharmacy_id): (String, i64) = connection
         .query_row(
@@ -852,15 +907,7 @@ async fn enrol_worker_from_server(
     if enrollment.pharmacy_id != expected_pharmacy_id {
         return Err("Worker enrollment response belongs to a different pharmacy".to_string());
     }
-    store_worker_credential(
-        app,
-        enrollment.worker_id,
-        identifier.to_string(),
-        enrollment.worker_name,
-        pin.to_string(),
-        enrollment.is_clocked_in,
-        enrollment.is_on_break,
-    )
+    Ok(enrollment)
 }
 
 fn record_offline_pin_attendance(
@@ -942,27 +989,35 @@ fn record_offline_pin_attendance(
             "Local request identity conflicts with a different worker or action".to_string(),
         );
     }
-    if let Some((event_id, sequence, event_hash, sync_status, original_employee, original_action)) =
-        connection
-            .query_row(
-                "SELECT e.event_id, e.device_seq, e.event_hash, e.sync_status,
+    if let Some((
+        event_id,
+        sequence,
+        event_hash,
+        sync_status,
+        captured_at,
+        original_employee,
+        original_action,
+    )) = connection
+        .query_row(
+            "SELECT e.event_id, e.device_seq, e.event_hash, e.sync_status, e.created_at,
                         r.employee_id, r.requested_action
                  FROM capture_request r JOIN attendance_event e ON e.event_id = r.event_id
-                 WHERE r.request_id = ?1 AND r.status = 'COMMITTED'",
-                [&local_request_id],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, i64>(4)?,
-                        row.get::<_, String>(5)?,
-                    ))
-                },
-            )
-            .optional()
-            .map_err(|error| error.to_string())?
+                 WHERE r.request_id = ?1 AND r.status IN ('COMMITTED', 'RECEIPT_CONFIRMED')",
+            [&local_request_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| error.to_string())?
     {
         if original_employee != credential.0 || original_action != requested_action {
             return Err(
@@ -985,7 +1040,9 @@ fn record_offline_pin_attendance(
                 device_seq: sequence,
                 event_hash,
                 queued: sync_status == "PENDING",
+                captured_at,
             },
+            recovered: true,
         });
     }
     let local_state: (bool, bool) = connection
@@ -1029,6 +1086,7 @@ fn record_offline_pin_attendance(
         worker_id: credential.0,
         worker_name: credential.1,
         event,
+        recovered: false,
     })
 }
 
@@ -1059,8 +1117,17 @@ async fn capture_pin_attendance(
         Err(error)
             if error.contains("not enrolled for offline use") || error == "Invalid worker PIN" =>
         {
-            enrol_worker_from_server(&app, &identifier, &pin).await?;
+            let enrollment = enrol_worker_from_server(&app, &identifier, &pin).await?;
             let _guard = runtime.capture_lock.lock().await;
+            store_worker_credential(
+                &app,
+                enrollment.worker_id,
+                identifier.clone(),
+                enrollment.worker_name,
+                pin.clone(),
+                enrollment.is_clocked_in,
+                enrollment.is_on_break,
+            )?;
             record_offline_pin_attendance(
                 &app,
                 &runtime,
@@ -1385,4 +1452,49 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running ChemistTasker Kiosk");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_schema_migration_preserves_duplicate_legacy_requests() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE capture_request (
+                    request_id TEXT PRIMARY KEY, identifier_hash TEXT NOT NULL,
+                    requested_action TEXT NOT NULL, status TEXT NOT NULL,
+                    employee_id INTEGER, event_id TEXT, created_at TEXT NOT NULL,
+                    completed_at TEXT
+                );
+                CREATE TABLE local_schema_migration (
+                    version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL
+                );
+                INSERT INTO capture_request VALUES
+                    ('one', 'worker', 'CLOCK_IN', 'COMMITTED', 1, 'event-one', '2026-09-15T00:00:00Z', NULL),
+                    ('two', 'worker', 'CLOCK_IN', 'COMMITTED', 1, 'event-two', '2026-09-16T00:00:00Z', NULL),
+                    ('three', 'worker', 'CLOCK_OUT', 'PREPARED', NULL, NULL, '2026-09-16T00:00:00Z', NULL);",
+            )
+            .unwrap();
+
+        migrate_local_schema(&mut connection).unwrap();
+        let legacy_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM capture_request WHERE status = 'LEGACY_COMMITTED'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(legacy_count, 2);
+        let index_exists: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'capture_request_pending_lookup'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_exists, 1);
+    }
 }
