@@ -1,9 +1,11 @@
 // vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'node:path'
 
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve'
+  const kioskBuild = process.env.VITE_KIOSK_BUILD === '1'
   const apiProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8000'
   const wsProxyTarget = process.env.VITE_DEV_WS_PROXY_TARGET || 'ws://127.0.0.1:8000'
 
@@ -36,9 +38,12 @@ export default defineConfig(({ command }) => {
     },
 
     build: {
-      outDir: 'dist',
+      outDir: kioskBuild ? 'dist-kiosk' : 'dist',
       sourcemap: isDev,
       rollupOptions: {
+        input: kioskBuild
+          ? { kiosk: resolve(__dirname, 'kiosk.html') }
+          : { app: resolve(__dirname, 'index.html') },
         output: {
           assetFileNames: 'dashboard-assets/[name].[hash][extname]',
           chunkFileNames:  'js/[name].[hash].js',

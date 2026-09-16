@@ -4554,8 +4554,11 @@ class KioskAttendanceEvent(models.Model):
     employee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="kiosk_offline_events",
     )
+    submitted_employee_id = models.PositiveBigIntegerField()
     shift_id = models.BigIntegerField(null=True, blank=True)
     event_type = models.CharField(max_length=16, choices=AttendanceEvent.EventType.choices)
     device_timestamp = models.DateTimeField()

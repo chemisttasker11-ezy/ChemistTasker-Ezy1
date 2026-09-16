@@ -182,6 +182,8 @@ def start_break(
         )
         if session is None:
             raise ValidationError("No active open attendance session found for worker.")
+        if device is not None and session.pharmacy_id != device.pharmacy_id:
+            raise ValidationError("Kiosk device does not belong to the active session pharmacy.")
 
         last_event = session.events.order_by("-occurred_at", "-id").first()
         if last_event and last_event.event_type == AttendanceEvent.EventType.BREAK_START:
@@ -216,6 +218,8 @@ def end_break(
         )
         if session is None:
             raise ValidationError("No active open attendance session found for worker.")
+        if device is not None and session.pharmacy_id != device.pharmacy_id:
+            raise ValidationError("Kiosk device does not belong to the active session pharmacy.")
 
         last_event = session.events.order_by("-occurred_at", "-id").first()
         if not last_event or last_event.event_type != AttendanceEvent.EventType.BREAK_START:

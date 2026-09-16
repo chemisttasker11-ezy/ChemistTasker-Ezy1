@@ -13,6 +13,7 @@
     "dev:dashboard": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite",
     "dev:all": "node scripts/dev-all.mjs",
     "kiosk:dev": "node scripts/run-tauri.mjs dev",
+    "build:kiosk-ui": "node scripts/build-kiosk-ui.mjs",
     "kiosk:build": "node scripts/run-tauri.mjs build",
     "install:all": "npm ci && npm ci --prefix landing_next",
     "build:all": "npm run build && npm run build --prefix landing_next"

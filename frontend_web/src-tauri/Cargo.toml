@@ -17,7 +17,7 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 hex = "0.4"
-keyring = "3"
+keyring = { version = "3", features = ["windows-native", "apple-native"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }

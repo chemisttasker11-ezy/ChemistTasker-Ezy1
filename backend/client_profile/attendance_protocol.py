@@ -187,20 +187,26 @@ def ingest_offline_event(device, raw_event):
     if str(payload["device_id"]).lower() != str(device.installation_id).lower():
         raise ValidationError("Event was signed for a different kiosk device.")
 
+    event_hash = calculate_event_hash(payload)
+    if raw_event.get("event_hash") != event_hash:
+        raise ValidationError("Event hash does not match its canonical payload.")
+    _verify_signature(device, event_hash, raw_event.get("signature", ""))
+
     existing = KioskAttendanceEvent.objects.filter(event_id=event_uuid).first()
     if existing:
         if existing.device_id != device.id:
             raise ValidationError("Event identifier is already owned by another kiosk.")
+        if (
+            existing.device_sequence != sequence
+            or existing.event_hash != event_hash
+            or existing.canonical_payload != payload
+        ):
+            raise ValidationError("Event identifier conflicts with different signed content.")
         return existing, "already_received"
 
     sequence_event = KioskAttendanceEvent.objects.filter(device=device, device_sequence=sequence).first()
     if sequence_event:
         raise ValidationError("Device sequence is already occupied by another event.")
-
-    event_hash = calculate_event_hash(payload)
-    if raw_event.get("event_hash") != event_hash:
-        raise ValidationError("Event hash does not match its canonical payload.")
-    _verify_signature(device, event_hash, raw_event.get("signature", ""))
 
     device_time = _parse_aware_datetime(payload["device_timestamp"], "device_timestamp")
     trusted_time = _parse_aware_datetime(
@@ -213,9 +219,7 @@ def ingest_offline_event(device, raw_event):
         raise ValidationError("Unsupported attendance event type.")
 
     User = get_user_model()
-    employee = User.objects.filter(pk=employee_id, is_active=True).first()
-    if employee is None:
-        raise ValidationError("Employee does not exist or is inactive.")
+    employee = User.objects.filter(pk=employee_id).first()
 
     flags = _integrity_flags(
         device,
@@ -235,8 +239,15 @@ def ingest_offline_event(device, raw_event):
         else KioskAttendanceEvent.ProcessingStatus.ACCEPTED
     )
 
+    if employee is None:
+        processing_status = KioskAttendanceEvent.ProcessingStatus.REJECTED
+        rejection_reason = "Employee could not be resolved."
+    elif not employee.is_active:
+        processing_status = KioskAttendanceEvent.ProcessingStatus.REJECTED
+        rejection_reason = "Employee is inactive."
+
     blocking_flags = {"SEQUENCE_GAP", "HASH_CHAIN_MISMATCH", "UNEXPECTED_INITIAL_HASH"}
-    if not blocking_flags.intersection(flags):
+    if employee is not None and employee.is_active and not blocking_flags.intersection(flags):
         try:
             with transaction.atomic():
                 attendance_event = _apply_business_event(
@@ -255,6 +266,7 @@ def ingest_offline_event(device, raw_event):
         device=device,
         device_sequence=sequence,
         employee=employee,
+        submitted_employee_id=employee_id,
         shift_id=payload["shift_id"],
         event_type=event_type,
         device_timestamp=device_time,
@@ -297,6 +309,7 @@ def sync_offline_batch(device, events, *, app_version=""):
             results.append({
                 "event_id": str(stored.event_id),
                 "device_seq": stored.device_sequence,
+                "event_hash": stored.event_hash,
                 "result": result,
                 "integrity_flags": stored.integrity_flags,
                 "reason": stored.rejection_reason or None,
@@ -306,6 +319,7 @@ def sync_offline_batch(device, events, *, app_version=""):
             results.append({
                 "event_id": str(raw_summary.get("event_id", "")),
                 "device_seq": raw_summary.get("device_seq"),
+                "event_hash": raw_summary.get("event_hash"),
                 "result": "rejected",
                 "integrity_flags": [],
                 "reason": "; ".join(exc.messages),

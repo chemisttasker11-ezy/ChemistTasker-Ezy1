@@ -7,6 +7,13 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def populate_kiosk_installation_ids(apps, schema_editor):
+    KioskDevice = apps.get_model("client_profile", "KioskDevice")
+    for row in KioskDevice.objects.all():
+        row.installation_id = uuid.uuid4()
+        row.save(update_fields=["installation_id"])
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("client_profile", "0045_roster_slot_ownership"),
@@ -15,6 +22,12 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
+            model_name="kioskdevice",
+            name="installation_id",
+            field=models.UUIDField(default=uuid.uuid4, editable=False, null=True),
+        ),
+        migrations.RunPython(populate_kiosk_installation_ids, migrations.RunPython.noop),
+        migrations.AlterField(
             model_name="kioskdevice",
             name="installation_id",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),

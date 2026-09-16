@@ -18,6 +18,7 @@ Provides the secure credential and physical-presence verification layer:
 """
 
 from datetime import datetime, timedelta
+import base64
 import hashlib
 import secrets
 from typing import Optional, Tuple
@@ -29,6 +30,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.utils import timezone
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from client_profile.models import (
     Chain,
@@ -43,6 +45,22 @@ from client_profile.models import (
 
 QR_SALT = "chemisttasker_attendance_kiosk_qr"
 DEVICE_TOKEN_PREFIX = "ctk_kiosk_"
+
+
+def _validate_kiosk_public_key(public_signing_key: str, *, required: bool = False) -> str:
+    encoded = str(public_signing_key or "").strip()
+    if not encoded:
+        if required:
+            raise ValidationError("A device public signing key is required.")
+        return ""
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+        if len(decoded) != 32:
+            raise ValueError
+        Ed25519PublicKey.from_public_bytes(decoded)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Device public signing key is invalid.") from exc
+    return encoded
 
 
 def hash_kiosk_token(raw_token: str) -> str:
@@ -118,7 +136,7 @@ def activate_kiosk_device(
     device = KioskDevice.objects.create(
         pharmacy=pharmacy,
         device_name=str(device_name).strip(),
-        public_signing_key=str(public_signing_key or "").strip(),
+        public_signing_key=_validate_kiosk_public_key(public_signing_key),
         platform=str(platform or "")[:24],
         app_version=str(app_version or "")[:40],
         device_token=token_hash,
@@ -182,9 +200,6 @@ def generate_kiosk_pairing_code(
     if not is_authorized_kiosk_manager(user, pharmacy):
         raise PermissionDenied("Only the pharmacy owner or manager can request a kiosk pairing code.")
 
-    # Generate cryptographically secure 6-digit code (100000 - 999999)
-    code = f"{secrets.randbelow(900000) + 100000}"
-
     payload = {
         "pharmacy_id": pharmacy.id,
         "pharmacy_name": pharmacy.name,
@@ -193,7 +208,17 @@ def generate_kiosk_pairing_code(
         "created_at": timezone.now().isoformat(),
     }
 
-    cache.set(f"{KIOSK_PAIR_CACHE_PREFIX}{code}", payload, timeout=ttl_seconds)
+    # Reserve a collision-free code instead of overwriting another live authorization.
+    for _ in range(20):
+        code = f"{secrets.randbelow(900000) + 100000}"
+        if cache.add(
+            f"{KIOSK_PAIR_CACHE_PREFIX}{code}",
+            payload,
+            timeout=ttl_seconds,
+        ):
+            break
+    else:
+        raise ValidationError("Unable to reserve a pairing code. Please try again.")
 
     # Dispatch notification to the user (triggers Expo push + WebSocket + DB in-app notification)
     try:
@@ -241,6 +266,8 @@ def redeem_kiosk_pairing_code(
     code = str(pairing_code).strip().replace(" ", "").replace("-", "")
     if len(code) != 6 or not code.isdigit():
         raise ValidationError("Pairing code must be a 6-digit number.")
+
+    public_signing_key = _validate_kiosk_public_key(public_signing_key, required=True)
 
     cache_key = f"{KIOSK_PAIR_CACHE_PREFIX}{code}"
     payload = cache.get(cache_key)

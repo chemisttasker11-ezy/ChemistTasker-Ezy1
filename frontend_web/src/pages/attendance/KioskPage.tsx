@@ -44,25 +44,24 @@ import { API_BASE_URL } from "../../constants/api";
 import { csrfToken } from "../../../landing_next/shared/browser-session";
 import { clearTokens, getAccessToken } from "../../utils/tokenService";
 import {
-  generateDesktopChallenge,
   getDesktopKioskStatus,
   isDesktopKiosk,
   pairDesktopKiosk,
-  enrolDesktopWorker,
-  recordDesktopOfflinePin,
+  captureDesktopPinAttendance,
 } from "../../kiosk/desktopBridge";
 
 const kioskClient = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true,
+  withCredentials: !isDesktopKiosk(),
 });
 
 kioskClient.interceptors.request.use(async (config) => {
-  config.withCredentials = true;
-  const token = getAccessToken();
+  const desktop = isDesktopKiosk();
+  config.withCredentials = !desktop;
+  const token = desktop ? null : getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  } else if (!["get", "head", "options"].includes((config.method || "get").toLowerCase())) {
+  } else if (!desktop && !["get", "head", "options"].includes((config.method || "get").toLowerCase())) {
     config.headers["X-CSRFToken"] = await csrfToken(API_BASE_URL);
   }
   return config;
@@ -85,6 +84,8 @@ export default function KioskPage() {
   // Activation modal state
   const [activationPharmacyId, setActivationPharmacyId] = useState("");
   const [activationDeviceName, setActivationDeviceName] = useState("Front Counter Tablet");
+  const [dashboardPin, setDashboardPin] = useState("");
+  const [dashboardPinConfirm, setDashboardPinConfirm] = useState("");
   const [activationError, setActivationError] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
@@ -110,6 +111,9 @@ export default function KioskPage() {
   const [pinSubmitting, setPinSubmitting] = useState<boolean>(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinLocked, setPinLocked] = useState<boolean>(false);
+  const [requestedPinAction, setRequestedPinAction] = useState<
+    "CLOCK_IN" | "CLOCK_OUT" | "BREAK_START" | "BREAK_END"
+  >("CLOCK_IN");
 
   // First-time PIN setup state
   const [setupStep, setSetupStep] = useState<"IDLE" | "SETUP_REQUIRED">("IDLE");
@@ -189,18 +193,14 @@ export default function KioskPage() {
   // Fetch rotating QR from server (30s TTL)
   const fetchQR = useCallback(async () => {
     if (!deviceToken || isFetchingRef.current) return;
+    if (desktopRuntime) {
+      setQrLoading(false);
+      return;
+    }
     try {
       isFetchingRef.current = true;
       setQrLoading(true);
       setQrError(null);
-      if (desktopRuntime) {
-        const challenge = await generateDesktopChallenge();
-        setQrToken(JSON.stringify(challenge));
-        setExpiresAt(challenge.payload.expires_at);
-        const expiry = new Date(challenge.payload.expires_at).getTime();
-        setCountdownSeconds(Math.max(0, Math.min(60, Math.round((expiry - Date.now()) / 1000))));
-        return;
-      }
       const res = await kioskClient.post(
         "/client-profile/attendance/kiosk/qr/",
         {},
@@ -305,11 +305,16 @@ export default function KioskPage() {
     setActivationError(null);
     try {
       if (desktopRuntime) {
+        if (dashboardPin.length < 6 || dashboardPin !== dashboardPinConfirm) {
+          setActivationError("Create and confirm a matching 6-digit Dashboard Access PIN.");
+          return;
+        }
         const status = await pairDesktopKiosk({
           pairingCode: cleanedCode,
           deviceName: activationDeviceName,
           apiBaseUrl: API_BASE_URL,
           appVersion: "0.1.0",
+          dashboardPin,
         });
         setDeviceToken("tauri-secure-device");
         setPharmacyName(status.pharmacy_name || "Pharmacy Counter");
@@ -425,6 +430,11 @@ export default function KioskPage() {
       return;
     }
 
+    if (desktopRuntime) {
+      setPinError("Set up or reset your attendance PIN in the ChemistTasker mobile app, then return to this kiosk.");
+      return;
+    }
+
     setSetupLoading(true);
     setPinError(null);
     try {
@@ -460,6 +470,10 @@ export default function KioskPage() {
 
   // Submit OTP + New PIN to set PIN and immediately clock in
   const handleCompletePinSetup = async () => {
+    if (desktopRuntime) {
+      setPinError("PIN setup is unavailable inside the desktop kiosk. Use the ChemistTasker mobile app.");
+      return;
+    }
     if (!setupOtp.trim() || setupOtp.trim().length !== 6) {
       setPinError("Please enter the 6-digit verification code sent to your email.");
       return;
@@ -492,15 +506,6 @@ export default function KioskPage() {
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         isProvisional: res.data.is_provisional || false,
       });
-
-      if (desktopRuntime) {
-        void enrolDesktopWorker({
-          employeeId: Number(res.data.worker_id),
-          identifier: identifier.trim(),
-          displayName: res.data.worker_name || setupWorkerName,
-          pin: setupNewPin,
-        }).catch((error) => console.warn("Could not enrol worker for offline kiosk use", error));
-      }
 
       // Reset setup state
       setSetupStep("IDLE");
@@ -543,6 +548,25 @@ export default function KioskPage() {
     setPinError(null);
 
     try {
+      if (desktopRuntime) {
+        const local = await captureDesktopPinAttendance(
+          identifier.trim(),
+          pin,
+          requestedPinAction,
+          crypto.randomUUID(),
+        );
+        setActionSuccess({
+          action: local.action,
+          workerName: local.worker_name,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          customMessage: "Recorded locally and queued for secure synchronization.",
+        });
+        setPin("");
+        setIdentifier("");
+        setPinMode(false);
+        return;
+      }
+
       const res = await kioskClient.post(
         "/client-profile/attendance/kiosk/pin-clock/",
         {
@@ -559,40 +583,15 @@ export default function KioskPage() {
         isProvisional: res.data.is_provisional,
       });
 
-      if (desktopRuntime) {
-        void enrolDesktopWorker({
-          employeeId: Number(res.data.worker_id),
-          identifier: identifier.trim(),
-          displayName: res.data.worker_name,
-          pin,
-        }).catch((error) => console.warn("Could not enrol worker for offline kiosk use", error));
-      }
-
       // Clear input
       setPin("");
       setIdentifier("");
       setPinMode(false);
     } catch (err: any) {
-      if (desktopRuntime && !err.response) {
-        try {
-          const offline = await recordDesktopOfflinePin(identifier.trim(), pin);
-          setActionSuccess({
-            action: offline.action,
-            workerName: offline.worker_name,
-            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            customMessage: "Saved securely on this kiosk and queued for sync.",
-          });
-          setPin("");
-          setIdentifier("");
-          setPinMode(false);
-          return;
-        } catch (offlineError) {
-          setPinError(String(offlineError));
-          return;
-        }
-      }
       const isLock = err.response?.data?.locked || false;
-      const msg = err.response?.data?.error || "Invalid PIN or staff member not found.";
+      const msg = desktopRuntime
+        ? String(err)
+        : err.response?.data?.error || "Invalid PIN or staff member not found.";
       setPinError(msg);
       setPinLocked(isLock);
     } finally {
@@ -788,11 +787,32 @@ export default function KioskPage() {
                     }}
                   />
 
+                  {desktopRuntime && (
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                      <TextField
+                        label="Dashboard Access PIN"
+                        type="password"
+                        value={dashboardPin}
+                        onChange={(event) => setDashboardPin(event.target.value.replace(/[^0-9]/g, "").slice(0, 12))}
+                        inputProps={{ inputMode: "numeric" }}
+                        fullWidth
+                      />
+                      <TextField
+                        label="Confirm Dashboard PIN"
+                        type="password"
+                        value={dashboardPinConfirm}
+                        onChange={(event) => setDashboardPinConfirm(event.target.value.replace(/[^0-9]/g, "").slice(0, 12))}
+                        inputProps={{ inputMode: "numeric" }}
+                        fullWidth
+                      />
+                    </Stack>
+                  )}
+
                   <Button
                     variant="contained"
                     size="large"
                     onClick={handlePairWithCode}
-                    disabled={isActivating || pairingCode.length < 6}
+                    disabled={isActivating || pairingCode.length < 6 || (desktopRuntime && (dashboardPin.length < 6 || dashboardPin !== dashboardPinConfirm))}
                     sx={{
                       height: 50,
                       fontWeight: 700,
@@ -833,7 +853,7 @@ export default function KioskPage() {
                       </Box>
                     </Stack>
 
-                    {!showRequestCodeBox ? (
+                    {!desktopRuntime && (!showRequestCodeBox ? (
                       <Button
                         size="small"
                         onClick={() => setShowRequestCodeBox(true)}
@@ -871,10 +891,10 @@ export default function KioskPage() {
                           {isRequestingCode ? <CircularProgress size={16} color="inherit" /> : "Send Code Notification to Owner Phone"}
                         </Button>
                       </Stack>
-                    )}
+                    ))}
                   </Paper>
 
-                  <Button
+                  {!desktopRuntime && <Button
                     size="small"
                     onClick={() => {
                       setPairingMode("LEGACY");
@@ -883,7 +903,7 @@ export default function KioskPage() {
                     sx={{ color: "#64748b", textTransform: "none", fontSize: 13 }}
                   >
                     Advanced: Set up with Pharmacy ID & Login
-                  </Button>
+                  </Button>}
                 </Stack>
               ) : (
                 /* Fallback Mode: Direct Pharmacy ID + Login */
@@ -1141,6 +1161,7 @@ export default function KioskPage() {
 
         <Grid container spacing={3} sx={{ maxWidth: 1040, alignItems: "center" }}>
           {/* Quick Staff Break Bar */}
+          {!desktopRuntime && (
           <Grid size={{ xs: 12 }}>
             <Paper
               elevation={4}
@@ -1247,8 +1268,10 @@ export default function KioskPage() {
               </Stack>
             </Paper>
           </Grid>
+          )}
 
-          {/* Left: Dynamic QR Terminal */}
+          {/* Legacy web QR remains available; desktop QR stays hidden until its return path is complete. */}
+          {!desktopRuntime && (
           <Grid size={{ xs: 12, md: 6 }}>
             <Paper
               elevation={8}
@@ -1353,9 +1376,10 @@ export default function KioskPage() {
               )}
             </Paper>
           </Grid>
+          )}
 
           {/* Right: Personal PIN Pad */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: desktopRuntime ? 12 : 6 }}>
             <Paper
               elevation={8}
               sx={{
@@ -1852,6 +1876,53 @@ export default function KioskPage() {
                     }}
                   />
 
+                  {desktopRuntime && (
+                    <Grid container spacing={1.2}>
+                      <Grid size={{ xs: 6 }}>
+                      <Button
+                        fullWidth
+                        variant={requestedPinAction === "CLOCK_IN" ? "contained" : "outlined"}
+                        onClick={() => setRequestedPinAction("CLOCK_IN")}
+                        disabled={pinSubmitting}
+                        color="success"
+                      >
+                        Clock In
+                      </Button>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                      <Button
+                        fullWidth
+                        variant={requestedPinAction === "CLOCK_OUT" ? "contained" : "outlined"}
+                        onClick={() => setRequestedPinAction("CLOCK_OUT")}
+                        disabled={pinSubmitting}
+                        color="warning"
+                      >
+                        Clock Out
+                      </Button>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Button
+                          fullWidth
+                          variant={requestedPinAction === "BREAK_START" ? "contained" : "outlined"}
+                          onClick={() => setRequestedPinAction("BREAK_START")}
+                          disabled={pinSubmitting}
+                        >
+                          Start Break
+                        </Button>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Button
+                          fullWidth
+                          variant={requestedPinAction === "BREAK_END" ? "contained" : "outlined"}
+                          onClick={() => setRequestedPinAction("BREAK_END")}
+                          disabled={pinSubmitting}
+                        >
+                          End Break
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  )}
+
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 0.5 }}>
                     <Typography variant="body2" sx={{ color: "#e2e8f0", fontSize: 13, fontWeight: 500 }}>
                       First time or forgot PIN?
@@ -2036,7 +2107,17 @@ export default function KioskPage() {
                       },
                     }}
                   >
-                    {pinSubmitting ? <CircularProgress size={24} sx={{ color: "#ffffff" }} /> : "Confirm Clock In / Out"}
+                    {pinSubmitting
+                      ? <CircularProgress size={24} sx={{ color: "#ffffff" }} />
+                      : desktopRuntime
+                        ? `Confirm ${requestedPinAction === "CLOCK_IN"
+                          ? "Clock In"
+                          : requestedPinAction === "CLOCK_OUT"
+                            ? "Clock Out"
+                            : requestedPinAction === "BREAK_START"
+                              ? "Start Break"
+                              : "End Break"}`
+                        : "Confirm Clock In / Out"}
                   </Button>
                 </Stack>
               )}

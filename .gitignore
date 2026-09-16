@@ -54,6 +54,7 @@ backend/content-test.sqlite3
 # ─── Frontend (Vite / Node) ────────────────────────────────────────
 node_modules/
 dist/
+dist-kiosk/
 build/
 
 # Local env for frontend

@@ -14,11 +14,20 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 
 from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
-from client_profile.attendance_credentials import activate_kiosk_device, revoke_kiosk_device
-from client_profile.attendance_protocol import calculate_event_hash, sync_offline_batch
+from client_profile.attendance_credentials import (
+    activate_kiosk_device,
+    revoke_kiosk_device,
+    set_worker_personal_code,
+)
+from client_profile.attendance_protocol import (
+    calculate_event_hash,
+    canonical_event_payload,
+    sync_offline_batch,
+)
+from client_profile.attendance_views import KioskWorkerEnrolView
 from client_profile.models import (
     AttendanceEvent,
     AttendanceSession,
@@ -60,7 +69,7 @@ class KioskOfflineProtocolTests(unittest.TestCase):
             organization=organization,
             timezone="Australia/Brisbane",
         )
-        Membership.objects.create(
+        self.membership = Membership.objects.create(
             user=self.worker,
             pharmacy=self.pharmacy,
             role="PHARMACIST",
@@ -135,6 +144,72 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertFalse(KioskAttendanceEvent.objects.exists())
         self.assertFalse(AttendanceSession.objects.exists())
 
+    def test_same_event_id_with_different_signed_content_is_rejected(self):
+        original = self.signed_event()
+        sync_offline_batch(self.device, [original])
+        conflicting = self.signed_event(sequence=2, previous_hash=original["event_hash"])
+        conflicting["event_id"] = original["event_id"]
+        conflicting_hash = calculate_event_hash(canonical_event_payload(conflicting))
+        conflicting["event_hash"] = conflicting_hash
+        conflicting["signature"] = base64.b64encode(
+            self.private_key.sign(conflicting_hash.encode("ascii"))
+        ).decode("ascii")
+
+        result = sync_offline_batch(self.device, [conflicting])
+
+        self.assertEqual(result["results"][0]["result"], "rejected")
+        self.assertIn("conflicts", result["results"][0]["reason"])
+        self.assertEqual(KioskAttendanceEvent.objects.count(), 1)
+
+    def test_worker_enrollment_verifies_pin_without_clocking_attendance(self):
+        set_worker_personal_code(self.owner, self.membership, "2468")
+
+        request = APIRequestFactory().post(
+            "/attendance/kiosk/workers/enrol/",
+            {"identifier": self.worker.email, "pin": "2468"},
+            format="json",
+            HTTP_X_DEVICE_TOKEN=self.raw_token,
+        )
+        response = KioskWorkerEnrolView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["worker_id"], self.worker.id)
+        self.assertFalse(response.data["is_clocked_in"])
+        self.assertFalse(AttendanceSession.objects.exists())
+
+    def test_break_from_kiosk_at_different_pharmacy_is_rejected(self):
+        clock_in = self.signed_event()
+        sync_offline_batch(self.device, [clock_in])
+        other_pharmacy = Pharmacy.objects.create(
+            name="Other Pharmacy",
+            owner=self.pharmacy.owner,
+            organization=self.pharmacy.organization,
+            timezone="Australia/Brisbane",
+        )
+        other_key = Ed25519PrivateKey.generate()
+        other_public = other_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        other_device, _ = activate_kiosk_device(
+            self.owner,
+            other_pharmacy,
+            "Other Counter",
+            public_signing_key=base64.b64encode(other_public).decode("ascii"),
+        )
+        event = self.signed_event(event_type="BREAK_START")
+        event["device_id"] = str(other_device.installation_id)
+        event_hash = calculate_event_hash(canonical_event_payload(event))
+        event["event_hash"] = event_hash
+        event["signature"] = base64.b64encode(
+            other_key.sign(event_hash.encode("ascii"))
+        ).decode("ascii")
+
+        result = sync_offline_batch(other_device, [event])
+
+        self.assertEqual(result["results"][0]["result"], "rejected")
+        self.assertIn("active session pharmacy", result["results"][0]["reason"])
+
     def test_sequence_gap_is_retained_for_review_without_advancing_ack(self):
         event = self.signed_event(sequence=2, previous_hash="missing")
 
@@ -144,6 +219,19 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertEqual(result["acknowledged_through"], 0)
         stored = KioskAttendanceEvent.objects.get()
         self.assertIn("SEQUENCE_GAP", stored.integrity_flags)
+        self.assertIsNone(stored.attendance_event)
+
+    def test_valid_event_for_inactive_worker_is_preserved_as_rejected_evidence(self):
+        self.worker.is_active = False
+        self.worker.save(update_fields=["is_active"])
+        event = self.signed_event()
+
+        result = sync_offline_batch(self.device, [event])
+
+        self.assertEqual(result["results"][0]["result"], "rejected")
+        stored = KioskAttendanceEvent.objects.get()
+        self.assertEqual(stored.submitted_employee_id, self.worker.id)
+        self.assertEqual(stored.employee_id, self.worker.id)
         self.assertIsNone(stored.attendance_event)
 
     def test_revoked_device_cannot_use_batch_endpoint(self):

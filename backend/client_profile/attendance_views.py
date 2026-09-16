@@ -277,6 +277,84 @@ class KioskOfflineSyncView(APIView):
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class KioskConfigView(APIView):
+    """Return restricted device policy and a fresh server-time anchor."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            now = timezone.now()
+            device.last_seen_at = now
+            device.save(update_fields=["last_seen_at"])
+            return Response({
+                "device_id": str(device.installation_id),
+                "pharmacy_id": device.pharmacy_id,
+                "server_time": now.isoformat(),
+                "max_offline_hours": 24,
+            })
+        except (DjangoPermissionDenied, PermissionDenied) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class KioskWorkerEnrolView(APIView):
+    """Verify an established worker PIN without creating attendance."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [KioskPINRateThrottle]
+
+    def post(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            identifier = request.data.get("identifier")
+            pin = request.data.get("pin")
+            if not identifier or not pin:
+                return Response(
+                    {"error": "identifier and pin are required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            is_valid, membership, reason = verify_kiosk_worker_pin(
+                kiosk_device=device,
+                user_identifier=identifier,
+                raw_pin=pin,
+            )
+            if not is_valid or membership is None:
+                if reason == "PIN_LOCKED":
+                    return Response(
+                        {"error": "Worker PIN is temporarily locked.", "locked": True},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                return Response(
+                    {"error": "Invalid worker identifier or PIN.", "locked": False},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            worker = membership.user
+            active_session = get_active_session_status(worker)
+            if active_session and active_session["pharmacy_id"] != device.pharmacy_id:
+                return Response(
+                    {"error": "Worker has an active attendance session at another pharmacy."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return Response({
+                "worker_id": worker.id,
+                "worker_name": worker.get_full_name() or worker.username,
+                "pharmacy_id": device.pharmacy_id,
+                "is_clocked_in": active_session is not None,
+                "is_on_break": bool(active_session and active_session["is_on_break"]),
+                "verified_at": timezone.now().isoformat(),
+            })
+        except (DjangoPermissionDenied, PermissionDenied) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+        except DjangoValidationError as exc:
+            message = "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class KioskQRView(APIView):
     """
     POST /api/attendance/kiosk/qr/

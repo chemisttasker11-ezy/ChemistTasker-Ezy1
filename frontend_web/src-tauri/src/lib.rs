@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeMap,
     fs,
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
@@ -11,7 +12,7 @@ use argon2::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use ed25519_dalek::{Signer, SigningKey};
-use keyring::Entry;
+use keyring::{Entry, Error as KeyringError};
 use rand_core::{OsRng, RngCore};
 use reqwest::StatusCode;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -23,6 +24,7 @@ use uuid::Uuid;
 
 const KEYRING_SERVICE: &str = "com.chemisttasker.kiosk";
 const PROTOCOL_VERSION: i64 = 1;
+static SECRET_INIT_LOCK: Mutex<()> = Mutex::new(());
 
 struct RuntimeState {
     boot_session_id: String,
@@ -63,32 +65,90 @@ struct PairResponse {
     pharmacy_name: String,
 }
 
+#[derive(Deserialize)]
+struct EnrollmentResponse {
+    worker_id: i64,
+    worker_name: String,
+    pharmacy_id: i64,
+    is_clocked_in: bool,
+    is_on_break: bool,
+}
+
+#[derive(Deserialize)]
+struct ConfigResponse {
+    device_id: String,
+    server_time: String,
+}
+
 #[derive(Deserialize, Serialize)]
 struct SyncResponse {
+    device_id: String,
     acknowledged_through: i64,
     server_time: String,
     results: Vec<Value>,
 }
 
 fn keyring_entry(account: &str) -> Result<Entry, String> {
-    Entry::new(KEYRING_SERVICE, account).map_err(|error| error.to_string())
+    let environment = if cfg!(debug_assertions) {
+        "development"
+    } else {
+        "production"
+    };
+    Entry::new(KEYRING_SERVICE, &format!("{environment}:{account}"))
+        .map_err(|error| error.to_string())
 }
 
-fn secret_or_create(account: &str, bytes: usize) -> Result<Vec<u8>, String> {
+fn load_secret(account: &str) -> Result<Option<Vec<u8>>, String> {
     let entry = keyring_entry(account)?;
-    if let Ok(encoded) = entry.get_password() {
-        return BASE64.decode(encoded).map_err(|error| error.to_string());
+    match entry.get_password() {
+        Ok(encoded) => BASE64
+            .decode(encoded)
+            .map(Some)
+            .map_err(|error| format!("Stored {account} is corrupt: {error}")),
+        Err(KeyringError::NoEntry) => Ok(None),
+        Err(error) => Err(format!(
+            "Secure storage is unavailable for {account}: {error}"
+        )),
+    }
+}
+
+fn load_or_initialize_secret(
+    account: &str,
+    bytes: usize,
+    may_initialize: bool,
+) -> Result<Vec<u8>, String> {
+    let _guard = SECRET_INIT_LOCK
+        .lock()
+        .map_err(|_| "Secure-storage initialization lock is poisoned".to_string())?;
+    if let Some(secret) = load_secret(account)? {
+        return Ok(secret);
+    }
+    if !may_initialize {
+        return Err(format!(
+            "RECOVERY_REQUIRED: {account} is missing for existing kiosk data"
+        ));
     }
     let mut secret = vec![0_u8; bytes];
     OsRng.fill_bytes(&mut secret);
-    entry
+    keyring_entry(account)?
         .set_password(&BASE64.encode(&secret))
         .map_err(|error| error.to_string())?;
     Ok(secret)
 }
 
-fn signing_key() -> Result<SigningKey, String> {
-    let bytes = secret_or_create("device-signing-key", 32)?;
+fn table_has_rows(connection: &Connection, table: &str) -> Result<bool, String> {
+    connection
+        .query_row(
+            &format!("SELECT EXISTS(SELECT 1 FROM {table} LIMIT 1)"),
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+fn signing_key(connection: &Connection) -> Result<SigningKey, String> {
+    let may_initialize = !table_has_rows(connection, "device_config")?;
+    let bytes = load_or_initialize_secret("device-signing-key", 32, may_initialize)?;
     let seed: [u8; 32] = bytes
         .try_into()
         .map_err(|_| "Stored signing key has an invalid length".to_string())?;
@@ -101,15 +161,26 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
         .app_data_dir()
         .map_err(|error| error.to_string())?;
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-    let database_key = secret_or_create("database-key", 32)?;
-    let connection =
-        Connection::open(directory.join("kiosk.db")).map_err(|error| error.to_string())?;
+    let database_path = directory.join("kiosk.db");
+    let database_key = load_or_initialize_secret("database-key", 32, !database_path.exists())?;
+    let connection = Connection::open(database_path).map_err(|error| error.to_string())?;
     connection
         .execute_batch(&format!(
             "PRAGMA key = \"x'{}'\"; PRAGMA cipher_memory_security = ON; PRAGMA foreign_keys = ON;",
             hex::encode(database_key)
         ))
         .map_err(|error| error.to_string())?;
+    let cipher_version: String = connection
+        .query_row("PRAGMA cipher_version", [], |row| row.get(0))
+        .map_err(|error| format!("SQLCipher is required but unavailable: {error}"))?;
+    if cipher_version.trim().is_empty() {
+        return Err("SQLCipher is required but reported no version".to_string());
+    }
+    connection
+        .query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .map_err(|error| format!("Encrypted kiosk database could not be opened: {error}"))?;
     connection
         .execute_batch(
             "
@@ -127,6 +198,7 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
             );
             CREATE TABLE IF NOT EXISTS attendance_event (
                 event_id TEXT PRIMARY KEY,
+                local_request_id TEXT,
                 device_seq INTEGER NOT NULL UNIQUE,
                 payload_json TEXT NOT NULL,
                 event_hash TEXT NOT NULL,
@@ -136,6 +208,8 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
             );
             CREATE TABLE IF NOT EXISTS sync_receipt (
                 device_seq INTEGER PRIMARY KEY,
+                event_id TEXT,
+                result_json TEXT,
                 acknowledged_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS clock_anchor (
@@ -162,12 +236,55 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
             CREATE TABLE IF NOT EXISTS worker_local_state (
                 employee_id INTEGER PRIMARY KEY,
                 is_clocked_in INTEGER NOT NULL DEFAULT 0,
+                is_on_break INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL
             );
             ",
         )
         .map_err(|error| error.to_string())?;
+    ensure_column(&connection, "sync_receipt", "event_id", "TEXT")?;
+    ensure_column(&connection, "sync_receipt", "result_json", "TEXT")?;
+    ensure_column(&connection, "attendance_event", "local_request_id", "TEXT")?;
+    ensure_column(
+        &connection,
+        "worker_local_state",
+        "is_on_break",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    connection
+        .execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS attendance_event_local_request
+             ON attendance_event(local_request_id) WHERE local_request_id IS NOT NULL",
+            [],
+        )
+        .map_err(|error| error.to_string())?;
     Ok(connection)
+}
+
+fn ensure_column(
+    connection: &Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<(), String> {
+    let mut statement = connection
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|error| error.to_string())?;
+    let names = statement
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|error| error.to_string())?;
+    for name in names {
+        if name.map_err(|error| error.to_string())? == column {
+            return Ok(());
+        }
+    }
+    connection
+        .execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+            [],
+        )
+        .map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 fn config_value(connection: &Connection, key: &str) -> Result<Option<String>, String> {
@@ -210,6 +327,28 @@ fn canonical_json(value: Value) -> Result<String, String> {
     serde_json::to_string(&sorted_json(value)).map_err(|error| error.to_string())
 }
 
+fn validated_api_base_url(value: &str) -> Result<String, String> {
+    let parsed = reqwest::Url::parse(value).map_err(|_| "Kiosk API URL is invalid".to_string())?;
+    let local_development = parsed.scheme() == "http"
+        && matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "::1"));
+    if parsed.scheme() != "https" && !local_development {
+        return Err("Kiosk API must use HTTPS outside local development".to_string());
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err("Kiosk API URL must not contain credentials".to_string());
+    }
+    Ok(value.trim_end_matches('/').to_string())
+}
+
+fn restricted_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|error| error.to_string())
+}
+
 fn device_identity_from(connection: &Connection) -> Result<DeviceIdentity, String> {
     let config: Option<(String, i64, String)> = connection
         .query_row(
@@ -219,7 +358,7 @@ fn device_identity_from(connection: &Connection) -> Result<DeviceIdentity, Strin
         )
         .optional()
         .map_err(|error| error.to_string())?;
-    let public_key = BASE64.encode(signing_key()?.verifying_key().as_bytes());
+    let public_key = BASE64.encode(signing_key(connection)?.verifying_key().as_bytes());
     Ok(match config {
         Some((installation_id, pharmacy_id, pharmacy_name)) => DeviceIdentity {
             public_signing_key: public_key,
@@ -251,13 +390,32 @@ async fn pair_device(
     device_name: String,
     api_base_url: String,
     app_version: String,
+    dashboard_pin: String,
 ) -> Result<DeviceIdentity, String> {
-    let public_signing_key = BASE64.encode(signing_key()?.verifying_key().as_bytes());
+    if dashboard_pin.len() < 6
+        || !dashboard_pin
+            .chars()
+            .all(|character| character.is_ascii_digit())
+    {
+        return Err("Dashboard PIN must contain at least six digits".to_string());
+    }
+    let api_base_url = validated_api_base_url(&api_base_url)?;
+    let mut connection = open_database(&app)?;
+    let public_signing_key = BASE64.encode(signing_key(&connection)?.verifying_key().as_bytes());
+    if table_has_rows(&connection, "dashboard_guard")? {
+        return Err("Dashboard PIN is already configured for this installation".to_string());
+    }
+    let pepper = BASE64.encode(load_or_initialize_secret("dashboard-pin-pepper", 32, true)?);
+    let salt = SaltString::generate(&mut OsRng);
+    let dashboard_hash = Argon2::default()
+        .hash_password(format!("{dashboard_pin}{pepper}").as_bytes(), &salt)
+        .map_err(|error| error.to_string())?
+        .to_string();
     let url = format!(
         "{}/client-profile/attendance/kiosk/pairing/pair/",
-        api_base_url.trim_end_matches('/')
+        api_base_url
     );
-    let response = reqwest::Client::new()
+    let response = restricted_http_client()?
         .post(url)
         .json(&json!({
             "pairing_code": pairing_code,
@@ -279,8 +437,10 @@ async fn pair_device(
     keyring_entry("device-token")?
         .set_password(&paired.device_token)
         .map_err(|error| error.to_string())?;
-    let connection = open_database(&app)?;
-    connection
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    transaction
         .execute(
             "INSERT OR REPLACE INTO device_config
              (singleton, installation_id, pharmacy_id, pharmacy_name, api_base_url, app_version)
@@ -289,11 +449,19 @@ async fn pair_device(
                 paired.installation_id,
                 paired.pharmacy_id,
                 paired.pharmacy_name,
-                api_base_url.trim_end_matches('/'),
+                api_base_url,
                 app_version,
             ],
         )
         .map_err(|error| error.to_string())?;
+    transaction
+        .execute(
+            "INSERT INTO dashboard_guard(singleton, pin_hash, failed_attempts, locked_until)
+             VALUES (1, ?1, 0, NULL)",
+            [dashboard_hash],
+        )
+        .map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())?;
     device_identity_from(&connection)
 }
 
@@ -324,19 +492,38 @@ fn trusted_time_estimate(
     ))
 }
 
+fn anchor_is_fresh(connection: &Connection, runtime: &RuntimeState) -> Result<bool, String> {
+    let anchor: Option<(String, i64)> = connection
+        .query_row(
+            "SELECT boot_session_id, monotonic_elapsed_ms FROM clock_anchor WHERE singleton = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    Ok(anchor.is_some_and(|(boot_id, elapsed)| {
+        boot_id == runtime.boot_session_id
+            && runtime.boot_started.elapsed().as_millis() as i64 - elapsed
+                < ChronoDuration::minutes(15).num_milliseconds()
+    }))
+}
+
 fn record_attendance_internal(
     app: &AppHandle,
     runtime: &RuntimeState,
     employee_id: i64,
     shift_id: Option<i64>,
     event_type: String,
+    local_request_id: String,
 ) -> Result<LocalEventReceipt, String> {
     if !["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"].contains(&event_type.as_str()) {
         return Err("Unsupported attendance event type".to_string());
     }
-    let worker_clock_state = match event_type.as_str() {
-        "CLOCK_IN" => Some(true),
-        "CLOCK_OUT" => Some(false),
+    let worker_state = match event_type.as_str() {
+        "CLOCK_IN" => Some((true, false)),
+        "CLOCK_OUT" => Some((false, false)),
+        "BREAK_START" => Some((true, true)),
+        "BREAK_END" => Some((true, false)),
         _ => None,
     };
     let mut connection = open_database(app)?;
@@ -350,6 +537,40 @@ fn record_attendance_internal(
             |row| row.get(0),
         )
         .map_err(|_| "This kiosk has not been paired".to_string())?;
+    if let Some((event_id, sequence, payload_json, event_hash, sync_status)) = transaction
+        .query_row(
+            "SELECT event_id, device_seq, payload_json, event_hash, sync_status
+             FROM attendance_event WHERE local_request_id = ?1",
+            [&local_request_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| error.to_string())?
+    {
+        let original: Value =
+            serde_json::from_str(&payload_json).map_err(|error| error.to_string())?;
+        if original.get("employee_id").and_then(Value::as_i64) != Some(employee_id)
+            || original.get("event_type").and_then(Value::as_str) != Some(event_type.as_str())
+        {
+            return Err(
+                "Local request identity conflicts with a different attendance action".to_string(),
+            );
+        }
+        return Ok(LocalEventReceipt {
+            event_id,
+            device_seq: sequence,
+            event_hash,
+            queued: sync_status == "PENDING",
+        });
+    }
     let sequence: i64 = config_value(&transaction, "device_sequence")?
         .unwrap_or_else(|| "0".to_string())
         .parse::<i64>()
@@ -373,15 +594,20 @@ fn record_attendance_internal(
     });
     let canonical = canonical_json(payload.clone())?;
     let event_hash = hex::encode(Sha256::digest(canonical.as_bytes()));
-    let signature = BASE64.encode(signing_key()?.sign(event_hash.as_bytes()).to_bytes());
+    let signature = BASE64.encode(
+        signing_key(&transaction)?
+            .sign(event_hash.as_bytes())
+            .to_bytes(),
+    );
     let event_id = payload["event_id"].as_str().unwrap_or_default().to_string();
     transaction
         .execute(
             "INSERT INTO attendance_event
-             (event_id, device_seq, payload_json, event_hash, signature, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+             (event_id, local_request_id, device_seq, payload_json, event_hash, signature, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 event_id,
+                local_request_id,
                 sequence,
                 canonical,
                 event_hash,
@@ -392,15 +618,21 @@ fn record_attendance_internal(
         .map_err(|error| error.to_string())?;
     set_config_value(&transaction, "device_sequence", &sequence.to_string())?;
     set_config_value(&transaction, "last_event_hash", &event_hash)?;
-    if let Some(is_clocked_in) = worker_clock_state {
+    if let Some((is_clocked_in, is_on_break)) = worker_state {
         transaction
             .execute(
-                "INSERT INTO worker_local_state(employee_id, is_clocked_in, updated_at)
-                 VALUES (?1, ?2, ?3)
+                "INSERT INTO worker_local_state(employee_id, is_clocked_in, is_on_break, updated_at)
+                 VALUES (?1, ?2, ?3, ?4)
                  ON CONFLICT(employee_id) DO UPDATE SET
                     is_clocked_in = excluded.is_clocked_in,
+                    is_on_break = excluded.is_on_break,
                     updated_at = excluded.updated_at",
-                params![employee_id, is_clocked_in, Utc::now().to_rfc3339()],
+                params![
+                    employee_id,
+                    is_clocked_in,
+                    is_on_break,
+                    Utc::now().to_rfc3339()
+                ],
             )
             .map_err(|error| error.to_string())?;
     }
@@ -413,35 +645,31 @@ fn record_attendance_internal(
     })
 }
 
-#[tauri::command]
-fn record_attendance(
-    app: AppHandle,
-    runtime: State<RuntimeState>,
-    employee_id: i64,
-    shift_id: Option<i64>,
-    event_type: String,
-) -> Result<LocalEventReceipt, String> {
-    record_attendance_internal(&app, &runtime, employee_id, shift_id, event_type)
-}
-
-#[tauri::command]
-fn enrol_worker_credential(
-    app: AppHandle,
+fn store_worker_credential(
+    app: &AppHandle,
     employee_id: i64,
     identifier: String,
     display_name: String,
     pin: String,
+    is_clocked_in: bool,
+    is_on_break: bool,
 ) -> Result<(), String> {
     if identifier.trim().is_empty() || pin.len() < 4 {
         return Err("A worker identifier and complete PIN are required".to_string());
     }
-    let pepper = BASE64.encode(secret_or_create("worker-pin-pepper", 32)?);
+    let connection = open_database(&app)?;
+    let may_initialize = !table_has_rows(&connection, "worker_credential")?;
+    let pepper = BASE64.encode(load_or_initialize_secret(
+        "worker-pin-pepper",
+        32,
+        may_initialize,
+    )?);
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
         .hash_password(format!("{pin}{pepper}").as_bytes(), &salt)
         .map_err(|error| error.to_string())?
         .to_string();
-    open_database(&app)?
+    connection
         .execute(
             "INSERT OR REPLACE INTO worker_credential
              (employee_id, identifier, display_name, pin_hash, failed_attempts, locked_until, enrolled_at)
@@ -455,17 +683,85 @@ fn enrol_worker_credential(
             ],
         )
         .map_err(|error| error.to_string())?;
+    connection
+        .execute(
+            "INSERT INTO worker_local_state(employee_id, is_clocked_in, is_on_break, updated_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(employee_id) DO UPDATE SET
+                is_clocked_in = excluded.is_clocked_in,
+                is_on_break = excluded.is_on_break,
+                updated_at = excluded.updated_at",
+            params![
+                employee_id,
+                is_clocked_in,
+                is_on_break,
+                Utc::now().to_rfc3339()
+            ],
+        )
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
-#[tauri::command]
+async fn enrol_worker_from_server(
+    app: &AppHandle,
+    identifier: &str,
+    pin: &str,
+) -> Result<(), String> {
+    let connection = open_database(app)?;
+    let (api_base_url, expected_pharmacy_id): (String, i64) = connection
+        .query_row(
+            "SELECT api_base_url, pharmacy_id FROM device_config WHERE singleton = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| "This kiosk has not been paired".to_string())?;
+    let token = keyring_entry("device-token")?
+        .get_password()
+        .map_err(|error| format!("Device credential is unavailable: {error}"))?;
+    let response = restricted_http_client()?
+        .post(format!(
+            "{}/client-profile/attendance/kiosk/workers/enrol/",
+            api_base_url.trim_end_matches('/')
+        ))
+        .header("X-Device-Token", token)
+        .json(&json!({ "identifier": identifier, "pin": pin }))
+        .send()
+        .await
+        .map_err(|error| format!("Online enrollment is unavailable: {error}"))?;
+    if !response.status().is_success() {
+        return Err(response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Worker enrollment failed".to_string()));
+    }
+    let enrollment: EnrollmentResponse =
+        response.json().await.map_err(|error| error.to_string())?;
+    if enrollment.pharmacy_id != expected_pharmacy_id {
+        return Err("Worker enrollment response belongs to a different pharmacy".to_string());
+    }
+    store_worker_credential(
+        app,
+        enrollment.worker_id,
+        identifier.to_string(),
+        enrollment.worker_name,
+        pin.to_string(),
+        enrollment.is_clocked_in,
+        enrollment.is_on_break,
+    )
+}
+
 fn record_offline_pin_attendance(
-    app: AppHandle,
-    runtime: State<RuntimeState>,
+    app: &AppHandle,
+    runtime: &RuntimeState,
     identifier: String,
     pin: String,
+    requested_action: String,
+    local_request_id: String,
 ) -> Result<OfflinePinReceipt, String> {
-    let connection = open_database(&app)?;
+    if !["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"].contains(&requested_action.as_str()) {
+        return Err("Choose an attendance action before confirming".to_string());
+    }
+    let connection = open_database(app)?;
     let credential: (i64, String, String, i64, Option<String>) = connection
         .query_row(
             "SELECT employee_id, display_name, pin_hash, failed_attempts, locked_until
@@ -489,7 +785,7 @@ fn record_offline_pin_attendance(
             return Err("Worker PIN is temporarily locked on this kiosk".to_string());
         }
     }
-    let pepper = BASE64.encode(secret_or_create("worker-pin-pepper", 32)?);
+    let pepper = BASE64.encode(load_or_initialize_secret("worker-pin-pepper", 32, false)?);
     let parsed = PasswordHash::new(&credential.2).map_err(|error| error.to_string())?;
     let valid = Argon2::default()
         .verify_password(format!("{pin}{pepper}").as_bytes(), &parsed)
@@ -515,23 +811,44 @@ fn record_offline_pin_attendance(
             [credential.0],
         )
         .map_err(|error| error.to_string())?;
-    let is_clocked_in: bool = connection
+    let local_state: (bool, bool) = connection
         .query_row(
-            "SELECT is_clocked_in FROM worker_local_state WHERE employee_id = ?1",
+            "SELECT is_clocked_in, is_on_break FROM worker_local_state WHERE employee_id = ?1",
             [credential.0],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
         .map_err(|error| error.to_string())?
-        .unwrap_or(false);
-    let action = if is_clocked_in {
-        "CLOCK_OUT"
-    } else {
-        "CLOCK_IN"
-    };
-    let event = record_attendance_internal(&app, &runtime, credential.0, None, action.to_string())?;
+        .unwrap_or((false, false));
+    if requested_action == "CLOCK_IN" && local_state.0 {
+        return Err("This kiosk already has you clocked in; choose Clock Out".to_string());
+    }
+    if requested_action == "CLOCK_OUT" && !local_state.0 {
+        return Err("This kiosk does not have an active local session; choose Clock In or reconnect for reconciliation".to_string());
+    }
+    if requested_action == "BREAK_START" && (!local_state.0 || local_state.1) {
+        return Err("A break can start only while clocked in and not already on break".to_string());
+    }
+    if requested_action == "BREAK_END" && !local_state.1 {
+        return Err("This kiosk does not have an active break to end".to_string());
+    }
+    let event = record_attendance_internal(
+        app,
+        runtime,
+        credential.0,
+        None,
+        requested_action.clone(),
+        local_request_id,
+    )?;
     Ok(OfflinePinReceipt {
-        action: format!("CLOCKED_{}", if is_clocked_in { "OUT" } else { "IN" }),
+        action: match requested_action.as_str() {
+            "CLOCK_IN" => "CLOCKED_IN",
+            "CLOCK_OUT" => "CLOCKED_OUT",
+            "BREAK_START" => "BREAK_START",
+            "BREAK_END" => "BREAK_END",
+            _ => unreachable!(),
+        }
+        .to_string(),
         worker_id: credential.0,
         worker_name: credential.1,
         event,
@@ -539,57 +856,40 @@ fn record_offline_pin_attendance(
 }
 
 #[tauri::command]
-fn generate_offline_challenge(
+async fn capture_pin_attendance(
     app: AppHandle,
-    runtime: State<RuntimeState>,
-) -> Result<Value, String> {
-    let connection = open_database(&app)?;
-    let (installation_id, pharmacy_id): (String, i64) = connection
-        .query_row(
-            "SELECT installation_id, pharmacy_id FROM device_config WHERE singleton = 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .map_err(|_| "This kiosk has not been paired".to_string())?;
-    let issued_at = Utc::now();
-    let payload = json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "challenge_id": Uuid::new_v4().to_string(),
-        "pharmacy_id": pharmacy_id,
-        "device_id": installation_id,
-        "issued_at": issued_at.to_rfc3339(),
-        "expires_at": (issued_at + ChronoDuration::seconds(60)).to_rfc3339(),
-        "nonce": Uuid::new_v4().to_string(),
-        "boot_session_id": runtime.boot_session_id.clone(),
-    });
-    let canonical = canonical_json(payload.clone())?;
-    let digest = hex::encode(Sha256::digest(canonical.as_bytes()));
-    Ok(json!({
-        "payload": payload,
-        "challenge_hash": digest,
-        "signature": BASE64.encode(signing_key()?.sign(digest.as_bytes()).to_bytes()),
-    }))
-}
-
-#[tauri::command]
-fn set_dashboard_pin(app: AppHandle, pin: String) -> Result<(), String> {
-    if pin.len() < 6 || !pin.chars().all(|character| character.is_ascii_digit()) {
-        return Err("Dashboard PIN must contain at least six digits".to_string());
+    runtime: State<'_, RuntimeState>,
+    identifier: String,
+    pin: String,
+    requested_action: String,
+    local_request_id: String,
+) -> Result<OfflinePinReceipt, String> {
+    Uuid::parse_str(&local_request_id)
+        .map_err(|_| "Local attendance request identity is invalid".to_string())?;
+    match record_offline_pin_attendance(
+        &app,
+        &runtime,
+        identifier.clone(),
+        pin.clone(),
+        requested_action.clone(),
+        local_request_id.clone(),
+    ) {
+        Ok(receipt) => Ok(receipt),
+        Err(error)
+            if error.contains("not enrolled for offline use") || error == "Invalid worker PIN" =>
+        {
+            enrol_worker_from_server(&app, &identifier, &pin).await?;
+            record_offline_pin_attendance(
+                &app,
+                &runtime,
+                identifier,
+                pin,
+                requested_action,
+                local_request_id,
+            )
+        }
+        Err(error) => Err(error),
     }
-    let pepper = BASE64.encode(secret_or_create("dashboard-pin-pepper", 32)?);
-    let salt = SaltString::generate(&mut OsRng);
-    let hash = Argon2::default()
-        .hash_password(format!("{pin}{pepper}").as_bytes(), &salt)
-        .map_err(|error| error.to_string())?
-        .to_string();
-    open_database(&app)?
-        .execute(
-            "INSERT OR REPLACE INTO dashboard_guard(singleton, pin_hash, failed_attempts, locked_until)
-             VALUES (1, ?1, 0, NULL)",
-            [hash],
-        )
-        .map_err(|error| error.to_string())?;
-    Ok(())
 }
 
 #[tauri::command]
@@ -609,7 +909,11 @@ fn verify_dashboard_pin(app: AppHandle, pin: String) -> Result<bool, String> {
             return Err("Dashboard access is temporarily locked".to_string());
         }
     }
-    let pepper = BASE64.encode(secret_or_create("dashboard-pin-pepper", 32)?);
+    let pepper = BASE64.encode(load_or_initialize_secret(
+        "dashboard-pin-pepper",
+        32,
+        false,
+    )?);
     let parsed = PasswordHash::new(&guard.0).map_err(|error| error.to_string())?;
     let valid = Argon2::default()
         .verify_password(format!("{pin}{pepper}").as_bytes(), &parsed)
@@ -663,29 +967,75 @@ fn pending_events(connection: &Connection) -> Result<Vec<Value>, String> {
 
 async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncResponse, String> {
     let _guard = runtime.sync_lock.lock().await;
-    let connection = open_database(app)?;
-    let config: (String, String) = connection
+    let mut connection = open_database(app)?;
+    let config: (String, String, String) = connection
         .query_row(
-            "SELECT api_base_url, app_version FROM device_config WHERE singleton = 1",
+            "SELECT api_base_url, app_version, installation_id FROM device_config WHERE singleton = 1",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .map_err(|_| "This kiosk has not been paired".to_string())?;
     let events = pending_events(&connection)?;
     if events.is_empty() {
+        if anchor_is_fresh(&connection, runtime)? {
+            return Ok(SyncResponse {
+                device_id: config.2,
+                acknowledged_through: config_value(&connection, "acknowledged_through")?
+                    .unwrap_or_else(|| "0".to_string())
+                    .parse()
+                    .unwrap_or(0),
+                server_time: trusted_time_estimate(&connection, runtime)?
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                results: vec![],
+            });
+        }
+        let token = keyring_entry("device-token")?
+            .get_password()
+            .map_err(|error| error.to_string())?;
+        let response = restricted_http_client()?
+            .get(format!(
+                "{}/client-profile/attendance/kiosk/config/",
+                config.0.trim_end_matches('/')
+            ))
+            .header("X-Device-Token", token)
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
+        if !response.status().is_success() {
+            return Err(response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Kiosk configuration refresh failed".to_string()));
+        }
+        let refreshed: ConfigResponse = response.json().await.map_err(|error| error.to_string())?;
+        if refreshed.device_id.to_lowercase() != config.2.to_lowercase() {
+            return Err("Configuration response belongs to a different kiosk".to_string());
+        }
+        connection
+            .execute(
+                "INSERT OR REPLACE INTO clock_anchor(singleton, server_utc, boot_session_id, monotonic_elapsed_ms)
+                 VALUES (1, ?1, ?2, ?3)",
+                params![
+                    refreshed.server_time,
+                    runtime.boot_session_id,
+                    runtime.boot_started.elapsed().as_millis() as i64,
+                ],
+            )
+            .map_err(|error| error.to_string())?;
         return Ok(SyncResponse {
+            device_id: config.2,
             acknowledged_through: config_value(&connection, "acknowledged_through")?
                 .unwrap_or_else(|| "0".to_string())
                 .parse()
                 .unwrap_or(0),
-            server_time: Utc::now().to_rfc3339(),
+            server_time: refreshed.server_time,
             results: vec![],
         });
     }
     let token = keyring_entry("device-token")?
         .get_password()
         .map_err(|error| error.to_string())?;
-    let response = reqwest::Client::new()
+    let response = restricted_http_client()?
         .post(format!(
             "{}/client-profile/attendance/kiosk/sync/batch/",
             config.0.trim_end_matches('/')
@@ -702,18 +1052,87 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
             .unwrap_or_else(|_| "Sync failed".to_string()));
     }
     let receipt: SyncResponse = response.json().await.map_err(|error| error.to_string())?;
-    connection
-        .execute(
-            "UPDATE attendance_event SET sync_status = 'SYNCED' WHERE device_seq <= ?1",
-            [receipt.acknowledged_through],
+    if receipt.device_id.to_lowercase() != config.2.to_lowercase() {
+        return Err("Sync receipt belongs to a different kiosk installation".to_string());
+    }
+    let highest_local_sequence: i64 = connection
+        .query_row(
+            "SELECT COALESCE(MAX(device_seq), 0) FROM attendance_event",
+            [],
+            |row| row.get(0),
         )
         .map_err(|error| error.to_string())?;
+    if receipt.acknowledged_through > highest_local_sequence {
+        return Err("Sync receipt acknowledges unknown local evidence".to_string());
+    }
+
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    for result in &receipt.results {
+        let sequence = result
+            .get("device_seq")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| "Sync result is missing device_seq".to_string())?;
+        let event_id = result
+            .get("event_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Sync result is missing event_id".to_string())?;
+        let event_hash = result
+            .get("event_hash")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Sync result is missing event_hash".to_string())?;
+        let outcome = result
+            .get("result")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Sync result is missing result".to_string())?;
+        if !["accepted", "already_received", "needs_review", "rejected"].contains(&outcome) {
+            return Err("Sync result contains an unsupported outcome".to_string());
+        }
+        let local: (String, String) = transaction
+            .query_row(
+                "SELECT event_id, event_hash FROM attendance_event WHERE device_seq = ?1",
+                [sequence],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| "Sync result references unknown local evidence".to_string())?;
+        if local.0 != event_id || local.1 != event_hash {
+            return Err("Sync result does not match submitted local evidence".to_string());
+        }
+        let delivery_status = if outcome == "rejected" {
+            "PERMANENT_REJECTION"
+        } else {
+            "RECEIVED"
+        };
+        transaction
+            .execute(
+                "UPDATE attendance_event SET sync_status = ?1 WHERE device_seq = ?2",
+                params![delivery_status, sequence],
+            )
+            .map_err(|error| error.to_string())?;
+        transaction
+            .execute(
+                "INSERT INTO sync_receipt(device_seq, event_id, result_json, acknowledged_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(device_seq) DO UPDATE SET
+                    event_id = excluded.event_id,
+                    result_json = excluded.result_json,
+                    acknowledged_at = excluded.acknowledged_at",
+                params![
+                    sequence,
+                    event_id,
+                    result.to_string(),
+                    Utc::now().to_rfc3339()
+                ],
+            )
+            .map_err(|error| error.to_string())?;
+    }
     set_config_value(
-        &connection,
+        &transaction,
         "acknowledged_through",
         &receipt.acknowledged_through.to_string(),
     )?;
-    connection
+    transaction
         .execute(
             "INSERT OR REPLACE INTO clock_anchor(singleton, server_utc, boot_session_id, monotonic_elapsed_ms)
              VALUES (1, ?1, ?2, ?3)",
@@ -724,6 +1143,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
             ],
         )
         .map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())?;
     Ok(receipt)
 }
 
@@ -773,11 +1193,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             kiosk_status,
             pair_device,
-            record_attendance,
-            enrol_worker_credential,
-            record_offline_pin_attendance,
-            generate_offline_challenge,
-            set_dashboard_pin,
+            capture_pin_attendance,
             verify_dashboard_pin,
             sync_now,
             pending_count,

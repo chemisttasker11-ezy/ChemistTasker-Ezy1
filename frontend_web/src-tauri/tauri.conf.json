@@ -5,14 +5,15 @@
   "identifier": "com.chemisttasker.kiosk",
   "build": {
     "beforeDevCommand": "npm run dev:5173",
-    "devUrl": "http://localhost:5173/kiosk",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build:kiosk-ui",
+    "frontendDist": "../dist-kiosk"
   },
   "app": {
     "windows": [
       {
         "title": "ChemistTasker Kiosk",
+        "url": "kiosk.html",
         "width": 1180,
         "height": 780,
         "minWidth": 900,
@@ -33,4 +34,3 @@
     }
   }
 }
-
