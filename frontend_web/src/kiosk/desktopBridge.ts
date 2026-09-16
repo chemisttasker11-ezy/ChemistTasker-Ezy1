@@ -51,6 +51,11 @@ export type OfflinePinResult = {
   event: { event_id: string; device_seq: number; queued: boolean };
 };
 
+export const prepareDesktopCaptureRequest = (
+  identifier: string,
+  requestedAction: 'CLOCK_IN' | 'CLOCK_OUT' | 'BREAK_START' | 'BREAK_END',
+) => invoke<string>('prepare_capture_request', { identifier, requestedAction });
+
 export const captureDesktopPinAttendance = (
   identifier: string,
   pin: string,

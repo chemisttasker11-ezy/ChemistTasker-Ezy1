@@ -4245,6 +4245,11 @@ class KioskDevice(models.Model):
         help_text="Stable public identifier generated for this kiosk installation.",
     )
     platform = models.CharField(max_length=24, blank=True, default="")
+    client_kind = models.CharField(
+        max_length=24,
+        choices=[("WEB_ONLINE", "Web online"), ("NATIVE_OFFLINE", "Native offline")],
+        default="WEB_ONLINE",
+    )
     public_signing_key = models.TextField(
         blank=True,
         default="",
@@ -4273,6 +4278,45 @@ class KioskDevice(models.Model):
 
     def __str__(self):
         return f"Kiosk '{self.device_name}' @ {self.pharmacy.name}"
+
+
+class KioskPairingAuthorization(models.Model):
+    """Durable, single-use authority to register one kiosk device."""
+
+    class ClientKind(models.TextChoices):
+        WEB_ONLINE = "WEB_ONLINE", "Web online"
+        NATIVE_OFFLINE = "NATIVE_OFFLINE", "Native offline"
+
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy",
+        on_delete=models.CASCADE,
+        related_name="kiosk_pairing_authorizations",
+    )
+    authorized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="authorized_kiosk_pairings",
+    )
+    code_digest = models.CharField(max_length=64, unique=True)
+    device_name = models.CharField(max_length=120, default="Counter Terminal")
+    allowed_client_kind = models.CharField(
+        max_length=24,
+        choices=ClientKind.choices,
+        default=ClientKind.NATIVE_OFFLINE,
+    )
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    resulting_device = models.OneToOneField(
+        KioskDevice,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="pairing_authorization",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["consumed_at", "expires_at"])]
 
 
 class PharmacyQRSession(models.Model):

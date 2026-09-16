@@ -239,6 +239,16 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
                 is_on_break INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS capture_request (
+                request_id TEXT PRIMARY KEY,
+                identifier_hash TEXT NOT NULL,
+                requested_action TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PREPARED',
+                employee_id INTEGER,
+                event_id TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT
+            );
             ",
         )
         .map_err(|error| error.to_string())?;
@@ -258,7 +268,57 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
             [],
         )
         .map_err(|error| error.to_string())?;
+    connection
+        .execute(
+            "CREATE INDEX IF NOT EXISTS capture_request_pending_lookup
+             ON capture_request(identifier_hash, requested_action, status)",
+            [],
+        )
+        .map_err(|error| error.to_string())?;
     Ok(connection)
+}
+
+fn capture_identifier_hash(identifier: &str) -> String {
+    hex::encode(Sha256::digest(identifier.trim().to_lowercase().as_bytes()))
+}
+
+#[tauri::command]
+fn prepare_capture_request(
+    app: AppHandle,
+    identifier: String,
+    requested_action: String,
+) -> Result<String, String> {
+    if identifier.trim().is_empty()
+        || !["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"]
+            .contains(&requested_action.as_str())
+    {
+        return Err("A worker identifier and attendance action are required".to_string());
+    }
+    let hash = capture_identifier_hash(&identifier);
+    let connection = open_database(&app)?;
+    if let Some(request_id) = connection
+        .query_row(
+            "SELECT request_id FROM capture_request
+             WHERE identifier_hash = ?1 AND requested_action = ?2 AND status = 'PREPARED'
+             ORDER BY created_at DESC LIMIT 1",
+            params![hash, requested_action],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?
+    {
+        return Ok(request_id);
+    }
+    let request_id = Uuid::new_v4().to_string();
+    connection
+        .execute(
+            "INSERT INTO capture_request
+             (request_id, identifier_hash, requested_action, created_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![request_id, hash, requested_action, Utc::now().to_rfc3339()],
+        )
+        .map_err(|error| error.to_string())?;
+    Ok(request_id)
 }
 
 fn ensure_column(
@@ -537,6 +597,22 @@ fn record_attendance_internal(
             |row| row.get(0),
         )
         .map_err(|_| "This kiosk has not been paired".to_string())?;
+    let prepared: Option<String> = transaction
+        .query_row(
+            "SELECT requested_action FROM capture_request WHERE request_id = ?1",
+            [&local_request_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    let Some(prepared_action) = prepared else {
+        return Err("Attendance request was not prepared by this kiosk".to_string());
+    };
+    if prepared_action != event_type {
+        return Err(
+            "Local request identity conflicts with a different attendance action".to_string(),
+        );
+    }
     if let Some((event_id, sequence, payload_json, event_hash, sync_status)) = transaction
         .query_row(
             "SELECT event_id, device_seq, payload_json, event_hash, sync_status
@@ -613,6 +689,18 @@ fn record_attendance_internal(
                 event_hash,
                 signature,
                 Utc::now().to_rfc3339()
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+    transaction
+        .execute(
+            "UPDATE capture_request SET status = 'COMMITTED', employee_id = ?1,
+             event_id = ?2, completed_at = ?3 WHERE request_id = ?4 AND status = 'PREPARED'",
+            params![
+                employee_id,
+                event_id,
+                Utc::now().to_rfc3339(),
+                local_request_id
             ],
         )
         .map_err(|error| error.to_string())?;
@@ -811,6 +899,70 @@ fn record_offline_pin_attendance(
             [credential.0],
         )
         .map_err(|error| error.to_string())?;
+    let request_binding: Option<(String, String)> = connection
+        .query_row(
+            "SELECT identifier_hash, requested_action FROM capture_request WHERE request_id = ?1",
+            [&local_request_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    if request_binding
+        != Some((
+            capture_identifier_hash(&identifier),
+            requested_action.clone(),
+        ))
+    {
+        return Err(
+            "Local request identity conflicts with a different worker or action".to_string(),
+        );
+    }
+    if let Some((event_id, sequence, event_hash, sync_status, original_employee, original_action)) =
+        connection
+            .query_row(
+                "SELECT e.event_id, e.device_seq, e.event_hash, e.sync_status,
+                        r.employee_id, r.requested_action
+                 FROM capture_request r JOIN attendance_event e ON e.event_id = r.event_id
+                 WHERE r.request_id = ?1 AND r.status = 'COMMITTED'",
+                [&local_request_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|error| error.to_string())?
+    {
+        if original_employee != credential.0 || original_action != requested_action {
+            return Err(
+                "Local request identity conflicts with a different attendance action".to_string(),
+            );
+        }
+        return Ok(OfflinePinReceipt {
+            action: match requested_action.as_str() {
+                "CLOCK_IN" => "CLOCKED_IN",
+                "CLOCK_OUT" => "CLOCKED_OUT",
+                "BREAK_START" => "BREAK_START",
+                "BREAK_END" => "BREAK_END",
+                _ => unreachable!(),
+            }
+            .to_string(),
+            worker_id: credential.0,
+            worker_name: credential.1,
+            event: LocalEventReceipt {
+                event_id,
+                device_seq: sequence,
+                event_hash,
+                queued: sync_status == "PENDING",
+            },
+        });
+    }
     let local_state: (bool, bool) = connection
         .query_row(
             "SELECT is_clocked_in, is_on_break FROM worker_local_state WHERE employee_id = ?1",
@@ -1193,6 +1345,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             kiosk_status,
             pair_device,
+            prepare_capture_request,
             capture_pin_attendance,
             verify_dashboard_pin,
             sync_now,

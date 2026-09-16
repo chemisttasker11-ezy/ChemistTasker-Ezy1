@@ -37,6 +37,7 @@ from client_profile.attendance_credentials import (
 )
 from client_profile.models import (
     KioskDevice,
+    KioskPairingAuthorization,
     Notification,
     OwnerOnboarding,
     Pharmacy,
@@ -49,6 +50,7 @@ PAIRING_SCHEMA_MODELS = (
     Pharmacy,
     PharmacyAdmin,
     KioskDevice,
+    KioskPairingAuthorization,
     Notification,
 )
 
@@ -123,6 +125,7 @@ class KioskPairingCodeTests(unittest.TestCase):
         with connection.cursor() as cursor:
             for table in (
                 "client_profile_notification",
+                "client_profile_kioskpairingauthorization",
                 "client_profile_kioskdevice",
                 "client_profile_pharmacyadmin",
                 "client_profile_pharmacy",

@@ -48,6 +48,7 @@ import {
   isDesktopKiosk,
   pairDesktopKiosk,
   captureDesktopPinAttendance,
+  prepareDesktopCaptureRequest,
 } from "../../kiosk/desktopBridge";
 
 const kioskClient = axios.create({
@@ -549,11 +550,15 @@ export default function KioskPage() {
 
     try {
       if (desktopRuntime) {
+        const requestId = await prepareDesktopCaptureRequest(
+          identifier.trim(),
+          requestedPinAction,
+        );
         const local = await captureDesktopPinAttendance(
           identifier.trim(),
           pin,
           requestedPinAction,
-          crypto.randomUUID(),
+          requestId,
         );
         setActionSuccess({
           action: local.action,

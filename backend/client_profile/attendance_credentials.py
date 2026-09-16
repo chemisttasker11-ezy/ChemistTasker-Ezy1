@@ -27,14 +27,16 @@ from django.conf import settings
 from django.core import signing
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from client_profile.models import (
     Chain,
     KioskDevice,
+    KioskPairingAuthorization,
     Membership,
     Pharmacy,
     PharmacyAdmin,
@@ -122,6 +124,7 @@ def activate_kiosk_device(
     public_signing_key: str = "",
     platform: str = "",
     app_version: str = "",
+    client_kind: str = "WEB_ONLINE",
 ) -> Tuple[KioskDevice, str]:
     """Activate a new kiosk device for a pharmacy, issuing a restricted device token."""
     if not is_authorized_kiosk_manager(user, pharmacy):
@@ -139,6 +142,7 @@ def activate_kiosk_device(
         public_signing_key=_validate_kiosk_public_key(public_signing_key),
         platform=str(platform or "")[:24],
         app_version=str(app_version or "")[:40],
+        client_kind=client_kind,
         device_token=token_hash,
         is_active=True,
         activated_by=user,
@@ -187,6 +191,10 @@ KIOSK_PAIR_CACHE_PREFIX = "ctk_kiosk_pair:"
 KIOSK_PAIR_TTL_SECONDS = 900  # 15 minutes
 
 
+def _pairing_code_digest(code: str) -> str:
+    return salted_hmac("chemisttasker.kiosk.pairing", code).hexdigest()
+
+
 def generate_kiosk_pairing_code(
     user,
     pharmacy: Pharmacy,
@@ -208,17 +216,26 @@ def generate_kiosk_pairing_code(
         "created_at": timezone.now().isoformat(),
     }
 
-    # Reserve a collision-free code instead of overwriting another live authorization.
+    expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
+    # The database uniqueness constraint is the authoritative collision boundary.
     for _ in range(20):
         code = f"{secrets.randbelow(900000) + 100000}"
-        if cache.add(
-            f"{KIOSK_PAIR_CACHE_PREFIX}{code}",
-            payload,
-            timeout=ttl_seconds,
-        ):
+        try:
+            KioskPairingAuthorization.objects.create(
+                pharmacy=pharmacy,
+                authorized_by=user,
+                code_digest=_pairing_code_digest(code),
+                device_name=payload["device_name"],
+                allowed_client_kind=KioskPairingAuthorization.ClientKind.NATIVE_OFFLINE,
+                expires_at=expires_at,
+            )
             break
+        except IntegrityError:
+            continue
     else:
         raise ValidationError("Unable to reserve a pairing code. Please try again.")
+    # Retain the cache entry only as a compatibility hint for older nodes/tests.
+    cache.set(f"{KIOSK_PAIR_CACHE_PREFIX}{code}", payload, timeout=ttl_seconds)
 
     # Dispatch notification to the user (triggers Expo push + WebSocket + DB in-app notification)
     try:
@@ -267,40 +284,44 @@ def redeem_kiosk_pairing_code(
     if len(code) != 6 or not code.isdigit():
         raise ValidationError("Pairing code must be a 6-digit number.")
 
-    public_signing_key = _validate_kiosk_public_key(public_signing_key, required=True)
+    native = str(platform or "").lower() in {"windows", "macos", "linux"}
+    public_signing_key = _validate_kiosk_public_key(public_signing_key, required=native)
+    with transaction.atomic():
+        authorization = (
+            KioskPairingAuthorization.objects.select_for_update()
+            .select_related("pharmacy", "authorized_by", "resulting_device")
+            .filter(code_digest=_pairing_code_digest(code))
+            .first()
+        )
+        if (
+            authorization is None
+            or authorization.consumed_at is not None
+            or authorization.expires_at <= timezone.now()
+        ):
+            raise ValidationError("Invalid or expired pairing code. Please request a new code from the owner's mobile app.")
+        if native and authorization.allowed_client_kind != KioskPairingAuthorization.ClientKind.NATIVE_OFFLINE:
+            raise ValidationError("This pairing authorization does not allow an offline native kiosk.")
+        resolved_device_name = (
+            str(device_name).strip()
+            if device_name and str(device_name).strip()
+            else authorization.device_name
+        )
+        pharmacy = authorization.pharmacy
+        user = authorization.authorized_by
+        device, raw_token = activate_kiosk_device(
+            user=user,
+            pharmacy=pharmacy,
+            device_name=resolved_device_name,
+            public_signing_key=public_signing_key,
+            platform=platform,
+            app_version=app_version,
+            client_kind=("NATIVE_OFFLINE" if native else "WEB_ONLINE"),
+        )
+        authorization.consumed_at = timezone.now()
+        authorization.resulting_device = device
+        authorization.save(update_fields=["consumed_at", "resulting_device"])
 
-    cache_key = f"{KIOSK_PAIR_CACHE_PREFIX}{code}"
-    payload = cache.get(cache_key)
-
-    if not payload or not isinstance(payload, dict):
-        raise ValidationError("Invalid or expired pairing code. Please request a new code from the owner's mobile app.")
-
-    # Immediately delete the code to ensure single-use (replay prevention)
-    cache.delete(cache_key)
-
-    pharmacy_id = payload.get("pharmacy_id")
-    user_id = payload.get("user_id")
-    default_device_name = payload.get("device_name") or "Counter Terminal"
-    resolved_device_name = str(device_name).strip() if device_name and str(device_name).strip() else default_device_name
-
-    pharmacy = Pharmacy.objects.filter(id=pharmacy_id).first()
-    if not pharmacy:
-        raise ValidationError("Pharmacy associated with this pairing code no longer exists.")
-
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-    user = User.objects.filter(id=user_id).first()
-    if not user:
-        raise ValidationError("User who authorized this pairing code no longer exists.")
-
-    device, raw_token = activate_kiosk_device(
-        user=user,
-        pharmacy=pharmacy,
-        device_name=resolved_device_name,
-        public_signing_key=public_signing_key,
-        platform=platform,
-        app_version=app_version,
-    )
+    cache.delete(f"{KIOSK_PAIR_CACHE_PREFIX}{code}")
 
     # Notify owner that device has been successfully paired
     try:
