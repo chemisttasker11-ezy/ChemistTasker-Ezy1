@@ -4238,8 +4238,26 @@ class KioskDevice(models.Model):
         max_length=120,
         help_text="Human-readable label, e.g. 'Front Counter iPad'.",
     )
+    installation_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="Stable public identifier generated for this kiosk installation.",
+    )
+    platform = models.CharField(max_length=24, blank=True, default="")
+    public_signing_key = models.TextField(
+        blank=True,
+        default="",
+        help_text="Base64-encoded Ed25519 public key. The private key remains on the device.",
+    )
+    app_version = models.CharField(max_length=40, blank=True, default="")
     is_active = models.BooleanField(default=True)
     activated_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_contiguous_sequence = models.PositiveBigIntegerField(default=0)
+    last_event_hash = models.CharField(max_length=64, blank=True, default="")
     activated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -4470,6 +4488,7 @@ class AttendanceEvent(models.Model):
         KIOSK_PIN = "KIOSK_PIN", "Kiosk PIN"
         IN_APP = "IN_APP", "In-App"
         MANAGER = "MANAGER", "Manager"
+        OFFLINE_KIOSK = "OFFLINE_KIOSK", "Offline Kiosk"
 
     session = models.ForeignKey(
         AttendanceSession,
@@ -4515,6 +4534,72 @@ class AttendanceEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} for session {self.session_id} at {self.occurred_at}"
+
+
+class KioskAttendanceEvent(models.Model):
+    """Immutable, signed event received from a local-first kiosk outbox."""
+
+    class ProcessingStatus(models.TextChoices):
+        ACCEPTED = "ACCEPTED", "Accepted"
+        NEEDS_REVIEW = "NEEDS_REVIEW", "Needs review"
+        REJECTED = "REJECTED", "Rejected"
+
+    event_id = models.UUIDField(unique=True, db_index=True)
+    device = models.ForeignKey(
+        KioskDevice,
+        on_delete=models.PROTECT,
+        related_name="offline_attendance_events",
+    )
+    device_sequence = models.PositiveBigIntegerField()
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="kiosk_offline_events",
+    )
+    shift_id = models.BigIntegerField(null=True, blank=True)
+    event_type = models.CharField(max_length=16, choices=AttendanceEvent.EventType.choices)
+    device_timestamp = models.DateTimeField()
+    trusted_time_estimate = models.DateTimeField(null=True, blank=True)
+    monotonic_elapsed_ms = models.PositiveBigIntegerField()
+    boot_session_id = models.CharField(max_length=80)
+    previous_event_hash = models.CharField(max_length=64, blank=True, default="")
+    event_hash = models.CharField(max_length=64)
+    device_signature = models.TextField()
+    canonical_payload = models.JSONField()
+    integrity_flags = models.JSONField(default=list, blank=True)
+    processing_status = models.CharField(max_length=20, choices=ProcessingStatus.choices)
+    rejection_reason = models.TextField(blank=True, default="")
+    attendance_event = models.OneToOneField(
+        AttendanceEvent,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="offline_source_event",
+    )
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ImmutableAttendanceQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["device_id", "device_sequence"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device", "device_sequence"],
+                name="kiosk_event_unique_device_sequence",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["device", "device_sequence"]),
+            models.Index(fields=["processing_status", "received_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Kiosk attendance evidence is append-only and cannot be updated.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Kiosk attendance evidence is append-only and cannot be deleted.")
 
 
 class ProvisionalAttendance(models.Model):

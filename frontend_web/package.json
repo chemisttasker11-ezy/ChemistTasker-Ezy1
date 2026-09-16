@@ -12,6 +12,8 @@
     "build": "node ../scripts/run-with-env.mjs ../env/web.prod.env vite build",
     "dev:dashboard": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite",
     "dev:all": "node scripts/dev-all.mjs",
+    "kiosk:dev": "node scripts/run-tauri.mjs dev",
+    "kiosk:build": "node scripts/run-tauri.mjs build",
     "install:all": "npm ci && npm ci --prefix landing_next",
     "build:all": "npm run build && npm run build --prefix landing_next"
   },
@@ -55,6 +57,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@tauri-apps/cli": "^2.8.0",
     "@types/aos": "^3.0.7",
     "@types/canvas-confetti": "^1.9.0",
     "@types/google.maps": "^3.58.1",

@@ -1,0 +1,29 @@
+[package]
+name = "chemisttasker-kiosk"
+version = "0.1.0"
+description = "Local-first ChemistTasker pharmacy kiosk"
+edition = "2021"
+
+[lib]
+name = "chemisttasker_kiosk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+argon2 = "0.5"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+hex = "0.4"
+keyring = "3"
+rand_core = { version = "0.6", features = ["getrandom"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tauri = { version = "2", features = [] }
+tokio = { version = "1", features = ["sync", "time"] }
+uuid = { version = "1", features = ["v4", "serde"] }

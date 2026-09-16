@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Box,
   Button,
@@ -29,7 +29,6 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import SettingsIcon from "@mui/icons-material/Settings";
-import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import BackspaceIcon from "@mui/icons-material/Backspace";
 import SmartphoneIcon from "@mui/icons-material/Smartphone";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
@@ -44,6 +43,14 @@ import axios from "axios";
 import { API_BASE_URL } from "../../constants/api";
 import { csrfToken } from "../../../landing_next/shared/browser-session";
 import { clearTokens, getAccessToken } from "../../utils/tokenService";
+import {
+  generateDesktopChallenge,
+  getDesktopKioskStatus,
+  isDesktopKiosk,
+  pairDesktopKiosk,
+  enrolDesktopWorker,
+  recordDesktopOfflinePin,
+} from "../../kiosk/desktopBridge";
 
 const kioskClient = axios.create({
   baseURL: API_BASE_URL,
@@ -66,15 +73,13 @@ const KIOSK_PHARMACY_NAME_KEY = "ctk_kiosk_pharmacy_name";
 const KIOSK_PHARMACY_ID_KEY = "ctk_kiosk_pharmacy_id";
 
 export default function KioskPage() {
+  const desktopRuntime = isDesktopKiosk();
   // Device state
   const [deviceToken, setDeviceToken] = useState<string | null>(
     localStorage.getItem(KIOSK_TOKEN_KEY)
   );
   const [pharmacyName, setPharmacyName] = useState<string>(
     localStorage.getItem(KIOSK_PHARMACY_NAME_KEY) || "Pharmacy Counter"
-  );
-  const [pharmacyId, setPharmacyId] = useState<string>(
-    localStorage.getItem(KIOSK_PHARMACY_ID_KEY) || ""
   );
 
   // Activation modal state
@@ -95,11 +100,11 @@ export default function KioskPage() {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(30);
-  const [qrLoading, setQrLoading] = useState<boolean>(false);
+  const [, setQrLoading] = useState<boolean>(false);
   const [qrError, setQrError] = useState<string | null>(null);
 
   // PIN mode state
-  const [pinMode, setPinMode] = useState<boolean>(false);
+  const [, setPinMode] = useState<boolean>(false);
   const [identifier, setIdentifier] = useState<string>("");
   const [pin, setPin] = useState<string>("");
   const [pinSubmitting, setPinSubmitting] = useState<boolean>(false);
@@ -170,6 +175,17 @@ export default function KioskPage() {
 
   const isFetchingRef = useRef(false);
 
+  useEffect(() => {
+    if (!desktopRuntime) return;
+    void getDesktopKioskStatus()
+      .then((status) => {
+        if (!status.paired) return;
+        setDeviceToken("tauri-secure-device");
+        setPharmacyName(status.pharmacy_name || "Pharmacy Counter");
+      })
+      .catch((error) => setActivationError(String(error)));
+  }, [desktopRuntime]);
+
   // Fetch rotating QR from server (30s TTL)
   const fetchQR = useCallback(async () => {
     if (!deviceToken || isFetchingRef.current) return;
@@ -177,6 +193,14 @@ export default function KioskPage() {
       isFetchingRef.current = true;
       setQrLoading(true);
       setQrError(null);
+      if (desktopRuntime) {
+        const challenge = await generateDesktopChallenge();
+        setQrToken(JSON.stringify(challenge));
+        setExpiresAt(challenge.payload.expires_at);
+        const expiry = new Date(challenge.payload.expires_at).getTime();
+        setCountdownSeconds(Math.max(0, Math.min(60, Math.round((expiry - Date.now()) / 1000))));
+        return;
+      }
       const res = await kioskClient.post(
         "/client-profile/attendance/kiosk/qr/",
         {},
@@ -203,7 +227,7 @@ export default function KioskPage() {
       setQrLoading(false);
       isFetchingRef.current = false;
     }
-  }, [deviceToken]);
+  }, [desktopRuntime, deviceToken]);
 
   // Initial fetch and rotation loop
   useEffect(() => {
@@ -250,7 +274,6 @@ export default function KioskPage() {
       const name = res.data.pharmacy_name;
       setDeviceToken(token);
       setPharmacyName(name);
-      setPharmacyId(activationPharmacyId);
       localStorage.setItem(KIOSK_TOKEN_KEY, token);
       localStorage.setItem(KIOSK_PHARMACY_NAME_KEY, name);
       localStorage.setItem(KIOSK_PHARMACY_ID_KEY, activationPharmacyId);
@@ -281,6 +304,17 @@ export default function KioskPage() {
     setIsActivating(true);
     setActivationError(null);
     try {
+      if (desktopRuntime) {
+        const status = await pairDesktopKiosk({
+          pairingCode: cleanedCode,
+          deviceName: activationDeviceName,
+          apiBaseUrl: API_BASE_URL,
+          appVersion: "0.1.0",
+        });
+        setDeviceToken("tauri-secure-device");
+        setPharmacyName(status.pharmacy_name || "Pharmacy Counter");
+        return;
+      }
       const res = await kioskClient.post("/client-profile/attendance/kiosk/pairing/pair/", {
         pairing_code: cleanedCode,
         device_name: activationDeviceName,
@@ -290,7 +324,6 @@ export default function KioskPage() {
       const pid = String(res.data.pharmacy_id);
       setDeviceToken(token);
       setPharmacyName(name);
-      setPharmacyId(pid);
       localStorage.setItem(KIOSK_TOKEN_KEY, token);
       localStorage.setItem(KIOSK_PHARMACY_NAME_KEY, name);
       localStorage.setItem(KIOSK_PHARMACY_ID_KEY, pid);
@@ -460,6 +493,15 @@ export default function KioskPage() {
         isProvisional: res.data.is_provisional || false,
       });
 
+      if (desktopRuntime) {
+        void enrolDesktopWorker({
+          employeeId: Number(res.data.worker_id),
+          identifier: identifier.trim(),
+          displayName: res.data.worker_name || setupWorkerName,
+          pin: setupNewPin,
+        }).catch((error) => console.warn("Could not enrol worker for offline kiosk use", error));
+      }
+
       // Reset setup state
       setSetupStep("IDLE");
       setSetupOtp("");
@@ -517,11 +559,38 @@ export default function KioskPage() {
         isProvisional: res.data.is_provisional,
       });
 
+      if (desktopRuntime) {
+        void enrolDesktopWorker({
+          employeeId: Number(res.data.worker_id),
+          identifier: identifier.trim(),
+          displayName: res.data.worker_name,
+          pin,
+        }).catch((error) => console.warn("Could not enrol worker for offline kiosk use", error));
+      }
+
       // Clear input
       setPin("");
       setIdentifier("");
       setPinMode(false);
     } catch (err: any) {
+      if (desktopRuntime && !err.response) {
+        try {
+          const offline = await recordDesktopOfflinePin(identifier.trim(), pin);
+          setActionSuccess({
+            action: offline.action,
+            workerName: offline.worker_name,
+            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            customMessage: "Saved securely on this kiosk and queued for sync.",
+          });
+          setPin("");
+          setIdentifier("");
+          setPinMode(false);
+          return;
+        } catch (offlineError) {
+          setPinError(String(offlineError));
+          return;
+        }
+      }
       const isLock = err.response?.data?.locked || false;
       const msg = err.response?.data?.error || "Invalid PIN or staff member not found.";
       setPinError(msg);

@@ -5,6 +5,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import crashlytics from '@react-native-firebase/crashlytics';
 import * as Updates from 'expo-updates';
+import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
@@ -242,7 +243,9 @@ function AuthGate() {
     const second = segmentList[1];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
-    const allowAuthenticatedAccess = new Set(['contact', 'reset-password']);
+    // `kiosk-link` is intentionally reachable only by an explicit deep link.
+    // It is never included in normal startup or navigation menus.
+    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
     const expectedTopByRole: Record<string, string> = {
@@ -356,6 +359,23 @@ function AuthGate() {
   return null;
 }
 
+function KioskLinkNotificationGate() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data: any = response?.notification?.request?.content?.data || {};
+      const route = String(data.kiosk_link_route || '');
+      if (route.startsWith('/kiosk-link?source=kiosk&')) {
+        router.push(route as any);
+      }
+    });
+    return () => subscription.remove();
+  }, [router]);
+
+  return null;
+}
+
 export default function RootLayout() {
   useEffect(() => {
     void initializeMobileSslPinning();
@@ -372,6 +392,7 @@ export default function RootLayout() {
                 <AuthProvider>
                   <WorkspaceProvider>
                     <AuthGate />
+                    <KioskLinkNotificationGate />
                     <UpdatePrompt />
                     <OfflineBanner />
                     <Stack

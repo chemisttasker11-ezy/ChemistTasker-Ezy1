@@ -26,7 +26,7 @@ from django.conf import settings
 from django.core import signing
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -65,12 +65,31 @@ def is_authorized_kiosk_manager(user, pharmacy: Pharmacy) -> bool:
         return True
 
     # 2. PharmacyAdmin check
-    return PharmacyAdmin.objects.filter(
+    if PharmacyAdmin.objects.filter(
         user=user,
         pharmacy=pharmacy,
         is_active=True,
         admin_level__in=[PharmacyAdmin.AdminLevel.OWNER, PharmacyAdmin.AdminLevel.MANAGER],
-    ).exists()
+    ).exists():
+        return True
+
+    # 3. Organization admins, limited to their explicit pharmacy scope when set.
+    if pharmacy.organization_id:
+        try:
+            from users.models import OrganizationMembership
+
+            membership = OrganizationMembership.objects.filter(
+                user=user,
+                organization_id=pharmacy.organization_id,
+                role="ORG_ADMIN",
+            ).first()
+            if membership:
+                scope = membership.pharmacies.all()
+                return not scope.exists() or scope.filter(pk=pharmacy.pk).exists()
+        except DatabaseError:
+            # Some isolated legacy tests intentionally omit the users membership table.
+            return False
+    return False
 
 
 # -----------------------------------------------------------------------------
@@ -81,6 +100,10 @@ def activate_kiosk_device(
     user,
     pharmacy: Pharmacy,
     device_name: str,
+    *,
+    public_signing_key: str = "",
+    platform: str = "",
+    app_version: str = "",
 ) -> Tuple[KioskDevice, str]:
     """Activate a new kiosk device for a pharmacy, issuing a restricted device token."""
     if not is_authorized_kiosk_manager(user, pharmacy):
@@ -95,6 +118,9 @@ def activate_kiosk_device(
     device = KioskDevice.objects.create(
         pharmacy=pharmacy,
         device_name=str(device_name).strip(),
+        public_signing_key=str(public_signing_key or "").strip(),
+        platform=str(platform or "")[:24],
+        app_version=str(app_version or "")[:40],
         device_token=token_hash,
         is_active=True,
         activated_by=user,
@@ -109,7 +135,8 @@ def revoke_kiosk_device(user, kiosk_device: KioskDevice) -> KioskDevice:
         raise PermissionDenied("Only the pharmacy owner or manager can revoke a kiosk device.")
 
     kiosk_device.is_active = False
-    kiosk_device.save(update_fields=["is_active"])
+    kiosk_device.revoked_at = timezone.now()
+    kiosk_device.save(update_fields=["is_active", "revoked_at"])
     return kiosk_device
 
 
@@ -182,6 +209,10 @@ def generate_kiosk_pairing_code(
                 "pharmacy_id": pharmacy.id,
                 "pharmacy_name": pharmacy.name,
                 "expires_in_seconds": ttl_seconds,
+                "kiosk_link_route": (
+                    f"/kiosk-link?source=kiosk&pharmacy_id={pharmacy.id}"
+                    f"&pairing_code={code}"
+                ),
             },
         )
     except Exception:
@@ -194,6 +225,10 @@ def generate_kiosk_pairing_code(
 def redeem_kiosk_pairing_code(
     pairing_code: str,
     device_name: Optional[str] = None,
+    *,
+    public_signing_key: str = "",
+    platform: str = "",
+    app_version: str = "",
 ) -> Tuple[KioskDevice, str]:
     """Redeem a single-use 6-digit pairing code from a physical kiosk terminal.
 
@@ -235,6 +270,9 @@ def redeem_kiosk_pairing_code(
         user=user,
         pharmacy=pharmacy,
         device_name=resolved_device_name,
+        public_signing_key=public_signing_key,
+        platform=platform,
+        app_version=app_version,
     )
 
     # Notify owner that device has been successfully paired
@@ -714,4 +752,3 @@ def worker_update_own_pin(user, new_pin: str) -> WorkerPIN:
     worker_pin.save()
 
     return worker_pin
-

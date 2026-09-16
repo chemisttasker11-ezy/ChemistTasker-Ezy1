@@ -1,27 +1,29 @@
 @echo off
-title ChemistTasker Kiosk Terminal
+setlocal
+title ChemistTasker Offline Kiosk
 
-:: Check if Django Backend is listening on port 8000
-netstat -ano | findstr ":8000 " | findstr "LISTENING" >nul
-if errorlevel 1 (
-    echo Starting ChemistTasker Backend on port 8000...
-    start /min "ChemistTasker Backend" cmd /c "cd /d c:\ChemistTasker_Ezy\chemisttasker-ezy\backend && ..\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000"
-    timeout /t 3 /nobreak >nul
+set "KIOSK_ROOT=%~dp0"
+set "KIOSK_EXE=%KIOSK_ROOT%frontend_web\src-tauri\target\release\chemisttasker-kiosk.exe"
+
+if exist "%KIOSK_EXE%" (
+    start "ChemistTasker Kiosk" "%KIOSK_EXE%"
+    exit /b 0
 )
 
-:: Check if Frontend Gateway is listening on port 3000
-netstat -ano | findstr ":3000 " | findstr "LISTENING" >nul
-if errorlevel 1 (
-    echo Starting ChemistTasker Web Platform on port 3000...
-    start /min "ChemistTasker Frontend" cmd /c "cd /d c:\ChemistTasker_Ezy\chemisttasker-ezy\frontend_web && npm.cmd run dev"
-    timeout /t 4 /nobreak >nul
-)
+where cargo.exe >nul 2>nul
+if errorlevel 1 goto :missing_build
 
-:: Launch Kiosk in Dedicated App Window (Chromium App Mode)
-if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
-    start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --app=http://localhost:3000/kiosk
-) else if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" (
-    start "" "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --app=http://localhost:3000/kiosk
-) else (
-    start http://localhost:3000/kiosk
-)
+if not exist "%KIOSK_ROOT%frontend_web\node_modules\.bin\tauri.cmd" goto :missing_build
+
+cd /d "%KIOSK_ROOT%frontend_web"
+call npm.cmd run kiosk:dev
+exit /b %errorlevel%
+
+:missing_build
+echo ChemistTasker Offline Kiosk has not been built on this computer.
+echo Install the Rust toolchain and frontend dependencies, then run:
+echo   cd /d "%KIOSK_ROOT%frontend_web"
+echo   npm.cmd install
+echo   npm.cmd run kiosk:build
+pause
+exit /b 1

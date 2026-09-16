@@ -55,6 +55,7 @@ from .attendance_transitions import (
     get_active_session_status,
     start_break,
 )
+from .attendance_protocol import sync_offline_batch
 from .models import (
     AttendanceEvent,
     AttendanceSession,
@@ -153,6 +154,9 @@ class KioskActivateView(APIView):
                 user=request.user,
                 pharmacy=pharmacy,
                 device_name=device_name,
+                public_signing_key=request.data.get("public_signing_key", ""),
+                platform=request.data.get("platform", ""),
+                app_version=request.data.get("app_version", ""),
             )
 
             return Response({
@@ -162,6 +166,7 @@ class KioskActivateView(APIView):
                 "pharmacy_id": pharmacy.id,
                 "pharmacy_name": pharmacy.name,
                 "activated_at": device.activated_at.isoformat(),
+                "installation_id": str(device.installation_id),
             }, status=status.HTTP_201_CREATED)
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
@@ -230,6 +235,9 @@ class KioskPairWithCodeView(APIView):
             device, raw_token = redeem_kiosk_pairing_code(
                 pairing_code=pairing_code,
                 device_name=device_name,
+                public_signing_key=request.data.get("public_signing_key", ""),
+                platform=request.data.get("platform", ""),
+                app_version=request.data.get("app_version", ""),
             )
             return Response({
                 "device_id": device.id,
@@ -238,12 +246,35 @@ class KioskPairWithCodeView(APIView):
                 "pharmacy_id": device.pharmacy.id,
                 "pharmacy_name": device.pharmacy.name,
                 "activated_at": device.activated_at.isoformat(),
+                "installation_id": str(device.installation_id),
             }, status=status.HTTP_201_CREATED)
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
             return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class KioskOfflineSyncView(APIView):
+    """Accept a signed, idempotent batch from a local-first kiosk outbox."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request)
+            result = sync_offline_batch(
+                device,
+                request.data.get("events"),
+                app_version=request.data.get("app_version", ""),
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except (DjangoPermissionDenied, PermissionDenied) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+        except DjangoValidationError as exc:
+            message = "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class KioskQRView(APIView):
@@ -1853,4 +1884,3 @@ class RosterActionAuditListView(APIView):
             for a in audits
         ]
         return Response({"audits": data})
-

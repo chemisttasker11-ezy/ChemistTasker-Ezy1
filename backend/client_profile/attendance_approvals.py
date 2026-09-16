@@ -58,14 +58,6 @@ def is_authorized_attendance_manager(user, pharmacy: Pharmacy) -> bool:
     from .admin_helpers import can_manage_roster
     if can_manage_roster(user, pharmacy):
         return True
-    if pharmacy.organization_id:
-        from users.models import OrganizationMembership
-        membership = OrganizationMembership.objects.filter(
-            user=user, organization_id=pharmacy.organization_id, role="ORG_ADMIN",
-        ).first()
-        if membership:
-            scope = membership.pharmacies.all()
-            return not scope.exists() or scope.filter(pk=pharmacy.pk).exists()
     return False
 
 

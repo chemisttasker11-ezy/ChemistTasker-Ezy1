@@ -4241,6 +4241,7 @@ class ShiftSlotSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'date', 'start_time', 'end_time', 'rate', 'start_hour',
             'is_recurring', 'recurring_days', 'recurring_end_date',
+            'roster_period', 'planned_break_minutes',
             'awaiting_payment', 'awaiting_payment_offer_id',
             'is_locked', 'locked_by_offer_id', 'confirmed_assignment_id',
         ]

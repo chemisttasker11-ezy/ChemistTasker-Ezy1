@@ -49,6 +49,9 @@ def clock_in(
     raw_pin: Optional[str] = None,
     user_identifier: Optional[str] = None,
     ip_address: Optional[str] = None,
+    verified_kiosk_event: bool = False,
+    occurred_at=None,
+    assignment_id: Optional[int] = None,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock in a worker at a pharmacy transactionally.
@@ -57,7 +60,7 @@ def clock_in(
     if user is None or pharmacy is None:
         raise ValidationError("Both user and pharmacy are required to clock in.")
 
-    now = timezone.now()
+    now = occurred_at or timezone.now()
 
     with transaction.atomic():
         # Check existing open session across all pharmacies
@@ -71,7 +74,7 @@ def clock_in(
             # Idempotent retry: if exact same pharmacy clocked in within 30 seconds, return existing
             if (
                 existing_session.pharmacy_id == pharmacy.id
-                and (now - existing_session.started_at) <= timedelta(seconds=30)
+                and timedelta(0) <= (now - existing_session.started_at) <= timedelta(seconds=30)
             ):
                 initial_event = existing_session.events.filter(
                     event_type=AttendanceEvent.EventType.CLOCK_IN
@@ -95,6 +98,13 @@ def clock_in(
                 raise ValidationError(f"QR validation failed: {reason}")
             qr_session = qr_sess
             source = AttendanceEvent.Source.MOBILE_QR
+        elif kiosk_device and verified_kiosk_event:
+            if not kiosk_device.is_active:
+                raise ValidationError("Kiosk device is inactive or revoked.")
+            if kiosk_device.pharmacy_id != pharmacy.id:
+                raise ValidationError("Kiosk device does not belong to the target pharmacy.")
+            device = kiosk_device
+            source = AttendanceEvent.Source.OFFLINE_KIOSK
         elif kiosk_device and raw_pin:
             if not kiosk_device.is_active:
                 raise ValidationError("Kiosk device is inactive or revoked.")
@@ -111,7 +121,12 @@ def clock_in(
             raise ValidationError("A valid signed QR token or kiosk PIN credentials must be provided.")
 
         # Resolve attendance eligibility
-        eligibility = resolve_attendance_eligibility(user, pharmacy, target_time=now)
+        eligibility = resolve_attendance_eligibility(
+            user,
+            pharmacy,
+            target_time=now,
+            assignment_id=assignment_id,
+        )
         if not eligibility.is_eligible:
             raise ValidationError(
                 f"Attendance eligibility rejected: {eligibility.rejection_reason}"
@@ -156,6 +171,7 @@ def start_break(
     source: str = AttendanceEvent.Source.IN_APP,
     device: Optional[KioskDevice] = None,
     ip_address: Optional[str] = None,
+    occurred_at=None,
 ) -> AttendanceEvent:
     """Start a break for the worker's active open session."""
     with transaction.atomic():
@@ -171,7 +187,7 @@ def start_break(
         if last_event and last_event.event_type == AttendanceEvent.EventType.BREAK_START:
             raise ValidationError("Cannot start break: Worker is already on break.")
 
-        now = timezone.now()
+        now = occurred_at or timezone.now()
         break_event = AttendanceEvent.objects.create(
             session=session,
             event_type=AttendanceEvent.EventType.BREAK_START,
@@ -189,6 +205,7 @@ def end_break(
     source: str = AttendanceEvent.Source.IN_APP,
     device: Optional[KioskDevice] = None,
     ip_address: Optional[str] = None,
+    occurred_at=None,
 ) -> AttendanceEvent:
     """End a break for the worker's active open session."""
     with transaction.atomic():
@@ -204,7 +221,7 @@ def end_break(
         if not last_event or last_event.event_type != AttendanceEvent.EventType.BREAK_START:
             raise ValidationError("Cannot end break: Worker is not currently on break.")
 
-        now = timezone.now()
+        now = occurred_at or timezone.now()
         end_event = AttendanceEvent.objects.create(
             session=session,
             event_type=AttendanceEvent.EventType.BREAK_END,
@@ -224,13 +241,15 @@ def clock_out(
     raw_pin: Optional[str] = None,
     user_identifier: Optional[str] = None,
     ip_address: Optional[str] = None,
+    verified_kiosk_event: bool = False,
+    occurred_at=None,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock out a worker from their active attendance session.
     Auto-closes active breaks before recording CLOCK_OUT.
     Returns (AttendanceSession, AttendanceEvent).
     """
-    now = timezone.now()
+    now = occurred_at or timezone.now()
 
     with transaction.atomic():
         session = (
@@ -246,6 +265,7 @@ def clock_out(
                 AttendanceSession.objects.filter(
                     user=user,
                     ended_at__gte=now - timedelta(seconds=30),
+                    ended_at__lte=now,
                 )
                 .order_by("-ended_at")
                 .first()
@@ -271,6 +291,13 @@ def clock_out(
                 raise ValidationError(f"QR validation failed: {reason}")
             qr_session = qr_sess
             source = AttendanceEvent.Source.MOBILE_QR
+        elif kiosk_device and verified_kiosk_event:
+            if not kiosk_device.is_active:
+                raise ValidationError("Kiosk device is inactive or revoked.")
+            if kiosk_device.pharmacy_id != session.pharmacy_id:
+                raise ValidationError("Kiosk device does not belong to session pharmacy.")
+            device = kiosk_device
+            source = AttendanceEvent.Source.OFFLINE_KIOSK
         elif kiosk_device and raw_pin:
             if not kiosk_device.is_active:
                 raise ValidationError("Kiosk device is inactive or revoked.")

@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Kiosk window with only application-owned commands","local":true,"windows":["main"],"permissions":["core:default"]}}

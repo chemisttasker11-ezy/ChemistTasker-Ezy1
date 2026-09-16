@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ChemistTasker Kiosk",
+  "version": "0.1.0",
+  "identifier": "com.chemisttasker.kiosk",
+  "build": {
+    "beforeDevCommand": "npm run dev:5173",
+    "devUrl": "http://localhost:5173/kiosk",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ChemistTasker Kiosk",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 900,
+        "minHeight": 650,
+        "fullscreen": false,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https: http://localhost:*; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "dmg"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true }
+    }
+  }
+}
+

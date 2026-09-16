@@ -25,3 +25,6 @@ export * from './constants/personas';
 
 // Re-export pricing utils
 export * from './utils/pricing';
+
+// Shared mobile/desktop offline kiosk protocol.
+export * from './kioskProtocol';

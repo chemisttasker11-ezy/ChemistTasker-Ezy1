@@ -102,3 +102,4 @@ frontend_mobile/steps.txt
 
 # Local preview process logs
 .local-run/
+frontend_web/src-tauri/target/

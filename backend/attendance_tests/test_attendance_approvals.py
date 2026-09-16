@@ -223,7 +223,10 @@ class AttendanceApprovalsTests(unittest.TestCase):
         self.assertIsNotNone(shift)
         self.assertEqual(shift.pharmacy, self.pharmacy_a)
         self.assertEqual(shift.role_needed, "PHARMACIST")
-        self.assertEqual(slot.date, session.started_at.date())
+        self.assertEqual(
+            slot.date,
+            session.started_at.astimezone(zoneinfo.ZoneInfo(self.pharmacy_a.timezone)).date(),
+        )
         self.assertEqual(assignment.user, self.worker_user)
         self.assertFalse(assignment.is_rostered)
 
