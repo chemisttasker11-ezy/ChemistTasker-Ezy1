@@ -278,9 +278,24 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
         "is_on_break",
         "INTEGER NOT NULL DEFAULT 0",
     )?;
-    ensure_column(&connection, "worker_credential", "server_verified_at", "TEXT")?;
-    ensure_column(&connection, "worker_credential", "offline_valid_until", "TEXT")?;
-    ensure_column(&connection, "worker_credential", "credential_generation", "TEXT")?;
+    ensure_column(
+        &connection,
+        "worker_credential",
+        "server_verified_at",
+        "TEXT",
+    )?;
+    ensure_column(
+        &connection,
+        "worker_credential",
+        "offline_valid_until",
+        "TEXT",
+    )?;
+    ensure_column(
+        &connection,
+        "worker_credential",
+        "credential_generation",
+        "TEXT",
+    )?;
     ensure_column(
         &connection,
         "worker_local_state",
@@ -581,7 +596,11 @@ async fn pair_device(
     } else {
         Uuid::new_v4().to_string()
     };
-    set_config_value(&connection, "pairing_code_pending", &normalized_pairing_code)?;
+    set_config_value(
+        &connection,
+        "pairing_code_pending",
+        &normalized_pairing_code,
+    )?;
     set_config_value(&connection, "pairing_attempt_id", &client_attempt_id)?;
     let recovery_message = format!(
         "chemisttasker:kiosk-pair-recovery:v1|{}|{}",
@@ -889,10 +908,20 @@ fn project_worker_state_with_unresolved_local_events(
             continue;
         }
         match payload.get("event_type").and_then(Value::as_str) {
-            Some("CLOCK_IN") => { is_clocked_in = true; is_on_break = false; }
-            Some("CLOCK_OUT") => { is_clocked_in = false; is_on_break = false; }
-            Some("BREAK_START") if is_clocked_in => { is_on_break = true; }
-            Some("BREAK_END") => { is_on_break = false; }
+            Some("CLOCK_IN") => {
+                is_clocked_in = true;
+                is_on_break = false;
+            }
+            Some("CLOCK_OUT") => {
+                is_clocked_in = false;
+                is_on_break = false;
+            }
+            Some("BREAK_START") if is_clocked_in => {
+                is_on_break = true;
+            }
+            Some("BREAK_END") => {
+                is_on_break = false;
+            }
             _ => {}
         }
     }
@@ -914,11 +943,17 @@ fn store_worker_credential(
     if identifier.trim().is_empty() || pin.len() < 4 {
         return Err("A worker identifier and complete PIN are required".to_string());
     }
-    DateTime::parse_from_rfc3339(&server_verified_at).map_err(|_| "Enrollment verified_at is invalid".to_string())?;
-    DateTime::parse_from_rfc3339(&offline_valid_until).map_err(|_| "Enrollment offline_valid_until is invalid".to_string())?;
+    DateTime::parse_from_rfc3339(&server_verified_at)
+        .map_err(|_| "Enrollment verified_at is invalid".to_string())?;
+    DateTime::parse_from_rfc3339(&offline_valid_until)
+        .map_err(|_| "Enrollment offline_valid_until is invalid".to_string())?;
     let connection = open_database(app)?;
     let may_initialize = !table_has_rows(&connection, "worker_credential")?;
-    let pepper = BASE64.encode(load_or_initialize_secret("worker-pin-pepper", 32, may_initialize)?);
+    let pepper = BASE64.encode(load_or_initialize_secret(
+        "worker-pin-pepper",
+        32,
+        may_initialize,
+    )?);
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
         .hash_password(format!("{pin}{pepper}").as_bytes(), &salt)
@@ -943,7 +978,10 @@ fn store_worker_credential(
         )
         .map_err(|error| error.to_string())?;
     let projected = project_worker_state_with_unresolved_local_events(
-        &connection, employee_id, is_clocked_in, is_on_break
+        &connection,
+        employee_id,
+        is_clocked_in,
+        is_on_break,
     )?;
     connection
         .execute(
@@ -1155,7 +1193,10 @@ fn record_offline_pin_attendance(
         .map_err(|error| error.to_string())?
         .unwrap_or(false);
     if needs_reconciliation {
-        return Err("Local attendance state requires online reconciliation before another action".to_string());
+        return Err(
+            "Local attendance state requires online reconciliation before another action"
+                .to_string(),
+        );
     }
     let local_state: (bool, bool) = connection
         .query_row(
