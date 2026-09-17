@@ -107,7 +107,7 @@ def listing_visible_to(user, listing):
             if not listing.scope_organization_id:
                 return False
             chain_admin_same_org = chain_admin and any(pharmacy.organization_id == listing.scope_organization_id for pharmacy in admitted_admin if _pharmacy_in_source_chain(listing, pharmacy))
-            return owner_in_org or source_owner or chain_admin_same_org
+            return owner_in_org or chain_admin_same_org
         return owner_in_org or source_owner or chain_admin
 
     if current == "PLATFORM_OWNERS":

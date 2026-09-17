@@ -18,10 +18,10 @@ class EthicalFinalisationTests(TestCase):
         return user, owner
 
     def approve(self, user, pharmacy, product):
-        EthicalPharmacyApproval.objects.create(pharmacy=pharmacy,applicant=user,accountable_owner=user,business_phone="0700000000",business_email=user.email,pbs_approval_number="PAN-TEST",status="VERIFIED")
-        EthicalProfessionalAccess.objects.update_or_create(user=user,defaults={"status":"VERIFIED","professional_basis":"Synthetic test","schedules":[product.schedule],"activities":["VIEW_CHAIN_ETHICAL","PREPARE_LISTING","APPROVE_TRANSFER"],"jurisdictions":["QLD"]})
+        EthicalPharmacyApproval.objects.get_or_create(pharmacy=pharmacy, defaults={"applicant": user, "accountable_owner": user, "business_phone": "0700000000", "business_email": user.email, "pbs_approval_number": "PAN-TEST", "status": "VERIFIED"})
+        EthicalProfessionalAccess.objects.update_or_create(user=user, defaults={"status": "VERIFIED", "professional_basis": "Synthetic test", "schedules": [product.schedule], "activities": ["VIEW_CHAIN_ETHICAL", "PREPARE_LISTING", "APPROVE_TRANSFER"], "jurisdictions": ["QLD"]})
         for activity in ("VIEW_CHAIN_ETHICAL", "PREPARE_LISTING", "APPROVE_TRANSFER"):
-            EthicalJurisdictionPolicy.objects.create(jurisdiction="QLD",activity=activity,schedule=product.schedule,mode="ANY",allowed=True,effective_from=timezone.now(),policy_version="test",reviewed_by=user)
+            EthicalJurisdictionPolicy.objects.get_or_create(jurisdiction="QLD", activity=activity, schedule=product.schedule, mode="ANY", defaults={"allowed": True, "effective_from": timezone.now(), "policy_version": "test", "reviewed_by": user})
 
     def test_s8_respects_current_chain_stage_before_organisation_ceiling(self):
         source_user, source_owner = self.make_owner("s8-source@example.test")
@@ -56,3 +56,17 @@ class EthicalFinalisationTests(TestCase):
         product = EthicalProduct.objects.create(name="Synthetic S4 2", strength="1", form="pack", pack_size="1", schedule="S4", classification_provenance="test", status="APPROVED")
         with self.assertRaises(ValidationError):
             EthicalListing.objects.create(pharmacy=pharmacy,accountable_owner=user,prepared_by=user,product=product,mode="TRANSFER",current_circle="PLATFORM_OWNERS",maximum_circle="CHAIN_PHARMACIES",scope_owner_id=owner.id)
+
+    def test_s8_denied_to_different_organisation(self):
+        source_user, source_owner = self.make_owner("s8-owner1@example.test")
+        other_user, other_owner = self.make_owner("s8-owner2@example.test")
+        org1 = Organization.objects.create(name="Org 1", slug="org-1")
+        org2 = Organization.objects.create(name="Org 2", slug="org-2")
+        source = Pharmacy.objects.create(name="Source Org1", owner=source_owner, organization=org1, verified=True, state="QLD")
+        dest_diff_org = Pharmacy.objects.create(name="Dest Org2", owner=other_owner, organization=org2, verified=True, state="QLD")
+        product = EthicalProduct.objects.create(name="Synthetic S8 Multi", strength="1", form="pack", pack_size="1", schedule="S8", classification_provenance="test", status="APPROVED")
+        self.approve(source_user, source, product)
+        self.approve(other_user, dest_diff_org, product)
+        listing = EthicalListing.objects.create(pharmacy=source, accountable_owner=source_user, prepared_by=source_user, product=product, mode="TRANSFER", current_circle="ORGANISATION_OWNERS", maximum_circle="ORGANISATION_OWNERS", scope_owner_id=source_owner.id, scope_organization_id=org1.id, status="PUBLISHED")
+        # Same org owner can see, but different org owner cannot
+        self.assertFalse(listing_visible_to(other_user, listing))

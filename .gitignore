@@ -39,6 +39,10 @@ Security_Audit_Tracking.md
 !backend/public_hub/migrations/*.py
 !backend/workforce/migrations/
 !backend/workforce/migrations/*.py
+!backend/marketplace/migrations/
+!backend/marketplace/migrations/*.py
+!backend/ethical_marketplace/migrations/
+!backend/ethical_marketplace/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/
