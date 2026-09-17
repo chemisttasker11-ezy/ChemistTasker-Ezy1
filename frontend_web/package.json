@@ -16,6 +16,8 @@
     "build:kiosk-ui": "node scripts/build-kiosk-ui.mjs",
     "typecheck:kiosk": "tsc --noEmit -p tsconfig.kiosk.json",
     "kiosk:build": "node scripts/run-tauri.mjs build",
+    "kiosk:build:acceptance": "cross-env KIOSK_BUILD_PROFILE=acceptance npm run kiosk:build",
+    "kiosk:build:production": "cross-env KIOSK_BUILD_PROFILE=production npm run kiosk:build",
     "install:all": "npm ci && npm ci --prefix landing_next",
     "build:all": "npm run build && npm run build --prefix landing_next"
   },

@@ -4298,6 +4298,12 @@ class KioskPairingAuthorization(models.Model):
         related_name="authorized_kiosk_pairings",
     )
     code_digest = models.CharField(max_length=64, unique=True)
+    client_attempt_id = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        help_text="Stable native pairing attempt used for proof-bound recovery after a lost response.",
+    )
     device_name = models.CharField(max_length=120, default="Counter Terminal")
     allowed_client_kind = models.CharField(
         max_length=24,

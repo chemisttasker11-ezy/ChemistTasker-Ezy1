@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import base64
 import hashlib
 import secrets
+import uuid
 from typing import Optional, Tuple
 
 from django.conf import settings
@@ -31,6 +32,7 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from client_profile.models import (
@@ -195,6 +197,29 @@ def _pairing_code_digest(code: str) -> str:
     return salted_hmac("chemisttasker.kiosk.pairing", code).hexdigest()
 
 
+PAIRING_RECOVERY_CONTEXT = "chemisttasker:kiosk-pair-recovery:v1"
+
+
+def _normalize_pairing_code(code: str) -> str:
+    return str(code or "").strip().replace(" ", "").replace("-", "")
+
+
+def _pairing_recovery_message(code: str, client_attempt_id) -> bytes:
+    normalized_code = _normalize_pairing_code(code)
+    attempt = uuid.UUID(str(client_attempt_id))
+    return f"{PAIRING_RECOVERY_CONTEXT}|{attempt}|{normalized_code}".encode("utf-8")
+
+
+def _verify_pairing_recovery_proof(public_signing_key: str, code: str, client_attempt_id, proof_signature: str) -> None:
+    try:
+        signature = base64.b64decode(str(proof_signature or ""), validate=True)
+        _validate_kiosk_public_key(public_signing_key, required=True)
+        key = Ed25519PublicKey.from_public_bytes(base64.b64decode(public_signing_key, validate=True))
+        key.verify(signature, _pairing_recovery_message(code, client_attempt_id))
+    except (TypeError, ValueError, InvalidSignature) as exc:
+        raise ValidationError("Native kiosk pairing proof is invalid.") from exc
+
+
 def generate_kiosk_pairing_code(
     user,
     pharmacy: Pharmacy,
@@ -276,78 +301,121 @@ def redeem_kiosk_pairing_code(
     public_signing_key: str = "",
     platform: str = "",
     app_version: str = "",
+    client_attempt_id: str = "",
+    proof_signature: str = "",
 ) -> Tuple[KioskDevice, str]:
-    """Redeem a single-use 6-digit pairing code from a physical kiosk terminal.
+    """Redeem or recover a single-use pairing authorization.
 
-    Atomically retrieves and deletes the cache key, validates the pharmacy,
-    and activates the kiosk device.
+    Native kiosks prove possession of their Ed25519 private key. If the server
+    committed the first redemption but the response was lost, repeating the
+    same pairing code + client_attempt_id + proof reissues a fresh device token
+    for the *same* KioskDevice instead of creating another installation.
     """
-    if not pairing_code or not str(pairing_code).strip():
-        raise ValidationError("A pairing code is required.")
-
-    code = str(pairing_code).strip().replace(" ", "").replace("-", "")
+    code = _normalize_pairing_code(pairing_code)
     if len(code) != 6 or not code.isdigit():
         raise ValidationError("Pairing code must be a 6-digit number.")
 
     native = str(platform or "").lower() in {"windows", "macos", "linux"}
     public_signing_key = _validate_kiosk_public_key(public_signing_key, required=native)
+    attempt_uuid = None
+    if native:
+        try:
+            attempt_uuid = uuid.UUID(str(client_attempt_id))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValidationError("A native kiosk pairing attempt identity is required.") from exc
+        _verify_pairing_recovery_proof(
+            public_signing_key, code, attempt_uuid, proof_signature
+        )
+
+    recovered = False
     with transaction.atomic():
         authorization = (
             KioskPairingAuthorization.objects.select_for_update()
             .filter(code_digest=_pairing_code_digest(code))
             .first()
         )
-        if (
-            authorization is None
-            or authorization.consumed_at is not None
-            or authorization.expires_at <= timezone.now()
-        ):
-            raise ValidationError("Invalid or expired pairing code. Please request a new code from the owner's mobile app.")
-        if native and authorization.allowed_client_kind != KioskPairingAuthorization.ClientKind.NATIVE_OFFLINE:
-            raise ValidationError("This pairing authorization does not allow an offline native kiosk.")
-        resolved_device_name = (
-            str(device_name).strip()
-            if device_name and str(device_name).strip()
-            else authorization.device_name
-        )
-        pharmacy = authorization.pharmacy
-        user = authorization.authorized_by
-        device, raw_token = activate_kiosk_device(
-            user=user,
-            pharmacy=pharmacy,
-            device_name=resolved_device_name,
-            public_signing_key=public_signing_key,
-            platform=platform,
-            app_version=app_version,
-            client_kind=("NATIVE_OFFLINE" if native else "WEB_ONLINE"),
-        )
-        authorization.consumed_at = timezone.now()
-        authorization.resulting_device = device
-        authorization.save(update_fields=["consumed_at", "resulting_device"])
+        if authorization is None or authorization.expires_at <= timezone.now():
+            raise ValidationError(
+                "Invalid or expired pairing code. Please request a new code from the owner's mobile app."
+            )
+
+        if authorization.consumed_at is not None:
+            if (
+                not native
+                or authorization.resulting_device_id is None
+                or authorization.client_attempt_id is None
+                or authorization.client_attempt_id != attempt_uuid
+            ):
+                raise ValidationError(
+                    "Invalid or expired pairing code. Please request a new code from the owner's mobile app."
+                )
+            device = KioskDevice.objects.select_related("pharmacy").get(
+                pk=authorization.resulting_device_id
+            )
+            if not device.is_active or device.revoked_at:
+                raise ValidationError("This kiosk registration has been revoked.")
+            if device.public_signing_key != public_signing_key:
+                raise ValidationError("Pairing recovery key does not match the registered kiosk.")
+            _verify_pairing_recovery_proof(
+                device.public_signing_key, code, attempt_uuid, proof_signature
+            )
+            raw_token = f"{DEVICE_TOKEN_PREFIX}{secrets.token_urlsafe(32)}"
+            device.device_token = hash_kiosk_token(raw_token)
+            device.last_seen_at = timezone.now()
+            device.save(update_fields=["device_token", "last_seen_at"])
+            recovered = True
+        else:
+            if native and authorization.allowed_client_kind != KioskPairingAuthorization.ClientKind.NATIVE_OFFLINE:
+                raise ValidationError("This pairing authorization does not allow an offline native kiosk.")
+            if native:
+                if authorization.client_attempt_id and authorization.client_attempt_id != attempt_uuid:
+                    raise ValidationError("Pairing authorization is already bound to another native attempt.")
+                authorization.client_attempt_id = attempt_uuid
+
+            resolved_device_name = (
+                str(device_name).strip()
+                if device_name and str(device_name).strip()
+                else authorization.device_name
+            )
+            pharmacy = authorization.pharmacy
+            user = authorization.authorized_by
+            device, raw_token = activate_kiosk_device(
+                user=user,
+                pharmacy=pharmacy,
+                device_name=resolved_device_name,
+                public_signing_key=public_signing_key,
+                platform=platform,
+                app_version=app_version,
+                client_kind=("NATIVE_OFFLINE" if native else "WEB_ONLINE"),
+            )
+            authorization.consumed_at = timezone.now()
+            authorization.resulting_device = device
+            update_fields = ["consumed_at", "resulting_device"]
+            if native:
+                update_fields.append("client_attempt_id")
+            authorization.save(update_fields=update_fields)
 
     try:
         cache.delete(f"{KIOSK_PAIR_CACHE_PREFIX}{code}")
     except Exception:
-        # The database is authoritative. A compatibility-cache outage must not
-        # turn a committed registration into an apparent pairing failure.
         pass
 
-    # Notify owner that device has been successfully paired
-    try:
-        from client_profile.notifications import notify_users, Notification
-        notify_users(
-            user_ids=[user.id],
-            title="Kiosk Device Paired",
-            body=f"Kiosk '{device.device_name}' has been successfully activated for {pharmacy.name}.",
-            notification_type=Notification.Type.SECURITY if hasattr(Notification.Type, "SECURITY") else Notification.Type.TASK,
-            payload={
-                "device_id": device.id,
-                "device_name": device.device_name,
-                "pharmacy_id": pharmacy.id,
-            },
-        )
-    except Exception:
-        pass
+    if not recovered:
+        try:
+            from client_profile.notifications import notify_users, Notification
+            notify_users(
+                user_ids=[authorization.authorized_by_id],
+                title="Kiosk Device Paired",
+                body=f"Kiosk '{device.device_name}' has been successfully activated for {device.pharmacy.name}.",
+                notification_type=Notification.Type.SECURITY if hasattr(Notification.Type, "SECURITY") else Notification.Type.TASK,
+                payload={
+                    "device_id": device.id,
+                    "device_name": device.device_name,
+                    "pharmacy_id": device.pharmacy_id,
+                },
+            )
+        except Exception:
+            pass
 
     return device, raw_token
 
@@ -680,7 +748,8 @@ def send_worker_pin_setup_code(
         "created_at": timezone.now().isoformat(),
     }, timeout=WORKER_PIN_OTP_TTL)
 
-    # Send Email via users.tasks.send_async_email
+    # Email delivery is part of this security workflow. Do not claim that a
+    # verification code was sent if the mail provider rejected it.
     try:
         from users.tasks import send_async_email
         pharmacy_name = kiosk_device.pharmacy.name
@@ -695,13 +764,18 @@ def send_worker_pin_setup_code(
             f"Best regards,\n"
             f"ChemistTasker Team"
         )
-        send_async_email(
+        delivery_result = send_async_email(
             subject=subject,
             message=message,
             recipient_list=[worker.email],
         )
-    except Exception:
-        pass
+        if not delivery_result:
+            raise RuntimeError("mail backend did not accept the verification email")
+    except Exception as exc:
+        cache.delete(cache_key)
+        raise ValidationError(
+            "Verification email could not be sent. Please retry; no active setup code was created."
+        ) from exc
 
     # Send in-app notification / push as well
     try:
@@ -721,6 +795,8 @@ def send_worker_pin_setup_code(
         "worker_name": worker.get_full_name() or worker.username,
         "masked_email": mask_email(worker.email),
         "code_already_sent": False,
+        "delivery_channel": "EMAIL",
+        "email_delivery": "SENT",
     }
 
 

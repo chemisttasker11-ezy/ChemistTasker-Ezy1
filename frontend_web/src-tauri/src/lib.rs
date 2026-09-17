@@ -75,6 +75,9 @@ struct EnrollmentResponse {
     pharmacy_id: i64,
     is_clocked_in: bool,
     is_on_break: bool,
+    verified_at: String,
+    offline_valid_until: String,
+    credential_generation: String,
 }
 
 #[derive(Deserialize)]
@@ -273,6 +276,15 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
         &connection,
         "worker_local_state",
         "is_on_break",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    ensure_column(&connection, "worker_credential", "server_verified_at", "TEXT")?;
+    ensure_column(&connection, "worker_credential", "offline_valid_until", "TEXT")?;
+    ensure_column(&connection, "worker_credential", "credential_generation", "TEXT")?;
+    ensure_column(
+        &connection,
+        "worker_local_state",
+        "needs_reconciliation",
         "INTEGER NOT NULL DEFAULT 0",
     )?;
     connection
@@ -560,6 +572,26 @@ async fn pair_device(
         .hash_password(format!("{dashboard_pin}{pepper}").as_bytes(), &salt)
         .map_err(|error| error.to_string())?
         .to_string();
+    let normalized_pairing_code = pairing_code.trim().replace(' ', "").replace('-', "");
+    let existing_code = config_value(&connection, "pairing_code_pending")?.unwrap_or_default();
+    let client_attempt_id = if existing_code == normalized_pairing_code {
+        config_value(&connection, "pairing_attempt_id")?
+            .filter(|value| Uuid::parse_str(value).is_ok())
+            .unwrap_or_else(|| Uuid::new_v4().to_string())
+    } else {
+        Uuid::new_v4().to_string()
+    };
+    set_config_value(&connection, "pairing_code_pending", &normalized_pairing_code)?;
+    set_config_value(&connection, "pairing_attempt_id", &client_attempt_id)?;
+    let recovery_message = format!(
+        "chemisttasker:kiosk-pair-recovery:v1|{}|{}",
+        client_attempt_id, normalized_pairing_code
+    );
+    let proof_signature = BASE64.encode(
+        signing_key(&connection)?
+            .sign(recovery_message.as_bytes())
+            .to_bytes(),
+    );
     let url = format!(
         "{}/client-profile/attendance/kiosk/pairing/pair/",
         api_base_url
@@ -572,6 +604,8 @@ async fn pair_device(
             "public_signing_key": public_signing_key,
             "platform": std::env::consts::OS,
             "app_version": app_version,
+            "client_attempt_id": client_attempt_id,
+            "proof_signature": proof_signature,
         }))
         .send()
         .await
@@ -611,6 +645,12 @@ async fn pair_device(
         )
         .map_err(|error| error.to_string())?;
     transaction.commit().map_err(|error| error.to_string())?;
+    connection
+        .execute(
+            "DELETE FROM local_state WHERE key IN ('pairing_code_pending', 'pairing_attempt_id')",
+            [],
+        )
+        .map_err(|error| error.to_string())?;
     device_identity_from(&connection)
 }
 
@@ -827,6 +867,38 @@ fn record_attendance_internal(
     })
 }
 
+fn project_worker_state_with_unresolved_local_events(
+    connection: &Connection,
+    employee_id: i64,
+    mut is_clocked_in: bool,
+    mut is_on_break: bool,
+) -> Result<(bool, bool), String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT payload_json FROM attendance_event
+             WHERE sync_status IN ('PENDING', 'RECEIVED') ORDER BY device_seq",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?;
+    for row in rows {
+        let payload: Value = serde_json::from_str(&row.map_err(|error| error.to_string())?)
+            .map_err(|error| error.to_string())?;
+        if payload.get("employee_id").and_then(Value::as_i64) != Some(employee_id) {
+            continue;
+        }
+        match payload.get("event_type").and_then(Value::as_str) {
+            Some("CLOCK_IN") => { is_clocked_in = true; is_on_break = false; }
+            Some("CLOCK_OUT") => { is_clocked_in = false; is_on_break = false; }
+            Some("BREAK_START") if is_clocked_in => { is_on_break = true; }
+            Some("BREAK_END") => { is_on_break = false; }
+            _ => {}
+        }
+    }
+    Ok((is_clocked_in, is_on_break))
+}
+
 fn store_worker_credential(
     app: &AppHandle,
     employee_id: i64,
@@ -835,17 +907,18 @@ fn store_worker_credential(
     pin: String,
     is_clocked_in: bool,
     is_on_break: bool,
+    server_verified_at: String,
+    offline_valid_until: String,
+    credential_generation: String,
 ) -> Result<(), String> {
     if identifier.trim().is_empty() || pin.len() < 4 {
         return Err("A worker identifier and complete PIN are required".to_string());
     }
-    let connection = open_database(&app)?;
+    DateTime::parse_from_rfc3339(&server_verified_at).map_err(|_| "Enrollment verified_at is invalid".to_string())?;
+    DateTime::parse_from_rfc3339(&offline_valid_until).map_err(|_| "Enrollment offline_valid_until is invalid".to_string())?;
+    let connection = open_database(app)?;
     let may_initialize = !table_has_rows(&connection, "worker_credential")?;
-    let pepper = BASE64.encode(load_or_initialize_secret(
-        "worker-pin-pepper",
-        32,
-        may_initialize,
-    )?);
+    let pepper = BASE64.encode(load_or_initialize_secret("worker-pin-pepper", 32, may_initialize)?);
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
         .hash_password(format!("{pin}{pepper}").as_bytes(), &salt)
@@ -854,31 +927,34 @@ fn store_worker_credential(
     connection
         .execute(
             "INSERT OR REPLACE INTO worker_credential
-             (employee_id, identifier, display_name, pin_hash, failed_attempts, locked_until, enrolled_at)
-             VALUES (?1, ?2, ?3, ?4, 0, NULL, ?5)",
+             (employee_id, identifier, display_name, pin_hash, failed_attempts, locked_until, enrolled_at,
+              server_verified_at, offline_valid_until, credential_generation)
+             VALUES (?1, ?2, ?3, ?4, 0, NULL, ?5, ?6, ?7, ?8)",
             params![
                 employee_id,
                 identifier.trim().to_lowercase(),
                 display_name,
                 hash,
                 Utc::now().to_rfc3339(),
+                server_verified_at,
+                offline_valid_until,
+                credential_generation,
             ],
         )
         .map_err(|error| error.to_string())?;
+    let projected = project_worker_state_with_unresolved_local_events(
+        &connection, employee_id, is_clocked_in, is_on_break
+    )?;
     connection
         .execute(
-            "INSERT INTO worker_local_state(employee_id, is_clocked_in, is_on_break, updated_at)
-             VALUES (?1, ?2, ?3, ?4)
+            "INSERT INTO worker_local_state(employee_id, is_clocked_in, is_on_break, needs_reconciliation, updated_at)
+             VALUES (?1, ?2, ?3, 0, ?4)
              ON CONFLICT(employee_id) DO UPDATE SET
                 is_clocked_in = excluded.is_clocked_in,
                 is_on_break = excluded.is_on_break,
+                needs_reconciliation = 0,
                 updated_at = excluded.updated_at",
-            params![
-                employee_id,
-                is_clocked_in,
-                is_on_break,
-                Utc::now().to_rfc3339()
-            ],
+            params![employee_id, projected.0, projected.1, Utc::now().to_rfc3339()],
         )
         .map_err(|error| error.to_string())?;
     Ok(())
@@ -936,9 +1012,9 @@ fn record_offline_pin_attendance(
         return Err("Choose an attendance action before confirming".to_string());
     }
     let connection = open_database(app)?;
-    let credential: (i64, String, String, i64, Option<String>) = connection
+    let credential: (i64, String, String, i64, Option<String>, Option<String>) = connection
         .query_row(
-            "SELECT employee_id, display_name, pin_hash, failed_attempts, locked_until
+            "SELECT employee_id, display_name, pin_hash, failed_attempts, locked_until, offline_valid_until
              FROM worker_credential WHERE identifier = ?1",
             [identifier.trim().to_lowercase()],
             |row| {
@@ -948,6 +1024,7 @@ fn record_offline_pin_attendance(
                     row.get(2)?,
                     row.get(3)?,
                     row.get(4)?,
+                    row.get(5)?,
                 ))
             },
         )
@@ -1059,6 +1136,27 @@ fn record_offline_pin_attendance(
             recovered: true,
         });
     }
+    let offline_valid_until = credential.5.as_deref().ok_or_else(||
+        "Offline worker authorization expired; reconnect to verify this worker before recording attendance".to_string()
+    )?;
+    let valid_until = DateTime::parse_from_rfc3339(offline_valid_until)
+        .map_err(|_| "Stored offline worker authorization is invalid".to_string())?
+        .with_timezone(&Utc);
+    if valid_until <= Utc::now() {
+        return Err("Offline worker authorization expired; reconnect to verify this worker before recording attendance".to_string());
+    }
+    let needs_reconciliation: bool = connection
+        .query_row(
+            "SELECT needs_reconciliation FROM worker_local_state WHERE employee_id = ?1",
+            [credential.0],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(false);
+    if needs_reconciliation {
+        return Err("Local attendance state requires online reconciliation before another action".to_string());
+    }
     let local_state: (bool, bool) = connection
         .query_row(
             "SELECT is_clocked_in, is_on_break FROM worker_local_state WHERE employee_id = ?1",
@@ -1129,7 +1227,10 @@ async fn capture_pin_attendance(
     match first_attempt {
         Ok(receipt) => Ok(receipt),
         Err(error)
-            if error.contains("not enrolled for offline use") || error == "Invalid worker PIN" =>
+            if error.contains("not enrolled for offline use")
+                || error == "Invalid worker PIN"
+                || error.contains("Offline worker authorization expired")
+                || error.contains("requires online reconciliation") =>
         {
             let enrollment = enrol_worker_from_server(&app, &identifier, &pin).await?;
             let _guard = runtime.capture_lock.lock().await;
@@ -1141,6 +1242,9 @@ async fn capture_pin_attendance(
                 pin.clone(),
                 enrollment.is_clocked_in,
                 enrollment.is_on_break,
+                enrollment.verified_at,
+                enrollment.offline_valid_until,
+                enrollment.credential_generation,
             )?;
             record_offline_pin_attendance(
                 &app,
@@ -1352,11 +1456,11 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
         if !["accepted", "already_received", "needs_review", "rejected"].contains(&outcome) {
             return Err("Sync result contains an unsupported outcome".to_string());
         }
-        let local: (String, String) = transaction
+        let local: (String, String, String) = transaction
             .query_row(
-                "SELECT event_id, event_hash FROM attendance_event WHERE device_seq = ?1",
+                "SELECT event_id, event_hash, payload_json FROM attendance_event WHERE device_seq = ?1",
                 [sequence],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .map_err(|_| "Sync result references unknown local evidence".to_string())?;
         if local.0 != event_id || local.1 != event_hash {
@@ -1373,6 +1477,18 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
                 params![delivery_status, sequence],
             )
             .map_err(|error| error.to_string())?;
+        if outcome == "rejected" {
+            if let Ok(payload) = serde_json::from_str::<Value>(&local.2) {
+                if let Some(employee_id) = payload.get("employee_id").and_then(Value::as_i64) {
+                    transaction
+                        .execute(
+                            "UPDATE worker_local_state SET needs_reconciliation = 1 WHERE employee_id = ?1",
+                            [employee_id],
+                        )
+                        .map_err(|error| error.to_string())?;
+                }
+            }
+        }
         transaction
             .execute(
                 "INSERT INTO sync_receipt(device_seq, event_id, result_json, acknowledged_at)

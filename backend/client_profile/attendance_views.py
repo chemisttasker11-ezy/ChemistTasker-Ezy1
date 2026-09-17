@@ -7,6 +7,8 @@ Attendance REST API views connecting to:
 import hashlib
 from datetime import date, datetime, timedelta
 
+from django.conf import settings
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
     PermissionDenied as DjangoPermissionDenied,
@@ -260,6 +262,8 @@ class KioskPairWithCodeView(APIView):
                 public_signing_key=request.data.get("public_signing_key", ""),
                 platform=request.data.get("platform", ""),
                 app_version=request.data.get("app_version", ""),
+                client_attempt_id=request.data.get("client_attempt_id", ""),
+                proof_signature=request.data.get("proof_signature", ""),
             )
             return Response({
                 "device_id": device.id,
@@ -317,7 +321,7 @@ class KioskConfigView(APIView):
                 "device_id": str(device.installation_id),
                 "pharmacy_id": device.pharmacy_id,
                 "server_time": now.isoformat(),
-                "max_offline_hours": 24,
+                "max_offline_hours": int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24)),
             })
         except (DjangoPermissionDenied, PermissionDenied) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
@@ -364,13 +368,22 @@ class KioskWorkerEnrolView(APIView):
                     {"error": "Worker has an active attendance session at another pharmacy."},
                     status=status.HTTP_409_CONFLICT,
                 )
+            verified_at = timezone.now()
+            max_offline_hours = int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24))
+            worker_pin = membership.worker_pin
+            credential_generation = hashlib.sha256(
+                f"{worker_pin.pk}:{int(worker_pin.is_enabled)}:{worker_pin.pin_hash}".encode("utf-8")
+            ).hexdigest()
             return Response({
                 "worker_id": worker.id,
                 "worker_name": worker.get_full_name() or worker.username,
                 "pharmacy_id": device.pharmacy_id,
                 "is_clocked_in": active_session is not None,
                 "is_on_break": bool(active_session and active_session["is_on_break"]),
-                "verified_at": timezone.now().isoformat(),
+                "verified_at": verified_at.isoformat(),
+                "offline_valid_until": (verified_at + timedelta(hours=max_offline_hours)).isoformat(),
+                "credential_generation": credential_generation,
+                "max_offline_hours": max_offline_hours,
             })
         except (DjangoPermissionDenied, PermissionDenied) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
