@@ -1555,6 +1555,8 @@ class Shift(models.Model):
 
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            _assert_roster_shift_mutable(self)
         self.full_clean()
         if not self.pk and self.role_needed == 'PHARMACIST':
             self.rate_type = self.rate_type or self.pharmacy.default_rate_type
@@ -1794,6 +1796,77 @@ class PillLedgerEntry(models.Model):
         return f"{self.user.email}: {self.delta:+d} pills ({self.source})"
 
 
+def _published_roster_period(pharmacy_id, work_date):
+    if not pharmacy_id or not work_date:
+        return None
+    monday = work_date - timedelta(days=work_date.weekday())
+    return RosterPeriod.objects.filter(
+        pharmacy_id=pharmacy_id,
+        week_start=monday,
+        status=RosterPeriod.Status.PUBLISHED,
+    ).first()
+
+
+def _published_period_for_slot(slot):
+    if slot.roster_period_id:
+        period = RosterPeriod.objects.filter(pk=slot.roster_period_id).first()
+        if period and period.status == RosterPeriod.Status.PUBLISHED:
+            return period
+
+    dates = {slot.date}
+    if slot.pk:
+        original = ShiftSlot.objects.filter(pk=slot.pk).values("date", "roster_period_id").first()
+        if original:
+            dates.add(original["date"])
+            if original["roster_period_id"]:
+                period = RosterPeriod.objects.filter(pk=original["roster_period_id"]).first()
+                if period and period.status == RosterPeriod.Status.PUBLISHED:
+                    return period
+        if ShiftSlotAssignment.objects.filter(slot_id=slot.pk, is_rostered=True).exists():
+            for work_date in dates:
+                period = _published_roster_period(slot.shift.pharmacy_id, work_date)
+                if period:
+                    return period
+    return None
+
+
+def _assert_roster_slot_mutable(slot):
+    period = _published_period_for_slot(slot)
+    if period:
+        raise ValidationError(
+            "Cannot change a published roster. Unpublish the roster period before editing it."
+        )
+
+
+def _assert_roster_shift_mutable(shift):
+    for slot in shift.slots.all():
+        period = _published_period_for_slot(slot)
+        if period:
+            raise ValidationError(
+                "Cannot change a shift in a published roster. Unpublish the roster period before editing it."
+            )
+
+
+def _assert_roster_assignment_mutable(assignment):
+    slot = assignment.slot if assignment.slot_id else None
+    if not slot:
+        return
+    is_rostered = assignment.is_rostered
+    if assignment.pk:
+        is_rostered = is_rostered or ShiftSlotAssignment.objects.filter(
+            pk=assignment.pk, is_rostered=True
+        ).exists()
+    if not is_rostered:
+        return
+    period = _published_period_for_slot(slot)
+    if not period:
+        period = _published_roster_period(slot.shift.pharmacy_id, assignment.slot_date or slot.date)
+    if period:
+        raise ValidationError(
+            "Cannot change an assignment in a published roster. Unpublish the roster period before editing it."
+        )
+
+
 class ShiftSlot(models.Model):
     roster_period = models.ForeignKey(
         "RosterPeriod", null=True, blank=True, on_delete=models.PROTECT,
@@ -1856,8 +1929,13 @@ class ShiftSlot(models.Model):
                 raise ValidationError({'recurring_end_date': 'Should be empty for non-recurring slots.'})
 
     def save(self, *args, **kwargs):
+        _assert_roster_slot_mutable(self)
         self.full_clean()
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        _assert_roster_slot_mutable(self)
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"{self.shift} slot on {self.date}"
@@ -1936,6 +2014,14 @@ class ShiftSlotAssignment(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} assigned to slot {self.slot.id}"
+
+    def save(self, *args, **kwargs):
+        _assert_roster_assignment_mutable(self)
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        _assert_roster_assignment_mutable(self)
+        return super().delete(*args, **kwargs)
 
 
 class ShiftProfileAccessAudit(models.Model):

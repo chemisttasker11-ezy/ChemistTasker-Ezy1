@@ -39,7 +39,7 @@ class TimesheetProjectionTests(TestCase):
         self.work_date = datetime.now(ZoneInfo("Australia/Brisbane")).date()
         monday = self.work_date - timedelta(days=self.work_date.weekday())
         self.roster_period = RosterPeriod.objects.create(
-            pharmacy=self.pharmacy, week_start=monday, status=RosterPeriod.Status.PUBLISHED, created_by=self.owner,
+            pharmacy=self.pharmacy, week_start=monday, status=RosterPeriod.Status.DRAFT, created_by=self.owner,
         )
         shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner, dedicated_user=self.worker,
@@ -52,6 +52,8 @@ class TimesheetProjectionTests(TestCase):
         self.assignment = ShiftSlotAssignment.objects.create(
             shift=shift, slot=slot, slot_date=self.work_date, user=self.worker, is_rostered=True,
         )
+        self.roster_period.status = RosterPeriod.Status.PUBLISHED
+        self.roster_period.save(update_fields=["status"])
         tz = ZoneInfo("Australia/Brisbane")
         start = datetime.combine(self.work_date, time(8, 9), tzinfo=tz)
         break_start = datetime.combine(self.work_date, time(12, 0), tzinfo=tz)
@@ -91,6 +93,20 @@ class TimesheetProjectionTests(TestCase):
         self.assertIsNotNone(day["actual_start"])
         self.assertIsNotNone(day["rostered_start"])
 
+    def test_published_roster_rows_cannot_be_changed(self):
+        slot = self.assignment.slot
+        slot.start_time = time(9, 0)
+        with self.assertRaises(ValidationError):
+            slot.save()
+
+        self.assignment.user = self.owner
+        with self.assertRaises(ValidationError):
+            self.assignment.save()
+
+        self.assignment.shift.description = "Changed after publication"
+        with self.assertRaises(ValidationError):
+            self.assignment.shift.save()
+
     def test_projection_is_idempotent_when_sources_unchanged(self):
         first = build_timesheet(self.timesheet.pk, actor=self.owner)
         second = build_timesheet(self.timesheet.pk, actor=self.owner)
@@ -99,6 +115,8 @@ class TimesheetProjectionTests(TestCase):
 
     def test_missing_clock_out_must_be_fixed_at_source(self):
         # Create a second open session in the same period with a clock-in only.
+        self.roster_period.status = RosterPeriod.Status.DRAFT
+        self.roster_period.save(update_fields=["status"])
         tz = ZoneInfo("Australia/Brisbane")
         next_day = self.period.start_date + timedelta(days=1)
         shift = Shift.objects.create(
@@ -111,6 +129,8 @@ class TimesheetProjectionTests(TestCase):
         assignment = ShiftSlotAssignment.objects.create(
             shift=shift, slot=slot, slot_date=next_day, user=self.worker, is_rostered=True,
         )
+        self.roster_period.status = RosterPeriod.Status.PUBLISHED
+        self.roster_period.save(update_fields=["status"])
         started = datetime.combine(next_day, time(9, 0), tzinfo=tz)
         open_session = AttendanceSession.objects.create(
             pharmacy=self.pharmacy, user=self.worker, assignment=assignment, source_membership=self.membership,
@@ -137,6 +157,8 @@ class TimesheetProjectionTests(TestCase):
         self.assertFalse(updated.checks.filter(code="MISSING_CLOCK_OUT").exists())
 
     def test_full_day_leave_counts_only_published_roster_overlap(self):
+        self.roster_period.status = RosterPeriod.Status.DRAFT
+        self.roster_period.save(update_fields=["status"])
         User = get_user_model()
         worker = User.objects.create(
             username="wf_leave_worker", email="wf-leave@example.invalid", role="PHARMACIST",
@@ -157,6 +179,8 @@ class TimesheetProjectionTests(TestCase):
         ShiftSlotAssignment.objects.create(
             shift=shift, slot=slot, slot_date=self.work_date, user=worker, is_rostered=True,
         )
+        self.roster_period.status = RosterPeriod.Status.PUBLISHED
+        self.roster_period.save(update_fields=["status"])
         tz = ZoneInfo("Australia/Brisbane")
         WorkforceLeaveRequest.objects.create(
             pharmacy=self.pharmacy, membership=membership, user=worker, leave_type="ANNUAL",

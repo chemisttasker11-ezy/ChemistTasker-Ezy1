@@ -51,7 +51,15 @@ The actual PostgreSQL run exposed and resolved:
 - Invalid package fixtures: three full-time shifts omitted mandatory hourly pay bounds. Added both bounds to the test fixtures, preserving the existing Shift validation rules.
 - A runtime PostgreSQL error in `build_timesheet`: unrestricted `select_for_update` included a nullable membership join. Restricted row locking to the timesheet and its non-null period with `of=("self", "period")`.
 
-Final result: seven tests passed, with Django system checks reporting no issues. These cover stale roster revision rejection, deterministic warning keys, idempotent publishing, roster/actual separation, idempotent timesheet projection, audited missing-clock-out repair with waiver rejection, and full-day leave overlap.
+Final result: seven original tests passed, with Django system checks reporting no issues. These cover stale roster revision rejection, deterministic warning keys, idempotent publishing, roster/actual separation, idempotent timesheet projection, audited missing-clock-out repair with waiver rejection, and full-day leave overlap.
+
+## Reviewer follow-up closed
+
+The reviewer found that the workforce migration was locally present but ignored by the root migration rule. Added explicit Git exceptions for `backend/workforce/migrations/`; `0001_initial.py` and `__init__.py` are now visible to Git and must be included in the next commit.
+
+Published roster isolation is now enforced for normal model-backed roster changes. A published week rejects changes to its Shift, ShiftSlot, and rostered ShiftSlotAssignment records. Managers must unpublish to draft, make changes, validate, and publish again. Added a PostgreSQL-backed regression test covering slot-time, assignment, and shift changes after publication.
+
+The disposable PostgreSQL workforce run now passes eight tests.
 
 Repeat with the local environment loaded:
 
