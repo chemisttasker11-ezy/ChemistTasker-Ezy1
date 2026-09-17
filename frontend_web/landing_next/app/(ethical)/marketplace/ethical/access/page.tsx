@@ -1,2 +1,2 @@
-import {EthicalWorkspace} from '@/features/marketplace/workspace';
-export default function Page(){return <EthicalWorkspace view="access"/>}
+import EthicalWorkspaceV2 from '@/features/marketplace/ethical-workspace-v2';
+export default function Page(){return <EthicalWorkspaceV2 view="access"/>}
