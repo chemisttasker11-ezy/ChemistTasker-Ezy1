@@ -6,10 +6,7 @@ from client_profile.models import OwnerOnboarding, Pharmacy, PharmacyAdmin
 from marketplace.policy import evaluate_marketplace_access, owns_pharmacy
 from .models import EthicalJurisdictionPolicy, EthicalPharmacyApproval, EthicalPharmacyGrant, EthicalProfessionalAccess
 
-CAPABILITIES = {
-    "VIEW_CHAIN_ETHICAL", "MANAGE_OWN_STOCK", "PREPARE_LISTING", "REQUEST_TRANSFER",
-    "APPROVE_TRANSFER", "DISPATCH", "RECEIVE",
-}
+CAPABILITIES = {"VIEW_CHAIN_ETHICAL", "MANAGE_OWN_STOCK", "PREPARE_LISTING", "REQUEST_TRANSFER", "APPROVE_TRANSFER", "DISPATCH", "RECEIVE"}
 
 
 @dataclass(frozen=True)
@@ -76,40 +73,52 @@ def models_q_effective():
     return Q(effective_until__isnull=True) | Q(effective_until__gt=now)
 
 
+def _pharmacy_in_source_chain(listing, pharmacy):
+    if listing.scope_chain_id:
+        return listing.scope_chain.pharmacies.filter(pk=pharmacy.pk).exists()
+    return pharmacy.owner_id == listing.scope_owner_id
+
+
 def listing_visible_to(user, listing):
-    # The source pharmacy team always sees its own listing under current access.
-    if evaluate_ethical_access(user, listing.pharmacy, "VIEW_CHAIN_ETHICAL", product=listing.product).admitted:
+    # Source pharmacy team always sees its own listing under current exact access.
+    if evaluate_ethical_access(user, listing.pharmacy, "VIEW_CHAIN_ETHICAL", product=listing.product, mode=listing.mode).admitted:
         return True
+
     owner_profile_id = OwnerOnboarding.objects.filter(user=user).values_list("id", flat=True).first()
     owned = list(Pharmacy.objects.filter(owner_id=owner_profile_id, verified=True))
     admitted_owned = [pharmacy for pharmacy in owned if evaluate_ethical_access(user, pharmacy, "VIEW_CHAIN_ETHICAL", product=listing.product, mode=listing.mode).admitted]
+
     active_grants = EthicalPharmacyGrant.objects.filter(user=user, revoked_at__isnull=True).filter(models_q_valid())
     active_admin_pharmacy_ids = [grant.pharmacy_id for grant in active_grants if "VIEW_CHAIN_ETHICAL" in grant.allowed_actions]
     admitted_admin = [pharmacy for pharmacy in Pharmacy.objects.filter(id__in=active_admin_pharmacy_ids, verified=True) if evaluate_ethical_access(user, pharmacy, "VIEW_CHAIN_ETHICAL", product=listing.product, mode=listing.mode).admitted]
-    # S8 never escapes a real shared organisation and never reaches platform.
-    if listing.product.schedule.upper() == "S8":
-        return bool(listing.pharmacy.organization_id and any(pharmacy.organization_id == listing.pharmacy.organization_id for pharmacy in admitted_owned + admitted_admin))
-    # Chain admins remain eligible at wider circles, but unrelated admins are not
-    # added by organisation/platform expansion.
-    if listing.scope_chain_id:
-        chain_admin = any(listing.scope_chain.pharmacies.filter(pk=pharmacy.pk).exists() for pharmacy in admitted_admin)
-    else:
-        chain_admin = any(pharmacy.owner_id == listing.scope_owner_id for pharmacy in admitted_admin)
-    if chain_admin:
-        return True
-    if not admitted_owned:
-        return False
-    if listing.current_circle == "CHAIN_PHARMACIES":
-        if listing.scope_chain_id:
-            return listing.scope_chain.pharmacies.filter(pk__in=[row.pk for row in admitted_owned]).exists()
-        return any(pharmacy.owner_id == listing.scope_owner_id for pharmacy in admitted_owned)
-    if listing.current_circle == "ORGANISATION_OWNERS":
-        return bool(listing.scope_organization_id and any(pharmacy.organization_id == listing.scope_organization_id for pharmacy in admitted_owned)) or any(pharmacy.owner_id == listing.scope_owner_id for pharmacy in admitted_owned)
-    return True
+
+    chain_admin = any(_pharmacy_in_source_chain(listing, pharmacy) for pharmacy in admitted_admin)
+    current = listing.current_circle
+    is_s8 = (listing.product.schedule or "").upper() == "S8"
+
+    if current == "CHAIN_PHARMACIES":
+        owner_in_chain = any(_pharmacy_in_source_chain(listing, pharmacy) for pharmacy in admitted_owned)
+        return chain_admin or owner_in_chain
+
+    if current == "ORGANISATION_OWNERS":
+        owner_in_org = bool(listing.scope_organization_id and any(pharmacy.organization_id == listing.scope_organization_id for pharmacy in admitted_owned))
+        source_owner = any(pharmacy.owner_id == listing.scope_owner_id for pharmacy in admitted_owned)
+        if is_s8:
+            if not listing.scope_organization_id:
+                return False
+            chain_admin_same_org = chain_admin and any(pharmacy.organization_id == listing.scope_organization_id for pharmacy in admitted_admin if _pharmacy_in_source_chain(listing, pharmacy))
+            return owner_in_org or source_owner or chain_admin_same_org
+        return owner_in_org or source_owner or chain_admin
+
+    if current == "PLATFORM_OWNERS":
+        if is_s8:
+            return False
+        return chain_admin or bool(admitted_owned)
+
+    return False
 
 
 def candidate_listings_for(user):
-    """Database-level coarse scope; object policy remains the final authority."""
     from django.db.models import Q
     from .models import EthicalListing
 
@@ -117,10 +126,7 @@ def candidate_listings_for(user):
     owned = Pharmacy.objects.filter(owner_id=owner_profile_id, verified=True)
     owner_ids = list(owned.values_list("owner_id", flat=True))
     organisation_ids = [value for value in owned.values_list("organization_id", flat=True) if value]
-    admin_pharmacy_ids = [
-        grant.pharmacy_id for grant in EthicalPharmacyGrant.objects.filter(user=user, revoked_at__isnull=True).filter(models_q_valid())
-        if "VIEW_CHAIN_ETHICAL" in grant.allowed_actions
-    ]
+    admin_pharmacy_ids = [grant.pharmacy_id for grant in EthicalPharmacyGrant.objects.filter(user=user, revoked_at__isnull=True).filter(models_q_valid()) if "VIEW_CHAIN_ETHICAL" in grant.allowed_actions]
     context_ids = list(owned.values_list("id", flat=True)) + admin_pharmacy_ids
     scope = Q(pharmacy_id__in=context_ids)
     if owner_ids:
