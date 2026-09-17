@@ -14,6 +14,7 @@ export * from './transport/client';
 export * from './platformApi';
 export * from './contracts/publicContent';
 export * from './contracts/marketplace';
+export * from './contracts/ethicalMarketplace';
 
 // Re-export all types
 export * from './types';

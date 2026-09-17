@@ -85,3 +85,29 @@ describe('createChemistTaskerApi Marketplace', () => {
     ]);
   });
 });
+
+describe('createChemistTaskerApi Ethical Marketplace', () => {
+  it('uses named import, lot, listing and transfer routes', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? 'GET' });
+      return json({ id: 1, status: 'ok', state: 'ok', version: 2 });
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const form = new FormData();
+    form.append('file', new Blob(['barcode,batch_number']), 'stock.csv');
+
+    await api.ethicalMarketplace.uploadImport(form);
+    await api.ethicalMarketplace.reconcileLot(2, { expected_version: 1, on_hand_quantity: 4 });
+    await api.ethicalMarketplace.actOnListing('listing-id', 'publish', { expected_version: 1 });
+    await api.ethicalMarketplace.actOnTransfer('transfer-id', 'dispatch', { expected_version: 1, client_request_id: 'request-id' });
+
+    expect(calls).toEqual([
+      { url: 'https://example.test/api/ethical/inventory/imports/', method: 'POST' },
+      { url: 'https://example.test/api/ethical/inventory/lots/2/reconcile/', method: 'POST' },
+      { url: 'https://example.test/api/ethical/listings/listing-id/publish/', method: 'POST' },
+      { url: 'https://example.test/api/ethical/transfers/transfer-id/dispatch/', method: 'POST' },
+    ]);
+    expect(api.ethicalMarketplace.transferDocumentPath('transfer-id', 9)).toBe('/ethical/transfers/transfer-id/documents/9/');
+  });
+});
