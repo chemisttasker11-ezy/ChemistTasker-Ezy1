@@ -15,6 +15,7 @@ export * from './platformApi';
 export * from './contracts/publicContent';
 export * from './contracts/marketplace';
 export * from './contracts/ethicalMarketplace';
+export * from './contracts/attendanceRoster';
 
 // Re-export all types
 export * from './types';

@@ -111,3 +111,26 @@ describe('createChemistTaskerApi Ethical Marketplace', () => {
     expect(api.ethicalMarketplace.transferDocumentPath('transfer-id', 9)).toBe('/ethical/transfers/transfer-id/documents/9/');
   });
 });
+
+describe('createChemistTaskerApi roster and attendance', () => {
+  it('uses named manager, PIN and roster action routes', async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return json({ status: 'ok', request_id: 1, message: 'ok' });
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+
+    await api.attendance.updatePin(2, '1234');
+    await api.attendance.approve(3, 'Roster confirmed');
+    await api.rosterV2.copyWeek({ source_period_id: 4, target_week_start: '2026-09-21' });
+    await api.rosterV2.approveReplacement(5, 6);
+
+    expect(urls).toEqual([
+      'https://example.test/api/client-profile/attendance/worker/pin/update/',
+      'https://example.test/api/client-profile/attendance/manager/approve/',
+      'https://example.test/api/client-profile/attendance/roster/copy-week/',
+      'https://example.test/api/client-profile/attendance/roster/manager/approve-replacement/',
+    ]);
+  });
+});
