@@ -17,4 +17,5 @@ MIGRATION_MODULES = {
     "public_hub": None,
     "marketplace": None,
     "ethical_marketplace": None,
+    "workforce": None,
 }

@@ -1,8 +1,10 @@
 from django.urls import path
 from . import views
+from .owner_views import ImportCommit, MyListings
 
 urlpatterns = [
     path("me/access/", views.MyAccess.as_view()),
+    path("me/listings/", MyListings.as_view()),
     path("pharmacies/<int:pharmacy_id>/approval/", views.PharmacyApproval.as_view()),
     path("pharmacies/<int:pharmacy_id>/grants/", views.PharmacyGrants.as_view()),
     path("pharmacies/<int:pharmacy_id>/grants/<int:pk>/revoke/", views.GrantRevoke.as_view()),
@@ -10,6 +12,7 @@ urlpatterns = [
     path("catalogue/lookup/", views.CatalogueLookup.as_view()),
     path("inventory/imports/", views.Imports.as_view()),
     path("inventory/imports/<int:pk>/", views.ImportDetail.as_view()),
+    path("inventory/imports/<int:pk>/commit/", ImportCommit.as_view()),
     path("inventory/lots/", views.Lots.as_view()),
     path("inventory/lots/<int:pk>/", views.LotDetail.as_view()),
     path("inventory/lots/<int:pk>/reconcile/", views.LotReconcile.as_view()),

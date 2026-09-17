@@ -20,8 +20,10 @@ def process_ethical_escalations(limit=100):
             listing = step.listing
             owner = listing.accountable_owner
             decision = evaluate_ethical_access(owner, listing.pharmacy, "APPROVE_TRANSFER", product=listing.product, mode=listing.mode)
+            order = {"CHAIN_PHARMACIES": 1, "ORGANISATION_OWNERS": 2, "PLATFORM_OWNERS": 3}
+            target_too_broad = order.get(step.target_circle, 99) > order.get(listing.maximum_circle, 0)
             s8_too_broad = listing.product.schedule.upper() == "S8" and step.target_circle == "PLATFORM_OWNERS"
-            valid = decision.admitted and owns_pharmacy(owner, listing.pharmacy) and listing.status == "PUBLISHED" and listing.version == step.schedule_version and not s8_too_broad
+            valid = decision.admitted and owns_pharmacy(owner, listing.pharmacy) and listing.status == "PUBLISHED" and listing.version == step.schedule_version and not s8_too_broad and not target_too_broad
             if valid:
                 listing.current_circle = step.target_circle
                 listing.save(update_fields=("current_circle", "updated_at"))

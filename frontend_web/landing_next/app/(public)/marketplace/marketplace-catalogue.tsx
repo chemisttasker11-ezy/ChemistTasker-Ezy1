@@ -5,92 +5,17 @@ import {ArrowRight, MapPin, PackageOpen, RefreshCw, Search, SlidersHorizontal, T
 import {useCallback,useEffect,useMemo,useState} from 'react';
 
 type ListingImage={url?:string;derivative_url?:string;alt?:string};
-type PublicListing={
- id:string|number;
- slug?:string;
- title:string;
- summary?:string;
- category?:string|{slug?:string;name?:string};
- condition?:string;
- mode?:'SELL'|'SWAP'|'FREE'|string;
- item_amount?:number|string|null;
- currency?:string;
- seller_role_label?:string;
- coarse_location?:string;
- permitted_buyer_labels?:string[];
- delivery_options?:string[];
- image_url?:string;
- images?:ListingImage[];
-};
+type PublicListing={id:string|number;slug?:string;title:string;summary?:string;category?:string|{slug?:string;name?:string};condition?:string;mode?:'SELL'|'SWAP'|'FREE'|string;item_amount?:number|string|null;currency?:string;seller_role_label?:string;coarse_location?:string;permitted_buyer_labels?:string[];delivery_options?:string[];image_url?:string;images?:ListingImage[]};
 type ListingsResponse=PublicListing[]|{results?:PublicListing[];count?:number};
-
-const categoryOptions=[
- ['','All categories'],['books-study','Books & study'],['workwear','Workwear'],['pharmacy-fixtures','Pharmacy fixtures'],['office-tools','Office & tools'],
-];
+const categoryOptions=[['','All categories'],['books-study','Books & study'],['workwear','Workwear'],['pharmacy-fixtures','Pharmacy fixtures'],['office-tools','Office & tools'],['pharmacy-stock','Ordinary pharmacy stock']];
 const modeOptions=[['','All'],['SELL','Sell'],['SWAP','Swap'],['FREE','Free']];
-
 function listingImage(listing:PublicListing){return listing.image_url||listing.images?.[0]?.derivative_url||listing.images?.[0]?.url;}
 function categoryName(listing:PublicListing){return typeof listing.category==='string'?listing.category:listing.category?.name||'Approved goods';}
 function modeLabel(listing:PublicListing){return listing.mode==='FREE'?'Free':listing.mode==='SWAP'?'Swap':'Sell';}
-function amountLabel(listing:PublicListing){
- if(listing.mode==='FREE')return 'Free';
- if(listing.mode==='SWAP')return 'Swap';
- if(listing.item_amount===null||listing.item_amount===undefined||listing.item_amount==='')return 'Price on listing';
- const amount=Number(listing.item_amount);
- return Number.isFinite(amount)?new Intl.NumberFormat('en-AU',{style:'currency',currency:listing.currency||'AUD',maximumFractionDigits:amount%1?2:0}).format(amount):String(listing.item_amount);
-}
-
+function amountLabel(listing:PublicListing){if(listing.mode==='FREE')return 'Free';if(listing.mode==='SWAP')return 'Swap';if(listing.item_amount===null||listing.item_amount===undefined||listing.item_amount==='')return 'Price on listing';const amount=Number(listing.item_amount);return Number.isFinite(amount)?new Intl.NumberFormat('en-AU',{style:'currency',currency:listing.currency||'AUD',maximumFractionDigits:amount%1?2:0}).format(amount):String(listing.item_amount);}
 export default function MarketplaceCatalogue({initialCategory='' }:{initialCategory?:string}){
- const [query,setQuery]=useState('');
- const [category,setCategory]=useState(initialCategory);
- const [mode,setMode]=useState('');
- const [listings,setListings]=useState<PublicListing[]>([]);
- const [count,setCount]=useState(0);
- const [state,setState]=useState<'loading'|'ready'|'error'>('loading');
- const [reloadKey,setReloadKey]=useState(0);
-
- const load=useCallback(async(signal:AbortSignal)=>{
-  setState('loading');
-  const params=new URLSearchParams();
-  if(query.trim())params.set('search',query.trim());
-  if(category)params.set('category',category);
-  if(mode)params.set('mode',mode);
-  try{
-   const response=await fetch(`/api/platform/marketplace/listings/${params.size?`?${params}`:''}`,{cache:'no-store',signal,headers:{Accept:'application/json'}});
-   if(!response.ok)throw new Error('Marketplace unavailable');
-   const data=await response.json() as ListingsResponse;
-   const next=Array.isArray(data)?data:Array.isArray(data.results)?data.results:[];
-   setListings(next);setCount(Array.isArray(data)?data.length:data.count??next.length);setState('ready');
-  }catch(error){if((error as Error).name!=='AbortError'){setListings([]);setCount(0);setState('error');}}
- },[query,category,mode,reloadKey]);
-
- useEffect(()=>{const controller=new AbortController();const timer=window.setTimeout(()=>void load(controller.signal),query?250:0);return()=>{window.clearTimeout(timer);controller.abort();};},[load,query]);
- const hasFilters=Boolean(query||category||mode);
- const resultLabel=useMemo(()=>`${count} approved ${count===1?'listing':'listings'}`,[count]);
- const clear=()=>{setQuery('');setCategory('');setMode('');};
-
- return <section id="browse" className="marketplace-catalogue" aria-labelledby="browse-title">
-  <div className="container">
-   <div className="marketplace-section-heading catalogue-heading">
-    <h2 id="browse-title">Browse approved listings.</h2>
-    <p>Search by item, then narrow by category or exchange type.</p>
-   </div>
-   <form className="marketplace-filters" role="search" onSubmit={event=>event.preventDefault()}>
-    <label className="marketplace-search"><span>Search listings</span><div><Search size={19}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Try textbooks, uniforms or shelving"/></div></label>
-    <label><span>Category</span><select value={category} onChange={event=>setCategory(event.target.value)}>{categoryOptions.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
-    <fieldset><legend>Exchange type</legend><div className="marketplace-mode-options">{modeOptions.map(([value,label])=><button type="button" key={value||'all'} aria-pressed={mode===value} onClick={()=>setMode(value)}>{label}</button>)}</div></fieldset>
-   </form>
-   <div className="marketplace-results-bar"><span role="status" aria-live="polite">{state==='ready'?resultLabel:'Checking approved listings'}</span>{hasFilters&&<button type="button" onClick={clear}><SlidersHorizontal size={16}/> Clear filters</button>}</div>
-
-   {state==='loading'&&<div className="marketplace-listing-grid" aria-label="Loading marketplace listings">{Array.from({length:4},(_,index)=><div className="marketplace-skeleton" key={index}><span/><span/><span/></div>)}</div>}
-   {state==='error'&&<div className="marketplace-state marketplace-error" role="alert"><TriangleAlert size={29}/><h3>Listings can&apos;t load right now.</h3><p>This is a service problem, not an empty marketplace. Your filters have been kept.</p><button className="button secondary" type="button" onClick={()=>setReloadKey(value=>value+1)}><RefreshCw size={17}/> Try again</button></div>}
-   {state==='ready'&&listings.length===0&&<div className="marketplace-state"><PackageOpen size={31}/><h3>No approved listings match this view.</h3><p>{hasFilters?'Try clearing a filter or searching for a broader item.':'New approved goods will appear here once they are published.'}</p>{hasFilters&&<button className="button secondary" type="button" onClick={clear}>Clear filters</button>}</div>}
-   {state==='ready'&&listings.length>0&&<div className="marketplace-listing-grid">{listings.map(listing=>{
-    const image=listingImage(listing);return <article className="marketplace-listing" key={listing.id}>
-     <Link className="marketplace-listing-image" href={`/marketplace/items/${listing.id}/${listing.slug||'listing'}`} aria-label={`View ${listing.title}`}>{image?<img src={image} alt={listing.images?.[0]?.alt||listing.title} loading="lazy"/>:<span><PackageOpen size={34}/> Image awaiting approval</span>}</Link>
-     <div className="marketplace-listing-body"><div className="marketplace-listing-meta"><span>{modeLabel(listing)}</span><span>{categoryName(listing)}</span></div><h3><Link href={`/marketplace/items/${listing.id}/${listing.slug||'listing'}`}>{listing.title}</Link></h3>{listing.summary&&<p>{listing.summary}</p>}<strong className="marketplace-price">{amountLabel(listing)}</strong><div className="marketplace-seller"><span>{listing.seller_role_label||'Verified member'}</span>{listing.coarse_location&&<span><MapPin size={14}/>{listing.coarse_location}</span>}</div><Link className="marketplace-card-link" href={`/marketplace/items/${listing.id}/${listing.slug||'listing'}`}>View listing <ArrowRight size={16}/></Link></div>
-    </article>;
-   })}</div>}
-  </div>
- </section>;
+ const [query,setQuery]=useState('');const [category,setCategory]=useState(initialCategory);const [mode,setMode]=useState('');const [listings,setListings]=useState<PublicListing[]>([]);const [count,setCount]=useState(0);const [state,setState]=useState<'loading'|'ready'|'error'>('loading');const [reloadKey,setReloadKey]=useState(0);
+ const load=useCallback(async(signal:AbortSignal)=>{setState('loading');const params=new URLSearchParams();if(query.trim())params.set('search',query.trim());if(category)params.set('category',category);if(mode)params.set('mode',mode);try{const response=await fetch(`/api/platform/marketplace/listings/${params.size?`?${params}`:''}`,{cache:'no-store',signal,headers:{Accept:'application/json'}});if(!response.ok)throw new Error('Marketplace unavailable');const data=await response.json() as ListingsResponse;const next=Array.isArray(data)?data:Array.isArray(data.results)?data.results:[];setListings(next);setCount(Array.isArray(data)?data.length:data.count??next.length);setState('ready');}catch(error){if((error as Error).name!=='AbortError'){setListings([]);setCount(0);setState('error');}}},[query,category,mode,reloadKey]);
+ useEffect(()=>{const controller=new AbortController();const timer=window.setTimeout(()=>void load(controller.signal),query?250:0);return()=>{window.clearTimeout(timer);controller.abort();};},[load,query]);const hasFilters=Boolean(query||category||mode);const resultLabel=useMemo(()=>`${count} approved ${count===1?'listing':'listings'}`,[count]);const clear=()=>{setQuery('');setCategory('');setMode('');};
+ return <section id="browse" className="marketplace-catalogue" aria-labelledby="browse-title"><div className="container"><div className="marketplace-section-heading catalogue-heading"><h2 id="browse-title">Browse approved listings.</h2><p>Search by item, then narrow by category or exchange type.</p></div><form className="marketplace-filters" role="search" onSubmit={event=>event.preventDefault()}><label className="marketplace-search"><span>Search listings</span><div><Search size={19}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Try textbooks, uniforms or shelving"/></div></label><label><span>Category</span><select value={category} onChange={event=>setCategory(event.target.value)}>{categoryOptions.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label><fieldset><legend>Exchange type</legend><div className="marketplace-mode-options">{modeOptions.map(([value,label])=><button type="button" key={value||'all'} aria-pressed={mode===value} onClick={()=>setMode(value)}>{label}</button>)}</div></fieldset></form><div className="marketplace-results-bar"><span role="status" aria-live="polite">{state==='ready'?resultLabel:'Checking approved listings'}</span>{hasFilters&&<button type="button" onClick={clear}><SlidersHorizontal size={16}/> Clear filters</button>}</div>{state==='loading'&&<div className="marketplace-listing-grid" aria-label="Loading marketplace listings">{Array.from({length:4},(_,index)=><div className="marketplace-skeleton" key={index}><span/><span/><span/></div>)}</div>}{state==='error'&&<div className="marketplace-state marketplace-error" role="alert"><TriangleAlert size={29}/><h3>Listings can&apos;t load right now.</h3><p>This is a service problem, not an empty marketplace.</p><button className="button secondary" onClick={()=>setReloadKey(value=>value+1)}><RefreshCw size={17}/> Try again</button></div>}{state==='ready'&&listings.length===0&&<div className="marketplace-state"><PackageOpen size={31}/><h3>No approved listings match this view.</h3><p>{hasFilters?'Try clearing a filter or searching more broadly.':'New approved goods will appear here once published.'}</p>{hasFilters&&<button className="button secondary" onClick={clear}>Clear filters</button>}</div>}{state==='ready'&&listings.length>0&&<div className="marketplace-listing-grid">{listings.map(listing=>{const image=listingImage(listing);return <article className="marketplace-listing" key={listing.id}><Link className="marketplace-listing-image" href={`/marketplace/items/${listing.id}/${listing.slug||'listing'}`}>{image?<img src={image} alt={listing.images?.[0]?.alt||listing.title}/>:<span><PackageOpen size={34}/> Image awaiting approval</span>}</Link><div className="marketplace-listing-body"><div className="marketplace-listing-meta"><span>{modeLabel(listing)}</span><span>{categoryName(listing)}</span></div><h3><Link href={`/marketplace/items/${listing.id}/${listing.slug||'listing'}`}>{listing.title}</Link></h3>{listing.summary&&<p>{listing.summary}</p>}<strong className="marketplace-price">{amountLabel(listing)}</strong><div className="marketplace-seller"><span>{listing.seller_role_label||'Verified member'}</span>{listing.coarse_location&&<span><MapPin size={14}/>{listing.coarse_location}</span>}</div><Link className="marketplace-card-link" href={`/marketplace/items/${listing.id}/${listing.slug||'listing'}`}>View listing <ArrowRight size={16}/></Link></div></article>})}</div>}</div></section>;
 }

@@ -1,12 +1,15 @@
 from django.urls import path
 from . import views
+from .entry_views import ListingOptions, MyListingDashboard
 
 urlpatterns = [
     path("categories/", views.Categories.as_view()),
     path("listings/", views.Listings.as_view()),
     path("listings/<uuid:pk>/", views.ListingDetail.as_view()),
     path("me/access/", views.MyAccess.as_view()),
+    path("me/listing-options/", ListingOptions.as_view()),
     path("me/listings/", views.MyListings.as_view()),
+    path("me/listings/dashboard/", MyListingDashboard.as_view()),
     path("listings/<uuid:pk>/eligibility/", views.ListingEligibility.as_view()),
     path("listings/<uuid:pk>/audience/", views.ListingAudience.as_view()),
     path("listings/<uuid:pk>/images/", views.ListingImages.as_view()),

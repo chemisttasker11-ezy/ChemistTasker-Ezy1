@@ -22,7 +22,9 @@ def process_goods_escalations(limit=100):
             except Exception:
                 step.status, step.cancellation_reason = "PAUSED", "Authority or eligibility changed"
             else:
-                valid = listing.publication_status == "PUBLISHED" and listing.availability_status == "AVAILABLE" and listing.version == step.schedule_version
+                order = {"OWNED_CHAIN": 1, "ORGANISATION": 2, "PLATFORM": 3}
+                target_too_broad = order.get(step.target_circle, 99) > order.get(getattr(listing.audience, "maximum_circle", ""), 0)
+                valid = listing.publication_status == "PUBLISHED" and listing.availability_status == "AVAILABLE" and listing.version == step.schedule_version and not target_too_broad
                 if valid:
                     listing.audience.current_circle = step.target_circle
                     listing.audience.save(update_fields=("current_circle", "updated_at"))
