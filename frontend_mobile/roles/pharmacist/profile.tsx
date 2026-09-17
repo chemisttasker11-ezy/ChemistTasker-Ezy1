@@ -113,6 +113,7 @@ export default function PharmacistProfileScreen() {
   };
 
   const menuItems = [
+    { title: 'Attendance PIN', description: 'Set a terminal PIN for each pharmacy', icon: 'dialpad', route: '/attendance-pin' },
     {
       title: 'Basic Info',
       description: 'Name, phone, address, and AHPRA details',

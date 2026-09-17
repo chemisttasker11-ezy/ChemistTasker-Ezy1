@@ -40,6 +40,7 @@ import CoffeeIcon from "@mui/icons-material/Coffee";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import PersonIcon from "@mui/icons-material/Person";
 import axios from "axios";
+import KioskSetup from "../../kiosk/KioskSetup";
 import { API_BASE_URL } from "../../constants/api";
 import { csrfToken } from "../../../landing_next/shared/browser-session";
 import { clearTokens, getAccessToken } from "../../utils/tokenService";
@@ -695,6 +696,13 @@ export default function KioskPage() {
   // ---------------------------------------------------------------------------
   // View 1: Device Activation Form (Pairing via Mobile Code or Direct)
   // ---------------------------------------------------------------------------
+  if (!deviceToken && desktopRuntime) {
+    return <KioskSetup initialError={activationError} onPaired={status => {
+      setDeviceToken('tauri-secure-device');
+      setPharmacyName(status.pharmacy_name || 'Pharmacy Counter');
+    }} />;
+  }
+
   if (!deviceToken) {
     return (
       <Box

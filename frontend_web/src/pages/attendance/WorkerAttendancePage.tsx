@@ -13,6 +13,7 @@ import {
   Divider,
   Grid,
   LinearProgress,
+  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -76,6 +77,19 @@ export default function WorkerAttendancePage() {
   const [confirmNewPin, setConfirmNewPin] = useState("");
   const [submittingPin, setSubmittingPin] = useState(false);
   const [pinUpdateError, setPinUpdateError] = useState<string | null>(null);
+  const [pinPharmacies, setPinPharmacies] = useState<Array<{ id: number; name: string }>>([]);
+  const [pinPharmacyId, setPinPharmacyId] = useState('');
+  useEffect(() => {
+    if (!pinModalOpen) return;
+    let active = true;
+    setPinPharmacies([]); setPinPharmacyId(''); setPinUpdateError(null);
+    apiClient.get('/client-profile/attendance/worker/pin/update/').then(({ data }) => {
+      if (!active) return;
+      setPinPharmacies(data.pharmacies);
+      if (data.pharmacies.length === 1) setPinPharmacyId(String(data.pharmacies[0].id));
+    }).catch(() => { if (active) setPinUpdateError('Unable to load your pharmacies. Close this dialog and try again.'); });
+    return () => { active = false; };
+  }, [pinModalOpen]);
 
   // Published Roster Shifts state
   const [rosterShifts, setRosterShifts] = useState<WorkerRosterShift[]>([]);
@@ -83,6 +97,7 @@ export default function WorkerAttendancePage() {
   const [acknowledgingPeriodId, setAcknowledgingPeriodId] = useState<number | null>(null);
 
   const handleUpdatePin = async () => {
+    if (!pinPharmacyId) { setPinUpdateError('Select a pharmacy.'); return; }
     if (newPin.length < 4 || newPin.length > 6) {
       setPinUpdateError("PIN must be between 4 and 6 numeric digits.");
       return;
@@ -97,8 +112,9 @@ export default function WorkerAttendancePage() {
     try {
       await apiClient.post("/client-profile/attendance/worker/pin/update/", {
         new_pin: newPin,
+        pharmacy_id: Number(pinPharmacyId),
       });
-      setSuccessMsg("Kiosk PIN updated successfully! You can now use this PIN on any counter kiosk.");
+      setSuccessMsg("Attendance PIN updated for the selected pharmacy. Connect its terminal to the internet when first using the new PIN.");
       setPinModalOpen(false);
       setNewPin("");
       setConfirmNewPin("");
@@ -769,6 +785,9 @@ export default function WorkerAttendancePage() {
             </Alert>
           )}
           <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField select label="Pharmacy" value={pinPharmacyId} onChange={e => setPinPharmacyId(e.target.value)} disabled={submittingPin} fullWidth>
+              {pinPharmacies.map(pharmacy => <MenuItem key={pharmacy.id} value={String(pharmacy.id)}>{pharmacy.name}</MenuItem>)}
+            </TextField>
             <TextField
               label="New PIN (4-6 digits)"
               type="password"
@@ -796,7 +815,7 @@ export default function WorkerAttendancePage() {
             variant="contained"
             color="secondary"
             onClick={handleUpdatePin}
-            disabled={submittingPin || newPin.length < 4 || newPin !== confirmNewPin}
+            disabled={submittingPin || !pinPharmacyId || newPin.length < 4 || newPin !== confirmNewPin}
             sx={{ bgcolor: "#a855f7", "&:hover": { bgcolor: "#9333ea" }, fontWeight: 700 }}
           >
             {submittingPin ? <CircularProgress size={24} color="inherit" /> : "Save PIN"}

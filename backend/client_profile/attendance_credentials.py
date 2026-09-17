@@ -784,7 +784,7 @@ def setup_worker_kiosk_pin(
     return membership, worker_pin
 
 
-def worker_update_own_pin(user, new_pin: str) -> WorkerPIN:
+def worker_update_own_pin(user, new_pin: str, pharmacy_id=None) -> WorkerPIN:
     """Self-service PIN update for authenticated worker from web or mobile dashboard."""
     if not user or not user.is_authenticated:
         raise PermissionDenied("Authentication required.")
@@ -793,11 +793,14 @@ def worker_update_own_pin(user, new_pin: str) -> WorkerPIN:
     if not (4 <= len(cleaned_pin) <= 6) or not cleaned_pin.isdigit():
         raise ValidationError("PIN must be 4 to 6 numeric digits.")
 
-    membership = (
-        Membership.objects.filter(user=user, is_active=True)
-        .order_by("-id")
-        .first()
+    memberships = Membership.objects.filter(
+        user=user, is_active=True, status=Membership.Status.ACCEPTED,
     )
+    if pharmacy_id is not None:
+        memberships = memberships.filter(pharmacy_id=pharmacy_id)
+    elif memberships.count() > 1:
+        raise ValidationError("Select the pharmacy whose attendance PIN you want to update.")
+    membership = memberships.first()
     if not membership:
         raise ValidationError("You do not have an active pharmacy membership.")
 

@@ -163,6 +163,13 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
+    // Development installations historically used the root directory. Keep
+    // that data in place; release builds use the matching production key scope.
+    let directory = if cfg!(debug_assertions) {
+        directory
+    } else {
+        directory.join("production")
+    };
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     let database_path = directory.join("kiosk.db");
     let database_key = load_or_initialize_secret("database-key", 32, !database_path.exists())?;
@@ -334,19 +341,26 @@ async fn prepare_capture_request(
     requested_action: String,
 ) -> Result<String, String> {
     let _guard = runtime.capture_lock.lock().await;
+    let connection = open_database(&app)?;
+    prepare_capture_request_from(&connection, &identifier, &requested_action)
+}
+
+fn prepare_capture_request_from(
+    connection: &Connection,
+    identifier: &str,
+    requested_action: &str,
+) -> Result<String, String> {
     if identifier.trim().is_empty()
-        || !["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"]
-            .contains(&requested_action.as_str())
+        || !["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"].contains(&requested_action)
     {
         return Err("A worker identifier and attendance action are required".to_string());
     }
-    let hash = capture_identifier_hash(&identifier);
-    let connection = open_database(&app)?;
+    let hash = capture_identifier_hash(identifier);
     if let Some(request_id) = connection
         .query_row(
             "SELECT request_id FROM capture_request
              WHERE identifier_hash = ?1 AND requested_action = ?2
-               AND status IN ('PREPARED', 'COMMITTED', 'RECEIPT_CONFIRMED')
+               AND status IN ('PREPARED', 'COMMITTED')
              ORDER BY created_at DESC LIMIT 1",
             params![hash, requested_action],
             |row| row.get::<_, String>(0),
@@ -1457,6 +1471,43 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preparation_resumes_only_unresolved_requests_for_all_actions() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch(
+            "CREATE TABLE capture_request (
+               request_id TEXT PRIMARY KEY, identifier_hash TEXT, requested_action TEXT,
+               status TEXT DEFAULT 'PREPARED', employee_id INTEGER, event_id TEXT, created_at TEXT);"
+        ).unwrap();
+        for action in ["CLOCK_IN", "BREAK_START", "BREAK_END", "CLOCK_OUT"] {
+            let first =
+                prepare_capture_request_from(&connection, "worker@example.test", action).unwrap();
+            assert_eq!(
+                prepare_capture_request_from(&connection, "worker@example.test", action).unwrap(),
+                first
+            );
+            connection
+                .execute(
+                    "UPDATE capture_request SET status='COMMITTED' WHERE request_id=?1",
+                    [&first],
+                )
+                .unwrap();
+            assert_eq!(
+                prepare_capture_request_from(&connection, "worker@example.test", action).unwrap(),
+                first
+            );
+            connection
+                .execute(
+                    "UPDATE capture_request SET status='RECEIPT_CONFIRMED' WHERE request_id=?1",
+                    [&first],
+                )
+                .unwrap();
+            let second =
+                prepare_capture_request_from(&connection, "worker@example.test", action).unwrap();
+            assert_ne!(second, first, "confirmed {action} must not be reused");
+        }
+    }
 
     #[test]
     fn local_schema_migration_preserves_duplicate_legacy_requests() {

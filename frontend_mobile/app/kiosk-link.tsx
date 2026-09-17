@@ -1,114 +1,87 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
-
-import { useAuth } from '@/context/AuthContext';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Button, Card, RadioButton, Text, TextInput } from 'react-native-paper';
 import apiClient from '@/utils/apiClient';
 
+type Pharmacy = { id: number; name: string; timezone: string };
 export default function KioskLinkPrompt() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    pharmacy_id?: string;
-    device_name?: string;
-    source?: string;
-    pairing_code?: string;
-  }>();
-  const { user, hasCapability } = useAuth();
-  const [pairingCode, setPairingCode] = useState<string | null>(
-    /^\d{6}$/.test(String(params.pairing_code || '')) ? String(params.pairing_code) : null,
-  );
+  const params = useLocalSearchParams<{ source?: string; pharmacy_id?: string; device_name?: string }>();
+  const prompted = params.source === 'kiosk';
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
+  const [selected, setSelected] = useState('');
+  const [deviceName, setDeviceName] = useState(params.device_name || 'Front counter');
+  const [code, setCode] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const pharmacyId = Number(params.pharmacy_id || 0);
-  const wasExplicitlyPrompted = params.source === 'kiosk' && Number.isInteger(pharmacyId) && pharmacyId > 0;
-  const normalizedRole = String(user?.role || '').toUpperCase();
-  const canLink = useMemo(
-    () => normalizedRole === 'OWNER'
-      || user?.memberships?.some((membership) => membership.role === 'ORG_ADMIN')
-      || hasCapability('MANAGE_ROSTER', pharmacyId),
-    [hasCapability, normalizedRole, pharmacyId, user?.memberships],
-  );
-
-  const requestPairingCode = async () => {
-    setLoading(true);
-    setError(null);
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    if (!prompted) { setLoading(false); return; }
+    let active = true;
+    setLoading(true); setError(null);
+    apiClient.get('/client-profile/attendance/kiosk/pairing/request/').then(({ data }) => {
+      if (!active) return;
+      const rows: Pharmacy[] = data.pharmacies || [];
+      setPharmacies(rows);
+      const requested = rows.find(p => String(p.id) === params.pharmacy_id);
+      if (params.pharmacy_id && !requested) {
+        setError('You do not have terminal-management access to the pharmacy in this link.');
+        setSelected('');
+      } else setSelected(requested ? String(requested.id) : rows.length === 1 ? String(rows[0].id) : '');
+    }).catch(() => { if (active) setError('Unable to load your pharmacies. Try again.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [prompted, params.pharmacy_id, refresh]);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+  const pharmacy = pharmacies.find(p => String(p.id) === selected);
+  const expired = !!code && now >= expiresAt;
+  const createCode = async () => {
+    if (!pharmacy || !deviceName.trim()) return;
+    setSaving(true); setError(null);
     try {
-      const response = await apiClient.post('/client-profile/attendance/kiosk/pairing/request/', {
-        pharmacy_id: pharmacyId,
-        device_name: params.device_name || 'Windows Pharmacy Kiosk',
+      const { data } = await apiClient.post('/client-profile/attendance/kiosk/pairing/request/', {
+        pharmacy_id: pharmacy.id, device_name: deviceName.trim(),
       });
-      setPairingCode(String(response.data?.pairing_code || ''));
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.error || 'Unable to create a kiosk pairing code.');
-    } finally {
-      setLoading(false);
-    }
+      setCode(String(data.pairing_code)); setExpiresAt(Date.now() + data.expires_in_seconds * 1000);
+    } catch (e: any) { setError(e.response?.data?.error || 'Unable to create a pairing code.'); }
+    finally { setSaving(false); }
   };
-
-  if (!wasExplicitlyPrompted) {
-    return (
-      <SafeAreaView style={styles.page}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleLarge">Kiosk linking unavailable</Text>
-            <Text style={styles.body}>Open the secure link shown by the kiosk you want to connect.</Text>
-            <Button onPress={() => router.back()}>Back</Button>
-          </Card.Content>
-        </Card>
-      </SafeAreaView>
-    );
-  }
-
-  if (!canLink) {
-    return (
-      <SafeAreaView style={styles.page}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleLarge">Permission required</Text>
-            <Text style={styles.body}>Only an owner or authorized organization/pharmacy administrator can link this kiosk.</Text>
-            <Button onPress={() => router.back()}>Back</Button>
-          </Card.Content>
-        </Card>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.page}>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text variant="labelLarge" style={styles.eyebrow}>Pharmacy kiosk</Text>
-          <Text variant="headlineSmall">Link this device?</Text>
-          <Text style={styles.body}>
-            {params.device_name || 'Windows Pharmacy Kiosk'} is requesting a one-time pairing code for pharmacy #{pharmacyId}.
-          </Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {pairingCode ? (
-            <View style={styles.codeBox}>
-              <Text variant="labelMedium">Enter this code on the kiosk</Text>
-              <Text variant="displaySmall" style={styles.code}>{pairingCode}</Text>
-              <Text variant="bodySmall">The code expires in 15 minutes and can be used once.</Text>
-            </View>
-          ) : (
-            <Button mode="contained" disabled={loading} onPress={requestPairingCode}>
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : 'Allow and create code'}
-            </Button>
-          )}
-          <Button onPress={() => router.back()}>Close</Button>
-        </Card.Content>
-      </Card>
-    </SafeAreaView>
-  );
+  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <Button icon="arrow-left" onPress={() => router.back()}>Back</Button>
+    <Text variant="headlineMedium" style={styles.heading}>Connect a terminal</Text>
+    {!prompted ? <Text>Scan the setup QR on the desktop kiosk to start linking.</Text> : <>
+      <Text style={styles.body}>Choose the pharmacy where this terminal will record attendance. Each terminal belongs to one pharmacy.</Text>
+      {loading && <ActivityIndicator accessibilityLabel="Loading authorized pharmacies" />}
+      {error && <View accessibilityLiveRegion="polite"><Text style={styles.error}>{error}</Text><Button onPress={() => setRefresh(v => v + 1)}>Retry</Button></View>}
+      {!loading && pharmacies.length === 0 && !error && <Text>No pharmacies are available. Ask the owner to grant terminal-management access.</Text>}
+      <RadioButton.Group value={selected} onValueChange={value => { setSelected(value); setCode(null); }}>
+        {pharmacies.map(p => <Card key={p.id} style={[styles.pharmacy, selected === String(p.id) && styles.selected]}>
+          <RadioButton.Item label={p.name} value={String(p.id)} disabled={saving} />
+          <Text style={styles.zone}>{p.timezone}</Text>
+        </Card>)}
+      </RadioButton.Group>
+      <TextInput mode="outlined" label="Terminal name" value={deviceName} onChangeText={setDeviceName} disabled={saving || !!code} maxLength={100} />
+      {code && pharmacy ? <Card style={styles.receipt}><Card.Content>
+        <Text variant="titleMedium">{pharmacy.name}</Text><Text>{deviceName}</Text>
+        <Text style={styles.code}>{expired ? 'Expired' : code}</Text>
+        <Text>{expired ? 'Create a new code to continue.' : 'Enter this code on the desktop. It can be used once and expires in 15 minutes.'}</Text>
+      </Card.Content></Card> : null}
+      <Button mode="contained" loading={saving} disabled={!pharmacy || !deviceName.trim() || loading || saving || (!!code && !expired)} onPress={createCode} contentStyle={styles.button}>
+        {expired ? 'Create a new pairing code' : 'Confirm pharmacy and create code'}
+      </Button>
+    </>}
+  </ScrollView></SafeAreaView>;
 }
-
 const styles = StyleSheet.create({
-  page: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#F5F7FA' },
-  card: { borderRadius: 20 },
-  body: { marginVertical: 18, color: '#4B5563', lineHeight: 22 },
-  eyebrow: { color: '#4F46E5', marginBottom: 6, textTransform: 'uppercase' },
-  error: { color: '#B91C1C', marginBottom: 12 },
-  codeBox: { alignItems: 'center', gap: 8, padding: 18, borderRadius: 14, backgroundColor: '#EEF2FF' },
-  code: { color: '#312E81', fontWeight: '800', letterSpacing: 7 },
+  page: { flex: 1, backgroundColor: '#F5F8FC' }, content: { padding: 24, gap: 18 },
+  heading: { color: '#06214A', fontWeight: '700' }, body: { color: '#46566C', lineHeight: 22 },
+  pharmacy: { marginBottom: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D6DEEA' },
+  selected: { borderColor: '#5222B8', borderWidth: 2 }, zone: { paddingHorizontal: 16, paddingBottom: 12, color: '#46566C' },
+  receipt: { backgroundColor: '#FFFFFF' }, code: { fontSize: 36, letterSpacing: 6, color: '#06214A', paddingVertical: 20, fontWeight: '700' },
+  error: { color: '#B42318' }, button: { minHeight: 52 },
 });

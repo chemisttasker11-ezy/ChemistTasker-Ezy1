@@ -34,6 +34,7 @@ from .attendance_credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_kiosk_pairing_code,
+    is_authorized_kiosk_manager,
     generate_signed_pharmacy_qr,
     redeem_kiosk_pairing_code,
     send_worker_pin_setup_code,
@@ -183,6 +184,27 @@ class KioskRequestPairingCodeView(APIView):
     Dispatches a push notification to their mobile app and records an in-app alert.
     """
     permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Q
+        from users.models import OrganizationMembership
+        from .models import PharmacyAdmin
+
+        pharmacies = Pharmacy.objects.select_related("owner").order_by("name", "pk")
+        if not request.user.is_superuser:
+            admin_ids = PharmacyAdmin.objects.filter(
+                user=request.user, is_active=True,
+                admin_level__in=[PharmacyAdmin.AdminLevel.OWNER, PharmacyAdmin.AdminLevel.MANAGER],
+            ).values_list("pharmacy_id", flat=True)
+            org_ids = OrganizationMembership.objects.filter(
+                user=request.user, role="ORG_ADMIN",
+            ).values_list("organization_id", flat=True)
+            pharmacies = pharmacies.filter(
+                Q(owner__user=request.user) | Q(pk__in=admin_ids) | Q(organization_id__in=org_ids)
+            )
+        return Response({"pharmacies": [{"id": pharmacy.pk, "name": pharmacy.name,
+                                         "timezone": pharmacy.timezone}
+            for pharmacy in pharmacies if is_authorized_kiosk_manager(request.user, pharmacy)]})
 
     def post(self, request):
         pharmacy_id = request.data.get("pharmacy_id")
@@ -952,16 +974,28 @@ class WorkerUpdatePinView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    def get(self, request):
+        memberships = Membership.objects.filter(
+            user=request.user, is_active=True, status=Membership.Status.ACCEPTED,
+        ).select_related("pharmacy", "worker_pin").order_by("pharmacy__name", "pk")
+        return Response({"pharmacies": [{
+            "id": membership.pharmacy_id,
+            "name": membership.pharmacy.name,
+            "has_pin": bool(getattr(membership, "worker_pin", None)
+                            and membership.worker_pin.pin_hash),
+        } for membership in memberships]})
+
     def post(self, request):
         new_pin = request.data.get("new_pin")
         if not new_pin:
             return Response({"error": "new_pin is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            worker_pin = worker_update_own_pin(request.user, new_pin)
+            worker_pin = worker_update_own_pin(request.user, new_pin, request.data.get("pharmacy_id"))
             return Response({
                 "success": True,
                 "message": "Attendance PIN updated successfully.",
+                "pharmacy_id": worker_pin.membership.pharmacy_id,
             }, status=status.HTTP_200_OK)
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
