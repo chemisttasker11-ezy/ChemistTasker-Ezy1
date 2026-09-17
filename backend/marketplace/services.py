@@ -2,11 +2,10 @@ import hashlib
 import json
 
 from django.db import transaction
-from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from .models import MarketplaceAuditEvent, MarketplaceExchange, MarketplaceExchangeParticipant, MarketplaceListing, MarketplaceRequestReceipt, MarketplaceReservation
-from .policy import evaluate_marketplace_access, owns_pharmacy, resolved_role
+from .models import MarketplaceAuditEvent, MarketplaceExchange, MarketplaceListing, MarketplaceRequestReceipt, MarketplaceReservation
+from .policy import evaluate_marketplace_access, owns_pharmacy
 
 
 def assert_listing_manager(user, listing):
@@ -32,6 +31,8 @@ def buyer_can_contact(user, listing, buying_pharmacy=None):
         if not buying_pharmacy or not owns_pharmacy(user, buying_pharmacy):
             return False, {"code": "OWNER_CONTEXT_REQUIRED", "message": "Use an eligible pharmacy you own."}
         circle = listing.audience.current_circle
+        if circle not in {"OWNED_CHAIN", "ORGANISATION", "PLATFORM"}:
+            return False, {"code": "AUDIENCE_NOT_CONFIGURED", "message": "This pharmacy listing is awaiting owner audience configuration."}
         source = listing.pharmacy
         if circle == "OWNED_CHAIN" and source.owner_id != buying_pharmacy.owner_id:
             return False, {"code": "OUTSIDE_CURRENT_CIRCLE", "message": "This pharmacy is outside the current owner network."}
