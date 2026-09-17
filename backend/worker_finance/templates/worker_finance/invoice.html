@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>{{ document.number }}</title>
+<style>
+@page { size: A4; margin: 18mm; }
+body { font-family: sans-serif; font-size: 10pt; color: #18243b; }
+h1 { font-size: 24pt; margin-bottom: 4mm; } h2 { font-size: 12pt; }
+.meta { color: #526076; } .section { margin-top: 6mm; }
+table { width: 100%; border-collapse: collapse; margin-top: 8mm; }
+th, td { text-align: left; padding: 3mm 2mm; border-bottom: 1px solid #ddd; }
+th { background: #f1f4f8; } .money { text-align: right; white-space: nowrap; }
+tr { break-inside: avoid; } thead { display: table-header-group; }
+.summary { margin-left: 45%; margin-top: 7mm; } .total { font-size: 15pt; font-weight: bold; }
+.notice { padding: 4mm; background: #f1f4f8; margin-top: 7mm; }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; } footer { margin-top: 12mm; font-size: 8pt; }
+</style></head><body>
+{% if not document.locked %}<p class="meta">DRAFT - NOT ISSUED</p>{% endif %}
+<h1>{% if document.kind == 'super_request' %}Super contribution request{% elif document.payload.gst_registered %}Tax invoice{% else %}Invoice{% endif %}</h1>
+<p class="meta">{{ document.number }} | {{ document.payload.invoice_date }} | Due {{ document.payload.due_date }}</p>
+<h2>{{ document.payload.issuer_name }}</h2><p>ABN: {{ document.payload.issuer_abn|default:'Not supplied' }}</p>
+<p class="pre">{{ document.payload.issuer_address }}</p>
+<div class="section"><h2>Bill to: {{ document.payload.customer.name }}</h2>
+<p>{{ document.payload.customer.legal_name }}<br>ABN: {{ document.payload.customer.abn|default:'Not supplied' }}<br>{{ document.payload.customer.email }}</p>
+<p class="pre">{{ document.payload.customer.address }}</p></div>
+{% if document.payload.reference %}<p>Reference / purchase order: {{ document.payload.reference }}</p>{% endif %}
+<table><thead><tr><th>Item / work date</th><th>Qty / unit</th><th class="money">Rate</th><th>Discount</th><th class="money">GST</th><th class="money">Amount</th></tr></thead>
+<tbody>{% for line in document.calculation.lines %}{% if document.kind == 'super_request' or line.category_code != 'Superannuation' %}<tr><td>{{ line.description }}{% if line.worked_on %}<br>{{ line.worked_on }}{% endif %}<br><small>{{ line.tax_code }}</small></td><td>{{ line.quantity }} {{ line.unit }}</td><td class="money">${{ line.unit_price }}</td><td>{{ line.discount }}%</td><td class="money">${{ line.gst }}</td><td class="money">${{ line.gross }}</td></tr>{% endif %}{% endfor %}</tbody></table>
+{% if document.kind == 'super_request' %}
+<div class="notice"><strong>Not a tax invoice. Pay this contribution directly to the nominated super fund, not the worker.</strong><br>Fund: {{ document.payload.super_fund_name }}<br>USI: {{ document.payload.super_usi }}<br>Member: {{ document.payload.super_member_number }}</div>
+<div class="summary total">Fund contribution: ${{ document.calculation.payable }}</div>
+{% else %}
+<div class="summary"><p>Services / charges ex GST: ${{ document.calculation.subtotal }}<br>GST: ${{ document.calculation.gst }}</p><p class="total">Payable to worker: ${{ document.calculation.payable }}</p><p>Separate super contribution: ${{ document.calculation.super }}<br><small>Not included in worker payable or taxable sales. Super basis must be agreed and reviewed.</small></p></div>
+<div class="section"><h2>Worker payment details</h2>{{ document.payload.bank_account_name }}<br>BSB: {{ document.payload.bsb }}<br>Account: {{ document.payload.account_number }}</div>
+{% if document.payload.super_mode == 'summary' %}<p>Super fund: {{ document.payload.super_fund_name }} | USI: {{ document.payload.super_usi }} | Member: {{ document.payload.super_member_number }}</p>{% endif %}
+{% endif %}
+<p class="pre section">{{ document.payload.notes }}</p>
+<footer>All amounts in AUD. Item prices are GST-{{ document.payload.price_mode }}. Stored document version {{ document.version }}.</footer>
+</body></html>

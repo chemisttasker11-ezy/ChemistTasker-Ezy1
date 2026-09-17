@@ -20,6 +20,7 @@ import {
   updateInvoice,
 } from '@chemisttasker/shared-core';
 import MobileInvoiceStats from './MobileInvoiceStats';
+import FinanceWorkspace from './FinanceWorkspace';
 import {
   filterInvoicesByTimeframe,
   formatInvoiceCurrency,
@@ -44,6 +45,12 @@ const PAGE_SIZE = 10;
 type Props = { basePath?: string };
 
 export default function InvoiceList({ basePath }: Props) {
+  const segments = useSegments();
+  if (segments[0] === 'owner') return <LegacyInvoiceList basePath={basePath} />;
+  return <FinanceWorkspace existingTools={<LegacyInvoiceList basePath={basePath} />} />;
+}
+
+function LegacyInvoiceList({ basePath }: Props) {
   const router = useRouter();
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';

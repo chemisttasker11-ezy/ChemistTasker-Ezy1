@@ -5,7 +5,14 @@
 
 // Legacy application-wide configuration and existing API functions remain
 // exported for backwards compatibility while clients migrate domain-by-domain.
-export { configureApi } from './api';
+import { configureApi as configureCoreApi } from './api';
+import { configureFinanceApi, type FinanceConfig } from './finance';
+export function configureApi(config: FinanceConfig): void {
+  configureCoreApi(config);
+  configureFinanceApi(config);
+}
+export * from './finance';
+export * from './financePresentation';
 export * from './api';
 
 // Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi

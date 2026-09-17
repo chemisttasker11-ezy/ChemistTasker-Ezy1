@@ -1,6 +1,7 @@
 // vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath, URL } from 'node:url'
 import { resolve } from 'node:path'
 
 export default defineConfig(({ command }) => {
@@ -12,11 +13,22 @@ export default defineConfig(({ command }) => {
   return {
     base: '/',
     plugins: [react()],
+    resolve: {
+      alias: [{ find: /^@chemisttasker\/shared-core$/, replacement: fileURLToPath(new URL('../shared-core/src/index.ts', import.meta.url)) }],
+    },
 
     server: {
       port: 5173,
       host: 'localhost',
       strictPort: true,
+      // The unified dev site is opened on Next.js :3000, while Vite owns HMR
+      // on :5173. Point the client there directly instead of first attempting
+      // an unsupported WebSocket upgrade through the Next.js rewrite.
+      hmr: {
+        host: 'localhost',
+        clientPort: Number(process.env.VITE_DEV_HMR_PORT || 5173),
+      },
+      fs: { allow: [fileURLToPath(new URL('.', import.meta.url)), fileURLToPath(new URL('../shared-core', import.meta.url))] },
       proxy: {
         '/api': {
           target: apiProxyTarget,

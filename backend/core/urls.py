@@ -9,6 +9,7 @@ from two_factor.urls import urlpatterns as two_factor_urlpatterns
 from .two_factor_views import AdminAwareLoginView
 from django.http import JsonResponse
 from django.db import connection
+from worker_finance import legacy as finance_legacy
 from public_hub.attachment_access import HubMediaAccess
 from public_hub.media import deny_raw_media
 
@@ -37,6 +38,10 @@ urlpatterns = [
     path('api/marketplace/', include('marketplace.urls')),
     path('api/ethical/', include('ethical_marketplace.urls')),
     path('api/content/', include('public_hub.content_urls')),
+    path('api/client-profile/finance/', include('worker_finance.urls')),
+    path('api/client-profile/invoices/<int:pk>/', finance_legacy.detail),
+    path('api/client-profile/invoices/<int:invoice_id>/pdf/', finance_legacy.pdf),
+    path('api/client-profile/invoices/<int:invoice_id>/send/', finance_legacy.send),
     path('api/client-profile/', include(('client_profile.urls', 'client_profile'), namespace='client_profile')),
     path('api/billing/', include('billing.urls', namespace='billing')),
     path('api/account/', DeleteAccountView.as_view(), name='delete-account'),

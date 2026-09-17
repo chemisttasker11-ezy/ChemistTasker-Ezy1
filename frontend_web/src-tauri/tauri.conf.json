@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "dmg"],
+    "icon": ["icons/icon.ico"],
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true }
     }

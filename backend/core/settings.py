@@ -149,6 +149,7 @@ INSTALLED_APPS = [
     # my apps
     "client_profile.apps.ClientProfileConfig",
     "workforce.apps.WorkforceConfig",
+    "worker_finance.apps.WorkerFinanceConfig",
 
     # Realtime
     'channels',
