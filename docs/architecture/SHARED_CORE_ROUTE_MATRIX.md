@@ -87,6 +87,20 @@ Implementation remains ordered SC01 through SC12. No duplicate helper should be
 deleted until its replacement uses one built shared-core artifact and the affected
 client passes typecheck/build.
 
+## SC08 Job Board / Talent Board reconciliation
+
+The two boards are not aliases. The Job Board is shift inventory
+(`public-job-board`, public shift detail, interests and assignment actions); the
+Talent Board is explorer-post inventory (`explorer-posts/public-feed`, profile
+posts, views and likes). Their Django resources, payloads and state transitions
+are different, so retaining distinct operation names is intentional.
+
+Both surfaces nevertheless use the existing shared-core transport and legacy API
+surface. React's remaining public Talent Board URL construction was replaced by
+`getPublicTalentFeed`; React Job Board already uses `getPublicJobBoard`, and Expo's
+authenticated talent feed already uses `getExplorerPostFeed`. No parallel Job or
+Talent SDK was introduced.
+
 ## Evidence commands
 
 ```text
@@ -96,4 +110,3 @@ rg "API_ENDPOINTS|PLATFORM_ENDPOINTS" shared-core frontend_web frontend_mobile
 rg "@chemisttasker/shared-core" frontend_web frontend_mobile
 node scripts/audit-shared-core-boundary.mjs
 ```
-
