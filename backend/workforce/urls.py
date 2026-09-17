@@ -1,0 +1,53 @@
+from django.urls import path
+
+from .views import (
+    CoverageRequirementDetailView,
+    CoverageRequirementListCreateView,
+    MembershipWorkSettingsView,
+    MyHoursView,
+    RosterPublishRevisionView,
+    RosterValidateRevisionView,
+    RosterWorkspaceView,
+    TimesheetApproveView,
+    TimesheetCheckDecisionView,
+    TimesheetCommentView,
+    TimesheetDetailView,
+    TimesheetListView,
+    TimesheetMissingPunchView,
+    TimesheetPeriodListCreateView,
+    TimesheetPeriodLockView,
+    TimesheetPeriodRecalculateView,
+    TimesheetPeriodSummaryView,
+    TimesheetRecalculateView,
+    TimesheetReopenView,
+    TimesheetSubmitView,
+    WorkforceLeaveDecisionView,
+    WorkforceLeaveListCreateView,
+)
+
+app_name = "workforce"
+
+urlpatterns = [
+    path("roster/workspace/", RosterWorkspaceView.as_view(), name="roster-workspace"),
+    path("roster/validate/", RosterValidateRevisionView.as_view(), name="roster-validate"),
+    path("roster/publish/", RosterPublishRevisionView.as_view(), name="roster-publish"),
+    path("work-settings/", MembershipWorkSettingsView.as_view(), name="work-settings"),
+    path("coverage-requirements/", CoverageRequirementListCreateView.as_view(), name="coverage-requirements"),
+    path("coverage-requirements/<int:pk>/", CoverageRequirementDetailView.as_view(), name="coverage-requirement-detail"),
+    path("leave/", WorkforceLeaveListCreateView.as_view(), name="leave-list-create"),
+    path("leave/<int:pk>/decision/", WorkforceLeaveDecisionView.as_view(), name="leave-decision"),
+    path("timesheet-periods/", TimesheetPeriodListCreateView.as_view(), name="timesheet-period-list-create"),
+    path("timesheet-periods/<int:pk>/summary/", TimesheetPeriodSummaryView.as_view(), name="timesheet-period-summary"),
+    path("timesheet-periods/<int:pk>/recalculate/", TimesheetPeriodRecalculateView.as_view(), name="timesheet-period-recalculate"),
+    path("timesheet-periods/<int:pk>/lock/", TimesheetPeriodLockView.as_view(), name="timesheet-period-lock"),
+    path("timesheets/", TimesheetListView.as_view(), name="timesheet-list"),
+    path("timesheets/<int:pk>/", TimesheetDetailView.as_view(), name="timesheet-detail"),
+    path("timesheets/<int:pk>/recalculate/", TimesheetRecalculateView.as_view(), name="timesheet-recalculate"),
+    path("timesheets/<int:pk>/missing-punch/", TimesheetMissingPunchView.as_view(), name="timesheet-missing-punch"),
+    path("timesheets/<int:pk>/submit/", TimesheetSubmitView.as_view(), name="timesheet-submit"),
+    path("timesheets/<int:pk>/approve-time/", TimesheetApproveView.as_view(), name="timesheet-approve"),
+    path("timesheets/<int:pk>/reopen/", TimesheetReopenView.as_view(), name="timesheet-reopen"),
+    path("timesheets/<int:pk>/comments/", TimesheetCommentView.as_view(), name="timesheet-comment"),
+    path("timesheet-checks/<int:pk>/decision/", TimesheetCheckDecisionView.as_view(), name="timesheet-check-decision"),
+    path("my-hours/", MyHoursView.as_view(), name="my-hours"),
+]

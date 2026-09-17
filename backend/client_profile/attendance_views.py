@@ -1365,7 +1365,7 @@ class RosterPublishView(APIView):
 
     def post(self, request):
         period_id = request.data.get("period_id")
-        force_warnings = bool(request.data.get("force_warnings", True))
+        force_warnings = bool(request.data.get("force_warnings", False))
 
         if not period_id:
             pharmacy_id = request.data.get("pharmacy_id")

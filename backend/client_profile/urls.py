@@ -148,6 +148,7 @@ hub_poll_comment_detail = HubPollCommentViewSet.as_view(
 )
 
 urlpatterns = [
+    path('workforce/', include('workforce.urls')),
     path('owner/onboarding/me/', OwnerOnboardingV2MeView.as_view(), name='owner-onboarding-me'),
     path('pharmacist/onboarding/me/', PharmacistOnboardingV2MeView.as_view(), name='pharmacist-onboarding-me'),
     path('otherstaff/onboarding/me/', OtherStaffOnboardingV2MeView.as_view(), name='otherstaff-onboarding-me'),
