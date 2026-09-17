@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { validateKioskBuildEnv } from './validate-kiosk-build.mjs';
+
+validateKioskBuildEnv();
 
 const executable = path.join(
   process.cwd(),

@@ -117,6 +117,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
             shift__pharmacy=pharmacy,
             slot_date__gte=week_start,
             slot_date__lte=week_end,
+            is_rostered=True,
         )
         .select_related("user", "slot", "shift", "shift__pharmacy")
         .order_by("slot_date", "slot__start_time")
@@ -286,7 +287,7 @@ def validate_roster_period(roster_period):
             "total_assignments": len(assignments), "total_workers": len({a.user_id for a in assignments})}
 
 
-def publish_roster_period(roster_period, published_by, force_warnings=True):
+def publish_roster_period(roster_period, published_by, force_warnings=False):
     """
     Atomically validates and publishes a roster period:
     - Verifies published_by is authorized manager for roster_period.pharmacy.

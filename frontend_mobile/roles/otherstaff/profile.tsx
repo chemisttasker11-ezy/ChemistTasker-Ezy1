@@ -34,6 +34,8 @@ export default function OtherStaffProfileScreen() {
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
   const menuItems = [
     { title: 'Attendance PIN', description: 'Set a terminal PIN for each pharmacy', icon: 'dialpad', route: '/attendance-pin' },
+    { title: 'My Hours', description: 'Review captured and approved hours', icon: 'clock-outline', route: '/my-hours' },
+    { title: 'My Leave', description: 'Request full or partial-day leave', icon: 'calendar-clock', route: '/my-leave' },
     { title: 'Basic Info', description: 'Personal and contact details', icon: 'account-edit-outline', route: '/otherstaff/profile-basic-info' },
     { title: 'Identity', description: 'Government ID verification', icon: 'card-account-details-outline', route: '/otherstaff/profile-identity' },
     { title: 'Regulatory Docs', description: 'Role-specific compliance files', icon: 'file-certificate-outline', route: '/otherstaff/profile-regulatory' },

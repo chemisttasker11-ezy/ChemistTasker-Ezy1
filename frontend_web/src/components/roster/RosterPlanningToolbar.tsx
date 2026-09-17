@@ -48,6 +48,7 @@ import moment from 'moment';
 import apiClient from '../../utils/apiClient';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import RosterGridViews, { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
+import RosterSafePublishButton from '../../features/workforce/RosterSafePublishButton';
 
 export interface RosterPlanningToolbarProps {
   pharmacyId: number | null;
@@ -203,7 +204,7 @@ export default function RosterPlanningToolbar({
   };
 
   // 2. Publish Roster
-  const handlePublish = async (forceWarnings = true) => {
+  const handlePublish = async (forceWarnings = false) => {
     if (!period) return;
     setActionLoading(true);
     try {
@@ -555,21 +556,14 @@ export default function RosterPlanningToolbar({
 
               {/* 2. Publish / Unpublish */}
               {!isPublished ? (
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={<PublishIcon />}
-                  onClick={() => handlePublish(true)}
-                  disabled={actionLoading || !period}
-                  sx={{
-                    fontWeight: 700,
-                    bgcolor: BRAND_COLORS.purple,
-                    borderRadius: '8px',
-                    '&:hover': { bgcolor: BRAND_COLORS.purpleHover },
+                <RosterSafePublishButton
+                  pharmacyId={pharmacyId}
+                  calendarDate={calendarDate}
+                  onPublished={async () => {
+                    await fetchPeriodData();
+                    onRosterUpdated?.();
                   }}
-                >
-                  Publish Roster
-                </Button>
+                />
               ) : (
                 <Button
                   variant="outlined"
@@ -753,17 +747,6 @@ export default function RosterPlanningToolbar({
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setValidationDialogOpen(false)}>Close</Button>
-          {!isPublished && (
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<PublishIcon />}
-              onClick={() => handlePublish(true)}
-              disabled={validationResult?.errors.length ? validationResult.errors.length > 0 : false}
-            >
-              Publish Now
-            </Button>
-          )}
         </DialogActions>
       </Dialog>
 

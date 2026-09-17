@@ -114,6 +114,8 @@ export default function PharmacistProfileScreen() {
 
   const menuItems = [
     { title: 'Attendance PIN', description: 'Set a terminal PIN for each pharmacy', icon: 'dialpad', route: '/attendance-pin' },
+    { title: 'My Hours', description: 'Review captured and approved hours', icon: 'clock-outline', route: '/my-hours' },
+    { title: 'My Leave', description: 'Request full or partial-day leave', icon: 'calendar-clock', route: '/my-leave' },
     {
       title: 'Basic Info',
       description: 'Name, phone, address, and AHPRA details',

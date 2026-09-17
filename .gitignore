@@ -37,6 +37,8 @@ Security_Audit_Tracking.md
 !backend/billing/migrations/*.py
 !backend/public_hub/migrations/
 !backend/public_hub/migrations/*.py
+!backend/workforce/migrations/
+!backend/workforce/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/

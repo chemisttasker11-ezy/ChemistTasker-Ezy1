@@ -361,8 +361,8 @@ export default function TalentBoard({
       mapRoleToShiftRole(candidate.explorerRoleType) ||
       mapRoleToShiftRole(candidate.role);
     const firstSlot = (candidate.availableSlots || []).find((slot: any) => uniqueDates.includes(slot.date));
-    const startTime = firstSlot?.startTime || firstSlot?.start_time || null;
-    const endTime = firstSlot?.endTime || firstSlot?.end_time || null;
+    const startTime = firstSlot?.startTime || (firstSlot as any)?.start_time || null;
+    const endTime = firstSlot?.endTime || (firstSlot as any)?.end_time || null;
     const params: Record<string, string | undefined> = {
       dates: uniqueDates.length > 0 ? uniqueDates.join(',') : undefined,
       role: shiftRole || undefined,

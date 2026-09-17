@@ -48,6 +48,11 @@ import RosterWorkerPage from './pages/dashboard/sidebar/RosterWorkerPage';
 import KioskPage from './pages/attendance/KioskPage';
 import WorkerAttendancePage from './pages/attendance/WorkerAttendancePage';
 import ManagerAttendanceReviewPage from './pages/attendance/ManagerAttendanceReviewPage';
+import TimesheetsPage from './features/workforce/TimesheetsPage';
+import MyHoursPage from './features/workforce/MyHoursPage';
+import MyLeavePage from './features/workforce/MyLeavePage';
+import ManagerLeavePage from './features/workforce/ManagerLeavePage';
+import WorkforceSettingsPage from './features/workforce/WorkforceSettingsPage';
 
 
 
@@ -163,6 +168,46 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ManagerAttendanceReviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'dashboard/workforce/timesheets',
+        element: (
+          <ProtectedRoute>
+            <TimesheetsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'dashboard/workforce/leave',
+        element: (
+          <ProtectedRoute>
+            <ManagerLeavePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'dashboard/workforce/settings',
+        element: (
+          <ProtectedRoute>
+            <WorkforceSettingsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'dashboard/my-hours',
+        element: (
+          <ProtectedRoute>
+            <MyHoursPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'dashboard/my-leave',
+        element: (
+          <ProtectedRoute>
+            <MyLeavePage />
           </ProtectedRoute>
         ),
       },

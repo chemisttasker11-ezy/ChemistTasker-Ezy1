@@ -181,7 +181,7 @@ interface OpenShift {
   description: string;
 }
 // --- Constants ---
-const ROLES = ['PHARMACIST', 'ASSISTANT', 'INTERN', 'TECHNICIAN'];
+const ROLES = ['PHARMACIST', 'ASSISTANT', 'INTERN', 'TECHNICIAN', 'STUDENT'];
 const ALL_STAFF = 'ALL';
 const LEAVE_TYPES = [
     { value: 'SICK', label: 'Sick Leave' },

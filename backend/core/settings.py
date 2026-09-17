@@ -148,6 +148,7 @@ INSTALLED_APPS = [
 
     # my apps
     "client_profile.apps.ClientProfileConfig",
+    "workforce.apps.WorkforceConfig",
 
     # Realtime
     'channels',
@@ -178,7 +179,7 @@ CELERY_TASK_TRACK_STARTED = env.bool("CELERY_TASK_TRACK_STARTED", default=True)
 CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
 CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
 CELERY_ACCEPT_CONTENT = _clean_env_list("CELERY_ACCEPT_CONTENT", default=["json"])
-CELERY_IMPORTS = ("client_profile.calendar_tasks", "marketplace.tasks", "ethical_marketplace.tasks")
+CELERY_IMPORTS = ("client_profile.calendar_tasks", "marketplace.tasks", "ethical_marketplace.tasks", "workforce.tasks")
 EMAIL_TASK_RATE_LIMIT = env("EMAIL_TASK_RATE_LIMIT", default="30/m")
 
 # Marketplace capabilities are independently reversible. Public reads are safe to

@@ -47,6 +47,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
 import { BRAND_COLORS, BRAND_FONTS } from '../../../constants/brandTheme';
 import RosterPlanningToolbar from '../../../components/roster/RosterPlanningToolbar';
+import RosterCoveragePanel from '../../../features/workforce/RosterCoveragePanel';
 import HorizontalCalendarGrid from '../../../components/roster/HorizontalCalendarGrid';
 import {
   PharmacySummary,
@@ -116,7 +117,7 @@ interface ShiftForEdit {
 
 
 // --- Constants for Roles, Colors, and Leave (Updated) ---
-const ROLES = ['PHARMACIST', 'ASSISTANT', 'INTERN', 'TECHNICIAN'];
+const ROLES = ['PHARMACIST', 'ASSISTANT', 'INTERN', 'TECHNICIAN', 'STUDENT'];
 const ALL_STAFF = 'ALL';
 const LEAVE_TYPES_MAP: { [key: string]: string } = {
     SICK: 'Sick Leave',
@@ -1047,6 +1048,11 @@ export default function RosterOwnerPage() {
         onNavigateWeek={(targetDate) => setCalendarDate(targetDate)}
         activeViewMode={rosterViewMode}
         onViewModeChange={setRosterViewMode}
+      />
+
+      <RosterCoveragePanel
+        pharmacyId={selectedPharmacyId}
+        calendarDate={calendarDate}
       />
       
       {rosterViewMode === 'CALENDAR' && (
