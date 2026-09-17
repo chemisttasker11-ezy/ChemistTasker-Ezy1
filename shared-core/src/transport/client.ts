@@ -13,7 +13,7 @@ export interface ApiClientConfig {
 }
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
-  body?: BodyInit | Record<string, unknown> | unknown[] | null;
+  body?: BodyInit | object | null;
   query?: ApiQuery;
   auth?: boolean;
   retryAuth?: boolean;
@@ -46,7 +46,7 @@ function withQuery(path: string, query?: ApiQuery): string {
   return suffix ? `${path}${path.includes('?') ? '&' : '?'}${suffix}` : path;
 }
 
-function isJsonBody(body: ApiRequestOptions['body']): body is Record<string, unknown> | unknown[] {
+function isJsonBody(body: ApiRequestOptions['body']): body is object {
   if (!body || typeof body !== 'object') return false;
   if (typeof FormData !== 'undefined' && body instanceof FormData) return false;
   if (typeof Blob !== 'undefined' && body instanceof Blob) return false;

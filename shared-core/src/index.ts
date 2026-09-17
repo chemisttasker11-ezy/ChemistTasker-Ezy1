@@ -13,6 +13,7 @@ export * from './api';
 export * from './transport/client';
 export * from './platformApi';
 export * from './contracts/publicContent';
+export * from './contracts/marketplace';
 
 // Re-export all types
 export * from './types';

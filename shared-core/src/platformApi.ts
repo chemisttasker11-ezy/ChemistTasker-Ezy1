@@ -20,6 +20,19 @@ import type {
   PublicHubPost,
   PublicHubSummary,
 } from './contracts/publicContent';
+import type {
+  MarketplaceAccess,
+  MarketplaceCategory,
+  MarketplaceDashboardListing,
+  MarketplaceExchange,
+  MarketplaceListingOptions,
+  MarketplaceListingPage,
+  MarketplaceListingWrite,
+  MarketplaceMessage,
+  MarketplaceOwnedListing,
+  MarketplacePublicListing,
+  MarketplaceStateResult,
+} from './contracts/marketplace';
 
 export interface DomainApi {
   request<T = unknown>(path: string, options?: ApiRequestOptions): Promise<T>;
@@ -54,16 +67,32 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
 
     marketplace: {
       ...domain(client),
-      listCategories: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.categories, query, { auth: false }),
-      listListings: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.listings, query, { auth: false }),
-      getListing: <T = unknown>(id: string) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.listing(id), undefined, { auth: false }),
-      getAccess: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.marketplace.access),
-      getListingOptions: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.marketplace.listingOptions),
-      getMyListings: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.myListings, query),
-      getDashboard: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.marketplace.dashboard),
-      getEligibility: <T = unknown>(id: string) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.eligibility(id)),
-      getAudience: <T = unknown>(id: string) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.audience(id)),
-      lookupCatalogue: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.marketplace.catalogueLookup, query),
+      listCategories: (query?: ApiQuery) => client.get<MarketplaceCategory[]>(PLATFORM_ENDPOINTS.marketplace.categories, query, { auth: false }),
+      listListings: (query?: ApiQuery) => client.get<MarketplaceListingPage>(PLATFORM_ENDPOINTS.marketplace.listings, query, { auth: false }),
+      getListing: (id: string) => client.get<MarketplacePublicListing>(PLATFORM_ENDPOINTS.marketplace.listing(id), undefined, { auth: false }),
+      getAccess: () => client.get<MarketplaceAccess>(PLATFORM_ENDPOINTS.marketplace.access),
+      getListingOptions: () => client.get<MarketplaceListingOptions>(PLATFORM_ENDPOINTS.marketplace.listingOptions),
+      getMyListings: (query?: ApiQuery) => client.get<MarketplaceOwnedListing[]>(PLATFORM_ENDPOINTS.marketplace.myListings, query),
+      getDashboard: () => client.get<MarketplaceDashboardListing[]>(PLATFORM_ENDPOINTS.marketplace.dashboard),
+      getEligibility: (id: string, query?: ApiQuery) => client.get<{ can_enquire: boolean; can_manage: boolean; blocker: unknown }>(PLATFORM_ENDPOINTS.marketplace.eligibility(id), query),
+      createListing: (body: MarketplaceListingWrite) => client.post<MarketplaceOwnedListing>(PLATFORM_ENDPOINTS.marketplace.listings, body),
+      updateListing: (id: string, body: Partial<MarketplaceListingWrite> & { expected_version: number }) => client.patch<MarketplaceOwnedListing>(PLATFORM_ENDPOINTS.marketplace.listing(id), body),
+      actOnListing: (id: string, action: 'submit' | 'withdraw', expectedVersion: number) => client.post<{ publication_status: string; availability_status: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.listingAction(id, action), { expected_version: expectedVersion }),
+      updateAudience: (id: string, body: { expected_version: number; current_circle: string; maximum_circle?: string; schedule?: Array<{ target_circle: string; due_at: string }> }) => client.post<{ current_circle: string; maximum_circle: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.audience(id), body),
+      uploadImage: (id: string, body: FormData) => client.post<{ id: number; moderation_status: string }>(PLATFORM_ENDPOINTS.marketplace.images(id), body),
+      deleteImage: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.marketplace.image(id)),
+      createEnquiry: (id: string, body: { buying_pharmacy?: number | null; client_request_id: string; terms?: Record<string, unknown>; message?: string }) => client.post<{ id: string; state: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.enquiries(id), body),
+      createInternalTransfer: (id: string, body: { destination_pharmacy: number; transport_terms?: Record<string, unknown> }) => client.post<{ id: number; state: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.internalTransfers(id), body),
+      actOnInternalTransfer: (id: number, action: 'authorise' | 'dispatch' | 'receive' | 'cancel', expectedVersion: number) => client.post<MarketplaceStateResult>(PLATFORM_ENDPOINTS.marketplace.internalTransferAction(id, action), { expected_version: expectedVersion }),
+      listExchanges: () => client.get<MarketplaceExchange[]>(PLATFORM_ENDPOINTS.marketplace.exchanges),
+      getExchange: (id: string) => client.get<MarketplaceExchange>(PLATFORM_ENDPOINTS.marketplace.exchange(id)),
+      listExchangeMessages: (id: string) => client.get<MarketplaceMessage[]>(PLATFORM_ENDPOINTS.marketplace.exchangeMessages(id)),
+      sendExchangeMessage: (id: string, body: string) => client.post<MarketplaceMessage>(PLATFORM_ENDPOINTS.marketplace.exchangeMessages(id), { body }),
+      actOnExchange: (id: string, action: string, body: Record<string, unknown>) => client.post<MarketplaceStateResult>(PLATFORM_ENDPOINTS.marketplace.exchangeAction(id, action), body),
+      saveListing: (id: string) => client.post<void>(PLATFORM_ENDPOINTS.marketplace.saved(id), {}),
+      unsaveListing: (id: string) => client.delete<void>(PLATFORM_ENDPOINTS.marketplace.saved(id)),
+      reportListing: (listing: string, reason: string) => client.post<{ reference: string }>(PLATFORM_ENDPOINTS.marketplace.reports, { listing, reason }, { auth: false }),
+      lookupCatalogue: (query?: ApiQuery) => client.get<{ results: Array<{ id: number; name: string; brand: string; description: string; category: { slug: string; name: string } }> }>(PLATFORM_ENDPOINTS.marketplace.catalogueLookup, query),
     },
 
     ethicalMarketplace: {

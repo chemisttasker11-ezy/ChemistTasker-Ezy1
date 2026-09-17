@@ -60,3 +60,28 @@ describe('createChemistTaskerApi content management', () => {
     ]);
   });
 });
+
+describe('createChemistTaskerApi Marketplace', () => {
+  it('uses named listing, enquiry, exchange and saved-listing routes', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? 'GET' });
+      return init?.method === 'DELETE' || String(input).includes('/saved/')
+        ? new Response(null, { status: 204 })
+        : json({ id: 'result', state: 'ENQUIRY', version: 1 });
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+
+    await api.marketplace.createEnquiry('listing-id', { client_request_id: 'request-id', message: 'Hello' });
+    await api.marketplace.sendExchangeMessage('exchange-id', 'Agreed');
+    await api.marketplace.saveListing('listing-id');
+    await api.marketplace.unsaveListing('listing-id');
+
+    expect(calls).toEqual([
+      { url: 'https://example.test/api/marketplace/listings/listing-id/enquiries/', method: 'POST' },
+      { url: 'https://example.test/api/marketplace/exchanges/exchange-id/messages/', method: 'POST' },
+      { url: 'https://example.test/api/marketplace/saved/listing-id/', method: 'POST' },
+      { url: 'https://example.test/api/marketplace/saved/listing-id/', method: 'DELETE' },
+    ]);
+  });
+});
