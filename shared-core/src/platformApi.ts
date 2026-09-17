@@ -72,6 +72,11 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
   return {
     client,
 
+    account: {
+      ...domain(client),
+      getCurrentUser: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.account.currentUser),
+    },
+
     publicContent: {
       ...domain(client),
       listHubs: () => client.get<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community, undefined, { auth: false }),

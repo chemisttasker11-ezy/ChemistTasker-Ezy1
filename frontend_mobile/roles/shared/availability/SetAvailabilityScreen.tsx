@@ -28,9 +28,9 @@ import {
   createUserAvailabilityService,
   deleteUserAvailabilityService,
   getOnboarding,
+  updateOnboardingForm,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../../../context/AuthContext';
-import { API_BASE_URL } from '@/constants/api';
 import { Autocomplete as WebAutocomplete, Circle, GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import GooglePlacesInput from '../pharmacies/GooglePlacesInput';
 import AvailabilityRadiusMap from './AvailabilityRadiusMap';
@@ -255,7 +255,7 @@ function AvailabilityWebLocationField({
 }
 
 export default function SetAvailabilityScreen() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [availabilityEntries, setAvailabilityEntries] = useState<AvailabilityEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<AvailabilityDraft>(createEmptyEntry());
   const [notifyNewShifts, setNotifyNewShifts] = useState(false);
@@ -465,7 +465,6 @@ export default function SetAvailabilityScreen() {
     if (!onboardingRole) return;
     setSavingLocation(true);
     try {
-      const safeRole = onboardingRole === 'other_staff' ? 'otherstaff' : onboardingRole;
       const form = new FormData();
       form.append('street_address', locationForm.streetAddress || '');
       form.append('suburb', locationForm.suburb || '');
@@ -478,12 +477,7 @@ export default function SetAvailabilityScreen() {
       if (locationForm.googlePlaceId) form.append('google_place_id', locationForm.googlePlaceId);
       form.append('coverage_radius_km', String(locationForm.coverageRadiusKm));
 
-      const response = await fetch(`${API_BASE_URL}/client-profile/${safeRole}/onboarding/me/`, {
-        method: 'PATCH',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body: form,
-      });
-      if (!response.ok) throw new Error('Failed to update location');
+      await updateOnboardingForm(onboardingRole, form);
       showSnackbar('Location updated', 'success');
     } catch {
       showSnackbar('Failed to update location', 'error');

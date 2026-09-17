@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import apiClient from '@/utils/apiClient';
+import { chemistTaskerApi } from '@/config/api';
 
 type Pharmacy = { id: number; name: string; has_pin: boolean };
 export default function AttendancePinScreen() {
@@ -19,7 +19,7 @@ export default function AttendancePinScreen() {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const { data } = await apiClient.get('/client-profile/attendance/worker/pin/update/');
+      const data = await chemistTaskerApi.attendance.getPinPharmacies();
       setPharmacies(data.pharmacies);
       setSelected(data.pharmacies.length === 1 ? String(data.pharmacies[0].id) : '');
     } catch { setError('Unable to load your active pharmacy memberships.'); }
@@ -31,10 +31,10 @@ export default function AttendancePinScreen() {
     if (!valid) return;
     setSaving(true); setError(''); setSuccess('');
     try {
-      await apiClient.post('/client-profile/attendance/worker/pin/update/', { pharmacy_id: Number(selected), new_pin: pin });
+      await chemistTaskerApi.attendance.updatePin(Number(selected), pin);
       setSuccess(`Attendance PIN saved for ${pharmacies.find(p => String(p.id) === selected)?.name}. Connect the terminal to the internet the next time you use this PIN.`);
       setPin(''); setConfirm('');
-    } catch (e: any) { setError(e.response?.data?.error || 'PIN was not saved. Try again.'); }
+    } catch (e: any) { setError(e?.payload?.error || e?.message || 'PIN was not saved. Try again.'); }
     finally { setSaving(false); }
   };
   return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

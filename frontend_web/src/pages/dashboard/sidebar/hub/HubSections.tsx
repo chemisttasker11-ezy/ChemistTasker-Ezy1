@@ -1,4 +1,3 @@
-import {browserRequest} from '../../../../../landing_next/shared/browser-session';
 ﻿import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -20,6 +19,7 @@ import {
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import TagIcon from '@mui/icons-material/Tag';
+import { getCurrentUser } from '@chemisttasker/shared-core';
 
 import { fetchHubGroupMembers } from '../../../../api/hub';
 import type {
@@ -377,7 +377,7 @@ interface ChemistTaskerHubContentProps {
 export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPostHandled }: ChemistTaskerHubContentProps) {
   const [opening,setOpening]=useState(true);
   useEffect(()=>{let active=true;setOpening(true);
-    browserRequest<{public_community_enabled:boolean}>('/api/users/me/').then(user=>{
+    getCurrentUser().then((user: {public_community_enabled?: boolean})=>{
       if(!active)return;
       if(user.public_community_enabled&&['public','pharmacist','intern','staff','explorer','owner'].includes(hub.key))window.location.assign(targetPostId?`/hubs/posts/${targetPostId}`:`/hubs/${hub.key}`);
       else setOpening(false);

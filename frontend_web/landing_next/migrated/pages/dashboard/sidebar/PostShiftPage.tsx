@@ -70,7 +70,7 @@ import {
   createOwnerShiftService,
   updateOwnerShiftService,
 } from '@chemisttasker/shared-core';
-import skillsCatalog from '@/shared-core/skills_catalog.json';
+import skillsCatalog from '@chemisttasker/shared-core/skills_catalog.json';
 import { useColorMode } from '../../../theme/sleekTheme';
 import apiClient from '../../../utils/apiClient';
 

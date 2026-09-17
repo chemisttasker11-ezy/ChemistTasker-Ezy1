@@ -7,6 +7,10 @@
  * first, then expose them through shared-core services.
  */
 export const PLATFORM_ENDPOINTS = {
+  account: {
+    currentUser: '/users/me/',
+  },
+
   publicHub: {
     media: (id: string) => `/public-hub/media/${id}/`,
     sitemap: '/public-hub/sitemap/',

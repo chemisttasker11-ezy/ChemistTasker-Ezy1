@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
-import { API_BASE_URL } from '@/constants/api';
 import {
   createExplorerPost,
   deleteExplorerPost,
@@ -15,6 +14,7 @@ import {
   likeExplorerPost,
   unlikeExplorerPost,
   updateExplorerPost,
+  updateOnboardingForm,
 } from '@chemisttasker/shared-core';
 import { ENGAGEMENT_LABELS } from './constants';
 import { Candidate } from './types';
@@ -537,7 +537,6 @@ export default function TalentBoard({
   }, [loadPitchDefaults, pitchOpen]);
 
   const updateOnboardingLocationPrefs = useCallback(async () => {
-    if (!API_BASE_URL) return;
     const safeRole = isOtherStaff ? 'otherstaff' : isPharmacist ? 'pharmacist' : 'explorer';
     const form = new FormData();
     form.append('street_address', pitchForm.streetAddress || '');
@@ -547,12 +546,7 @@ export default function TalentBoard({
     form.append('open_to_travel', pitchForm.openToTravel ? 'true' : 'false');
     form.append('travel_states', JSON.stringify(pitchForm.travelStates || []));
     form.append('coverage_radius_km', String(pitchForm.coverageRadiusKm || 0));
-    const response = await fetch(`${API_BASE_URL}/client-profile/${safeRole}/onboarding/me/`, {
-      method: 'PATCH',
-      credentials: 'include',
-      body: form,
-    });
-    if (!response.ok) throw new Error('Failed to update location preferences');
+    await updateOnboardingForm(safeRole, form);
   }, [isOtherStaff, isPharmacist, pitchForm]);
 
   const handlePitchSave = async () => {

@@ -1,5 +1,5 @@
 import { Syringe, FlaskConical, HeartPulse, Monitor, ShieldCheck, Pill, Leaf, PackageCheck, Bot, Droplets, Stethoscope, Plane, ClipboardCheck, GraduationCap, Sparkles, Users, ShoppingBag, type LucideIcon } from 'lucide-react';
-import catalog from '@/shared-core/skills_catalog.json';
+import catalog from '@chemisttasker/shared-core/skills_catalog.json';
 const labels = new Map<string,string>();
 for (const role of Object.values(catalog)) for (const entries of Object.values(role)) if(Array.isArray(entries)) for (const entry of entries) labels.set(entry.code,entry.label);
 export function skillLabel(skill: string) { return labels.get(skill) || skill; }

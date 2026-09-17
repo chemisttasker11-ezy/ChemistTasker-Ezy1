@@ -1,7 +1,7 @@
-import { configureApi, configureStorage } from '@chemisttasker/shared-core';
+import { configureApi, configureStorage, createChemistTaskerApi } from '@chemisttasker/shared-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSecureKey, secureGet, secureRemove, secureRemoveMany, secureSet } from '../utils/secureStorage';
-import { getValidAccessToken } from '../utils/authSession';
+import { getValidAccessToken, refreshAccessToken } from '../utils/authSession';
 
 const normalizeApiBaseUrl = (value?: string) => {
   const trimmed = (value || '').trim().replace(/\/+$/, '');
@@ -27,4 +27,11 @@ configureApi({
   getToken: async () => {
     return await getValidAccessToken(baseURL);
   },
+});
+
+/** Shared request/contract facade; device storage and lifecycle remain mobile-owned. */
+export const chemistTaskerApi = createChemistTaskerApi({
+  baseUrl: baseURL,
+  getAuthToken: () => getValidAccessToken(baseURL),
+  refreshAuthToken: () => refreshAccessToken(baseURL),
 });

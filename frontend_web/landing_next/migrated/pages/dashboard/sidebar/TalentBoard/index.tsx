@@ -28,7 +28,7 @@ import {
 } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../../../../constants/api";
 import { otherStaffRoleLabel } from "../../../../utils/roleLabels";
-import skillsCatalog from "@/shared-core/skills_catalog.json";
+import skillsCatalog from "@chemisttasker/shared-core/skills_catalog.json";
 
 const titleCase = (value: string) =>
   value

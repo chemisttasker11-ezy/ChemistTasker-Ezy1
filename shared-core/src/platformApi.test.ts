@@ -7,6 +7,52 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 });
 
 describe('createChemistTaskerApi public content', () => {
+  it('exposes the current-user session route without client-local URL construction', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe('https://example.test/api/users/me/');
+      return json({ id: 1 });
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+
+    await api.account.getCurrentUser();
+  });
+
+  it('isolates concurrent request-scoped server tokens and keeps public SSR anonymous', async () => {
+    const calls: Array<{ url: string; authorization: string | null }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        authorization: new Headers(init?.headers).get('Authorization'),
+      });
+      return json(String(input).includes('/articles/')
+        ? { count: 0, next: null, previous: null, results: [] }
+        : { eligible_pharmacies: [] });
+    });
+    const first = createChemistTaskerApi({
+      baseUrl: 'https://example.test/api',
+      getAuthToken: async () => 'request-one-token',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+    const second = createChemistTaskerApi({
+      baseUrl: 'https://example.test/api',
+      getAuthToken: async () => 'request-two-token',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    await Promise.all([
+      first.marketplace.getAccess(),
+      second.marketplace.getAccess(),
+      first.publicContent.listArticles(),
+    ]);
+
+    expect(calls).toHaveLength(3);
+    expect(calls).toEqual(expect.arrayContaining([
+      { url: 'https://example.test/api/marketplace/me/access/', authorization: 'Bearer request-one-token' },
+      { url: 'https://example.test/api/marketplace/me/access/', authorization: 'Bearer request-two-token' },
+      { url: 'https://example.test/api/public-hub/articles/', authorization: null },
+    ]));
+  });
+
   it('uses public reads without attaching the configured token', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('https://example.test/api/public-hub/articles/?kind=news');

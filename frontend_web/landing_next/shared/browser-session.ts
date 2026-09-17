@@ -65,7 +65,6 @@ export async function browserRequest<T>(url:string,method='GET',body?:unknown,re
  }
  return decode<T>(response);
 }
-export const currentSession=()=>browserRequest<SessionUser>('/api/users/me/');
 export function logoutSession(root='/api'):Promise<void> {
  if(signingOut)return signingOut;
  const clear=async()=>{await decode(await fetch(`${root}/users/logout/`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root)},body:'{}'}));announceSession('logout');};
