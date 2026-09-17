@@ -1,0 +1,51 @@
+import { describe, expect, it } from 'vitest';
+import { API_ENDPOINTS } from './endpoints';
+import { PLATFORM_ENDPOINTS } from './platformEndpoints';
+
+describe('PLATFORM_ENDPOINTS', () => {
+  it('matches Django public Hub and content routes', () => {
+    expect(PLATFORM_ENDPOINTS.publicHub.article('hello')).toBe('/public-hub/articles/hello/');
+    expect(PLATFORM_ENDPOINTS.publicHub.articleComments('hello')).toBe('/public-hub/articles/hello/comments/');
+    expect(PLATFORM_ENDPOINTS.publicHub.communityPosts('owners')).toBe('/public-hub/community/owners/posts/');
+    expect(PLATFORM_ENDPOINTS.publicHub.commentReport(12)).toBe('/public-hub/comments/12/report/');
+    expect(PLATFORM_ENDPOINTS.content.documentAction(4, 'publish')).toBe('/content/documents/4/publish/');
+    expect(PLATFORM_ENDPOINTS.content.invitationAction(5, 'revoke')).toBe('/content/invitations/5/revoke/');
+    expect(PLATFORM_ENDPOINTS.content.moderationItem('comment', 6)).toBe('/content/moderation/comment/6/');
+  });
+
+  it('matches Django Marketplace routes', () => {
+    expect(PLATFORM_ENDPOINTS.marketplace.listing('listing-id')).toBe('/marketplace/listings/listing-id/');
+    expect(PLATFORM_ENDPOINTS.marketplace.eligibility('listing-id')).toBe('/marketplace/listings/listing-id/eligibility/');
+    expect(PLATFORM_ENDPOINTS.marketplace.listingAction('listing-id', 'submit')).toBe('/marketplace/listings/listing-id/submit/');
+    expect(PLATFORM_ENDPOINTS.marketplace.exchangeMessages('exchange-id')).toBe('/marketplace/exchanges/exchange-id/messages/');
+    expect(PLATFORM_ENDPOINTS.marketplace.internalTransferAction(7, 'accept')).toBe('/marketplace/internal-transfers/7/accept/');
+  });
+
+  it('matches Django Ethical Marketplace routes', () => {
+    expect(PLATFORM_ENDPOINTS.ethicalMarketplace.pharmacyApproval(2)).toBe('/ethical/pharmacies/2/approval/');
+    expect(PLATFORM_ENDPOINTS.ethicalMarketplace.revokeGrant(2, 3)).toBe('/ethical/pharmacies/2/grants/3/revoke/');
+    expect(PLATFORM_ENDPOINTS.ethicalMarketplace.importCommit(8)).toBe('/ethical/inventory/imports/8/commit/');
+    expect(PLATFORM_ENDPOINTS.ethicalMarketplace.lotReconcile(9)).toBe('/ethical/inventory/lots/9/reconcile/');
+    expect(PLATFORM_ENDPOINTS.ethicalMarketplace.transferDocument('transfer-id', 10)).toBe('/ethical/transfers/transfer-id/documents/10/');
+  });
+
+  it('matches Django attendance, roster and kiosk routes', () => {
+    expect(PLATFORM_ENDPOINTS.attendance.managerTimeline(11)).toBe('/client-profile/attendance/manager/timeline/11/');
+    expect(PLATFORM_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/client-profile/attendance/roster/acknowledgements/12/');
+    expect(PLATFORM_ENDPOINTS.rosterV2.managerApproveReplacement).toBe('/client-profile/attendance/roster/manager/approve-replacement/');
+    expect(PLATFORM_ENDPOINTS.kiosk.syncBatch).toBe('/client-profile/attendance/kiosk/sync/batch/');
+    expect(PLATFORM_ENDPOINTS.kiosk.workerEnrol).toBe('/client-profile/attendance/kiosk/workers/enrol/');
+  });
+});
+
+describe('legacy API_ENDPOINTS reconciliation', () => {
+  it('uses canonical Django detail routes', () => {
+    expect(API_ENDPOINTS.getCommunityShiftDetail(1)).toBe('/client-profile/community-shifts/1/');
+    expect(API_ENDPOINTS.getPublicShiftDetail(2)).toBe('/client-profile/public-shifts/2/');
+    expect(API_ENDPOINTS.getActiveShiftDetail(3)).toBe('/client-profile/shifts/active/3/');
+  });
+
+  it('exposes the current token-based referee rejection route', () => {
+    expect(API_ENDPOINTS.refereeRejectByToken('signed-token')).toBe('/client-profile/onboarding/referee-reject/signed-token/');
+  });
+});

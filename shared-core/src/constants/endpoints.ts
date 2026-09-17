@@ -45,6 +45,10 @@ export const API_ENDPOINTS = {
     submitRefereeResponse: (token: string) =>
         `/client-profile/onboarding/submit-reference/${token}/`,
 
+    refereeRejectByToken: (token: string) =>
+        `/client-profile/onboarding/referee-reject/${token}/`,
+
+    /** @deprecated Django now exposes the token route above. Kept until legacy links are migrated. */
     refereeReject: (pk: string | number, refIndex: string | number) =>
         `/client-profile/onboarding/referee-reject/${pk}/${refIndex}/`,
 
@@ -109,9 +113,9 @@ export const API_ENDPOINTS = {
     expressInterestInShift: (shiftId: string | number) => `/client-profile/shifts/${shiftId}/express_interest/`,
     revealProfile: (shiftId: string | number) => `/client-profile/shifts/${shiftId}/reveal_profile/`,
     acceptUserToShift: (shiftId: string | number) => `/client-profile/shifts/${shiftId}/accept_user/`,
-    getCommunityShiftDetail: (id: string | number) => `/client-profile/community-shifts/${id}`,
-    getPublicShiftDetail: (id: string | number) => `/client-profile/public-shifts/${id}`,
-    getActiveShiftDetail: (id: string | number) => `/client-profile/shifts/active/${id}`,
+    getCommunityShiftDetail: (id: string | number) => `/client-profile/community-shifts/${id}/`,
+    getPublicShiftDetail: (id: string | number) => `/client-profile/public-shifts/${id}/`,
+    getActiveShiftDetail: (id: string | number) => `/client-profile/shifts/active/${id}/`,
     getConfirmedShiftDetail: (id: string | number) => `/client-profile/shifts/confirmed/${id}/`,
     escalateCommunityShift: (shiftId: string | number) => `/client-profile/community-shifts/${shiftId}/escalate/`,
     getCommunityShiftMemberStatus: (shiftId: string | number) => `/client-profile/community-shifts/${shiftId}/member_status/`,

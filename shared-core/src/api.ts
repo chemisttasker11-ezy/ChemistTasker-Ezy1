@@ -423,6 +423,10 @@ export function updateOnboardingForm(rawRole: string, body: FormData) {
 export function submitRefereeResponse(token, data) {
     return fetchApi(`/client-profile/onboarding/submit-reference/${token}/`, { method: 'POST', body: JSON.stringify(data) });
 }
+export function refereeRejectByToken(token) {
+    return fetchApi(API_ENDPOINTS.refereeRejectByToken(token), { method: 'POST' });
+}
+/** @deprecated Use refereeRejectByToken(). */
 export function refereeReject(pk, refIndex) {
     return fetchApi(`/client-profile/onboarding/referee-reject/${pk}/${refIndex}/`, { method: 'POST' });
 }
