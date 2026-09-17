@@ -626,5 +626,6 @@ if not USE_REDIS_CHANNEL_LAYER:
         }
     }
 
-# Anonymous community publication requires an explicit deployment opt-in.
-PUBLIC_COMMUNITY_ENABLED = env.bool("PUBLIC_COMMUNITY_ENABLED", default=False)
+# Anonymous community publication is available in local DEBUG sessions while
+# production deployments still require an explicit opt-in.
+PUBLIC_COMMUNITY_ENABLED = env.bool("PUBLIC_COMMUNITY_ENABLED", default=DEBUG)
