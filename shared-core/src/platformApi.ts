@@ -1,6 +1,25 @@
 import type { ApiClient, ApiClientConfig, ApiQuery, ApiRequestOptions } from './transport/client';
 import { createApiClient } from './transport/client';
 import { PLATFORM_ENDPOINTS } from './constants/platformEndpoints';
+import type {
+  ApiPage,
+  ContentAssignments,
+  ContentAuditItem,
+  ContentDocument,
+  ContentInvitation,
+  ContentMe,
+  ContentModerationItem,
+  ContentPayload,
+  ContentTeamMember,
+  DetailResponse,
+  PublicArticle,
+  PublicArticleComment,
+  PublicArticleDetail,
+  PublicHubComment,
+  PublicHubPoll,
+  PublicHubPost,
+  PublicHubSummary,
+} from './contracts/publicContent';
 
 export interface DomainApi {
   request<T = unknown>(path: string, options?: ApiRequestOptions): Promise<T>;
@@ -16,11 +35,20 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
 
     publicContent: {
       ...domain(client),
-      listArticles: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.publicHub.articles, query, { auth: false }),
-      getArticle: <T = unknown>(slug: string) => client.get<T>(PLATFORM_ENDPOINTS.publicHub.article(slug), undefined, { auth: false }),
-      listArticleComments: <T = unknown>(slug: string, query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), query, { auth: false }),
-      createArticleComment: <T = unknown>(slug: string, body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), body),
-      reactToArticle: <T = unknown>(slug: string, body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.publicHub.articleReaction(slug), body),
+      listHubs: () => client.get<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community, undefined, { auth: false }),
+      listCommunityPosts: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query, { auth: false }),
+      listCommunityPolls: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query, { auth: false }),
+      getPost: (id: number) => client.get<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id), undefined, { auth: false }),
+      listPostComments: (id: number, query?: ApiQuery) => client.get<ApiPage<PublicHubComment>>(PLATFORM_ENDPOINTS.publicHub.postComments(id), query, { auth: false }),
+      reportPost: (id: number, body: { reason: string; comment_id?: number }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.postReport(id), body),
+      listArticles: (query?: ApiQuery) => client.get<ApiPage<PublicArticle>>(PLATFORM_ENDPOINTS.publicHub.articles, query, { auth: false }),
+      getArticle: (slug: string) => client.get<PublicArticleDetail>(PLATFORM_ENDPOINTS.publicHub.article(slug), undefined, { auth: false }),
+      listArticleComments: (slug: string, query?: ApiQuery) => client.get<ApiPage<PublicArticleComment>>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), query, { auth: false }),
+      createArticleComment: (slug: string, body: { body: string; parent?: number | null }) => client.post<PublicArticleComment>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), body),
+      deleteArticleComment: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.publicHub.comment(id)),
+      reactToArticle: (slug: string, body: { kind: string }) => client.post<PublicArticle>(PLATFORM_ENDPOINTS.publicHub.articleReaction(slug), body),
+      reactToArticleComment: (id: number, body: { kind: string }) => client.post<PublicArticleComment>(PLATFORM_ENDPOINTS.publicHub.commentReaction(id), body),
+      reportArticleComment: (id: number, body: { reason: string }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.commentReport(id), body),
       getMemberContext: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.me),
     },
 
@@ -90,11 +118,22 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
 
     contentManagement: {
       ...domain(client),
-      getMe: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.content.me),
-      getDocuments: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.content.documents, query),
-      getInvitations: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.content.invitations, query),
-      getTeam: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.content.team, query),
-      getAudit: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.content.audit, query),
+      getMe: () => client.get<ContentMe>(PLATFORM_ENDPOINTS.content.me),
+      getDocuments: (query?: ApiQuery) => client.get<ApiPage<ContentDocument>>(PLATFORM_ENDPOINTS.content.documents, query),
+      createDocument: (body: { area: string; payload: ContentPayload }) => client.post<ContentDocument>(PLATFORM_ENDPOINTS.content.documents, body),
+      getDocument: (id: number) => client.get<ContentDocument>(PLATFORM_ENDPOINTS.content.document(id)),
+      updateDocument: (id: number, body: { payload: ContentPayload; version: number }) => client.patch<ContentDocument>(PLATFORM_ENDPOINTS.content.document(id), body),
+      actOnDocument: (id: number, action: 'submit' | 'return' | 'publish' | 'archive', body: { version: number; publish_at?: string | null; feedback?: string }) => client.post<ContentDocument>(PLATFORM_ENDPOINTS.content.documentAction(id, action), body),
+      getInvitations: (query?: ApiQuery) => client.get<ApiPage<ContentInvitation>>(PLATFORM_ENDPOINTS.content.invitations, query),
+      createInvitation: (body: { email: string; assignments: ContentAssignments }) => client.post<{ id: number; detail: string }>(PLATFORM_ENDPOINTS.content.invitations, body),
+      acceptInvitation: (token: string) => client.post<DetailResponse & Pick<ContentMe, 'administrator' | 'areas'>>(PLATFORM_ENDPOINTS.content.invitationAccept, { token }),
+      actOnInvitation: (id: number, action: 'resend' | 'revoke') => client.post<DetailResponse>(PLATFORM_ENDPOINTS.content.invitationAction(id, action), {}),
+      getTeam: (query?: ApiQuery) => client.get<ApiPage<ContentTeamMember>>(PLATFORM_ENDPOINTS.content.team, query),
+      updateTeamMember: (id: number, assignments: ContentAssignments) => client.put<DetailResponse>(PLATFORM_ENDPOINTS.content.teamMember(id), { assignments }),
+      uploadMedia: (body: FormData) => client.post<{ url: string }>(PLATFORM_ENDPOINTS.content.media, body),
+      getModeration: () => client.get<ContentModerationItem[]>(PLATFORM_ENDPOINTS.content.moderation),
+      moderate: (kind: 'article' | 'hub', id: number, action: 'resolve' | 'hide') => client.post<DetailResponse>(PLATFORM_ENDPOINTS.content.moderationItem(kind, id), { action }),
+      getAudit: (query?: ApiQuery) => client.get<ApiPage<ContentAuditItem>>(PLATFORM_ENDPOINTS.content.audit, query),
     },
   };
 }

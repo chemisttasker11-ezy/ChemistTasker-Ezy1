@@ -12,6 +12,7 @@ export * from './api';
 // for new cross-platform work (especially Next.js SSR).
 export * from './transport/client';
 export * from './platformApi';
+export * from './contracts/publicContent';
 
 // Re-export all types
 export * from './types';
