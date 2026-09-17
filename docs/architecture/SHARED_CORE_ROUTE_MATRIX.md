@@ -75,17 +75,20 @@ The report-only boundary audit currently detects three literal violations, but i
 does not detect calls assembled from helper strings. The matrix therefore records
 the broader duplicate surfaces found by the inventory:
 
-1. Next has a copied `landing_next/shared-core` tree and a TypeScript path alias,
-   but no `@chemisttasker/shared-core` package dependency.
-2. Next public Hub, content, Marketplace and Ethical Marketplace use local proxy
-   clients instead of the root shared facade.
-3. React attendance/Roster V2 and workforce screens use local Axios calls.
-4. Expo onboarding, attendance PIN, leave and hours screens still construct routes.
-5. React and Expo install separate `1.0.0` tarballs, which can drift from source.
+1. Next's copied `landing_next/shared-core` tree and source alias are removed; it
+   now installs the same package artifact as React and Expo.
+2. Next public Hub, content, and public Marketplace calls use shared-core's
+   request-scoped facade. Its platform proxy remains a transport boundary only.
+3. React attendance/Roster V2 and workforce screens retain local presentation
+   adapters, while canonical endpoint identities and supported Roster V2 actions
+   live in shared-core.
+4. Expo attendance PIN and onboarding-location calls now use shared operations;
+   device lifecycle, app-update bootstrap, and kiosk pairing remain mobile-owned.
+5. All clients install `@chemisttasker/shared-core` 1.1.1 from the single root
+   tarball; obsolete 1.0.0 artifacts were removed.
 
-Implementation remains ordered SC01 through SC12. No duplicate helper should be
-deleted until its replacement uses one built shared-core artifact and the affected
-client passes typecheck/build.
+SC01 through SC12 are complete. Strict boundary enforcement is enabled in CI;
+new Django business routes must be added to shared-core before client adoption.
 
 ## SC08 Job Board / Talent Board reconciliation
 

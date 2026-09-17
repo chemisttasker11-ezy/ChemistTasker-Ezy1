@@ -1,0 +1,104 @@
+name: Shared Core Consolidation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  consolidation:
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-shared-core-contract-key
+      ADMIN_URL: admin/
+      EMAIL_HOST_USER: ci@example.test
+      EMAIL_HOST_PASSWORD: ci-placeholder
+      DEFAULT_FROM_EMAIL: ci@example.test
+      RECAPTCHA_SECRET_KEY: ci-placeholder
+      AZURE_OCR_ENDPOINT: https://example.test
+      AZURE_OCR_KEY: ci-placeholder
+      SCRAPINGBEE_API_KEY: ci-placeholder
+      MOBILEMESSAGE_USERNAME: ci-placeholder
+      MOBILEMESSAGE_PASSWORD: ci-placeholder
+      MOBILEMESSAGE_SENDER: ChemistTasker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            shared-core/package-lock.json
+            frontend_web/package-lock.json
+            frontend_web/landing_next/package-lock.json
+            frontend_mobile/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Shared core install
+        run: npm ci
+        working-directory: shared-core
+      - name: Shared core typecheck
+        run: npm run typecheck
+        working-directory: shared-core
+      - name: Shared core unit tests
+        run: npm run test:ci
+        working-directory: shared-core
+      - name: Shared core build
+        run: npm run build
+        working-directory: shared-core
+
+      - name: React install
+        run: npm ci
+        working-directory: frontend_web
+      - name: React typecheck
+        run: npx tsc --noEmit
+        working-directory: frontend_web
+      - name: React build
+        run: npx vite build
+        working-directory: frontend_web
+        env:
+          VITE_API_URL: http://127.0.0.1:8000
+          VITE_API_BASE_URL: http://127.0.0.1:8000
+
+      - name: Next install
+        run: npm ci
+        working-directory: frontend_web/landing_next
+      - name: Next typecheck
+        run: npm run typecheck
+        working-directory: frontend_web/landing_next
+      - name: Next build and public-page smoke generation
+        run: npm run build
+        working-directory: frontend_web/landing_next
+
+      - name: Expo install
+        run: npm ci
+        working-directory: frontend_mobile
+      - name: Expo lint
+        run: npm run lint
+        working-directory: frontend_mobile
+      - name: Expo typecheck
+        run: npx tsc --noEmit
+        working-directory: frontend_mobile
+
+      - name: Backend install
+        run: pip install -r backend/requirements.txt
+      - name: Django checks
+        run: python backend/manage.py check --settings=core.contract_test_settings
+      - name: Migration drift check
+        run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
+      - name: Focused backend contracts
+        run: python backend/manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
+      - name: Public content contracts
+        run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
+
+      - name: Strict shared-core boundary audit
+        run: node scripts/audit-shared-core-boundary.mjs --strict
+      - name: Native kiosk regression tests
+        run: cargo test
+        working-directory: frontend_web/src-tauri
