@@ -3,9 +3,15 @@
  * Exports everything from the package
  */
 
-// Re-export API configuration and all functions
+// Legacy application-wide configuration and existing API functions remain
+// exported for backwards compatibility while clients migrate domain-by-domain.
 export { configureApi } from './api';
 export * from './api';
+
+// Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi
+// for new cross-platform work (especially Next.js SSR).
+export * from './transport/client';
+export * from './platformApi';
 
 // Re-export all types
 export * from './types';
@@ -16,8 +22,10 @@ export * from './domain';
 // Re-export storage helpers
 export * from './storage';
 
-// Re-export all constants
+// Re-export all constants. API_ENDPOINTS is the legacy catalogue; the new
+// platform surfaces live in PLATFORM_ENDPOINTS until the catalogues are merged.
 export * from './constants/endpoints';
+export * from './constants/platformEndpoints';
 export * from './constants/roles';
 export * from './constants/capabilities';
 export * from './constants/colors';
