@@ -40,4 +40,9 @@ describe('kiosk protocol', () => {
     expect(kioskRetryDelayMs(0, () => 0)).toBe(1600);
     expect(kioskRetryDelayMs(99, () => 1)).toBe(108000);
   });
+
+  it('keeps signatures and hashes outside the canonical signed payload', () => {
+    const signed = { ...fixture, event_hash: 'hash', signature: 'signature' };
+    expect(canonicalKioskEventJson(signed)).toBe(canonicalKioskEventJson(fixture));
+  });
 });

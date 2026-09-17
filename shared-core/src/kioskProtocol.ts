@@ -25,6 +25,7 @@ export interface KioskSignedEvent extends KioskSignedEventPayload {
 export interface KioskSyncResult {
   event_id: string;
   device_seq: number | null;
+  event_hash: string | null;
   result: 'accepted' | 'already_received' | 'rejected' | 'needs_review';
   integrity_flags: string[];
   reason: string | null;
@@ -35,6 +36,61 @@ export interface KioskSyncResponse {
   acknowledged_through: number;
   results: KioskSyncResult[];
   server_time: string;
+}
+
+export interface KioskPairingRequest {
+  pairing_code: string;
+  device_name: string;
+  public_signing_key: string;
+  platform: string;
+  app_version: string;
+  client_attempt_id: string;
+  proof_signature: string;
+}
+
+export interface KioskPairingResponse {
+  device_id: number;
+  device_token: string;
+  device_name: string;
+  pharmacy_id: number;
+  pharmacy_name: string;
+  activated_at: string;
+  installation_id: string;
+}
+
+export interface KioskSyncRequest {
+  events: KioskSignedEvent[];
+  app_version: string;
+}
+
+export interface KioskConfigResponse {
+  device_id: string;
+  server_time: string;
+}
+
+export interface KioskWorkerEnrollmentRequest {
+  identifier: string;
+  pin: string;
+}
+
+export interface KioskWorkerEnrollmentResponse {
+  worker_id: number;
+  worker_name: string;
+  pharmacy_id: number;
+  is_clocked_in: boolean;
+  is_on_break: boolean;
+  verified_at: string;
+  offline_valid_until: string;
+  credential_generation: string;
+  max_offline_hours: number;
+}
+
+export interface KioskQrResponse {
+  qr_token: string;
+  expires_at: string;
+  pharmacy_id: number;
+  pharmacy_name: string;
+  refresh_interval_seconds: number;
 }
 
 const SIGNED_FIELDS: ReadonlyArray<keyof KioskSignedEventPayload> = [
