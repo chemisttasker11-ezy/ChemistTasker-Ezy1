@@ -78,6 +78,13 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
 
   const request = async <T = unknown>(path: string, options: ApiRequestOptions = {}): Promise<T> => {
     const perform = async (tokenOverride?: string | null): Promise<Response> => {
+      const {
+        auth: _auth,
+        query: _query,
+        retryAuth: _retryAuth,
+        body: requestBody,
+        ...requestInit
+      } = options;
       const headers = new Headers(options.headers ?? {});
       const wantsAuth = options.auth !== false;
       const token = tokenOverride !== undefined
@@ -87,14 +94,14 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
           : null;
       if (wantsAuth && token) headers.set('Authorization', `Bearer ${token}`);
 
-      let body = options.body as BodyInit | null | undefined;
-      if (isJsonBody(options.body)) {
+      let body = requestBody as BodyInit | null | undefined;
+      if (isJsonBody(requestBody)) {
         headers.set('Content-Type', 'application/json');
-        body = JSON.stringify(options.body);
+        body = JSON.stringify(requestBody);
       }
 
       return fetchImpl(`${baseUrl}${withQuery(ensureLeadingSlash(path), options.query)}`, {
-        ...options,
+        ...requestInit,
         body,
         headers,
       });
@@ -107,7 +114,13 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
       options.retryAuth !== false &&
       config.refreshAuthToken
     ) {
-      const refreshed = await config.refreshAuthToken();
+      let refreshed: string | null;
+      try {
+        refreshed = await config.refreshAuthToken();
+      } catch (error) {
+        if (config.onAuthFailure) await config.onAuthFailure();
+        throw error;
+      }
       if (refreshed) response = await perform(refreshed);
     }
 
