@@ -42,6 +42,16 @@ class OrganizationRolePermission(BasePermission):
             role__in=required
         ).exists()
 
+
+class AuthenticatedOrganizationMember(BasePermission):
+    """Allow authenticated users who belong to at least one organization."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        return OrganizationMembership.objects.filter(user=user).exists()
+
 class IsPharmacist(BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.is_pharmacist()
