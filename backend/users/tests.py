@@ -122,3 +122,14 @@ class PasswordResetConfirmTests(TestCase):
         self.assertFalse(AccessAttempt.objects.filter(username__iexact=user.email).exists())
         user.refresh_from_db()
         self.assertTrue(user.check_password("NewPassword123!"))
+
+
+class OrganizationRolePermissionSafetyTests(TestCase):
+    def test_role_permission_fails_closed_without_required_roles(self):
+        from types import SimpleNamespace
+        from users.permissions import OrganizationRolePermission
+
+        request = SimpleNamespace(user=SimpleNamespace(is_authenticated=True))
+        view = SimpleNamespace(kwargs={})
+
+        self.assertFalse(OrganizationRolePermission().has_permission(request, view))
