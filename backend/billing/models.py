@@ -98,3 +98,26 @@ class ShiftPayment(models.Model):
 
     def __str__(self):
         return f"{self.get_payment_type_display()} - {self.owner.email} - ${self.amount_aud} ({self.status})"
+
+
+class StripeWebhookEvent(models.Model):
+    class Status(models.TextChoices):
+        PROCESSING = 'processing', 'Processing'
+        PROCESSED = 'processed', 'Processed'
+        FAILED = 'failed', 'Failed'
+
+    event_id = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=120)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PROCESSING)
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(blank=True, null=True)
+    failed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-received_at']
+        indexes = [
+            models.Index(fields=['event_type', 'received_at'], name='billing_event_type_received'),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} {self.event_id} ({self.status})"
