@@ -133,3 +133,17 @@ class OrganizationRolePermissionSafetyTests(TestCase):
         view = SimpleNamespace(kwargs={})
 
         self.assertFalse(OrganizationRolePermission().has_permission(request, view))
+
+
+class OrganizationPermissionConfigurationTests(TestCase):
+    def test_role_permission_fails_closed_without_required_roles(self):
+        from types import SimpleNamespace
+        from .permissions import OrganizationRolePermission
+
+        request = SimpleNamespace(
+            user=SimpleNamespace(is_authenticated=True),
+            data={},
+        )
+        view = SimpleNamespace(kwargs={})
+
+        self.assertFalse(OrganizationRolePermission().has_permission(request, view))
