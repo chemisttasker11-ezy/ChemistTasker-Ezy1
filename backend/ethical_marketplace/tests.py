@@ -56,3 +56,22 @@ class EthicalMarketplaceTests(TestCase):
         from marketplace.models import MarketplaceListing
         field_targets = {getattr(field.remote_field, "model", None) for field in MarketplaceListing._meta.fields if field.is_relation}
         self.assertNotIn(EthicalProduct, field_targets)
+
+
+class EthicalTransferDocumentValidationTests(TestCase):
+    def test_accepts_pdf_signature(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from ethical_marketplace.views import _validate_transfer_document
+
+        upload = SimpleUploadedFile('evidence.pdf', b'%PDF-1.7\nsynthetic-test-content', content_type='application/pdf')
+        _validate_transfer_document(upload)
+        self.assertEqual(upload.tell(), 0)
+
+    def test_rejects_unknown_binary_signature(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from rest_framework.exceptions import ValidationError
+        from ethical_marketplace.views import _validate_transfer_document
+
+        upload = SimpleUploadedFile('evidence.bin', b'MZsynthetic-executable', content_type='application/octet-stream')
+        with self.assertRaises(ValidationError):
+            _validate_transfer_document(upload)
