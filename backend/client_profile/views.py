@@ -2097,7 +2097,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         if request.method in permissions.SAFE_METHODS:
             return
         user = request.user
-        if IsOwner().has_permission(request, self) or OrganizationRolePermission().has_permission(request, self):
+        if IsOwner().has_permission(request, self) or AuthenticatedOrganizationMember().has_permission(request, self):
             return
         self.permission_denied(request)
 
