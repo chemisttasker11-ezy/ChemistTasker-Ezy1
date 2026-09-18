@@ -451,8 +451,9 @@ def create_subscription_checkout(request):
             )
             return Response({'url': checkout_session.url})
 
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        logger.exception('Billing request failed')
+        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -534,8 +535,9 @@ def update_subscription_seats(request):
             'url': checkout_session.url,
             'message': 'Redirecting to Stripe to purchase extra seats.',
         })
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        logger.exception('Billing request failed')
+        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -684,8 +686,9 @@ def charge_shift_fulfillment(request, shift_id):
             session_kwargs['customer_email'] = getattr(billing_contact, 'email', None) or user.email
         checkout_session = stripe.checkout.Session.create(**session_kwargs)
         return Response({'url': checkout_session.url})
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        logger.exception('Billing request failed')
+        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -791,8 +794,9 @@ def charge_penalty(request, shift_id):
             session_kwargs['customer_email'] = getattr(billing_contact, 'email', None) or user.email
         checkout_session = stripe.checkout.Session.create(**session_kwargs)
         return Response({'url': checkout_session.url})
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        logger.exception('Billing request failed')
+        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 from django.views.decorators.csrf import csrf_exempt
