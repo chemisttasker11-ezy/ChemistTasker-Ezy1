@@ -4,6 +4,7 @@ import {
   Shift,
   ShiftCounterOfferPayload,
   calculateShiftRates,
+  fetchShiftCounterOffersBatchService,
   fetchShiftCounterOffersService,
   getOnboardingDetail,
   storageGetItem,
@@ -196,62 +197,52 @@ export const useCounterOffers = ({
     load();
   }, [reviewOfferShiftId, currentUserId]);
 
-  // Reconcile local counter offers with backend data to avoid stale badges when offers are removed server-side.
+  // Reconcile local counter offers with one batch request per rendered shift page.
   useEffect(() => {
     // This board is also used by the anonymous public job board. Counter
     // offers are private, so do not query them until a user is signed in.
     if (!isHydrated || currentUserId == null) return;
-    const shiftIds = shifts.map((s) => s.id).filter((id) => Number.isFinite(id));
-    const toFetch = shiftIds;
+    const toFetch = shifts.map((s) => s.id).filter((id) => Number.isFinite(id));
     if (toFetch.length === 0) return;
 
     const fetchCounters = async () => {
       const updates: Record<number, CounterOfferTrack> = {};
-      await Promise.all(
-        toFetch.map(async (shiftId) => {
-          try {
-            const remote = await fetchShiftCounterOffersService(shiftId);
-            const offers = currentUserId != null
-              ? (remote || []).filter((offer: any) => getOfferUserId(offer) === currentUserId)
-              : (remote || []);
-            const validOffers = offers.filter(offerHasValidSlots);
-            const slotsMap: Record<number, { rate: string; start: string; end: string }> = {};
-            validOffers.forEach((offer: any) => {
-              getOfferSlots(offer).forEach((slot: any) => {
-                const slotId = getOfferSlotId(slot);
-                if (slotId == null) return;
-                slotsMap[slotId] = {
-                  rate: slot.proposedRate != null ? String(slot.proposedRate) : '',
-                  start: slot.proposedStartTime || slot.proposed_start_time || '',
-                  end: slot.proposedEndTime || slot.proposed_end_time || '',
-                };
-              });
-            });
-            const sentCount = Object.keys(slotsMap).length;
-            if (sentCount > 0) {
-              updates[shiftId] = {
-                slots: { ...slotsMap },
-                summary: `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})`,
+      try {
+        const remoteByShift = await fetchShiftCounterOffersBatchService(toFetch) as Record<number, any[]>;
+        toFetch.forEach((shiftId) => {
+          const remote = remoteByShift[shiftId] || [];
+          const offers = remote.filter((offer: any) => getOfferUserId(offer) === currentUserId);
+          const validOffers = offers.filter(offerHasValidSlots);
+          const slotsMap: Record<number, { rate: string; start: string; end: string }> = {};
+          validOffers.forEach((offer: any) => {
+            getOfferSlots(offer).forEach((slot: any) => {
+              const slotId = getOfferSlotId(slot);
+              if (slotId == null) return;
+              slotsMap[slotId] = {
+                rate: slot.proposedRate != null ? String(slot.proposedRate) : '',
+                start: slot.proposedStartTime || slot.proposed_start_time || '',
+                end: slot.proposedEndTime || slot.proposed_end_time || '',
               };
-            }
-          } catch (err: any) {
-            const msg = String(err?.message || err || '');
-            if (!msg.includes('404') && !msg.includes('No Shift matches') && !msg.includes('Not Found') && !msg.includes('not found')) {
-              console.warn('Failed to fetch counter offers for shift', shiftId, err);
-            }
+            });
+          });
+          const sentCount = Object.keys(slotsMap).length;
+          if (sentCount > 0) {
+            updates[shiftId] = {
+              slots: { ...slotsMap },
+              summary: `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})`,
+            };
           }
-        })
-      );
+        });
+      } catch (err) {
+        console.warn('Failed to batch-load counter offers', err);
+        return;
+      }
 
       setCounterOffers((prev) => {
         const next = { ...prev };
-        // Remove entries for shifts we fetched that have no remote offers
         toFetch.forEach((id) => {
-          if (!updates[id]) {
-            delete next[id];
-          }
+          if (!updates[id]) delete next[id];
         });
-        // Apply fresh data
         Object.entries(updates).forEach(([idStr, data]) => {
           next[Number(idStr)] = data;
         });
