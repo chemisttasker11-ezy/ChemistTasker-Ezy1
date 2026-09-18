@@ -4387,6 +4387,55 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 
+    @action(detail=False, methods=['get'], url_path='counter-offers-batch')
+    def counter_offers_batch(self, request):
+        raw_ids = request.query_params.get('shift_ids', '')
+        parsed_ids = []
+        for value in raw_ids.split(','):
+            value = value.strip()
+            if not value:
+                continue
+            try:
+                parsed_ids.append(int(value))
+            except (TypeError, ValueError):
+                raise ValidationError({'shift_ids': 'Use a comma-separated list of numeric shift IDs.'})
+        shift_ids = list(dict.fromkeys(parsed_ids))
+        if len(shift_ids) > 100:
+            raise ValidationError({'shift_ids': 'A maximum of 100 shifts can be requested at once.'})
+        if not shift_ids:
+            return Response({})
+
+        shifts = (
+            self.filter_queryset(self.get_queryset())
+            .filter(id__in=shift_ids)
+            .select_related('pharmacy')
+        )
+        result = {}
+        for shift in shifts:
+            offers = (
+                shift.counter_offers
+                .select_related('user', 'decided_by')
+                .prefetch_related('slots__slot')
+                .annotate(slot_count=Count('slots'))
+                .filter(
+                    slot_count__gt=0,
+                    status=ShiftCounterOffer.Status.PENDING,
+                )
+            )
+            if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
+                offers = offers.filter(user=request.user)
+            result[str(shift.id)] = ShiftCounterOfferSerializer(
+                offers,
+                many=True,
+                context={
+                    'request': request,
+                    'shift': shift,
+                    'include_user_detail': True,
+                },
+            ).data
+
+        return Response(result)
+
     @action(detail=True, methods=['get', 'post'], url_path='counter-offers')
     def counter_offers(self, request, pk=None):
         shift = self.get_object()
