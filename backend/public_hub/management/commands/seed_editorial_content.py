@@ -20,7 +20,7 @@ class Command(BaseCommand):
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
         landing_img_dir = os.path.join(project_root, 'frontend_web', 'landing_next', 'public', 'images', 'editorial')
         backend_media_dir = os.path.join(project_root, 'backend', 'media', 'editorial')
-        brain_dir = r"C:\Users\semse\.gemini\antigravity-ide\brain\0fca5270-d474-499c-921d-7711e6ababc5"
+        brain_dir = os.environ.get('EDITORIAL_SOURCE_DIR', '')
 
         os.makedirs(landing_img_dir, exist_ok=True)
         os.makedirs(backend_media_dir, exist_ok=True)
@@ -463,12 +463,12 @@ class Command(BaseCommand):
             )
             ContentRevision.objects.update_or_create(
                 document=doc,
+                version=1,
                 defaults={
                     'status': 'published' if status == 'published' else 'superseded',
                     'created_by': article.created_by,
                     'approved_by': u_salah,
                     'publish_at': article.published_at,
-                    'version': 1,
                     'payload': {
                         'slug': article.slug,
                         'title': article.title,

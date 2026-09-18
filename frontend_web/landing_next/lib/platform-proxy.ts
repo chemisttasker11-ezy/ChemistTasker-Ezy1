@@ -4,7 +4,7 @@ export async function platformProxy(request: NextRequest, path: string, method =
   if (path.split('/').some(segment => segment === '..' || !/^[A-Za-z0-9_.~-]*$/.test(segment))) return Response.json({detail:'Invalid API path.'},{status:400});
   const expected = process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL).origin : `${request.nextUrl.protocol}//${request.headers.get('host')}`;
   const origin = request.headers.get('origin');
-  const originMatches = !origin || origin === expected || origin.replace('127.0.0.1', 'localhost') === expected.replace('127.0.0.1', 'localhost');
+  const originMatches = Boolean(origin) && (origin === expected || origin.replace('127.0.0.1', 'localhost') === expected.replace('127.0.0.1', 'localhost'));
   if (!['GET','HEAD','OPTIONS'].includes(method) && !originMatches) return Response.json({detail:'Request origin could not be verified.'},{status:403});
   const headers = new Headers();
   for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform','x-device-token']) { const value=request.headers.get(name); if(value) headers.set(name,value); }

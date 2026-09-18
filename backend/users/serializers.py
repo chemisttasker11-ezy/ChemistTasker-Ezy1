@@ -469,40 +469,10 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
         try:
             original_refresh = RefreshToken(attrs['refresh'])
             user = User.objects.get(id=original_refresh['user_id'])
-        except TokenError as te:
-            # Grace period for token rotation race conditions:
-            # If a refresh token was just rotated in another concurrent request or tab,
-            # allow re-issuing if it was blacklisted within 60 seconds.
-            if "blacklisted" in str(te).lower():
-                try:
-                    from rest_framework_simplejwt.tokens import UntypedToken
-                    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
-                    from django.utils import timezone
-                    from datetime import timedelta
-
-                    untyped = UntypedToken(attrs['refresh'])
-                    jti = untyped.payload.get('jti')
-                    user_id = untyped.payload.get('user_id')
-                    bt = BlacklistedToken.objects.filter(token__jti=jti).select_related('token').first()
-                    if bt and (timezone.now() - bt.blacklisted_at) < timedelta(seconds=60):
-                        user = User.objects.get(id=user_id)
-                        if not user.is_active:
-                            raise serializers.ValidationError({'detail': 'Account is inactive.'})
-                        new_refresh = RefreshToken.for_user(user)
-                        remember_me = untyped.payload.get('remember_me')
-                        if remember_me is True:
-                            new_refresh['remember_me'] = True
-                        data = {
-                            'access': str(new_refresh.access_token),
-                            'refresh': str(new_refresh),
-                            'remember_me': remember_me,
-                        }
-                        self._populate_user_payload(data, user)
-                        return data
-                except serializers.ValidationError:
-                    raise
-                except Exception:
-                    pass
+        except TokenError:
+            # A rotated/blacklisted refresh token must remain unusable. The
+            # client coordinates concurrent refreshes and retries with the
+            # newly-issued token instead of reopening this credential.
             raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
         except (KeyError, User.DoesNotExist):
             raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})

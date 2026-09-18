@@ -6509,8 +6509,13 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__organization__in=user_org_memberships.values_list('organization', flat=True)
             )
 
-        # 4. Shifts with PLATFORM visibility are public to all authenticated users on the platform
-        combined_filter |= Q(visibility='PLATFORM')
+        # 4. Authenticated users see platform shifts for roles they can perform.
+        # The anonymous PublicJobBoardView is intentionally broader; this
+        # authenticated listing must not expose every platform role.
+        combined_filter |= Q(
+            visibility='PLATFORM',
+            role_needed__in=_shift_roles_visible_to_user(user),
+        )
 
         # 5. Allow workers to view dedicated shifts and shifts where they have an offer,
         # counter-offer, interest, or assignment.
