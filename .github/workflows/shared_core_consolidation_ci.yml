@@ -52,9 +52,17 @@ jobs:
       - name: Shared core build
         run: npm run build
         working-directory: shared-core
+      - name: Pack shared core from the validated source
+        run: |
+          mkdir -p ../.ci-artifacts
+          npm pack --pack-destination ../.ci-artifacts
+        working-directory: shared-core
 
       - name: React install
         run: npm ci
+        working-directory: frontend_web
+      - name: React use freshly packed shared core
+        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
         working-directory: frontend_web
       - name: React typecheck
         run: npx tsc --noEmit
@@ -69,6 +77,9 @@ jobs:
       - name: Next install
         run: npm ci
         working-directory: frontend_web/landing_next
+      - name: Next use freshly packed shared core
+        run: npm install --no-save --package-lock=false --ignore-scripts ../../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+        working-directory: frontend_web/landing_next
       - name: Next typecheck
         run: npm run typecheck
         working-directory: frontend_web/landing_next
@@ -78,6 +89,9 @@ jobs:
 
       - name: Expo install
         run: npm ci
+        working-directory: frontend_mobile
+      - name: Expo use freshly packed shared core
+        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
         working-directory: frontend_mobile
       - name: Expo lint
         run: npm run lint

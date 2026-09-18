@@ -36,6 +36,14 @@ describe('PLATFORM_ENDPOINTS', () => {
     expect(PLATFORM_ENDPOINTS.kiosk.syncBatch).toBe('/client-profile/attendance/kiosk/sync/batch/');
     expect(PLATFORM_ENDPOINTS.kiosk.workerEnrol).toBe('/client-profile/attendance/kiosk/workers/enrol/');
   });
+
+  it('matches Django workforce and timesheet routes', () => {
+    expect(PLATFORM_ENDPOINTS.workforce.rosterWorkspace).toBe('/client-profile/workforce/roster/workspace/');
+    expect(PLATFORM_ENDPOINTS.workforce.leaveDecision(3)).toBe('/client-profile/workforce/leave/3/decision/');
+    expect(PLATFORM_ENDPOINTS.workforce.timesheetPeriodSummary(4)).toBe('/client-profile/workforce/timesheet-periods/4/summary/');
+    expect(PLATFORM_ENDPOINTS.workforce.timesheetSubmit(5)).toBe('/client-profile/workforce/timesheets/5/submit/');
+    expect(PLATFORM_ENDPOINTS.workforce.timesheetCheckDecision(6)).toBe('/client-profile/workforce/timesheet-checks/6/decision/');
+  });
 });
 
 describe('legacy API_ENDPOINTS reconciliation', () => {

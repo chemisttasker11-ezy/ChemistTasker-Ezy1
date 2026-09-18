@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
-import apiClient from '../utils/apiClient';
+import { chemistTaskerApi } from '../config/api';
 
 type Row = {
   id: number;
@@ -33,8 +33,8 @@ export default function MyHoursScreen() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
-      const response = await apiClient.get('/client-profile/workforce/my-hours/');
-      setRows(Array.isArray(response.data) ? response.data : []);
+      const response = await chemistTaskerApi.workforce.getMyHours();
+      setRows(Array.isArray(response) ? response : []);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to load your hours.');
     } finally {
@@ -50,9 +50,7 @@ export default function MyHoursScreen() {
     setSubmitting(row.id);
     setError('');
     try {
-      await apiClient.post(`/client-profile/workforce/timesheets/${row.id}/submit/`, {
-        revision_number: row.revision_number,
-      });
+      await chemistTaskerApi.workforce.submitTimesheet(row.id, row.revision_number);
       await load();
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to submit the timesheet.');

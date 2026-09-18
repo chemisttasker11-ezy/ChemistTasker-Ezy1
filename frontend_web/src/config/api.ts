@@ -1,4 +1,4 @@
-import { configureApi, configureStorage } from '@chemisttasker/shared-core';
+import { configureApi, configureStorage, createChemistTaskerApi } from '@chemisttasker/shared-core';
 import { getAccessToken, refreshCookieSession } from '../utils/tokenService';
 
 let configured = false;
@@ -9,13 +9,18 @@ const normalizeApiBaseUrl = (value: string) => {
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
 
+const configuredBase = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
+const baseURL = configuredBase ? new URL(configuredBase, window.location.origin).href : '';
+if (!baseURL) throw new Error('VITE_API_URL is not defined');
+
+export const chemistTaskerApi = createChemistTaskerApi({
+  baseUrl: baseURL,
+  getAuthToken: async () => getAccessToken(),
+  refreshAuthToken: async () => (await refreshCookieSession(true))?.access ?? null,
+});
+
 export function initSharedCoreApi() {
   if (configured) return;
-  const configuredBase = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
-  const baseURL = configuredBase ? new URL(configuredBase, window.location.origin).href : '';
-  if (!baseURL) {
-    throw new Error('VITE_API_URL is not defined');
-  }
   configureStorage({
     getItem: (key: string) => localStorage.getItem(key),
     setItem: (key: string, value: string) => localStorage.setItem(key, value),

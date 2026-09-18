@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Chip, Dialog, Menu, Portal, Text, TextInput } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useAuth } from '../context/AuthContext';
-import apiClient from '../utils/apiClient';
+import { chemistTaskerApi } from '../config/api';
 
 const TYPES = ['ANNUAL', 'SICK', 'CARER', 'COMPASSIONATE', 'STUDY', 'UNPAID', 'OTHER'];
 const parseTime = (value: string) => {
@@ -35,7 +35,7 @@ export default function MyLeaveScreen() {
   const [typeMenu, setTypeMenu] = useState(false);
 
   useEffect(() => { if (!membershipId && memberships.length) setMembershipId(Number(memberships[0].id)); }, [membershipId, memberships]);
-  const load = useCallback(async () => { try { const res = await apiClient.get('/client-profile/workforce/leave/'); setRows(Array.isArray(res.data) ? res.data : []); } catch (e: any) { setError(e?.response?.data?.error || e?.message || 'Unable to load leave.'); } }, []);
+  const load = useCallback(async () => { try { const rows = await chemistTaskerApi.workforce.listLeave(); setRows(Array.isArray(rows) ? rows : []); } catch (e: any) { setError(e?.payload?.error || e?.message || 'Unable to load leave.'); } }, []);
   useEffect(() => { void load(); }, [load]);
 
   const start = combine(startDate, startTime); const end = combine(endDate, endTime);
@@ -43,11 +43,11 @@ export default function MyLeaveScreen() {
     if (!membershipId || !start || !end || end <= start) { setError('Enter a valid start and end date/time.'); return; }
     setError('');
     try {
-      await apiClient.post('/client-profile/workforce/leave/', { membership_id: membershipId, leave_type: type, start_at: start.toISOString(), end_at: end.toISOString(), note });
+      await chemistTaskerApi.workforce.createLeave({ membership_id: membershipId, leave_type: type, start_at: start.toISOString(), end_at: end.toISOString(), note });
       setVisible(false); setNote(''); await load();
     } catch (e: any) { setError(e?.response?.data?.error || e?.message || 'Unable to request leave.'); }
   };
-  const cancel = async (id: number) => { try { await apiClient.post(`/client-profile/workforce/leave/${id}/decision/`, { decision: 'CANCELLED', manager_note: 'Cancelled by worker' }); await load(); } catch (e: any) { setError(e?.response?.data?.error || e?.message || 'Unable to cancel request.'); } };
+  const cancel = async (id: number) => { try { await chemistTaskerApi.workforce.decideLeave(id, 'CANCELLED', 'Cancelled by worker'); await load(); } catch (e: any) { setError(e?.payload?.error || e?.message || 'Unable to cancel request.'); } };
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><View style={{flex:1}}><Text variant="headlineMedium" style={styles.title}>My leave</Text><Text variant="bodyMedium">Request full or partial-day leave without waiting for a rostered shift.</Text></View><Button mode="contained" onPress={() => setVisible(true)}>Request</Button></View>

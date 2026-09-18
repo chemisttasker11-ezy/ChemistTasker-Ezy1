@@ -180,3 +180,24 @@ describe('createChemistTaskerApi roster and attendance', () => {
     ]);
   });
 });
+
+describe('createChemistTaskerApi workforce', () => {
+  it('uses named roster, leave and timesheet routes', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? 'GET' });
+      return json([]);
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+
+    await api.workforce.getRosterWorkspace(2, '2026-09-21');
+    await api.workforce.createLeave({ membership_id: 3, leave_type: 'ANNUAL', start_at: '2026-09-21T09:00:00Z', end_at: '2026-09-21T17:00:00Z' });
+    await api.workforce.submitTimesheet(4, 5);
+
+    expect(calls).toEqual([
+      { url: 'https://example.test/api/client-profile/workforce/roster/workspace/?pharmacy_id=2&week_start=2026-09-21', method: 'GET' },
+      { url: 'https://example.test/api/client-profile/workforce/leave/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/workforce/timesheets/4/submit/', method: 'POST' },
+    ]);
+  });
+});

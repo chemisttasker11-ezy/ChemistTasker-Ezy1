@@ -63,16 +63,18 @@ remain the wire-contract authority.
 | Roster V2 planning/actions | Copy week, templates/apply, bulk edit, swap/cover, manager actions, audits | `backend/client_profile/urls.py` | Endpoint identities; only template/audit reads named | Direct Axios in roster screens | — | — | `MISSING_WRAPPER` | Add named wrappers before migrating consumers. |
 | Attendance worker | `client-profile/attendance/worker/{status,clock-in,break-start,break-end,clock-out,pin/update}/` | `backend/client_profile/urls.py` | Named status/clock/break operations; PIN only endpoint identity | Direct Axios | — | Direct Axios for PIN | `DUPLICATED_CLIENT` | Add PIN wrapper and migrate both clients in SC06. |
 | Attendance manager | Pending/approve/reject/correct/timeline routes | `backend/client_profile/urls.py` | Named pending/timeline reads; action endpoints only in registry | Direct Axios | — | — | `MISSING_WRAPPER` | Add named mutation wrappers before React migration. |
-| Workforce roster | `client-profile/workforce/roster/{workspace,validate,publish}/` | `backend/workforce/urls.py` | None | Local workforce request module | — | — | `MISSING_WRAPPER` | Distinct revision-based workforce surface; do not conflate with Roster V2 without backend-semantic review. |
-| Workforce settings/coverage/leave | `client-profile/workforce/work-settings/`, coverage requirements, leave/decision | `backend/workforce/urls.py` | None | Local workforce request module | — | Direct Axios for leave | `MISSING_WRAPPER` | Candidate for a later shared workforce domain. |
-| Workforce timesheets | `client-profile/workforce/timesheet-periods/**`, `timesheets/**`, checks, `my-hours/` | `backend/workforce/urls.py` | None | Local workforce request module | — | Direct Axios for my hours/submit | `MISSING_WRAPPER` | Backend remains time-calculation authority. |
+| Workforce roster | `client-profile/workforce/roster/{workspace,validate,publish}/` | `backend/workforce/urls.py` | Named `workforce` operations and contracts | Shared adapter | — | — | `SHARED` | Kept distinct from Roster V2; Django remains revision and validation authority. |
+| Workforce settings/coverage/leave | `client-profile/workforce/work-settings/`, coverage requirements, leave/decision | `backend/workforce/urls.py` | Named `workforce` operations and contracts | Shared adapter | — | Shared facade | `SHARED` | Role and ownership decisions remain server-side. |
+| Workforce timesheets | `client-profile/workforce/timesheet-periods/**`, `timesheets/**`, checks, `my-hours/` | `backend/workforce/urls.py` | Named `workforce` operations and contracts | Shared adapter | — | Shared facade | `SHARED` | Backend remains time-calculation authority. |
 | Kiosk pairing/admin | `client-profile/attendance/kiosk/{activate,pairing/request,pairing/pair,qr,config,worker-pin/status,worker-pin/setup,active-staff,break}/` | `backend/client_profile/urls.py` | `PLATFORM_ENDPOINTS.kiosk`; protocol types in `kioskProtocol.ts` | Kiosk UI uses restricted local client | — | Pairing/PIN setup helpers use user auth where applicable | `SECURITY_NATIVE` | Device token, key material and native durable state must stay in Tauri/Rust. |
 | Kiosk offline event transport | `client-profile/attendance/kiosk/pin-clock/`, `sync/batch/`, `workers/enrol/` | `backend/client_profile/urls.py` | Endpoint identities and signed event types only | Tauri/Rust restricted transport | — | — | `SECURITY_NATIVE` | Never route native sync through the general end-user bearer client. |
 
 ## Active duplication and migration order
 
-The report-only boundary audit currently detects three literal violations, but it
-does not detect calls assembled from helper strings. The matrix therefore records
+The boundary audit now detects both `/api/...` literals and relative route literals
+used with an API-root Axios/fetch client. A reviewed digest locks the legacy backlog
+so any added, removed, or changed direct route requires an explicit migration or
+baseline review. The matrix therefore records
 the broader duplicate surfaces found by the inventory:
 
 1. Next's copied `landing_next/shared-core` tree and source alias are removed; it

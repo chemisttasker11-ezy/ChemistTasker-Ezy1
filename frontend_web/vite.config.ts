@@ -1,7 +1,6 @@
 // vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { fileURLToPath, URL } from 'node:url'
 import { resolve } from 'node:path'
 
 export default defineConfig(({ command }) => {
@@ -13,10 +12,12 @@ export default defineConfig(({ command }) => {
   return {
     base: '/',
     plugins: [react()],
-    resolve: {
-      alias: [{ find: /^@chemisttasker\/shared-core$/, replacement: fileURLToPath(new URL('../shared-core/src/index.ts', import.meta.url)) }],
+    // shared-core is rebuilt and repacked locally during consolidation work.
+    // Serving it through Vite's normal module pipeline prevents an older
+    // optimized bundle from surviving with a stale named-export surface.
+    optimizeDeps: {
+      exclude: ['@chemisttasker/shared-core'],
     },
-
     server: {
       port: 5173,
       host: 'localhost',
@@ -28,7 +29,6 @@ export default defineConfig(({ command }) => {
         host: 'localhost',
         clientPort: Number(process.env.VITE_DEV_HMR_PORT || 5173),
       },
-      fs: { allow: [fileURLToPath(new URL('.', import.meta.url)), fileURLToPath(new URL('../shared-core', import.meta.url))] },
       proxy: {
         '/api': {
           target: apiProxyTarget,

@@ -4,6 +4,11 @@
     "description": "Shared TypeScript package for ChemistTasker web and mobile apps",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "README.md",
+        "skills_catalog.json"
+    ],
     "scripts": {
         "build": "tsc",
         "dev": "tsc --watch",

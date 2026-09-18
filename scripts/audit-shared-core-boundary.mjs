@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const root = path.resolve(import.meta.dirname, '..');
 const targets = [
@@ -14,7 +15,13 @@ const allowed = new Set([
 ]);
 const ignoredDirs = new Set(['node_modules', 'dist', 'dist-kiosk', '.next', '.expo', 'build', 'coverage']);
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/api\/(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//g;
+// Match both absolute `/api/...` routes and the relative `/<domain>/...`
+// literals used with Axios instances whose base URL already ends at `/api`.
+const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//g;
+// This digest records the reviewed legacy direct-route backlog. Strict mode
+// fails on any added, removed or changed literal, so relative Axios/fetch
+// routes cannot be introduced quietly while remaining migrations are explicit.
+const REVIEWED_BASELINE_DIGEST = '5168552e6396b6e2dff321d78580d1473f5a4c3de660b6ae02934fabcb10ee1c';
 
 function walk(directory, output = []) {
   if (!fs.existsSync(directory)) return output;
@@ -40,6 +47,15 @@ for (const target of targets) {
   }
 }
 
+const digest = crypto.createHash('sha256')
+  .update(findings.map(({ file, text }) => `${file}\t${text}`).sort().join('\n'))
+  .digest('hex');
+
+if (process.argv.includes('--baseline-digest')) {
+  console.log(digest);
+  process.exit(0);
+}
+
 if (findings.length === 0) {
   console.log('Shared-core boundary audit: no direct internal /api route literals found.');
   process.exit(0);
@@ -47,6 +63,12 @@ if (findings.length === 0) {
 
 console.log(`Shared-core boundary audit: ${findings.length} existing direct internal API route literal(s) found.`);
 for (const finding of findings) console.log(`${finding.file}:${finding.line}  ${finding.text}`);
-console.log('\nMigration rule: reuse/add the operation in @chemisttasker/shared-core before changing the client.');
-console.log('This audit is report-only by default. Pass --strict only after the existing baseline is migrated.');
-if (process.argv.includes('--strict')) process.exit(1);
+console.log(`\nReviewed baseline digest: ${digest}`);
+console.log('Migration rule: reuse/add the operation in @chemisttasker/shared-core before changing the client.');
+if (process.argv.includes('--strict')) {
+  if (digest !== REVIEWED_BASELINE_DIGEST) {
+    console.error('Strict boundary audit failed: direct-route baseline changed. Migrate the route or review and update the baseline intentionally.');
+    process.exit(1);
+  }
+  console.log('Strict boundary audit passed: no unreviewed direct-route drift.');
+}

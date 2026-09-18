@@ -59,6 +59,17 @@ import type {
   RosterPeriod,
   RosterTemplate,
 } from './contracts/attendanceRoster';
+import type {
+  WorkforceCoverageRequirement,
+  WorkforceLeave,
+  WorkforceMyHoursRow,
+  WorkforceRosterWorkspace,
+  WorkforceTimesheetDetail,
+  WorkforceTimesheetPeriod,
+  WorkforceTimesheetRow,
+  WorkforceTimesheetSummary,
+  WorkforceWorkSettings,
+} from './contracts/workforce';
 
 export interface DomainApi {
   request<T = unknown>(path: string, options?: ApiRequestOptions): Promise<T>;
@@ -198,6 +209,36 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       releaseWorker: (requestId: number, escalateToVisibility?: string | null) => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.managerReleaseWorker, { request_id: requestId, escalate_to_visibility: escalateToVisibility ?? null }),
       rejectRequest: (requestId: number, reason = '') => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.managerRejectRequest, { request_id: requestId, reason }),
       getAudits: (pharmacyId: number) => client.get<{ audits: RosterAudit[] }>(PLATFORM_ENDPOINTS.rosterV2.audits, { pharmacy_id: pharmacyId }),
+    },
+
+    workforce: {
+      ...domain(client),
+      getRosterWorkspace: (pharmacyId: number, weekStart: string) => client.get<WorkforceRosterWorkspace>(PLATFORM_ENDPOINTS.workforce.rosterWorkspace, { pharmacy_id: pharmacyId, week_start: weekStart }),
+      validateRoster: <T = unknown>(periodId: number, expectedRevision: number) => client.post<T>(PLATFORM_ENDPOINTS.workforce.rosterValidate, { period_id: periodId, expected_revision: expectedRevision }),
+      publishRoster: <T = unknown>(body: { period_id: number; expected_revision: number; acknowledged_warning_keys: string[]; operation_id: string }) => client.post<T>(PLATFORM_ENDPOINTS.workforce.rosterPublish, body),
+      listWorkSettings: (pharmacyId: number) => client.get<WorkforceWorkSettings[]>(PLATFORM_ENDPOINTS.workforce.workSettings, { pharmacy_id: pharmacyId }),
+      saveWorkSettings: (body: { membership_id: number; contracted_weekly_minutes: number | null; effective_from?: string | null; work_pattern?: Record<string, unknown> }) => client.post<WorkforceWorkSettings>(PLATFORM_ENDPOINTS.workforce.workSettings, body),
+      listCoverageRequirements: (pharmacyId: number) => client.get<WorkforceCoverageRequirement[]>(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { pharmacy_id: pharmacyId }),
+      createCoverageRequirement: (body: { pharmacy_id: number; weekday: number; start_time: string; end_time: string; role: string; minimum_staff: number; active?: boolean }) => client.post<WorkforceCoverageRequirement>(PLATFORM_ENDPOINTS.workforce.coverageRequirements, body),
+      deleteCoverageRequirement: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.workforce.coverageRequirement(id)),
+      listLeave: (query?: ApiQuery) => client.get<WorkforceLeave[]>(PLATFORM_ENDPOINTS.workforce.leave, query),
+      createLeave: (body: { membership_id: number; leave_type: string; start_at: string; end_at: string; note?: string }) => client.post<WorkforceLeave>(PLATFORM_ENDPOINTS.workforce.leave, body),
+      decideLeave: (id: number, decision: 'APPROVED' | 'REJECTED' | 'CANCELLED', managerNote = '') => client.post<WorkforceLeave>(PLATFORM_ENDPOINTS.workforce.leaveDecision(id), { decision, manager_note: managerNote }),
+      listTimesheetPeriods: (pharmacyId: number) => client.get<WorkforceTimesheetPeriod[]>(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { pharmacy_id: pharmacyId }),
+      openTimesheetPeriod: (pharmacyId: number, startDate: string, endDate: string) => client.post<{ id: number; created: boolean; status: string }>(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { pharmacy_id: pharmacyId, start_date: startDate, end_date: endDate }),
+      getTimesheetPeriodSummary: (id: number) => client.get<WorkforceTimesheetSummary>(PLATFORM_ENDPOINTS.workforce.timesheetPeriodSummary(id)),
+      recalculateTimesheetPeriod: <T = unknown>(id: number, sync = false) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetPeriodRecalculate(id), { sync }),
+      lockTimesheetPeriod: <T = unknown>(id: number) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetPeriodLock(id), {}),
+      listTimesheets: (periodId: number, query: { status?: string; search?: string } = {}) => client.get<WorkforceTimesheetRow[]>(PLATFORM_ENDPOINTS.workforce.timesheets, { period_id: periodId, ...query }),
+      getTimesheet: (id: number) => client.get<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheet(id)),
+      recalculateTimesheet: (id: number) => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetRecalculate(id), {}),
+      addMissingPunch: (id: number, body: { session_id: number; event_type: 'CLOCK_IN' | 'CLOCK_OUT'; occurred_at?: string; occurred_at_local?: string; reason: string }) => client.post<{ created_event_id: number; timesheet: WorkforceTimesheetDetail }>(PLATFORM_ENDPOINTS.workforce.timesheetMissingPunch(id), body),
+      submitTimesheet: (id: number, revisionNumber: number) => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetSubmit(id), { revision_number: revisionNumber }),
+      approveTimesheet: (id: number, revisionNumber: number, reason = '') => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetApprove(id), { revision_number: revisionNumber, reason }),
+      reopenTimesheet: (id: number, reason: string) => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetReopen(id), { reason }),
+      addTimesheetComment: <T = unknown>(id: number, body: string, workerVisible = true) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetComments(id), { body, worker_visible: workerVisible }),
+      decideTimesheetCheck: <T = unknown>(id: number, decision: 'RESOLVED' | 'WAIVED' | 'REOPENED', reason: string) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetCheckDecision(id), { decision, reason }),
+      getMyHours: (query?: ApiQuery) => client.get<WorkforceMyHoursRow[]>(PLATFORM_ENDPOINTS.workforce.myHours, query),
     },
 
     /**
