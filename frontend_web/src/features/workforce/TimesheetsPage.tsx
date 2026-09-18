@@ -163,7 +163,7 @@ export default function TimesheetsPage() {
     setActionLoading(true);
     setError('');
     try {
-      const result = await lockTimesheetPeriod(periodId);
+      const result = await lockTimesheetPeriod(periodId) as { manifest_hash?: string };
       setFeedback(`Period locked. Manifest ${String(result.manifest_hash || '').slice(0, 12)}… created for future integration.`);
       await loadPeriods();
       await loadPeriod();

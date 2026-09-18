@@ -16,7 +16,7 @@ import { getRooms } from "@chemisttasker/shared-core";
 import { type PersonaMode, type AdminLevel } from "@chemisttasker/shared-core";
 import { AdminCapability, ALL_ADMIN_CAPABILITIES } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
-import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, isTokenExpired, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
+import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
 export interface OrgMembership {
   organization_id: number;

@@ -22,6 +22,8 @@ import {
 
 dayjs.extend(utc);
 
+const GOOGLE_LIBRARIES: ('places')[] = ['places'];
+
 interface ShiftSlot {
   id: number;
   date: string;
@@ -127,7 +129,7 @@ export default function InvoiceGeneratePage() {
     // Google Places loader (same as PharmacyPage)
     const { isLoaded } = useJsApiLoader({
       googleMapsApiKey: import.meta.env.VITE_Maps_API_KEY as string,
-      libraries: ['places'],
+      libraries: GOOGLE_LIBRARIES,
     });
 
     // Keep a ref to the Autocomplete instance

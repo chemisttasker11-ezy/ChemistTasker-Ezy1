@@ -6,22 +6,16 @@ import {
   Card,
   Chip,
   IconButton,
-  Paper,
   Stack,
   Tooltip,
   Typography,
-  useTheme,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AddIcon from '@mui/icons-material/Add';
-import PersonIcon from '@mui/icons-material/Person';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import EventBusyIcon from '@mui/icons-material/EventBusy';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import ViewTimelineIcon from '@mui/icons-material/ViewTimeline';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import moment from 'moment';
@@ -193,7 +187,6 @@ export default function HorizontalCalendarGrid({
   onSelectEvent,
   onDuplicateShift,
   roleFilters = [],
-  isLoading = false,
   pharmacy,
 }: HorizontalCalendarGridProps) {
   // Compute operating hours for all 7 days and week restricted range

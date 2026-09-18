@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Alert,
-  Badge,
   Box,
   Button,
   Card,
@@ -13,7 +12,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControlLabel,
   Grid,
   IconButton,
@@ -33,7 +31,6 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import PublishIcon from '@mui/icons-material/Publish';
 import UndoIcon from '@mui/icons-material/Undo';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -229,6 +226,7 @@ export default function RosterPlanningToolbar({
       setActionLoading(false);
     }
   };
+  void handlePublish;
 
   // 3. Unpublish Roster (Revert to Draft)
   const handleUnpublish = async () => {
@@ -773,7 +771,7 @@ export default function RosterPlanningToolbar({
             <Stack spacing={2.5}>
               {/* Summary Metrics */}
               <Grid container spacing={2}>
-                <Grid item xs={4}>
+                <Grid size={4}>
                   <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'grey.50' }}>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
                       {ackData.total_workers}
@@ -783,7 +781,7 @@ export default function RosterPlanningToolbar({
                     </Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid size={4}>
                   <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.50' }}>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>
                       {ackData.acknowledged_count}
@@ -793,7 +791,7 @@ export default function RosterPlanningToolbar({
                     </Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid size={4}>
                   <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.50' }}>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: 'warning.main' }}>
                       {ackData.pending_count}

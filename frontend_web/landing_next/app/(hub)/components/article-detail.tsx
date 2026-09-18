@@ -1,6 +1,7 @@
 import RichContent,{richHeadings} from '@/components/rich-content';
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Script from 'next/script';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowUpRight, Clock3, MessageCircle } from 'lucide-react';
 import { getArticle, getArticles } from '../../../lib/hub-server';
@@ -33,7 +34,7 @@ export default async function ArticleDetail({ slug, kind }: { slug: string; kind
     publisher: { '@type': 'Organization', name: 'ChemistTasker', url: site }, mainEntityOfPage: `${site}${articlePath(article)}`,
     image: safeWebUrl(article.cover_url), articleSection: topics[article.topic], inLanguage: 'en-AU',
   };
-  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }}/>
+  return <><Script id={`article-json-ld-${article.id}`} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }}/>
     <div className="container hub-article-shell"><nav className="hub-breadcrumb" aria-label="Breadcrumb"><Link href="/">Home</Link><span>/</span><Link href={`/${kind}`}>{kind === 'news' ? 'News' : 'The blog'}</Link><span>/</span><span aria-current="page">{topics[article.topic]}</span></nav>
       <header className="hub-article-heading"><Link className="hub-back" href={`/${kind}`}><ArrowLeft size={17}/>Back to {kind === 'news' ? 'news' : 'the journal'}</Link><span className="hub-tag">{topics[article.topic]}</span><h1>{article.title}</h1><p>{article.excerpt}</p>
         <div className="hub-article-meta"><div className="hub-byline"><span className="hub-avatar">{article.author_name.split(' ').map(w => w[0]).slice(0, 2).join('')}</span><div><strong>{article.author_name}</strong><span><time dateTime={article.published_at}>{dateLabel(article.published_at)}</time></span></div></div><span><Clock3 size={17}/>{article.read_minutes} min read</span><a href="#discussion"><MessageCircle size={17}/>Read and add comments</a><ShareButton/></div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -11,8 +11,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
-  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -25,8 +23,6 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import StopIcon from "@mui/icons-material/Stop";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
-import StorefrontIcon from "@mui/icons-material/Storefront";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";

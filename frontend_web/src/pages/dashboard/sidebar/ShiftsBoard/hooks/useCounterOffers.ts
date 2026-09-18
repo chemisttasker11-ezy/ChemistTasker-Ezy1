@@ -198,7 +198,10 @@ export const useCounterOffers = ({
 
   // Reconcile local counter offers with backend data to avoid stale badges when offers are removed server-side.
   useEffect(() => {
-    if (!isHydrated) return;
+    // Counter offers are private and require authentication. The same board is
+    // also rendered by the public job board, so anonymous visitors must not
+    // trigger one request per public shift.
+    if (!isHydrated || currentUserId == null) return;
     const shiftIds = shifts.map((s) => s.id).filter((id) => Number.isFinite(id));
     const toFetch = shiftIds;
     if (toFetch.length === 0) return;

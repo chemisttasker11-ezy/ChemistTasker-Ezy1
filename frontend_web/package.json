@@ -9,7 +9,7 @@
     "dev:5174": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5174",
     "dev:5175": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5175",
     "dev:5176": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5176",
-    "build": "node ../scripts/run-with-env.mjs ../env/web.prod.env vite build",
+    "build": "vite build",
     "dev:dashboard": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite",
     "dev:all": "node scripts/dev-all.mjs",
     "kiosk:dev": "node scripts/run-tauri.mjs dev",

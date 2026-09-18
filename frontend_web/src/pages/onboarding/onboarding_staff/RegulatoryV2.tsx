@@ -124,7 +124,7 @@ export default function RegulatoryV2() {
         const res = await getOnboardingDetail(roleKey);
         if (!isMounted) return;
         const d: any = res || {};
-        const nextData = {
+        const nextData: FormDataShape = {
           role_type: (d.role_type as Role) || "",
           classification_level: d.classification_level || "",
           student_year: d.student_year || "",

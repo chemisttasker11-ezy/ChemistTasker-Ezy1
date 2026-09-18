@@ -109,14 +109,6 @@ const getSlotIds = (shift: Shift): number[] => {
         .filter((id: number | null): id is number => id != null);
 };
 
-const slotHasAwaitingPayment = (slot: any): boolean => {
-    return Boolean(slot?.awaitingPayment ?? slot?.awaiting_payment);
-};
-
-const getSlotAwaitingPaymentOfferId = (slot: any): number | null => {
-    return toFiniteNumber(slot?.awaitingPaymentOfferId ?? slot?.awaiting_payment_offer_id);
-};
-
 const formatAuSlotDateTime = (slot: any): string => {
     const date = slot?.date ? new Date(`${slot.date}T00:00:00`) : null;
     const dateLabel = date && !Number.isNaN(date.getTime())
@@ -132,42 +124,6 @@ const formatAuSlotDateTime = (slot: any): string => {
         .map((value: string) => String(value).slice(0, 5))
         .join(' - ');
     return time ? `${dateLabel} | ${time}` : dateLabel;
-};
-
-const getCandidateNameForPaymentSlot = (shift: Shift, slotId: number): string => {
-    const offers = ((shift as any).offers ?? (shift as any).shiftOffers ?? []) as any[];
-    const match = offers.find((offer) => {
-        const status = String(offer?.status ?? '').toUpperCase();
-        const offerSlotId = toFiniteNumber(offer?.slotId ?? offer?.slot_id ?? offer?.slot?.id ?? offer?.slot);
-        return status === 'ACCEPTED_AWAITING_PAYMENT' && offerSlotId === slotId;
-    });
-    const user = match?.userDetail ?? match?.user_detail ?? (typeof match?.user === 'object' ? match.user : null);
-    const name = user?.name || user?.displayName || user?.display_name ||
-        [user?.firstName ?? user?.first_name, user?.lastName ?? user?.last_name].filter(Boolean).join(' ');
-    return name || 'Participant';
-};
-
-const shouldShowPaymentRequired = (shift: Shift, selectedSlotId: number | null): boolean => {
-    const shiftAny = shift as any;
-    const paymentStatus = shiftAny.paymentStatus ?? shiftAny.payment_status;
-    if (paymentStatus !== 'PENDING') return false;
-
-    const slots = Array.isArray(shiftAny.slots) ? shiftAny.slots : [];
-    const isSingleUserShift = Boolean(shiftAny.singleUserOnly ?? shiftAny.single_user_only);
-    if (selectedSlotId != null) {
-        const selectedSlot = slots.find((slot: any) => resolveSlotId(slot) === selectedSlotId);
-        if (selectedSlot && slotHasAwaitingPayment(selectedSlot)) return true;
-        if (selectedSlot && ('awaiting_payment' in selectedSlot || 'awaitingPayment' in selectedSlot)) return false;
-    }
-
-    const rawPendingSlotIds = shiftAny.pendingPaymentSlotIds ?? shiftAny.pending_payment_slot_ids;
-    if (!Array.isArray(rawPendingSlotIds)) return isSingleUserShift || slots.length <= 1;
-    if (selectedSlotId == null) return false;
-
-    const pendingSlotIds = rawPendingSlotIds
-        .map((value: any) => Number(value))
-        .filter((value: number) => Number.isFinite(value));
-    return pendingSlotIds.includes(selectedSlotId);
 };
 
 const offerBelongsToSlot = (offer: any, slotId: number) => {
@@ -1165,7 +1121,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 const offerId = toFiniteNumber(member.awaitingPaymentOfferId ?? member.awaiting_payment_offer_id);
                 const slotId = toFiniteNumber(member.slotId ?? member.slot_id) ?? selectedSlotId;
                 if (!offerId || (!slotId && !isSingleUserShift)) return null;
-                const slot = slotById.get(slotId);
+                const slot = slotId != null ? slotById.get(slotId) : undefined;
                 return {
                     offerId,
                     slotId: slotId ?? 0,
@@ -1182,7 +1138,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 return {
                     offerId,
                     slotId: slotId ?? 0,
-                    slot: slotById.get(slotId) || ((shift as any).slots || [])[0] || null,
+                    slot: (slotId != null ? slotById.get(slotId) : undefined) || ((shift as any).slots || [])[0] || null,
                     name: interest.displayName || interest.display_name || interest.userName || interest.user_name || interest.email || 'Participant',
                 };
             })

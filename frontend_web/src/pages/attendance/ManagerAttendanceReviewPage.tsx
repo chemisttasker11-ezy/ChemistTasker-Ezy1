@@ -1,18 +1,17 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Alert,
   Box,
   Button,
   Card,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
+  Grid,
   IconButton,
   InputLabel,
   MenuItem,
@@ -32,10 +31,8 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import HistoryIcon from "@mui/icons-material/History";
-import StorefrontIcon from "@mui/icons-material/Storefront";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import apiClient from "../../utils/apiClient";
-import { useAuth } from "../../contexts/AuthContext";
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from "../../constants/brandTheme";
 
 type PendingReview = {
@@ -74,7 +71,6 @@ type SessionTimelineData = {
 };
 
 export default function ManagerAttendanceReviewPage() {
-  const { user } = useAuth();
 
   const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | "">("");

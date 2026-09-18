@@ -15,7 +15,7 @@ import apiClient from '../../../utils/apiClient';
 
 dayjs.extend(utc);
 
-
+const GOOGLE_LIBRARIES: ('places')[] = ['places'];
 
 const CATEGORY_CHOICES = [
   { code: 'ProfessionalServices', label: 'Professional services' },
@@ -78,7 +78,7 @@ export default function InvoiceDetailPage() {
 
   const { isLoaded } = useJsApiLoader({
   googleMapsApiKey: import.meta.env.VITE_Maps_API_KEY as string,
-  libraries: ['places'],
+  libraries: GOOGLE_LIBRARIES,
   });
   const externalAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const internalAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);

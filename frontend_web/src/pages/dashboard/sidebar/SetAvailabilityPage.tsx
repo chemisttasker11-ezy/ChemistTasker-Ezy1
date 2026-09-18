@@ -37,6 +37,8 @@ type AvailabilityEntry = UserAvailability & { notifyNewShifts?: boolean };
 type AvailabilityDraft = Omit<AvailabilityEntry, 'id'>;
 type AvailabilityPayload = UserAvailabilityPayload & { notify_new_shifts?: boolean };
 
+const GOOGLE_LIBRARIES: ('places')[] = ['places'];
+
 const createEmptyEntry = (): AvailabilityDraft => ({
   date: '',
   startTime: '09:00',
@@ -223,7 +225,7 @@ export default function SetAvailabilityPage() {
 
   const { isLoaded: isMapsLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_Maps_API_KEY || '',
-    libraries: ['places'],
+    libraries: GOOGLE_LIBRARIES,
   });
 
   useEffect(() => {

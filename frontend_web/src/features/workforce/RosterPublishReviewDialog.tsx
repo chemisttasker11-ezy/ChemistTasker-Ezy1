@@ -38,7 +38,11 @@ export default function RosterPublishReviewDialog({
     setMessage('');
     setBusy(true);
     validateRosterRevision(workspace.period_id, workspace.draft_revision)
-      .then((result) => { setWarnings(result.warnings || []); setErrors(result.errors || []); })
+      .then((result) => {
+        const validation = result as { warnings?: RosterWarning[]; errors?: Array<{ type: string; message: string }> };
+        setWarnings(validation.warnings || []);
+        setErrors(validation.errors || []);
+      })
       .catch((err: any) => setMessage(err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Validation failed.'))
       .finally(() => setBusy(false));
   }, [open, workspace?.period_id, workspace?.draft_revision]);

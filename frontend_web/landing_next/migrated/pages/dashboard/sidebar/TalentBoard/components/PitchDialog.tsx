@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { GoogleMap, Marker, Circle, Autocomplete, useJsApiLoader } from "@react-google-maps/api";
+const GOOGLE_LIBRARIES: ("places")[] = ["places"];
 type PitchAvailabilityEntry = {
   date: string;
   startTime: string;
@@ -139,7 +140,7 @@ export default function PitchDialog(props: {
 
   const { isLoaded: isMapsLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_Maps_API_KEY || "",
-    libraries: ["places"],
+    libraries: GOOGLE_LIBRARIES,
   });
 
   const pitchMapCenter = useMemo(() => {

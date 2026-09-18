@@ -54,8 +54,8 @@ export default defineConfig(({ command }) => {
       sourcemap: isDev,
       rollupOptions: {
         input: kioskBuild
-          ? { kiosk: resolve(__dirname, 'kiosk.html') }
-          : { app: resolve(__dirname, 'index.html') },
+          ? { kiosk: resolve(import.meta.dirname, 'kiosk.html') }
+          : { app: resolve(import.meta.dirname, 'index.html') },
         output: {
           assetFileNames: 'dashboard-assets/[name].[hash][extname]',
           chunkFileNames:  'js/[name].[hash].js',

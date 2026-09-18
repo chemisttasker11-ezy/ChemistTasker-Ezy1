@@ -7,13 +7,12 @@ COPY shared-core /shared-core
 COPY frontend_web/package*.json ./
 RUN npm install
 
-COPY scripts /scripts
-RUN mkdir -p /env
-COPY env/web.prod.env /env/web.prod.env
 COPY frontend_web/ ./
 
 ARG VITE_PUBLIC_SITE_ENABLED=0
+ARG VITE_API_URL=/api
 ENV VITE_PUBLIC_SITE_ENABLED=$VITE_PUBLIC_SITE_ENABLED
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 FROM nginx:1.27-alpine

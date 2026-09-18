@@ -5,7 +5,6 @@ import {
   Box,
   Button,
   Card,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -38,8 +37,6 @@ import {
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -47,7 +44,6 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
@@ -122,11 +118,8 @@ const getRoleStyle = (role: string) => {
 };
 
 export default function RosterGridViews({
-  viewMode,
   staffViewData,
-  stackedViewData,
   weekStart,
-  weekEnd,
   periodId,
   pharmacyId,
   vacantSlots = [],

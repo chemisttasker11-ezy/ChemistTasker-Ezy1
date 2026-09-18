@@ -24,7 +24,7 @@ export default function ProtectedRoute({
   requiredRole,
   requireAdmin = false,
 }: ProtectedRouteProps) {
-  const { token, user, isLoading, isAdminUser } = useAuth();
+  const { user, isLoading, isAdminUser } = useAuth();
   const location = useLocation();
 
   if (isLoading) {

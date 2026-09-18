@@ -13,7 +13,6 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import ReceiptIcon from "@mui/icons-material/Receipt";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";

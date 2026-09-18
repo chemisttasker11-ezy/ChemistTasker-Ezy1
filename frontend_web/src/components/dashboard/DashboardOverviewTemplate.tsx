@@ -158,6 +158,7 @@ export default function DashboardOverviewTemplate({
     }
   };
   const handleOpenActivity = () => {
+    onOpenActivity?.();
     setActivityDialogLoading(true);
     setActivityDialogOpen(true);
     window.setTimeout(() => setActivityDialogLoading(false), 250);
