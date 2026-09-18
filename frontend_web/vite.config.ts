@@ -22,6 +22,9 @@ export default defineConfig(({ command }) => {
       port: 5173,
       host: 'localhost',
       strictPort: true,
+      watch: {
+        ignored: ['**/landing_next/**', '**/.next/**', '**/dist/**', '**/dist-kiosk/**'],
+      },
       // The unified dev site is opened on Next.js :3000, while Vite owns HMR
       // on :5173. Point the client there directly instead of first attempting
       // an unsupported WebSocket upgrade through the Next.js rewrite.

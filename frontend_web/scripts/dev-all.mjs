@@ -14,6 +14,8 @@ const origin=`http://localhost:${port}`;
 Object.assign(env,{VITE_PUBLIC_SITE_ENABLED:'1',VITE_API_URL:'/api',PLATFORM_API_URL:backend,HUB_API_URL:backend,
  VITE_DEV_PROXY_TARGET:backend.replace(/\/api\/?$/, ''),VITE_DEV_WS_PROXY_TARGET:backend.replace(/\/api\/?$/, '').replace(/^http/,'ws'),
  NEXT_PUBLIC_SITE_URL:origin,NEXT_PUBLIC_PLATFORM_URL:origin,
+ NEXT_PUBLIC_Maps_API_KEY:env.NEXT_PUBLIC_Maps_API_KEY||env.VITE_Maps_API_KEY||'',
+ NEXT_PUBLIC_RECAPTCHA_SITE_KEY:env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY||env.VITE_RECAPTCHA_SITE_KEY||'',
  DASHBOARD_INTERNAL_URL:`http://127.0.0.1:${dashboardPort}`,NEXT_TELEMETRY_DISABLED:'1'});
 const commands=[
  [root,'node_modules/vite/bin/vite.js',['--host','127.0.0.1','--port',dashboardPort]],
