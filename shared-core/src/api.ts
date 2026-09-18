@@ -940,6 +940,14 @@ export async function deleteSavedShift(savedId) {
     await fetchApi(`${API_ENDPOINTS.getShiftSaved}${savedId}/`, { method: "DELETE" });
     return true;
 }
+export async function fetchShiftCounterOffersBatchService(shiftIds) {
+    const data = await getShiftCounterOffersBatch(shiftIds);
+    const result: Record<number, any[]> = {};
+    Object.entries(data || {}).forEach(([shiftId, offers]) => {
+        result[Number(shiftId)] = asList(offers).map(mapShiftCounterOffer);
+    });
+    return result;
+}
 export async function fetchShiftCounterOffersService(shiftId) {
     try {
         const data = await getShiftCounterOffers(shiftId);
