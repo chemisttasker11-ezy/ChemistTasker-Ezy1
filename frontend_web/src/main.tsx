@@ -37,7 +37,7 @@ const PublicOrganizationPage = React.lazy(() => import('./pages/PublicOrganizati
 // Orgnization
 const OrganizationOverviewPage = React.lazy(() => import('./pages/dashboard/organization/OrganizationOverviewPage'));
 const InviteStaffPage = React.lazy(() => import('./pages/dashboard/organization/InviteStaffPage'));
-import OrganizationDashboardWrapper from './layouts/OrganizationDashboardWrapper';
+const OrganizationDashboardWrapper = React.lazy(() => import('./layouts/OrganizationDashboardWrapper'));
 
 // Other users types
 const OwnerOnboarding = React.lazy(() => import('./pages/onboarding/OwnerOnboarding'));
@@ -59,7 +59,7 @@ const WorkforceSettingsPage = React.lazy(() => import('./features/workforce/Work
 
 import ProtectedRoute from './components/ProtectedRoute';
 import OwnerDashboardGate from './components/OwnerDashboardGate';
-import OwnerDashboardWrapper from './layouts/ownerDashboard';
+const OwnerDashboardWrapper = React.lazy(() => import('./layouts/ownerDashboard'));
 const AdminOverview = React.lazy(() => import('./pages/dashboard/admin/AdminOverview'));
 const AdminManagePharmaciesPage = React.lazy(() => import('./pages/dashboard/admin/AdminManagePharmaciesPage'));
 const AdminRosterPage = React.lazy(() => import('./pages/dashboard/admin/AdminRosterPage'));
@@ -68,12 +68,14 @@ const AdminActiveShiftsPage = React.lazy(() => import('./pages/dashboard/admin/A
 const AdminConfirmedShiftsPage = React.lazy(() => import('./pages/dashboard/admin/AdminConfirmedShiftsPage'));
 const AdminHistoryShiftsPage = React.lazy(() => import('./pages/dashboard/admin/AdminHistoryShiftsPage'));
 const AdminPosterShiftDetailPage = React.lazy(() => import('./pages/dashboard/admin/AdminPosterShiftDetailPage'));
-import AdminDashboardWrapper from './layouts/adminDashboard';
-import PharmacistDashboardWrapper from './layouts/pharmacistDashboard';
-import HubDashboardWrapper from './layouts/HubDashboardWrapper';
-import OtherstaffDashboardWrapper from './layouts/otherStaffDashboard';
-import ExplorerDashboardWrapper from './layouts/explorerDashboard';
-import { OwnerShiftCenterPage, OrganizationShiftCenterPage, AdminShiftCenterPage } from './pages/dashboard/shiftCenter/ShiftCenterPage';
+const AdminDashboardWrapper = React.lazy(() => import('./layouts/adminDashboard'));
+const PharmacistDashboardWrapper = React.lazy(() => import('./layouts/pharmacistDashboard'));
+const HubDashboardWrapper = React.lazy(() => import('./layouts/HubDashboardWrapper'));
+const OtherstaffDashboardWrapper = React.lazy(() => import('./layouts/otherStaffDashboard'));
+const ExplorerDashboardWrapper = React.lazy(() => import('./layouts/explorerDashboard'));
+const OwnerShiftCenterPage = React.lazy(() => import('./pages/dashboard/shiftCenter/ShiftCenterPage').then((module) => ({ default: module.OwnerShiftCenterPage })));
+const OrganizationShiftCenterPage = React.lazy(() => import('./pages/dashboard/shiftCenter/ShiftCenterPage').then((module) => ({ default: module.OrganizationShiftCenterPage })));
+const AdminShiftCenterPage = React.lazy(() => import('./pages/dashboard/shiftCenter/ShiftCenterPage').then((module) => ({ default: module.AdminShiftCenterPage })));
 
 initSharedCoreApi();
 
