@@ -6,22 +6,45 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  SECRET_KEY: ci-only-shared-core-contract-key
+  ADMIN_URL: admin/
+  EMAIL_HOST_USER: ci@example.test
+  EMAIL_HOST_PASSWORD: ci-placeholder
+  DEFAULT_FROM_EMAIL: ci@example.test
+  RECAPTCHA_SECRET_KEY: ci-placeholder
+  AZURE_OCR_ENDPOINT: https://example.test
+  AZURE_OCR_KEY: ci-placeholder
+  SCRAPINGBEE_API_KEY: ci-placeholder
+  MOBILEMESSAGE_USERNAME: ci-placeholder
+  MOBILEMESSAGE_PASSWORD: ci-placeholder
+  MOBILEMESSAGE_SENDER: ChemistTasker
+
 jobs:
-  consolidation:
+  shared-core:
     runs-on: ubuntu-latest
-    env:
-      SECRET_KEY: ci-only-shared-core-contract-key
-      ADMIN_URL: admin/
-      EMAIL_HOST_USER: ci@example.test
-      EMAIL_HOST_PASSWORD: ci-placeholder
-      DEFAULT_FROM_EMAIL: ci@example.test
-      RECAPTCHA_SECRET_KEY: ci-placeholder
-      AZURE_OCR_ENDPOINT: https://example.test
-      AZURE_OCR_KEY: ci-placeholder
-      SCRAPINGBEE_API_KEY: ci-placeholder
-      MOBILEMESSAGE_USERNAME: ci-placeholder
-      MOBILEMESSAGE_PASSWORD: ci-placeholder
-      MOBILEMESSAGE_SENDER: ChemistTasker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: shared-core/package-lock.json
+      - name: Install
+        working-directory: shared-core
+        run: npm ci
+      - name: Typecheck
+        working-directory: shared-core
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: shared-core
+        run: npm run test:ci
+      - name: Build
+        working-directory: shared-core
+        run: npm run build
+
+  web-vite:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,13 +54,134 @@ jobs:
           cache-dependency-path: |
             shared-core/package-lock.json
             frontend_web/package-lock.json
+      - name: Build shared core package
+        working-directory: shared-core
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          mkdir -p ../.ci-artifacts
+          npm pack --pack-destination ../.ci-artifacts
+      - name: Install web
+        working-directory: frontend_web
+        run: npm ci
+      - name: Use freshly packed shared core
+        working-directory: frontend_web
+        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+      - name: Typecheck
+        working-directory: frontend_web
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: frontend_web
+        env:
+          VITE_API_URL: http://127.0.0.1:8000
+          VITE_API_BASE_URL: http://127.0.0.1:8000
+        run: npx vite build
+
+  web-next:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            shared-core/package-lock.json
             frontend_web/landing_next/package-lock.json
+      - name: Build shared core package
+        working-directory: shared-core
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          mkdir -p ../.ci-artifacts
+          npm pack --pack-destination ../.ci-artifacts
+      - name: Install Next
+        working-directory: frontend_web/landing_next
+        run: npm ci
+      - name: Use freshly packed shared core
+        working-directory: frontend_web/landing_next
+        run: npm install --no-save --package-lock=false --ignore-scripts ../../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+      - name: Typecheck
+        working-directory: frontend_web/landing_next
+        run: npm run typecheck
+      - name: Build and public-page smoke generation
+        working-directory: frontend_web/landing_next
+        run: npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            shared-core/package-lock.json
             frontend_mobile/package-lock.json
+      - name: Build shared core package
+        working-directory: shared-core
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          mkdir -p ../.ci-artifacts
+          npm pack --pack-destination ../.ci-artifacts
+      - name: Install mobile
+        working-directory: frontend_mobile
+        run: npm ci
+      - name: Use freshly packed shared core
+        working-directory: frontend_mobile
+        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+      - name: Lint
+        working-directory: frontend_mobile
+        run: npm run lint
+      - name: Typecheck
+        working-directory: frontend_mobile
+        run: npx tsc --noEmit
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
+      - name: Install
+        run: pip install -r backend/requirements.txt
+      - name: Django checks
+        run: python backend/manage.py check --settings=core.contract_test_settings
+      - name: Migration drift check
+        run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
+      - name: Focused backend contracts
+        run: python backend/manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
+      - name: Public content contracts
+        run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
+      - name: User authentication contracts
+        run: python backend/manage.py test users.tests --settings=core.contract_test_settings
+      - name: Workforce contracts
+        run: python backend/manage.py test workforce.tests --settings=core.contract_test_settings
+      - name: Worker finance contracts
+        run: python backend/manage.py test worker_finance.tests --settings=worker_finance.tests.settings
+
+  boundary-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Strict shared-core boundary audit
+        run: node scripts/audit-shared-core-boundary.mjs --strict
+
+  kiosk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Install Tauri Linux prerequisites
         run: |
           sudo apt-get update
@@ -51,80 +195,33 @@ jobs:
             libxdo-dev \
             patchelf
       - uses: dtolnay/rust-toolchain@stable
-
-      - name: Shared core install
-        run: npm ci
-        working-directory: shared-core
-      - name: Shared core typecheck
-        run: npm run typecheck
-        working-directory: shared-core
-      - name: Shared core unit tests
-        run: npm run test:ci
-        working-directory: shared-core
-      - name: Shared core build
-        run: npm run build
-        working-directory: shared-core
-      - name: Pack shared core from the validated source
-        run: |
-          mkdir -p ../.ci-artifacts
-          npm pack --pack-destination ../.ci-artifacts
-        working-directory: shared-core
-
-      - name: React install
-        run: npm ci
-        working-directory: frontend_web
-      - name: React use freshly packed shared core
-        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
-        working-directory: frontend_web
-      - name: React typecheck
-        run: npx tsc --noEmit
-        working-directory: frontend_web
-      - name: React build
-        run: npx vite build
-        working-directory: frontend_web
-        env:
-          VITE_API_URL: http://127.0.0.1:8000
-          VITE_API_BASE_URL: http://127.0.0.1:8000
-
-      - name: Next install
-        run: npm ci
-        working-directory: frontend_web/landing_next
-      - name: Next use freshly packed shared core
-        run: npm install --no-save --package-lock=false --ignore-scripts ../../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
-        working-directory: frontend_web/landing_next
-      - name: Next typecheck
-        run: npm run typecheck
-        working-directory: frontend_web/landing_next
-      - name: Next build and public-page smoke generation
-        run: npm run build
-        working-directory: frontend_web/landing_next
-
-      - name: Expo install
-        run: npm ci
-        working-directory: frontend_mobile
-      - name: Expo use freshly packed shared core
-        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
-        working-directory: frontend_mobile
-      - name: Expo lint
-        run: npm run lint
-        working-directory: frontend_mobile
-      - name: Expo typecheck
-        run: npx tsc --noEmit
-        working-directory: frontend_mobile
-
-      - name: Backend install
-        run: pip install -r backend/requirements.txt
-      - name: Django checks
-        run: python backend/manage.py check --settings=core.contract_test_settings
-      - name: Migration drift check
-        run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
-      - name: Focused backend contracts
-        run: python backend/manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
-      - name: Public content contracts
-        run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
-
-      - name: Strict shared-core boundary audit
-        run: node scripts/audit-shared-core-boundary.mjs --strict
       - name: Native kiosk regression tests
-        run: cargo test
         working-directory: frontend_web/src-tauri
+        run: cargo test
+
+  release-gate:
+    name: release-gate
+    if: always()
+    needs:
+      - shared-core
+      - web-vite
+      - web-next
+      - mobile
+      - backend
+      - boundary-audit
+      - kiosk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all required jobs
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: |
+          node -e '
+            const needs = JSON.parse(process.env.NEEDS_CONTEXT);
+            const failed = Object.entries(needs).filter(([, job]) => job.result !== "success");
+            if (failed.length) {
+              console.error("Required CI jobs failed:", failed.map(([name, job]) => `${name}=${job.result}`).join(", "));
+              process.exit(1);
+            }
+            console.log("All required CI jobs passed.");
+          '
