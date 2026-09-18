@@ -666,6 +666,13 @@ export function getShiftRejections(params) {
 export function getShiftCounterOffers(shiftId) {
     return fetchApi(`/client-profile/shifts/${shiftId}/counter-offers/`);
 }
+
+export function getShiftCounterOffersBatch(shiftIds) {
+    const ids = Array.from(new Set((shiftIds || []).map(Number).filter(Number.isFinite)));
+    if (ids.length === 0) return Promise.resolve({});
+    const query = encodeURIComponent(ids.join(','));
+    return fetchApi(`/client-profile/shifts/counter-offers-batch/?shift_ids=${query}`);
+}
 export function createShiftCounterOffer(shiftId, data) {
     return fetchApi(`/client-profile/shifts/${shiftId}/counter-offers/`, {
         method: 'POST',
