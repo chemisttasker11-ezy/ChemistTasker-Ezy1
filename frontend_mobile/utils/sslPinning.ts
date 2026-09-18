@@ -12,7 +12,7 @@ const normalizeApiBaseUrl = (value?: string) => {
 const PINNING_ENABLED = process.env.EXPO_PUBLIC_SSL_PINNING_ENABLED;
 const PUBLIC_KEY_HASHES = (process.env.EXPO_PUBLIC_SSL_PINNED_PUBLIC_KEY_HASHES || '')
   .split(',')
-  .map((hash) => hash.trim())
+  .map((hash: string) => hash.trim())
   .filter(Boolean);
 
 let initPromise: Promise<void> | null = null;
