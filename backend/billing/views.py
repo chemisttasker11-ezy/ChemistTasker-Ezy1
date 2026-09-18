@@ -4,13 +4,14 @@ from urllib.parse import urlencode
 import stripe
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from django.utils import timezone
-from .models import OwnerSubscription, ShiftPayment
+from .models import OwnerSubscription, ShiftPayment, StripeWebhookEvent
 from .utils import (
     BILLING_STATE_FREE_TRIAL,
     BILLING_STATE_PRE_LIVE,
@@ -797,28 +798,7 @@ def charge_penalty(request, shift_id):
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([])
-def stripe_webhook(request):
-    """
-    Handles Stripe webhooks (e.g., checkout.session.completed, invoice.paid).
-    """
-    payload = request.body
-    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
-    
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError as e:
-        logger.warning('Stripe webhook rejected due to invalid payload.')
-        return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError as e:
-        logger.warning('Stripe webhook signature verification failed.')
-        return HttpResponse(status=400)
-
-    # Handle the event
+def _process_stripe_event(event):
     if event.type == 'checkout.session.completed':
         session = event.data.object
         metadata = session.get('metadata', {})
@@ -953,4 +933,68 @@ def stripe_webhook(request):
     else:
         pass
 
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([])
+def stripe_webhook(request):
+    """Verify, deduplicate, and process one Stripe webhook delivery."""
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        logger.warning('Stripe webhook rejected due to invalid payload.')
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError:
+        logger.warning('Stripe webhook signature verification failed.')
+        return HttpResponse(status=400)
+
+    event_id = str(getattr(event, 'id', '') or '')
+    event_type = str(getattr(event, 'type', '') or '')
+    if not event_id or not event_type:
+        logger.warning('Stripe webhook rejected because event identity was missing.')
+        return HttpResponse(status=400)
+
+    try:
+        with transaction.atomic():
+            delivery, created = StripeWebhookEvent.objects.select_for_update().get_or_create(
+                event_id=event_id,
+                defaults={
+                    'event_type': event_type,
+                    'status': StripeWebhookEvent.Status.PROCESSING,
+                },
+            )
+            if not created and delivery.status == StripeWebhookEvent.Status.PROCESSED:
+                return HttpResponse(status=200)
+
+            delivery.event_type = event_type
+            delivery.status = StripeWebhookEvent.Status.PROCESSING
+            delivery.failed_at = None
+            delivery.save(update_fields=['event_type', 'status', 'failed_at'])
+
+            _process_stripe_event(event)
+
+            delivery.status = StripeWebhookEvent.Status.PROCESSED
+            delivery.processed_at = timezone.now()
+            delivery.save(update_fields=['status', 'processed_at'])
+    except Exception:
+        logger.exception(
+            'Stripe webhook processing failed for event_id=%s event_type=%s',
+            event_id,
+            event_type,
+        )
+        StripeWebhookEvent.objects.update_or_create(
+            event_id=event_id,
+            defaults={
+                'event_type': event_type,
+                'status': StripeWebhookEvent.Status.FAILED,
+                'failed_at': timezone.now(),
+            },
+        )
+        return HttpResponse(status=500)
+
     return HttpResponse(status=200)
+
