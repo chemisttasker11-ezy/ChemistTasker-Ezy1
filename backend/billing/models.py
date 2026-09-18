@@ -86,7 +86,6 @@ class ShiftPayment(models.Model):
     
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
     stripe_invoice_id = models.CharField(max_length=255, blank=True, null=True)
-    stripe_event_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
     
     payment_type = models.CharField(max_length=50, choices=PAYMENT_TYPE_CHOICES)
     payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
@@ -122,27 +121,3 @@ class StripeWebhookEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} {self.event_id} ({self.status})"
-
-
-class StripeWebhookEvent(models.Model):
-    STATUS_PROCESSING = 'processing'
-    STATUS_PROCESSED = 'processed'
-    STATUS_FAILED = 'failed'
-    STATUS_CHOICES = (
-        (STATUS_PROCESSING, 'Processing'),
-        (STATUS_PROCESSED, 'Processed'),
-        (STATUS_FAILED, 'Failed'),
-    )
-
-    event_id = models.CharField(max_length=255, unique=True)
-    event_type = models.CharField(max_length=120)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PROCESSING)
-    received_at = models.DateTimeField(auto_now_add=True)
-    processed_at = models.DateTimeField(blank=True, null=True)
-    last_error = models.CharField(max_length=255, blank=True)
-
-    class Meta:
-        ordering = ['-received_at']
-
-    def __str__(self):
-        return f"{self.event_type} ({self.event_id}) - {self.status}"
