@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from django.utils import timezone
@@ -940,7 +940,7 @@ def _process_stripe_event(event):
 
 @csrf_exempt
 @api_view(['POST'])
-@permission_classes([])
+@permission_classes([AllowAny])
 def stripe_webhook(request):
     """Verify, deduplicate, and process one Stripe webhook delivery."""
     payload = request.body
