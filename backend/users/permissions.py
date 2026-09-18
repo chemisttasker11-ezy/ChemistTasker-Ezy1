@@ -22,8 +22,9 @@ class OrganizationRolePermission(BasePermission):
         # Get the list of roles this view requires
         required = getattr(view, 'required_roles', [])
         if not required:
-            # No roles specified → allow any authenticated user
-            return True
+            # A role-gated view without an explicit role list is a configuration error.
+            # Fail closed rather than silently degrading to plain authentication.
+            return False
 
         # Identify which org the view is targeting
         org_id = (
