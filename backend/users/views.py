@@ -1153,7 +1153,7 @@ class PasswordResetConfirmAPIView(APIView):
     """
     Accepts JSON: { uid, token, new_password1, new_password2 }
     """
-    permission_classes = []  # allow any
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         uid    = request.data.get('uid')
@@ -1188,7 +1188,7 @@ class PasswordResetConfirmAPIView(APIView):
         return Response({'detail':'Password has been reset.'})
 
 class PasswordResetRequestAPIView(APIView):
-    permission_classes = []
+    permission_classes = [permissions.AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "password_reset"
 
