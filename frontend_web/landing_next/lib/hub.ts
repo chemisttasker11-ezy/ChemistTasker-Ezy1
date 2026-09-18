@@ -12,7 +12,7 @@ export type HubComment = { id: number; parent: number | null; body: string; auth
   created_at: string; deleted: boolean; can_delete: boolean; reply_count: number; reactions: Reactions };
 export const topics: Record<string, string> = {
   practice: 'Pharmacy practice', career: 'Careers & learning', tga: 'TGA updates',
-  industry: 'Industry news', community: 'Community',
+  industry: 'Industry news', community: 'Community', learning: 'Clinical & CPD learning',
 };
 export const platform = (process.env.NEXT_PUBLIC_PLATFORM_URL || 'https://chemisttasker.com.au').replace(/\/$/, '');
 export const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://chemisttasker.com.au').replace(/\/$/, '');
@@ -26,6 +26,10 @@ export function safeWebUrl(value?: string | null) {
   const assetIdx = value.indexOf('/assets/');
   if (assetIdx !== -1) {
     return value.slice(assetIdx);
+  }
+  const imgIdx = value.indexOf('/images/');
+  if (imgIdx !== -1) {
+    return value.slice(imgIdx);
   }
   try {
     const url = new URL(value);
