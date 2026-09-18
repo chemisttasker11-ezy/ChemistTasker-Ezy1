@@ -1,2 +1,0 @@
-import PublicContactFormSection from '../components/PublicContactFormSection';
-export default function Contact(){return <PublicContactFormSection title="How can we help?" subtitle="Send a message to the ChemistTasker team." source="public-next"/>;}

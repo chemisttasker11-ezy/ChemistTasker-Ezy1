@@ -1,1 +1,0 @@
-export default function Loading() { return <div className="container hub-empty" role="status"><p className="eyebrow">THE CHEMISTTASKER JOURNAL</p><h2>Opening the conversation…</h2><p>Loading the latest stories and perspectives.</p></div>; }

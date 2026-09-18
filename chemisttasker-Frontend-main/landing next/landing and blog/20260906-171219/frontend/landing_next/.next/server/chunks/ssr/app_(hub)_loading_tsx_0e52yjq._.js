@@ -1,3 +1,0 @@
-module.exports=[6746,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function(){return(0,b.jsxs)("div",{className:"container hub-empty",role:"status",children:[(0,b.jsx)("p",{className:"eyebrow",children:"THE CHEMISTTASKER JOURNAL"}),(0,b.jsx)("h2",{children:"Opening the conversation…"}),(0,b.jsx)("p",{children:"Loading the latest stories and perspectives."})]})}])},35337,function(a){a.n(a.i(6746))}];
-
-//# sourceMappingURL=app_%28hub%29_loading_tsx_0e52yjq._.js.map

@@ -1,6 +1,0 @@
-export type Source = { id: string; title: string; url: string; section: string; version: string; checkedAt: string; reviewDue?: string };
-export type Dose = { kind: 'weight'; amount: number; upper?: number; basis?: 'dose' | 'day' } | { kind: 'fixed'; amount: number } | { kind: 'bands'; bands: { below: number | null; amount: number }[] };
-export type Regimen = { id: string; ingredient: string; indication: string; route: 'oral' | 'IV'; category: 'calculation' | 'specialist' | 'reference'; sourceId: string; dose?: Dose; unit: 'mg' | 'units'; frequency: number; frequencyText: string; maxDose?: number; maxDay?: number; minMonths: number; maxMonths?: number; minKg?: number; duration: string; note: string; component?: string; allowedForms?: string[] };
-export type Formulation = { id: string; label: string; concentration?: number; unit: 'mg' | 'units'; sourceId: string; note?: string };
-export type Medicine = { id: string; name: string; family: string; specialist: boolean; formulations: Formulation[]; sourceIds: string[]; administration?: string; registration: string };
-export type PatientInput = { years: string; months: string; weight: string; organConcern: boolean; allergyConcern: boolean; complexConcern: boolean };

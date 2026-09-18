@@ -1,3 +1,0 @@
-module.exports=[3900,a=>{"use strict";var b=a.i(7997),c=a.i(95936);a.s(["default",0,function(){return(0,b.jsxs)("div",{className:"container hub-empty",children:[(0,b.jsx)("p",{className:"eyebrow",children:"STORY NOT FOUND"}),(0,b.jsx)("h1",{children:"Let’s find your next read."}),(0,b.jsx)("p",{children:"This article may have moved or is no longer published."}),(0,b.jsx)(c.default,{className:"button primary",href:"/blog",children:"Explore the journal"})]})}])},12002,function(a){a.n(a.i(3900))}];
-
-//# sourceMappingURL=app_%28hub%29_not-found_tsx_03001w5._.js.map
