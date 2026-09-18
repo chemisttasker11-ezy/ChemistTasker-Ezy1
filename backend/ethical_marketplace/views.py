@@ -22,9 +22,15 @@ from .models import (EthicalAuditEvent, EthicalEscalationStep, EthicalImportBatc
                      EthicalProduct, EthicalRequestReceipt, EthicalReservation, EthicalStagingRow, EthicalStockLot,
                      EthicalStockMovement, EthicalTransfer, EthicalTransferDocument, EthicalTransferLine)
 from .policy import CAPABILITIES, application_blockers, candidate_listings_for, evaluate_ethical_access, listing_visible_to
-from .serializers import (ApprovalSerializer, EthicalListingSerializer, GrantSerializer, MessageSerializer,
-from .uploads import validate_private_transfer_document
-                          ProductSerializer, StockLotSerializer, TransferSerializer)
+from .serializers import (
+    ApprovalSerializer,
+    EthicalListingSerializer,
+    GrantSerializer,
+    MessageSerializer,
+    ProductSerializer,
+    StockLotSerializer,
+    TransferSerializer,
+)
 
 
 def private(response):
