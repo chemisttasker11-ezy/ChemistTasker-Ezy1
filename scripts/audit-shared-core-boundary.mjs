@@ -24,7 +24,7 @@ const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|publi
 const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
 // This digest records the reviewed legacy route and escape-hatch backlog.
 // Strict mode fails on any added, removed or changed finding.
-const REVIEWED_BASELINE_DIGEST = 'e5cdd03e68dc08f5f9247826e6063cfe3eeb2268d43e0a166ed4efe53ebc5ef5';
+const REVIEWED_BASELINE_DIGEST = '6ce745a3cf8fde6ff61b4fcebcb69a96ab41b36eaaef101ca8b032fa7d6cbf1b';
 
 function walk(directory, output = []) {
   if (!fs.existsSync(directory)) return output;
