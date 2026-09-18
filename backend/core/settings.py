@@ -438,7 +438,7 @@ BACKEND_CSP_POLICY = env(
 # JWT settings for better frontend integration
 SIMPLE_JWT = {
     # Short‑lived access token
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=env.int('JWT_ACCESS_TOKEN_MINUTES', default=30)),
     # Longer‑lived refresh token
     'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
     # Issue a new refresh token each time /refresh/ is called
