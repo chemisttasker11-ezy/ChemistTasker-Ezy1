@@ -68,6 +68,9 @@ jobs:
         working-directory: frontend_web
       - run: npx tsc --noEmit
         working-directory: frontend_web
+      - name: Cross-frontend auth flow tests
+        run: node --test scripts/auth-flow.test.mjs
+        working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
         working-directory: frontend_web
@@ -163,6 +166,15 @@ jobs:
           node-version: "22"
       - run: node scripts/audit-shared-core-boundary.mjs --strict
 
+  architecture-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node scripts/audit-architecture-boundaries.mjs
+
   kiosk:
     runs-on: ubuntu-latest
     steps:
@@ -193,6 +205,7 @@ jobs:
       - mobile
       - backend
       - boundary-audit
+      - architecture-audit
       - kiosk
     steps:
       - name: Require every independent gate
@@ -203,4 +216,5 @@ jobs:
           test "${{ needs.mobile.result }}" = "success"
           test "${{ needs.backend.result }}" = "success"
           test "${{ needs.boundary-audit.result }}" = "success"
+          test "${{ needs.architecture-audit.result }}" = "success"
           test "${{ needs.kiosk.result }}" = "success"
