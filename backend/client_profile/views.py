@@ -4412,18 +4412,12 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         )
         result = {}
         for shift in shifts:
-            offers = (
-                shift.counter_offers
-                .select_related('user', 'decided_by')
-                .prefetch_related('slots__slot')
-                .annotate(slot_count=Count('slots'))
-                .filter(
-                    slot_count__gt=0,
-                    status=ShiftCounterOffer.Status.PENDING,
-                )
+            from client_profile.domains.shifts.counter_offers import visible_counter_offers_for_shift
+            offers = visible_counter_offers_for_shift(
+                shift=shift,
+                user=request.user,
+                can_manage_pharmacy=self._user_can_manage_pharmacy(request.user, shift.pharmacy),
             )
-            if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
-                offers = offers.filter(user=request.user)
             result[str(shift.id)] = ShiftCounterOfferSerializer(
                 offers,
                 many=True,
@@ -4441,18 +4435,12 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         shift = self.get_object()
 
         if request.method == 'GET':
-            offers = (
-                shift.counter_offers
-                .select_related('user', 'decided_by')
-                .prefetch_related('slots__slot')
-                .annotate(slot_count=Count('slots'))
-                .filter(
-                    slot_count__gt=0,
-                    status=ShiftCounterOffer.Status.PENDING,
-                )
+            from client_profile.domains.shifts.counter_offers import visible_counter_offers_for_shift
+            offers = visible_counter_offers_for_shift(
+                shift=shift,
+                user=request.user,
+                can_manage_pharmacy=self._user_can_manage_pharmacy(request.user, shift.pharmacy),
             )
-            if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
-                offers = offers.filter(user=request.user)
             serializer = ShiftCounterOfferSerializer(
                 offers,
                 many=True,
