@@ -31,6 +31,13 @@ export * from './types';
 // Re-export all domain helpers
 export * from './domain';
 
+// Transitional domain namespaces. These let new work use stable domain seams
+// while legacy top-level exports remain backwards compatible.
+export * as authDomain from './domains/auth';
+export * as shiftsDomain from './domains/shifts';
+export * as pharmaciesDomain from './domains/pharmacies';
+export * as chatDomain from './domains/chat';
+
 // Re-export storage helpers
 export * from './storage';
 
