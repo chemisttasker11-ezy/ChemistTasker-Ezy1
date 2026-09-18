@@ -2,6 +2,7 @@ import csv
 import hashlib
 import io
 import json
+import zipfile
 
 from django.conf import settings
 from django.db import transaction
@@ -29,6 +30,32 @@ def private(response):
     response["Cache-Control"] = "private, no-store"
     response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     return response
+
+def _validate_transfer_document(upload):
+    """Allow common business-document formats after checking their actual file signature."""
+    original_position = upload.tell()
+    try:
+        header = upload.read(16)
+        upload.seek(0)
+
+        is_pdf = header.startswith(b"%PDF-")
+        is_jpeg = header.startswith(b"\xff\xd8\xff")
+        is_png = header.startswith(b"\x89PNG\r\n\x1a\n")
+        is_webp = header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+        is_docx = False
+        if header.startswith(b"PK\x03\x04"):
+            try:
+                with zipfile.ZipFile(upload) as archive:
+                    names = set(archive.namelist())
+                    is_docx = "[Content_Types].xml" in names and any(name.startswith("word/") for name in names)
+            except (zipfile.BadZipFile, OSError):
+                is_docx = False
+
+        if not any((is_pdf, is_jpeg, is_png, is_webp, is_docx)):
+            raise ValidationError({"file": "Upload a PDF, DOCX, JPEG, PNG, or WebP document."})
+    finally:
+        upload.seek(original_position)
+
 
 
 def pharmacy_or_404(pk):
@@ -513,5 +540,6 @@ class TransferDocument(APIView):
         upload = request.FILES.get("file")
         if not upload or upload.size > 5 * 1024 * 1024:
             return Response({"code": "DOCUMENT_TOO_LARGE_OR_MISSING"}, status=413)
+        _validate_transfer_document(upload)
         row = EthicalTransferDocument.objects.create(transfer=transfer, document_type=str(request.data.get("document_type", "SUPPORTING"))[:80], file=upload, uploaded_by=request.user)
         return private(Response({"id": row.id, "document_type": row.document_type}, status=201))
