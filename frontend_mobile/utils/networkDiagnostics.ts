@@ -49,7 +49,7 @@ export function describeRequestError(label: string, error: any) {
 export function getNetworkDiagnosticsSnapshot() {
   const pinHashes = (process.env.EXPO_PUBLIC_SSL_PINNED_PUBLIC_KEY_HASHES || '')
     .split(',')
-    .map((hash) => hash.trim())
+    .map((hash: string) => hash.trim())
     .filter(Boolean);
 
   return [

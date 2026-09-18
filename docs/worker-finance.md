@@ -1,8 +1,5 @@
 # Worker finance - implementation and release review
 
-The authoritative integrated specification and deployment notes live in:
-https://github.com/mostafagafer/chemisttasker/blob/feat/locum-finance-complete/docs/worker-finance.md
-
 ## Architecture
 
 `backend/worker_finance/` extends canonical `client_profile.Invoice` and `InvoiceLineItem` records through owner-private metadata, snapshots, customers, catalogue items, payments, deliveries and expenses. `shared-core/src/finance.ts` uses the application's existing configuration and authenticated API. The original invoice page is preserved and mounted under Existing tools; owner views are retained.
