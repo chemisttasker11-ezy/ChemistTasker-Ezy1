@@ -1,19 +1,31 @@
-from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import StripeWebhookEvent
 
 
-class StripeWebhookIdempotencyTests(TestCase):
-    def _event(self, event_id='evt_replay_safe'):
-        return SimpleNamespace(id=event_id, type='test.event')
+class _StripeObject(dict):
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
 
-    @patch('billing.views.stripe.Webhook.construct_event')
+
+@override_settings(STRIPE_WEBHOOK_SECRET='whsec-test')
+class StripeWebhookIdempotencyTests(TestCase):
+    def _event(self, event_id='evt_test_1', event_type='test.event'):
+        return _StripeObject(
+            id=event_id,
+            type=event_type,
+            data=_StripeObject(object=_StripeObject()),
+        )
+
     @patch('billing.views._process_stripe_event')
-    def test_duplicate_delivery_is_processed_once(self, process_event, construct_event):
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_replayed_processed_event_is_not_processed_twice(self, construct_event, process_event):
         construct_event.return_value = self._event()
 
         first = self.client.post(
@@ -32,16 +44,15 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
         self.assertEqual(process_event.call_count, 1)
-        self.assertEqual(StripeWebhookEvent.objects.count(), 1)
-        delivery = StripeWebhookEvent.objects.get(event_id='evt_replay_safe')
+        delivery = StripeWebhookEvent.objects.get(event_id='evt_test_1')
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
         self.assertIsNotNone(delivery.processed_at)
 
-    @patch('billing.views.stripe.Webhook.construct_event')
     @patch('billing.views._process_stripe_event')
-    def test_failed_delivery_can_be_retried(self, process_event, construct_event):
-        construct_event.return_value = self._event('evt_retry')
-        process_event.side_effect = [RuntimeError('provider processing failed'), None]
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_failed_event_can_be_retried_and_then_marked_processed(self, construct_event, process_event):
+        construct_event.return_value = self._event(event_id='evt_retry')
+        process_event.side_effect = [RuntimeError('synthetic failure'), None]
 
         first = self.client.post(
             reverse('billing:stripe_webhook'),
@@ -49,10 +60,10 @@ class StripeWebhookIdempotencyTests(TestCase):
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE='test-signature',
         )
+        delivery = StripeWebhookEvent.objects.get(event_id='evt_retry')
         self.assertEqual(first.status_code, 500)
-        failed = StripeWebhookEvent.objects.get(event_id='evt_retry')
-        self.assertEqual(failed.status, StripeWebhookEvent.Status.FAILED)
-        self.assertIsNotNone(failed.failed_at)
+        self.assertEqual(delivery.status, StripeWebhookEvent.Status.FAILED)
+        self.assertIsNotNone(delivery.failed_at)
 
         second = self.client.post(
             reverse('billing:stripe_webhook'),
@@ -60,9 +71,9 @@ class StripeWebhookIdempotencyTests(TestCase):
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE='test-signature',
         )
+        delivery.refresh_from_db()
+
         self.assertEqual(second.status_code, 200)
         self.assertEqual(process_event.call_count, 2)
-
-        failed.refresh_from_db()
-        self.assertEqual(failed.status, StripeWebhookEvent.Status.PROCESSED)
-        self.assertIsNotNone(failed.processed_at)
+        self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
+        self.assertIsNotNone(delivery.processed_at)
