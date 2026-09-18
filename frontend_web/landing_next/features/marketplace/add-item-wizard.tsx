@@ -200,13 +200,15 @@ export default function AddItemWizard() {
         },
       } as Parameters<typeof marketplaceApi.createListing>[0]);
 
+      let listingVersion = listing.version;
       if (context === 'PHARMACY') {
-        await marketplaceApi.updateAudience(listing.id, {
+        const audience = await marketplaceApi.updateAudience(listing.id, {
           expected_version: listing.version,
           current_circle: 'OWNED_CHAIN',
           maximum_circle: maximumCircle,
           schedule: [],
         });
+        listingVersion = audience.version;
       }
 
       // Upload selected photos
@@ -224,7 +226,7 @@ export default function AddItemWizard() {
       let finalStatus = 'DRAFT';
       if (submitForReview) {
         try {
-          const res = await marketplaceApi.actOnListing(listing.id, 'submit', listing.version);
+          const res = await marketplaceApi.actOnListing(listing.id, 'submit', listingVersion);
           finalStatus = res.publication_status || 'PENDING_REVIEW';
         } catch (subErr) {
           setError(`Listing created as draft, but submit failed: ${(subErr as Error).message}`);

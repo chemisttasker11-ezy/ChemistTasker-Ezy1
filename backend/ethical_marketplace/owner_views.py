@@ -70,6 +70,8 @@ class ImportCommit(APIView):
         with transaction.atomic():
             locked = EthicalImportBatch.objects.select_for_update().get(pk=batch.pk)
             for staging in EthicalStagingRow.objects.select_for_update().filter(batch=locked).order_by("row_number"):
+                if staging.status not in {"PENDING", "REJECTED"}:
+                    continue
                 payload = staging.safe_payload if isinstance(staging.safe_payload, dict) else {}
                 try:
                     barcode = str(payload.get("barcode") or "").strip()

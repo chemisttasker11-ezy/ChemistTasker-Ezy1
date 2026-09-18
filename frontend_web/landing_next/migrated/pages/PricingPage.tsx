@@ -145,19 +145,15 @@ function PricingPage() {
                                 open={Boolean(anchorElNav)} onClose={handleCloseNavMenu}
                                 sx={{ display: { xs: 'block', md: 'none' } }}>
                                 <MenuItem component="a" href="/"><Typography>Home</Typography></MenuItem>
-                                {user ? (
-                                    <>
-                                        <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
-                                        <MenuItem onClick={handleLogout}><Typography>Logout</Typography></MenuItem>
-                                    </>
-                                ) : (
-                                    <>
-                                        <MenuItem component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>
-                                        <MenuItem component="a" href={user?'/dashboard':PAGE_ROUTES.register}>
+                                {user ? [
+                                        (<MenuItem key="dashboard" component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>),
+                                        (<MenuItem key="logout" onClick={handleLogout}><Typography>Logout</Typography></MenuItem>),
+                                    ] : [
+                                        (<MenuItem key="login" component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>),
+                                        (<MenuItem key="signup" component="a" href={user?'/dashboard':PAGE_ROUTES.register}>
                                             <CtaButton variant="contained" fullWidth>Sign Up</CtaButton>
-                                        </MenuItem>
-                                    </>
-                                )}
+                                        </MenuItem>),
+                                    ]}
                             </Menu>
                         </Box>
                     </Toolbar>

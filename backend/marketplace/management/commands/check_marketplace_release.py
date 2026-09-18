@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -21,3 +22,11 @@ class Command(BaseCommand):
         present=set(MarketplaceCategory.objects.filter(is_active=True).values_list("slug",flat=True)); missing_categories=REQUIRED_CATEGORY_SLUGS-present
         if missing_categories: raise CommandError("Marketplace categories not seeded: "+", ".join(sorted(missing_categories)))
         self.stdout.write(self.style.SUCCESS("Marketplace migration/category release gate passed."))
+        flags = (
+            "MARKETPLACE_READ_ENABLED", "MARKETPLACE_NEW_LISTINGS_ENABLED", "MARKETPLACE_CONTACT_ENABLED",
+            "MARKETPLACE_NEW_COMMITMENTS_ENABLED", "MARKETPLACE_ESCALATION_ENABLED",
+            "ETHICAL_PRIVATE_READ_ENABLED", "ETHICAL_INVENTORY_ENABLED", "ETHICAL_NEW_TRANSFERS_ENABLED",
+            "ETHICAL_ESCALATION_ENABLED", "ETHICAL_S8_ENABLED",
+        )
+        for name in flags:
+            self.stdout.write(f"{name}={getattr(settings, name)}")
