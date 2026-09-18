@@ -28,31 +28,31 @@ import MobileOTPVerify from './pages/MobileOTPVerify';
 import MobileCheckoutReturnPage from './pages/MobileCheckoutReturnPage';
 import AccountDeletionPage from './pages/AccountDeletionPage';
 
-import PublicJobBoardPage from './pages/PublicJobBoardPage';
-import PublicTalentBoardPage from './pages/PublicTalentBoardPage';
-import SharedShiftLandingPage from './pages/SharedShiftLandingPage';
-import MembershipApplyPage from './pages/MembershipApplyPage';
-import PublicOrganizationPage from './pages/PublicOrganizationPage';
+const PublicJobBoardPage = React.lazy(() => import('./pages/PublicJobBoardPage'));
+const PublicTalentBoardPage = React.lazy(() => import('./pages/PublicTalentBoardPage'));
+const SharedShiftLandingPage = React.lazy(() => import('./pages/SharedShiftLandingPage'));
+const MembershipApplyPage = React.lazy(() => import('./pages/MembershipApplyPage'));
+const PublicOrganizationPage = React.lazy(() => import('./pages/PublicOrganizationPage'));
 
 // Orgnization
-import OrganizationOverviewPage from './pages/dashboard/organization/OrganizationOverviewPage';
-import InviteStaffPage from './pages/dashboard/organization/InviteStaffPage';
+const OrganizationOverviewPage = React.lazy(() => import('./pages/dashboard/organization/OrganizationOverviewPage'));
+const InviteStaffPage = React.lazy(() => import('./pages/dashboard/organization/InviteStaffPage'));
 import OrganizationDashboardWrapper from './layouts/OrganizationDashboardWrapper';
 
 // Other users types
-import OwnerOnboarding from './pages/onboarding/OwnerOnboarding';
-import RefereeQuestionnairePage from './pages/onboarding/RefereeQuestionnairePage';
-import RefereeRejectPage from './pages/onboarding/RefereeRejectPage';
-import RosterOwnerPage from './pages/dashboard/sidebar/RosterOwnerPage';
-import RosterWorkerPage from './pages/dashboard/sidebar/RosterWorkerPage';
-import KioskPage from './pages/attendance/KioskPage';
-import WorkerAttendancePage from './pages/attendance/WorkerAttendancePage';
-import ManagerAttendanceReviewPage from './pages/attendance/ManagerAttendanceReviewPage';
-import TimesheetsPage from './features/workforce/TimesheetsPage';
-import MyHoursPage from './features/workforce/MyHoursPage';
-import MyLeavePage from './features/workforce/MyLeavePage';
-import ManagerLeavePage from './features/workforce/ManagerLeavePage';
-import WorkforceSettingsPage from './features/workforce/WorkforceSettingsPage';
+const OwnerOnboarding = React.lazy(() => import('./pages/onboarding/OwnerOnboarding'));
+const RefereeQuestionnairePage = React.lazy(() => import('./pages/onboarding/RefereeQuestionnairePage'));
+const RefereeRejectPage = React.lazy(() => import('./pages/onboarding/RefereeRejectPage'));
+const RosterOwnerPage = React.lazy(() => import('./pages/dashboard/sidebar/RosterOwnerPage'));
+const RosterWorkerPage = React.lazy(() => import('./pages/dashboard/sidebar/RosterWorkerPage'));
+const KioskPage = React.lazy(() => import('./pages/attendance/KioskPage'));
+const WorkerAttendancePage = React.lazy(() => import('./pages/attendance/WorkerAttendancePage'));
+const ManagerAttendanceReviewPage = React.lazy(() => import('./pages/attendance/ManagerAttendanceReviewPage'));
+const TimesheetsPage = React.lazy(() => import('./features/workforce/TimesheetsPage'));
+const MyHoursPage = React.lazy(() => import('./features/workforce/MyHoursPage'));
+const MyLeavePage = React.lazy(() => import('./features/workforce/MyLeavePage'));
+const ManagerLeavePage = React.lazy(() => import('./features/workforce/ManagerLeavePage'));
+const WorkforceSettingsPage = React.lazy(() => import('./features/workforce/WorkforceSettingsPage'));
 
 
 
@@ -60,14 +60,14 @@ import WorkforceSettingsPage from './features/workforce/WorkforceSettingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import OwnerDashboardGate from './components/OwnerDashboardGate';
 import OwnerDashboardWrapper from './layouts/ownerDashboard';
-import AdminOverview from './pages/dashboard/admin/AdminOverview';
-import AdminManagePharmaciesPage from './pages/dashboard/admin/AdminManagePharmaciesPage';
-import AdminRosterPage from './pages/dashboard/admin/AdminRosterPage';
-import AdminPostShiftPage from './pages/dashboard/admin/AdminPostShiftPage';
-import AdminActiveShiftsPage from './pages/dashboard/admin/AdminActiveShiftsPage';
-import AdminConfirmedShiftsPage from './pages/dashboard/admin/AdminConfirmedShiftsPage';
-import AdminHistoryShiftsPage from './pages/dashboard/admin/AdminHistoryShiftsPage';
-import AdminPosterShiftDetailPage from './pages/dashboard/admin/AdminPosterShiftDetailPage';
+const AdminOverview = React.lazy(() => import('./pages/dashboard/admin/AdminOverview'));
+const AdminManagePharmaciesPage = React.lazy(() => import('./pages/dashboard/admin/AdminManagePharmaciesPage'));
+const AdminRosterPage = React.lazy(() => import('./pages/dashboard/admin/AdminRosterPage'));
+const AdminPostShiftPage = React.lazy(() => import('./pages/dashboard/admin/AdminPostShiftPage'));
+const AdminActiveShiftsPage = React.lazy(() => import('./pages/dashboard/admin/AdminActiveShiftsPage'));
+const AdminConfirmedShiftsPage = React.lazy(() => import('./pages/dashboard/admin/AdminConfirmedShiftsPage'));
+const AdminHistoryShiftsPage = React.lazy(() => import('./pages/dashboard/admin/AdminHistoryShiftsPage'));
+const AdminPosterShiftDetailPage = React.lazy(() => import('./pages/dashboard/admin/AdminPosterShiftDetailPage'));
 import AdminDashboardWrapper from './layouts/adminDashboard';
 import PharmacistDashboardWrapper from './layouts/pharmacistDashboard';
 import HubDashboardWrapper from './layouts/HubDashboardWrapper';
@@ -81,43 +81,43 @@ initSharedCoreApi();
 
 // owner stub pages
 // import OverviewPageOwner          from './pages/dashboard/sidebar/OverviewPageOwner';
-import OwnerOverviewContainer from './pages/dashboard/sidebar/owner/OwnerOverviewContainer';
-import PillsPage from './pages/dashboard/sidebar/rewards/PillsPage';
+const OwnerOverviewContainer = React.lazy(() => import('./pages/dashboard/sidebar/owner/OwnerOverviewContainer'));
+const PillsPage = React.lazy(() => import('./pages/dashboard/sidebar/rewards/PillsPage'));
 
-import OverviewPageStaff from './pages/dashboard/sidebar/OverviewPageStaff';
-import ChainPage from './pages/dashboard/sidebar/ChainPage';
-import PharmacyPage from './pages/dashboard/sidebar/PharmacyPage';
-import PostShiftPage from './pages/dashboard/sidebar/PostShiftPage';
-import PublicShiftsPage from './pages/dashboard/sidebar/PublicShiftsPage';
-import CommunityShiftsPage from './pages/dashboard/sidebar/CommunityShiftsPage';
-import SetAvailabilityPage from './pages/dashboard/sidebar/SetAvailabilityPage';
-import TalentBoard from './pages/dashboard/sidebar/TalentBoard';
-import LearningMaterialsPage from './pages/dashboard/sidebar/LearningMaterialsPage';
-import LogoutPage from './pages/dashboard/sidebar/LogoutPage';
-import ActiveShiftsPage from './pages/dashboard/sidebar/ActiveShiftsPage';
-import ConfirmedShiftsPage from './pages/dashboard/sidebar/ConfirmedShiftsPage';
-import HistoryShiftsPage from './pages/dashboard/sidebar/HistoryShiftsPage';
-import MyConfirmedShiftsPage from './pages/dashboard/sidebar/MyConfirmedShiftsPage';
-import MyHistoryShiftsPage from './pages/dashboard/sidebar/MyHistoryShiftsPage';
-import PosterShiftDetailPage from './pages/dashboard/sidebar/PosterShiftDetailPage';
-import WorkerShiftDetailPage from './pages/dashboard/sidebar/WorkerShiftDetailPage';
-import ChatPage from './pages/dashboard/sidebar/chat/ChatPage';
-import HubPage from './pages/dashboard/sidebar/hub/HubPage';
-import InvoiceManagePage from './pages/dashboard/sidebar/Invoices/InvoiceManagePage';
-import InvoiceGeneratePage from './pages/dashboard/sidebar/Invoices/InvoiceGeneratePage';
-import InvoiceDetailPage from './pages/dashboard/sidebar/Invoices/InvoiceDetailPage';
-import PharmacyCalendarPage from './pages/dashboard/sidebar/PharmacyCalendarPage';
-import ManageMembershipsPage from './pages/dashboard/sidebar/ManageMembershipsPage';
+const OverviewPageStaff = React.lazy(() => import('./pages/dashboard/sidebar/OverviewPageStaff'));
+const ChainPage = React.lazy(() => import('./pages/dashboard/sidebar/ChainPage'));
+const PharmacyPage = React.lazy(() => import('./pages/dashboard/sidebar/PharmacyPage'));
+const PostShiftPage = React.lazy(() => import('./pages/dashboard/sidebar/PostShiftPage'));
+const PublicShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/PublicShiftsPage'));
+const CommunityShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/CommunityShiftsPage'));
+const SetAvailabilityPage = React.lazy(() => import('./pages/dashboard/sidebar/SetAvailabilityPage'));
+const TalentBoard = React.lazy(() => import('./pages/dashboard/sidebar/TalentBoard'));
+const LearningMaterialsPage = React.lazy(() => import('./pages/dashboard/sidebar/LearningMaterialsPage'));
+const LogoutPage = React.lazy(() => import('./pages/dashboard/sidebar/LogoutPage'));
+const ActiveShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/ActiveShiftsPage'));
+const ConfirmedShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/ConfirmedShiftsPage'));
+const HistoryShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/HistoryShiftsPage'));
+const MyConfirmedShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/MyConfirmedShiftsPage'));
+const MyHistoryShiftsPage = React.lazy(() => import('./pages/dashboard/sidebar/MyHistoryShiftsPage'));
+const PosterShiftDetailPage = React.lazy(() => import('./pages/dashboard/sidebar/PosterShiftDetailPage'));
+const WorkerShiftDetailPage = React.lazy(() => import('./pages/dashboard/sidebar/WorkerShiftDetailPage'));
+const ChatPage = React.lazy(() => import('./pages/dashboard/sidebar/chat/ChatPage'));
+const HubPage = React.lazy(() => import('./pages/dashboard/sidebar/hub/HubPage'));
+const InvoiceManagePage = React.lazy(() => import('./pages/dashboard/sidebar/Invoices/InvoiceManagePage'));
+const InvoiceGeneratePage = React.lazy(() => import('./pages/dashboard/sidebar/Invoices/InvoiceGeneratePage'));
+const InvoiceDetailPage = React.lazy(() => import('./pages/dashboard/sidebar/Invoices/InvoiceDetailPage'));
+const PharmacyCalendarPage = React.lazy(() => import('./pages/dashboard/sidebar/PharmacyCalendarPage'));
+const ManageMembershipsPage = React.lazy(() => import('./pages/dashboard/sidebar/ManageMembershipsPage'));
 
 import { AuthProvider } from './contexts/AuthContext';
 
 
 // Version2
-import PharmacistOnboardingV2Layout from './pages/onboarding/onboarding_pharmacist/PharmacistOnboardingV2Layout';
-import OtherStaffOnboardingV2Layout from './pages/onboarding/onboarding_staff/OtherStaffOnboardingV2Layout';
-import ExplorerOnboardingV2Layout from './pages/onboarding/onboarding_explorer/ExplorerOnboardingV2Layout';
-import OwnerSetupOnboardingPage from './pages/setup/OwnerSetupOnboardingPage';
-import OwnerSetupPharmaciesPage from './pages/setup/OwnerSetupPharmaciesPage';
+const PharmacistOnboardingV2Layout = React.lazy(() => import('./pages/onboarding/onboarding_pharmacist/PharmacistOnboardingV2Layout'));
+const OtherStaffOnboardingV2Layout = React.lazy(() => import('./pages/onboarding/onboarding_staff/OtherStaffOnboardingV2Layout'));
+const ExplorerOnboardingV2Layout = React.lazy(() => import('./pages/onboarding/onboarding_explorer/ExplorerOnboardingV2Layout'));
+const OwnerSetupOnboardingPage = React.lazy(() => import('./pages/setup/OwnerSetupOnboardingPage'));
+const OwnerSetupPharmaciesPage = React.lazy(() => import('./pages/setup/OwnerSetupPharmaciesPage'));
 
 const router = createBrowserRouter([
   {
@@ -571,7 +571,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <WorkspaceProvider> {/* Add this wrapper */}
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <ToastProvider>
-            <RouterProvider router={router} />
+            <React.Suspense fallback={null}>
+              <RouterProvider router={router} />
+            </React.Suspense>
           </ToastProvider>
         </LocalizationProvider>
       </WorkspaceProvider> {/* Close wrapper */}
