@@ -400,8 +400,9 @@ def create_subscription_checkout(request):
             )
             subscription.stripe_customer_id = customer.id
             subscription.save()
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception('Stripe customer creation failed')
+            return Response({'error': 'Unable to initialise billing with the payment provider.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # 2. Line Items Configuration
     line_items = [
