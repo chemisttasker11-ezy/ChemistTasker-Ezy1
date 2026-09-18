@@ -1,15 +1,17 @@
 from datetime import timedelta
+import json
 import os
 import shutil
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from public_hub.models import Article, Comment, Reaction
+from public_hub.content_schema import plain_text
+from public_hub.models import Article, Comment, ContentAdministrator, ContentDocument, ContentRevision, Reaction
 
 
 class Command(BaseCommand):
-    help = 'Seed realistic, high-quality News and Learning editorial articles with variety under each class and generated photos.'
+    help = 'Seed realistic, high-quality News, Learning, and Blog editorial articles with variety under each class and generated photos.'
 
     def handle(self, *args, **options):
         User = get_user_model()
@@ -18,6 +20,7 @@ class Command(BaseCommand):
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
         landing_img_dir = os.path.join(project_root, 'frontend_web', 'landing_next', 'public', 'images', 'editorial')
         backend_media_dir = os.path.join(project_root, 'backend', 'media', 'editorial')
+        brain_dir = r"C:\Users\semse\.gemini\antigravity-ide\brain\0fca5270-d474-499c-921d-7711e6ababc5"
 
         os.makedirs(landing_img_dir, exist_ok=True)
         os.makedirs(backend_media_dir, exist_ok=True)
@@ -58,7 +61,75 @@ class Command(BaseCommand):
 
         now = timezone.now()
 
-        articles_data = [
+        # Content Administrators
+        if u_salah:
+            ContentAdministrator.objects.get_or_create(user=u_salah, defaults={'active': True})
+        if u_admin:
+            ContentAdministrator.objects.get_or_create(user=u_admin, defaults={'active': True})
+
+        # Load 5 core launch blog guides
+        launch_guides_path = os.path.join(os.path.dirname(__file__), '..', '..', 'editorial_content', 'launch-guides.json')
+        blog_guides = []
+        if os.path.exists(launch_guides_path):
+            with open(launch_guides_path, 'r', encoding='utf-8') as f:
+                raw_guides = json.load(f)
+            for idx, g in enumerate(raw_guides):
+                p = g['payload']
+                cover_url = f"http://localhost:3000/assets/{g.get('cover_asset', 'pharmacist-priya.jpg')}"
+                body_text = plain_text(p['body_document']) if p.get('body_document') else p.get('excerpt', '')
+                blog_guides.append({
+                    'slug': p['slug'],
+                    'title': p['title'],
+                    'kind': 'blog',
+                    'topic': p['topic'],
+                    'author_user': u_salah if idx % 2 == 0 else u_admin,
+                    'author_name': p.get('author_name', 'ChemistTasker Editorial'),
+                    'cover_url': cover_url,
+                    'cover_alt': p.get('cover_alt', p['title']),
+                    'source_name': p.get('source_name', ''),
+                    'source_url': p.get('source_url', ''),
+                    'featured': p.get('featured', False),
+                    'status': 'published',
+                    'published_at': now - timedelta(days=idx + 3),
+                    'excerpt': p['excerpt'],
+                    'body': body_text,
+                    'body_document': p.get('body_document', {}),
+                    'seo_title': p.get('seo_title', p['title'])[:70],
+                    'seo_description': p.get('seo_description', p['excerpt'])[:170],
+                })
+
+        # Hello Pharmacy initial blog post
+        blog_guides.append({
+            'slug': 'hello-pharmacy',
+            'title': 'Hello Pharmacy',
+            'kind': 'blog',
+            'topic': 'community',
+            'author_user': u_salah,
+            'author_name': 'ChemistTasker Editorial',
+            'cover_url': 'http://localhost:3000/assets/pharmacist-mina.jpg',
+            'cover_alt': 'Australian community pharmacy professional welcoming colleagues to ChemistTasker',
+            'source_name': '',
+            'source_url': '',
+            'featured': False,
+            'status': 'archived',
+            'published_at': now - timedelta(days=14),
+            'excerpt': 'Welcome to ChemistTasker. A dedicated platform for Australian community pharmacy teams, locums, and owners.',
+            'body': (
+                "Welcome to ChemistTasker — the connected platform built specifically for Australian pharmacy teams, locums, and pharmacy owners.\n\n"
+                "## A Platform Built for Australian Pharmacy\n\n"
+                "ChemistTasker is designed to solve real-world problems faced by pharmacists, technicians, students, and pharmacy owners every single day. "
+                "From seamless locum matching and shift briefings to verified peer-to-peer equipment exchange, our mission is to make pharmacy operations smoother, more transparent, and collaborative.\n\n"
+                "## Community Discussions & Professional Growth\n\n"
+                "Our public hubs and private team channels provide a professional space to discuss regulatory changes, share practical dispensing insights, and connect with peers across metropolitan, regional, and rural Australia.\n\n"
+                "## What's Ahead\n\n"
+                "Explore our latest clinical guides, stay up to date with TGA regulatory notices, and browse our verified equipment marketplace. Welcome aboard!"
+            ),
+            'body_document': {},
+            'seo_title': 'Welcome to ChemistTasker | Hello Pharmacy',
+            'seo_description': 'Welcome to ChemistTasker — connecting Australian pharmacy teams, locums, and owners.',
+        })
+
+        articles_data = blog_guides + [
             # ==========================================
             # NEWS ARTICLES (kind='news')
             # ==========================================
@@ -356,6 +427,8 @@ class Command(BaseCommand):
 
         for item in articles_data:
             slug = item.pop('slug')
+            status = item.pop('status', 'published')
+            body_document = item.pop('body_document', {})
             article, created = Article.objects.update_or_create(
                 slug=slug,
                 defaults={
@@ -364,13 +437,14 @@ class Command(BaseCommand):
                     'topic': item['topic'],
                     'excerpt': item['excerpt'],
                     'body': item['body'],
+                    'body_document': body_document,
                     'cover_url': item['cover_url'],
                     'cover_alt': item['cover_alt'],
                     'source_name': item['source_name'],
                     'source_url': item['source_url'],
                     'author_name': item['author_name'],
                     'created_by': item['author_user'],
-                    'status': 'published',
+                    'status': status,
                     'published_at': item['published_at'],
                     'featured': item['featured'],
                     'comments_open': True,
@@ -378,6 +452,42 @@ class Command(BaseCommand):
                     'seo_description': item['seo_description'][:170],
                 }
             )
+
+            # Ensure ContentDocument and ContentRevision exist for editorial governance
+            doc, _ = ContentDocument.objects.get_or_create(
+                article=article,
+                defaults={
+                    'area': article.kind,
+                    'created_by': article.created_by,
+                }
+            )
+            ContentRevision.objects.update_or_create(
+                document=doc,
+                defaults={
+                    'status': 'published' if status == 'published' else 'superseded',
+                    'created_by': article.created_by,
+                    'approved_by': u_salah,
+                    'publish_at': article.published_at,
+                    'version': 1,
+                    'payload': {
+                        'slug': article.slug,
+                        'title': article.title,
+                        'topic': article.topic,
+                        'excerpt': article.excerpt,
+                        'body_document': body_document,
+                        'author_name': article.author_name,
+                        'cover_url': article.cover_url,
+                        'cover_alt': article.cover_alt,
+                        'source_name': article.source_name,
+                        'source_url': article.source_url,
+                        'featured': article.featured,
+                        'comments_open': True,
+                        'seo_title': article.seo_title,
+                        'seo_description': article.seo_description,
+                    }
+                }
+            )
+
             if created:
                 created_count += 1
                 self.stdout.write(self.style.SUCCESS(f"Created article: [{article.kind}] {article.title} ({article.topic})"))

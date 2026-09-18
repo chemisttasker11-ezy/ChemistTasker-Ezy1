@@ -934,8 +934,16 @@ export async function deleteSavedShift(savedId) {
     return true;
 }
 export async function fetchShiftCounterOffersService(shiftId) {
-    const data = await getShiftCounterOffers(shiftId);
-    return asList(data).map(mapShiftCounterOffer);
+    try {
+        const data = await getShiftCounterOffers(shiftId);
+        return asList(data).map(mapShiftCounterOffer);
+    } catch (err: any) {
+        const msg = String(err?.message || err || '');
+        if (msg.includes('404') || msg.includes('No Shift matches') || msg.includes('Not Found') || msg.includes('not found')) {
+            return [];
+        }
+        throw err;
+    }
 }
 export async function submitShiftCounterOfferService(payload) {
     const body = {

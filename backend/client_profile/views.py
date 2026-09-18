@@ -121,7 +121,7 @@ def _shift_roles_visible_to_user(user):
             return ["INTERN"]
         if staff_role in ALL_OTHER_STAFF_SHIFT_ROLES:
             return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
-        return []
+        return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
     return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
 
 
@@ -6423,12 +6423,15 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         combined_filter |= Q(created_by=user)
 
         # 2. Shifts associated with pharmacies owned/managed by the user/their organization
-        #    CORRECTED: Changed 'organizationmembership' to 'memberships' to match related_name
+        managed_pharmacies = BaseShiftViewSet._managed_pharmacies(user)
+        if managed_pharmacies.exists():
+            combined_filter |= Q(pharmacy__in=managed_pharmacies)
+
         is_owner_admin_of_pharmacy_q = Q(
             pharmacy__owner__user=user
         ) | Q(
-            pharmacy__organization__memberships__user=user, # <-- CORRECTED HERE: use 'memberships'
-            pharmacy__organization__memberships__role='ORG_ADMIN' # <-- CORRECTED HERE: use 'memberships'
+            pharmacy__organization__memberships__user=user,
+            pharmacy__organization__memberships__role='ORG_ADMIN'
         )
         combined_filter |= is_owner_admin_of_pharmacy_q
 
@@ -6499,9 +6502,6 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pass
 
         # For ORG_CHAIN: Shift's pharmacy is related to an organization the user is a member of
-        # This section uses OrganizationMembership. The filter itself is on OrganizationMembership.
-        # It correctly uses `user=user` as filter on the OrganizationMembership model.
-        # This part looks correct after the initial import fix.
         user_org_memberships = OrganizationMembership.objects.filter(user=user)
         if user_org_memberships.exists():
             combined_filter |= Q(
@@ -6509,22 +6509,18 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__organization__in=user_org_memberships.values_list('organization', flat=True)
             )
 
-        # ... (rest of the get_queryset logic for public shifts and assigned shifts)
-        
-        eligible_platform_q = Q()
-        allowed_roles_for_user = _shift_roles_visible_to_user(user)
+        # 4. Shifts with PLATFORM visibility are public to all authenticated users on the platform
+        combined_filter |= Q(visibility='PLATFORM')
 
-        if allowed_roles_for_user:
-            eligible_platform_q |= Q(
-                visibility='PLATFORM',
-                role_needed__in=allowed_roles_for_user
-            )
-        combined_filter |= eligible_platform_q
-
-        # Allow workers to view dedicated shifts and shifts where they have an offer.
-        combined_filter |= Q(dedicated_user=user) | Q(offers__user=user)
-
-        combined_filter |= Q(slot_assignments__user=user)
+        # 5. Allow workers to view dedicated shifts and shifts where they have an offer,
+        # counter-offer, interest, or assignment.
+        combined_filter |= (
+            Q(dedicated_user=user)
+            | Q(offers__user=user)
+            | Q(counter_offers__user=user)
+            | Q(interests__user=user)
+            | Q(slot_assignments__user=user)
+        )
 
         return qs.filter(combined_filter).distinct()
 

@@ -267,12 +267,16 @@ def _login_invalid_credentials_response(user, attempt_state):
 
 
 def _cookie_kwargs():
-    return {
+    kwargs = {
         "httponly": True,
         "secure": bool(getattr(settings, "JWT_COOKIE_SECURE", not settings.DEBUG)),
         "samesite": getattr(settings, "JWT_COOKIE_SAMESITE", "None" if not settings.DEBUG else "Lax"),
         "path": getattr(settings, "JWT_COOKIE_PATH", "/"),
     }
+    cookie_domain = getattr(settings, "JWT_COOKIE_DOMAIN", None)
+    if cookie_domain:
+        kwargs["domain"] = cookie_domain
+    return kwargs
 
 
 def _set_auth_cookies(response, *, access_token, refresh_token, remember_me=None):
@@ -297,9 +301,21 @@ def _set_auth_cookies(response, *, access_token, refresh_token, remember_me=None
 
 def _clear_auth_cookies(response):
     cookie_kwargs = _cookie_kwargs()
-    cookie_kwargs.pop("max_age", None)
-    response.delete_cookie(getattr(settings, "JWT_AUTH_COOKIE", "ct_access"), path=cookie_kwargs["path"])
-    response.delete_cookie(getattr(settings, "JWT_REFRESH_COOKIE", "ct_refresh"), path=cookie_kwargs["path"])
+    domain = cookie_kwargs.get("domain")
+    path = cookie_kwargs.get("path", "/")
+    samesite = cookie_kwargs.get("samesite")
+    response.delete_cookie(
+        getattr(settings, "JWT_AUTH_COOKIE", "ct_access"),
+        path=path,
+        domain=domain,
+        samesite=samesite,
+    )
+    response.delete_cookie(
+        getattr(settings, "JWT_REFRESH_COOKIE", "ct_refresh"),
+        path=path,
+        domain=domain,
+        samesite=samesite,
+    )
 
 
 def _build_authenticated_user_payload(user):
@@ -925,13 +941,21 @@ class VerifyMobileOTPView(APIView):
         _reset_mobile_otp_security_state(user)
         user.save()
 
-        return Response(
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+
+        response = Response(
             {
                 "detail": "Mobile number verified successfully",
                 "user": _build_authenticated_user_payload(user),
+                "access": access,
+                "refresh": str(refresh),
             },
             status=status.HTTP_200_OK,
         )
+        _set_auth_cookies(response, access_token=access, refresh_token=str(refresh))
+        return response
 
 
 class ResendMobileOTPView(APIView):
@@ -1062,16 +1086,22 @@ class CustomTokenRefreshView(TokenRefreshView):
             if cookie_refresh:
                 mutable_data["refresh"] = cookie_refresh
         if not mutable_data.get("refresh"):
-            return Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            _clear_auth_cookies(response)
+            return response
 
         serializer = self.get_serializer(data=mutable_data)
         try:
             serializer.is_valid(raise_exception=True)
         except ValidationError:
-            return Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            _clear_auth_cookies(response)
+            return response
         except Exception:
             logging.getLogger(__name__).exception("Unexpected refresh failure")
-            return Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            _clear_auth_cookies(response)
+            return response
 
         response = Response(serializer.validated_data, status=status.HTTP_200_OK)
 

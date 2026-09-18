@@ -1,4 +1,4 @@
-import {returnDestination,finishDestination} from '../../shared/browser-session';
+import {returnDestination,finishDestination,announceSession} from '../../shared/browser-session';
 import React, { useEffect, useState } from 'react';
 import { Link as RouterLink } from '@/public/navigation';
 import {
@@ -17,7 +17,7 @@ import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function MobileOTPVerify() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, login } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [username, setUsername]   = useState('');
@@ -74,7 +74,12 @@ export default function MobileOTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      await apiClient.post('/users/mobile/verify-otp/', { otp });
+      const resp = await apiClient.post('/users/mobile/verify-otp/', { otp });
+      const data = resp.data;
+      if (data?.access && data?.refresh && data?.user && typeof login === 'function') {
+        login(data.access, data.refresh, data.user);
+      }
+      announceSession('login');
       setIdentityLocked(true);
       setUser((prev) =>
         prev
@@ -86,7 +91,7 @@ export default function MobileOTPVerify() {
               mobile_number: mobile,
               is_mobile_verified: true,
             }
-          : prev
+          : data?.user || prev
       );
       setStatus('Mobile verified! Redirecting...');
       setTimeout(() => finishDestination(returnDestination()||'/dashboard'), 800);

@@ -392,27 +392,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
-    def validate(self, attrs):
-        try:
-            original_refresh = RefreshToken(attrs['refresh'])
-            user = User.objects.get(id=original_refresh['user_id'])
-        except (KeyError, TokenError, User.DoesNotExist):
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-        except Exception:
-            # Never allow refresh endpoint to 500 on malformed/legacy tokens.
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-
-        if not user.is_active:
-            raise serializers.ValidationError({'detail': 'Account is inactive.'})
-        data = super().validate(attrs)
-        data['remember_me'] = original_refresh.get('remember_me')
-        if original_refresh.get('remember_me') is True and data.get('refresh'):
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = True
-            refresh['exp'] = original_refresh['exp']
-            data['refresh'] = str(refresh)
-            data['access'] = str(refresh.access_token)
-
+    def _populate_user_payload(self, data, user):
         try:
             org_memberships = OrganizationMembership.objects.filter(user=user)
             org_payload = serialize_org_memberships(org_memberships)
@@ -424,20 +404,20 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
             pharm_payload = [
                 {
-                'pharmacy_id':   pm.pharmacy_id,
-                'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
-                'role':          pm.role,
-                'employment_type': pm.employment_type,
-            }
-            for pm in pharm_memberships
-        ]
+                    'pharmacy_id': pm.pharmacy_id,
+                    'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
+                    'role': pm.role,
+                    'employment_type': pm.employment_type,
+                }
+                for pm in pharm_memberships
+            ]
 
             owned_pharmacies = Pharmacy.objects.filter(owner__user=user)
             owned_payload = [
                 {
-                    'pharmacy_id':   pharmacy.id,
+                    'pharmacy_id': pharmacy.id,
                     'pharmacy_name': pharmacy.name,
-                    'role':          'OWNER',
+                    'role': 'OWNER',
                 }
                 for pharmacy in owned_pharmacies
             ]
@@ -465,12 +445,12 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
             from billing.utils import is_billing_active, is_in_free_trial
             data['user'] = {
-                'id':       user.id,
+                'id': user.id,
                 'username': user.username,
-                'email':    user.email,
+                'email': user.email,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
-                'role':     user.role,
+                'role': user.role,
                 'mobile_number': user.mobile_number,
                 'memberships': org_payload + combined_pharm_payload,
                 'admin_assignments': admin_payload,
@@ -483,6 +463,65 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             # Keep refresh successful even if ancillary user payload construction fails.
             pass
 
+    def validate(self, attrs):
+        user = None
+        original_refresh = None
+        try:
+            original_refresh = RefreshToken(attrs['refresh'])
+            user = User.objects.get(id=original_refresh['user_id'])
+        except TokenError as te:
+            # Grace period for token rotation race conditions:
+            # If a refresh token was just rotated in another concurrent request or tab,
+            # allow re-issuing if it was blacklisted within 60 seconds.
+            if "blacklisted" in str(te).lower():
+                try:
+                    from rest_framework_simplejwt.tokens import UntypedToken
+                    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+                    from django.utils import timezone
+                    from datetime import timedelta
+
+                    untyped = UntypedToken(attrs['refresh'])
+                    jti = untyped.payload.get('jti')
+                    user_id = untyped.payload.get('user_id')
+                    bt = BlacklistedToken.objects.filter(token__jti=jti).select_related('token').first()
+                    if bt and (timezone.now() - bt.blacklisted_at) < timedelta(seconds=60):
+                        user = User.objects.get(id=user_id)
+                        if not user.is_active:
+                            raise serializers.ValidationError({'detail': 'Account is inactive.'})
+                        new_refresh = RefreshToken.for_user(user)
+                        remember_me = untyped.payload.get('remember_me')
+                        if remember_me is True:
+                            new_refresh['remember_me'] = True
+                        data = {
+                            'access': str(new_refresh.access_token),
+                            'refresh': str(new_refresh),
+                            'remember_me': remember_me,
+                        }
+                        self._populate_user_payload(data, user)
+                        return data
+                except serializers.ValidationError:
+                    raise
+                except Exception:
+                    pass
+            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
+        except (KeyError, User.DoesNotExist):
+            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
+        except Exception:
+            # Never allow refresh endpoint to 500 on malformed/legacy tokens.
+            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
+
+        if not user.is_active:
+            raise serializers.ValidationError({'detail': 'Account is inactive.'})
+        data = super().validate(attrs)
+        data['remember_me'] = original_refresh.get('remember_me')
+        if original_refresh.get('remember_me') is True and data.get('refresh'):
+            refresh = RefreshToken(data['refresh'])
+            refresh['remember_me'] = True
+            refresh['exp'] = original_refresh['exp']
+            data['refresh'] = str(refresh)
+            data['access'] = str(refresh.access_token)
+
+        self._populate_user_payload(data, user)
         return data
 
 class InviteOrgUserSerializer(serializers.Serializer):

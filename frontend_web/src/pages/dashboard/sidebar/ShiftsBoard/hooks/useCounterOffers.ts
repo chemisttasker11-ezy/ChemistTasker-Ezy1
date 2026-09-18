@@ -198,9 +198,8 @@ export const useCounterOffers = ({
 
   // Reconcile local counter offers with backend data to avoid stale badges when offers are removed server-side.
   useEffect(() => {
-    // Counter offers are private and require authentication. The same board is
-    // also rendered by the public job board, so anonymous visitors must not
-    // trigger one request per public shift.
+    // This board is also used by the anonymous public job board. Counter
+    // offers are private, so do not query them until a user is signed in.
     if (!isHydrated || currentUserId == null) return;
     const shiftIds = shifts.map((s) => s.id).filter((id) => Number.isFinite(id));
     const toFetch = shiftIds;
@@ -208,36 +207,41 @@ export const useCounterOffers = ({
 
     const fetchCounters = async () => {
       const updates: Record<number, CounterOfferTrack> = {};
-      for (const shiftId of toFetch) {
-        try {
-          const remote = await fetchShiftCounterOffersService(shiftId);
-          const offers = currentUserId != null
-            ? (remote || []).filter((offer: any) => getOfferUserId(offer) === currentUserId)
-            : (remote || []);
-          const validOffers = offers.filter(offerHasValidSlots);
-          const slotsMap: Record<number, { rate: string; start: string; end: string }> = {};
-          validOffers.forEach((offer: any) => {
-            getOfferSlots(offer).forEach((slot: any) => {
-              const slotId = getOfferSlotId(slot);
-              if (slotId == null) return;
-              slotsMap[slotId] = {
-                rate: slot.proposedRate != null ? String(slot.proposedRate) : '',
-                start: slot.proposedStartTime || slot.proposed_start_time || '',
-                end: slot.proposedEndTime || slot.proposed_end_time || '',
-              };
+      await Promise.all(
+        toFetch.map(async (shiftId) => {
+          try {
+            const remote = await fetchShiftCounterOffersService(shiftId);
+            const offers = currentUserId != null
+              ? (remote || []).filter((offer: any) => getOfferUserId(offer) === currentUserId)
+              : (remote || []);
+            const validOffers = offers.filter(offerHasValidSlots);
+            const slotsMap: Record<number, { rate: string; start: string; end: string }> = {};
+            validOffers.forEach((offer: any) => {
+              getOfferSlots(offer).forEach((slot: any) => {
+                const slotId = getOfferSlotId(slot);
+                if (slotId == null) return;
+                slotsMap[slotId] = {
+                  rate: slot.proposedRate != null ? String(slot.proposedRate) : '',
+                  start: slot.proposedStartTime || slot.proposed_start_time || '',
+                  end: slot.proposedEndTime || slot.proposed_end_time || '',
+                };
+              });
             });
-          });
-          const sentCount = Object.keys(slotsMap).length;
-          if (sentCount > 0) {
-            updates[shiftId] = {
-              slots: { ...slotsMap },
-              summary: `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})`,
-            };
+            const sentCount = Object.keys(slotsMap).length;
+            if (sentCount > 0) {
+              updates[shiftId] = {
+                slots: { ...slotsMap },
+                summary: `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})`,
+              };
+            }
+          } catch (err: any) {
+            const msg = String(err?.message || err || '');
+            if (!msg.includes('404') && !msg.includes('No Shift matches') && !msg.includes('Not Found') && !msg.includes('not found')) {
+              console.warn('Failed to fetch counter offers for shift', shiftId, err);
+            }
           }
-        } catch (err) {
-          console.warn('Failed to fetch counter offers for shift', shiftId, err);
-        }
-      }
+        })
+      );
 
       setCounterOffers((prev) => {
         const next = { ...prev };

@@ -33,7 +33,20 @@ export default function Login() {
   const location = useLocation();
   const { login } = useAuth();
   const session = useSession();
-  useEffect(()=>{const target=returnDestination();if(target)rememberDestination(target);if(session.status==='authenticated')finishDestination(target||'/dashboard');},[session.status]);
+  useEffect(() => {
+    const target = returnDestination();
+    if (target) rememberDestination(target);
+    if (session.status === 'authenticated') {
+      const lastBounce = sessionStorage.getItem('ct:last-login-redirect');
+      const now = Date.now();
+      if (lastBounce && now - Number(lastBounce) < 3000) {
+        // Prevent rapid redirect bounce (< 3s). Stay on login page and do not loop.
+        return;
+      }
+      sessionStorage.setItem('ct:last-login-redirect', String(now));
+      finishDestination(target || '/dashboard');
+    }
+  }, [session.status]);
 
   useEffect(() => {
     setRobotsMeta('noindex,follow');
