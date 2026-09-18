@@ -6,8 +6,3 @@ export type EthicalContext={pharmacy:{id:number;label:string;suburb:string;state
 
 export const marketplaceApi=chemistTaskerApi.marketplace;
 export const ethicalMarketplaceApi=chemistTaskerApi.ethicalMarketplace;
-
-/** @deprecated Migrate workspace call sites to the named shared operations. */
-export const marketApi=<T>(path:string,method='GET',body?:unknown)=>marketplaceApi.request<T>(`/marketplace/${path}`,{method,body:body as object|undefined});
-/** @deprecated Migrate workspace call sites to the named shared operations. */
-export const ethicalApi=<T>(path:string,method='GET',body?:unknown)=>ethicalMarketplaceApi.request<T>(`/ethical/${path}`,{method,body:body as object|undefined});

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { loginHref } from '@/shared/browser-session';
 import { useSession } from '@/shared/session-provider';
-import { marketApi, type Blocker } from './api';
+import { marketplaceApi, type Blocker } from './api';
 import styles from './add-item-wizard.module.css';
 
 type PharmacyOption = { id: number; label: string; suburb: string; state: string };
@@ -111,7 +111,7 @@ export default function AddItemWizard() {
 
   useEffect(() => {
     if (session.status !== 'authenticated') return;
-    marketApi<ListingOptions>('me/listing-options/')
+    marketplaceApi.getListingOptions()
       .then((next) => {
         setOptions(next);
         setPharmacyId(next.eligible_pharmacies[0]?.id);
@@ -153,9 +153,7 @@ export default function AddItemWizard() {
     if (!barcode.trim()) return;
     setLookupMessage('Looking up barcode…');
     try {
-      const data = await marketApi<{
-        results: { name: string; description?: string; category?: { slug: string } }[];
-      }>('catalogue/lookup/?barcode=' + encodeURIComponent(barcode.trim()));
+      const data = await marketplaceApi.lookupCatalogue({ barcode: barcode.trim() });
       const product = data.results?.[0];
       if (!product) {
         setLookupMessage('No reviewed ordinary product matched. Enter it manually.');
@@ -176,7 +174,7 @@ export default function AddItemWizard() {
     setBusy(true);
     setError('');
     try {
-      const listing = await marketApi<{ id: string; version: number }>('listings/', 'POST', {
+      const listing = await marketplaceApi.createListing({
         seller_context: context,
         pharmacy: context === 'PHARMACY' ? pharmacyId : null,
         category: category.id,
@@ -200,10 +198,10 @@ export default function AddItemWizard() {
           postage_organiser: delivery === 'PICKUP' ? '' : postageOrganiser,
           quote_required: quoteRequired,
         },
-      });
+      } as Parameters<typeof marketplaceApi.createListing>[0]);
 
       if (context === 'PHARMACY') {
-        await marketApi(`listings/${listing.id}/audience/`, 'POST', {
+        await marketplaceApi.updateAudience(listing.id, {
           expected_version: listing.version,
           current_circle: 'OWNED_CHAIN',
           maximum_circle: maximumCircle,
@@ -216,7 +214,7 @@ export default function AddItemWizard() {
         const formData = new FormData();
         formData.append('image', item.file);
         try {
-          await marketApi(`listings/${listing.id}/images/`, 'POST', formData);
+          await marketplaceApi.uploadImage(listing.id, formData);
         } catch {
           // Continue uploading remaining photos even if one fails
         }
@@ -226,9 +224,7 @@ export default function AddItemWizard() {
       let finalStatus = 'DRAFT';
       if (submitForReview) {
         try {
-          const res = await marketApi<{ publication_status: string }>(`listings/${listing.id}/submit/`, 'POST', {
-            expected_version: listing.version,
-          });
+          const res = await marketplaceApi.actOnListing(listing.id, 'submit', listing.version);
           finalStatus = res.publication_status || 'PENDING_REVIEW';
         } catch (subErr) {
           setError(`Listing created as draft, but submit failed: ${(subErr as Error).message}`);

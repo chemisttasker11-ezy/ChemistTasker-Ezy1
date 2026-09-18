@@ -5,7 +5,7 @@ import {FormEvent,useCallback,useEffect,useRef,useState} from 'react';
 import {Boxes,CheckCircle2,Clock3,FileUp,LockKeyhole,PackagePlus,Repeat2,ScanLine,ShieldCheck,TriangleAlert} from 'lucide-react';
 import {loginHref} from '@/shared/browser-session';
 import {useSession} from '@/shared/session-provider';
-import {ethicalApi,type EthicalContext} from './api';
+import {ethicalMarketplaceApi,type EthicalContext} from './api';
 
 type View='home'|'access'|'inventory'|'new'|'listings'|'transfers';
 type Product={id:number;name:string;strength:string;form:string;pack_size:string;schedule:string};
@@ -26,7 +26,7 @@ export default function EthicalWorkspaceV2({view}:{view:View}){
  useEffect(()=>{
   if(session.status!=='authenticated')return;
   setLoading(true);
-  ethicalApi<{contexts:EthicalContext[]}>('me/access/').then(data=>{
+  ethicalMarketplaceApi.getAccess().then(data=>{
    setContexts(data.contexts||[]);
    setSelected(current=>current&&data.contexts.some(row=>row.pharmacy.id===current)?current:data.contexts[0]?.pharmacy.id);
   }).catch(reason=>setError((reason as Error).message)).finally(()=>setLoading(false));
@@ -46,14 +46,14 @@ export default function EthicalWorkspaceV2({view}:{view:View}){
   try{
    let result:unknown[]=[];
    if(view==='inventory'){
-    result=await ethicalApi<Lot[]>(`inventory/lots/?pharmacy=${selected}`);
+    result=await ethicalMarketplaceApi.getLots({pharmacy:selected});
    }else if(view==='transfers'){
-    result=await ethicalApi<Transfer[]>(`transfers/?pharmacy=${selected}`);
+    result=await ethicalMarketplaceApi.listTransfers({pharmacy:selected});
    }else if(view==='listings'||view==='new'){
-    const data=await ethicalApi<{results:Listing[]}>(`me/listings/?pharmacy=${selected}`);
+    const data=await ethicalMarketplaceApi.getMyListings({pharmacy:selected});
     result=data.results||[];
    }else{
-    const data=await ethicalApi<{results:Listing[]}>(`listings/?pharmacy=${selected}`);
+    const data=await ethicalMarketplaceApi.listListings({pharmacy:selected});
     result=data.results||[];
    }
    if(activeReqRef.current===reqId){
@@ -125,9 +125,9 @@ function render(view:View,context:EthicalContext,rows:unknown[],reload:()=>Promi
 
 function Overview(){return <div className="ethical-overview"><article><ShieldCheck/><h2>Premises admission</h2><p>PBS/PAN evidence and exact pharmacy scope.</p></article><article><ScanLine/><h2>Private inventory</h2><p>Barcode-backed products and reconciled lots.</p></article><article><Repeat2/><h2>Escalation</h2><p>Chain pharmacies → organisation owners → platform owners. S8 stops at organisation.</p></article><article><CheckCircle2/><h2>Accountable transfer</h2><p>Request, agreement, authorisation, dispatch and receipt.</p></article></div>}
 
-function Access({context}:{context:EthicalContext}){const [message,setMessage]=useState('');const canApply=context.blockers.some(row=>row.code==='PHARMACY_APPROVAL_REQUIRED');return <div className="workspace-stack">{canApply&&<form className="workspace-form compact" onSubmit={async e=>{e.preventDefault();try{await ethicalApi(`pharmacies/${context.pharmacy.id}/approval/`,'POST',new FormData(e.currentTarget));setMessage('Premises application submitted for private review.')}catch(error){setMessage((error as Error).message)}}}><fieldset><legend>Premises application</legend><label><span>PBS/PAN approval number</span><input name="pbs_approval_number" required/></label><label><span>Business phone</span><input name="business_phone" required/></label><label><span>Business email</span><input name="business_email" type="email" required/></label><label className="full"><span>Private evidence</span><input name="evidence" type="file" required/></label></fieldset><button className="button primary">Submit for review</button></form>}{message&&<p role="status">{message}</p>}</div>}
+function Access({context}:{context:EthicalContext}){const [message,setMessage]=useState('');const canApply=context.blockers.some(row=>row.code==='PHARMACY_APPROVAL_REQUIRED');return <div className="workspace-stack">{canApply&&<form className="workspace-form compact" onSubmit={async e=>{e.preventDefault();try{await ethicalMarketplaceApi.submitPharmacyApproval(context.pharmacy.id,new FormData(e.currentTarget));setMessage('Premises application submitted for private review.')}catch(error){setMessage((error as Error).message)}}}><fieldset><legend>Premises application</legend><label><span>PBS/PAN approval number</span><input name="pbs_approval_number" required/></label><label><span>Business phone</span><input name="business_phone" required/></label><label><span>Business email</span><input name="business_email" type="email" required/></label><label className="full"><span>Private evidence</span><input name="evidence" type="file" required/></label></fieldset><button className="button primary">Submit for review</button></form>}{message&&<p role="status">{message}</p>}</div>}
 
-function Inventory({pharmacy,lots,reload,setError}:{pharmacy:number;lots:Lot[];reload:()=>Promise<void>;setError:(v:string)=>void}){const [barcode,setBarcode]=useState('');const [product,setProduct]=useState<Product>();const [batch,setBatch]=useState<{id:number;row_count:number}>();const [message,setMessage]=useState('');async function lookup(){try{const found=await ethicalApi<Product|Record<string,never>>(`catalogue/lookup/?pharmacy=${pharmacy}&barcode=${encodeURIComponent(barcode)}`);if('id' in found){setProduct(found as Product);setMessage('Reviewed private product matched.')}else setMessage('No approved product matched.')}catch(error){setError((error as Error).message)}}return <div className="workspace-stack"><section className="workspace-panel"><h2>Scan or enter a medicine barcode</h2><div className="inline-upload"><input value={barcode} onChange={e=>setBarcode(e.target.value)} placeholder="Barcode"/><button onClick={()=>void lookup()}><ScanLine size={14}/> Lookup</button></div>{product&&<p><strong>{product.name}</strong> · {product.strength} · {product.form} · {product.schedule}</p>}</section><form className="workspace-form compact" onSubmit={async e=>{e.preventDefault();const data=new FormData(e.currentTarget);data.set('pharmacy',String(pharmacy));data.set('source_rights_attested','true');try{const staged=await ethicalApi<{id:number;row_count:number}>('inventory/imports/','POST',data);setBatch(staged);setMessage(`${staged.row_count} row(s) staged.`)}catch(error){setError((error as Error).message)}}}><fieldset><legend>Import inventory CSV</legend><label><span>Source name</span><input name="source_name" required/></label><label><span>CSV file</span><input name="file" type="file" accept=".csv,text/csv" required/></label></fieldset><button className="button secondary"><FileUp size={15}/> Stage CSV</button></form>{batch&&<section className="workspace-panel"><p>{batch.row_count} row(s) staged. No stock changes until commit.</p><button className="button primary" onClick={async()=>{try{const r=await ethicalApi<{status:string;accepted_count:number;rejected_count:number}>(`inventory/imports/${batch.id}/commit/`,'POST',{});setMessage(`${r.status}: ${r.accepted_count} accepted, ${r.rejected_count} rejected`);await reload()}catch(error){setError((error as Error).message)}}}>Commit reconciled inventory</button></section>}<section className="workspace-section"><h2>Current private lots</h2>{lots.map(lot=><article key={lot.id}><strong>{lot.product_detail.name} {lot.product_detail.strength}</strong><p>Batch {lot.batch_number} · exp {lot.expiry_date} · {lot.available_quantity} available</p></article>)}</section>{message&&<p role="status">{message}</p>}</div>}
+function Inventory({pharmacy,lots,reload,setError}:{pharmacy:number;lots:Lot[];reload:()=>Promise<void>;setError:(v:string)=>void}){const [barcode,setBarcode]=useState('');const [product,setProduct]=useState<Product>();const [batch,setBatch]=useState<{id:number;row_count:number}>();const [message,setMessage]=useState('');async function lookup(){try{const found=await ethicalMarketplaceApi.lookupCatalogue({pharmacy,barcode});if('id' in found){setProduct(found as Product);setMessage('Reviewed private product matched.')}else setMessage('No approved product matched.')}catch(error){setError((error as Error).message)}}return <div className="workspace-stack"><section className="workspace-panel"><h2>Scan or enter a medicine barcode</h2><div className="inline-upload"><input value={barcode} onChange={e=>setBarcode(e.target.value)} placeholder="Barcode"/><button onClick={()=>void lookup()}><ScanLine size={14}/> Lookup</button></div>{product&&<p><strong>{product.name}</strong> · {product.strength} · {product.form} · {product.schedule}</p>}</section><form className="workspace-form compact" onSubmit={async e=>{e.preventDefault();const data=new FormData(e.currentTarget);data.set('pharmacy',String(pharmacy));data.set('source_rights_attested','true');try{const staged=await ethicalMarketplaceApi.uploadImport(data);setBatch({id:staged.id,row_count:staged.row_count??0});setMessage(`${staged.row_count??0} row(s) staged.`)}catch(error){setError((error as Error).message)}}}><fieldset><legend>Import inventory CSV</legend><label><span>Source name</span><input name="source_name" required/></label><label><span>CSV file</span><input name="file" type="file" accept=".csv,text/csv" required/></label></fieldset><button className="button secondary"><FileUp size={15}/> Stage CSV</button></form>{batch&&<section className="workspace-panel"><p>{batch.row_count} row(s) staged. No stock changes until commit.</p><button className="button primary" onClick={async()=>{try{const r=await ethicalMarketplaceApi.commitImport(batch.id);setMessage(`${r.status}: ${r.accepted_count} accepted, ${r.rejected_count} rejected`);await reload()}catch(error){setError((error as Error).message)}}}>Commit reconciled inventory</button></section>}<section className="workspace-section"><h2>Current private lots</h2>{lots.map(lot=><article key={lot.id}><strong>{lot.product_detail.name} {lot.product_detail.strength}</strong><p>Batch {lot.batch_number} · exp {lot.expiry_date} · {lot.available_quantity} available</p></article>)}</section>{message&&<p role="status">{message}</p>}</div>}
 
 function Composer({pharmacy,setError}:{pharmacy:number;setError:(v:string)=>void}){
  const [lots,setLots]=useState<Lot[]>([]);
@@ -135,18 +135,18 @@ function Composer({pharmacy,setError}:{pharmacy:number;setError:(v:string)=>void
  useEffect(()=>{
   let isMounted=true;
   setLots([]);
-  ethicalApi<Lot[]>(`inventory/lots/?pharmacy=${pharmacy}`)
+  ethicalMarketplaceApi.getLots({pharmacy})
    .then(data=>{if(isMounted)setLots(data);})
    .catch(error=>{if(isMounted)setError(error.message);});
   return ()=>{isMounted=false;};
  },[pharmacy,setError]);
- return <form className="workspace-form compact" onSubmit={async e=>{e.preventDefault();const data=new FormData(e.currentTarget);const lot=lots.find(row=>row.id===Number(data.get('lot')));if(!lot)return;try{await ethicalApi('listings/','POST',{pharmacy,product:lot.product,mode:String(data.get('mode')),amount:String(data.get('amount')||'0'),current_circle:'CHAIN_PHARMACIES',maximum_circle:String(data.get('maximum_circle')),scope_chain:null,lots:[{lot:lot.id,quantity:Number(data.get('quantity'))}]});setMessage('Private draft prepared. The accountable owner must publish it.')}catch(error){setError((error as Error).message)}}}><fieldset><legend>Selected stock only</legend><label className="full"><span>Reconciled lot</span><select name="lot" required><option value="">Choose lot</option>{lots.filter(row=>row.available_quantity>0).map(row=><option value={row.id} key={row.id}>{row.product_detail.name} · {row.product_detail.schedule} · batch {row.batch_number} · {row.available_quantity} available</option>)}</select></label><label><span>Quantity</span><input name="quantity" type="number" min="1" required/></label><label><span>Mode</span><select name="mode"><option value="SALE">Sale</option><option value="TRANSFER">No-charge transfer</option><option value="SWAP">Swap</option></select></label><label><span>Amount AUD</span><input name="amount" type="number" min="0" step="0.01"/></label><label><span>Maximum audience</span><select name="maximum_circle"><option value="CHAIN_PHARMACIES">Chain only</option><option value="ORGANISATION_OWNERS">Organisation owners</option><option value="PLATFORM_OWNERS">Platform owners</option></select></label></fieldset><button className="button primary"><PackagePlus size={15}/> Prepare private draft</button>{message&&<p role="status">{message}</p>}</form>;
+ return <form className="workspace-form compact" onSubmit={async e=>{e.preventDefault();const data=new FormData(e.currentTarget);const lot=lots.find(row=>row.id===Number(data.get('lot')));if(!lot)return;try{await ethicalMarketplaceApi.createListing({pharmacy,product:lot.product,mode:String(data.get('mode')),amount:String(data.get('amount')||'0'),current_circle:'CHAIN_PHARMACIES',maximum_circle:String(data.get('maximum_circle')),scope_chain:null,lots:[{lot:lot.id,quantity:Number(data.get('quantity'))}]});setMessage('Private draft prepared. The accountable owner must publish it.')}catch(error){setError((error as Error).message)}}}><fieldset><legend>Selected stock only</legend><label className="full"><span>Reconciled lot</span><select name="lot" required><option value="">Choose lot</option>{lots.filter(row=>row.available_quantity>0).map(row=><option value={row.id} key={row.id}>{row.product_detail.name} · {row.product_detail.schedule} · batch {row.batch_number} · {row.available_quantity} available</option>)}</select></label><label><span>Quantity</span><input name="quantity" type="number" min="1" required/></label><label><span>Mode</span><select name="mode"><option value="SALE">Sale</option><option value="TRANSFER">No-charge transfer</option><option value="SWAP">Swap</option></select></label><label><span>Amount AUD</span><input name="amount" type="number" min="0" step="0.01"/></label><label><span>Maximum audience</span><select name="maximum_circle"><option value="CHAIN_PHARMACIES">Chain only</option><option value="ORGANISATION_OWNERS">Organisation owners</option><option value="PLATFORM_OWNERS">Platform owners</option></select></label></fieldset><button className="button primary"><PackagePlus size={15}/> Prepare private draft</button>{message&&<p role="status">{message}</p>}</form>;
 }
 
 function Mine({rows,isOwner,reload,setError}:{rows:Listing[];isOwner:boolean;reload:()=>Promise<void>;setError:(v:string)=>void}){
  async function act(row:Listing,action:string,extra:Record<string,unknown>={}){
   try{
-   await ethicalApi(`listings/${row.id}/${action}/`,'POST',{expected_version:row.version,...extra});
+   await ethicalMarketplaceApi.actOnListing(row.id,action as 'publish'|'withdraw'|'escalation',{expected_version:row.version,...extra});
    await reload();
   }catch(error){
    setError((error as Error).message);
@@ -196,7 +196,7 @@ function Discovery({rows,destination,setError}:{rows:Listing[];destination:numbe
 function Transfers({rows,reload,setError}:{rows:Transfer[];reload:()=>Promise<void>;setError:(v:string)=>void}){
  async function act(row:Transfer,action:string){
   try{
-   await ethicalApi(`transfers/${row.id}/${action}/`,'POST',{expected_version:row.version,client_request_id:crypto.randomUUID()});
+   await ethicalMarketplaceApi.actOnTransfer(row.id,action as 'agree'|'authorise'|'dispatch'|'receive'|'cancel',{expected_version:row.version,client_request_id:crypto.randomUUID()});
    await reload();
   }catch(error){
    setError((error as Error).message);

@@ -38,6 +38,18 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
+      - name: Install Tauri Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Shared core install

@@ -18,10 +18,13 @@ const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 // Match both absolute `/api/...` routes and the relative `/<domain>/...`
 // literals used with Axios instances whose base URL already ends at `/api`.
 const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//g;
-// This digest records the reviewed legacy direct-route backlog. Strict mode
-// fails on any added, removed or changed literal, so relative Axios/fetch
-// routes cannot be introduced quietly while remaining migrations are explicit.
-const REVIEWED_BASELINE_DIGEST = '5168552e6396b6e2dff321d78580d1473f5a4c3de660b6ae02934fabcb10ee1c';
+// Generic request helpers can hide relative routes from the literal matcher.
+// Keep those escape hatches in the reviewed baseline too; new domain work must
+// add a named shared-core operation instead of extending one of these helpers.
+const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
+// This digest records the reviewed legacy route and escape-hatch backlog.
+// Strict mode fails on any added, removed or changed finding.
+const REVIEWED_BASELINE_DIGEST = 'cdcfd9591f10c670f8dcfa28188ee74b0b4379b9cf71ef06d716f166910fdc64';
 
 function walk(directory, output = []) {
   if (!fs.existsSync(directory)) return output;
@@ -41,7 +44,7 @@ for (const target of targets) {
     if (allowed.has(relative)) continue;
     const text = fs.readFileSync(file, 'utf8');
     text.split(/\r?\n/).forEach((line, index) => {
-      if (routePattern.test(line)) findings.push({ file: relative, line: index + 1, text: line.trim() });
+      if (routePattern.test(line) || escapeHatchPattern.test(line)) findings.push({ file: relative, line: index + 1, text: line.trim() });
       routePattern.lastIndex = 0;
     });
   }
@@ -61,14 +64,14 @@ if (findings.length === 0) {
   process.exit(0);
 }
 
-console.log(`Shared-core boundary audit: ${findings.length} existing direct internal API route literal(s) found.`);
+console.log(`Shared-core boundary audit: ${findings.length} reviewed direct-route or generic-request finding(s) found.`);
 for (const finding of findings) console.log(`${finding.file}:${finding.line}  ${finding.text}`);
 console.log(`\nReviewed baseline digest: ${digest}`);
 console.log('Migration rule: reuse/add the operation in @chemisttasker/shared-core before changing the client.');
 if (process.argv.includes('--strict')) {
   if (digest !== REVIEWED_BASELINE_DIGEST) {
-    console.error('Strict boundary audit failed: direct-route baseline changed. Migrate the route or review and update the baseline intentionally.');
+    console.error('Strict boundary audit failed: route or generic-request baseline changed. Migrate the call to a named shared-core operation or review the baseline intentionally.');
     process.exit(1);
   }
-  console.log('Strict boundary audit passed: no unreviewed direct-route drift.');
+  console.log('Strict boundary audit passed: no unreviewed route or generic-request drift.');
 }
