@@ -264,7 +264,28 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         received_request = factory.get("/client-profile/finance/received-invoices/")
         force_authenticate(received_request, user=self.owner)
         received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
-        self.assertEqual(received.data["count"], 0)
+        self.assertEqual(received.data["count"], 1)
+        visible = received.data["results"][0]
+        self.assertEqual(visible["version"], 1)
+        self.assertEqual(visible["current_version"], 2)
+        self.assertFalse(visible["is_current"])
+        self.assertTrue(visible["has_unsent_revision"])
+        self.assertEqual([row["version"] for row in visible["revisions"]], [1])
+
+        detail_request = factory.get(f"/client-profile/finance/received-invoices/{record.id}/")
+        force_authenticate(detail_request, user=self.owner)
+        detail = ReceivedInvoiceViewSet.as_view({"get": "retrieve"})(detail_request, pk=record.id)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["version"], 1)
+        self.assertNotIn(2, [row["version"] for row in detail.data["revisions"]])
+
+        revision_request = factory.get(f"/client-profile/finance/received-invoices/{record.id}/revisions/1/")
+        force_authenticate(revision_request, user=self.owner)
+        revision = ReceivedInvoiceViewSet.as_view({"get": "revision"})(revision_request, pk=record.id, version="1")
+        self.assertEqual(revision.status_code, 200)
+        self.assertEqual(revision.data["version"], 1)
+        self.assertTrue(revision.data["has_unsent_revision"])
+        self.assertEqual([row["version"] for row in revision.data["revisions"]], [1])
 
         legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
         force_authenticate(legacy_request, user=self.owner)
@@ -343,7 +364,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         force_authenticate(request, user=self.owner)
         response = ReceivedInvoiceViewSet.as_view({"post": "request_revision"})(request, pk=record.id)
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 400)
         revised.refresh_from_db()
         self.assertEqual(revised.review_status, "NONE")
         self.assertFalse(revised.review_requests.exists())
