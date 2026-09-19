@@ -64,9 +64,12 @@ def _minutes_between(start, end) -> int:
     anchor = datetime(2000, 1, 1)
     start_dt = datetime.combine(anchor.date(), start)
     end_dt = datetime.combine(anchor.date(), end)
+    # 00:00 is accepted as midnight at the end of the agreed work day.
+    if end.hour == 0 and end.minute == 0 and start_dt.time() != end:
+        end_dt += timedelta(days=1)
     if end_dt <= start_dt:
         raise ValidationError(
-            {"ordinary_hours_pattern": "Part-time ordinary hours must start and finish on the same calendar day."}
+            {"ordinary_hours_pattern": "Finish time must be after start time; use 00:00 for midnight."}
         )
     return int((end_dt - start_dt).total_seconds() // 60)
 
@@ -103,6 +106,10 @@ def normalise_part_time_pattern(raw_pattern) -> dict:
 
         start = _parse_hhmm(raw_day.get("start_time"), field=f"{prefix}.start_time")
         end = _parse_hhmm(raw_day.get("end_time"), field=f"{prefix}.end_time")
+        if start.hour < 7:
+            raise ValidationError(
+                {f"{prefix}.start_time": "Pharmacy Award ordinary hours cannot start before 07:00."}
+            )
         span_minutes = _minutes_between(start, end)
 
         if span_minutes > 12 * 60:
