@@ -28,6 +28,8 @@ from .award_rates import (
     resolve_award_schedule,
 )
 
+from .employment_terms import correspondence_profile, normalise_part_time_pattern
+
 from .models import (
     CoverageRequirement,
     EmploymentEngagement,
@@ -92,6 +94,7 @@ def _parse_required_datetime(value, label):
 def _serialize_engagement(row):
     membership = row.membership
     user = membership.user
+    correspondence = correspondence_profile(row.employment_type, row.pay_basis)
     return {
         "id": row.pk,
         "public_id": str(row.public_id),
@@ -111,6 +114,25 @@ def _serialize_engagement(row):
         "award_source_url": row.award_source_url,
         "award_effective_from": str(row.award_effective_from) if row.award_effective_from else None,
         "award_rate_snapshot": row.award_rate_snapshot,
+        "ordinary_hours_pattern": row.ordinary_hours_pattern,
+        "correspondence": {
+            **correspondence,
+            "employment_type": row.employment_type,
+            "pay_basis": row.pay_basis,
+            "award_code": row.award_code,
+            "award_classification": row.award_classification,
+            "award_source_label": row.award_source_label,
+            "award_source_url": row.award_source_url,
+            "ordinary_hours_pattern": row.ordinary_hours_pattern,
+            "rates": {
+                "weekday": str(row.rate_weekday),
+                "saturday": str(row.rate_saturday),
+                "sunday": str(row.rate_sunday),
+                "public_holiday": str(row.rate_public_holiday),
+                "early_morning": str(row.rate_early_morning) if row.rate_early_morning is not None else None,
+                "late_night": str(row.rate_late_night) if row.rate_late_night is not None else None,
+            },
+        },
         "rate_weekday": str(row.rate_weekday),
         "rate_saturday": str(row.rate_saturday),
         "rate_sunday": str(row.rate_sunday),
@@ -159,6 +181,18 @@ def _engagement_payload(request_data, membership, *, existing=None):
         or ""
     ).upper()
 
+    if employment_type == "PART_TIME":
+        raw_pattern = request_data.get(
+            "ordinary_hours_pattern",
+            getattr(existing, "ordinary_hours_pattern", None) if existing else None,
+        )
+        ordinary_hours_pattern = normalise_part_time_pattern(raw_pattern)
+    else:
+        ordinary_hours_pattern = {}
+
+    # Fail closed if the employment/pay combination has no correspondence profile.
+    correspondence_profile(employment_type, pay_basis)
+
     # Always resolve the Award underpinning. For above-award engagements this is
     # retained as the correspondence/minimum floor rather than discarded.
     resolved = resolve_award_schedule(
@@ -180,6 +214,7 @@ def _engagement_payload(request_data, membership, *, existing=None):
         "award_source_label": AWARD_SOURCE_LABEL,
         "award_source_url": AWARD_SOURCE_URL,
         "award_effective_from": parse_date(AWARD_EFFECTIVE_FROM),
+        "ordinary_hours_pattern": ordinary_hours_pattern,
         "notes": str(request_data.get("notes", getattr(existing, "notes", "")) or "").strip(),
     }
 
