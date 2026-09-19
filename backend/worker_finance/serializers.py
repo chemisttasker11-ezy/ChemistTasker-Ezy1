@@ -87,10 +87,28 @@ class LineInput(serializers.Serializer):
         return attrs
 
 
+class CustomerSnapshotInput(serializers.Serializer):
+    """Invoice-only bill-to snapshot. Editing it never rewrites the saved customer/pharmacy."""
+
+    name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    legal_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    abn = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    contact_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    address = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+
+    def validate_abn(self, value):
+        try:
+            return normalise_abn(value) if value.strip() else ''
+        except CalculationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+
 class InvoiceInput(serializers.Serializer):
     request_key = serializers.UUIDField()
     version = serializers.IntegerField(min_value=1, required=False)
     customer_id = serializers.IntegerField(min_value=0)
+    customer = CustomerSnapshotInput(required=False)
     source_assignment_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
