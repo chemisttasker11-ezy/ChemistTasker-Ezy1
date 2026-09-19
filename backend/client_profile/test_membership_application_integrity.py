@@ -22,6 +22,7 @@ from client_profile.models import (
     MembershipApplication,
     MembershipInviteLink,
     OtherStaffOnboarding,
+    OwnerOnboarding,
     Pharmacy,
     Shift,
     ShiftOffer,
@@ -33,7 +34,7 @@ from client_profile.serializers import (
     MembershipApplicationSerializer,
 )
 from client_profile.services import validate_internal_invoice_shifts
-from client_profile.views import ShiftOfferViewSet
+from client_profile.views import MembershipApplicationViewSet, ShiftOfferViewSet
 from client_profile.utils import finalize_shift_offer
 
 
@@ -47,7 +48,12 @@ class MembershipApplicationIntegrityTests(TestCase):
             password="test-pass",
             role="OWNER",
         )
-        self.pharmacy = Pharmacy.objects.create(name="Integrity Pharmacy")
+        self.owner_profile = OwnerOnboarding.objects.create(
+            user=self.manager,
+            phone_number="0400000000",
+            role="MANAGER",
+        )
+        self.pharmacy = Pharmacy.objects.create(name="Integrity Pharmacy", owner=self.owner_profile)
         self.staff_link = MembershipInviteLink.objects.create(
             pharmacy=self.pharmacy,
             created_by=self.manager,
@@ -136,6 +142,26 @@ class MembershipApplicationIntegrityTests(TestCase):
         self.assertEqual(updated.review_changes[0]["from"], "Pharmacist")
         self.assertEqual(updated.review_changes[0]["to"], "Senior Pharmacist")
         self.assertEqual(updated.reviewed_by_id, self.manager.id)
+
+    def test_approval_rejects_explicit_invalid_employment_type(self):
+        serializer = MembershipApplicationSerializer(data=self._payload())
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        app = serializer.save()
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            f"/client-profile/membership-applications/{app.id}/approve/",
+            {"employment_type": "CONTRACTOR"},
+            format="json",
+        )
+        force_authenticate(request, user=self.manager)
+        response = MembershipApplicationViewSet.as_view({"post": "approve"})(request, pk=app.id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("employment_type", response.data)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "PENDING")
+        self.assertFalse(Membership.objects.filter(pharmacy=self.pharmacy, user__email=app.email).exists())
 
     def test_payroll_enabled_staff_requires_award_classification(self):
         self.pharmacy.use_chemisttasker_payroll = True
