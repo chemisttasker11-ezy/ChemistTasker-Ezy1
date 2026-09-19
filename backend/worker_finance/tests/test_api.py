@@ -165,6 +165,38 @@ class FinanceApiTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ['accounts@example.invalid'])
         self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
 
+    @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
+    def test_sent_invoice_can_be_revised_and_new_revision_sent_again(self, _render):
+        record = self.create()
+        first_send = self.post(f'invoices/{record["id"]}/send/', {'version': 1, 'confirmed': True})
+        self.assertEqual(first_send.status_code, 200, first_send.data)
+
+        payload = {**self.data, 'version': 1, 'notes': 'Corrected after send'}
+        edited = self.client.patch(BASE + f'invoices/{record["id"]}/', payload, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data['version'], 2)
+        self.assertEqual(edited.data['status'], 'draft')
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
+        self.assertIsNone(edited.data['delivery_status'])
+
+        second_send = self.post(f'invoices/{record["id"]}/send/', {'version': 2, 'confirmed': True})
+        self.assertEqual(second_send.status_code, 200, second_send.data)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=2).invoice_status, 'sent')
+
+    def test_paid_invoice_can_be_corrected_and_returns_to_saved_state(self):
+        record = self.create()
+        paid = self.post(f'invoices/{record["id"]}/mark-paid/', {'version': 1})
+        self.assertEqual(paid.status_code, 200, paid.data)
+        self.assertEqual(paid.data['status'], 'paid')
+
+        payload = {**self.data, 'version': 1, 'notes': 'Corrected after payment status'}
+        edited = self.client.patch(BASE + f'invoices/{record["id"]}/', payload, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data['version'], 2)
+        self.assertEqual(edited.data['status'], 'draft')
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'paid')
+
     def test_seed_preserves_user_defaults(self):
         self.post('items/seed/', {})
         CatalogueItem.objects.filter(owner=self.user, code='TRAVEL').update(unit_price='9.00')
