@@ -208,7 +208,34 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
     pharmacy = shift.pharmacy
 
     if staff_membership:
+        membership_role = str(staff_membership.role or "").upper()
+        shift_role = str(shift.role_needed or "").upper()
+        if membership_role != shift_role:
+            raise ValidationError({
+                "role": (
+                    f"This worker is a {membership_role.replace('_', ' ').title()} member of the pharmacy "
+                    f"and cannot be directly allocated to a {shift_role.replace('_', ' ').title()} shift."
+                )
+            })
+
         payroll_enabled = bool(getattr(pharmacy, "use_chemisttasker_payroll", False))
+        engagement_public_ids = []
+        routed_occurrences = []
+        for occurrence in occurrences:
+            routed = dict(occurrence)
+            if payroll_enabled:
+                assignment_defaults = staff_assignment_defaults(
+                    user=user,
+                    pharmacy=pharmacy,
+                    work_date=occurrence["date"],
+                )
+                engagement_snapshot = assignment_defaults["engagement_terms_snapshot"]
+                engagement_public_id = engagement_snapshot.get("employment_engagement_public_id")
+                routed["employment_engagement_public_id"] = engagement_public_id
+                if engagement_public_id and engagement_public_id not in engagement_public_ids:
+                    engagement_public_ids.append(engagement_public_id)
+            routed_occurrences.append(routed)
+
         return {
             "version": 1,
             "acceptance_required": False,
@@ -221,10 +248,11 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
             "worker_id": user.id,
             "worker_name": user.get_full_name() or user.email,
             "role": shift.role_needed,
-            "occurrences": occurrences,
+            "occurrences": routed_occurrences,
+            "employment_engagement_public_ids": engagement_public_ids,
             "payroll_enabled": payroll_enabled,
             "notice": (
-                "Existing pharmacy staff employment uses the worker's dated EmploymentEngagement for ChemistTasker Payroll."
+                "Existing pharmacy staff employment uses the dated EmploymentEngagement covering each offered occurrence."
                 if payroll_enabled
                 else
                 "ChemistTasker Payroll is disabled. This shift remains available in roster, attendance and timesheets for the pharmacy's own payroll process."
