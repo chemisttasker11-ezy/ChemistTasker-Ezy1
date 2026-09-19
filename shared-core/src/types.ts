@@ -1340,9 +1340,7 @@ export interface RosterAssignmentApi {
     payment_preference_snapshot?: string | null;
     settlement_channel?: 'PAYROLL' | 'TIMESHEET_ONLY' | 'INVOICE' | string | null;
     engagement_kind?: string | null;
-    engagement_terms_snapshot?: Record<string, any> | null;
     engagement_terms_accepted_at?: string | null;
-    payroll_activated_at?: string | null;
     workforce_status?: {
         payment_preference?: string;
         settlement_channel?: 'PAYROLL' | 'TIMESHEET_ONLY' | 'INVOICE' | string;
