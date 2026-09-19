@@ -132,6 +132,8 @@ def normalise_part_time_pattern(raw_pattern) -> dict:
             anchor = datetime(2000, 1, 1)
             start_dt = datetime.combine(anchor.date(), start)
             end_dt = datetime.combine(anchor.date(), end)
+            if end.hour == 0 and end.minute == 0 and start_dt.time() != end:
+                end_dt += timedelta(days=1)
             meal_dt = datetime.combine(anchor.date(), meal_start)
             meal_end = meal_dt + timedelta(minutes=meal_minutes)
             if not (start_dt < meal_dt and meal_end < end_dt):
