@@ -312,12 +312,14 @@ export function getAdminNav({
           { segment: "attendance-reviews", title: "Attendance Approvals", icon: <CheckCircleIcon /> },
         ],
       });
+      navigation.push(
+        { segment: "dashboard/workforce/settings", title: "Workforce & Payroll", icon: <ManageAccountsSharpIcon /> },
+      );
     }
     if (canManageRoster) {
       navigation.push(
         { segment: buildPath("post-shift"), title: "Post Shift", icon: <PostAddIcon /> },
         { segment: "dashboard/workforce/timesheets", title: "Timesheets", icon: <AccessTimeIcon /> },
-        { segment: "dashboard/workforce/settings", title: "Workforce & Payroll", icon: <ManageAccountsSharpIcon /> },
         {
           segment: buildPath("shift-center"),
           title: "Shift Centre",
