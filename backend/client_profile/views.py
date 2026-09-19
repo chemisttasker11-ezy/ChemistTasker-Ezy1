@@ -2851,6 +2851,7 @@ class MagicLinkInfoView(APIView):
             'pharmacy_name': link.pharmacy.name,
             'category': link.category,
             'expires_at': link.expires_at,
+            'payroll_enabled': bool(link.pharmacy.use_chemisttasker_payroll),
         })
 
 

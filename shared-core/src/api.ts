@@ -613,6 +613,12 @@ export function getMembershipApplications(params) {
     const query = buildQuery(params);
     return fetchApi(`/client-profile/membership-applications/${query}`);
 }
+export function reviewMembershipApplication(id, data) {
+    return fetchApi(`/client-profile/membership-applications/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
 export function approveMembershipApplication(id, data) {
     return fetchApi(`/client-profile/membership-applications/${id}/approve/`, {
         method: 'POST',
@@ -1376,8 +1382,11 @@ export async function fetchMembershipApplicationsService(params) {
             : [];
     return list.map(item => mapMembershipApplication(item));
 }
+export async function reviewMembershipApplicationService(applicationId, payload) {
+    return mapMembershipApplication(await reviewMembershipApplication(applicationId, payload));
+}
 export async function approveMembershipApplicationService(applicationId, payload) {
-    await approveMembershipApplication(applicationId, payload);
+    return camelCaseKeysDeep(await approveMembershipApplication(applicationId, payload));
 }
 export async function rejectMembershipApplicationService(applicationId) {
     await rejectMembershipApplication(applicationId);

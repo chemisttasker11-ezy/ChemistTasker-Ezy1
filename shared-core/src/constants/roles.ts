@@ -42,6 +42,8 @@ export type PharmacyDTO = {
     organization?: number | { id: number; name?: string | null } | null;
     organization_id?: number | null;
     organizationId?: number | null;
+    use_chemisttasker_payroll?: boolean;
+    useChemisttaskerPayroll?: boolean;
 };
 
 export type MembershipDTO = {

@@ -139,6 +139,7 @@ export const PLATFORM_ENDPOINTS = {
     rosterValidate: '/client-profile/workforce/roster/validate/',
     rosterPublish: '/client-profile/workforce/roster/publish/',
     workSettings: '/client-profile/workforce/work-settings/',
+    payrollConfiguration: '/client-profile/workforce/payroll-configuration/',
     employmentEngagements: '/client-profile/workforce/employment-engagements/',
     employmentEngagement: (publicId: string) => `/client-profile/workforce/employment-engagements/${publicId}/`,
     employmentEngagementAwardPreview: '/client-profile/workforce/employment-engagements/award-preview/',
