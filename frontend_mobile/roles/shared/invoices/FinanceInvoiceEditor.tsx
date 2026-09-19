@@ -107,9 +107,16 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         <TextInput mode="outlined" dense label="Description" value={line.description || ''} onChangeText={description => changeLine(index, { description })} />
         <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Qty" value={line.quantity} onChangeText={text => changeLine(index, { quantity: text })} /><TextInput mode="outlined" dense style={{ flex: 1 }} label="Unit" value={line.unit || ''} onChangeText={unit => changeLine(index, { unit })} /><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Rate" value={line.unit_price} onChangeText={text => changeLine(index, { unit_price: text })} /></View>
         <TextInput mode="outlined" dense label="Discount %" keyboardType="decimal-pad" value={line.discount} onChangeText={discount => changeLine(index, { discount })} />
-        <TextInput mode="outlined" dense label="Work date (YYYY-MM-DD)" value={line.worked_on || ''} disabled={line.locked} onChangeText={worked_on => changeLine(index, { worked_on })} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>{(['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'] as const).map((tax, i) => <Chip key={tax} selected={line.tax_code === tax} disabled={line.locked} onPress={() => changeLine(index, { tax_code: tax })}>{['GST 10%', 'GST-free', 'Input taxed', 'N-T / not taxable'][i]}</Chip>)}</View>
-        <Checkbox.Item label="Include in reviewed super base" disabled={line.locked} status={line.super_eligible ? 'checked' : 'unchecked'} onPress={() => changeLine(index, { super_eligible: !line.super_eligible })} />
+        <TextInput mode="outlined" dense label="Work date (YYYY-MM-DD)" value={line.worked_on || ''} onChangeText={worked_on => changeLine(index, { worked_on })} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>{(['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'] as const).map((tax, i) => <Chip key={tax} selected={line.tax_code === tax} onPress={() => changeLine(index, { tax_code: tax })}>{['GST 10%', 'GST-free', 'Input taxed', 'N-T / not taxable'][i]}</Chip>)}</View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+          {(['ProfessionalServices', 'Transportation', 'Accommodation', 'Miscellaneous', 'Superannuation'] as FinanceCategory[]).map(category => (
+            <Chip key={category} compact selected={line.category_code === category} onPress={() => changeLine(index, { category_code: category })}>
+              {category.replace(/([A-Z])/g, ' $1').trim()}
+            </Chip>
+          ))}
+        </View>
+        <Checkbox.Item label="Include in reviewed super base" status={line.super_eligible ? 'checked' : 'unchecked'} onPress={() => changeLine(index, { super_eligible: !line.super_eligible })} />
         <Text style={{ textAlign: 'right', fontWeight: '700' }}>{preview?.lines[index] ? money(preview.lines[index].gross) : 'Pending'}</Text>
       </Surface>)}
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8 }}>
