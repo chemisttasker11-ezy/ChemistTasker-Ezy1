@@ -60,7 +60,10 @@ import type {
   RosterTemplate,
 } from './contracts/attendanceRoster';
 import type {
+  WorkforceAwardPreview,
   WorkforceCoverageRequirement,
+  WorkforceEmploymentEngagement,
+  WorkforceEmploymentEngagementWrite,
   WorkforceLeave,
   WorkforceMyHoursRow,
   WorkforceRosterWorkspace,
@@ -218,6 +221,10 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       publishRoster: <T = unknown>(body: { period_id: number; expected_revision: number; acknowledged_warning_keys: string[]; operation_id: string }) => client.post<T>(PLATFORM_ENDPOINTS.workforce.rosterPublish, body),
       listWorkSettings: (pharmacyId: number) => client.get<WorkforceWorkSettings[]>(PLATFORM_ENDPOINTS.workforce.workSettings, { pharmacy_id: pharmacyId }),
       saveWorkSettings: (body: { membership_id: number; contracted_weekly_minutes: number | null; effective_from?: string | null; work_pattern?: Record<string, unknown> }) => client.post<WorkforceWorkSettings>(PLATFORM_ENDPOINTS.workforce.workSettings, body),
+      listEmploymentEngagements: (pharmacyId: number, membershipId?: number) => client.get<WorkforceEmploymentEngagement[]>(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { pharmacy_id: pharmacyId, ...(membershipId ? { membership_id: membershipId } : {}) }),
+      previewEmploymentEngagementAward: (body: { membership_id: number; employment_type?: string; award_classification?: string }) => client.post<WorkforceAwardPreview>(PLATFORM_ENDPOINTS.workforce.employmentEngagementAwardPreview, body),
+      createEmploymentEngagement: (body: WorkforceEmploymentEngagementWrite) => client.post<WorkforceEmploymentEngagement>(PLATFORM_ENDPOINTS.workforce.employmentEngagements, body),
+      updateEmploymentEngagement: (publicId: string, body: Partial<WorkforceEmploymentEngagementWrite>) => client.patch<WorkforceEmploymentEngagement>(PLATFORM_ENDPOINTS.workforce.employmentEngagement(publicId), body),
       listCoverageRequirements: (pharmacyId: number) => client.get<WorkforceCoverageRequirement[]>(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { pharmacy_id: pharmacyId }),
       createCoverageRequirement: (body: { pharmacy_id: number; weekday: number; start_time: string; end_time: string; role: string; minimum_staff: number; active?: boolean }) => client.post<WorkforceCoverageRequirement>(PLATFORM_ENDPOINTS.workforce.coverageRequirements, body),
       deleteCoverageRequirement: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.workforce.coverageRequirement(id)),
