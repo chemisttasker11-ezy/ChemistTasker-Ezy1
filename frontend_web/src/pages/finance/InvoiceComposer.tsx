@@ -31,6 +31,18 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
   const [internalSources, setInternalSources] = useState<FinanceInternalSource[]>([]);
   const [selectedInternalSource, setSelectedInternalSource] = useState<FinanceInternalSource | null>(null);
   const customer = customerOptions.find(c => c.id === value.customer_id);
+  const snapshotCustomer = (item: FinanceCustomer) => ({
+    name: item.name, legal_name: item.legal_name, address: item.address, abn: item.abn,
+    email: item.email, contact_name: item.contact_name,
+  });
+  const invoiceCustomer = value.customer || (customer ? snapshotCustomer(customer) : undefined);
+  const changeCustomer = (key: keyof NonNullable<FinanceDraft['customer']>, next: string) => setValue(current => ({
+    ...current,
+    customer: {
+      ...(current.customer || (customer ? snapshotCustomer(customer) : { name: '', legal_name: '', address: '', abn: '', email: '', contact_name: '' })),
+      [key]: next,
+    },
+  }));
   const internalSource = initial?.source === 'internal' || Boolean(value.source_assignment_ids?.length);
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
   const changeLine = (index: number, patch: Partial<FinanceLine>) => change('lines', value.lines.map((line, i) => i === index ? { ...line, ...patch } : line));
@@ -132,9 +144,20 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: '8px' }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(300px, 380px)' }, gap: { xs: 3, md: 8 }, mb: 3 }}>
         <Stack spacing={2}>
-          <Autocomplete disabled={internalSource} options={customerOptions.filter(c => c.active)} value={customer || null} getOptionLabel={c => c.name} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => setValue(current => ({ ...current, customer_id: next?.id || 0, due_date: financeDueDate(current.invoice_date, next?.payment_terms_days ?? 14) }))} renderInput={props => <TextField {...props} label="Customer *" placeholder="Search customers or stores" />} />
+          <Autocomplete disabled={internalSource} options={customerOptions.filter(c => c.active)} value={customer || null} getOptionLabel={c => c.name} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => setValue(current => ({ ...current, customer_id: next?.id || 0, customer: next ? snapshotCustomer(next) : undefined, due_date: financeDueDate(current.invoice_date, next?.payment_terms_days ?? 14) }))} renderInput={props => <TextField {...props} label="Customer *" placeholder="Search customers or stores" />} />
           <Button disabled={internalSource} startIcon={<AddIcon />} onClick={() => setInline('customer')} sx={{ alignSelf: 'flex-start' }}>Create customer</Button>
-          <Box sx={{ minHeight: 72 }}><Typography variant="caption" color="text.secondary">Billing address</Typography><Typography variant="body2" sx={{ whiteSpace: 'pre-line', mt: .5 }}>{customer?.address || 'Select a customer to see billing details.'}</Typography>{customer?.abn && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>ABN {customer.abn}</Typography>}</Box>
+          <Box sx={{ minHeight: 72 }}><Typography variant="caption" color="text.secondary">Billing address</Typography><Typography variant="body2" sx={{ whiteSpace: 'pre-line', mt: .5 }}>{invoiceCustomer?.address || 'Select a customer to see billing details.'}</Typography>{invoiceCustomer?.abn && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>ABN {invoiceCustomer.abn}</Typography>}</Box>
+          {invoiceCustomer && <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Box><Typography variant="body2" fontWeight={700}>Invoice recipient details</Typography><Typography variant="caption" color="text.secondary">Optional overrides for this invoice only; the saved pharmacy/customer record is unchanged.</Typography></Box></AccordionSummary>
+            <AccordionDetails><Stack spacing={1.5}>
+              <TextField size="small" label="Bill-to name" value={invoiceCustomer.name} onChange={e => changeCustomer('name', e.target.value)} />
+              <TextField size="small" label="Legal name" value={invoiceCustomer.legal_name} onChange={e => changeCustomer('legal_name', e.target.value)} />
+              <TextField size="small" label="ABN" value={invoiceCustomer.abn} onChange={e => changeCustomer('abn', e.target.value)} />
+              <TextField size="small" label="Accounts contact" value={invoiceCustomer.contact_name} onChange={e => changeCustomer('contact_name', e.target.value)} />
+              <TextField size="small" type="email" label="Invoice email" value={invoiceCustomer.email} onChange={e => changeCustomer('email', e.target.value)} />
+              <TextField size="small" multiline minRows={2} label="Billing address" value={invoiceCustomer.address} onChange={e => changeCustomer('address', e.target.value)} />
+            </Stack></AccordionDetails>
+          </Accordion>}
         </Stack>
         <Box sx={grid}>
           <TextField label="Invoice number" value={initial?.number || 'Assigned when saved'} slotProps={{ input: { readOnly: true } }} />
@@ -150,7 +173,7 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
         <Typography variant="h6" sx={{ flex: 1 }}>Items & services</Typography>
         <Autocomplete sx={{ width: { xs: '100%', sm: 320 } }} options={itemOptions.filter(i => i.active)} value={selectedItem} getOptionLabel={i => i.code ? `${i.code} · ${i.name}` : i.name} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => { if (next) addItem(next); }} renderInput={props => <TextField {...props} label="Add saved item" placeholder="Search your catalogue" />} />
         <Button startIcon={<AddIcon />} onClick={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Blank row</Button>
-        <Button startIcon={<AddIcon />} onClick={() => setInline('item')}>Save new item</Button>
+        <Button startIcon={<AddIcon />} onClick={() => setInline('item')}>Add new saved item</Button>
       </Stack>
       <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(180px, 2.2fr) 1.1fr .7fr 1fr 1fr .8fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit', 'Unit price', 'Discount %', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
       {!value.lines.length && <Box sx={{ textAlign: 'center', py: 5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}><Typography fontWeight={600}>Add the work you’re billing for</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Choose a saved item, or add a free-entry row without saving a catalogue item.</Typography></Box>}
@@ -193,7 +216,7 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
         {initial.revisions.map(revision => <Stack key={revision.version} direction="row" justifyContent="space-between" gap={2}><Typography variant="body2">Revision {revision.version} · {new Date(revision.created_at).toLocaleString('en-AU')}</Typography><Typography variant="body2" color="text.secondary">{revision.invoice_status} · {dollars(revision.calculation.payable)}</Typography></Stack>)}
       </Stack>
     </Paper> : null}
-    {inline === 'customer' && <CustomerEditor onClose={() => setInline(null)} onSaved={async saved => { setCustomers(current => [...current, saved]); setValue(current => ({ ...current, customer_id: saved.id, due_date: financeDueDate(current.invoice_date, saved.payment_terms_days) })); await onSaved(); }} />}
+    {inline === 'customer' && <CustomerEditor onClose={() => setInline(null)} onSaved={async saved => { setCustomers(current => [...current, saved]); setValue(current => ({ ...current, customer_id: saved.id, customer: snapshotCustomer(saved), due_date: financeDueDate(current.invoice_date, saved.payment_terms_days) })); await onSaved(); }} />}
     {inline === 'item' && <ItemEditor onClose={() => setInline(null)} onSaved={async saved => { setItems(current => [...current, saved]); addItem(saved); await onSaved(); }} />}
   </Box>;
 }
