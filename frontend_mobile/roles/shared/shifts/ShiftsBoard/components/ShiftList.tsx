@@ -2,11 +2,11 @@
 // Complete shift cards display with exact web logic
 
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Text, Button, Chip, IconButton, Checkbox, ActivityIndicator, Icon } from 'react-native-paper';
 import { format } from 'date-fns';
-import { Shift, ShiftCounterOfferPayload } from '@chemisttasker/shared-core';
-import { CounterOfferTrack, RatePreference, ShiftSlot, SlotFilterMode } from '../types';
+import { Shift } from '@chemisttasker/shared-core';
+import { ShiftSlot } from '../types';
 import { formatDateLong, formatDateShort, formatTime } from '../utils/date';
 import { getRateSummary, getSlotRate } from '../utils/rates';
 import {
@@ -23,74 +23,7 @@ import {
     getShiftState,
     getShiftUrgent,
 } from '../utils/shift';
-
-const buildMapAddress = (shift: Shift) => {
-    const addressLine = getShiftAddress(shift);
-    const city = getShiftCity(shift);
-    const state = getShiftState(shift);
-    const parts = [addressLine, city, state].filter(Boolean);
-    if (parts.length > 0) return parts.join(', ');
-    const pharmacy = shift.pharmacyDetail as any;
-    const fallbackParts = [
-        pharmacy?.streetAddress,
-        pharmacy?.suburb,
-        pharmacy?.state,
-        pharmacy?.postcode,
-    ].filter(Boolean);
-    return fallbackParts.join(', ');
-};
-
-const openMap = (address: string) => {
-    if (!address) return;
-    const query = encodeURIComponent(address);
-    const url = Platform.select({
-        ios: `maps:0,0?q=${query}`,
-        android: `geo:0,0?q=${query}`,
-        default: `https://www.google.com/maps/search/?api=1&query=${query}`,
-    });
-    Linking.openURL(url!).catch(() => {});
-};
-
-type ShiftListProps = {
-    loading?: boolean;
-    processedShifts: Shift[];
-    clearAllFilters: () => void;
-    hideCounterOffer?: boolean;
-    onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload) => Promise<void> | void;
-    onRejectShift?: (shift: Shift) => Promise<void> | void;
-    onRejectSlot?: (shift: Shift, slotId: number) => Promise<void> | void;
-    onRejectSlots?: (shift: Shift, slotIds: number[]) => Promise<void> | void;
-    handleApplyAll: (shift: Shift) => Promise<void> | void;
-    handleApplySlot: (shift: Shift, slotId: number) => Promise<void> | void;
-    handleApplySlots: (shift: Shift, slotIds: number[]) => Promise<void> | void;
-    handleRejectShift: (shift: Shift) => Promise<void> | void;
-    handleRejectSlot: (shift: Shift, slotId: number) => Promise<void> | void;
-    handleRejectSlots: (shift: Shift, slotIds: number[]) => Promise<void> | void;
-    toggleExpandedCard: (shiftId: number) => void;
-    expandedCards: Record<number, boolean>;
-    selectedSlotIds: Record<number, Set<number>>;
-    toggleSlotSelection: (shiftId: number, slotId: number) => void;
-    clearSelection: (shiftId: number) => void;
-    appliedShiftIds: Set<number>;
-    appliedSlotIds: Set<number>;
-    rejectedShiftIds: Set<number>;
-    rejectedSlotIds: Set<number>;
-    savedShiftIds: Set<number>;
-    savedFeatureEnabled: boolean;
-    hideSaveToggle?: boolean;
-    toggleSaveShift: (shiftId: number) => void;
-    counterOffers: Record<number, CounterOfferTrack>;
-    onReviewOffers: (shiftId: number) => void;
-    openCounterOffer: (shift: Shift, selectedSlots?: Set<number>) => void;
-    rejectActionGuard?: (shift: Shift) => boolean;
-    actionDisabledGuard?: (shift: Shift) => boolean;
-    userRatePreference?: RatePreference;
-    pharmacyRatings: Record<number, { average: number; count: number }>;
-    slotFilterMode?: SlotFilterMode;
-    applyLabel?: string;
-    disableSlotActions?: boolean;
-    disableActionGuards?: boolean;
-};
+import { buildMapAddress, openMap, type ShiftListProps } from './ShiftList.model';
 
 const ShiftList: React.FC<ShiftListProps> = ({
     loading,
