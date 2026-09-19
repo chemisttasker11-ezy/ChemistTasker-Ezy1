@@ -297,7 +297,7 @@ def resolve_award_schedule(*, role: str, classification: str, employment_type: s
             raise ValidationError({"date_of_birth": "Date of birth cannot be after the engagement effective date."})
         age_at_effective_date = _age_on(date_of_birth, as_of)
         if age_at_effective_date < 21:
-            pct_key = min(age_at_effective_date, 15)
+            pct_key = 15 if age_at_effective_date < 16 else age_at_effective_date
             junior_percentage = JUNIOR_PERCENTAGES[pct_key]
             schedule, minimum_hourly_rate = _junior_schedule(
                 classification=classification_key,
