@@ -158,10 +158,21 @@ def _engagement_payload(request_data, membership, *, existing=None):
         or ""
     ).upper()
 
+    # Always resolve the Award underpinning. For above-award engagements this is
+    # retained as the correspondence/minimum floor rather than discarded.
+    resolved = resolve_award_schedule(
+        role=role,
+        classification=classification,
+        employment_type=employment_type,
+    )
+
     payload = {
         "role": role,
         "employment_type": employment_type,
-        "job_title": str(request_data.get("job_title", getattr(existing, "job_title", membership.job_title or "")) or "").strip(),
+        "job_title": str(
+            request_data.get("job_title", getattr(existing, "job_title", membership.job_title or ""))
+            or ""
+        ).strip(),
         "pay_basis": pay_basis,
         "award_code": AWARD_CODE,
         "award_classification": classification,
@@ -172,11 +183,6 @@ def _engagement_payload(request_data, membership, *, existing=None):
     }
 
     if pay_basis == EmploymentEngagement.PayBasis.AWARD:
-        resolved = resolve_award_schedule(
-            role=role,
-            classification=classification,
-            employment_type=employment_type,
-        )
         payload.update(
             award_rate_snapshot=resolved,
             rate_weekday=resolved["rate_weekday"],
@@ -188,38 +194,140 @@ def _engagement_payload(request_data, membership, *, existing=None):
             early_morning_applicable=bool(resolved["early_morning_applicable"]),
             late_night_applicable=bool(resolved["late_night_applicable"]),
         )
-    else:
-        def required_rate(key):
-            raw = request_data.get(key, getattr(existing, key, None) if existing else None)
-            if raw in (None, ""):
-                raise DjangoValidationError({key: "An agreed hourly rate is required."})
-            try:
-                value = Decimal(str(raw))
-            except Exception as exc:
-                raise DjangoValidationError({key: "Enter a valid hourly rate."}) from exc
-            if value < 0:
-                raise DjangoValidationError({key: "Rate cannot be negative."})
-            return value
+        return payload
 
-        early_applies = bool(request_data.get(
-            "early_morning_applicable",
-            getattr(existing, "early_morning_applicable", False) if existing else False,
-        ))
-        late_applies = bool(request_data.get(
-            "late_night_applicable",
-            getattr(existing, "late_night_applicable", False) if existing else False,
-        ))
-        payload.update(
-            award_rate_snapshot={},
-            rate_weekday=required_rate("rate_weekday"),
-            rate_saturday=required_rate("rate_saturday"),
-            rate_sunday=required_rate("rate_sunday"),
-            rate_public_holiday=required_rate("rate_public_holiday"),
-            rate_early_morning=required_rate("rate_early_morning") if early_applies else None,
-            rate_late_night=required_rate("rate_late_night") if late_applies else None,
-            early_morning_applicable=early_applies,
-            late_night_applicable=late_applies,
+    def required_rate(key):
+        raw = request_data.get(key, getattr(existing, key, None) if existing else None)
+        if raw in (None, ""):
+            raise DjangoValidationError({key: "An agreed hourly rate is required."})
+        try:
+            value = Decimal(str(raw))
+        except Exception as exc:
+            raise DjangoValidationError({key: "Enter a valid hourly rate."}) from exc
+        if value < 0:
+            raise DjangoValidationError({key: "Rate cannot be negative."})
+        return value
+
+    def requested_bool(key, fallback=False):
+        raw = request_data.get(key, fallback)
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str):
+            lowered = raw.strip().lower()
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "off", ""}:
+                return False
+        return bool(raw)
+
+    agreed = {
+        "rate_weekday": required_rate("rate_weekday"),
+        "rate_saturday": required_rate("rate_saturday"),
+        "rate_sunday": required_rate("rate_sunday"),
+        "rate_public_holiday": required_rate("rate_public_holiday"),
+    }
+
+    floor_by_field = {
+        "rate_weekday": Decimal(resolved["rate_weekday"]),
+        "rate_saturday": Decimal(resolved["rate_saturday"]),
+        "rate_sunday": Decimal(resolved["rate_sunday"]),
+        "rate_public_holiday": Decimal(resolved["rate_public_holiday"]),
+    }
+    for key, floor in floor_by_field.items():
+        if agreed[key] < floor:
+            raise DjangoValidationError(
+                {key: "Above-award rate cannot be below the selected Award minimum of $" + f"{floor:.2f}/hr."}
+            )
+
+    early_applies = requested_bool(
+        "early_morning_applicable",
+        getattr(existing, "early_morning_applicable", False) if existing else False,
+    )
+    late_applies = requested_bool(
+        "late_night_applicable",
+        getattr(existing, "late_night_applicable", False) if existing else False,
+    )
+    early_rate = required_rate("rate_early_morning") if early_applies else None
+    late_rate = required_rate("rate_late_night") if late_applies else None
+
+    if early_rate is not None and early_rate < Decimal(resolved["rate_early_morning"]):
+        raise DjangoValidationError(
+            {
+                "rate_early_morning": (
+                    "Above-award early-morning rate cannot be below the selected Award minimum of $"
+                    + f"{Decimal(resolved['rate_early_morning']):.2f}/hr."
+                )
+            }
         )
+    if late_rate is not None and late_rate < Decimal(resolved["rate_late_night"]):
+        raise DjangoValidationError(
+            {
+                "rate_late_night": (
+                    "Above-award late-night rate cannot be below the selected Award minimum of $"
+                    + f"{Decimal(resolved['rate_late_night']):.2f}/hr."
+                )
+            }
+        )
+
+    def max_rate(agreed_rate, award_rate):
+        return str(max(Decimal(str(agreed_rate)), Decimal(str(award_rate))).quantize(Decimal("0.01")))
+
+    # Payroll can use this ordinary-hours floor even when the written agreement
+    # only specifies summary weekday/weekend rates. It never lets an agreed
+    # above-award rate suppress a higher Award penalty window.
+    effective_ordinary_schedule = {
+        "weekday": {
+            "daytime_08_19": max_rate(agreed["rate_weekday"], resolved["schedule"]["weekday"]["daytime_08_19"]),
+            "early_07_08": max_rate(early_rate or agreed["rate_weekday"], resolved["schedule"]["weekday"]["early_07_08"]),
+            "evening_19_21": max_rate(agreed["rate_weekday"], resolved["schedule"]["weekday"]["evening_19_21"]),
+            "late_21_24": max_rate(late_rate or agreed["rate_weekday"], resolved["schedule"]["weekday"]["late_21_24"]),
+        },
+        "saturday": {
+            key: max_rate(agreed["rate_saturday"], award_rate)
+            for key, award_rate in resolved["schedule"]["saturday"].items()
+        },
+        "sunday": {
+            key: max_rate(agreed["rate_sunday"], award_rate)
+            for key, award_rate in resolved["schedule"]["sunday"].items()
+        },
+        "public_holiday": {
+            "all_day": max_rate(
+                agreed["rate_public_holiday"],
+                resolved["schedule"]["public_holiday"]["all_day"],
+            )
+        },
+    }
+
+    agreed_snapshot = {
+        **{key: str(value.quantize(Decimal("0.01"))) for key, value in agreed.items()},
+        "rate_early_morning": str(early_rate.quantize(Decimal("0.01"))) if early_rate is not None else None,
+        "rate_late_night": str(late_rate.quantize(Decimal("0.01"))) if late_rate is not None else None,
+        "early_morning_applicable": early_applies,
+        "late_night_applicable": late_applies,
+    }
+
+    payload.update(
+        award_rate_snapshot={
+            "kind": "ABOVE_AWARD",
+            "award_floor": resolved,
+            "agreed_rates": agreed_snapshot,
+            "effective_ordinary_schedule": effective_ordinary_schedule,
+            "overtime_floor": resolved["schedule"]["overtime"],
+            "note": (
+                "Agreed summary rates are checked against the Award. For penalty "
+                "windows without a separately agreed rate, payroll must use at least "
+                "the higher of the agreed summary rate and the frozen Award floor."
+            ),
+        },
+        rate_weekday=agreed["rate_weekday"],
+        rate_saturday=agreed["rate_saturday"],
+        rate_sunday=agreed["rate_sunday"],
+        rate_public_holiday=agreed["rate_public_holiday"],
+        rate_early_morning=early_rate,
+        rate_late_night=late_rate,
+        early_morning_applicable=early_applies,
+        late_night_applicable=late_applies,
+    )
     return payload
 
 
@@ -281,9 +389,30 @@ class EmploymentEngagementListCreateView(APIView):
             effective_to_raw = request.data.get("effective_to")
             effective_to = _parse_required_date(effective_to_raw, "effective_to") if effective_to_raw else None
             payload = _engagement_payload(request.data, membership)
+            supersedes_public_id = request.data.get("supersedes_public_id")
 
             with transaction.atomic():
                 Membership.objects.select_for_update().get(pk=membership.pk)
+
+                if supersedes_public_id:
+                    try:
+                        previous = EmploymentEngagement.objects.select_for_update().get(
+                            public_id=supersedes_public_id,
+                            membership=membership,
+                        )
+                    except (EmploymentEngagement.DoesNotExist, ValueError) as exc:
+                        raise DjangoValidationError(
+                            {"supersedes_public_id": "The engagement being superseded was not found for this worker."}
+                        ) from exc
+                    if effective_from <= previous.effective_from:
+                        raise DjangoValidationError(
+                            {"effective_from": "Successor engagement must start after the engagement it supersedes."}
+                        )
+                    previous.effective_to = effective_from - timedelta(days=1)
+                    previous.updated_by = request.user
+                    previous.full_clean()
+                    previous.save(update_fields=["effective_to", "updated_by", "updated_at"])
+
                 row = EmploymentEngagement(
                     membership=membership,
                     effective_from=effective_from,
@@ -294,7 +423,9 @@ class EmploymentEngagementListCreateView(APIView):
                 )
                 row.full_clean()
                 row.save()
-            row = EmploymentEngagement.objects.select_related("membership__user", "membership__pharmacy").get(pk=row.pk)
+            row = EmploymentEngagement.objects.select_related(
+                "membership__user", "membership__pharmacy"
+            ).get(pk=row.pk)
             return Response(_serialize_engagement(row), status=status.HTTP_201_CREATED)
         except DjangoPermissionDenied as exc:
             return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
@@ -314,20 +445,48 @@ class EmploymentEngagementDetailView(APIView):
                 require_manage_pharmacy(request.user, row.membership.pharmacy)
                 Membership.objects.select_for_update().get(pk=row.membership_id)
 
-                if "effective_from" in request.data:
-                    row.effective_from = _parse_required_date(request.data.get("effective_from"), "effective_from")
-                if "effective_to" in request.data:
-                    row.effective_to = (
-                        _parse_required_date(request.data.get("effective_to"), "effective_to")
-                        if request.data.get("effective_to")
-                        else None
-                    )
-                payload = _engagement_payload(request.data, row.membership, existing=row)
-                for key, value in payload.items():
-                    setattr(row, key, value)
+                started = row.effective_from <= timezone.localdate()
+                if started:
+                    allowed = {"effective_to", "notes"}
+                    forbidden = sorted(set(request.data.keys()) - allowed)
+                    if forbidden:
+                        raise DjangoValidationError(
+                            {
+                                "error": (
+                                    "An engagement that has started is payroll-historical. "
+                                    "Only its end date and notes may be changed; create a "
+                                    "successor engagement for new employment or pay terms."
+                                ),
+                                "immutable_fields": forbidden,
+                            }
+                        )
+                    if "effective_to" in request.data:
+                        row.effective_to = (
+                            _parse_required_date(request.data.get("effective_to"), "effective_to")
+                            if request.data.get("effective_to")
+                            else None
+                        )
+                    if "notes" in request.data:
+                        row.notes = str(request.data.get("notes") or "").strip()
+                else:
+                    if "effective_from" in request.data:
+                        row.effective_from = _parse_required_date(
+                            request.data.get("effective_from"), "effective_from"
+                        )
+                    if "effective_to" in request.data:
+                        row.effective_to = (
+                            _parse_required_date(request.data.get("effective_to"), "effective_to")
+                            if request.data.get("effective_to")
+                            else None
+                        )
+                    payload = _engagement_payload(request.data, row.membership, existing=row)
+                    for key, value in payload.items():
+                        setattr(row, key, value)
+
                 row.updated_by = request.user
                 row.full_clean()
                 row.save()
+
             return Response(_serialize_engagement(row))
         except EmploymentEngagement.DoesNotExist:
             return Response({"error": "Employment engagement not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -420,6 +579,9 @@ class MembershipWorkSettingsView(APIView):
                     "worker_name": membership.user.get_full_name() or membership.user.username,
                     "role": membership.role,
                     "employment_type": membership.employment_type,
+                    "employment_engagement_eligible": membership.employment_type in {"FULL_TIME", "PART_TIME", "CASUAL"},
+                    "award_classification_options": classification_options(membership.role),
+                    "default_award_classification": default_membership_classification(membership),
                     "contracted_weekly_minutes": settings.contracted_weekly_minutes if settings else None,
                     "effective_from": str(settings.effective_from) if settings and settings.effective_from else None,
                     "work_pattern": settings.work_pattern if settings else {},
