@@ -224,6 +224,7 @@ export interface WorkforceTimesheetEmploymentEngagement {
   award_source_url: string;
   award_effective_from: string | null;
   award_rate_snapshot: Record<string, unknown>;
+  adult_rate_confirmed: boolean | null;
   ordinary_hours_pattern: WorkforceOrdinaryHoursPattern | Record<string, never>;
   correspondence: Pick<WorkforceEmploymentCorrespondence, 'key' | 'label'>;
   rates: {
@@ -313,6 +314,7 @@ export interface WorkforceEmploymentEngagementWrite {
   job_title?: string;
   pay_basis: WorkforceEngagementPayBasis;
   award_classification?: string;
+  adult_rate_confirmed?: boolean;
   ordinary_hours_pattern?: {
     days: Array<{
       weekday: number;
