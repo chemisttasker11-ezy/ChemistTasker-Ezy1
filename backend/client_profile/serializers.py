@@ -5766,6 +5766,23 @@ class ShiftCounterOfferSerializer(serializers.ModelSerializer):
 class ShiftOfferSerializer(serializers.ModelSerializer):
     shift_detail = ShiftSerializer(source='shift', read_only=True)
     slot_detail = ShiftSlotSerializer(source='slot', read_only=True)
+    engagement_terms_preview = serializers.SerializerMethodField()
+
+    def get_engagement_terms_preview(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        can_view = request.user.id == obj.user_id or has_admin_capability(
+            request.user, obj.shift.pharmacy, CAPABILITY_MANAGE_ROSTER
+        )
+        if not can_view:
+            return None
+        from .engagement_routing import build_shift_engagement_terms
+        try:
+            return build_shift_engagement_terms(shift=obj.shift, user=obj.user, offer=obj)
+        except Exception as exc:
+            detail = getattr(exc, 'message_dict', None) or getattr(exc, 'detail', None) or str(exc)
+            return {'blocked': True, 'error': detail}
 
     class Meta:
         model = ShiftOffer
@@ -5781,6 +5798,12 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
             'offered_start_time',
             'offered_end_time',
             'offered_rate',
+            'engagement_terms_preview',
+            'payment_preference_snapshot',
+            'settlement_channel',
+            'engagement_kind',
+            'engagement_terms_snapshot',
+            'engagement_terms_accepted_at',
             'expires_at',
             'created_at',
             'updated_at',
@@ -5797,6 +5820,12 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
             'offered_start_time',
             'offered_end_time',
             'offered_rate',
+            'engagement_terms_preview',
+            'payment_preference_snapshot',
+            'settlement_channel',
+            'engagement_kind',
+            'engagement_terms_snapshot',
+            'engagement_terms_accepted_at',
             'expires_at',
             'created_at',
             'updated_at',
@@ -6063,6 +6092,8 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
         model = ShiftSlotAssignment
         fields = [
             "id", "slot_date", "unit_rate", "rate_reason", "is_rostered",
+            "payment_preference_snapshot", "settlement_channel", "engagement_kind",
+            "engagement_terms_accepted_at",
             "user", "slot", "shift",
             "user_detail",
             "slot_detail",

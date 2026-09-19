@@ -24,6 +24,7 @@ from client_profile.models import (
     RosterPeriod,
 )
 from client_profile.timezone_utils import get_pharmacy_timezone
+from client_profile.engagement_routing import validate_tfn_payroll_profile
 
 from .attendance_edits import append_missing_punch
 from .award_rates import (
@@ -199,6 +200,7 @@ def _engagement_payload(request_data, membership, *, effective_from=None, effect
         raise DjangoValidationError(
             {"employment_type": "Employment engagement must be FULL_TIME, PART_TIME or CASUAL."}
         )
+    validate_tfn_payroll_profile(membership.user)
 
     pay_basis = str(request_data.get("pay_basis") or getattr(existing, "pay_basis", None) or "").upper()
     if pay_basis not in {EmploymentEngagement.PayBasis.AWARD, EmploymentEngagement.PayBasis.ABOVE_AWARD}:

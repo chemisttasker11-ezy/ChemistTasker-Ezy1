@@ -6190,12 +6190,45 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         if not shift.single_user_only and slot_obj is None:
             return Response({'detail': 'Offer is missing slot selection.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        from client_profile.engagement_routing import (
+            build_shift_engagement_terms,
+            freeze_accepted_terms,
+            require_acceptance_payload,
+        )
+        try:
+            engagement_terms = build_shift_engagement_terms(shift=shift, user=offer.user, offer=offer)
+            require_acceptance_payload(terms=engagement_terms, data=request.data)
+        except DjangoValidationError as exc:
+            return Response(getattr(exc, 'message_dict', {'detail': exc.messages}), status=status.HTTP_400_BAD_REQUEST)
+
+        if engagement_terms.get("acceptance_required"):
+            accepted_terms, terms_accepted_at = freeze_accepted_terms(
+                terms=engagement_terms,
+                user=request.user,
+            )
+        else:
+            accepted_terms, terms_accepted_at = engagement_terms, None
+
         assignment_ids = []
         assignment_rates = []
         billing_state = get_billing_state_for_pharmacy(shift.pharmacy, acting_user=request.user)
         requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
 
         with transaction.atomic():
+            offer.payment_preference_snapshot = accepted_terms.get("payment_preference", "")
+            offer.settlement_channel = accepted_terms.get("settlement_channel", "")
+            offer.engagement_kind = accepted_terms.get("engagement_kind", "")
+            offer.engagement_terms_snapshot = accepted_terms
+            offer.engagement_terms_accepted_at = terms_accepted_at
+            offer.save(update_fields=[
+                "payment_preference_snapshot",
+                "settlement_channel",
+                "engagement_kind",
+                "engagement_terms_snapshot",
+                "engagement_terms_accepted_at",
+                "updated_at",
+            ])
+
             if requires_payment:
                 offer.status = ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
                 offer.save(update_fields=['status', 'updated_at'])

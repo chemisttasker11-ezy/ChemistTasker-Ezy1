@@ -233,6 +233,13 @@ def _roster_rows(user_id, period: TimesheetPeriod, tz):
             "minutes": _minutes(start, end),
             "planned_break_minutes": int(assignment.slot.planned_break_minutes or 0),
             "role": assignment.shift.role_needed,
+            "payment_preference": assignment.payment_preference_snapshot or None,
+            "settlement_channel": assignment.settlement_channel or None,
+            "engagement_kind": assignment.engagement_kind or None,
+            "engagement_terms_accepted_at": (
+                assignment.engagement_terms_accepted_at.isoformat()
+                if assignment.engagement_terms_accepted_at else None
+            ),
         })
     return rows
 
