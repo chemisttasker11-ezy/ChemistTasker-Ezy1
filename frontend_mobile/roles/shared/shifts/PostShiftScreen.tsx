@@ -61,6 +61,8 @@ import {
     normalizePrefillRole,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
+import PostShiftDetailsStep from './PostShiftDetailsStep';
+import PostShiftSkillsStep from './PostShiftSkillsStep';
 
 export default function PostShiftScreen() {
     const router = useRouter();
@@ -1090,218 +1092,6 @@ export default function PostShiftScreen() {
     const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipSelected : styles.chipUnselected];
     const chipTextStyle = (selected: boolean) => (selected ? styles.chipTextSelected : styles.chipText);
 
-    const renderDetails = () => (
-        <Surface style={styles.card} elevation={1}>
-            <Text style={styles.label}>Pharmacy</Text>
-            <Menu
-                visible={pharmacyMenuVisible}
-                onDismiss={() => setPharmacyMenuVisible(false)}
-                anchor={
-                    <TouchableOpacity style={styles.selector} onPress={() => setPharmacyMenuVisible(true)}>
-                        <Text style={styles.selectorText}>
-                            {pharmacies.find((p) => p.id === pharmacyId)?.name || 'Select pharmacy'}
-                        </Text>
-                        <IconButton icon="chevron-down" size={18} />
-                    </TouchableOpacity>
-                }
-            >
-                {pharmacies.map((p) => (
-                    <Menu.Item
-                        key={p.id}
-                        onPress={() => {
-                            setPharmacyId(p.id);
-                            setPharmacyMenuVisible(false);
-                        }}
-                        title={p.name || `Pharmacy ${p.id}`}
-                    />
-                ))}
-            </Menu>
-
-            <Text style={styles.label}>Role Needed</Text>
-            <View style={styles.pills}>
-                {ROLE_OPTIONS.map((role) => {
-                    const selected = roleNeeded === role;
-                    return (
-                        <Chip
-                            key={role}
-                            selected={selected}
-                            onPress={() => setRoleNeeded(role)}
-                            style={chipStyle(selected)}
-                            textStyle={chipTextStyle(selected)}
-                        >
-                            {role}
-                        </Chip>
-                    );
-                })}
-            </View>
-
-            <Text style={styles.label}>Employment Type</Text>
-            <View style={styles.pills}>
-                {EMPLOYMENT_TYPES.map((emp) => {
-                    const selected = employmentType === emp || (emp === 'LOCUM' && employmentType === 'CASUAL');
-                    return (
-                        <Chip
-                            key={emp}
-                            selected={selected}
-                            onPress={() => setEmploymentType(emp)}
-                            style={chipStyle(selected)}
-                            textStyle={chipTextStyle(selected)}
-                        >
-                            {getEmploymentLabel(emp)}
-                        </Chip>
-                    );
-                })}
-            </View>
-
-            <Text style={styles.label}>Description</Text>
-            <Text style={styles.templateStatus}>
-                {descriptionTemplateLoading
-                    ? 'Loading role description template...'
-                    : descriptionTemplate?.description
-                        ? 'Role description template available'
-                        : 'No role description template saved yet'}
-            </Text>
-            <View style={styles.templateActions}>
-                <Button
-                    mode="outlined"
-                    compact
-                    disabled={!descriptionTemplate?.description}
-                    onPress={handleUseDescriptionTemplate}
-                    style={styles.templateButton}
-                >
-                    Use Template
-                </Button>
-                <Button
-                    mode="contained"
-                    compact
-                    loading={descriptionTemplateSaving}
-                    disabled={descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
-                    onPress={handleSaveDescriptionTemplate}
-                    style={styles.templateButton}
-                >
-                    Save as Template
-                </Button>
-            </View>
-            <TextInput
-                mode="outlined"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={3}
-                style={styles.input}
-                placeholder="Duties, expectations, notes"
-            />
-
-            <Text style={styles.label}>Workload Tags</Text>
-            <View style={styles.pills}>
-                {WORKLOAD_TAGS.map((tag) => {
-                    const selected = workloadTags.includes(tag);
-                    return (
-                        <Chip
-                            key={tag}
-                            selected={selected}
-                            onPress={() =>
-                                setWorkloadTags((current: string[]) =>
-                                    current.includes(tag) ? current.filter((x: string) => x !== tag) : [...current, tag]
-                                )
-                            }
-                            style={chipStyle(selected)}
-                            textStyle={chipTextStyle(selected)}
-                        >
-                            {tag}
-                        </Chip>
-                    );
-                })}
-            </View>
-        </Surface>
-    );
-
-    const renderSkills = () => {
-        const roleKey = roleNeeded === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
-        const roleCatalog = (skillsCatalog as any)[roleKey] || {};
-
-        const categories = [
-            { key: 'clinical_services', title: 'Clinical Services', items: roleCatalog.clinical_services || [] },
-            { key: 'dispense_software', title: 'Dispense Software', items: roleCatalog.dispense_software || [] },
-            { key: 'expanded_scope', title: 'Expanded Scope', items: roleCatalog.expanded_scope || [] },
-        ].filter(cat => cat.items.length > 0);
-
-        return (
-            <Surface style={styles.card} elevation={1}>
-                <Text style={styles.label}>Skills</Text>
-                <View style={styles.infoAlert}>
-                    <Text style={styles.infoAlertText}>
-                        Select which skills are Required (must have to apply) or Favorable (nice to have, but not mandatory).
-                    </Text>
-                </View>
-
-                <List.AccordionGroup>
-                    {categories.map((category) => {
-                        const selectedCount = category.items.filter((s: any) => mustHave.includes(s.code) || niceToHave.includes(s.code)).length;
-                        
-                        return (
-                            <List.Accordion
-                                key={category.key}
-                                id={category.key}
-                                title={category.title}
-                                titleStyle={{ fontWeight: '700', color: '#111827' }}
-                                description={selectedCount > 0 ? `${selectedCount} selected` : undefined}
-                                descriptionStyle={{ color: PRIMARY, fontWeight: '600' }}
-                                style={styles.accordionHeader}
-                            >
-                                <View style={styles.skillGrid}>
-                                    {category.items.map((s: any) => {
-                                        const isRequired = mustHave.includes(s.code);
-                                        const isFavorable = niceToHave.includes(s.code);
-
-                                        return (
-                                            <View
-                                                key={s.code}
-                                                style={[
-                                                    styles.skillTile,
-                                                    isRequired && { backgroundColor: 'rgba(109, 40, 217, 0.06)' },
-                                                    isFavorable && { backgroundColor: 'rgba(16, 185, 129, 0.08)' }
-                                                ]}
-                                            >
-                                                <View style={styles.skillTextContainer}>
-                                                    <Text style={[styles.skillLabel, (isRequired || isFavorable) ? { fontWeight: '700' } : {}]}>{s.label}</Text>
-                                                    {s.description ? (
-                                                        <Text style={styles.skillDescription}>{s.description}</Text>
-                                                    ) : null}
-                                                </View>
-
-                                                <View style={styles.toggleGroup}>
-                                                    <TouchableOpacity
-                                                        style={[styles.toggleBtn, styles.toggleBtnLeft, isRequired && styles.toggleBtnRequiredActive]}
-                                                        onPress={() => {
-                                                            setMustHave((prev: string[]) => prev.includes(s.code) ? prev.filter(x => x !== s.code) : [...prev, s.code]);
-                                                            setNiceToHave((prev: string[]) => prev.filter(x => x !== s.code));
-                                                        }}
-                                                    >
-                                                        <Text style={[styles.toggleBtnText, isRequired && styles.toggleBtnTextActive]}>Required</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={[styles.toggleBtn, styles.toggleBtnRight, isFavorable && styles.toggleBtnFavorableActive]}
-                                                        onPress={() => {
-                                                            setNiceToHave((prev: string[]) => prev.includes(s.code) ? prev.filter(x => x !== s.code) : [...prev, s.code]);
-                                                            setMustHave((prev: string[]) => prev.filter(x => x !== s.code));
-                                                        }}
-                                                    >
-                                                        <Text style={[styles.toggleBtnText, isFavorable && styles.toggleBtnTextActive]}>Favorable</Text>
-                                                    </TouchableOpacity>
-                                                </View>
-                                            </View>
-                                        );
-                                    })}
-                                </View>
-                            </List.Accordion>
-                        );
-                    })}
-                </List.AccordionGroup>
-            </Surface>
-        );
-    };
-
     const renderVisibility = () => {
         const startIdx = allowedVis.indexOf(initialAudience as VisibilityTier);
         const upcomingTiers = startIdx > -1 ? allowedVis.slice(startIdx + 1) : allowedVis;
@@ -1932,8 +1722,40 @@ export default function PostShiftScreen() {
 
     const renderStep = (step: StepKey) => {
         switch (step) {
-            case 'details': return renderDetails();
-            case 'skills': return renderSkills();
+            case 'details':
+                return (
+                    <PostShiftDetailsStep
+                        pharmacyMenuVisible={pharmacyMenuVisible}
+                        setPharmacyMenuVisible={setPharmacyMenuVisible}
+                        pharmacies={pharmacies}
+                        pharmacyId={pharmacyId}
+                        setPharmacyId={setPharmacyId}
+                        roleNeeded={roleNeeded}
+                        setRoleNeeded={setRoleNeeded}
+                        employmentType={employmentType}
+                        setEmploymentType={setEmploymentType}
+                        getEmploymentLabel={getEmploymentLabel}
+                        descriptionTemplateLoading={descriptionTemplateLoading}
+                        descriptionTemplate={descriptionTemplate}
+                        descriptionTemplateSaving={descriptionTemplateSaving}
+                        handleUseDescriptionTemplate={handleUseDescriptionTemplate}
+                        handleSaveDescriptionTemplate={handleSaveDescriptionTemplate}
+                        description={description}
+                        setDescription={setDescription}
+                        workloadTags={workloadTags}
+                        setWorkloadTags={setWorkloadTags}
+                    />
+                );
+            case 'skills':
+                return (
+                    <PostShiftSkillsStep
+                        roleNeeded={roleNeeded}
+                        mustHave={mustHave}
+                        setMustHave={setMustHave}
+                        niceToHave={niceToHave}
+                        setNiceToHave={setNiceToHave}
+                    />
+                );
             case 'visibility': return renderVisibility();
             case 'timetable': return renderTimetable();
             case 'payrate': return renderPayRate();
