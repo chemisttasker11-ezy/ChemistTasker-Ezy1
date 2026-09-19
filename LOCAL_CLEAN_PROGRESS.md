@@ -70,4 +70,4 @@ After using the local PostgreSQL env configuration and supplied password, the di
 
 The PostgreSQL fix was a real production-path correction: invoice assignment and invoice adoption locks now clear nullable eager joins before `FOR UPDATE`, avoiding PostgreSQL's nullable-side lock error while retaining row-level concurrency protection.
 
-Generated validation output was removed after the run. The canonical `git status` is clean and only the canonical worktree remains registered.
+Generated validation output was removed after the run. The canonical `git status` is clean and only the canonical worktree remains registered. One four-file kiosk runtime cache is still present under ignored `.local-run/kiosk-runtime-cache`; Windows denied removal while the kiosk runtime held it open, so it was left intact rather than forcing a process termination.
