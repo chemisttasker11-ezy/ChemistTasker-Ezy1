@@ -400,6 +400,10 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record.last_review_note = note
             record.last_reviewed_at = timezone.now()
             record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
+            InvoiceReviewRequest.objects.filter(record=record, resolved_at__isnull=True).update(
+                resolved_at=timezone.now(),
+                resolved_by_version=record.version,
+            )
             record_revision_state(record)
             Notification.objects.create(
                 user=record.owner,
@@ -427,10 +431,14 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record.invoice.status = 'paid'
             record.invoice.save(update_fields=['status'])
             record.invoice.refresh_from_db()
-            if note:
-                record.last_review_note = note
-                record.last_reviewed_at = timezone.now()
-                record.save(update_fields=['last_review_note', 'last_reviewed_at', 'updated_at'])
+            record.review_status = 'APPROVED_FOR_PAYMENT'
+            record.last_review_note = note
+            record.last_reviewed_at = timezone.now()
+            record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
+            InvoiceReviewRequest.objects.filter(record=record, resolved_at__isnull=True).update(
+                resolved_at=timezone.now(),
+                resolved_by_version=record.version,
+            )
             record_revision_state(record)
             Notification.objects.create(
                 user=record.owner,
