@@ -46,6 +46,8 @@ const sidebarItems = [
   { label: 'Invite Staff', icon: 'account-plus', route: '/organization/invite' },
   { label: 'Pharmacies', icon: 'store', route: '/organization/pharmacies' },
   { label: 'Shifts', icon: 'calendar-month', route: '/organization/shifts' },
+  { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
+  { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
   { label: 'Post Shift', icon: 'plus-circle', route: '/organization/post-shift' },
   { label: 'Calendar', icon: 'calendar', route: '/organization/calendar' },
   { label: 'Messages', icon: 'message', route: '/organization/chat' },
