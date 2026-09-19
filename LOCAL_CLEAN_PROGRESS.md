@@ -52,7 +52,7 @@ Passed:
 
 The Vite build output was removed again after validation so generated files are not left in the canonical tree.
 
-## Final state
+## Historical state before final PR #3 reconciliation
 
 Final canonical commit: `f41e88381cb1fa9a0f59a4caeecf53a056761976`
 

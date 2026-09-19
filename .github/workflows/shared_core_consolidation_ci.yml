@@ -158,6 +158,8 @@ jobs:
         run: python backend/manage.py test client_profile.test_membership_application_integrity client_profile.test_invoice_integrity --settings=core.contract_test_settings
       - name: Workforce and finance contracts
         run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
+      - name: Isolated finance API contracts
+        run: python backend/manage.py test worker_finance.tests --settings=worker_finance.tests.settings
 
   postgres-concurrency:
     runs-on: ubuntu-latest

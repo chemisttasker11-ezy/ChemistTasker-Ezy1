@@ -1,5 +1,16 @@
 # EmploymentEngagement / Membership / Payroll Progress
 
+## Final local consolidation — 2026-09-19
+
+- Canonical project: `C:\ChemistTasker_Ezy\chemisttasker-ezy`. User authorized consolidation onto local `main` and deletion of the two merged PR branches. No GitHub push or remote merge.
+- Correction to earlier reports: `dcd7796` contained PR #2 and an earlier PR #3 checkpoint, not all final invoice work. All 27 subsequent functional commits through original `3ebb40a` have now been replayed. Git patch-equivalence confirmed every one; only the original documentation-only `8572ed9` checkpoint is superseded by this record.
+- Preserved PR #2 security/refactor changes and local PostgreSQL lock fixes. Restored invoice-only customer corrections, exact-revision owner review/audit, successful-send visibility, legacy mutation protections, mobile saved items and PDF sharing.
+- Final review also fixed saved-item defaults being overwritten by serializer defaults and invoice-list history queries bypassing prefetch. Restored the isolated finance model fixture and added its dedicated CI command so these tests actually execute.
+- Rebuilt the tracked shared-core package and refreshed all three consumer lockfile checksums. No Vite-to-Next rewrite.
+- Applied additive finance migration 0004 to rename the revision constraint, retaining the already-applied 0003 definition. Migration drift check: no changes detected.
+- Validation: PostgreSQL real-model membership/payroll/invoice/concurrency/workforce suite **42 passed**; isolated finance suite **43 passed**; other backend contracts **47 passed**; shared-core **32 passed**; browser-session tests **4 passed**. Vite typecheck/build, Next typecheck/build, mobile lint/typecheck, architecture audit and strict shared-core boundary audit passed. Kiosk source unchanged from its earlier two-test pass.
+- The following historical records do not override this checkpoint. Automated authenticated API coverage is complete for the suites above; no claim is made that every manual browser/mobile business workflow has been exercised.
+
 ## Local running project checkpoint — 2026-09-19
 
 - User confirmed the final project location: `C:\ChemistTasker_Ezy\chemisttasker-ezy`.
