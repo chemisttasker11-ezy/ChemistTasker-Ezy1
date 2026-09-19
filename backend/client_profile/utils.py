@@ -907,6 +907,12 @@ def finalize_shift_offer(offer: ShiftOffer):
                     unit_rate=rate,
                     rate_reason=reason,
                     is_rostered=True,
+                    payment_preference_snapshot=offer.payment_preference_snapshot,
+                    settlement_channel=offer.settlement_channel,
+                    engagement_kind=offer.engagement_kind,
+                    engagement_terms_snapshot=offer.engagement_terms_snapshot,
+                    engagement_terms_accepted_at=offer.engagement_terms_accepted_at,
+                    source_offer=offer,
                 )
                 assignment_ids.append(assn.id)
                 assignment_rates.append(assn.unit_rate)
