@@ -321,7 +321,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         return (
             InvoiceRecord.objects.filter(source='internal', invoice__pharmacy__in=managed)
             .filter(
-                models.Q(deliveries__isnull=False)
+                models.Q(deliveries__version=models.F('version'))
                 | models.Q(invoice__status__in=['sent', 'paid'])
                 | ~models.Q(review_status='NONE')
             )
