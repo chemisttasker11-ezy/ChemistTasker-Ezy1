@@ -294,6 +294,18 @@ class PayrollOptInRosterRoutingTests(TestCase):
         self.assertEqual(workforce["timesheet"]["worked_minutes"], 465)
         self.assertEqual(workforce["timesheet"]["reviewed_minutes"], 465)
 
+        colleague = User.objects.create_user(
+            email="colleague@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        worker_view = RosterAssignmentSerializer(
+            assignment,
+            context={"request": SimpleNamespace(user=colleague)},
+        ).data
+        self.assertIsNone(worker_view["workforce_status"])
+        self.assertNotIn("engagement_terms_snapshot", worker_view)
+
     def test_payroll_on_keeps_strict_payment_profile_and_engagement_path(self):
         self.pharmacy.use_chemisttasker_payroll = True
         self.pharmacy.save(update_fields=["use_chemisttasker_payroll"])
