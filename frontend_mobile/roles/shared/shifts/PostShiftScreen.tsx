@@ -2,14 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import {
     Text,
-    TextInput,
     Button,
     HelperText,
-    Surface,
-    IconButton,
-    Chip,
     Snackbar,
-    Checkbox,
 } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -40,8 +35,6 @@ import {
     pharmacyHoursForDate,
     toIsoDate,
     toLocalIsoDate,
-    formatAuDate,
-    formatLongSlotDate,
     normalizePrefillRole,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
