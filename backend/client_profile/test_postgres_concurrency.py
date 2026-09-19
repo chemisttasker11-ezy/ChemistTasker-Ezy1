@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from queue import Queue
 from threading import Barrier, Thread
 from unittest import skipUnless
@@ -46,7 +46,7 @@ class MembershipApplicationPostgresConcurrencyTests(TransactionTestCase):
             pharmacy=self.pharmacy,
             created_by=self.manager,
             category="FULL_PART_TIME",
-            expires_at=timezone.now() + timezone.timedelta(days=7),
+            expires_at=timezone.now() + timedelta(days=7),
         )
 
     def _payload(self):
