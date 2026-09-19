@@ -136,19 +136,14 @@ def normalise_part_time_pattern(raw_pattern) -> dict:
                 {f"{prefix}.meal_break_start": "Meal break start must be blank when duration is 0."}
             )
 
-        # Award clause 15 requires an unpaid 30–60 minute meal break when the
-        # employee works more than five hours on a day. For 7.6+ hours, it must
-        # start within the first five hours but not before 2.5 hours.
+        # Award clause 15 uses paid hours worked (the meal break itself is
+        # unpaid) to determine the break entitlement.
         worked_minutes = span_minutes - meal_minutes
-        if span_minutes > 5 * 60 and not meal_minutes:
+        if worked_minutes > 5 * 60 and not meal_minutes:
             raise ValidationError(
-                {f"{prefix}.meal_break_minutes": "A 30–60 minute meal break is required for a day longer than 5 hours."}
+                {f"{prefix}.meal_break_minutes": "A 30–60 minute meal break is required when paid work exceeds 5 hours."}
             )
-        if meal_minutes and span_minutes <= 5 * 60:
-            raise ValidationError(
-                {f"{prefix}.meal_break_minutes": "An unpaid meal break is not required for an agreed span of 5 hours or less."}
-            )
-        if span_minutes >= 456 and meal_start is not None:
+        if worked_minutes >= 456 and meal_start is not None:
             anchor = datetime(2000, 1, 1)
             offset = int(
                 (
