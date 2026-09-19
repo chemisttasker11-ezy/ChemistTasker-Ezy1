@@ -1,3 +1,4 @@
+import type { WorkforceEmploymentEngagementWrite } from '@chemisttasker/shared-core';
 import { chemistTaskerApi } from '../../config/api';
 
 const workforce = chemistTaskerApi.workforce;
@@ -31,5 +32,5 @@ export const decideWorkforceLeave = (id: number, decision: 'APPROVED' | 'REJECTE
 
 export const listEmploymentEngagements = (pharmacyId: number, membershipId?: number) => workforce.listEmploymentEngagements(pharmacyId, membershipId);
 export const previewEmploymentEngagementAward = (payload: { membership_id: number; employment_type?: string; award_classification?: string }) => workforce.previewEmploymentEngagementAward(payload);
-export const createEmploymentEngagement = (payload: any) => workforce.createEmploymentEngagement(payload);
-export const updateEmploymentEngagement = (publicId: string, payload: any) => workforce.updateEmploymentEngagement(publicId, payload);
+export const createEmploymentEngagement = (payload: WorkforceEmploymentEngagementWrite) => workforce.createEmploymentEngagement(payload);
+export const updateEmploymentEngagement = (publicId: string, payload: Partial<WorkforceEmploymentEngagementWrite>) => workforce.updateEmploymentEngagement(publicId, payload);
