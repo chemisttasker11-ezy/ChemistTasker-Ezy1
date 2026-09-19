@@ -52,6 +52,18 @@ Passed:
 
 The Vite build output was removed again after validation so generated files are not left in the canonical tree.
 
-## Next required action
+## Final state
 
-Run the complete final validation matrix once more from this canonical tree after committing the current Post Shift extraction. The final report must include the canonical commit SHA, clean `git status`, remaining worktrees, remaining meaningful cleanup targets, and any PostgreSQL credential limitation.
+Final canonical commit: `f41e88381cb1fa9a0f59a4caeecf53a056761976`
+
+Final validation was rerun from this canonical tree after the Post Shift extraction:
+
+- Backend checks, migration drift check, and 90 tests passed with 28 skipped.
+- Shared-core typecheck, 32 tests, and build passed.
+- Vite TypeScript check passed.
+- Next typecheck and production build passed.
+- Mobile lint and TypeScript passed against the current shared-core source package.
+- Kiosk Rust tests passed: 2 passed.
+- Strict shared-core boundary and architecture audits passed.
+
+Generated validation output was removed after the run. The canonical `git status` is clean and only the canonical worktree remains registered.
