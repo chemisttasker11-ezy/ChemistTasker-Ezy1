@@ -9173,18 +9173,19 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
         if invoice.user_id == user.id:
             finance_record = getattr(invoice, "finance_record", None)
             if finance_record is not None:
-                if requested_fields == {"status"} and self.request.data.get("status") in {"sent", "paid"}:
-                    serializer.save(status=self.request.data.get("status"))
-                    from worker_finance.services import record_revision_state
-                    finance_record.invoice.refresh_from_db()
-                    record_revision_state(finance_record)
-                    return
                 raise PermissionDenied(
                     "This invoice is managed by the new Invoices & finances workspace. "
-                    "Edit and save it there so revision history is preserved."
+                    "Use its Save, Send/Resend and Mark paid actions so revision and delivery history are preserved."
                 )
             serializer.save()
             return
+
+        finance_record = getattr(invoice, "finance_record", None)
+        if finance_record is not None:
+            raise PermissionDenied(
+                "This invoice is managed by the Received invoices workspace. "
+                "Use Approve, Request revision or Mark paid there so the decision is bound to the correct revision."
+            )
 
         if requested_fields != {"status"}:
             raise PermissionDenied("Received invoices can only have their payment status updated.")
@@ -9384,6 +9385,11 @@ def report_invoice_issue(request, invoice_id):
     invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
     if invoice.user_id == request.user.id:
         return Response({"detail": "You cannot report an issue on your own invoice."}, status=400)
+    if getattr(invoice, "finance_record", None) is not None:
+        raise PermissionDenied(
+            "This invoice is managed by the Received invoices workspace. "
+            "Use Request revision with a note so the request is attached to the exact invoice revision."
+        )
 
     reporter_name = (
         f"{getattr(request.user, 'first_name', '')} {getattr(request.user, 'last_name', '')}".strip()
