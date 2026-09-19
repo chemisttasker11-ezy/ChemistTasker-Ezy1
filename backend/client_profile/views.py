@@ -9159,7 +9159,8 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
         requested_fields = set(self.request.data.keys())
 
         if invoice.user_id == user.id:
-            if invoice.status == "draft":
+            finance_record = getattr(invoice, "finance_record", None)
+            if invoice.status == "draft" and not getattr(finance_record, "locked_at", None):
                 serializer.save()
                 return
             if requested_fields == {"status"} and self.request.data.get("status") in {"sent", "paid"}:
@@ -9179,7 +9180,8 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         if instance.user_id != self.request.user.id:
             raise PermissionDenied("Only the invoice issuer can delete this invoice.")
-        if instance.status != "draft":
+        finance_record = getattr(instance, "finance_record", None)
+        if instance.status != "draft" or getattr(finance_record, "locked_at", None):
             raise PermissionDenied("Issued invoices cannot be deleted. Preserve the issued snapshot.")
         instance.delete()
 
