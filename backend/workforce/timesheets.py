@@ -24,6 +24,7 @@ from client_profile.models import (
 from client_profile.roster_validation import work_interval
 from client_profile.timezone_utils import get_pharmacy_timezone
 
+from .employment_terms import correspondence_profile
 from .models import (
     EmploymentEngagement,
     MembershipWorkSettings,
@@ -123,6 +124,7 @@ def _employment_engagements_for_period(membership, period: TimesheetPeriod):
 
 
 def _serialize_pay_engagement(row: EmploymentEngagement):
+    correspondence = correspondence_profile(row.employment_type, row.pay_basis)
     return {
         "public_id": str(row.public_id),
         "membership_id": row.membership_id,
@@ -138,6 +140,8 @@ def _serialize_pay_engagement(row: EmploymentEngagement):
         "award_source_url": row.award_source_url,
         "award_effective_from": str(row.award_effective_from) if row.award_effective_from else None,
         "award_rate_snapshot": row.award_rate_snapshot,
+        "ordinary_hours_pattern": row.ordinary_hours_pattern,
+        "correspondence": correspondence,
         "rates": {
             "weekday": str(row.rate_weekday),
             "saturday": str(row.rate_saturday),
