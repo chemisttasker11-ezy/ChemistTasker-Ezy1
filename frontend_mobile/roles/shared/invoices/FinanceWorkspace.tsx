@@ -70,9 +70,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: {}, save: async fields => {
       const note = fields.note.trim();
       if (kind === 'revise' && !note) throw new Error('Add a revision note for the contractor.');
-      if (kind === 'revise') return finance.requestRevision(invoice.id, note);
-      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, note);
-      return finance.approveForPayment(invoice.id, note);
+      if (kind === 'revise') return finance.requestRevision(invoice.id, invoice.version, note);
+      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, invoice.version, note);
+      return finance.approveForPayment(invoice.id, invoice.version, note);
     }});
   };
   const closeForm = () => { if (!busy) Alert.alert('Discard changes?', 'Unsaved changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => setForm(null) }]); };
