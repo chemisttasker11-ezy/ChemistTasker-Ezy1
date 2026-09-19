@@ -273,7 +273,12 @@ def save_draft(owner, data, record_id=None, source='external'):
     if record_id is not None:
         record = get_object_or_404(InvoiceRecord.objects.select_for_update(), pk=record_id, owner=owner)
         check_version(record, data.get('version'))
-        if record.locked_at or record.voided_at or record.kind != 'invoice':
+        if (
+            record.locked_at
+            or record.voided_at
+            or record.kind != 'invoice'
+            or record.invoice.status != 'draft'
+        ):
             raise ValidationError('Only unissued service-invoice drafts can be edited.')
         if str(record.request_key) != str(data['request_key']):
             raise ValidationError('The draft request key cannot change.')
