@@ -145,6 +145,22 @@ class EmploymentEngagement(models.Model):
         super().clean()
         if self.membership_id and not self.membership.pharmacy_id:
             raise ValidationError("Employment engagement requires a pharmacy membership.")
+        if self.membership_id and self.role and self.role != self.membership.role:
+            raise ValidationError({"role": "Engagement role must match the membership role."})
+
+        from .employment_terms import normalise_part_time_pattern
+
+        if self.employment_type == "PART_TIME":
+            self.ordinary_hours_pattern = normalise_part_time_pattern(self.ordinary_hours_pattern)
+        elif self.employment_type in {"FULL_TIME", "CASUAL"}:
+            if self.ordinary_hours_pattern:
+                raise ValidationError(
+                    {"ordinary_hours_pattern": "Ordinary-hours patterns are stored only for part-time engagements."}
+                )
+        else:
+            raise ValidationError(
+                {"employment_type": "Employment engagement must be FULL_TIME, PART_TIME or CASUAL."}
+            )
         if self.effective_to and self.effective_to < self.effective_from:
             raise ValidationError({"effective_to": "Must be on or after effective_from."})
         for field in ("rate_weekday", "rate_saturday", "rate_sunday", "rate_public_holiday"):
