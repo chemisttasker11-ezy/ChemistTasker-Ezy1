@@ -22,7 +22,7 @@ from client_profile.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
 from client_profile.views import InvoiceDetailView, send_invoice_email
 from worker_finance.views import ReceivedInvoiceViewSet
-from worker_finance.models import CatalogueItem, Delivery, InvoiceRevision
+from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision
 from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record
 
 
@@ -141,8 +141,11 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(serialize_record(record)["source_snapshot"], invoice.source_snapshot)
 
     def test_internal_prefill_uses_pharmacy_shift_and_worker_onboarding_without_saving_invoice(self):
+        self.assertEqual(Customer.objects.count(), 0)
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
 
+        self.assertEqual(Customer.objects.count(), 0)
+        self.assertEqual(draft["customer_id"], 0)
         self.assertEqual(draft["source_assignment_ids"], [self.assignment.id])
         self.assertEqual(draft["customer"]["name"], self.pharmacy.name)
         self.assertEqual(draft["customer"]["abn"], self.pharmacy.abn)
@@ -155,6 +158,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(InvoiceRevision.objects.count(), 0)
 
         record = save_draft(self.worker, draft)
+        self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(record.source, "internal")
         self.assertEqual(record.version, 1)
         self.assertEqual(record.invoice.pharmacy_id, self.pharmacy.id)
