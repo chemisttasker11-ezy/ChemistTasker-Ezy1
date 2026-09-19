@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from datetime import datetime, timedelta
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
@@ -17,9 +18,19 @@ from client_profile.models import AttendanceSession, Membership, Pharmacy, Roste
 from client_profile.timezone_utils import get_pharmacy_timezone
 
 from .attendance_edits import append_missing_punch
+from .award_rates import (
+    AWARD_CODE,
+    AWARD_EFFECTIVE_FROM,
+    AWARD_SOURCE_LABEL,
+    AWARD_SOURCE_URL,
+    classification_options,
+    default_membership_classification,
+    resolve_award_schedule,
+)
 
 from .models import (
     CoverageRequirement,
+    EmploymentEngagement,
     MembershipWorkSettings,
     Timesheet,
     TimesheetCheck,
@@ -76,6 +87,254 @@ def _parse_required_datetime(value, label):
     if timezone.is_naive(parsed):
         raise DjangoValidationError(f"{label} must include a timezone offset.")
     return parsed
+
+
+def _serialize_engagement(row):
+    membership = row.membership
+    user = membership.user
+    return {
+        "id": row.pk,
+        "public_id": str(row.public_id),
+        "membership_id": membership.pk,
+        "pharmacy_id": membership.pharmacy_id,
+        "worker_id": membership.user_id,
+        "worker_name": user.get_full_name() or user.email,
+        "role": row.role,
+        "employment_type": row.employment_type,
+        "job_title": row.job_title,
+        "effective_from": str(row.effective_from),
+        "effective_to": str(row.effective_to) if row.effective_to else None,
+        "pay_basis": row.pay_basis,
+        "award_code": row.award_code,
+        "award_classification": row.award_classification,
+        "award_source_label": row.award_source_label,
+        "award_source_url": row.award_source_url,
+        "award_effective_from": str(row.award_effective_from) if row.award_effective_from else None,
+        "award_rate_snapshot": row.award_rate_snapshot,
+        "rate_weekday": str(row.rate_weekday),
+        "rate_saturday": str(row.rate_saturday),
+        "rate_sunday": str(row.rate_sunday),
+        "rate_public_holiday": str(row.rate_public_holiday),
+        "rate_early_morning": str(row.rate_early_morning) if row.rate_early_morning is not None else None,
+        "rate_late_night": str(row.rate_late_night) if row.rate_late_night is not None else None,
+        "early_morning_applicable": row.early_morning_applicable,
+        "late_night_applicable": row.late_night_applicable,
+        "notes": row.notes,
+        "created_at": row.created_at.isoformat(),
+        "updated_at": row.updated_at.isoformat(),
+    }
+
+
+def _engagement_membership(pk):
+    try:
+        return Membership.objects.select_related("pharmacy", "user").get(pk=int(pk))
+    except (Membership.DoesNotExist, TypeError, ValueError):
+        raise DjangoValidationError({"membership_id": "Valid membership_id is required."})
+
+
+def _engagement_payload(request_data, membership, *, existing=None):
+    role = str(request_data.get("role") or getattr(existing, "role", None) or membership.role or "").upper()
+    employment_type = str(
+        request_data.get("employment_type")
+        or getattr(existing, "employment_type", None)
+        or membership.employment_type
+        or ""
+    ).upper()
+    if role != str(membership.role or "").upper():
+        raise DjangoValidationError({"role": "Engagement role must match the membership role."})
+    if employment_type not in {"FULL_TIME", "PART_TIME", "CASUAL"}:
+        raise DjangoValidationError(
+            {"employment_type": "Employment engagement must be FULL_TIME, PART_TIME or CASUAL."}
+        )
+
+    pay_basis = str(request_data.get("pay_basis") or getattr(existing, "pay_basis", None) or "").upper()
+    if pay_basis not in {EmploymentEngagement.PayBasis.AWARD, EmploymentEngagement.PayBasis.ABOVE_AWARD}:
+        raise DjangoValidationError({"pay_basis": "Choose AWARD or ABOVE_AWARD."})
+
+    classification = str(
+        request_data.get("award_classification")
+        or getattr(existing, "award_classification", None)
+        or default_membership_classification(membership)
+        or ""
+    ).upper()
+
+    payload = {
+        "role": role,
+        "employment_type": employment_type,
+        "job_title": str(request_data.get("job_title", getattr(existing, "job_title", membership.job_title or "")) or "").strip(),
+        "pay_basis": pay_basis,
+        "award_code": AWARD_CODE,
+        "award_classification": classification,
+        "award_source_label": AWARD_SOURCE_LABEL,
+        "award_source_url": AWARD_SOURCE_URL,
+        "award_effective_from": parse_date(AWARD_EFFECTIVE_FROM),
+        "notes": str(request_data.get("notes", getattr(existing, "notes", "")) or "").strip(),
+    }
+
+    if pay_basis == EmploymentEngagement.PayBasis.AWARD:
+        resolved = resolve_award_schedule(
+            role=role,
+            classification=classification,
+            employment_type=employment_type,
+        )
+        payload.update(
+            award_rate_snapshot=resolved,
+            rate_weekday=resolved["rate_weekday"],
+            rate_saturday=resolved["rate_saturday"],
+            rate_sunday=resolved["rate_sunday"],
+            rate_public_holiday=resolved["rate_public_holiday"],
+            rate_early_morning=resolved["rate_early_morning"],
+            rate_late_night=resolved["rate_late_night"],
+            early_morning_applicable=bool(resolved["early_morning_applicable"]),
+            late_night_applicable=bool(resolved["late_night_applicable"]),
+        )
+    else:
+        def required_rate(key):
+            raw = request_data.get(key, getattr(existing, key, None) if existing else None)
+            if raw in (None, ""):
+                raise DjangoValidationError({key: "An agreed hourly rate is required."})
+            try:
+                value = Decimal(str(raw))
+            except Exception as exc:
+                raise DjangoValidationError({key: "Enter a valid hourly rate."}) from exc
+            if value < 0:
+                raise DjangoValidationError({key: "Rate cannot be negative."})
+            return value
+
+        early_applies = bool(request_data.get(
+            "early_morning_applicable",
+            getattr(existing, "early_morning_applicable", False) if existing else False,
+        ))
+        late_applies = bool(request_data.get(
+            "late_night_applicable",
+            getattr(existing, "late_night_applicable", False) if existing else False,
+        ))
+        payload.update(
+            award_rate_snapshot={},
+            rate_weekday=required_rate("rate_weekday"),
+            rate_saturday=required_rate("rate_saturday"),
+            rate_sunday=required_rate("rate_sunday"),
+            rate_public_holiday=required_rate("rate_public_holiday"),
+            rate_early_morning=required_rate("rate_early_morning") if early_applies else None,
+            rate_late_night=required_rate("rate_late_night") if late_applies else None,
+            early_morning_applicable=early_applies,
+            late_night_applicable=late_applies,
+        )
+    return payload
+
+
+class EmploymentEngagementAwardPreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            membership = _engagement_membership(request.data.get("membership_id"))
+            require_manage_pharmacy(request.user, membership.pharmacy)
+            role = str(membership.role or "").upper()
+            employment_type = str(request.data.get("employment_type") or membership.employment_type or "").upper()
+            classification = str(
+                request.data.get("award_classification")
+                or default_membership_classification(membership)
+                or ""
+            ).upper()
+            resolved = resolve_award_schedule(
+                role=role,
+                classification=classification,
+                employment_type=employment_type,
+            )
+            return Response({
+                **resolved,
+                "classification_options": classification_options(role),
+                "default_classification": default_membership_classification(membership),
+            })
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+
+
+class EmploymentEngagementListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            pharmacy = _pharmacy(request.query_params.get("pharmacy_id"))
+            require_manage_pharmacy(request.user, pharmacy)
+            qs = EmploymentEngagement.objects.filter(
+                membership__pharmacy=pharmacy
+            ).select_related("membership__user", "membership__pharmacy")
+            membership_id = request.query_params.get("membership_id")
+            if membership_id:
+                qs = qs.filter(membership_id=membership_id)
+            rows = [_serialize_engagement(row) for row in qs.order_by("membership_id", "-effective_from")]
+            return Response(rows)
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+
+    def post(self, request):
+        try:
+            membership = _engagement_membership(request.data.get("membership_id"))
+            require_manage_pharmacy(request.user, membership.pharmacy)
+            effective_from = _parse_required_date(request.data.get("effective_from"), "effective_from")
+            effective_to_raw = request.data.get("effective_to")
+            effective_to = _parse_required_date(effective_to_raw, "effective_to") if effective_to_raw else None
+            payload = _engagement_payload(request.data, membership)
+
+            with transaction.atomic():
+                Membership.objects.select_for_update().get(pk=membership.pk)
+                row = EmploymentEngagement(
+                    membership=membership,
+                    effective_from=effective_from,
+                    effective_to=effective_to,
+                    created_by=request.user,
+                    updated_by=request.user,
+                    **payload,
+                )
+                row.full_clean()
+                row.save()
+            row = EmploymentEngagement.objects.select_related("membership__user", "membership__pharmacy").get(pk=row.pk)
+            return Response(_serialize_engagement(row), status=status.HTTP_201_CREATED)
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+
+
+class EmploymentEngagementDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, public_id):
+        try:
+            with transaction.atomic():
+                row = EmploymentEngagement.objects.select_for_update().select_related(
+                    "membership__pharmacy", "membership__user"
+                ).get(public_id=public_id)
+                require_manage_pharmacy(request.user, row.membership.pharmacy)
+                Membership.objects.select_for_update().get(pk=row.membership_id)
+
+                if "effective_from" in request.data:
+                    row.effective_from = _parse_required_date(request.data.get("effective_from"), "effective_from")
+                if "effective_to" in request.data:
+                    row.effective_to = (
+                        _parse_required_date(request.data.get("effective_to"), "effective_to")
+                        if request.data.get("effective_to")
+                        else None
+                    )
+                payload = _engagement_payload(request.data, row.membership, existing=row)
+                for key, value in payload.items():
+                    setattr(row, key, value)
+                row.updated_by = request.user
+                row.full_clean()
+                row.save()
+            return Response(_serialize_engagement(row))
+        except EmploymentEngagement.DoesNotExist:
+            return Response({"error": "Employment engagement not found."}, status=status.HTTP_404_NOT_FOUND)
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
 
 
 class RosterWorkspaceView(APIView):
