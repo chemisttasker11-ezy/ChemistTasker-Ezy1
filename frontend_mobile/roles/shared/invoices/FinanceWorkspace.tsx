@@ -36,14 +36,17 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   }, [receivedMode]);
   useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
-  const sharePdf = async (invoice: FinanceInvoice, received = false) => {
+  const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
-    const blob = received ? await finance.receivedPdf(invoice.id) : await finance.pdf(invoice.id);
-    const file = new File(Paths.cache, invoice.number + '-revision-' + invoice.version + '.pdf');
+    const targetVersion = version ?? invoice.version;
+    const blob = version == null
+      ? (received ? await finance.receivedPdf(invoice.id) : await finance.pdf(invoice.id))
+      : (received ? await finance.receivedRevisionPdf(invoice.id, version) : await finance.invoiceRevisionPdf(invoice.id, version));
+    const file = new File(Paths.cache, invoice.number + '-revision-' + targetVersion + '.pdf');
     file.create({ overwrite: true });
     file.write(new Uint8Array(await blob.arrayBuffer()));
     await Sharing.shareAsync(file.uri, {
-      dialogTitle: 'Share ' + invoice.number,
+      dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
       mimeType: 'application/pdf',
       UTI: 'com.adobe.pdf',
     });
@@ -118,12 +121,20 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
             <Text>{receivedMode ? selected.payload.issuer_name : selected.payload.customer?.name}</Text>
             <Text variant="headlineMedium">{money(selected.calculation.payable)}</Text>
             <Text>Revision {selected.version} · GST {money(selected.calculation.gst)}</Text>
+            {selected.has_unsent_revision ? <Surface elevation={0} style={[panel, { backgroundColor: theme.colors.surfaceVariant }]}><Text variant="bodyMedium" style={{ fontWeight: '700' }}>Last delivered revision</Text><Text variant="bodySmall">The contractor has saved a newer revision but has not sent it yet. This delivered version stays available read-only until the replacement is sent.</Text></Surface> : null}
             {selected.payload.lines.map((line, i) => <List.Item key={i} title={line.description} description={line.quantity + ' ' + (line.unit || '') + ' × ' + money(line.unit_price)} />)}
+            {!!selected.revisions?.length && <Surface elevation={0} style={panel}>
+              <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: 8 }}>Revision history</Text>
+              {selected.revisions.map(revision => <View key={revision.version} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+                <View style={{ flex: 1 }}><Text>Revision {revision.version}</Text><Text variant="bodySmall">{revision.invoice_status.replaceAll('_', ' ')} · {money(revision.calculation.payable)}</Text></View>
+                <Button compact disabled={busy} onPress={() => void run(() => sharePdf(selected, receivedMode, revision.version))}>Share PDF</Button>
+              </View>)}
+            </Surface>}
             {receivedMode ? <View style={{ gap: 8 }}>
-              <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, true))}>Share PDF</Button>
-              <Button mode="contained" onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
-              <Button mode="outlined" textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
-              <Button mode="outlined" disabled={selected.status === 'paid'} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+              <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, true))}>Share delivered PDF</Button>
+              <Button mode="contained" disabled={selected.is_current === false} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
+              <Button mode="outlined" disabled={selected.is_current === false} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
+              <Button mode="outlined" disabled={selected.is_current === false || selected.status === 'paid'} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
             </View> : <>
               <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit invoice</Button>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected))}>Share PDF</Button>

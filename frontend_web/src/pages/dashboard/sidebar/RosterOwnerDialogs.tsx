@@ -32,6 +32,7 @@ import type {
 } from '@chemisttasker/shared-core';
 import { BRAND_COLORS, BRAND_FONTS } from '../../../constants/brandTheme';
 import PostShiftPage from './PostShiftPage';
+import RosterWorkforceSummary from '../../../components/roster/RosterWorkforceSummary';
 import {
   getVisibilityLabel,
   LEAVE_TYPES_MAP,
@@ -92,6 +93,8 @@ type AssignmentOptionsDialogProps = {
   setEscalationLevel: Setter<string>;
   setIsEscalateDialogOpen: Setter<boolean>;
   handleDeleteAssignment: () => void | Promise<void>;
+  onOpenTimesheets: () => void;
+  onOpenWorkforce: () => void;
 };
 
 type DuplicateDialogProps = {
@@ -219,6 +222,8 @@ export default function RosterOwnerDialogs({
     setEscalationLevel,
     setIsEscalateDialogOpen,
     handleDeleteAssignment,
+    onOpenTimesheets,
+    onOpenWorkforce,
   } = assignmentOptions;
 
   const {
@@ -371,6 +376,19 @@ export default function RosterOwnerDialogs({
                   <ListItem><Chip label="LEAVE APPROVED" color="error" size="small" /></ListItem>
                 }
             </List>}
+            {selectedAssignment && !selectedAssignment.isOpenShift && (
+              <RosterWorkforceSummary
+                assignment={selectedAssignment}
+                onOpenTimesheets={() => {
+                  setIsOptionsDialogOpen(false);
+                  onOpenTimesheets();
+                }}
+                onOpenWorkforce={() => {
+                  setIsOptionsDialogOpen(false);
+                  onOpenWorkforce();
+                }}
+              />
+            )}
         </DialogContent>
         <DialogActions sx={{ flexDirection: 'column', alignItems: 'stretch', p: 2, gap: 1}}>
             <Button

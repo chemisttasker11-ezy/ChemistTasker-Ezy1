@@ -142,6 +142,8 @@ export function getOrganizationNav(hasUnreadMessages: boolean): Navigation {
       ],
     },
     { segment: 'dashboard/organization/post-shift', title: 'Post Shift', icon: <PostAddIcon /> },
+    { segment: 'dashboard/workforce/timesheets', title: 'Timesheets', icon: <AccessTimeIcon /> },
+    { segment: 'dashboard/workforce/settings', title: 'Workforce & Payroll', icon: <ManageAccountsSharpIcon /> },
     {
       segment: 'dashboard/organization/shift-center',
       title: 'Shift Centre',
@@ -200,6 +202,8 @@ export function getOwnerNav(progressPercent: number, hasUnreadMessages: boolean)
       ],
     },
     { segment: "dashboard/owner/post-shift", title: "Post Shift", icon: <PostAddIcon /> },
+    { segment: "dashboard/workforce/timesheets", title: "Timesheets", icon: <AccessTimeIcon /> },
+    { segment: "dashboard/workforce/settings", title: "Workforce & Payroll", icon: <ManageAccountsSharpIcon /> },
     {
       segment: "dashboard/owner/shift-center",
       title: "Shift Centre",
@@ -308,10 +312,14 @@ export function getAdminNav({
           { segment: "attendance-reviews", title: "Attendance Approvals", icon: <CheckCircleIcon /> },
         ],
       });
+      navigation.push(
+        { segment: "dashboard/workforce/settings", title: "Workforce & Payroll", icon: <ManageAccountsSharpIcon /> },
+      );
     }
     if (canManageRoster) {
       navigation.push(
         { segment: buildPath("post-shift"), title: "Post Shift", icon: <PostAddIcon /> },
+        { segment: "dashboard/workforce/timesheets", title: "Timesheets", icon: <AccessTimeIcon /> },
         {
           segment: buildPath("shift-center"),
           title: "Shift Centre",
@@ -385,6 +393,7 @@ export function getOtherStaffNavDynamic(_progress_percent: number, workspace: 'i
     { segment: 'dashboard/otherstaff/interests?publish_availability=1', title: 'Publish Availability', icon: <PostAddIcon /> },
     { segment: 'dashboard/otherstaff/availability', title: 'Set Availability', icon: <EventAvailableIcon /> },
     { segment: 'dashboard/otherstaff/attendance', title: 'My Attendance', icon: <AccessTimeIcon /> },
+    { segment: 'dashboard/my-hours', title: 'My Hours', icon: <CheckCircleIcon /> },
     { segment: 'dashboard/otherstaff/memberships', title: 'Manage Memberships', icon: <StoreIcon /> },
 
     // -- Divider & Shifts Section --
@@ -447,6 +456,7 @@ export function getPharmacistNavDynamic(_progress_percent: number, workspace: 'i
     { segment: 'dashboard/pharmacist/interests?publish_availability=1', title: 'Publish Availability', icon: <PostAddIcon /> },
     { segment: 'dashboard/pharmacist/availability', title: 'Set Availability', icon: <EventAvailableIcon /> },
     { segment: 'dashboard/pharmacist/attendance', title: 'My Attendance', icon: <AccessTimeIcon /> },
+    { segment: 'dashboard/my-hours', title: 'My Hours', icon: <CheckCircleIcon /> },
     { segment: 'dashboard/pharmacist/memberships', title: 'Manage Memberships', icon: <StoreIcon /> },
     { kind: 'divider' as const },
     { kind: 'header' as const, title: 'Shifts & Invoices' },

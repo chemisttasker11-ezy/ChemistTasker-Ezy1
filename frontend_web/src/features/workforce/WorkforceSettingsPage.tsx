@@ -37,8 +37,9 @@ import {
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function WorkforceSettingsPage() {
+  const initialPharmacy = Number(new URLSearchParams(window.location.search).get('pharmacy_id') || '') || null;
   const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
-  const [pharmacyId, setPharmacyId] = useState<number | null>(null);
+  const [pharmacyId, setPharmacyId] = useState<number | null>(initialPharmacy);
   const [tab, setTab] = useState(0);
   const [coverage, setCoverage] = useState<any[]>([]);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
@@ -52,7 +53,7 @@ export default function WorkforceSettingsPage() {
     fetchPharmaciesService({}).then((rows: any[]) => {
       const next = (rows || []).map((row: any) => ({ id: Number(row.id), name: row.name || `Pharmacy #${row.id}` }));
       setPharmacies(next);
-      if (next.length) setPharmacyId((id) => id ?? next[0].id);
+      if (next.length) setPharmacyId((id) => id && next.some((row) => row.id === id) ? id : next[0].id);
     }).catch((err: any) => setError(err?.message || 'Unable to load pharmacies.'));
   }, []);
 

@@ -32,7 +32,7 @@ from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
     make_super_document, record_payment, check_version, json_safe,
     invoice_defaults, internal_invoice_sources, internal_invoice_prefill,
-    record_revision_state,
+    record_revision_state, serialize_revision, serialize_owner_revision, owner_visible_document,
 )
 
 logger = logging.getLogger(__name__)
@@ -134,10 +134,13 @@ class PaymentInput(serializers.Serializer):
     fund_payment_confirmed = serializers.BooleanField(default=False)
 
 
-def pdf_response(record):
-    from .documents import render_pdf
-    response = HttpResponse(render_pdf(record), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{serialize_record(record)["number"]}.pdf"'
+def pdf_response(record, document=None):
+    from .documents import render_pdf, render_document_pdf
+    serialized = document or serialize_record(record)
+    pdf = render_document_pdf(serialized) if document is not None else render_pdf(record)
+    response = HttpResponse(pdf, content_type='application/pdf')
+    suffix = f'-v{serialized["version"]}' if not serialized.get("is_current", True) else ''
+    response['Content-Disposition'] = f'attachment; filename="{serialized["number"]}{suffix}.pdf"'
     response['Cache-Control'] = 'no-store'
     response['X-Content-Type-Options'] = 'nosniff'
     return response
@@ -163,6 +166,18 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         return Response(serialize_record(self.owned(request, pk)))
+
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)')
+    def revision(self, request, pk=None, version=None):
+        record = self.owned(request, pk)
+        revision = get_object_or_404(record.revisions.all(), version=int(version))
+        return Response(serialize_revision(record, revision))
+
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)/pdf')
+    def revision_pdf(self, request, pk=None, version=None):
+        record = self.owned(request, pk)
+        revision = get_object_or_404(record.revisions.all(), version=int(version))
+        return pdf_response(record, serialize_revision(record, revision))
 
     @action(detail=False, methods=['get'], url_path='defaults')
     def defaults(self, request):
@@ -321,10 +336,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         return (
             InvoiceRecord.objects.filter(source='internal', invoice__pharmacy__in=managed)
             .filter(
-                models.Q(
-                    deliveries__version=models.F('version'),
-                    deliveries__status__in=['sent', 'legacy_queued'],
-                )
+                models.Q(deliveries__status__in=['sent', 'legacy_queued'])
                 | models.Q(invoice__status__in=['sent', 'paid'])
                 | ~models.Q(review_status='NONE')
             )
@@ -342,18 +354,72 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             qs = qs.select_for_update(of=('self',))
         return get_object_or_404(qs, pk=allowed)
 
+    @staticmethod
+    def _require_current_delivered(record):
+        delivered = record.deliveries.filter(
+            version=record.version,
+            status__in=['sent', 'legacy_queued'],
+        ).exists()
+        current_visible = (
+            delivered
+            or record.invoice.status in {'sent', 'paid'}
+            or record.review_status != 'NONE'
+        )
+        if not current_visible:
+            raise ValidationError({
+                'version': (
+                    'The contractor has a newer saved revision that has not been sent yet. '
+                    'Review actions remain attached to the last delivered revision until the new version is sent.'
+                )
+            })
+
     def list(self, request):
         from rest_framework.pagination import PageNumberPagination
         pager = PageNumberPagination()
         page = pager.paginate_queryset(self.queryset(request), request)
-        return pager.get_paginated_response([serialize_record(record) for record in page])
+        documents = [owner_visible_document(record) for record in page]
+        return pager.get_paginated_response([document for document in documents if document is not None])
 
     def retrieve(self, request, pk=None):
-        return Response(serialize_record(self._get(request, pk)))
+        record = self._get(request, pk)
+        document = owner_visible_document(record)
+        if document is None:
+            raise Http404
+        return Response(document)
 
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):
-        return pdf_response(self._get(request, pk))
+        record = self._get(request, pk)
+        document = owner_visible_document(record)
+        if document is None:
+            raise Http404
+        return pdf_response(record, document if document.get('version') != record.version else None)
+
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)')
+    def revision(self, request, pk=None, version=None):
+        record = self._get(request, pk)
+        revision = get_object_or_404(record.revisions.all(), version=int(version))
+        delivered = record.deliveries.filter(
+            version=revision.version,
+            status__in=['sent', 'legacy_queued'],
+        ).exists()
+        if not delivered:
+            visible = owner_visible_document(record)
+            if visible is None or visible.get('version') != revision.version:
+                raise Http404
+        return Response(serialize_owner_revision(record, revision))
+
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)/pdf')
+    def revision_pdf(self, request, pk=None, version=None):
+        record = self._get(request, pk)
+        revision = get_object_or_404(record.revisions.all(), version=int(version))
+        delivered = record.deliveries.filter(
+            version=revision.version,
+            status__in=['sent', 'legacy_queued'],
+        ).exists()
+        if not delivered:
+            raise Http404
+        return pdf_response(record, serialize_owner_revision(record, revision))
 
     @action(detail=True, methods=['post'], url_path='request-revision')
     def request_revision(self, request, pk=None):
@@ -364,6 +430,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Revision notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             InvoiceReviewRequest.objects.create(
                 record=record,
@@ -398,6 +465,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             record.review_status = 'APPROVED_FOR_PAYMENT'
             record.last_review_note = note
@@ -430,6 +498,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             record.invoice.status = 'paid'
             record.invoice.save(update_fields=['status'])

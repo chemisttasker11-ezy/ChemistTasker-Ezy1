@@ -29,6 +29,8 @@ const sidebarItems = [
   { label: 'Staff', icon: 'account-group', route: '/owner/staff' },
   { label: 'Locums', icon: 'account-heart', route: '/owner/locums' },
   { label: 'Shifts', icon: 'calendar-month', route: '/owner/shifts' },
+  { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
+  { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
   { label: 'Invoices', icon: 'receipt', route: '/owner/invoice' },
   { label: 'Calendar', icon: 'calendar', route: '/owner/calendar' },
   { label: 'Messages', icon: 'message', route: '/owner/chat' },

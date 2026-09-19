@@ -986,6 +986,30 @@ export default function RosterOwnerPage() {
         ))}
       </Tabs>
 
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          disabled={!selectedPharmacyId}
+          onClick={() => navigate(`/dashboard/workforce/timesheets?pharmacy_id=${selectedPharmacyId ?? ''}`)}
+        >
+          Timesheets
+        </Button>
+        <Button
+          variant="outlined"
+          disabled={!selectedPharmacyId}
+          onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${selectedPharmacyId ?? ''}`)}
+        >
+          Workforce settings
+        </Button>
+        <Button
+          variant="text"
+          disabled={!selectedPharmacyId}
+          onClick={() => navigate(`/dashboard/attendance/reviews?pharmacy_id=${selectedPharmacyId ?? ''}`)}
+        >
+          Attendance review
+        </Button>
+      </Stack>
+
       {/* Roster V2 Weekly Planning, Draft/Publish, Validation & Templates Toolbar */}
       <RosterPlanningToolbar
         pharmacyId={selectedPharmacyId}
@@ -1167,6 +1191,36 @@ export default function RosterOwnerPage() {
                 onSelectSlot={handleSelectSlot}
                 onSelectEvent={handleSelectEvent}
                 eventPropGetter={eventStyleGetter}
+                components={{
+                  event: ({ event }: any) => {
+                    const workforce = event.resource?.workforceStatus;
+                    const settlement =
+                      workforce?.settlementChannel === 'PAYROLL'
+                        ? 'Payroll'
+                        : workforce?.settlementChannel === 'TIMESHEET_ONLY'
+                          ? 'Timesheet only'
+                          : workforce?.settlementChannel === 'INVOICE'
+                            ? 'Invoice'
+                            : '';
+                    return (
+                      <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
+                        <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 800, lineHeight: 1.15 }}>
+                          {event.title}
+                        </Typography>
+                        {settlement && (
+                          <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .95, fontSize: 9, lineHeight: 1.15 }}>
+                            {settlement}{workforce?.agreedRate ? ` · ${workforce.agreedRate}/hr` : ''}
+                          </Typography>
+                        )}
+                        {workforce?.timesheet && (
+                          <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .9, fontSize: 9, lineHeight: 1.15 }}>
+                            {workforce.timesheet.status.replaceAll('_', ' ')} · reviewed {(workforce.timesheet.reviewedMinutes / 60).toFixed(2)}h
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  },
+                }}
                 views={calendarViews}
                 messages={calendarMessages}
               />
@@ -1216,6 +1270,8 @@ export default function RosterOwnerPage() {
           setEscalationLevel,
           setIsEscalateDialogOpen,
           handleDeleteAssignment,
+          onOpenTimesheets: () => navigate(`/dashboard/workforce/timesheets?pharmacy_id=${selectedPharmacyId ?? ''}`),
+          onOpenWorkforce: () => navigate(`/dashboard/workforce/settings?pharmacy_id=${selectedPharmacyId ?? ''}`),
         }}
         duplicate={{
           open: isDuplicateDialogOpen,

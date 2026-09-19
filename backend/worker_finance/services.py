@@ -716,6 +716,98 @@ def save_draft(owner, data, record_id=None, source="external"):
     return record
 
 
+def serialize_revision(record, revision):
+    """Read-only historical invoice view for an exact audited revision."""
+    document = serialize_record(record)
+    payments = list(record.payments.all())
+    paid = sum((payment.amount for payment in payments), ZERO)
+    delivery = record.deliveries.filter(version=revision.version).first()
+    payable = Decimal(str(revision.calculation.get("payable") or "0.00"))
+    document.update({
+        "version": revision.version,
+        "current_version": record.version,
+        "is_current": revision.version == record.version,
+        "payload": revision.payload,
+        "calculation": revision.calculation,
+        "source_snapshot": revision.source_snapshot or {},
+        "locked": True,
+        "editable": False,
+        "status": "void" if record.voided_at else revision.invoice_status,
+        "review_status": revision.review_status,
+        "delivery_status": delivery.status if delivery else None,
+        "balance": str(payable - paid),
+    })
+    return document
+
+
+def serialize_owner_revision(record, revision):
+    document = serialize_revision(record, revision)
+    visible_versions = set(
+        record.deliveries
+        .filter(status__in=["sent", "legacy_queued"])
+        .values_list("version", flat=True)
+    )
+    if (
+        record.invoice.status in {"sent", "paid"}
+        or record.review_status != "NONE"
+    ):
+        visible_versions.add(record.version)
+    document["revisions"] = [
+        item for item in document.get("revisions", [])
+        if item.get("version") in visible_versions
+    ]
+    latest_visible = max(visible_versions) if visible_versions else 0
+    document["has_unsent_revision"] = record.version > latest_visible
+    return document
+
+
+def owner_visible_document(record):
+    """Return the current delivered revision, or the last successfully delivered revision.
+
+    Saving a newer worker revision must not expose that unsent draft to the pharmacy,
+    but it also must not make the previously sent invoice disappear from history.
+    """
+    current_delivery = record.deliveries.filter(
+        version=record.version,
+        status__in=["sent", "legacy_queued"],
+    ).first()
+    current_is_visible = (
+        current_delivery is not None
+        or record.invoice.status in {"sent", "paid"}
+        or record.review_status != "NONE"
+    )
+    visible_versions = set(
+        record.deliveries
+        .filter(status__in=["sent", "legacy_queued"])
+        .values_list("version", flat=True)
+    )
+    if current_is_visible:
+        visible_versions.add(record.version)
+        document = serialize_record(record)
+    else:
+        delivered = (
+            record.deliveries
+            .filter(status__in=["sent", "legacy_queued"])
+            .order_by("-version")
+            .first()
+        )
+        if delivered is None:
+            return None
+        revision = record.revisions.filter(version=delivered.version).first()
+        if revision is None:
+            return None
+        document = serialize_owner_revision(record, revision)
+
+    document["revisions"] = [
+        item for item in document.get("revisions", [])
+        if item.get("version") in visible_versions
+    ]
+    if "has_unsent_revision" not in document:
+        latest_visible = max(visible_versions) if visible_versions else 0
+        document["has_unsent_revision"] = record.version > latest_visible
+    return document
+
+
 def serialize_record(record):
     payments = list(record.payments.all())
     paid = sum((payment.amount for payment in payments), ZERO)

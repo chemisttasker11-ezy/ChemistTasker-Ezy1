@@ -34,6 +34,7 @@ const sidebarItems = [
   { label: 'Publish Availability', icon: 'calendar-plus', route: '/otherstaff/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/otherstaff/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/otherstaff/calendar' },
+  { label: 'My Hours', icon: 'clock-check-outline', route: '/my-hours' },
   { label: 'Chat', icon: 'message', route: '/otherstaff/chat' },
   { label: 'Hub', icon: 'view-grid', route: '/otherstaff/hub' },
   { label: 'Invoices', icon: 'file-document-multiple', route: '/otherstaff/invoice' },

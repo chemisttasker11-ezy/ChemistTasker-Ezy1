@@ -35,6 +35,7 @@ const sidebarItems = [
   { label: 'Publish Availability', icon: 'calendar-plus', route: '/pharmacist/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/pharmacist/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/pharmacist/calendar' },
+  { label: 'My Hours', icon: 'clock-check-outline', route: '/my-hours' },
   { label: 'Chat', icon: 'message', route: '/pharmacist/chat' },
   { label: 'Hub', icon: 'view-grid', route: '/pharmacist/hub' },
   { label: 'Invoices', icon: 'file-document-multiple', route: '/pharmacist/invoice' },
