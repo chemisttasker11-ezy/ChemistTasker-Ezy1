@@ -21,7 +21,7 @@ const byteBudgets = {
   'frontend_web/src/pages/attendance/KioskPage.tsx': 77000,
   'frontend_web/src/layouts/TopBarActions.tsx': 48000,
   'frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx': 75000,
-  'frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx': 76000,
+  'frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx': 52000,
   'frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx': 47000,
   'frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx': 31000,
   'frontend_web/src/components/roster/RosterGridViews.tsx': 53000,
