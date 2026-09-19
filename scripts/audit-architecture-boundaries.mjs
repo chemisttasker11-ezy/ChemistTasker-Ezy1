@@ -34,4 +34,3 @@ if (failures.length) {
 }
 
 console.log('Architecture boundary audit passed.');
-console.log('Source-size caps are temporarily disabled so the full suite can validate behavior; architectural splitting remains a review concern, not a blocking CI gate.');
