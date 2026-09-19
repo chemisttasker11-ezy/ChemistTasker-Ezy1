@@ -8,7 +8,6 @@ import {
     Surface,
     IconButton,
     Chip,
-    Menu,
     Snackbar,
     Checkbox,
 } from 'react-native-paper';
@@ -26,8 +25,6 @@ import {
 import apiClient from '@/utils/apiClient';
 
 import {
-    VISIBILITY_LABELS,
-    VISIBILITY_META,
     RATE_TYPE_DESCRIPTIONS,
     GOVERNMENT_AWARD_GUIDE_URL,
     BASE_STEP_ORDER,
@@ -49,7 +46,6 @@ import {
     formatLongSlotDate,
     formatClockTime,
     getSlotDurationHours,
-    formatDateLabel,
     normalizePrefillRole,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
