@@ -76,7 +76,8 @@ frontend_mobile/.env.production
 
 # ─── Miscellaneous ─────────────────────────────────────────────────
 # OS and editor
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .qwen/
 *.log
 *.tmp

@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "pyrefly.extraSearchPaths": [
+    "${workspaceFolder}/backend"
+  ]
+}
