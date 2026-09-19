@@ -284,13 +284,13 @@ export default function InvoiceManagePage() {
             </Typography>
             <Typography color="text.secondary">
               {isOwner
-                ? 'Review and track invoices received from pharmacists across your network.'
-                : 'Draft invoices are created first, sending moves them to sent, and you can mark sent invoices as paid from the action menu.'}
+                ? 'Historical invoice tools. Current contractor invoice review lives in the Received invoices workspace.'
+                : 'Historical invoice tools. Create and revise current invoices in the Invoices & finances workspace.'}
             </Typography>
           </Box>
           {!isOwner && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('new')}>
-              New Invoice
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('?tool=invoices')}>
+              New invoice in finance workspace
             </Button>
           )}
         </Box>
