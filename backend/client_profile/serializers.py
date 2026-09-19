@@ -6388,8 +6388,9 @@ class InvoiceLineItemSerializer(serializers.ModelSerializer):
             'super_applicable',
             'is_manual',
             'shift',
+            'source_assignment',
         ]
-        read_only_fields = ['total']
+        read_only_fields = ['total', 'source_assignment']
 
     def create(self, validated_data):
         qty      = validated_data['quantity']
@@ -6422,6 +6423,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'bill_to_email', 'cc_emails',
             'invoice_date', 'due_date',
             'subtotal', 'gst_amount', 'super_amount', 'total',
+            'source_snapshot',
             'status', 'created_at',
             'line_items',
             # Recipient snapshot
@@ -6431,7 +6433,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'issuer_first_name', 'issuer_last_name', 'issuer_abn', 'issuer_email',
         ]
         read_only_fields = [
-            'subtotal', 'gst_amount', 'super_amount', 'total', 'created_at'
+            'subtotal', 'gst_amount', 'super_amount', 'total', 'source_snapshot', 'created_at'
         ]
 
     def create(self, validated_data):
@@ -6441,17 +6443,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
             item['invoice'] = invoice
             InvoiceLineItemSerializer().create(item)
 
-        # Recompute totals
+        from client_profile.services import recalculate_invoice_totals
         invoice.refresh_from_db()
-        subtotal = sum(li.total for li in invoice.line_items.all())
-        gst_amt = subtotal * Decimal('0.10') if invoice.gst_registered else Decimal('0.00')
-        super_amt = subtotal * (invoice.super_rate_snapshot / Decimal('100'))
-        invoice.subtotal = subtotal
-        invoice.gst_amount = gst_amt
-        invoice.super_amount = super_amt
-        invoice.total = subtotal + gst_amt + super_amt
-        invoice.save()
-        return invoice
+        return recalculate_invoice_totals(invoice)
 
     def update(self, instance, validated_data):
         items = validated_data.pop('line_items', None)
@@ -6465,16 +6459,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 item['invoice'] = instance
                 InvoiceLineItemSerializer().create(item)
 
-        # Recompute totals
-        subtotal = sum(li.total for li in instance.line_items.all())
-        gst_amt = subtotal * Decimal('0.10') if instance.gst_registered else Decimal('0.00')
-        super_amt = subtotal * (instance.super_rate_snapshot / Decimal('100'))
-        instance.subtotal = subtotal
-        instance.gst_amount = gst_amt
-        instance.super_amount = super_amt
-        instance.total = subtotal + gst_amt + super_amt
-        instance.save()
-        return instance
+        from client_profile.services import recalculate_invoice_totals
+        return recalculate_invoice_totals(instance)
 
 class ExplorerPostReadSerializer(serializers.ModelSerializer):
     explorer_name = serializers.SerializerMethodField()
