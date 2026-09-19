@@ -1,8 +1,9 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend"
   ],
+  "python.pyrefly.configPath": "${workspaceFolder}/pyrefly.toml",
   "pyrefly.extraSearchPaths": [
     "${workspaceFolder}/backend"
   ]
