@@ -89,6 +89,7 @@ export default function MembershipApplyPage() {
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [mobile, setMobile] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [email, setEmail] = useState('');
   const [jobTitle, setJobTitle] = useState('');
 
@@ -216,6 +217,18 @@ export default function MembershipApplyPage() {
         return;
       }
 
+      if (!dateOfBirth) {
+        setSubmitError('Please enter your date of birth.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (dateOfBirth > new Date().toISOString().slice(0, 10)) {
+        setSubmitError('Date of birth cannot be in the future.');
+        setSubmitting(false);
+        return;
+      }
+
       if (!email.trim()) {
         setSubmitError('Please enter your email address.');
         setSubmitting(false);
@@ -240,6 +253,7 @@ export default function MembershipApplyPage() {
         last_name: lastName.trim(),
         username: username.trim(),
         mobile_number: mobile.trim(),
+        date_of_birth: dateOfBirth,
         email: email.trim().toLowerCase(),
         pharmacist_award_level: pharmacistLevel || null,
         otherstaff_classification_level: otherStaffLevel || null,
@@ -405,6 +419,19 @@ export default function MembershipApplyPage() {
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
                 placeholder="e.g., 041x xxx xxx"
+                required
+              />
+
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Date of birth"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ max: new Date().toISOString().slice(0, 10) }}
+                helperText="Used to apply age-dependent Pharmacy Award rates correctly."
                 required
               />
 

@@ -215,6 +215,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
         membership_id: next.membership_id,
         employment_type: next.employment_type,
         award_classification: next.award_classification,
+        effective_from: next.effective_from,
       });
       if (requestId !== previewSequence.current) return;
       setAwardPreview(preview);
@@ -431,10 +432,6 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
       && (!form.early_morning_applicable || form.rate_early_morning)
       && (!form.late_night_applicable || form.rate_late_night),
     );
-  const adultConfirmationRequired =
-    form.role === 'ASSISTANT'
-    && ['LEVEL_1', 'LEVEL_2'].includes(form.award_classification);
-
   const partTimePatternComplete =
     form.employment_type !== 'PART_TIME'
     || form.ordinary_hours_days.some(
@@ -449,7 +446,6 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
     || Boolean(
       form.effective_from
       && form.award_classification
-      && (!adultConfirmationRequired || form.adult_rate_confirmed)
       && aboveAwardComplete
       && partTimePatternComplete
       && !loadingAward,
@@ -754,22 +750,12 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                   </Alert>
                 )}
 
-                {adultConfirmationRequired && (
-                  <Alert severity={form.adult_rate_confirmed ? 'success' : 'warning'}>
-                    <FormControlLabel
-                      control={(
-                        <Checkbox
-                          checked={form.adult_rate_confirmed}
-                          onChange={(_, checked) => setForm((current) => ({ ...current, adult_rate_confirmed: checked }))}
-                        />
-                      )}
-                      label="Confirm this Pharmacy Assistant is 21 or older, so adult Schedule B rates apply"
-                    />
-                    {!form.adult_rate_confirmed && (
-                      <Typography variant="body2">
-                        Levels 1 and 2 have separate junior percentages under age 21. ChemistTasker will not save an adult Award-rate engagement until this is confirmed.
-                      </Typography>
-                    )}
+                {awardPreview?.rate_scope === 'junior' && (
+                  <Alert severity="warning">
+                    DOB-based junior rate: age {awardPreview.age_at_effective_date}; clause 16.2 percentage {awardPreview.junior_percentage}%.{' '}
+                    {awardPreview.next_rate_review_date
+                      ? `Create successor terms from ${awardPreview.next_rate_review_date} because the minimum changes on that birthday.`
+                      : ''}
                   </Alert>
                 )}
 

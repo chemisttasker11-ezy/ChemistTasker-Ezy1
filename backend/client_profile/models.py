@@ -1295,7 +1295,8 @@ class MembershipApplication(models.Model):
     username = models.CharField(max_length=150, blank=True)
     mobile_number = models.CharField(max_length=32)
     date_of_birth = models.DateField(
-        help_text="Candidate date of birth used for age-dependent Award rates and identity matching."
+        null=True,
+        help_text="Candidate date of birth used for age-dependent Award rates and identity matching.",
     )
     job_title = models.CharField(max_length=255, blank=True)
 

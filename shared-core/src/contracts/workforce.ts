@@ -285,6 +285,10 @@ export interface WorkforceAwardPreview {
   award_effective_from: string;
   award_effective_basis?: string;
   rate_scope?: string;
+  date_of_birth?: string | null;
+  age_at_effective_date?: number | null;
+  junior_percentage?: string | null;
+  next_rate_review_date?: string | null;
   role: string;
   classification: string;
   classification_label: string;
