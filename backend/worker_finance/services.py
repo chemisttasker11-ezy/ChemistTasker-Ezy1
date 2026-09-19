@@ -276,11 +276,21 @@ def internal_invoice_sources(owner):
 
 
 def _source_snapshot(assignments):
+    pharmacy = assignments[0].shift.pharmacy if assignments else None
+    owner_user = getattr(getattr(pharmacy, "owner", None), "user", None) if pharmacy else None
     return {
-        "version": 2,
+        "version": 3,
         "source": "INTERNAL_ABN_SHIFT_ASSIGNMENTS",
         "assignment_ids": [a.id for a in assignments],
         "shift_ids": sorted({a.shift_id for a in assignments}),
+        "pharmacy": {
+            "id": pharmacy.id,
+            "name": pharmacy.name,
+            "legal_name": getattr(pharmacy, "abn_entity_name", "") or pharmacy.name,
+            "abn": getattr(pharmacy, "abn", "") or "",
+            "email": getattr(pharmacy, "email", "") or getattr(owner_user, "email", "") or "",
+            "address": _pharmacy_address(pharmacy),
+        } if pharmacy else {},
         "accepted_terms": [
             {
                 "assignment_id": a.id,
@@ -571,6 +581,7 @@ def save_draft(owner, data, record_id=None, source="external"):
     """
     owner.__class__.objects.select_for_update().get(pk=owner.pk)
     data = dict(data)
+    submitted_customer = json_safe(data.pop("customer", {}) or {})
     source_assignment_ids = [int(v) for v in data.pop("source_assignment_ids", [])]
     existing = InvoiceRecord.objects.filter(owner=owner, request_key=data["request_key"]).first()
     if record_id is None and existing:
@@ -637,10 +648,16 @@ def save_draft(owner, data, record_id=None, source="external"):
             else list((record.invoice.source_snapshot or {}).get("assignment_ids") or [])
         )
     payload["lines"] = lines
-    payload["customer"] = {
+    customer_snapshot = {
         key: getattr(customer, key)
         for key in ("name", "legal_name", "address", "abn", "email", "contact_name")
     }
+    for key in customer_snapshot:
+        if key in submitted_customer:
+            customer_snapshot[key] = submitted_customer[key]
+    if not str(customer_snapshot.get("name") or "").strip():
+        customer_snapshot["name"] = customer.name
+    payload["customer"] = customer_snapshot
 
     if record_id is None:
         invoice = Invoice.objects.create(
