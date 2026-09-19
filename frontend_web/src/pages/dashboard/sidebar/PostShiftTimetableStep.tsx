@@ -1,10 +1,12 @@
 import type { CSSProperties, Dispatch, SetStateAction } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
   Chip,
   FormControlLabel,
+  Grid,
   IconButton,
   Paper,
   Stack,
@@ -146,6 +148,8 @@ export default function PostShiftTimetableStep({
   todayStart,
   showSnackbar,
 }: Props) {
+  const minDateInputValue = dayjs(minCalendarDate).format('YYYY-MM-DD');
+
   const fieldSx = {
     '& .MuiOutlinedInput-root': {
       borderRadius: 2,
@@ -153,8 +157,7 @@ export default function PostShiftTimetableStep({
     },
   };
 
-      case 'timetable': {
-        return (
+  return (
           <Grid
             container
             rowSpacing={isEmbedded ? 1.5 : 2}
@@ -721,6 +724,5 @@ export default function PostShiftTimetableStep({
               </Paper>
             </Grid>
           </Grid>
-        );
-      }
+  );
 }
