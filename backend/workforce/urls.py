@@ -2,6 +2,9 @@ from django.urls import path
 
 from .views import (
     CoverageRequirementDetailView,
+    EmploymentEngagementAwardPreviewView,
+    EmploymentEngagementDetailView,
+    EmploymentEngagementListCreateView,
     CoverageRequirementListCreateView,
     MembershipWorkSettingsView,
     MyHoursView,
@@ -32,6 +35,9 @@ urlpatterns = [
     path("roster/validate/", RosterValidateRevisionView.as_view(), name="roster-validate"),
     path("roster/publish/", RosterPublishRevisionView.as_view(), name="roster-publish"),
     path("work-settings/", MembershipWorkSettingsView.as_view(), name="work-settings"),
+    path("employment-engagements/", EmploymentEngagementListCreateView.as_view(), name="employment-engagements"),
+    path("employment-engagements/award-preview/", EmploymentEngagementAwardPreviewView.as_view(), name="employment-engagement-award-preview"),
+    path("employment-engagements/<uuid:public_id>/", EmploymentEngagementDetailView.as_view(), name="employment-engagement-detail"),
     path("coverage-requirements/", CoverageRequirementListCreateView.as_view(), name="coverage-requirements"),
     path("coverage-requirements/<int:pk>/", CoverageRequirementDetailView.as_view(), name="coverage-requirement-detail"),
     path("leave/", WorkforceLeaveListCreateView.as_view(), name="leave-list-create"),
