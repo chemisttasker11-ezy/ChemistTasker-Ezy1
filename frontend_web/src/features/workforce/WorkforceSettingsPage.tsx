@@ -20,6 +20,7 @@ import {
   Typography,
 } from '@mui/material';
 import { STAFF_ROLE_OPTIONS, fetchPharmaciesService } from '@chemisttasker/shared-core';
+import type { WorkforceWorkSettings } from '@chemisttasker/shared-core';
 import EmploymentEngagementsPanel from './EmploymentEngagementsPanel';
 import {
   createCoverageRequirement,
@@ -36,7 +37,7 @@ export default function WorkforceSettingsPage() {
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [tab, setTab] = useState(0);
   const [coverage, setCoverage] = useState<any[]>([]);
-  const [staff, setStaff] = useState<any[]>([]);
+  const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
   const [error, setError] = useState('');
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [coverageForm, setCoverageForm] = useState({ weekday: 0, start_time: '08:00', end_time: '18:00', role: 'PHARMACIST', minimum_staff: 1 });
@@ -79,7 +80,7 @@ export default function WorkforceSettingsPage() {
       <Stack spacing={2.5}>
         <Box>
           <Typography variant="h4" fontWeight={900} color="#06214A">Workforce settings</Typography>
-          <Typography color="text.secondary">Non-payroll configuration used by roster coverage and timesheet comparisons. These values do not calculate wages.</Typography>
+          <Typography color="text.secondary">Roster coverage, contracted hours, and dated employment/pay terms. Employment engagements preserve the Award correspondence and agreed rates used for payroll history.</Typography>
         </Box>
         <FormControl size="small" sx={{ maxWidth: 320 }}><InputLabel>Pharmacy</InputLabel><Select value={pharmacyId ?? ''} label="Pharmacy" onChange={(e) => setPharmacyId(Number(e.target.value))}>{pharmacies.map((row) => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</Select></FormControl>
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
