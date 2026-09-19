@@ -86,8 +86,10 @@ def calculate_invoice(lines, *, gst_registered, price_mode='exclusive',
     subtotal = gst = sales_gross = super_base = manual_super = ZERO
     has_manual_super = False
     for source in lines:
-        if not isinstance(source, dict) or not source.get('item_id'):
-            raise CalculationError('Every line must reference a saved item.')
+        if not isinstance(source, dict):
+            raise CalculationError('Every invoice line must be an object.')
+        if not source.get('item_id') and not str(source.get('description') or '').strip():
+            raise CalculationError('Every line needs a description or a saved item.')
         quantity = decimal_value(source.get('quantity'), 'Quantity', minimum=CENT, maximum=Decimal('9999.99'))
         price = decimal_value(source.get('unit_price'), 'Unit price')
         discount = decimal_value(source.get('discount', '0'), 'Discount', maximum=Decimal('100'))
