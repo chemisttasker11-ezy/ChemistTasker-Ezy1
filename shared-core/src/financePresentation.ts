@@ -24,8 +24,8 @@ export function financeItemLine(item: FinanceItem): FinanceLine {
 }
 export function financeStatus(invoice: FinanceInvoice): string {
   if (invoice.voided) return 'Void';
-  if (invoice.review_status === 'REVISION_REQUESTED') return 'Revision requested';
   if (invoice.status === 'paid') return 'Paid';
+  if (invoice.review_status === 'REVISION_REQUESTED') return 'Revision requested';
   if (invoice.review_status === 'APPROVED_FOR_PAYMENT') return 'Approved for payment';
   if (invoice.status === 'sent' && invoice.payload.due_date < financeToday()) return 'Overdue';
   if (invoice.status === 'sent') return Number(invoice.paid) > 0 ? 'Part paid' : 'Sent';
