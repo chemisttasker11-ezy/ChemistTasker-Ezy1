@@ -2042,6 +2042,7 @@ class ShiftSlotAssignment(models.Model):
     engagement_kind = models.CharField(max_length=32, blank=True)
     engagement_terms_snapshot = models.JSONField(default=dict, blank=True)
     engagement_terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    payroll_activated_at = models.DateTimeField(null=True, blank=True)
     source_offer = models.ForeignKey(
         'ShiftOffer', on_delete=models.PROTECT, related_name='slot_assignments',
         null=True, blank=True,
@@ -2239,6 +2240,7 @@ class ShiftOffer(models.Model):
     engagement_kind = models.CharField(max_length=32, blank=True)
     engagement_terms_snapshot = models.JSONField(default=dict, blank=True)
     engagement_terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    payroll_activated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -2565,6 +2567,7 @@ class Invoice(models.Model):
     gst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     super_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    source_snapshot = models.JSONField(default=dict, blank=True)
 
     status     = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -2631,10 +2634,28 @@ class InvoiceLineItem(models.Model):
         blank=True,
         related_name='invoice_items'
     )
+    source_assignment = models.ForeignKey(
+        'client_profile.ShiftSlotAssignment',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='invoice_line_items',
+    )
     class Meta:
         indexes = [
             models.Index(fields=['invoice']),
             models.Index(fields=['shift']),
+            models.Index(fields=['source_assignment']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source_assignment'],
+                condition=models.Q(
+                    source_assignment__isnull=False,
+                    category_code='ProfessionalServices',
+                ),
+                name='uniq_professional_invoice_assignment',
+            )
         ]
 
     def __str__(self):
