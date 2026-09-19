@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
@@ -131,6 +132,34 @@ def _format_abn(value):
     return f"{raw[:2]} {raw[2:5]} {raw[5:8]} {raw[8:]}" if len(raw) == 11 else raw
 
 
+def _money(value):
+    if value in (None, ""):
+        return None
+    return str(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _tfn_payroll_status(onboarding):
+    missing = []
+    if not getattr(onboarding, "tfn_number", None):
+        missing.append("tfn")
+    if not getattr(onboarding, "super_fund_name", None):
+        missing.append("super_fund_name")
+    if not getattr(onboarding, "super_usi", None):
+        missing.append("super_usi")
+    if not getattr(onboarding, "super_member_number", None):
+        missing.append("super_member_number")
+    return {
+        "ready": not missing,
+        "missing_fields": missing,
+        "tfn_present": bool(getattr(onboarding, "tfn_number", None)),
+        "super": {
+            "fund_name": getattr(onboarding, "super_fund_name", None),
+            "usi": getattr(onboarding, "super_usi", None),
+            "member_number_present": bool(getattr(onboarding, "super_member_number", None)),
+        },
+    }
+
+
 def validate_tfn_payroll_profile(user):
     onboarding = worker_onboarding(user)
     if not onboarding:
@@ -139,30 +168,26 @@ def validate_tfn_payroll_profile(user):
         raise ValidationError({
             "payment_preference": "Employee/payroll engagements require the TFN pathway. ABN service work is settled through invoicing."
         })
-    errors = {}
-    if not getattr(onboarding, "tfn_number", None):
-        errors["tfn"] = "TFN is required for payroll."
-    if not getattr(onboarding, "super_fund_name", None):
-        errors["super_fund_name"] = "Super fund name is required for payroll."
-    if not getattr(onboarding, "super_usi", None):
-        errors["super_usi"] = "Super fund USI is required for payroll."
-    if not getattr(onboarding, "super_member_number", None):
-        errors["super_member_number"] = "Super member number is required for payroll."
-    if errors:
-        raise ValidationError(errors)
+    status = _tfn_payroll_status(onboarding)
+    labels = {
+        "tfn": "TFN is required for payroll.",
+        "super_fund_name": "Super fund name is required for payroll.",
+        "super_usi": "Super fund USI is required for payroll.",
+        "super_member_number": "Super member number is required for payroll.",
+    }
+    if status["missing_fields"]:
+        raise ValidationError({key: labels[key] for key in status["missing_fields"]})
     return onboarding
 
 
 def _external_payment_profile(user):
     onboarding = worker_onboarding(user)
     if not onboarding:
-        raise ValidationError({"payment_profile": "Complete and verify worker onboarding before accepting this external shift."})
+        raise ValidationError({"payment_profile": "Complete worker onboarding before accepting this external shift."})
     pref = str(onboarding.payment_preference or "").upper()
     if pref not in {PAYMENT_TFN, PAYMENT_ABN}:
         raise ValidationError({"payment_preference": "Select TFN or ABN in onboarding before accepting this shift."})
-    if pref == PAYMENT_TFN:
-        validate_tfn_payroll_profile(user)
-    else:
+    if pref == PAYMENT_ABN:
         errors = {}
         if not getattr(onboarding, "abn", None):
             errors["abn"] = "ABN is required for invoice settlement."
