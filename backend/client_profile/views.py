@@ -3038,11 +3038,22 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
 
         allowed_ftpt = {'FULL_TIME', 'PART_TIME', 'CASUAL'}
         allowed_fav = {'LOCUM', 'SHIFT_HERO'}
-        req_emp = (request.data.get('employment_type') or '').strip().upper()
+        raw_employment_type = request.data.get('employment_type')
+        req_emp = str(raw_employment_type or '').strip().upper()
         if app.category == 'FULL_PART_TIME':
-            employment_type = req_emp if req_emp in allowed_ftpt else 'CASUAL'
+            if raw_employment_type not in (None, '') and req_emp not in allowed_ftpt:
+                return Response(
+                    {'employment_type': ['Choose FULL_TIME, PART_TIME or CASUAL.']},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            employment_type = req_emp or 'CASUAL'
         else:
-            employment_type = req_emp if req_emp in allowed_fav else (
+            if raw_employment_type not in (None, '') and req_emp not in allowed_fav:
+                return Response(
+                    {'employment_type': ['Choose LOCUM or SHIFT_HERO.']},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            employment_type = req_emp or (
                 'LOCUM' if app.role == 'PHARMACIST' else 'SHIFT_HERO'
             )
 
