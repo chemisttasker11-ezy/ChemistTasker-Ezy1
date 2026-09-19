@@ -99,6 +99,7 @@ class EmploymentEngagement(models.Model):
         default="https://calculate.fairwork.gov.au/payguides/fairwork/ma000012/pdf",
     )
     award_effective_from = models.DateField(null=True, blank=True)
+    award_rate_snapshot = models.JSONField(default=dict, blank=True)
 
     rate_weekday = models.DecimalField(max_digits=8, decimal_places=2)
     rate_saturday = models.DecimalField(max_digits=8, decimal_places=2)
