@@ -154,6 +154,8 @@ jobs:
         run: python backend/manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
       - name: Public content contracts
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
+      - name: Membership and engagement contracts
+        run: python backend/manage.py test client_profile.test_membership_application_integrity --settings=core.contract_test_settings
       - name: Workforce and finance contracts
         run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
 
