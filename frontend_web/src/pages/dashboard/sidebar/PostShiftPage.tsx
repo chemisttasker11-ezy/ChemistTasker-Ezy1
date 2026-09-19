@@ -3,6 +3,7 @@ import {
   Container,
   Paper,
   Snackbar,
+  Typography,
   createTheme,
   ThemeProvider,
   useMediaQuery,
