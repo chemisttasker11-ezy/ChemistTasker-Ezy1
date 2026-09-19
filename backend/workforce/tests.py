@@ -1,11 +1,13 @@
+from datetime import date
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from .award_rates import classification_options, resolve_award_schedule
 from .employment_terms import correspondence_profile, normalise_part_time_pattern
-from .views import _engagement_payload
+from .employment_engagement_service import build_employment_engagement_payload
 
 
 class PharmacyAwardResolverTests(SimpleTestCase):
@@ -235,35 +237,54 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
         values.update(overrides)
         return SimpleNamespace(**values)
 
-    def test_level_1_assistant_requires_adult_rate_confirmation(self):
+    @patch(
+        "workforce.employment_engagement_service.membership_date_of_birth",
+        return_value=date(2006, 10, 1),
+    )
+    def test_level_1_assistant_uses_dob_driven_junior_rate(self, _mock_dob):
+        membership = self._membership(
+            role="ASSISTANT",
+            otherstaff_classification_level="LEVEL_1",
+        )
+        payload = build_employment_engagement_payload(
+            {
+                "pay_basis": "AWARD",
+                "award_classification": "LEVEL_1",
+            },
+            membership,
+            effective_from=date(2026, 9, 19),
+            effective_to=date(2026, 9, 30),
+        )
+        self.assertEqual(str(payload["rate_weekday"]), "25.03")
+        self.assertEqual(payload["award_rate_snapshot"]["rate_scope"], "junior")
+        self.assertEqual(payload["award_rate_snapshot"]["age_at_effective_date"], 19)
+        self.assertEqual(payload["award_rate_snapshot"]["junior_percentage"], "80.00")
+        self.assertEqual(payload["award_rate_snapshot"]["next_rate_review_date"], "2026-10-01")
+
+    @patch(
+        "workforce.employment_engagement_service.membership_date_of_birth",
+        return_value=date(2006, 10, 1),
+    )
+    def test_junior_engagement_must_end_before_next_birthday(self, _mock_dob):
         membership = self._membership(
             role="ASSISTANT",
             otherstaff_classification_level="LEVEL_1",
         )
         with self.assertRaises(ValidationError):
-            _engagement_payload(
+            build_employment_engagement_payload(
                 {
                     "pay_basis": "AWARD",
                     "award_classification": "LEVEL_1",
                 },
                 membership,
+                effective_from=date(2026, 9, 19),
             )
 
-        payload = _engagement_payload(
-            {
-                "pay_basis": "AWARD",
-                "award_classification": "LEVEL_1",
-                "adult_rate_confirmed": True,
-            },
-            membership,
-        )
-        self.assertEqual(str(payload["rate_weekday"]), "27.81")
-        self.assertTrue(payload["award_rate_snapshot"]["adult_rate_confirmed"])
-
+    @patch("workforce.employment_engagement_service.membership_date_of_birth", return_value=None)
     def test_above_award_cannot_undercut_award_summary_floor(self):
         membership = self._membership()
         with self.assertRaises(ValidationError):
-            _engagement_payload(
+            build_employment_engagement_payload(
                 {
                     "pay_basis": "ABOVE_AWARD",
                     "award_classification": "PHARMACIST",
@@ -275,10 +296,11 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
                 membership,
             )
 
+    @patch("workforce.employment_engagement_service.membership_date_of_birth", return_value=None)
     def test_above_award_requires_at_least_one_rate_above_the_floor(self):
         membership = self._membership()
         with self.assertRaises(ValidationError):
-            _engagement_payload(
+            build_employment_engagement_payload(
                 {
                     "pay_basis": "ABOVE_AWARD",
                     "award_classification": "PHARMACIST",
@@ -290,9 +312,10 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
                 membership,
             )
 
+    @patch("workforce.employment_engagement_service.membership_date_of_birth", return_value=None)
     def test_above_award_snapshot_keeps_penalty_and_overtime_floors(self):
         membership = self._membership()
-        payload = _engagement_payload(
+        payload = build_employment_engagement_payload(
             {
                 "pay_basis": "ABOVE_AWARD",
                 "award_classification": "PHARMACIST",
