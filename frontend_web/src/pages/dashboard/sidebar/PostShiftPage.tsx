@@ -57,6 +57,7 @@ import {
   normalizePrefillRole,
   pharmacyHoursForDate,
   ORG_ROLE_VALUES,
+  readPostShiftPrefill,
 } from './PostShiftPage.helpers';
 
 type PostShiftPageProps = {
@@ -81,27 +82,18 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const adminRedirectBase = scopedPharmacyId != null ? `/dashboard/admin/${scopedPharmacyId}` : null;
   const editingShiftId = params.get('edit');
   const isEmbedded = params.get('embedded') === '1';
-
-  const prefillPharmacyId = params.get('pharmacy') ?? params.get('pharmacy_id');
-  const prefillRoleNeeded = params.get('role') ?? params.get('role_needed');
-  const prefillDate = params.get('date') ?? params.get('slot_date');
-  const prefillDatesParam = params.get('dates') ?? params.get('slot_dates');
-  const prefillStartTime = params.get('start_time') ?? params.get('start');
-  const prefillEndTime = params.get('end_time') ?? params.get('end');
-  const prefillVisibility = params.get('visibility');
-  const prefillEmploymentType = params.get('employment_type');
-  const prefillDedicatedUser = params.get('dedicated_user') ?? params.get('dedicated_user_id');
-  const hasPrefill = Boolean(
-    prefillPharmacyId ||
-    prefillRoleNeeded ||
-    prefillDate ||
-    prefillDatesParam ||
-    prefillStartTime ||
-    prefillEndTime ||
-    prefillVisibility ||
-    prefillEmploymentType ||
-    prefillDedicatedUser
-  );
+  const {
+    pharmacyId: prefillPharmacyId,
+    roleNeeded: prefillRoleNeeded,
+    date: prefillDate,
+    dates: prefillDatesParam,
+    startTime: prefillStartTime,
+    endTime: prefillEndTime,
+    visibility: prefillVisibility,
+    employmentType: prefillEmploymentType,
+    dedicatedUser: prefillDedicatedUser,
+    hasPrefill,
+  } = readPostShiftPrefill(location.search);
 
   const orgMembership = useMemo(() => {
     const memberships = Array.isArray(user?.memberships) ? user.memberships : [];

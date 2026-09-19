@@ -43,6 +43,48 @@ export interface CalendarEvent {
 
 export type CalendarViewOption = 'month' | 'week' | 'day';
 
+export type PostShiftPrefill = {
+  pharmacyId: string | null;
+  roleNeeded: string | null;
+  date: string | null;
+  dates: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  visibility: string | null;
+  employmentType: string | null;
+  dedicatedUser: string | null;
+  hasPrefill: boolean;
+};
+
+export const readPostShiftPrefill = (search: string): PostShiftPrefill => {
+  const params = new URLSearchParams(search);
+  const pharmacyId = params.get('pharmacy') ?? params.get('pharmacy_id');
+  const roleNeeded = params.get('role') ?? params.get('role_needed');
+  const date = params.get('date') ?? params.get('slot_date');
+  const dates = params.get('dates') ?? params.get('slot_dates');
+  const startTime = params.get('start_time') ?? params.get('start');
+  const endTime = params.get('end_time') ?? params.get('end');
+  const visibility = params.get('visibility');
+  const employmentType = params.get('employment_type');
+  const dedicatedUser = params.get('dedicated_user') ?? params.get('dedicated_user_id');
+  const hasPrefill = Boolean(
+    pharmacyId || roleNeeded || date || dates || startTime || endTime || visibility ||
+      employmentType || dedicatedUser,
+  );
+  return {
+    pharmacyId,
+    roleNeeded,
+    date,
+    dates,
+    startTime,
+    endTime,
+    visibility,
+    employmentType,
+    dedicatedUser,
+    hasPrefill,
+  };
+};
+
 export interface CalendarSlotSelection {
   start: Date;
   end: Date;
