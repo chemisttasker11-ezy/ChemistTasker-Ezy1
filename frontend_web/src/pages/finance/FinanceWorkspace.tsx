@@ -37,6 +37,8 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [search, setSearch] = useState('');
   const [editor, setEditor] = useState<Editor | null>(null);
   const [menu, setMenu] = useState<{ anchor: HTMLElement; invoice: FinanceInvoice } | null>(null);
+  const [historyInvoice, setHistoryInvoice] = useState<FinanceInvoice | null>(null);
+  const [historyDocument, setHistoryDocument] = useState<FinanceInvoice | null>(null);
   const [confirmation, setConfirmation] = useState<{ title: string; body: string; action: () => Promise<unknown> } | null>(null);
   const [reviewAction, setReviewAction] = useState<{ invoice: FinanceInvoice; kind: 'approve' | 'revise' | 'paid'; note: string } | null>(null);
   const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
@@ -72,6 +74,19 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   };
   const changeTool = (value: string) => { const next = new URLSearchParams(params); next.set('tool', value); setParams(next); setSearch(''); };
   const ask = (title: string, body: string, action: () => Promise<unknown>) => { setError(''); setMenu(null); setConfirmation({ title, body, action }); };
+  const openHistory = (invoice: FinanceInvoice) => { setHistoryInvoice(invoice); setHistoryDocument(null); setMenu(null); };
+  const openRevision = (invoice: FinanceInvoice, version: number) => void run(async () => {
+    const document = receivedMode
+      ? await finance.receivedRevision(invoice.id, version)
+      : await finance.invoiceRevision(invoice.id, version);
+    setHistoryDocument(document);
+  });
+  const downloadRevision = (invoice: FinanceInvoice, version: number) => void run(async () => {
+    const blob = receivedMode
+      ? await finance.receivedRevisionPdf(invoice.id, version)
+      : await finance.invoiceRevisionPdf(invoice.id, version);
+    download(blob, `${invoice.number}-v${version}.pdf`);
+  });
   const matches = (...values: (string | undefined)[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
   const serviceInvoices = invoices.filter(invoice => invoice.kind === 'invoice' && !invoice.voided);
   const totalCents = (key: 'balance' | 'paid') => serviceInvoices.reduce((sum, invoice) => sum + Math.round(Number(invoice[key]) * 100), 0) / 100;
@@ -144,7 +159,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
                 <TableCell>{invoice.payload.customer?.name}</TableCell><TableCell>{invoice.payload.due_date}{financeStatus(invoice) === 'Overdue' && <Chip label="Overdue" size="small" color="warning" sx={{ ml: 1 }} />}</TableCell>
                 <TableCell align="right">{dollars(invoice.calculation.payable)}<Typography variant="caption" display="block">Balance {dollars(invoice.balance)}</Typography></TableCell>
                 <TableCell><Chip label={financeStatus(invoice)} color={invoice.status === 'paid' ? 'success' : invoice.review_status === 'REVISION_REQUESTED' ? 'warning' : 'default'} size="small" />{invoice.delivery_status && <Typography variant="caption" display="block">Latest email: {invoice.delivery_status}</Typography>}</TableCell>
-                <TableCell><Button aria-label={`Actions for ${invoice.number}`} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, invoice })}>Actions</Button></TableCell>
+                <TableCell><Stack direction="row" spacing={.5}><Button size="small" onClick={() => openHistory(invoice)}>History</Button><Button aria-label={`Actions for ${invoice.number}`} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, invoice })}>Actions</Button></Stack></TableCell>
               </TableRow>)}</TableBody></Table></TableContainer>}
             {tool === 'invoices' && invoices.length > 0 && !visibleInvoices.length && <Empty title="No matching documents" detail="Adjust the status, customer, dates or search to see your invoices." />}
             {tool === 'received' && <>
@@ -153,13 +168,16 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
               </Alert>
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}><TextField size="small" label="Search received invoices" value={search} onChange={event => setSearch(event.target.value)} sx={{ flex: 1 }} /></Box>
               <TableContainer><Table aria-label="Received internal invoices"><TableHead><TableRow><TableCell>Invoice / contractor</TableCell><TableCell>Pharmacy</TableCell><TableCell align="right">Payable</TableCell><TableCell>Status</TableCell><TableCell>Review</TableCell></TableRow></TableHead>
-                <TableBody>{visibleReceived.map(invoice => <TableRow key={invoice.id} hover>
-                  <TableCell><Typography fontWeight={800}>{invoice.number}</Typography><Typography variant="body2">{invoice.payload.issuer_name}</Typography><Typography variant="caption" color="text.secondary">Revision {invoice.version} · {invoice.payload.invoice_date}</Typography></TableCell>
-                  <TableCell>{invoice.payload.customer?.name}<Typography variant="caption" display="block">{invoice.payload.reference}</Typography></TableCell>
-                  <TableCell align="right">{dollars(invoice.calculation.payable)}<Button size="small" sx={{ display: 'block', ml: 'auto' }} onClick={() => void run(async () => download(await finance.receivedPdf(invoice.id), `${invoice.number}.pdf`))}>PDF</Button></TableCell>
-                  <TableCell><Chip size="small" label={financeStatus(invoice)} color={invoice.status === 'paid' ? 'success' : invoice.review_status === 'REVISION_REQUESTED' ? 'warning' : 'default'} />{invoice.last_review_note && <Typography variant="caption" display="block" sx={{ mt: .5, maxWidth: 260 }}>{invoice.last_review_note}</Typography>}</TableCell>
-                  <TableCell><Stack direction="row" spacing={.5} flexWrap="wrap"><Button size="small" variant="contained" onClick={() => setReviewAction({ invoice, kind: 'approve', note: '' })}>Approve</Button><Button size="small" color="warning" onClick={() => setReviewAction({ invoice, kind: 'revise', note: '' })}>Request revision</Button><Button size="small" disabled={invoice.status === 'paid'} onClick={() => setReviewAction({ invoice, kind: 'paid', note: '' })}>Mark paid</Button></Stack></TableCell>
-                </TableRow>)}</TableBody>
+                <TableBody>{visibleReceived.map(invoice => {
+                  const historicalOnly = invoice.is_current === false;
+                  return <TableRow key={invoice.id} hover>
+                    <TableCell><Typography fontWeight={800}>{invoice.number}</Typography><Typography variant="body2">{invoice.payload.issuer_name}</Typography><Typography variant="caption" color="text.secondary">Revision {invoice.version} · {invoice.payload.invoice_date}</Typography>{invoice.has_unsent_revision && <Typography variant="caption" display="block" color="warning.main" sx={{ maxWidth: 300 }}>A newer contractor revision is saved but has not been sent. This is the last delivered version.</Typography>}</TableCell>
+                    <TableCell>{invoice.payload.customer?.name}<Typography variant="caption" display="block">{invoice.payload.reference}</Typography></TableCell>
+                    <TableCell align="right">{dollars(invoice.calculation.payable)}<Stack direction="row" justifyContent="flex-end" spacing={.5}><Button size="small" onClick={() => openHistory(invoice)}>History</Button><Button size="small" onClick={() => void run(async () => download(await finance.receivedPdf(invoice.id), `${invoice.number}-v${invoice.version}.pdf`))}>PDF</Button></Stack></TableCell>
+                    <TableCell><Chip size="small" label={financeStatus(invoice)} color={invoice.status === 'paid' ? 'success' : invoice.review_status === 'REVISION_REQUESTED' ? 'warning' : 'default'} />{historicalOnly && <Chip size="small" variant="outlined" label="Read-only last sent" sx={{ ml: .5 }} />}{invoice.last_review_note && <Typography variant="caption" display="block" sx={{ mt: .5, maxWidth: 260 }}>{invoice.last_review_note}</Typography>}</TableCell>
+                    <TableCell><Stack direction="row" spacing={.5} flexWrap="wrap"><Button size="small" variant="contained" disabled={historicalOnly} onClick={() => setReviewAction({ invoice, kind: 'approve', note: '' })}>Approve</Button><Button size="small" color="warning" disabled={historicalOnly} onClick={() => setReviewAction({ invoice, kind: 'revise', note: '' })}>Request revision</Button><Button size="small" disabled={historicalOnly || invoice.status === 'paid'} onClick={() => setReviewAction({ invoice, kind: 'paid', note: '' })}>Mark paid</Button></Stack></TableCell>
+                  </TableRow>;
+                })}</TableBody>
               </Table></TableContainer>
               {!receivedInvoices.length && <Empty title="No received invoices yet" detail="Internal invoices will appear here after the contractor sends them to the pharmacy." />}
             </>}
@@ -196,12 +214,35 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     <Menu anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)}>
       <MenuItem disabled={menu?.invoice.kind !== 'invoice'} onClick={() => { if (menu) viewInvoice(menu.invoice); setMenu(null); }}>Edit invoice</MenuItem>
       <MenuItem disabled={menu?.invoice.kind !== 'invoice'} onClick={() => { if (!menu) return; const invoice = menu.invoice; const key = crypto.randomUUID(); ask('Duplicate invoice?', 'Creates a new editable external invoice without shift links, payment history or send history.', async () => { const result = await finance.duplicate(invoice.id, key); await load(); setEditor({ kind: 'invoice', value: result }); }); }}>Duplicate</MenuItem>
+      <MenuItem onClick={() => { if (!menu) return; openHistory(menu.invoice); }}>Revision history</MenuItem>
       <MenuItem onClick={() => { if (!menu) return; const invoice = menu.invoice; setMenu(null); void run(async () => download(await finance.pdf(invoice.id), `${invoice.number}.pdf`)); }}>Download PDF</MenuItem>
       <MenuItem onClick={() => { if (!menu) return; const invoice = menu.invoice; ask(`Send ${invoice.number} revision ${invoice.version}?`, `Email the current saved PDF to ${invoice.payload.customer?.email || '(no saved email)'}. If you edit and save later, the next revision can be sent again.`, async () => { const result = await finance.send(invoice.id, invoice.version); setNotice(result.detail); await load(); }); }}>Send email</MenuItem>
       <MenuItem disabled={menu?.invoice.kind !== 'invoice' || menu?.invoice.status === 'paid'} onClick={() => { if (!menu) return; const invoice = menu.invoice; ask('Mark invoice paid?', 'This is a manual status. You can still edit the invoice later if a correction is required.', async () => { await finance.markPaid(invoice.id, invoice.version); await load(); }); }}>Mark paid</MenuItem>
       <MenuItem disabled={menu?.invoice.kind !== 'invoice' || menu?.invoice.payload.super_mode !== 'separate' || Boolean(menu?.invoice.super_document_id)} onClick={() => { if (!menu) return; const invoice = menu.invoice; ask('Create separate super request?', 'Creates a linked contribution request. Super remains separate from worker payable.', async () => { await finance.superDocument(invoice.id, invoice.version); await load(); }); }}>Create linked super request</MenuItem>
       <MenuItem disabled={Number(menu?.invoice.balance || '0') <= 0} onClick={() => { if (menu) setEditor({ kind: 'payment', value: menu.invoice }); setMenu(null); }}>Record payment</MenuItem>
     </Menu>
+    <Dialog open={Boolean(historyInvoice)} onClose={() => { if (!busy) { setHistoryInvoice(null); setHistoryDocument(null); } }} maxWidth="md" fullWidth>
+      <DialogTitle>{historyInvoice?.number} · revision history</DialogTitle>
+      <DialogContent dividers>
+        {historyInvoice?.has_unsent_revision && <Alert severity="info" sx={{ mb: 2 }}>A newer contractor revision exists but is not part of the pharmacy record until it is sent. Only delivered revisions are shown here.</Alert>}
+        <Stack spacing={1.25}>
+          {(historyInvoice?.revisions || []).map(revision => <Paper key={revision.version} variant="outlined" sx={{ p: 1.5 }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+              <Box flex={1}><Typography fontWeight={800}>Revision {revision.version}</Typography><Typography variant="body2" color="text.secondary">{revision.invoice_status.replaceAll('_', ' ')} · {new Date(revision.created_at).toLocaleString('en-AU')} · {dollars(revision.calculation.payable)}</Typography></Box>
+              <Button size="small" disabled={busy} onClick={() => openRevision(historyInvoice!, revision.version)}>View</Button>
+              <Button size="small" disabled={busy} onClick={() => downloadRevision(historyInvoice!, revision.version)}>PDF</Button>
+            </Stack>
+          </Paper>)}
+          {!historyInvoice?.revisions?.length && <Typography color="text.secondary">No earlier revision snapshots are available.</Typography>}
+          {historyDocument && <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+            <Stack direction="row" justifyContent="space-between" gap={2} alignItems="center"><Box><Typography variant="h6">Revision {historyDocument.version}</Typography><Typography variant="body2" color="text.secondary">{historyDocument.payload.invoice_date} · {historyDocument.payload.issuer_name} → {historyDocument.payload.customer?.name}</Typography></Box><Chip label={financeStatus(historyDocument)} size="small" /></Stack>
+            <Table size="small" sx={{ mt: 1.5 }}><TableHead><TableRow><TableCell>Description</TableCell><TableCell>Unit</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Rate</TableCell><TableCell align="right">Tax</TableCell></TableRow></TableHead><TableBody>{historyDocument.payload.lines.map((line, index) => <TableRow key={`${line.source_assignment_id || 'manual'}-${index}`}><TableCell>{line.description}</TableCell><TableCell>{line.unit}</TableCell><TableCell align="right">{line.quantity}</TableCell><TableCell align="right">{dollars(line.unit_price)}</TableCell><TableCell align="right">{line.tax_code?.replaceAll('_', ' ')}</TableCell></TableRow>)}</TableBody></Table>
+            <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1.5 }}><Typography fontWeight={900}>Payable {dollars(historyDocument.calculation.payable)}</Typography></Stack>
+          </Paper>}
+        </Stack>
+      </DialogContent>
+      <DialogActions><Button disabled={busy} onClick={() => { setHistoryInvoice(null); setHistoryDocument(null); }}>Close</Button></DialogActions>
+    </Dialog>
     {editor?.kind === 'customer' && <CustomerEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'item' && <ItemEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'expense' && <ExpenseEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
