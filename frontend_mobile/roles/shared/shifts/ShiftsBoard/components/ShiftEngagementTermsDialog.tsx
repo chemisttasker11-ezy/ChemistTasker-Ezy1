@@ -13,6 +13,7 @@ type Props = {
   loading?: boolean;
   onDismiss: () => void;
   onConfirm: (payload: ShiftOfferAcceptancePayload) => Promise<void> | void;
+  onOpenPaymentProfile?: () => void;
 };
 
 const termsFor = (offer: ShiftOffer): ShiftEngagementTerms | null =>
@@ -24,6 +25,7 @@ export default function ShiftEngagementTermsDialog({
   loading = false,
   onDismiss,
   onConfirm,
+  onOpenPaymentProfile,
 }: Props) {
   const [accepted, setAccepted] = useState(false);
   const [contractorConfirmed, setContractorConfirmed] = useState(false);
@@ -57,9 +59,16 @@ export default function ShiftEngagementTermsDialog({
         <Dialog.ScrollArea style={styles.scrollArea}>
           <ScrollView contentContainerStyle={styles.content}>
             {blocked ? (
-              <Text style={styles.error}>
-                These terms cannot be accepted yet. Complete the required payment/onboarding details first.
-              </Text>
+              <View style={styles.callout}>
+                <Text style={styles.error}>
+                  These terms cannot be accepted yet. Complete the required payment/onboarding details first.
+                </Text>
+                {onOpenPaymentProfile ? (
+                  <Button mode="outlined" compact onPress={onOpenPaymentProfile}>
+                    Open private payment profile
+                  </Button>
+                ) : null}
+              </View>
             ) : primary ? (
               <>
                 <View style={styles.chips}>
@@ -72,10 +81,20 @@ export default function ShiftEngagementTermsDialog({
                 {primary.facilitatorNotice ? <Text style={styles.notice}>{primary.facilitatorNotice}</Text> : null}
                 {primary.relationshipNotice ? <Text style={styles.notice}>{primary.relationshipNotice}</Text> : null}
                 {primary.payrollSetupStatus === 'DEFERRED' ? (
-                  <Text style={styles.warning}>
-                    {primary.payrollSetupNotice || 'ChemistTasker Payroll setup is deferred. Assignment and timesheets can continue.'}
-                    {primary.payrollMissingFields?.length ? ` Complete later: ${primary.payrollMissingFields.join(', ')}.` : ''}
-                  </Text>
+                  <View style={styles.callout}>
+                    <Text style={styles.warning}>
+                      {primary.payrollSetupNotice || 'ChemistTasker Payroll setup is deferred. Assignment and timesheets can continue.'}
+                      {primary.payrollMissingFields?.length
+                        ? ` Complete later: ${primary.payrollMissingFields.map((field) => field.replaceAll('_', ' ')).join(', ')}.`
+                        : ''}
+                      {' Your TFN and super identifiers remain private and are not shared with the pharmacy.'}
+                    </Text>
+                    {onOpenPaymentProfile ? (
+                      <Button mode="outlined" compact onPress={onOpenPaymentProfile}>
+                        Complete private payment profile
+                      </Button>
+                    ) : null}
+                  </View>
                 ) : null}
                 {primary.awardPayrollReviewRequired ? (
                   <Text style={styles.warning}>
@@ -150,6 +169,7 @@ export default function ShiftEngagementTermsDialog({
 const styles = StyleSheet.create({
   scrollArea: { maxHeight: 520 },
   content: { paddingVertical: 16, gap: 12 },
+  callout: { gap: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   heading: { fontWeight: '700', marginTop: 4 },
   row: { color: '#334155' },
