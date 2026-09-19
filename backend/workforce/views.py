@@ -122,6 +122,7 @@ def _serialize_engagement(row):
         "notes": row.notes,
         "created_at": row.created_at.isoformat(),
         "updated_at": row.updated_at.isoformat(),
+        "terms_editable": row.effective_from > timezone.localdate(),
     }
 
 
