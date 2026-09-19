@@ -91,7 +91,7 @@ class InvoiceRevision(models.Model):
     class Meta:
         ordering = ['-version']
         constraints = [
-            models.UniqueConstraint(fields=['record', 'version'], name='finance_invoice_revision_version')
+            models.UniqueConstraint(fields=['record', 'version'], name='finance_inv_revision_ver')
         ]
 
 
