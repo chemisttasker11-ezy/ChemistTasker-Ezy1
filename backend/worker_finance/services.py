@@ -309,7 +309,15 @@ def internal_invoice_prefill(owner, assignment_ids):
         raise ValidationError({"assignment_ids": "One invoice can only contain shifts for the same pharmacy."})
 
     pharmacy = assignments[0].shift.pharmacy
-    customer = _customer_for_pharmacy(owner, pharmacy)
+    owner_user = getattr(getattr(pharmacy, "owner", None), "user", None)
+    customer_snapshot = {
+        "name": pharmacy.name,
+        "legal_name": getattr(pharmacy, "abn_entity_name", "") or pharmacy.name,
+        "abn": getattr(pharmacy, "abn", "") or "",
+        "contact_name": owner_user.get_full_name() if owner_user else "",
+        "email": getattr(pharmacy, "email", "") or getattr(owner_user, "email", "") or "",
+        "address": _pharmacy_address(pharmacy),
+    }
     defaults = invoice_defaults(owner)
     today = timezone.localdate()
     onboarding = _worker_onboarding(owner)
@@ -338,10 +346,10 @@ def internal_invoice_prefill(owner, assignment_ids):
         )
     draft = {
         "request_key": str(uuid4()),
-        "customer_id": customer.id,
+        "customer_id": 0,
         "source_assignment_ids": ids,
         "invoice_date": str(today),
-        "due_date": str(today + timedelta(days=customer.payment_terms_days)),
+        "due_date": str(today + timedelta(days=14)),
         "issuer_name": defaults["issuer_name"],
         "issuer_entity_type": "sole_trader",
         "issuer_abn": defaults["issuer_abn"],
@@ -360,10 +368,7 @@ def internal_invoice_prefill(owner, assignment_ids):
         "reference": f"ChemistTasker shift {assignments[0].shift_id}",
         "notes": "",
         "lines": lines,
-        "customer": {
-            key: getattr(customer, key)
-            for key in ("name", "legal_name", "address", "abn", "email", "contact_name")
-        },
+        "customer": customer_snapshot,
     }
     return json_safe(draft)
 
@@ -608,8 +613,9 @@ def save_draft(owner, data, record_id=None, source="external"):
         if len(pharmacy_ids) != 1:
             raise ValidationError({"source_assignment_ids": "One invoice can only contain assignments for one pharmacy."})
         customer = _customer_for_pharmacy(owner, assignments[0].shift.pharmacy)
-        if int(data["customer_id"]) != customer.id:
+        if int(data.get("customer_id") or 0) not in {0, customer.id}:
             raise ValidationError({"customer_id": "The internal invoice customer must be the pharmacy from the selected shifts."})
+        data["customer_id"] = customer.id
         submitted_ids = [int(line.get("source_assignment_id")) for line in data.get("lines", []) if line.get("source_assignment_id")]
         if set(submitted_ids) != set(source_assignment_ids) or len(submitted_ids) != len(source_assignment_ids):
             raise ValidationError({"lines": "Keep one editable source row for every selected shift assignment."})
