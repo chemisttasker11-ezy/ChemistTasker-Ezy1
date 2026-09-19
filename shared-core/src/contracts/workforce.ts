@@ -142,6 +142,9 @@ export interface WorkforceWorkSettings {
   worker_name: string;
   role: string;
   employment_type: string;
+  employment_engagement_eligible: boolean;
+  award_classification_options: Array<{ value: string; label: string; help?: string }>;
+  default_award_classification: string;
   contracted_weekly_minutes: number | null;
   effective_from: string | null;
   work_pattern: Record<string, unknown>;
@@ -197,6 +200,7 @@ export interface WorkforceEmploymentEngagement {
   notes: string;
   created_at: string;
   updated_at: string;
+  terms_editable?: boolean;
 }
 
 export interface WorkforceAwardPreview {
@@ -224,6 +228,7 @@ export interface WorkforceAwardPreview {
 
 export interface WorkforceEmploymentEngagementWrite {
   membership_id: number;
+  supersedes_public_id?: string;
   effective_from: string;
   effective_to?: string | null;
   employment_type?: 'FULL_TIME' | 'PART_TIME' | 'CASUAL';
