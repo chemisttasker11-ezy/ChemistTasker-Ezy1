@@ -65,17 +65,40 @@ export default function ShiftEngagementTermsDialog({
                 <View style={styles.chips}>
                   {primary.paymentPreference ? <Chip compact>Payment: {primary.paymentPreference}</Chip> : null}
                   {primary.settlementChannel ? <Chip compact>Settlement: {primary.settlementChannel}</Chip> : null}
+                  {primary.awardClassification ? <Chip compact>Award: {primary.awardClassification}</Chip> : null}
+                  {primary.payBasis ? <Chip compact>Basis: {primary.payBasis}</Chip> : null}
                 </View>
 
                 {primary.facilitatorNotice ? <Text style={styles.notice}>{primary.facilitatorNotice}</Text> : null}
                 {primary.relationshipNotice ? <Text style={styles.notice}>{primary.relationshipNotice}</Text> : null}
+                {primary.payrollSetupStatus === 'DEFERRED' ? (
+                  <Text style={styles.warning}>
+                    {primary.payrollSetupNotice || 'ChemistTasker Payroll setup is deferred. Assignment and timesheets can continue.'}
+                    {primary.payrollMissingFields?.length ? ` Complete later: ${primary.payrollMissingFields.join(', ')}.` : ''}
+                  </Text>
+                ) : null}
+                {primary.awardPayrollReviewRequired ? (
+                  <Text style={styles.warning}>
+                    Assignment can proceed, but ChemistTasker Payroll needs an Award/overtime review before activation.
+                    {primary.awardPayrollReviewReasons?.length ? ` ${primary.awardPayrollReviewReasons.join(' ')}` : ''}
+                  </Text>
+                ) : null}
 
                 <Text style={styles.heading}>Agreed shift details</Text>
                 {occurrences.map((item, index) => (
-                  <Text key={`${item.slotId ?? 'shift'}-${item.date}-${index}`} style={styles.row}>
-                    {item.date} · {item.startTime}–{item.endTime}
-                    {item.agreedRate ? ` · $${item.agreedRate}/hr` : ''}
-                  </Text>
+                  <View key={`${item.slotId ?? 'shift'}-${item.date}-${index}`}>
+                    <Text style={styles.row}>
+                      {item.date} · {item.startTime}–{item.endTime}
+                      {item.agreedRate ? ` · Final ${item.agreedRate}/hr` : ''}
+                    </Text>
+                    {item.awardFloorRate || item.ownerBonus || item.postedRate ? (
+                      <Text style={styles.caption}>
+                        {item.awardFloorRate ? `Award floor ${item.awardFloorRate}/hr` : ''}
+                        {item.ownerBonus && Number(item.ownerBonus) > 0 ? ` + bonus ${item.ownerBonus}/hr` : ''}
+                        {item.postedRate ? ` · posted/agreed input ${item.postedRate}/hr` : ''}
+                      </Text>
+                    ) : null}
+                  </View>
                 ))}
 
                 {primary.invoiceNotice ? <Text style={styles.notice}>{primary.invoiceNotice}</Text> : null}
