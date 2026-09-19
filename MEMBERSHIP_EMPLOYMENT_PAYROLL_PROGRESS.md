@@ -1,6 +1,6 @@
 # EmploymentEngagement / Membership / Payroll Progress
 
-Last updated: 2026-09-19 (Australia/Brisbane)
+Last updated: 2026-09-19 16:00+ AEST (Australia/Brisbane)
 
 ## Current branch
 
@@ -133,46 +133,79 @@ Implemented:
 - `245f55ae048e40bd89e0718aca6cff0c655d1ffd` dated employee engagement boundary for direct roster assignment.
 - `aed92651f83a09da1e2c2274b5bcf0bd4d43033b` external workers forced through offer acceptance.
 
-## Current remaining work after green validation
+## Current remaining work after production-blocker closure
 
-The earlier unfinished checklist below has been closed by the implementation and test passes recorded later in this file. The following are the only material follow-ups still intentionally open:
+The production blockers found in the final PR #3 source review have now been addressed in code. The remaining items are validation/release sequencing and future payroll-engine work, not a second implementation of the same membership/engagement logic.
 
-1. **External TFN Award floor before production ChemistTasker payroll for marketplace/favourite shifts**
-   - Per-shift TFN acceptance already freezes the final agreed rate, dates, role, employee relationship, super readiness and settlement route.
-   - When the pharmacy does **not** use ChemistTasker Payroll, its own payroll system remains responsible for Award classification/floor processing.
-   - Before ChemistTasker itself calculates wages for an external TFN shift, add an explicit, non-guessed Award classification source and floor comparison. Do not infer an Experienced Pharmacist / higher classification from role name alone.
+1. **Execute the new head through runners once GitHub Actions allocates steps**
+   - The previous stacked PR #3 head passed the full clean-checkout suite.
+   - The new production-blocker fixes have **not** yet executed in Actions because current repository jobs are ending before a runner step is allocated (zero steps, no job logs).
+   - Latest affected runs at this checkpoint: Shared Core Consolidation 35427741247 and Mobile Lint 35427741224. A direct Mobile Lint retry also ended with zero steps.
+   - Do not call the new head green until these commands actually execute.
+   - GitHub's public status page showed Actions operational, so this is recorded as a repository/account/runner-allocation validation blocker, not as a code-test failure.
 
-2. **Future payroll engine settlement filter**
-   - There is currently no separate ChemistTasker payroll export/processor in this repository.
-   - When that processor is introduced, it must accept only assignments explicitly routed as `PAYROLL`; `INVOICE` and `TIMESHEET_ONLY` must fail closed.
-   - The current invoice path already fails closed to accepted `INVOICE + INDEPENDENT_CONTRACTOR` assignments.
+2. **Future ChemistTasker payroll processor**
+   - The repository still does not contain the final wage-run/STP payroll processor.
+   - When introduced, it must consume only assignments explicitly routed to PAYROLL; TIMESHEET_ONLY and INVOICE must fail closed.
+   - Marketplace TFN terms now freeze the worker-specific Award/above-Award basis needed by that future processor.
+   - TIMESHEET_ONLY remains the deliberate hand-off to the pharmacy's own payroll system.
 
-3. **Re-enable/refine source-size budgets after functional validation**
-   - The owner explicitly requested the “capped at xx KB” gate be removed temporarily.
-   - Large-file splitting remains a refactor target, but byte size is no longer a blocking CI condition during this validation cycle.
+3. **Fair Work rate maintenance**
+   - Current code is aligned to the Pharmacy Industry Award state effective from 1 July 2026 and the current clause 16.2 junior percentages.
+   - Fair Work has announced further junior-wage changes for ages 18–20 but, as of this review date, says the changes are still being introduced with further detail/timing to be confirmed.
+   - Refresh the Award resolver when final effective rules are published; do not implement speculative future percentages/dates.
 
-4. **Next phase: preservation/security audit**
-   - Endpoint permission matrix / anonymous-route preservation.
-   - Object-level authorization / IDOR tests.
-   - Continue the security-hardening backlog after this membership/employment/payroll workflow is accepted.
+4. **Next phase after executable validation**
+   - Preservation/security audit: endpoint permission matrix, anonymous-route preservation, object-level authorization/IDOR tests, upload and sensitive-field review.
+   - Source-size caps remain intentionally removed; large-file splitting is a refactor target, not a CI byte-budget gate.
 
-### Completed from the prior unfinished checklist
+### Production blockers closed in this final pass
 
-- Acceptance + rejection correspondence — COMPLETE.
-- Owner/admin application review UI (web + mobile) — COMPLETE.
-- Shared-core application PATCH/types — COMPLETE.
-- Pharmacy “Use ChemistTasker Payroll” switch and explanatory UI — COMPLETE.
-- Payroll mode surfaced in Workforce Settings — COMPLETE.
-- Acceptance-time initial EmploymentEngagement for payroll-enabled pharmacy staff — COMPLETE and transactional.
-- Shift CASUAL model compatibility — COMPLETE.
-- Direct staff offer validation with payroll ON/OFF behavior — COMPLETE.
-- ABN accepted-shift integration into the existing invoice system — COMPLETE.
-- Duplicate guards / locked identifiers / review audit tests — COMPLETE.
-- DOB junior-rate tests and birthday successor guard — COMPLETE.
-- ABN/TFN settlement routing tests — COMPLETE.
-- Invoice boundary tests excluding PAYROLL/TIMESHEET_ONLY assignments — COMPLETE.
-- Full CI/migration verification — COMPLETE on functional head `7f2f11b53f544f345acbdc159bf15ce6a6d425d4`.
+#### Junior Pharmacy Award rates
+- Fixed the age selector that incorrectly collapsed ages 16–20 to the under-16 percentage.
+- Current mapping: under 16 -> 45%, 16 -> 50%, 17 -> 60%, 18 -> 70%, 19 -> 80%, 20 -> 90%, 21+ -> adult.
+- Added boundary regression coverage across ages 15–21 and corrected the inconsistent 19-year-old expectation.
 
+#### Marketplace / favourite TFN engagement
+- **Other staff:** reuses the classification already captured at public-platform onboarding; no duplicate classification source was created.
+- Assistant/technician uses onboarding classification level; intern uses first/second half; pharmacy student uses course year.
+- Existing post-shift owner_adjusted_rate is applied on top of the worker-specific applicable casual Award floor.
+- Frozen final other-staff rate is the higher of the negotiated/posted rate and Award floor + owner bonus.
+- **Pharmacists:** marketplace TFN is a per-shift casual employee engagement; the final agreed hourly rate must be above the applicable casual Pharmacist Award floor. No higher pharmacist classification is guessed.
+- Pharmacy payroll OFF -> accepted TFN shift is TIMESHEET_ONLY and ChemistTasker records the casual agreement/terms.
+- Pharmacy payroll ON + TFN/super ready + no Award review flag -> PAYROLL.
+- Pharmacy payroll ON + incomplete TFN/super -> assignment is not blocked; it is accepted as TIMESHEET_ONLY with payroll setup DEFERRED.
+- Award/overtime review may also defer payroll without blocking assignment.
+- Added owner/admin activate-payroll utility plus web and mobile confirmed-shift UI.
+- Activation is stored separately from the frozen accepted terms and can be copied into an assignment created later after fulfillment.
+
+#### ABN invoice integration
+- Reuses the existing canonical client_profile Invoice / InvoiceLineItem lifecycle rather than creating a second invoice engine.
+- Accepted ABN labour is rebuilt server-side from frozen accepted assignment terms.
+- Invoice.source_snapshot stores exact assignment ids, shift ids, offer ids, settlement route, acceptance time and frozen accepted terms.
+- InvoiceLineItem.source_assignment ties each labour line to the exact accepted assignment.
+- A database conditional unique constraint prevents two ProfessionalServices lines for the same assignment.
+- Internal generation is transactional, row-locks accepted invoice-routed assignments and rejects already invoiced work.
+- The newer worker_finance workspace wraps the **same canonical Invoice** through InvoiceRecord; it does not clone it.
+- Accepted labour rows and the pharmacy/customer are locked in the new web/mobile editors; reimbursements and separately reviewed super remain editable while draft.
+- Duplicating an internal invoice strips source identities and produces a clean external/editable draft.
+- Legacy send is row-locked/idempotent and freezes the newer finance wrapper too; both old and new editors respect issuance locks.
+- The existing recipient/email/PDF lifecycle remains the sending mechanism.
+
+#### Super / invoice total reconciliation
+- One canonical total calculation is shared by legacy invoice create/update paths.
+- Worker payable is consistently services/reimbursements + GST; super is tracked separately.
+- Contractor super_review_required no longer means super is automatically payable; accepted ABN terms also carry super_payable_confirmed=false until separately reviewed.
+- Reviewed super can still be represented manually or via the newer workspace's summary/separate-super mode.
+- Legacy PDF now reads stored canonical totals and labels super separately.
+- Billed shift hours are rounded to the actual 2-decimal InvoiceLineItem.quantity precision before money calculation, preventing partial-hour drift.
+- Default super snapshot for **new** legacy invoices is now 12%; historical snapshots are untouched.
+
+#### PostgreSQL concurrency coverage
+- Added PostgreSQL-backed test settings and a postgres-concurrency CI job.
+- Tests cover concurrent same-identity membership applications and concurrent attempts to invoice the same accepted ABN assignment.
+- The job performs a PostgreSQL migration rehearsal first and is now required by the release gate.
+- SQLite contract coverage was expanded for classified TFN routing, bonus/floor rules, pharmacist above-Award enforcement, deferred payroll activation, invoice snapshots/idempotency, partial hours, super, and old/new invoice immutability.
 ## Known design constraints
 
 - Keep both Vite and Next. Do not rewrite the Vite dashboard in Next.
@@ -287,3 +320,24 @@ Authoritative clean-checkout validation:
 - Standalone Mobile Lint run `35422029920` — **PASS**
 
 The private repository cannot be cloned from the local container because that runtime cannot resolve `github.com`; GitHub Actions therefore served as the clean CLI runner for the exact branch commands.
+
+## Production-blocker implementation checkpoint — 2026-09-19
+
+Functional code head before this documentation update: 55e1f62be010022e43e3392657b800c859935512.
+
+### Regulatory references rechecked during implementation
+- Fair Work Pharmacy Industry Award 2020 [MA000012], current consolidated award including 1 July 2026 amendments.
+- Current clause 16.2 junior rates remain 45/50/60/70/80/90% for under-16 through age 20 respectively.
+- Fair Work's April 2026 junior-wage-change notice says further 18–20 changes are upcoming and timing/details remain subject to implementation.
+- ATO material confirms the SG rate is 12% for 1 July 2026–30 June 2027.
+
+### Validation status of this new head
+- Static/source review: completed across routing, invoices, worker-finance wrapper, migrations, shared-core, web and mobile.
+- New regression tests: committed.
+- PostgreSQL CI job and release-gate dependency: committed.
+- Executable latest-head CI: **BLOCKED BEFORE RUNNER STEPS**.
+  - Shared Core Consolidation run 35427741247: all jobs ended with zero steps/no command logs.
+  - Mobile Lint run 35427741224: zero steps/no command logs.
+  - Direct Mobile Lint retry: again zero steps.
+- The previous green CI remains evidence for the pre-fix stack only; it is not being misrepresented as validation of these new fixes.
+- Before merge: rerun the exact latest head once GitHub allocates runners, fix any real command/test failures if they appear, and only then mark PR #3 ready.
