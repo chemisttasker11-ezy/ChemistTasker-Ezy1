@@ -197,6 +197,43 @@ class FinanceApiTests(TestCase):
         self.assertEqual(edited.data['status'], 'draft')
         self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'paid')
 
+    @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
+    def test_sent_invoice_can_be_edited_saved_and_resent_as_new_revision(self, _render):
+        record = self.create()
+        sent = self.post(f'invoices/{record["id"]}/send/', {'version': 1, 'confirmed': True})
+        self.assertEqual(sent.status_code, 200, sent.data)
+
+        payload = {**self.data, 'version': 1, 'notes': 'Corrected after first send'}
+        edited = self.client.patch(BASE + f'invoices/{record["id"]}/', payload, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data['version'], 2)
+        self.assertEqual(edited.data['status'], 'draft')
+
+        resent = self.post(f'invoices/{record["id"]}/send/', {'version': 2, 'confirmed': True})
+        self.assertEqual(resent.status_code, 200, resent.data)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=2).invoice_status, 'sent')
+
+    @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
+    def test_paid_invoice_can_be_corrected_saved_and_resent(self, _render):
+        record = self.create()
+        paid = self.post(f'invoices/{record["id"]}/mark-paid/', {'version': 1})
+        self.assertEqual(paid.status_code, 200, paid.data)
+        self.assertEqual(paid.data['status'], 'paid')
+
+        payload = {**self.data, 'version': 1, 'notes': 'Correction after paid status'}
+        edited = self.client.patch(BASE + f'invoices/{record["id"]}/', payload, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data['version'], 2)
+        self.assertEqual(edited.data['status'], 'draft')
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'paid')
+
+        resent = self.post(f'invoices/{record["id"]}/send/', {'version': 2, 'confirmed': True})
+        self.assertEqual(resent.status_code, 200, resent.data)
+        self.assertEqual(resent.data['document']['status'], 'sent')
+        self.assertEqual(len(mail.outbox), 1)
+
     def test_seed_preserves_user_defaults(self):
         self.post('items/seed/', {})
         CatalogueItem.objects.filter(owner=self.user, code='TRAVEL').update(unit_price='9.00')
