@@ -938,6 +938,7 @@ def finalize_shift_offer(offer: ShiftOffer):
                     engagement_kind=offer.engagement_kind,
                     engagement_terms_snapshot=offer.engagement_terms_snapshot,
                     engagement_terms_accepted_at=offer.engagement_terms_accepted_at,
+                    payroll_activated_at=offer.payroll_activated_at,
                     source_offer=offer,
                 )
                 assignment_ids.append(assn.id)
