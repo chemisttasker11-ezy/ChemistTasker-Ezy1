@@ -626,6 +626,9 @@ export default function LocumManager({
                 >
                     <ScrollView>
                         <Text style={styles.modalTitle}>Invite Locum to {pharmacyName || pharmacyId}</Text>
+                        <Text style={styles.helperText}>
+                            Favourite workers keep their own payment source of truth. Do not enter TFN or ABN details here: their private Payment Profile determines each accepted shift. TFN routes to payroll/timesheets and verified ABN routes to invoicing.
+                        </Text>
                         {inviteError ? <Text style={styles.dialogErrorText}>{inviteError}</Text> : null}
                         {inviteRows.map((row, idx) => (
                             <View key={idx} style={styles.inviteRow}>
