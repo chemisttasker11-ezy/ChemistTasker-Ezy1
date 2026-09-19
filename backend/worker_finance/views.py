@@ -419,7 +419,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         ).exists()
         if not delivered:
             raise Http404
-        return pdf_response(record, serialize_revision(record, revision))
+        return pdf_response(record, serialize_owner_revision(record, revision))
 
     @action(detail=True, methods=['post'], url_path='request-revision')
     def request_revision(self, request, pk=None):
