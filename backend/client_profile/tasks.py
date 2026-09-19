@@ -1261,6 +1261,83 @@ def email_membership_application_submitted(app_id: int):
         )
 
 
+@shared_task(name="client_profile.tasks.email_membership_application_review_updated", queue="notifications")
+def email_membership_application_review_updated(app_id: int, changes: list[dict] | None = None):
+    """Notify an applicant immediately when the pharmacy edits reviewable application fields."""
+    try:
+        app = (
+            MembershipApplication.objects
+            .select_related("pharmacy", "submitted_by")
+            .get(id=app_id)
+        )
+    except MembershipApplication.DoesNotExist:
+        logger.warning("Application %s not found", app_id)
+        return
+
+    if not app.email or app.status != "PENDING":
+        return
+
+    field_labels = {
+        "role": "Role",
+        "first_name": "First name",
+        "last_name": "Last name",
+        "job_title": "Job title",
+        "pharmacist_award_level": "Pharmacist Award classification",
+        "otherstaff_classification_level": "Classification level",
+        "intern_half": "Intern training half",
+        "student_year": "Student year",
+    }
+    normalized_changes = []
+    for change in changes or []:
+        field_name = str(change.get("field") or "")
+        if not field_name:
+            continue
+        normalized_changes.append({
+            "field": field_name,
+            "label": field_labels.get(field_name, field_name.replace("_", " ").title()),
+            "from": change.get("from"),
+            "to": change.get("to"),
+        })
+    if not normalized_changes:
+        return
+
+    applicant_user = getattr(app, "submitted_by", None) or User.objects.filter(
+        email__iexact=app.email
+    ).first()
+    dashboard_url = get_frontend_dashboard_url(applicant_user).rstrip("/")
+    membership_url = f"{dashboard_url}/memberships"
+    pharmacy = app.pharmacy
+    labels = [item["label"] for item in normalized_changes]
+
+    ctx = {
+        "pharmacy_name": pharmacy.name,
+        "applicant_full_name": f"{app.first_name} {app.last_name}".strip(),
+        "changes": normalized_changes,
+        "membership_url": membership_url,
+    }
+    notification = {
+        "title": f"Application updated: {pharmacy.name}",
+        "body": "The pharmacy reviewed and updated: " + ", ".join(labels) + ".",
+        "action_url": membership_url,
+        "payload": {
+            "application_id": app.id,
+            "status": app.status,
+            "review_changes": normalized_changes,
+        },
+    }
+    if applicant_user:
+        notification["user_ids"] = [applicant_user.id]
+
+    send_async_email(
+        subject=f"{pharmacy.name} updated your membership application",
+        recipient_list=[app.email],
+        template_name="emails/membership_application_review_updated.html",
+        text_template="emails/membership_application_review_updated.txt",
+        context=ctx,
+        notification=notification,
+    )
+
+
 @shared_task(name="client_profile.tasks.email_membership_application_approved", queue="notifications")
 def email_membership_application_approved(app_id: int):
     """Notify the applicant with the final accepted membership and terms."""
