@@ -25,6 +25,7 @@ interface MagicInfo {
   pharmacy_name: string;
   category: 'FULL_PART_TIME' | 'LOCUM_CASUAL';
   expires_at: string;
+  payroll_enabled: boolean;
 }
 
 const getFirstErrorMessage = (value: unknown): string | null => {
@@ -89,6 +90,7 @@ export default function MembershipApplyPage() {
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [mobile, setMobile] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [email, setEmail] = useState('');
   const [jobTitle, setJobTitle] = useState('');
 
@@ -99,6 +101,8 @@ export default function MembershipApplyPage() {
 
   const isAuthenticatedWorker = user?.role === 'PHARMACIST' || user?.role === 'OTHER_STAFF';
   const authenticatedRoleBlocked = Boolean(user && !isAuthenticatedWorker);
+  const payrollClassificationRequired =
+    info?.category === 'FULL_PART_TIME' && Boolean(info?.payroll_enabled);
   const roleOptions = useMemo(() => {
     if (user?.role === 'PHARMACIST') {
       return ROLE_OPTIONS.filter((option) => option.value === 'PHARMACIST');
@@ -204,7 +208,7 @@ export default function MembershipApplyPage() {
         return;
       }
 
-      if (activeLevelField && !activeLevelField.value) {
+      if (payrollClassificationRequired && activeLevelField && !activeLevelField.value) {
         setSubmitError(`Please select ${activeLevelField.label.toLowerCase()}.`);
         setSubmitting(false);
         return;
@@ -212,6 +216,18 @@ export default function MembershipApplyPage() {
 
       if (authenticatedRoleBlocked) {
         setSubmitError('Only pharmacist and other staff accounts can submit this application while signed in.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (!dateOfBirth) {
+        setSubmitError('Please enter your date of birth.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (dateOfBirth > new Date().toISOString().slice(0, 10)) {
+        setSubmitError('Date of birth cannot be in the future.');
         setSubmitting(false);
         return;
       }
@@ -240,11 +256,12 @@ export default function MembershipApplyPage() {
         last_name: lastName.trim(),
         username: username.trim(),
         mobile_number: mobile.trim(),
+        date_of_birth: dateOfBirth,
         email: email.trim().toLowerCase(),
-        pharmacist_award_level: pharmacistLevel || null,
-        otherstaff_classification_level: otherStaffLevel || null,
-        intern_half: internHalf || null,
-        student_year: studentYear || null,
+        pharmacist_award_level: payrollClassificationRequired ? (pharmacistLevel || null) : null,
+        otherstaff_classification_level: payrollClassificationRequired ? (otherStaffLevel || null) : null,
+        intern_half: payrollClassificationRequired ? (internHalf || null) : null,
+        student_year: payrollClassificationRequired ? (studentYear || null) : null,
       };
 
       if (requiresJobTitle) {
@@ -353,6 +370,19 @@ export default function MembershipApplyPage() {
             )}
             {submitError && <Alert severity="error" sx={{ mb: 2 }}>{submitError}</Alert>}
 
+            {info?.category === 'FULL_PART_TIME' && (
+              <Alert severity={info.payroll_enabled ? 'info' : 'success'} sx={{ mb: 2 }}>
+                {info.payroll_enabled
+                  ? 'This pharmacy uses ChemistTasker Payroll. Your Award classification will be reviewed by the pharmacy and used to prepare your dated employment terms. Your TFN and super details stay in your private worker profile and are not entered in this application.'
+                  : 'This pharmacy manages payroll outside ChemistTasker. ChemistTasker can still manage roster, attendance and timesheets. Your private TFN details are not collected by this pharmacy application.'}
+              </Alert>
+            )}
+            {info?.category === 'LOCUM_CASUAL' && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Favourite-list membership does not set a standing pay rate or payment method. Your verified ChemistTasker worker profile remains the source of truth for TFN vs ABN. Each accepted shift freezes the final rate and routes TFN work to payroll/timesheet processing or ABN work to invoicing.
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit}>
               <TextField
                 select
@@ -411,6 +441,19 @@ export default function MembershipApplyPage() {
               <TextField
                 fullWidth
                 margin="normal"
+                label="Date of birth"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ max: new Date().toISOString().slice(0, 10) }}
+                helperText="Used for identity matching and age-dependent Pharmacy Award rates. The pharmacy cannot edit this after submission."
+                required
+              />
+
+              <TextField
+                fullWidth
+                margin="normal"
                 label="Email"
                 type="email"
                 value={email}
@@ -430,7 +473,7 @@ export default function MembershipApplyPage() {
                 />
               )}
 
-              {activeLevelField && (
+              {payrollClassificationRequired && activeLevelField && (
                 <TextField
                   select
                   fullWidth
@@ -449,6 +492,9 @@ export default function MembershipApplyPage() {
               )}
 
               <Box mt={3}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
+                  After submission, email, mobile number, date of birth and username are locked. The pharmacy may review employment-facing details before approval; any changes are recorded and communicated to you.
+                </Typography>
                 <Button
                   fullWidth
                   type="submit"
