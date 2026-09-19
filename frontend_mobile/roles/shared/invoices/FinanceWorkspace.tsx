@@ -56,9 +56,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: {}, save: async fields => {
       const note = fields.note.trim();
       if (kind === 'revise' && !note) throw new Error('Add a revision note for the contractor.');
-      if (kind === 'revise') return finance.requestRevision(invoice.id, invoice.version, note);
-      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, invoice.version, note);
-      return finance.approveForPayment(invoice.id, invoice.version, note);
+      if (kind === 'revise') return finance.requestRevision(invoice.id, note);
+      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, note);
+      return finance.approveForPayment(invoice.id, note);
     }});
   };
   const closeForm = () => { if (!busy) Alert.alert('Discard changes?', 'Unsaved changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => setForm(null) }]); };
@@ -74,7 +74,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: 8, marginBottom: 16 }} />}
       {tab === 'Invoices' && <>
         <View style={{ flexDirection: 'row', gap: 24, marginBottom: 20 }}><View><Text variant="labelMedium">Balance due</Text><Text variant="titleLarge">{money(invoices.filter(i => !i.voided && i.kind === 'invoice').reduce((sum, i) => sum + Number(i.balance), 0))}</Text></View><View><Text variant="labelMedium">Saved</Text><Text variant="titleLarge">{invoices.filter(i => financeStatus(i) === 'Saved').length}</Text></View></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>{['All', 'Draft', 'Unpaid', 'Overdue', 'Part paid', 'Paid'].map(s => <Chip key={s} selected={status === s} onPress={() => setStatus(s)}>{s}</Chip>)}</ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>{['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(s => <Chip key={s} selected={status === s} onPress={() => setStatus(s)}>{s}</Chip>)}</ScrollView>
         {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => setSelected(i)}>View invoice</Button></Surface>)}
         {!invoices.length && <View style={{ padding: 24, alignItems: 'center', gap: 12 }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
       </>}
