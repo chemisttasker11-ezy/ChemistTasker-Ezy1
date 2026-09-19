@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIRequestFactory, force_authenticate
+from unittest.mock import patch
 
 from client_profile.models import (
     InvoiceLineItem,
@@ -16,7 +18,8 @@ from client_profile.models import (
 )
 from client_profile.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
-from worker_finance.models import CatalogueItem
+from client_profile.views import send_invoice_email
+from worker_finance.models import CatalogueItem, Delivery
 from worker_finance.services import save_draft, serialize_record
 
 
@@ -216,6 +219,36 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(updated.gst_amount, Decimal("56.00"))
         self.assertEqual(updated.total, Decimal("666.00"))
 
+
+    def test_legacy_send_locks_new_workspace_and_cannot_send_twice(self):
+        invoice = self._generate()
+        invoice.bill_to_email = self.owner.email
+        invoice.save(update_fields=["bill_to_email"])
+        record = invoice.finance_record
+        factory = APIRequestFactory()
+
+        def request():
+            req = factory.post(f"/client-profile/invoices/{invoice.id}/send/", {}, format="json")
+            force_authenticate(req, user=self.worker)
+            return req
+
+        with patch("client_profile.views.render_invoice_to_pdf", return_value=b"%PDF-test"), patch(
+            "client_profile.views.async_task"
+        ) as enqueue:
+            first = send_invoice_email(request(), invoice.id)
+            second = send_invoice_email(request(), invoice.id)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(enqueue.call_count, 1)
+
+        invoice.refresh_from_db()
+        record.refresh_from_db()
+        self.assertEqual(invoice.status, "sent")
+        self.assertIsNotNone(record.locked_at)
+        delivery = Delivery.objects.get(record=record, version=record.version)
+        self.assertEqual(delivery.recipient, self.owner.email)
+        self.assertEqual(delivery.status, "legacy_queued")
 
     def test_new_finance_workspace_edit_cannot_rewrite_accepted_shift_line(self):
         invoice = self._generate()
