@@ -2,7 +2,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    dependencies = [("client_profile", "0051_shiftprofileaccessaudit")]
+    dependencies = [("client_profile", "0051_kiosk_pairing_recovery_attempt")]
 
     operations = [
         migrations.AddField(
