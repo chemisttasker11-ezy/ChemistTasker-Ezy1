@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, CircularProgress, FormControlLabel, Switch, Typography } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
@@ -13,6 +13,7 @@ import StaffManager from "./StaffManager";
 import LocumManager from "./LocumManager";
 import PharmacyAdmins from "./PharmacyAdmins";
 import { useNavigate } from "react-router-dom";
+import { getPayrollConfiguration, updatePayrollConfiguration } from "../../../../features/workforce/api";
 
 const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
 const DASHBOARD_INK = "#06123A";
@@ -126,6 +127,39 @@ export default function OwnerPharmacyDetailPage({
   const staffSectionRef = useRef<HTMLDivElement>(null);
   const locumSectionRef = useRef<HTMLDivElement>(null);
   const adminsSectionRef = useRef<HTMLDivElement>(null);
+  const [payrollEnabled, setPayrollEnabled] = useState<boolean>(
+    Boolean((pharmacy as any).use_chemisttasker_payroll ?? (pharmacy as any).useChemisttaskerPayroll),
+  );
+  const [payrollLoading, setPayrollLoading] = useState(false);
+  const [payrollError, setPayrollError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setPayrollError("");
+    getPayrollConfiguration(Number(pharmacy.id))
+      .then((config) => {
+        if (!cancelled) setPayrollEnabled(Boolean(config.use_chemisttasker_payroll));
+      })
+      .catch((error: any) => {
+        if (!cancelled) setPayrollError(error?.message || "Unable to load payroll configuration.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pharmacy.id]);
+
+  const handlePayrollToggle = async (enabled: boolean) => {
+    setPayrollLoading(true);
+    setPayrollError("");
+    try {
+      const config = await updatePayrollConfiguration(Number(pharmacy.id), enabled);
+      setPayrollEnabled(Boolean(config.use_chemisttasker_payroll));
+    } catch (error: any) {
+      setPayrollError(error?.message || "Unable to update payroll configuration.");
+    } finally {
+      setPayrollLoading(false);
+    }
+  };
 
   const scrollTo = (ref: { current: HTMLElement | null }) => {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -213,6 +247,45 @@ export default function OwnerPharmacyDetailPage({
       </Box>
 
       <Box sx={{ mt: 3 }} ref={staffSectionRef}>
+        <Box
+          sx={{
+            mb: 2,
+            p: { xs: 2, md: 2.5 },
+            border: "1px solid #E5ECF7",
+            borderRadius: { xs: "16px", md: "20px" },
+            background: "#FFFFFF",
+          }}
+        >
+          <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", gap: 2, alignItems: { md: "center" } }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ color: DASHBOARD_INK, fontSize: { xs: 22, md: 26 }, fontWeight: 950 }}>
+                Use ChemistTasker Payroll
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.75, color: DASHBOARD_MUTED, maxWidth: 780, fontWeight: 700, lineHeight: 1.45 }}>
+                Optional. Keep this off while you use your current payroll system. Staff can still be invited, rostered, clocked and timesheeted without entering Award classifications or ChemistTasker pay rates.
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+              {payrollLoading ? <CircularProgress size={20} /> : null}
+              <FormControlLabel
+                control={<Switch checked={payrollEnabled} disabled={payrollLoading} onChange={(_, checked) => void handlePayrollToggle(checked)} />}
+                label={payrollEnabled ? "Enabled" : "Disabled"}
+                sx={{ m: 0 }}
+              />
+            </Box>
+          </Box>
+          {payrollEnabled ? (
+            <Alert severity="info" sx={{ mt: 1.5 }}>
+              ChemistTasker Payroll requires dated employment terms for TFN staff: employment type, Award classification, Award or above-award rates, and agreed part-time hours where applicable. Before payroll processing, the worker must also complete TFN and super fund details. ABN assignees continue through invoicing.
+            </Alert>
+          ) : (
+            <Alert severity="success" sx={{ mt: 1.5 }}>
+              Timesheet-only mode is active. No Award classification or pay-rate setup is required for direct pharmacy staff. Approved timesheets can be handed to your existing payroll system.
+            </Alert>
+          )}
+          {payrollError ? <Alert severity="error" sx={{ mt: 1.5 }}>{payrollError}</Alert> : null}
+        </Box>
+
         <Box
           sx={{
             mb: 3,
