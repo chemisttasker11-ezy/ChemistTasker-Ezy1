@@ -884,6 +884,53 @@ export interface ShiftSaved {
     createdAt: string;
 }
 
+export interface ShiftEngagementOccurrenceApi {
+    slot_id?: number | null;
+    date: string;
+    start_time: string;
+    end_time: string;
+    agreed_rate?: string | null;
+}
+
+export interface ShiftEngagementTermsApi {
+    version?: number;
+    blocked?: boolean;
+    error?: unknown;
+    acceptance_required?: boolean;
+    engagement_kind?: 'STAFF_EMPLOYMENT' | 'SHIFT_EMPLOYMENT' | 'INDEPENDENT_CONTRACTOR' | string;
+    settlement_channel?: 'PAYROLL' | 'INVOICE' | string;
+    payment_preference?: 'TFN' | 'ABN' | string;
+    pharmacy_id?: number;
+    pharmacy_name?: string;
+    pharmacy_abn?: string | null;
+    worker_id?: number;
+    worker_name?: string;
+    role?: string;
+    shift_id?: number;
+    source_visibility?: string;
+    employment_type?: string;
+    award_code?: string;
+    provider_abn?: string | null;
+    provider_entity_name?: string | null;
+    gst_registered?: boolean;
+    super_review_required?: boolean;
+    occurrences?: ShiftEngagementOccurrenceApi[];
+    facilitator_notice?: string;
+    relationship_notice?: string;
+    super_notice?: string;
+    invoice_notice?: string;
+    legal_review_notice?: string;
+    accepted_at?: string | null;
+    accepted_by_user_id?: number | null;
+}
+
+export type ShiftEngagementTerms = CamelCasedPropertiesDeep<ShiftEngagementTermsApi>;
+
+export interface ShiftOfferAcceptancePayload {
+    engagementTermsAccepted?: boolean;
+    independentContractorStatusConfirmed?: boolean;
+}
+
 export interface ShiftOfferApi {
     id: number;
     shift: number;
@@ -891,7 +938,13 @@ export interface ShiftOfferApi {
     slot?: number | null;
     slot_detail?: ShiftSlotApi | null;
     user: number;
-    status?: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+    status?: "PENDING" | "ACCEPTED_AWAITING_PAYMENT" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+    engagement_terms_preview?: ShiftEngagementTermsApi | null;
+    payment_preference_snapshot?: string | null;
+    settlement_channel?: string | null;
+    engagement_kind?: string | null;
+    engagement_terms_snapshot?: ShiftEngagementTermsApi | Record<string, unknown> | null;
+    engagement_terms_accepted_at?: string | null;
     expires_at?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
