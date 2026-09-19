@@ -9271,57 +9271,83 @@ def invoice_pdf_view(request, invoice_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_invoice_email(request, invoice_id):
-    invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
-    if invoice.user_id != request.user.id:
-        return Response({"detail": "Only the invoice issuer can send this invoice."}, status=403)
+    # Serialize send attempts so the legacy screen and the newer finance
+    # workspace cannot send the same canonical document twice concurrently.
+    with transaction.atomic():
+        invoice = get_object_or_404(
+            Invoice.objects.select_for_update(),
+            pk=invoice_id,
+            user=request.user,
+        )
+        if invoice.status != 'draft':
+            return Response(
+                {"status": invoice.status, "detail": "This invoice has already been issued."},
+                status=status.HTTP_409_CONFLICT,
+            )
 
-    # Basic recipient validation
-    to_email = (invoice.bill_to_email or "").strip()
-    if not to_email:
-        return Response({"detail": "Missing bill_to_email on invoice."}, status=400)
+        to_email = (invoice.bill_to_email or "").strip()
+        if not to_email:
+            return Response({"detail": "Missing bill_to_email on invoice."}, status=400)
 
-    # CC parsing from stored `cc_emails`
-    cc_list = []
-    if invoice.cc_emails:
-        cc_list = [e.strip() for e in invoice.cc_emails.split(",") if e.strip()]
+        cc_list = []
+        if invoice.cc_emails:
+            cc_list = [e.strip() for e in invoice.cc_emails.split(",") if e.strip()]
 
-    # Render PDF into memory
-    pdf_bytes = render_invoice_to_pdf(invoice)  # you already use this in invoice_pdf_view
-    filename = f"invoice_{invoice.id}.pdf"
-    full_bill_to_name = f"{(invoice.bill_to_first_name or '').strip()} {(invoice.bill_to_last_name or '').strip()}".strip()
+        pdf_bytes = render_invoice_to_pdf(invoice)
+        filename = f"invoice_{invoice.id}.pdf"
+        full_bill_to_name = f"{(invoice.bill_to_first_name or '').strip()} {(invoice.bill_to_last_name or '').strip()}".strip()
+        context = {
+            "invoice": invoice,
+            "client_name": (
+                (invoice.custom_bill_to_name or "").strip()
+                or full_bill_to_name
+                or (invoice.pharmacy_name_snapshot or "").strip()
+            ),
+            "issuer_name": f"{invoice.issuer_first_name} {invoice.issuer_last_name}".strip(),
+            "subtotal": str(invoice.subtotal),
+            "gst_amount": str(invoice.gst_amount),
+            "super_amount": str(invoice.super_amount),
+            "total": str(invoice.total),
+            "invoice_date": str(invoice.invoice_date),
+            "due_date": str(invoice.due_date or ""),
+        }
 
-    # Build email context (match your brand look & tone)
-    context = {
-        "invoice": invoice,
-        "client_name": (
-            (invoice.custom_bill_to_name or "").strip()
-            or full_bill_to_name
-            or (invoice.pharmacy_name_snapshot or "").strip()
-        ),
-        "issuer_name": f"{invoice.issuer_first_name} {invoice.issuer_last_name}".strip(),
-        "subtotal": str(invoice.subtotal),
-        "gst_amount": str(invoice.gst_amount),
-        "super_amount": str(invoice.super_amount),
-        "total": str(invoice.total),
-        "invoice_date": str(invoice.invoice_date),
-        "due_date": str(invoice.due_date or ""),
-    }
+        # Preserve the existing async email path. The DB row lock prevents a
+        # second request from queuing the same canonical invoice concurrently.
+        async_task(
+            'users.tasks.send_async_email',
+            subject=f"Invoice #{invoice.id} from ChemistTasker",
+            recipient_list=[to_email],
+            template_name="emails/invoice_sent.html",
+            context=context,
+            text_template=None,
+            cc=cc_list,
+            attachments=[(filename, pdf_bytes, "application/pdf")],
+        )
 
-    # Kick off async email with PDF attached (backward compatible task)
-    async_task(
-        'users.tasks.send_async_email',
-        subject=f"Invoice #{invoice.id} from ChemistTasker",
-        recipient_list=[to_email],
-        template_name="emails/invoice_sent.html",
-        context=context,
-        text_template=None,               # optional plain text template; use html for now
-        cc=cc_list,                       # NEW
-        attachments=[(filename, pdf_bytes, "application/pdf")]  # NEW
-    )
+        invoice.status = 'sent'
+        invoice.save(update_fields=['status'])
 
-    # Mark as sent (see §3 below)
-    invoice.status = 'sent'
-    invoice.save(update_fields=['status'])
+        # If the invoice has already been adopted by the new finance workspace,
+        # freeze that wrapper too. Both UIs now represent the same document.
+        try:
+            from worker_finance.models import Delivery, InvoiceRecord
+
+            record = InvoiceRecord.objects.select_for_update().get(invoice=invoice)
+        except Exception:
+            record = None
+        if record is not None:
+            if not record.locked_at:
+                record.locked_at = timezone.now()
+                record.save(update_fields=['locked_at', 'updated_at'])
+            Delivery.objects.get_or_create(
+                record=record,
+                version=record.version,
+                defaults={
+                    'recipient': to_email,
+                    'status': 'legacy_queued',
+                },
+            )
 
     return Response({"status": "sent"})
 
