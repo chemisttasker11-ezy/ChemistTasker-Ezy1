@@ -22,6 +22,7 @@ from client_profile.models import (
     MembershipApplication,
     MembershipInviteLink,
     OtherStaffOnboarding,
+    PharmacistOnboarding,
     OwnerOnboarding,
     Pharmacy,
     Shift,
@@ -144,6 +145,96 @@ class MembershipApplicationIntegrityTests(TestCase):
         self.assertEqual(updated.review_changes[0]["from"], "Pharmacist")
         self.assertEqual(updated.review_changes[0]["to"], "Senior Pharmacist")
         self.assertEqual(updated.reviewed_by_id, self.manager.id)
+
+    def test_owner_review_edit_queues_applicant_notification(self):
+        serializer = MembershipApplicationSerializer(data=self._payload())
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        app = serializer.save()
+
+        factory = APIRequestFactory()
+        request = factory.patch(
+            f"/client-profile/membership-applications/{app.id}/",
+            {"job_title": "Senior Pharmacist"},
+            format="json",
+        )
+        force_authenticate(request, user=self.manager)
+
+        with patch("client_profile.views.async_task") as queued:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = MembershipApplicationViewSet.as_view({"patch": "partial_update"})(
+                    request,
+                    pk=app.id,
+                )
+
+        self.assertEqual(response.status_code, 200)
+        queued.assert_called_once()
+        args = queued.call_args.args
+        self.assertEqual(
+            args[0],
+            "client_profile.tasks.email_membership_application_review_updated",
+        )
+        self.assertEqual(args[1], app.id)
+        self.assertEqual(args[2][0]["field"], "job_title")
+        self.assertEqual(args[2][0]["to"], "Senior Pharmacist")
+
+    def test_payment_profile_summary_is_safe_and_reports_tfn_readiness(self):
+        worker = User.objects.create_user(
+            email="candidate@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        PharmacistOnboarding.objects.create(
+            user=worker,
+            payment_preference="TFN",
+            tfn_number="123456789",
+            super_fund_name="Example Super",
+            super_usi="EXAMPLE123",
+            super_member_number="MEMBER-SECRET",
+        )
+        serializer = MembershipApplicationSerializer(data=self._payload())
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        app = serializer.save()
+
+        status_data = MembershipApplicationSerializer(app).data["payment_profile_status"]
+
+        self.assertEqual(status_data["payment_preference"], "TFN")
+        self.assertTrue(status_data["payroll_ready"])
+        self.assertEqual(status_data["missing_fields"], [])
+        self.assertNotIn("tfn_number", status_data)
+        self.assertNotIn("super_member_number", status_data)
+        self.assertNotIn("123456789", str(status_data))
+        self.assertNotIn("MEMBER-SECRET", str(status_data))
+
+    def test_staff_approval_rejects_abn_source_profile(self):
+        worker = User.objects.create_user(
+            email="candidate@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        PharmacistOnboarding.objects.create(
+            user=worker,
+            payment_preference="ABN",
+            abn="51824753556",
+            abn_verified=True,
+            abn_entity_confirmed=True,
+        )
+        serializer = MembershipApplicationSerializer(data=self._payload())
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        app = serializer.save()
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            f"/client-profile/membership-applications/{app.id}/approve/",
+            {"employment_type": "CASUAL"},
+            format="json",
+        )
+        force_authenticate(request, user=self.manager)
+        response = MembershipApplicationViewSet.as_view({"post": "approve"})(request, pk=app.id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("payment_profile", response.data)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "PENDING")
 
     def test_approval_rejects_explicit_invalid_employment_type(self):
         serializer = MembershipApplicationSerializer(data=self._payload())
