@@ -277,6 +277,8 @@ def save_draft(owner, data, record_id=None, source='external'):
             raise ValidationError('Only unissued service-invoice drafts can be edited.')
         if str(record.request_key) != str(data['request_key']):
             raise ValidationError('The draft request key cannot change.')
+    internal_frozen_lines = None
+    internal_manual_lines = None
     if record_id is not None and record.source == "internal":
         frozen = {
             int(line["source_assignment_id"]): line
@@ -292,10 +294,8 @@ def save_draft(owner, data, record_id=None, source='external'):
                     raise ValidationError("Internal shift source lines cannot be added or replaced.")
                 continue
             submitted_manual.append(line)
-        data = {
-            **data,
-            "lines": [*frozen.values(), *submitted_manual],
-        }
+        internal_frozen_lines = list(frozen.values())
+        internal_manual_lines = submitted_manual
     elif any(line.get("source_assignment_id") or line.get("locked") for line in data.get("lines", [])):
         raise ValidationError("Shift source identities are server-managed and cannot be supplied for an external invoice.")
 
@@ -303,7 +303,16 @@ def save_draft(owner, data, record_id=None, source='external'):
         raise ValidationError("The pharmacy/customer on an accepted-shift invoice is locked to the original engagement.")
 
     customer = get_object_or_404(Customer, pk=data['customer_id'], owner=owner, active=True)
-    lines = snapshot_lines(owner, data)
+    if internal_frozen_lines is not None:
+        manual_snapshot = (
+            snapshot_lines(owner, {"lines": internal_manual_lines})
+            if internal_manual_lines
+            else []
+        )
+        lines = [*internal_frozen_lines, *manual_snapshot]
+        data = {**data, "lines": lines}
+    else:
+        lines = snapshot_lines(owner, data)
     calc = calculate(data, lines)
     if Decimal(calc['payable']) <= 0:
         raise ValidationError('A service invoice needs a positive worker-payable amount.')
