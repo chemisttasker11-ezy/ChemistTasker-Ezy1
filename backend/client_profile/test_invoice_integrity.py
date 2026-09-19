@@ -17,7 +17,7 @@ from client_profile.models import (
 from client_profile.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
 from worker_finance.models import CatalogueItem
-from worker_finance.services import save_draft
+from worker_finance.services import save_draft, serialize_record
 
 
 User = get_user_model()
@@ -127,7 +127,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         locked_line = next(line for line in record.payload["lines"] if line.get("source_assignment_id"))
         self.assertTrue(locked_line["locked"])
         self.assertEqual(locked_line["source_assignment_id"], self.assignment.id)
-        self.assertEqual(record.source_snapshot if hasattr(record, "source_snapshot") else invoice.source_snapshot, invoice.source_snapshot)
+        self.assertEqual(serialize_record(record)["source_snapshot"], invoice.source_snapshot)
 
     def test_same_accepted_assignment_cannot_be_invoiced_twice(self):
         first = self._generate()
