@@ -207,13 +207,19 @@ export interface WorkforceAwardPreview {
   award_code: string;
   award_source_label: string;
   award_source_url: string;
+  award_reference_url?: string;
   award_effective_from: string;
+  award_effective_basis?: string;
+  rate_scope?: string;
   role: string;
   classification: string;
   classification_label: string;
   employment_type: string;
   minimum_hourly_rate: string;
   schedule: Record<string, Record<string, string>>;
+  window_labels?: Record<string, Record<string, string>>;
+  ordinary_hours_note?: string;
+  junior_rate_note?: string;
   rate_weekday: string;
   rate_saturday: string;
   rate_sunday: string;
@@ -222,7 +228,7 @@ export interface WorkforceAwardPreview {
   rate_late_night: string;
   early_morning_applicable: boolean;
   late_night_applicable: boolean;
-  classification_options: Array<{ value: string; label: string }>;
+  classification_options: Array<{ value: string; label: string; help?: string }>;
   default_classification: string;
 }
 
