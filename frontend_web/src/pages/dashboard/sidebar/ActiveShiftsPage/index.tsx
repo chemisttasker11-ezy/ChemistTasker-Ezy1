@@ -5,6 +5,7 @@ import {
     Box,
     CircularProgress,
     Snackbar,
+    Stack,
     IconButton,
     Button,
     ThemeProvider,
@@ -49,7 +50,6 @@ import {
     PUBLIC_LEVEL_KEY,
     CustomEscalationLevelKey,
     getCurrentLevelKey,
-    getShiftSummary,
     deriveLevelSequence,
 } from './utils/shiftHelpers';
 import { findInterestForOffer } from './utils/candidateHelpers';
@@ -69,14 +69,9 @@ import {
     toFiniteNumber,
     resolveSlotId,
     getSlotIds,
-    formatAuSlotDateTime,
-    offerBelongsToSlot,
-    interestBelongsToSlot,
     findInterestForMember,
     buildPublicSlotSignature,
     buildMemberSlotSignature,
-    countUniquePeople,
-    isActiveCounterOffer,
     getCandidateUserId,
 } from './utils/activeShiftRuntime';
 
