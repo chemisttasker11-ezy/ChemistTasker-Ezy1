@@ -225,3 +225,69 @@ Do not mark the feature complete until all items below are resolved.
 ## Pause checkpoint
 
 Work is committed and the branch is safe to resume from. Continue from the unfinished work list above, starting with correspondence + shared-core/application review UI, then payroll opt-in UI, then the remaining routing/payroll/invoice hardening and tests.
+
+## Validation checkpoint — 2026-09-19 14:38 AEST
+
+Validated functional head: `c4ce7aef7d360529ce6e88aa14a8dbfc009a3e16`.
+
+### Temporary architecture gate change requested by owner
+
+- Removed the source byte-size / "capped at xx KB" budget enforcement from `scripts/audit-architecture-boundaries.mjs` for this validation cycle.
+- The architecture audit still enforces forbidden duplicate/stale paths and required lazy/Suspense boundaries.
+- Source-size splitting remains a follow-up code-quality concern, but is not blocking the current test suite.
+
+### Migration repairs found by CLI/CI validation
+
+- Fixed `0052_membershipapplication_date_of_birth` dependency to the real parent: `0051_kiosk_pairing_recovery_attempt`.
+- Aligned the MembershipApplication email/status index name between model state and migration: `cp_memapp_email_status_idx`.
+- After those fixes, Django `check` and `makemigrations --check --dry-run` both passed.
+
+### Full command-level validation result
+
+GitHub Actions was used as the authoritative CLI runner because the local container cannot resolve github.com to clone the private repository. The workflow executes the same project commands in a clean checkout.
+
+Run: `Shared Core Consolidation #265` / Actions run `35421644670` on functional head `c4ce7aef...`.
+
+All gates passed:
+
+- backend Django system check — PASS
+- migration drift check — PASS
+- auth/account contract tests — PASS
+- marketplace contract tests — PASS
+- public-content contract tests — PASS
+- membership/application/engagement integrity tests — PASS
+- workforce + finance contract tests — PASS
+- shared-core typecheck — PASS
+- shared-core tests — PASS
+- shared-core build — PASS
+- shared-core boundary audit — PASS
+- Vite TypeScript check — PASS
+- cross-frontend auth-flow tests — PASS
+- Vite production build — PASS
+- Next typecheck — PASS
+- Next production build — PASS
+- mobile lint — PASS
+- mobile TypeScript check — PASS
+- standalone Mobile Lint workflow — PASS
+- kiosk Cargo tests — PASS
+- architecture audit with source-size budget disabled — PASS
+- release gate — PASS
+
+### Membership / Employment / Payroll state after validation
+
+- DOB is part of new membership applications and drives junior Award age handling.
+- Pending applications are duplicate-guarded and owner review edits are audited.
+- Applicant identifiers remain locked after submission (email, mobile, DOB, username).
+- Approval is transactional with canonical Membership linkage and, when ChemistTasker Payroll is enabled, initial EmploymentEngagement creation.
+- Approval correspondence contains manager edits and final employment/pay terms when payroll is enabled.
+- Rejection correspondence/email + notification is implemented.
+- Pharmacy-level "Use ChemistTasker Payroll" is opt-in; OFF means timesheet-only and no rate/Award setup requirement for direct staff.
+- ABN external assignees remain invoice-routed; TFN external assignees freeze per-shift terms and route to payroll or timesheet-only according to pharmacy payroll mode.
+- Direct roster assignment no longer forces EmploymentEngagement when ChemistTasker Payroll is OFF.
+- External/favourite/marketplace workers must use final offer acceptance so fixed/flexible/negotiated rates and engagement terms are frozen.
+
+### Current merge posture
+
+- PR #3 remains DRAFT intentionally.
+- Functional code at `c4ce7aef...` passed the entire current CI/release gate.
+- Remaining work should now be preservation/security review rather than fixing failing functional tests.
