@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
@@ -14,6 +15,7 @@ const hours = (minutes?: number | null) => minutes == null ? '' : (minutes / 60)
 const pretty = (value?: string | null) => String(value || '').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 
 export default function WorkforceSettingsScreen() {
+  const router = useRouter();
   const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [payroll, setPayroll] = useState<WorkforcePayrollConfiguration | null>(null);
@@ -115,6 +117,7 @@ export default function WorkforceSettingsScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />} contentContainerStyle={styles.content}>
         <View>
+          <Button compact icon="arrow-left" onPress={() => router.back()} style={{ alignSelf: 'flex-start', marginBottom: 6 }}>Back</Button>
           <Text variant="headlineMedium" style={styles.title}>Workforce settings</Text>
           <Text variant="bodyMedium" style={styles.subtitle}>Manage payroll opt-in, contracted hours, and review the dated employment terms frozen into roster and timesheet history.</Text>
         </View>
