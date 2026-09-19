@@ -30,6 +30,7 @@ const byteBudgets = {
   'frontend_mobile/roles/shared/calendar/index.tsx': 55000,
   'frontend_mobile/roles/shared/hub/HubScreen.tsx': 56000,
   'frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx': 40000,
+  'frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.tsx': 44000,
 };
 
 const failures = [];
