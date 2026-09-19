@@ -227,6 +227,235 @@ def _offer_occurrences(shift, offer=None):
     } for slot in shift.slots.all()]
 
 
+
+def _parse_time(value):
+    if isinstance(value, time):
+        return value
+    raw = str(value or "").strip()
+    for fmt, length in (("%H:%M:%S", 8), ("%H:%M", 5)):
+        try:
+            return datetime.strptime(raw[:length], fmt).time()
+        except ValueError:
+            continue
+    raise ValidationError({"shift_time": f"Invalid shift time: {value}"})
+
+
+def _other_staff_classification(onboarding, role):
+    role = str(role or "").upper()
+    onboard_role = str(getattr(onboarding, "role_type", "") or "").upper()
+    if onboard_role and onboard_role != role:
+        raise ValidationError({
+            "role": (
+                f"This worker onboarded to the public platform as {onboard_role.replace('_', ' ').title()} "
+                f"and cannot accept a {role.replace('_', ' ').title()} shift."
+            )
+        })
+    if role in {"ASSISTANT", "TECHNICIAN"}:
+        return str(getattr(onboarding, "classification_level", "") or "").upper()
+    if role == "INTERN":
+        return str(getattr(onboarding, "intern_half", "") or "").upper()
+    if role == "STUDENT":
+        return str(getattr(onboarding, "student_year", "") or "").upper()
+    return ""
+
+
+def _segment_rate_key(day_type, clock_time):
+    if day_type == "public_holiday":
+        return ("public_holiday", "all_day")
+    if day_type == "weekday":
+        if clock_time < time(7, 0):
+            return None
+        if clock_time < time(8, 0):
+            return ("weekday", "early_07_08")
+        if clock_time < time(19, 0):
+            return ("weekday", "daytime_08_19")
+        if clock_time < time(21, 0):
+            return ("weekday", "evening_19_21")
+        return ("weekday", "late_21_24")
+    if day_type == "saturday":
+        if clock_time < time(7, 0):
+            return None
+        if clock_time < time(8, 0):
+            return ("saturday", "early_07_08")
+        if clock_time < time(18, 0):
+            return ("saturday", "daytime_08_18")
+        if clock_time < time(21, 0):
+            return ("saturday", "evening_18_21")
+        return ("saturday", "late_21_24")
+    if clock_time < time(7, 0) or clock_time >= time(21, 0):
+        return ("sunday", "outside_07_21")
+    return ("sunday", "daytime_07_21")
+
+
+def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
+    from client_profile.services import get_day_type
+
+    work_date = date.fromisoformat(str(occurrence["date"]))
+    start_time = _parse_time(occurrence["start_time"])
+    end_time = _parse_time(occurrence["end_time"])
+    start_dt = datetime.combine(work_date, start_time)
+    end_dt = datetime.combine(work_date, end_time)
+    if end_dt <= start_dt:
+        end_dt += timedelta(days=1)
+
+    if end_dt - start_dt > timedelta(hours=12):
+        return {
+            "rate": None,
+            "review_required": True,
+            "review_reason": "Shift exceeds 12 hours and needs overtime review before ChemistTasker Payroll can process it.",
+            "segments": [],
+        }
+
+    schedule = award_snapshot["schedule"]
+    state = getattr(pharmacy, "state", "") or ""
+    segments = []
+    total_hours = Decimal("0")
+    total_pay = Decimal("0")
+    cursor = start_dt
+
+    while cursor < end_dt:
+        day_end = datetime.combine(cursor.date() + timedelta(days=1), time.min)
+        segment_end_limit = min(end_dt, day_end)
+        day_type = get_day_type(cursor.date(), state)
+
+        if day_type == "weekday":
+            boundary_times = [time(7, 0), time(8, 0), time(19, 0), time(21, 0)]
+        elif day_type == "saturday":
+            boundary_times = [time(7, 0), time(8, 0), time(18, 0), time(21, 0)]
+        elif day_type == "sunday":
+            boundary_times = [time(7, 0), time(21, 0)]
+        else:
+            boundary_times = []
+
+        boundaries = [segment_end_limit]
+        for boundary_time in boundary_times:
+            boundary = datetime.combine(cursor.date(), boundary_time)
+            if cursor < boundary < segment_end_limit:
+                boundaries.append(boundary)
+        next_boundary = min(boundaries)
+
+        rate_key = _segment_rate_key(day_type, cursor.time())
+        if rate_key is None:
+            return {
+                "rate": None,
+                "review_required": True,
+                "review_reason": (
+                    "This occurrence includes hours before 7:00 am on a weekday/Saturday. "
+                    "Overtime must be reviewed before ChemistTasker Payroll can process it."
+                ),
+                "segments": segments,
+            }
+
+        rate = Decimal(str(schedule[rate_key[0]][rate_key[1]]))
+        hours = Decimal(str((next_boundary - cursor).total_seconds())) / Decimal("3600")
+        line_total = rate * hours
+        total_hours += hours
+        total_pay += line_total
+        segments.append({
+            "date": str(cursor.date()),
+            "start_time": cursor.time().strftime("%H:%M:%S"),
+            "end_time": next_boundary.time().strftime("%H:%M:%S"),
+            "day_type": day_type,
+            "rate_key": rate_key[1],
+            "rate": _money(rate),
+            "hours": _money(hours),
+            "line_total": _money(line_total),
+        })
+        cursor = next_boundary
+
+    if total_hours <= 0:
+        raise ValidationError({"shift_time": "Shift duration must be greater than zero."})
+    return {
+        "rate": _money(total_pay / total_hours),
+        "review_required": False,
+        "review_reason": None,
+        "segments": segments,
+    }
+
+
+def _build_tfn_award_terms(*, shift, onboarding, occurrences):
+    from workforce.award_rates import resolve_award_schedule
+
+    role = str(shift.role_needed or "").upper()
+    classification = "PHARMACIST" if role == "PHARMACIST" else _other_staff_classification(onboarding, role)
+    if not classification:
+        raise ValidationError({
+            "award_classification": "Complete the worker's public-platform Award classification before accepting this TFN shift."
+        })
+
+    bonus = Decimal(str(getattr(shift, "owner_adjusted_rate", None) or "0"))
+    if role == "PHARMACIST":
+        bonus = Decimal("0")
+
+    routed_occurrences = []
+    payroll_review_required = False
+    review_reasons = []
+    first_award_snapshot = None
+
+    for occurrence in occurrences:
+        work_date = date.fromisoformat(str(occurrence["date"]))
+        award_snapshot = resolve_award_schedule(
+            role=role,
+            classification=classification,
+            employment_type="CASUAL",
+            date_of_birth=getattr(onboarding, "date_of_birth", None),
+            as_of=work_date,
+        )
+        if first_award_snapshot is None:
+            first_award_snapshot = award_snapshot
+
+        floor = _award_floor_for_occurrence(award_snapshot, occurrence, shift.pharmacy)
+        posted_rate = (
+            Decimal(str(occurrence.get("agreed_rate")))
+            if occurrence.get("agreed_rate") not in (None, "")
+            else None
+        )
+        routed = dict(occurrence)
+        routed["posted_rate"] = _money(posted_rate)
+        routed["award_classification"] = classification
+        routed["award_floor_rate"] = floor["rate"]
+        routed["award_floor_segments"] = floor["segments"]
+        routed["owner_bonus"] = _money(bonus)
+        routed["award_review_required"] = floor["review_required"]
+        routed["award_review_reason"] = floor["review_reason"]
+
+        if floor["review_required"]:
+            payroll_review_required = True
+            if floor["review_reason"] and floor["review_reason"] not in review_reasons:
+                review_reasons.append(floor["review_reason"])
+            if posted_rate is None:
+                raise ValidationError({"agreed_rate": "The final agreed hourly rate must be recorded before accepting this shift."})
+            routed["agreed_rate"] = _money(posted_rate)
+        else:
+            floor_rate = Decimal(str(floor["rate"]))
+            if role == "PHARMACIST":
+                if posted_rate is None:
+                    raise ValidationError({"agreed_rate": "A final agreed pharmacist hourly rate is required before accepting the shift."})
+                if posted_rate <= floor_rate:
+                    raise ValidationError({
+                        "agreed_rate": (
+                            "Marketplace TFN pharmacist shifts are above-Award engagements. "
+                            f"The agreed rate must be above the applicable casual Pharmacist Award floor of {floor_rate:.2f}/hr."
+                        )
+                    })
+                routed["agreed_rate"] = _money(posted_rate)
+            else:
+                minimum_with_bonus = floor_rate + bonus
+                routed["minimum_with_bonus"] = _money(minimum_with_bonus)
+                routed["agreed_rate"] = _money(max(posted_rate or Decimal("0"), minimum_with_bonus))
+
+        routed_occurrences.append(routed)
+
+    return {
+        "classification": classification,
+        "pay_basis": "ABOVE_AWARD" if role == "PHARMACIST" else ("AWARD_PLUS_BONUS" if bonus > 0 else "AWARD_OR_HIGHER"),
+        "owner_bonus": _money(bonus),
+        "award_floor": first_award_snapshot,
+        "occurrences": routed_occurrences,
+        "payroll_review_required": payroll_review_required,
+        "payroll_review_reasons": review_reasons,
+    }
+
 def build_shift_engagement_terms(*, shift, user, offer=None):
     staff_membership = direct_pharmacy_staff_membership(user=user, pharmacy=shift.pharmacy)
     occurrences = _offer_occurrences(shift, offer)
