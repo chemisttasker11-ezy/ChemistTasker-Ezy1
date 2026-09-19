@@ -213,8 +213,6 @@ export default function RosterOwnerDialogs({
     setShiftToEdit,
     setEditIsOpenShift,
     setEditOpenShiftVisibility,
-    openShiftVisibility: optionsOpenShiftVisibility,
-    setSelectedUserForAssignment: setSelectedUserForOptions,
     handleOpenDuplicateDialog,
     selectableEscalationLevels,
     showSnackbar,
@@ -254,25 +252,15 @@ export default function RosterOwnerDialogs({
 
   const {
     open: isEditDialogOpen,
-    setOpen: setIsEditDialogOpenFromEdit,
     shiftToEdit,
-    setShiftToEdit: setShiftToEditFromEdit,
     editIsOpenShift,
-    setEditIsOpenShift: setEditIsOpenShiftFromEdit,
     editOpenShiftVisibility,
-    setEditOpenShiftVisibility: setEditOpenShiftVisibilityFromEdit,
-    selectedUserForAssignment: selectedUserForEdit,
-    setSelectedUserForAssignment: setSelectedUserForEdit,
-    filteredMembers: editFilteredMembers,
     handleSaveChanges,
   } = edit;
 
   const {
     open: isEscalateDialogOpen,
-    setOpen: setIsEscalateDialogOpenFromEscalation,
     escalationLevel,
-    setEscalationLevel: setEscalationLevelFromEscalation,
-    selectableEscalationLevels: escalationLevels,
     handleConfirmEscalation,
   } = escalation;
 
@@ -281,18 +269,6 @@ export default function RosterOwnerDialogs({
     handleClosePostShiftModal,
     handlePostShiftCompleted,
   } = postShift;
-
-  // Alias grouped values back to the original dialog names so the moved JSX stays byte-for-byte equivalent.
-  const setIsEditDialogOpen = setIsEditDialogOpenFromEdit;
-  const setSelectedUserForAssignment = setSelectedUserForEdit;
-  const setShiftToEdit = setShiftToEditFromEdit;
-  const setEditIsOpenShift = setEditIsOpenShiftFromEdit;
-  const setEditOpenShiftVisibility = setEditOpenShiftVisibilityFromEdit;
-  const openShiftVisibility = optionsOpenShiftVisibility;
-  const filteredMembers = editFilteredMembers;
-  const setIsEscalateDialogOpen = setIsEscalateDialogOpenFromEscalation;
-  const setEscalationLevel = setEscalationLevelFromEscalation;
-  const selectableEscalationLevels = escalationLevels;
 
   return (
     <>
