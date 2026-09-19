@@ -1246,6 +1246,15 @@ export interface MembershipApplicationApi {
     reviewed_by?: number | null;
     approved_membership?: number | null;
     payroll_enabled?: boolean;
+    payment_profile_status?: {
+        account_linked: boolean;
+        onboarding_complete: boolean;
+        payment_preference: 'TFN' | 'ABN' | null;
+        status: 'READY' | 'ACCOUNT_NOT_LINKED' | 'ONBOARDING_INCOMPLETE' | 'TFN_SETUP_INCOMPLETE' | 'ABN_SETUP_INCOMPLETE' | 'PAYMENT_PREFERENCE_REQUIRED' | string;
+        payroll_ready: boolean;
+        invoice_ready: boolean;
+        missing_fields: string[];
+    } | null;
 }
 
 export type MembershipApplication = CamelCasedPropertiesDeep<MembershipApplicationApi>;
