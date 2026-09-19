@@ -6416,6 +6416,7 @@ class InvoiceLineItemSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     line_items = InvoiceLineItemSerializer(many=True)
     user = serializers.PrimaryKeyRelatedField(read_only=True)
+    finance_record_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -6429,7 +6430,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'bill_to_email', 'cc_emails',
             'invoice_date', 'due_date',
             'subtotal', 'gst_amount', 'super_amount', 'total',
-            'source_snapshot',
+            'source_snapshot', 'finance_record_id',
             'status', 'created_at',
             'line_items',
             # Recipient snapshot
@@ -6441,6 +6442,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'subtotal', 'gst_amount', 'super_amount', 'total', 'source_snapshot', 'created_at'
         ]
+
+    def get_finance_record_id(self, obj):
+        record = getattr(obj, "finance_record", None)
+        return getattr(record, "id", None)
 
     def create(self, validated_data):
         items = validated_data.pop('line_items', [])
