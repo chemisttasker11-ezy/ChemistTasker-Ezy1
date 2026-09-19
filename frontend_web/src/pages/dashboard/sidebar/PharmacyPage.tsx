@@ -12,10 +12,6 @@ import {
   Chip,
   CircularProgress,
   Paper,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   FormGroup,
   GlobalStyles,
@@ -59,6 +55,7 @@ import OwnerPharmaciesPage from "./owner/OwnerPharmaciesPage";
 import OwnerPharmacyDetailPage from "./owner/OwnerPharmacyDetailPage";
 import TopBar from "./owner/TopBar";
 import type { PharmacyAdminDTO } from "./owner/types";
+import PharmacyPageDialogs from "./PharmacyPageDialogs";
 import { ORG_ROLES } from "../../../constants/roles";
 import { clearOwnerPharmacySetupSkipped, markOwnerPharmacySetupSkipped } from "../../../utils/ownerSetup";
 import {
@@ -2786,168 +2783,34 @@ export default function PharmacyPage({
         </Snackbar>
       )}
 
-      <Dialog
-        open={ownerDialog.open}
-        onClose={closeOwnerDialog}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          {ownerDialog.action === "ACCEPTED" ? "Approve claim request" : "Reject claim request"}
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Organization: <strong>{ownerDialog.claim?.organization?.name ?? "Unknown organization"}</strong>
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Pharmacy: <strong>{ownerDialog.claim?.pharmacy?.name ?? "Untitled pharmacy"}</strong>
-          </Typography>
-          <TextField
-            label={ownerDialog.action === "ACCEPTED" ? "Optional note to the organization" : "Reason (optional)"}
-            multiline
-            minRows={3}
-            fullWidth
-            value={ownerDialog.note}
-            onChange={(event) => setOwnerDialog((prev) => ({ ...prev, note: event.target.value }))}
-            placeholder={ownerDialog.action === "ACCEPTED" ? "Add a short note (optional)." : "Explain why you are rejecting (optional)."}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeOwnerDialog} disabled={ownerResponding}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color={ownerDialog.action === "ACCEPTED" ? "success" : "error"}
-            onClick={handleOwnerRespond}
-            disabled={ownerResponding || !canRespondToClaims}
-          >
-            {ownerResponding ? <CircularProgress size={18} color="inherit" /> : ownerDialog.action === "ACCEPTED" ? "Approve" : "Reject"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <PharmacyPageDialogs
+        ownerDialog={ownerDialog}
+        setOwnerDialog={setOwnerDialog}
+        closeOwnerDialog={closeOwnerDialog}
+        handleOwnerRespond={handleOwnerRespond}
+        ownerResponding={ownerResponding}
+        canRespondToClaims={canRespondToClaims}
+        pendingDeletePharmacy={pendingDeletePharmacy}
+        handleCancelDeletePharmacy={handleCancelDeletePharmacy}
+        confirmDeletePharmacy={confirmDeletePharmacy}
+        isDeletingPharmacy={isDeletingPharmacy}
+        additionalPharmacyPromptOpen={additionalPharmacyPromptOpen}
+        setAdditionalPharmacyPromptOpen={setAdditionalPharmacyPromptOpen}
+        onGoDashboard={() => navigate(onCompletePath)}
+        onAddAnother={() => openDialog()}
+        standalone={standalone}
+        dialogOpen={dialogOpen}
+        closeDialog={closeDialog}
+        editing={editing}
+        isSaving={isSaving}
+        tabIndex={tabIndex}
+        lastTabIndex={lastTabIndex}
+        handleSave={handleSave}
+        handlePreviousTab={handlePreviousTab}
+        handleNextTab={handleNextTab}
+        formContent={renderPharmacyFormSections()}
+      />
 
-      <Dialog
-        open={Boolean(pendingDeletePharmacy)}
-        onClose={handleCancelDeletePharmacy}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Delete Pharmacy</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {pendingDeletePharmacy
-              ? `You are about to delete "${pendingDeletePharmacy.name}". This action can't be undone.`
-              : "This action can't be undone."}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDeletePharmacy} disabled={isDeletingPharmacy}>
-            Cancel
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={confirmDeletePharmacy}
-            disabled={isDeletingPharmacy}
-          >
-            {isDeletingPharmacy ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={additionalPharmacyPromptOpen}
-        onClose={() => setAdditionalPharmacyPromptOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Add another pharmacy?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Do you want to add another pharmacy now, or go straight to your dashboard?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setAdditionalPharmacyPromptOpen(false);
-              navigate(onCompletePath);
-            }}
-          >
-            Go to Dashboard
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setAdditionalPharmacyPromptOpen(false);
-              openDialog();
-            }}
-          >
-            Add Another
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {!standalone && (
-      <Dialog
-        open={dialogOpen}
-        onClose={closeDialog}
-        fullWidth
-        maxWidth="xl"
-        disableEnforceFocus
-        PaperProps={{
-          sx: {
-            width: "min(1320px, calc(100vw - 32px))",
-            maxWidth: "1320px",
-            minHeight: "min(860px, calc(100vh - 48px))",
-            borderRadius: 4,
-            bgcolor: LIGHT_SURFACE,
-            border: `1px solid ${LIGHT_BORDER}`,
-            boxShadow: "0 18px 42px rgba(99, 102, 241, 0.08)",
-            overflow: "hidden",
-          },
-        }}
-      >
-        <DialogTitle>{editing ? "Edit Pharmacy" : "Add Pharmacy"}</DialogTitle>
-        <DialogContent
-          sx={{
-            minHeight: 640,
-            px: { xs: 2, md: 3 },
-            pb: 2,
-            ...pharmacyFormLightSx,
-          }}
-        >
-          {renderPharmacyFormSections()}
-        </DialogContent>
-        <DialogActions sx={{ px: { xs: 2, md: 3 }, pb: { xs: 2, md: 2.5 } }}>
-          {editing ? (
-            <Stack direction="row" justifyContent="space-between" sx={{ width: '100%' }}>
-              <Button variant="outlined" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? "Saving..." : "Save Changes"}
-              </Button>
-              <Stack direction="row" spacing={1.5}>
-                <Button onClick={handlePreviousTab} disabled={isSaving || tabIndex === 0}>
-                  Back
-                </Button>
-                <Button variant="contained" onClick={handleNextTab} disabled={isSaving || tabIndex === lastTabIndex} sx={{ bgcolor: "#7C8CF8", color: "#FFFFFF", boxShadow: "none", "&:hover": { bgcolor: "#6978F5", boxShadow: "none" } }}>
-                  Next
-                </Button>
-              </Stack>
-            </Stack>
-          ) : (
-            <Stack direction="row" justifyContent="space-between" sx={{ width: '100%' }}>
-              <Button onClick={tabIndex > 0 ? handlePreviousTab : closeDialog} disabled={isSaving}>
-                {tabIndex > 0 ? "Back" : "Cancel"}
-              </Button>
-              <Button variant="contained" onClick={tabIndex === lastTabIndex ? handleSave : handleNextTab} disabled={isSaving} sx={{ bgcolor: "#7C8CF8", color: "#FFFFFF", boxShadow: "none", "&:hover": { bgcolor: "#6978F5", boxShadow: "none" } }}>
-                {tabIndex === lastTabIndex ? (isSaving ? "Saving..." : "Create Pharmacy") : "Next"}
-              </Button>
-            </Stack>
-          )}
-        </DialogActions>
-      </Dialog>
-      )}
     </Box>
   );
 }
