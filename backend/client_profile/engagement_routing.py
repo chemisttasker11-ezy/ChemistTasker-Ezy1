@@ -539,25 +539,70 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
 
     if pref == PAYMENT_TFN:
         payroll_enabled = bool(getattr(pharmacy, "use_chemisttasker_payroll", False))
+        award_terms = _build_tfn_award_terms(
+            shift=shift,
+            onboarding=onboarding,
+            occurrences=occurrences,
+        )
+        profile_status = _tfn_payroll_status(onboarding)
+        payroll_ready = bool(
+            payroll_enabled
+            and profile_status["ready"]
+            and not award_terms["payroll_review_required"]
+        )
+        deferred_reasons = list(profile_status["missing_fields"])
+        if award_terms["payroll_review_required"]:
+            deferred_reasons.append("award_overtime_review")
+
         return {
             **base,
             "engagement_kind": KIND_SHIFT_EMPLOYMENT,
-            "settlement_channel": SETTLEMENT_PAYROLL if payroll_enabled else SETTLEMENT_TIMESHEET_ONLY,
+            "settlement_channel": SETTLEMENT_PAYROLL if payroll_ready else SETTLEMENT_TIMESHEET_ONLY,
             "payment_preference": PAYMENT_TFN,
             "payroll_enabled": payroll_enabled,
+            "payroll_requested": payroll_enabled,
+            "payroll_setup_status": "READY" if payroll_ready else ("DEFERRED" if payroll_enabled else "NOT_USED"),
+            "payroll_target_settlement_channel": SETTLEMENT_PAYROLL if payroll_enabled else None,
+            "payroll_missing_fields": deferred_reasons,
+            "payroll_activation_required": bool(payroll_enabled and not payroll_ready),
             "employment_type": "CASUAL",
-            "award_code": "MA000012",
-            "super": {
-                "fund_name": onboarding.super_fund_name,
-                "usi": onboarding.super_usi,
-                "member_number_present": bool(onboarding.super_member_number),
+            "casual_agreement": {
+                "employment_type": "CASUAL",
+                "award_code": "MA000012",
+                "classification": award_terms["classification"],
+                "pay_basis": award_terms["pay_basis"],
+                "payroll_may_be_activated_after_acceptance": True,
             },
-            "facilitator_notice": "ChemistTasker facilitates the connection and records acceptance. The employment engagement for this shift is between the pharmacy/employer and the worker.",
+            "award_code": "MA000012",
+            "award_classification": award_terms["classification"],
+            "pay_basis": award_terms["pay_basis"],
+            "award_floor": award_terms["award_floor"],
+            "owner_bonus": award_terms["owner_bonus"],
+            "occurrences": award_terms["occurrences"],
+            "award_payroll_review_required": award_terms["payroll_review_required"],
+            "award_payroll_review_reasons": award_terms["payroll_review_reasons"],
+            "super": profile_status["super"],
+            "facilitator_notice": (
+                "ChemistTasker facilitates the connection and records the agreed shift terms. "
+                "The casual employment engagement for this shift is between the pharmacy/employer and the worker."
+            ),
             "relationship_notice": (
-                "The parties intend this shift to be an employee engagement settled through ChemistTasker Payroll. Applicable Award/NES, tax withholding and superannuation obligations are not displaced by these terms."
-                if payroll_enabled
-                else
-                "The parties intend this shift to be an employee engagement. ChemistTasker records the agreed shift and timesheet, while the pharmacy processes payroll in its own system. Applicable Award/NES, tax withholding and superannuation obligations are not displaced by these terms."
+                "ChemistTasker Payroll is available for this pharmacy. TFN/super setup may be completed after shift acceptance; "
+                "until it is complete the assignment remains rostered and timesheet-only and is not released to ChemistTasker Payroll."
+                if payroll_enabled and not payroll_ready
+                else (
+                    "The parties intend this shift to be a casual employee engagement settled through ChemistTasker Payroll. "
+                    "Applicable Award/NES, tax withholding and superannuation obligations are not displaced by these terms."
+                    if payroll_enabled
+                    else
+                    "The parties intend this shift to be a casual employee engagement. ChemistTasker records the agreed shift and timesheet, "
+                    "while the pharmacy processes payroll in its own system. ChemistTasker facilitates the connection and is not the employer."
+                )
+            ),
+            "payroll_setup_notice": (
+                "Payroll details are deferred. Assignment is not blocked; complete TFN/super details later and activate payroll for this accepted offer."
+                if payroll_enabled and not payroll_ready
+                else None
             ),
         }
 
@@ -573,7 +618,7 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
         "facilitator_notice": "ChemistTasker provides the technology that facilitates the connection and records the agreed shift terms. The services engagement is between the pharmacy/principal and the assignee/provider; ChemistTasker is not the employer or engaging principal for the shift.",
         "relationship_notice": "The parties confirm they intend an independent services engagement. An ABN or invoice does not by itself determine legal contractor status, and these terms do not waive workplace rights that apply by law.",
         "super_notice": "Invoice settlement does not by itself remove superannuation obligations. The pharmacy/principal must review whether super is payable for a labour-only contractor.",
-        "invoice_notice": "The worked shift remains visible in roster and timesheet records, but settlement is routed to the invoicing system rather than payroll.",
+        "invoice_notice": "The worked shift remains visible in roster and timesheet records, but settlement is routed to the existing ChemistTasker invoicing system rather than payroll.",
     }
 
 
