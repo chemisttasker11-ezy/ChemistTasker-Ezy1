@@ -165,19 +165,15 @@ function LandingPage() {
                     <MenuItem onClick={() => handleNavClick('#how-it-works')}><Typography>How It Works</Typography></MenuItem>
                     <MenuItem onClick={() => handleNavClick('#for-who')}><Typography>For Who?</Typography></MenuItem>
                     <MenuItem onClick={() => handleNavClick('#contact')}><Typography>Contact</Typography></MenuItem>
-                    {user ? (
-                      <>
-                        <MenuItem component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>
-                        <MenuItem onClick={handleLogout}><Typography>Logout</Typography></MenuItem>
-                      </>
-                    ) : (
-                      <>
-                        <MenuItem component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>
-                        <MenuItem component="a" href={PAGE_ROUTES.register}>
-                          <CtaButton variant="contained" fullWidth>Sign Up</CtaButton>
-                        </MenuItem>
-                      </>
-                    )}
+                    {user ? [
+                      <MenuItem key="dashboard" component="a" href={dashboardHref}><Typography>Go to Dashboard</Typography></MenuItem>,
+                      <MenuItem key="logout" onClick={handleLogout}><Typography>Logout</Typography></MenuItem>
+                    ] : [
+                      <MenuItem key="login" component="a" href={PAGE_ROUTES.login}><Typography>Login</Typography></MenuItem>,
+                      <MenuItem key="register" component="a" href={PAGE_ROUTES.register}>
+                        <CtaButton variant="contained" fullWidth>Sign Up</CtaButton>
+                      </MenuItem>
+                    ]}
                   </Menu>
                 </Box>
               </Toolbar>
