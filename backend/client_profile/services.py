@@ -626,7 +626,9 @@ def recalculate_invoice_totals(invoice, *, ensure_generated_super_line=True):
     invoice.subtotal = subtotal
     invoice.gst_amount = gst_amount
     invoice.super_amount = super_amount
-    invoice.total = (subtotal + gst_amount + super_amount).quantize(Decimal("0.01"))
+    # Worker payable excludes super. Super is a separate contribution, matching
+    # the worker_finance workspace and optional separate super document.
+    invoice.total = (subtotal + gst_amount).quantize(Decimal("0.01"))
     invoice.save(update_fields=["subtotal", "gst_amount", "super_amount", "total"])
     return invoice
 
