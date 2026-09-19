@@ -47,6 +47,7 @@ import {
     getSlotRateValue,
     firstPresent,
     type SlotEntry,
+    type SlotTime,
     type PharmacyOption,
     type ShiftDescriptionTemplate,
     pharmacyHoursForDate,
