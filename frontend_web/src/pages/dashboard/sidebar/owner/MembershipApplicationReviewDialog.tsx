@@ -372,7 +372,7 @@ export default function MembershipApplicationReviewDialog({
       <DialogContent dividers>
         <Stack spacing={2.25}>
           <Alert severity="info">
-            Email, mobile number, date of birth and username are locked identifiers after submission. Employment-facing details can be corrected before approval, and every change is included in the applicant's approval notification.
+            Email, mobile number, date of birth and username are locked identifiers after submission. Employment-facing edits are audited and emailed to the applicant when you save them; the complete change list is also included in the final approval notification.
           </Alert>
 
           <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -493,7 +493,7 @@ export default function MembershipApplicationReviewDialog({
 
           {existingChanges.length > 0 && (
             <Alert severity="warning">
-              {existingChanges.length} review change{existingChanges.length === 1 ? '' : 's'} already recorded. The applicant will receive the full change list on approval.
+              {existingChanges.length} review change{existingChanges.length === 1 ? '' : 's'} already recorded. Saved edits are emailed immediately, and the full change list is included again on approval.
             </Alert>
           )}
 
