@@ -38,7 +38,7 @@ export interface FinanceCalculation {
   subtotal: string; gst: string; payable: string; sales_gross: string; super: string; automatic_super: string;
 }
 export interface FinanceInvoice {
-  id: number; invoice_id: number; number: string; version: number; request_key: string;
+  id: number; invoice_id: number; number: string; version: number; current_version?: number; is_current?: boolean; request_key: string;
   kind: 'invoice' | 'super_request'; source: 'external' | 'internal'; payload: FinanceDraft;
   calculation: FinanceCalculation; source_snapshot?: Record<string, unknown>;
   locked: boolean; editable?: boolean; voided: boolean; status: 'draft' | 'sent' | 'paid' | 'void';
@@ -137,10 +137,14 @@ export const finance = {
   invoices: () => listAll<FinanceInvoice>('invoices/'),
   receivedInvoices: () => listAll<FinanceInvoice>('received-invoices/'),
   receivedInvoice: (id: number) => request<FinanceInvoice>(`received-invoices/${id}/`),
+  receivedRevision: (id: number, version: number) => request<FinanceInvoice>(`received-invoices/${id}/revisions/${version}/`),
+  receivedRevisionPdf: (id: number, version: number) => request<Blob>(`received-invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
   invoiceDefaults: () => request<FinanceInvoiceDefaults>('invoices/defaults/'),
   internalSources: () => request<FinanceInternalSource[]>('invoices/internal-sources/'),
   internalPrefill: (assignment_ids: number[]) => request<FinanceDraft>('invoices/internal-prefill/', 'POST', { assignment_ids }),
   invoice: (id: number) => request<FinanceInvoice>(`invoices/${id}/`),
+  invoiceRevision: (id: number, version: number) => request<FinanceInvoice>(`invoices/${id}/revisions/${version}/`),
+  invoiceRevisionPdf: (id: number, version: number) => request<Blob>(`invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
   saveInvoice: (value: FinanceDraft, id?: number) => request<FinanceInvoice>(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
   preview: (value: FinanceDraft) => request<FinanceCalculation>('invoices/preview/', 'POST', value),
   duplicate: (id: number, request_key: string) => request<FinanceInvoice>(`invoices/${id}/duplicate/`, 'POST', { request_key }),
