@@ -160,7 +160,7 @@ class EmploymentTermsTests(SimpleTestCase):
                         {
                             "weekday": weekday,
                             "start_time": "09:00",
-                            "end_time": "17:00",
+                            "end_time": "17:30",
                             "meal_break_start": "13:00",
                             "meal_break_minutes": 30,
                         }
