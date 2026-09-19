@@ -29,6 +29,7 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
   const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [breakMinutes, setBreak] = useState('0');
   const [hours, setHours] = useState('');
   const customer = customerOptions.find(c => c.id === value.customer_id);
+  const internalSource = initial?.source === 'internal';
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
   const changeLine = (index: number, patch: Partial<FinanceLine>) => change('lines', value.lines.map((line, i) => i === index ? { ...line, ...patch } : line));
   const close = () => { if (!busy && (JSON.stringify(value) === original.current || window.confirm('Discard unsaved invoice changes?'))) onClose(); };
@@ -66,12 +67,17 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
       <Stack direction="row" spacing={1}><Button onClick={close} disabled={busy}>Cancel</Button><Button variant="contained" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button></Stack>
     </Stack>
     {error && <Alert severity="error" role="alert" sx={{ mb: 2 }}>{error}</Alert>}
+    {internalSource && (
+      <Alert severity="info" sx={{ mb: 2 }}>
+        This invoice comes from accepted ChemistTasker shift terms. The pharmacy/customer and accepted labour rows are locked; reimbursements and reviewed super remain editable.
+      </Alert>
+    )}
     <Box component="fieldset" disabled={busy} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: '8px' }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(300px, 380px)' }, gap: { xs: 3, md: 8 }, mb: 3 }}>
         <Stack spacing={2}>
-          <Autocomplete options={customerOptions.filter(c => c.active)} value={customer || null} getOptionLabel={c => c.name} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => setValue(current => ({ ...current, customer_id: next?.id || 0, due_date: financeDueDate(current.invoice_date, next?.payment_terms_days ?? 14) }))} renderInput={props => <TextField {...props} label="Customer *" placeholder="Search customers or stores" />} />
-          <Button startIcon={<AddIcon />} onClick={() => setInline('customer')} sx={{ alignSelf: 'flex-start' }}>Create customer</Button>
+          <Autocomplete disabled={internalSource} options={customerOptions.filter(c => c.active)} value={customer || null} getOptionLabel={c => c.name} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => setValue(current => ({ ...current, customer_id: next?.id || 0, due_date: financeDueDate(current.invoice_date, next?.payment_terms_days ?? 14) }))} renderInput={props => <TextField {...props} label="Customer *" placeholder="Search customers or stores" />} />
+          <Button disabled={internalSource} startIcon={<AddIcon />} onClick={() => setInline('customer')} sx={{ alignSelf: 'flex-start' }}>Create customer</Button>
           <Box sx={{ minHeight: 72 }}><Typography variant="caption" color="text.secondary">Billing address</Typography><Typography variant="body2" sx={{ whiteSpace: 'pre-line', mt: .5 }}>{customer?.address || 'Select a customer to see billing details.'}</Typography>{customer?.abn && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>ABN {customer.abn}</Typography>}</Box>
         </Stack>
         <Box sx={grid}>
