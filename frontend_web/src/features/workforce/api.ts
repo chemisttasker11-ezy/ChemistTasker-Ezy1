@@ -28,3 +28,8 @@ export const saveWorkSettings = (payload: { membership_id: number; contracted_we
 export const listWorkforceLeave = (params?: { pharmacy_id?: number; status?: string }) => workforce.listLeave(params);
 export const createWorkforceLeave = (payload: { membership_id: number; leave_type: string; start_at: string; end_at: string; note?: string }) => workforce.createLeave(payload);
 export const decideWorkforceLeave = (id: number, decision: 'APPROVED' | 'REJECTED' | 'CANCELLED', managerNote = '') => workforce.decideLeave(id, decision, managerNote);
+
+export const listEmploymentEngagements = (pharmacyId: number, membershipId?: number) => workforce.listEmploymentEngagements(pharmacyId, membershipId);
+export const previewEmploymentEngagementAward = (payload: { membership_id: number; employment_type?: string; award_classification?: string }) => workforce.previewEmploymentEngagementAward(payload);
+export const createEmploymentEngagement = (payload: any) => workforce.createEmploymentEngagement(payload);
+export const updateEmploymentEngagement = (publicId: string, payload: any) => workforce.updateEmploymentEngagement(publicId, payload);
