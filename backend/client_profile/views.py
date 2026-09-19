@@ -9160,13 +9160,19 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         if invoice.user_id == user.id:
             finance_record = getattr(invoice, "finance_record", None)
-            if invoice.status == "draft" and not getattr(finance_record, "locked_at", None):
-                serializer.save()
-                return
-            if requested_fields == {"status"} and self.request.data.get("status") in {"sent", "paid"}:
-                serializer.save(status=self.request.data.get("status"))
-                return
-            raise PermissionDenied("Issued invoices are immutable. Only payment status can change after sending.")
+            if finance_record is not None:
+                if requested_fields == {"status"} and self.request.data.get("status") in {"sent", "paid"}:
+                    serializer.save(status=self.request.data.get("status"))
+                    from worker_finance.services import record_revision_state
+                    finance_record.invoice.refresh_from_db()
+                    record_revision_state(finance_record)
+                    return
+                raise PermissionDenied(
+                    "This invoice is managed by the new Invoices & finances workspace. "
+                    "Edit and save it there so revision history is preserved."
+                )
+            serializer.save()
+            return
 
         if requested_fields != {"status"}:
             raise PermissionDenied("Received invoices can only have their payment status updated.")
@@ -9181,8 +9187,8 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
         if instance.user_id != self.request.user.id:
             raise PermissionDenied("Only the invoice issuer can delete this invoice.")
         finance_record = getattr(instance, "finance_record", None)
-        if instance.status != "draft" or getattr(finance_record, "locked_at", None):
-            raise PermissionDenied("Issued invoices cannot be deleted. Preserve the issued snapshot.")
+        if finance_record is not None:
+            raise PermissionDenied("Finance-workspace invoices keep their revision history and cannot be deleted through the legacy editor.")
         instance.delete()
 
 
@@ -9337,17 +9343,14 @@ def send_invoice_email(request, invoice_id):
         invoice.status = 'sent'
         invoice.save(update_fields=['status'])
 
-        # If the invoice has already been adopted by the new finance workspace,
-        # freeze that wrapper too. Both UIs now represent the same document.
+        # If this invoice belongs to the new finance workspace, record the
+        # legacy send against the current revision without locking future edits.
         from worker_finance.models import Delivery, InvoiceRecord
         try:
             record = InvoiceRecord.objects.select_for_update().get(invoice=invoice)
         except InvoiceRecord.DoesNotExist:
             record = None
         if record is not None:
-            if not record.locked_at:
-                record.locked_at = timezone.now()
-                record.save(update_fields=['locked_at', 'updated_at'])
             Delivery.objects.get_or_create(
                 record=record,
                 version=record.version,
@@ -9356,6 +9359,9 @@ def send_invoice_email(request, invoice_id):
                     'status': 'legacy_queued',
                 },
             )
+            from worker_finance.services import record_revision_state
+            record.invoice.refresh_from_db()
+            record_revision_state(record)
 
     return Response({"status": "sent"})
 
