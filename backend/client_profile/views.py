@@ -9132,7 +9132,7 @@ def _invoice_queryset_for_user(user):
         | Q(pharmacy_id__in=owned_pharmacy_ids)
         | Q(pharmacy_id__in=admin_pharmacy_ids)
         | Q(pharmacy_id__in=org_pharmacy_ids)
-    ).distinct()
+    ).select_related("finance_record").distinct()
 
 
 class InvoiceListView(generics.ListCreateAPIView):
