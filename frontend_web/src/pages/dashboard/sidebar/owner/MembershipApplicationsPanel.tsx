@@ -209,15 +209,6 @@ export default function MembershipApplicationsPanel({
           String(app.pharmacy) === String(pharmacyId) && app.category === category
       );
       setApplications(filtered);
-      setApproveTypeById((prev) => {
-        const base = { ...prev };
-        filtered.forEach((app: MembershipApplication) => {
-          if (!base[app.id]) {
-            base[app.id] = defaultEmploymentType;
-          }
-        });
-        return base;
-      });
     } catch (error: any) {
       console.error(error);
       notify(error?.response?.data?.detail || "Failed to load membership applications.", "error");
@@ -225,7 +216,7 @@ export default function MembershipApplicationsPanel({
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [category, defaultEmploymentType, notify, pharmacyId]);
+  }, [category, notify, pharmacyId]);
 
   useEffect(() => {
     fetchApplications();
