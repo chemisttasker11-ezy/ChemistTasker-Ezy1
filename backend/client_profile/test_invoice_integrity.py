@@ -369,6 +369,21 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(revised.review_status, "NONE")
         self.assertFalse(revised.review_requests.exists())
 
+        unsent_request = factory.post(
+            f"/client-profile/finance/received-invoices/{record.id}/approve-payment/",
+            {"version": 2, "note": "Attempt to approve an unsent revision."},
+            format="json",
+        )
+        force_authenticate(unsent_request, user=self.owner)
+        unsent_response = ReceivedInvoiceViewSet.as_view({"post": "approve_payment"})(
+            unsent_request,
+            pk=record.id,
+        )
+        self.assertEqual(unsent_response.status_code, 400)
+        revised.refresh_from_db()
+        self.assertEqual(revised.review_status, "NONE")
+        self.assertEqual(revised.invoice.status, "draft")
+
     def test_partial_hour_invoice_uses_same_precision_for_quantity_and_total(self):
         self.slot.end_time = time(16, 37)
         self.slot.save(update_fields=["end_time"])
