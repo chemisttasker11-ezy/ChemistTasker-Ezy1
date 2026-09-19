@@ -6595,6 +6595,88 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
             'billing_state': billing_state,
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='activate-payroll')
+    def activate_payroll(self, request, pk=None):
+        from client_profile.engagement_routing import (
+            KIND_SHIFT_EMPLOYMENT,
+            PAYMENT_TFN,
+            SETTLEMENT_PAYROLL,
+            validate_tfn_payroll_profile,
+        )
+
+        with transaction.atomic():
+            offer = (
+                ShiftOffer.objects
+                .select_for_update()
+                .select_related("shift__pharmacy", "user")
+                .get(pk=pk)
+            )
+            shift = offer.shift
+            if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+                return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+            if not getattr(shift.pharmacy, "use_chemisttasker_payroll", False):
+                return Response(
+                    {'detail': 'ChemistTasker Payroll is not enabled for this pharmacy.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if (
+                offer.payment_preference_snapshot != PAYMENT_TFN
+                or offer.engagement_kind != KIND_SHIFT_EMPLOYMENT
+            ):
+                return Response(
+                    {'detail': 'Only accepted external TFN employee shifts can be activated for payroll.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if offer.status not in {
+                ShiftOffer.Status.ACCEPTED,
+                ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            }:
+                return Response(
+                    {'detail': 'Accept the shift offer before activating payroll.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            snapshot = offer.engagement_terms_snapshot or {}
+            if snapshot.get("award_payroll_review_required"):
+                return Response(
+                    {
+                        'detail': 'This shift needs Award/overtime review before ChemistTasker Payroll can process it.',
+                        'reasons': snapshot.get("award_payroll_review_reasons") or [],
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                validate_tfn_payroll_profile(offer.user)
+            except DjangoValidationError as exc:
+                return Response(
+                    getattr(exc, 'message_dict', {'detail': exc.messages}),
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            activated_at = timezone.now()
+            offer.settlement_channel = SETTLEMENT_PAYROLL
+            offer.payroll_activated_at = activated_at
+            offer.save(update_fields=[
+                "settlement_channel",
+                "payroll_activated_at",
+                "updated_at",
+            ])
+            assignment_count = ShiftSlotAssignment.objects.filter(
+                source_offer=offer,
+                payment_preference_snapshot=PAYMENT_TFN,
+                engagement_kind=KIND_SHIFT_EMPLOYMENT,
+            ).update(
+                settlement_channel=SETTLEMENT_PAYROLL,
+                payroll_activated_at=activated_at,
+            )
+
+        return Response({
+            'status': 'payroll_activated',
+            'offer_id': offer.id,
+            'assignment_count': assignment_count,
+            'payroll_activated_at': activated_at.isoformat(),
+        })
+
     @action(detail=True, methods=['post'])
     def decline(self, request, pk=None):
         offer = self.get_object()
