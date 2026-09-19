@@ -32,10 +32,12 @@ from client_profile.models import (
 from client_profile.serializers import (
     MembershipApplicationReviewSerializer,
     MembershipApplicationSerializer,
+    RosterAssignmentSerializer,
 )
 from client_profile.services import validate_internal_invoice_shifts
 from client_profile.views import MembershipApplicationViewSet, ShiftOfferViewSet
 from client_profile.utils import finalize_shift_offer
+from workforce.models import Timesheet, TimesheetPeriod
 
 
 User = get_user_model()
@@ -222,6 +224,75 @@ class PayrollOptInRosterRoutingTests(TestCase):
         self.assertEqual(result["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
         self.assertEqual(result["payment_preference_snapshot"], "TFN")
         self.assertFalse(result["engagement_terms_snapshot"]["payroll_enabled"])
+
+    def test_roster_assignment_exposes_frozen_settlement_and_timesheet_context(self):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.user,
+            role_needed="PHARMACIST",
+            employment_type="FULL_TIME",
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=date(2026, 9, 22),
+            start_time=time(9, 0),
+            end_time=time(17, 0),
+        )
+        assignment = ShiftSlotAssignment.objects.create(
+            shift=shift,
+            slot=slot,
+            slot_date=slot.date,
+            user=self.user,
+            unit_rate="48.50",
+            payment_preference_snapshot="TFN",
+            settlement_channel=SETTLEMENT_PAYROLL,
+            engagement_kind="EMPLOYEE",
+            engagement_terms_snapshot={
+                "payment_preference": "TFN",
+                "settlement_channel": SETTLEMENT_PAYROLL,
+                "engagement_kind": "EMPLOYEE",
+                "employment_type": "FULL_TIME",
+                "pay_basis": "ABOVE_AWARD",
+                "award_code": "MA000012",
+                "award_classification": "PHARMACIST",
+                "employment_engagement_public_id": "00000000-0000-0000-0000-000000000001",
+                "rates": {"weekday": "48.50"},
+            },
+            engagement_terms_accepted_at=timezone.now(),
+            payroll_activated_at=timezone.now(),
+        )
+        period = TimesheetPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            start_date=date(2026, 9, 21),
+            end_date=date(2026, 10, 4),
+            timezone="Australia/Brisbane",
+        )
+        timesheet = Timesheet.objects.create(
+            period=period,
+            user=self.user,
+            membership=self.membership,
+            status=Timesheet.Status.READY,
+            needs_rebuild=False,
+            rostered_minutes=480,
+            worked_minutes=465,
+            reviewed_minutes=465,
+            blocking_checks=0,
+            warning_checks=1,
+        )
+
+        data = RosterAssignmentSerializer(assignment).data
+        workforce = data["workforce_status"]
+
+        self.assertEqual(workforce["settlement_channel"], SETTLEMENT_PAYROLL)
+        self.assertEqual(workforce["engagement_kind"], "EMPLOYEE")
+        self.assertEqual(workforce["pay_basis"], "ABOVE_AWARD")
+        self.assertEqual(workforce["award_classification"], "PHARMACIST")
+        self.assertEqual(workforce["agreed_rate"], "48.50")
+        self.assertTrue(workforce["payroll_ready"])
+        self.assertEqual(workforce["timesheet"]["id"], timesheet.id)
+        self.assertEqual(workforce["timesheet"]["status"], Timesheet.Status.READY)
+        self.assertEqual(workforce["timesheet"]["worked_minutes"], 465)
+        self.assertEqual(workforce["timesheet"]["reviewed_minutes"], 465)
 
     def test_payroll_on_keeps_strict_payment_profile_and_engagement_path(self):
         self.pharmacy.use_chemisttasker_payroll = True
