@@ -26,7 +26,6 @@ const pages={
  "PublicTalentBoardPage": dynamic(() => import("@/migrated/pages/PublicTalentBoardPage"), {ssr:false,loading:Loading}),
  "SharedShiftLandingPage": dynamic(() => import("@/migrated/pages/SharedShiftLandingPage"), {ssr:false,loading:Loading}),
  "PublicOrganizationPage": dynamic(() => import("@/migrated/pages/PublicOrganizationPage"), {ssr:false,loading:Loading}),
- "MembershipApplyPage": dynamic(() => import("@/migrated/pages/MembershipApplyPage"), {ssr:false,loading:Loading}),
  "onboarding/RefereeQuestionnairePage": dynamic(() => import("@/migrated/pages/onboarding/RefereeQuestionnairePage"), {ssr:false,loading:Loading}),
  "onboarding/RefereeRejectPage": dynamic(() => import("@/migrated/pages/onboarding/RefereeRejectPage"), {ssr:false,loading:Loading}),
  "Contact": dynamic(() => import("@/migrated/pages/Contact"), {ssr:false,loading:Loading})
