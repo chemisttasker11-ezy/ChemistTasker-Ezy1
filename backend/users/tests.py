@@ -147,3 +147,32 @@ class OrganizationPermissionConfigurationTests(TestCase):
         view = SimpleNamespace(kwargs={})
 
         self.assertFalse(OrganizationRolePermission().has_permission(request, view))
+
+
+class PublicAndPrivateRoutePreservationTests(TestCase):
+    def test_public_reads_remain_anonymous(self):
+        for path in ('/api/marketplace/categories/', '/api/marketplace/listings/', '/api/public-hub/articles/', '/api/users/mobile/app-config/'):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_private_reads_require_authentication(self):
+        for path in ('/api/client-profile/pharmacies/', '/api/users/me/', '/api/content/documents/', '/api/marketplace/me/listings/'):
+            with self.subTest(path=path):
+                self.assertIn(self.client.get(path).status_code, (401, 403))
+
+    def test_owner_cannot_read_or_modify_another_owners_pharmacy(self):
+        from client_profile.models import OwnerOnboarding, Pharmacy
+        from rest_framework.test import APIClient
+        owner = get_user_model().objects.create_user(email='scope-owner@example.test', role='OWNER')
+        outsider = get_user_model().objects.create_user(email='scope-outsider@example.test', role='OWNER')
+        profile = OwnerOnboarding.objects.create(user=owner, phone_number='0400000000', role='MANAGER', chain_pharmacy=False)
+        pharmacy = Pharmacy.objects.create(name='Private pharmacy', owner=profile)
+        client = APIClient()
+        client.force_authenticate(outsider)
+        path = f'/api/client-profile/pharmacies/{pharmacy.pk}/'
+        self.assertEqual(client.get(path).status_code, 404)
+        self.assertEqual(client.patch(path, {'name': 'Changed'}, format='json').status_code, 404)
+        client.force_authenticate(owner)
+        self.assertEqual(client.get(path).status_code, 200)
+        pharmacy.refresh_from_db()
+        self.assertEqual(pharmacy.name, 'Private pharmacy')

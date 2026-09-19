@@ -2094,6 +2094,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def check_permissions(self, request):
+        super().check_permissions(request)
         if request.method in permissions.SAFE_METHODS:
             return
         user = request.user

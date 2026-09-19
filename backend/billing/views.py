@@ -886,6 +886,9 @@ def _process_stripe_event(event):
                         shift_obj.save(update_fields=['payment_status'])
                 except Exception as e:
                     logger.warning('Could not finalize paid shift offers: %s', e)
+                    # Roll back payment and offer changes together so Stripe can
+                    # retry instead of permanently acknowledging partial work.
+                    raise
 
 
     elif event.type == 'invoice.paid':
@@ -991,14 +994,17 @@ def stripe_webhook(request):
             event_id,
             event_type,
         )
-        StripeWebhookEvent.objects.update_or_create(
-            event_id=event_id,
-            defaults={
-                'event_type': event_type,
-                'status': StripeWebhookEvent.Status.FAILED,
-                'failed_at': timezone.now(),
-            },
-        )
+        with transaction.atomic():
+            delivery, _ = StripeWebhookEvent.objects.select_for_update().get_or_create(
+                event_id=event_id,
+                defaults={'event_type': event_type},
+            )
+            # Another delivery may have succeeded after this transaction rolled
+            # back. Never downgrade its processed marker and enable a replay.
+            if delivery.status != StripeWebhookEvent.Status.PROCESSED:
+                delivery.status = StripeWebhookEvent.Status.FAILED
+                delivery.failed_at = timezone.now()
+                delivery.save(update_fields=['status', 'failed_at'])
         return HttpResponse(status=500)
 
     return HttpResponse(status=200)
