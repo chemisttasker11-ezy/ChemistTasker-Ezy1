@@ -9156,12 +9156,17 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         invoice = self.get_object()
         user = self.request.user
+        requested_fields = set(self.request.data.keys())
 
         if invoice.user_id == user.id:
-            serializer.save()
-            return
+            if invoice.status == "draft":
+                serializer.save()
+                return
+            if requested_fields == {"status"} and self.request.data.get("status") in {"sent", "paid"}:
+                serializer.save(status=self.request.data.get("status"))
+                return
+            raise PermissionDenied("Issued invoices are immutable. Only payment status can change after sending.")
 
-        requested_fields = set(self.request.data.keys())
         if requested_fields != {"status"}:
             raise PermissionDenied("Received invoices can only have their payment status updated.")
 
@@ -9174,6 +9179,8 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         if instance.user_id != self.request.user.id:
             raise PermissionDenied("Only the invoice issuer can delete this invoice.")
+        if instance.status != "draft":
+            raise PermissionDenied("Issued invoices cannot be deleted. Preserve the issued snapshot.")
         instance.delete()
 
 
