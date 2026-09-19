@@ -1456,6 +1456,14 @@ class Shift(models.Model):
     employment_type = models.CharField(
         max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, default='LOCUM'
     )
+    is_roster_container = models.BooleanField(
+        default=False,
+        editable=False,
+        help_text=(
+            "Internal schedule container. Full/part-time candidate advertisements "
+            "remain separate and keep their advertised pay-band validation."
+        ),
+    )
 
     workload_tags = models.JSONField(default=list, blank=True)
     must_have = models.JSONField(default=list, blank=True)
@@ -1558,8 +1566,10 @@ class Shift(models.Model):
             if self.rate_type or self.fixed_rate is not None:
                 raise ValidationError('Rate fields are only allowed for Pharmacist shifts.')
 
-        # Validate FT/PT pay bands (hourly or annual + super)
-        if self.employment_type in ['FULL_TIME', 'PART_TIME']:
+        # A slotless FT/PT record is a candidate advertisement and must carry
+        # its advertised pay band. Roster containers get their frozen rate and
+        # settlement terms from ShiftSlotAssignment/EmploymentEngagement.
+        if self.employment_type in ['FULL_TIME', 'PART_TIME'] and not self.is_roster_container:
             has_hourly = self.min_hourly_rate is not None or self.max_hourly_rate is not None
             has_annual = self.min_annual_salary is not None or self.max_annual_salary is not None
             if not has_hourly and not has_annual:

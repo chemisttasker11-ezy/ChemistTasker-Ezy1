@@ -7614,6 +7614,7 @@ class CreateShiftAndAssignView(APIView):
             "pharmacy": pharmacy,
             "role_needed": role_needed,
             "employment_type": assignment_defaults["engagement_terms_snapshot"]["employment_type"],
+            "is_roster_container": True,
             "visibility": "FULL_PART_TIME",
             "single_user_only": True,
             "created_by": requesting_user,

@@ -645,6 +645,7 @@ def copy_roster_week(source_period, target_week_start, user, include_assignments
                 pharmacy=source_period.pharmacy,
                 role_needed=slot.shift.role_needed,
                 employment_type=slot.shift.employment_type,
+                is_roster_container=True,
                 created_by=user,
                 visibility="FULL_PART_TIME",
                 rate_type=slot.shift.rate_type,
@@ -842,6 +843,7 @@ def apply_roster_template(pharmacy, template, target_week_start, user, include_a
             new_shift = Shift.objects.create(
                 pharmacy=pharmacy,
                 role_needed=role,
+                is_roster_container=True,
                 visibility="FULL_PART_TIME",
                 created_by=user,
             )
@@ -985,6 +987,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 new_shift = Shift.objects.create(
                     pharmacy=roster_period.pharmacy,
                     role_needed=role,
+                    is_roster_container=True,
                     visibility="FULL_PART_TIME",
                     created_by=user,
                 )

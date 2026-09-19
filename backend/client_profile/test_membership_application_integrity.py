@@ -316,12 +316,22 @@ class PayrollOptInRosterRoutingTests(TestCase):
         self.assertEqual(result["payment_preference_snapshot"], "TFN")
         self.assertFalse(result["engagement_terms_snapshot"]["payroll_enabled"])
 
+    def test_full_time_candidate_post_still_requires_advertised_pay(self):
+        with self.assertRaises(ValidationError):
+            Shift.objects.create(
+                pharmacy=self.pharmacy,
+                created_by=self.user,
+                role_needed="PHARMACIST",
+                employment_type="FULL_TIME",
+            )
+
     def test_roster_assignment_exposes_frozen_settlement_and_timesheet_context(self):
         shift = Shift.objects.create(
             pharmacy=self.pharmacy,
             created_by=self.user,
             role_needed="PHARMACIST",
             employment_type="FULL_TIME",
+            is_roster_container=True,
         )
         slot = ShiftSlot.objects.create(
             shift=shift,
@@ -357,6 +367,7 @@ class PayrollOptInRosterRoutingTests(TestCase):
             start_date=date(2026, 9, 21),
             end_date=date(2026, 10, 4),
             timezone="Australia/Brisbane",
+            created_by=self.user,
         )
         timesheet = Timesheet.objects.create(
             period=period,
