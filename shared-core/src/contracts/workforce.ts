@@ -109,6 +109,7 @@ export interface WorkforceTimesheetDay {
   rostered_start: string | null;
   rostered_end: string | null;
   planned_break_minutes: number;
+  employment_engagement_public_id: string | null;
 }
 
 export interface WorkforceTimesheetDetail extends WorkforceTimesheetRow {
@@ -116,6 +117,7 @@ export interface WorkforceTimesheetDetail extends WorkforceTimesheetRow {
     worker: { id: number; name: string };
     pharmacy: { id: number; name: string };
     period: { id: number; start_date: string; end_date: string; timezone: string };
+    employment_engagements: WorkforceTimesheetEmploymentEngagement[];
     days: WorkforceTimesheetDay[];
     leave: unknown[];
     totals: Record<string, number | null>;
@@ -168,6 +170,74 @@ export type WorkforceMyHoursRow = WorkforceTimesheetRow & {
 };
 
 
+export interface WorkforceOrdinaryHoursDay {
+  weekday: number;
+  weekday_label: string;
+  start_time: string;
+  end_time: string;
+  meal_break_start: string | null;
+  meal_break_minutes: number;
+  ordinary_minutes: number;
+}
+
+export interface WorkforceOrdinaryHoursPattern {
+  days: WorkforceOrdinaryHoursDay[];
+  weekly_ordinary_minutes: number;
+  weekly_ordinary_hours: string;
+  variation_must_be_in_writing: boolean;
+  overtime_above_agreed_hours: boolean;
+  award_clause: string;
+}
+
+export interface WorkforceEmploymentCorrespondence {
+  key: string;
+  label: string;
+  employment_type?: string;
+  pay_basis?: string;
+  award_code?: string;
+  award_classification?: string;
+  award_source_label?: string;
+  award_source_url?: string;
+  ordinary_hours_pattern?: WorkforceOrdinaryHoursPattern | Record<string, never>;
+  rates?: {
+    weekday: string;
+    saturday: string;
+    sunday: string;
+    public_holiday: string;
+    early_morning: string | null;
+    late_night: string | null;
+  };
+}
+
+export interface WorkforceTimesheetEmploymentEngagement {
+  public_id: string;
+  membership_id: number;
+  effective_from: string;
+  effective_to: string | null;
+  role: string;
+  employment_type: string;
+  job_title: string;
+  pay_basis: WorkforceEngagementPayBasis;
+  award_code: string;
+  award_classification: string;
+  award_source_label: string;
+  award_source_url: string;
+  award_effective_from: string | null;
+  award_rate_snapshot: Record<string, unknown>;
+  ordinary_hours_pattern: WorkforceOrdinaryHoursPattern | Record<string, never>;
+  correspondence: Pick<WorkforceEmploymentCorrespondence, 'key' | 'label'>;
+  rates: {
+    weekday: string;
+    saturday: string;
+    sunday: string;
+    public_holiday: string;
+    early_morning: string | null;
+    late_night: string | null;
+    early_morning_applicable: boolean;
+    late_night_applicable: boolean;
+  };
+}
+
 export type WorkforceEngagementPayBasis = 'AWARD' | 'ABOVE_AWARD';
 
 export interface WorkforceEmploymentEngagement {
@@ -189,6 +259,8 @@ export interface WorkforceEmploymentEngagement {
   award_source_url: string;
   award_effective_from: string | null;
   award_rate_snapshot: Record<string, unknown>;
+  ordinary_hours_pattern: WorkforceOrdinaryHoursPattern | Record<string, never>;
+  correspondence: WorkforceEmploymentCorrespondence;
   rate_weekday: string;
   rate_saturday: string;
   rate_sunday: string;
@@ -241,6 +313,15 @@ export interface WorkforceEmploymentEngagementWrite {
   job_title?: string;
   pay_basis: WorkforceEngagementPayBasis;
   award_classification?: string;
+  ordinary_hours_pattern?: {
+    days: Array<{
+      weekday: number;
+      start_time: string;
+      end_time: string;
+      meal_break_start?: string | null;
+      meal_break_minutes?: number;
+    }>;
+  };
   rate_weekday?: string | number;
   rate_saturday?: string | number;
   rate_sunday?: string | number;
