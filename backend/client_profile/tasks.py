@@ -1263,14 +1263,13 @@ def email_membership_application_submitted(app_id: int):
 
 @shared_task(name="client_profile.tasks.email_membership_application_approved", queue="notifications")
 def email_membership_application_approved(app_id: int):
-    """
-    Notify the applicant that their application was approved.
-    (This is in addition to your existing invite/login email.)
-    """
+    """Notify the applicant with the final accepted membership and terms."""
     try:
-        app = (MembershipApplication.objects
-               .select_related("pharmacy")
-               .get(id=app_id))
+        app = (
+            MembershipApplication.objects
+            .select_related("pharmacy", "submitted_by", "approved_membership")
+            .get(id=app_id)
+        )
     except MembershipApplication.DoesNotExist:
         logger.warning("Application %s not found", app_id)
         return
@@ -1280,7 +1279,144 @@ def email_membership_application_approved(app_id: int):
         return
 
     pharmacy = app.pharmacy
-    applicant_user = getattr(app, "submitted_by", None) or User.objects.filter(email=app.email).first()
+    applicant_user = getattr(app, "submitted_by", None) or User.objects.filter(
+        email__iexact=app.email
+    ).first()
+    dashboard_url = get_frontend_dashboard_url(applicant_user).rstrip("/")
+    membership_url = f"{dashboard_url}/memberships"
+
+    field_labels = {
+        "role": "Role",
+        "first_name": "First name",
+        "last_name": "Last name",
+        "job_title": "Job title",
+        "pharmacist_award_level": "Pharmacist Award classification",
+        "otherstaff_classification_level": "Classification level",
+        "intern_half": "Intern training half",
+        "student_year": "Student year",
+    }
+    review_changes = []
+    for change in app.review_changes or []:
+        field_name = str(change.get("field") or "")
+        review_changes.append({
+            "field": field_name,
+            "label": field_labels.get(field_name, field_name.replace("_", " ").title()),
+            "from": change.get("from"),
+            "to": change.get("to"),
+        })
+
+    employment_terms = None
+    if pharmacy.use_chemisttasker_payroll and app.approved_membership_id:
+        try:
+            from workforce.models import EmploymentEngagement
+            engagement = (
+                EmploymentEngagement.objects
+                .filter(membership_id=app.approved_membership_id)
+                .order_by("-effective_from", "-id")
+                .first()
+            )
+        except Exception:
+            logger.exception("Unable to load employment terms for approved application %s", app_id)
+            engagement = None
+
+        if engagement:
+            employment_terms = {
+                "effective_from": str(engagement.effective_from),
+                "effective_to": str(engagement.effective_to) if engagement.effective_to else None,
+                "employment_type": engagement.get_employment_type_display()
+                    if hasattr(engagement, "get_employment_type_display") else engagement.employment_type,
+                "job_title": engagement.job_title or "",
+                "pay_basis": engagement.get_pay_basis_display(),
+                "award_classification": str(engagement.award_classification or "").replace("_", " ").title(),
+                "rate_weekday": str(engagement.rate_weekday),
+                "rate_saturday": str(engagement.rate_saturday),
+                "rate_sunday": str(engagement.rate_sunday),
+                "rate_public_holiday": str(engagement.rate_public_holiday),
+                "rate_early_morning": (
+                    str(engagement.rate_early_morning)
+                    if engagement.rate_early_morning is not None else None
+                ),
+                "rate_late_night": (
+                    str(engagement.rate_late_night)
+                    if engagement.rate_late_night is not None else None
+                ),
+                "correspondence_label": (
+                    (engagement.award_rate_snapshot or {})
+                    .get("correspondence", {})
+                    .get("label", "")
+                ),
+            }
+
+    ctx = {
+        "pharmacy_name": pharmacy.name,
+        "applicant_full_name": f"{app.first_name} {app.last_name}".strip(),
+        "role": membership_role_label(app.role),
+        "category": (
+            "Pharmacy staff"
+            if app.category == "FULL_PART_TIME"
+            else "Favourite (Locum / Shift Hero)"
+        ),
+        "membership_url": membership_url,
+        "review_changes": review_changes,
+        "has_review_changes": bool(review_changes),
+        "employment_terms": employment_terms,
+        "payroll_enabled": bool(pharmacy.use_chemisttasker_payroll),
+    }
+
+    changed_labels = [item["label"] for item in review_changes]
+    notification_body = f"Your application with {pharmacy.name} has been approved."
+    if changed_labels:
+        notification_body += " The pharmacy updated: " + ", ".join(changed_labels) + "."
+
+    notification_payload = {
+        "title": f"Application approved: {pharmacy.name}",
+        "body": notification_body,
+        "action_url": membership_url,
+        "payload": {
+            "application_id": app.id,
+            "membership_id": app.approved_membership_id,
+            "review_changes": review_changes,
+            "payroll_enabled": bool(pharmacy.use_chemisttasker_payroll),
+            "has_employment_terms": bool(employment_terms),
+        },
+    }
+    user_ids = []
+    if getattr(app, "submitted_by_id", None):
+        user_ids.append(app.submitted_by_id)
+    else:
+        existing_id = User.objects.filter(email__iexact=app.email).values_list("id", flat=True).first()
+        if existing_id:
+            user_ids.append(existing_id)
+    if user_ids:
+        notification_payload["user_ids"] = user_ids
+
+    send_async_email(
+        subject=f"Your application to {pharmacy.name} was approved",
+        recipient_list=[app.email],
+        template_name="emails/membership_application_approved.html",
+        text_template="emails/membership_application_approved.txt",
+        context=ctx,
+        notification=notification_payload,
+    )
+
+
+@shared_task(name="client_profile.tasks.email_membership_application_rejected", queue="notifications")
+def email_membership_application_rejected(app_id: int):
+    """Notify the applicant when a pharmacy declines a membership application."""
+    try:
+        app = MembershipApplication.objects.select_related("pharmacy", "submitted_by").get(id=app_id)
+    except MembershipApplication.DoesNotExist:
+        logger.warning("Application %s not found", app_id)
+        return
+
+    if not app.email:
+        logger.info("Application %s has no email; skipping rejection notification.", app_id)
+        return
+
+    pharmacy = app.pharmacy
+    applicant_user = getattr(app, "submitted_by", None) or User.objects.filter(
+        email__iexact=app.email
+    ).first()
     dashboard_url = get_frontend_dashboard_url(applicant_user).rstrip("/")
     membership_url = f"{dashboard_url}/memberships"
 
@@ -1289,33 +1425,27 @@ def email_membership_application_approved(app_id: int):
         "applicant_full_name": f"{app.first_name} {app.last_name}".strip(),
         "role": membership_role_label(app.role),
         "category": (
-            "Full/Part-time (Pharmacy staff)"
+            "Pharmacy staff"
             if app.category == "FULL_PART_TIME"
-            else "Favorite (Locum/Shift Hero)"
+            else "Favourite (Locum / Shift Hero)"
         ),
         "membership_url": membership_url,
     }
 
     notification_payload = {
-        "title": f"Application approved: {pharmacy.name}",
-        "body": f"Your application with {pharmacy.name} has been approved.",
-        "action_url": ctx["membership_url"],
-        "payload": {"application_id": app.id},
+        "title": f"Application update: {pharmacy.name}",
+        "body": f"Your membership application with {pharmacy.name} was not approved.",
+        "action_url": membership_url,
+        "payload": {"application_id": app.id, "status": "REJECTED"},
     }
-    user_ids = []
-    if getattr(app, "submitted_by_id", None):
-        user_ids.append(app.submitted_by_id)
-    else:
-        existing_id = User.objects.filter(email=app.email).values_list('id', flat=True).first()
-        if existing_id:
-            user_ids.append(existing_id)
-    if user_ids:
-        notification_payload['user_ids'] = user_ids
+    if applicant_user:
+        notification_payload["user_ids"] = [applicant_user.id]
+
     send_async_email(
-        subject=f"Your application to {pharmacy.name} was approved",
+        subject=f"Update on your application to {pharmacy.name}",
         recipient_list=[app.email],
-        template_name="emails/membership_application_approved.html",
-        text_template="emails/membership_application_approved.txt",
+        template_name="emails/membership_application_rejected.html",
+        text_template="emails/membership_application_rejected.txt",
         context=ctx,
         notification=notification_payload,
     )

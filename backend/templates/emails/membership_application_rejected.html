@@ -1,0 +1,17 @@
+{% extends "emails/base.html" %}
+{% block title %}Membership Application Update{% endblock %}
+{% block content %}
+<div class="wave">Update</div>
+<h2 style="margin:8px 0 0;">Update on your application to {{ pharmacy_name }}</h2>
+<div class="subtitle" style="margin:0 0 18px; color:#475569;">Hi <strong>{{ applicant_full_name }}</strong>,</div>
+<div class="card">
+<p style="margin-top:0;">Your membership application was not approved by {{ pharmacy_name }}.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+<tr><td style="padding:7px 14px 7px 0; width:130px; font-weight:700;">Role:</td><td>{{ role }}</td></tr>
+<tr><td style="padding:7px 14px 7px 0; font-weight:700;">Category:</td><td>{{ category }}</td></tr>
+</table>
+</div>
+<a href="{{ membership_url }}" class="btn">View memberships</a>
+<div class="muted" style="color:#64748b; margin-top:8px;">You may contact the pharmacy directly if you need more information.</div>
+<div class="footer" style="color:#64748b; margin-top:18px; font-size:13px;">The ChemistTasker Team</div>
+{% endblock %}

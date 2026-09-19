@@ -1,0 +1,14 @@
+Update on your application to {{ pharmacy_name }}
+
+Hi {{ applicant_full_name }},
+
+Your membership application was not approved by {{ pharmacy_name }}.
+
+Role: {{ role }}
+Category: {{ category }}
+
+View memberships: {{ membership_url }}
+
+You may contact the pharmacy directly if you need more information.
+
+The ChemistTasker Team
