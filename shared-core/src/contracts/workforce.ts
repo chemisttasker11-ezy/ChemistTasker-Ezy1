@@ -260,6 +260,7 @@ export interface WorkforceEmploymentEngagement {
   award_source_url: string;
   award_effective_from: string | null;
   award_rate_snapshot: Record<string, unknown>;
+  adult_rate_confirmed: boolean | null;
   ordinary_hours_pattern: WorkforceOrdinaryHoursPattern | Record<string, never>;
   correspondence: WorkforceEmploymentCorrespondence;
   rate_weekday: string;
