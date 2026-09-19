@@ -12,12 +12,12 @@ import {
 } from 'react-native-paper';
 import {
     fetchMembershipApplicationsService,
-    approveMembershipApplicationService,
     rejectMembershipApplicationService,
     type MembershipApplication,
     type MembershipDTO,
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
+import MembershipApplicationReviewDialog from './MembershipApplicationReviewDialog';
 
 const getFirstErrorMessage = (value: unknown): string | null => {
     if (Array.isArray(value)) {
@@ -119,6 +119,7 @@ export default function MembershipApplicationsPanel({
     const [processingId, setProcessingId] = useState<string | number | null>(null);
     const [employmentMenuVisible, setEmploymentMenuVisible] = useState<string | number | null>(null);
     const [selectedEmployment, setSelectedEmployment] = useState<Record<string | number, string>>({});
+    const [reviewing, setReviewing] = useState<MembershipApplication | null>(null);
 
     const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
         (app as any)?.[camelKey] ?? (app as any)?.[snakeKey] ?? '';
@@ -146,37 +147,6 @@ export default function MembershipApplicationsPanel({
     useEffect(() => {
         void loadApplications();
     }, [pharmacyId, category]);
-
-    const handleApprove = async (app: MembershipApplication, employment?: string) => {
-        const applicationId = app.id;
-        setProcessingId(applicationId);
-        try {
-            const employmentType =
-                app.category === 'LOCUM_CASUAL'
-                    ? deriveLocumEmploymentType(app.role)
-                    : employment || selectedEmployment[applicationId] || defaultEmploymentType;
-
-            await approveMembershipApplicationService(String(applicationId), {
-                employment_type: employmentType,
-            });
-
-            onNotification?.('Application approved', 'success');
-            onApproved?.();
-            await loadApplications();
-        } catch (error: any) {
-            const data = error?.response?.data;
-            const firstFieldError =
-                data && typeof data === 'object'
-                    ? Object.values(data as Record<string, unknown>)
-                        .map(getFirstErrorMessage)
-                        .find((value): value is string => Boolean(value))
-                    : null;
-            const detail = data?.detail || firstFieldError || error?.message;
-            onNotification?.(detail || 'Failed to approve application', 'error');
-        } finally {
-            setProcessingId(null);
-        }
-    };
 
     const handleReject = async (applicationId: string | number) => {
         setProcessingId(applicationId);
@@ -281,12 +251,11 @@ export default function MembershipApplicationsPanel({
                                 <View style={styles.actions}>
                                     <Button
                                         mode="contained"
-                                        onPress={() => handleApprove(app)}
-                                        loading={processingId === app.id}
+                                        onPress={() => setReviewing(app)}
                                         disabled={!!processingId}
                                         compact
                                     >
-                                        Approve
+                                        Review
                                     </Button>
                                     <Button
                                         mode="outlined"
@@ -303,6 +272,27 @@ export default function MembershipApplicationsPanel({
                     );
                 })}
             </ScrollView>
+            <MembershipApplicationReviewDialog
+                visible={Boolean(reviewing)}
+                application={reviewing}
+                allowedEmploymentTypes={allowedEmploymentTypes}
+                defaultEmploymentType={
+                    reviewing?.category === 'LOCUM_CASUAL'
+                        ? deriveLocumEmploymentType(reviewing?.role)
+                        : (reviewing ? (selectedEmployment[reviewing.id] || defaultEmploymentType) : defaultEmploymentType)
+                }
+                onDismiss={() => setReviewing(null)}
+                onUpdated={(updated) => {
+                    setReviewing(updated);
+                    setApplications((rows) => rows.map((row) => row.id === updated.id ? updated : row));
+                }}
+                onApproved={async () => {
+                    setReviewing(null);
+                    onApproved?.();
+                    await loadApplications();
+                }}
+                onNotification={onNotification}
+            />
         </View>
     );
 }
