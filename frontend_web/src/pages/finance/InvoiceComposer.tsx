@@ -92,17 +92,18 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
       <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(180px, 2.5fr) 1.3fr .7fr 1fr .8fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit price', 'Discount %', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
       {!value.lines.length && <Box sx={{ textAlign: 'center', py: 5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}><Typography fontWeight={600}>Add the work you’re billing for</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Choose a saved item above, or create an item with your rate.</Typography></Box>}
       {value.lines.map((line, index) => <Box key={`${index}-${line.item_id}`} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
+        {line.locked && <Chip size="small" label="Accepted shift terms · locked" sx={{ mb: 1 }} />}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'minmax(180px, 2.5fr) 1.3fr .7fr 1fr .8fr 1.1fr 1fr 40px' }, gap: 1, alignItems: 'start', '& .MuiInputBase-root': { fontSize: 13 } }}>
-          <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} onChange={e => changeLine(index, { description: e.target.value })} multiline />
-          <TextField type="date" label="Work date" value={line.worked_on || ''} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
-          <TextField label={line.unit || 'Quantity'} value={line.quantity} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
-          <TextField label="Unit price" value={line.unit_price} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
-          <TextField label="Discount %" value={line.discount} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { discount: e.target.value })} />
-          <TextField select label="Tax code" value={line.tax_code || 'OUT_OF_SCOPE'} onChange={e => changeLine(index, { tax_code: e.target.value as FinanceTaxCode })}>{Object.entries(taxLabels).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
+          <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} disabled={line.locked} onChange={e => changeLine(index, { description: e.target.value })} multiline />
+          <TextField type="date" label="Work date" value={line.worked_on || ''} disabled={line.locked} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
+          <TextField label={line.unit || 'Quantity'} value={line.quantity} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
+          <TextField label="Unit price" value={line.unit_price} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
+          <TextField label="Discount %" value={line.discount} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { discount: e.target.value })} />
+          <TextField select label="Tax code" disabled={line.locked} value={line.tax_code || 'OUT_OF_SCOPE'} onChange={e => changeLine(index, { tax_code: e.target.value as FinanceTaxCode })}>{Object.entries(taxLabels).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
           <Typography sx={{ py: 1, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{preview?.lines[index] ? dollars(preview.lines[index].gross) : 'Pending'}</Typography>
-          <IconButton aria-label={`Remove item ${index + 1}`} onClick={() => change('lines', value.lines.filter((_, i) => i !== index))}><DeleteOutlineIcon fontSize="small" /></IconButton>
+          <IconButton aria-label={`Remove item ${index + 1}`} disabled={line.locked} onClick={() => change('lines', value.lines.filter((_, i) => i !== index))}><DeleteOutlineIcon fontSize="small" /></IconButton>
         </Box>
-        <FormControlLabel sx={{ mt: .5 }} control={<Checkbox size="small" checked={line.super_eligible || false} onChange={e => changeLine(index, { super_eligible: e.target.checked })} />} label={<Typography variant="caption">Include in reviewed super base</Typography>} />
+        <FormControlLabel sx={{ mt: .5 }} control={<Checkbox size="small" disabled={line.locked} checked={line.super_eligible || false} onChange={e => changeLine(index, { super_eligible: e.target.checked })} />} label={<Typography variant="caption">Include in reviewed super base</Typography>} />
       </Box>)}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 340px' }, gap: { xs: 3, md: 8 }, mt: 3 }}>
         <Stack spacing={1}>{field('notes', 'Notes to customer')}<Typography variant="caption" color="text.secondary">Saved as a draft. Review and issue from the invoice list before sending.</Typography></Stack>
