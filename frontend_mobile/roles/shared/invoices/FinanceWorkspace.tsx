@@ -94,7 +94,52 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface>}</View>}
       </>}
     </ScrollView>}
-    <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelected(null)}><SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}><ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}><Button icon="arrow-left" onPress={() => setSelected(null)}>Back to invoices</Button>{selected && <><Text variant="headlineSmall">{selected.number}</Text><Chip style={{ alignSelf: 'flex-start' }}>{financeStatus(selected)}</Chip><Text>{selected.payload.customer?.name}</Text><Text variant="headlineMedium">{money(selected.calculation.payable)}</Text><Text>Balance {money(selected.balance)} · GST {money(selected.calculation.gst)}</Text>{selected.payload.lines.map((line, i) => <List.Item key={i} title={line.description} description={`${line.quantity} × ${money(line.unit_price)}`} />)}{!selected.locked && selected.kind === 'invoice' && <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit draft</Button>}{!selected.locked && <Button onPress={() => ask('Issue invoice?', 'Issuing locks the reviewed invoice. Email is a separate action.', async () => { await finance.issue(selected.id, selected.version); setSelected(null); await load(); })}>Review complete · Issue</Button>}{selected.kind === 'invoice' && <Button onPress={() => { const requestKey = key(); ask('Duplicate invoice?', 'Create a new draft without payments or work dates.', async () => { const copy = await finance.duplicate(selected.id, requestKey); setSelected(null); setEditor({ invoice: copy, key: copy.request_key }); await load(); }); }}>Duplicate as draft</Button>}{selected.locked && <><Button disabled={busy || !!(selected.delivery_status && selected.delivery_status !== 'failed')} onPress={() => ask('Send invoice?', `Email the saved PDF to ${selected.payload.customer?.email || 'the saved recipient'}.`, async () => { await finance.send(selected.id, selected.version); setSelected(null); await load(); })}>Send email</Button><Button disabled={Number(selected.balance) <= 0} onPress={() => paymentForm(selected)}>Record payment</Button>{selected.kind === 'invoice' && selected.payload.super_mode === 'separate' && !selected.super_document_id && <Button onPress={() => ask('Create contribution request?', 'Create a separate request for payment to your super fund.', async () => { await finance.superDocument(selected.id, selected.version); setSelected(null); await load(); })}>Create super request</Button>}</>}</>}{!!error && <Text style={{ color: theme.colors.error }}>{error}</Text>}</ScrollView></SafeAreaView></Modal>
+    <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelected(null)}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+          <Button icon="arrow-left" onPress={() => setSelected(null)}>Back to invoices</Button>
+          {selected ? <>
+            <Text variant="headlineSmall">{selected.number}</Text>
+            <Chip style={{ alignSelf: 'flex-start' }}>{financeStatus(selected)}</Chip>
+            <Text>{receivedMode ? selected.payload.issuer_name : selected.payload.customer?.name}</Text>
+            <Text variant="headlineMedium">{money(selected.calculation.payable)}</Text>
+            <Text>Revision {selected.version} · GST {money(selected.calculation.gst)}</Text>
+            {selected.payload.lines.map((line, i) => <List.Item key={i} title={line.description} description={line.quantity + ' ' + (line.unit || '') + ' × ' + money(line.unit_price)} />)}
+            {receivedMode ? <View style={{ gap: 8 }}>
+              <Button mode="contained" onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
+              <Button mode="outlined" textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
+              <Button mode="outlined" disabled={selected.status === 'paid'} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+            </View> : <>
+              <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit invoice</Button>
+              {selected.kind === 'invoice' ? <Button onPress={() => {
+                const requestKey = key();
+                ask('Duplicate invoice?', 'Create a separate editable invoice without shift links or payment history.', async () => {
+                  const copy = await finance.duplicate(selected.id, requestKey);
+                  setSelected(null); setEditor({ invoice: copy, key: copy.request_key }); await load();
+                });
+              }}>Duplicate</Button> : null}
+              <Button disabled={busy} onPress={() => ask(
+                'Send current revision?',
+                'Email revision ' + selected.version + ' to ' + (selected.payload.customer?.email || 'the saved recipient') + '.',
+                async () => { await finance.send(selected.id, selected.version); setSelected(null); await load(); },
+              )}>Send email</Button>
+              <Button disabled={selected.status === 'paid'} onPress={() => ask(
+                'Mark paid?',
+                'This status can still be corrected later by editing and saving a new revision.',
+                async () => { await finance.markPaid(selected.id, selected.version); setSelected(null); await load(); },
+              )}>Mark paid</Button>
+              <Button disabled={Number(selected.balance) <= 0} onPress={() => paymentForm(selected)}>Record payment</Button>
+              {selected.kind === 'invoice' && selected.payload.super_mode === 'separate' && !selected.super_document_id ? <Button onPress={() => ask(
+                'Create contribution request?',
+                'Create a separate contribution request for payment to the super fund.',
+                async () => { await finance.superDocument(selected.id, selected.version); setSelected(null); await load(); },
+              )}>Create super request</Button> : null}
+            </>}
+          </> : null}
+          {!!error && <Text style={{ color: theme.colors.error }}>{error}</Text>}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
     <Modal visible={!!form} animationType="slide" onRequestClose={closeForm}><SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><View style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}><IconButton icon="close" accessibilityLabel="Close form" disabled={busy} onPress={closeForm} /><Text variant="titleLarge" style={{ flex: 1 }}>{form?.title}</Text><Button mode="contained" disabled={busy} loading={busy} onPress={async () => { if (!form || running.current) return; running.current = true; setBusy(true); setFormError(''); try { await form.save(form.fields, form.booleans); await afterSave(); setForm(null); } catch (e: any) { setFormError(e.message || 'Unable to save.'); } finally { running.current = false; setBusy(false); } }}>Save</Button></View><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, gap: 16 }}>{!!formError && <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{formError}</Text>}{form && Object.entries(form.fields).map(([name, value]) => fieldOptions[name] ? <View key={name} style={{ gap: 8 }}><Text variant="labelLarge">{labels[name] || name}</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{fieldOptions[name].map(option => <Chip key={option} selected={value === option} onPress={() => setForm({ ...form, fields: { ...form.fields, [name]: option } })}>{option.replaceAll('_', ' ')}</Chip>)}</View></View> : <TextInput key={name} mode="outlined" dense label={labels[name] || name} value={value} disabled={busy} keyboardType={name === 'email' ? 'email-address' : ['amount', 'gst_amount', 'unit_price', 'business_use_percent', 'payment_terms_days'].includes(name) ? 'decimal-pad' : 'default'} onChangeText={text => setForm({ ...form, fields: { ...form.fields, [name]: text } })} />)}{form && Object.entries(form.booleans).map(([name, value]) => <Checkbox.Item key={name} label={labels[name] || name} disabled={busy} status={value ? 'checked' : 'unchecked'} onPress={() => setForm({ ...form, booleans: { ...form.booleans, [name]: !value } })} />)}</ScrollView></KeyboardAvoidingView></SafeAreaView></Modal>
   </SafeAreaView>;
 }
