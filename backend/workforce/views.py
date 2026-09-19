@@ -519,11 +519,20 @@ class EmploymentEngagementDetailView(APIView):
                             }
                         )
                     if "effective_to" in request.data:
-                        row.effective_to = (
+                        if row.effective_to and row.effective_to < timezone.localdate():
+                            raise DjangoValidationError(
+                                {"effective_to": "A completed historical engagement end date is immutable."}
+                            )
+                        next_effective_to = (
                             _parse_required_date(request.data.get("effective_to"), "effective_to")
                             if request.data.get("effective_to")
                             else None
                         )
+                        if next_effective_to and next_effective_to < timezone.localdate():
+                            raise DjangoValidationError(
+                                {"effective_to": "An active engagement may only be closed today or on a future date."}
+                            )
+                        row.effective_to = next_effective_to
                     if "notes" in request.data:
                         row.notes = str(request.data.get("notes") or "").strip()
                 else:
