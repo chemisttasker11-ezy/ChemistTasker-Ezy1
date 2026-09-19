@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
@@ -28,6 +29,7 @@ function currentFortnight() {
 }
 
 export default function WorkforceTimesheetsScreen() {
+  const router = useRouter();
   const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [periods, setPeriods] = useState<WorkforceTimesheetPeriod[]>([]);
@@ -117,6 +119,7 @@ export default function WorkforceTimesheetsScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh(true)} />} contentContainerStyle={styles.content}>
         <View>
+          <Button compact icon="arrow-left" onPress={() => router.back()} style={{ alignSelf: 'flex-start', marginBottom: 6 }}>Back</Button>
           <Text variant="headlineMedium" style={styles.title}>Timesheets</Text>
           <Text variant="bodyMedium" style={styles.subtitle}>Review rostered, worked and reviewed time before payroll or external payroll hand-off.</Text>
         </View>
