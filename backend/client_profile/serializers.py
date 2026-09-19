@@ -6290,19 +6290,14 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
         snapshot = obj.engagement_terms_snapshot or {}
         timesheet = None
         if obj.user_id and obj.shift_id and obj.slot_date:
-            from workforce.models import Timesheet
-            timesheet = (
-                Timesheet.objects
-                .filter(
-                    user_id=obj.user_id,
-                    period__pharmacy_id=obj.shift.pharmacy_id,
-                    period__start_date__lte=obj.slot_date,
-                    period__end_date__gte=obj.slot_date,
-                )
-                .select_related("period")
-                .order_by("-period__start_date", "-id")
-                .first()
-            )
+            prefetched = list(obj.user.workforce_timesheets.all())
+            matches = [
+                row for row in prefetched
+                if row.period.pharmacy_id == obj.shift.pharmacy_id
+                and row.period.start_date <= obj.slot_date <= row.period.end_date
+            ]
+            if matches:
+                timesheet = max(matches, key=lambda row: (row.period.start_date, row.id))
 
         rates = snapshot.get("rates") or {}
         occurrences = snapshot.get("occurrences") or []
