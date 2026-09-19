@@ -167,13 +167,13 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         return Response(serialize_record(self.owned(request, pk)))
 
-    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\\d+)')
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)')
     def revision(self, request, pk=None, version=None):
         record = self.owned(request, pk)
         revision = get_object_or_404(record.revisions.all(), version=int(version))
         return Response(serialize_revision(record, revision))
 
-    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\\d+)/pdf')
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)/pdf')
     def revision_pdf(self, request, pk=None, version=None):
         record = self.owned(request, pk)
         revision = get_object_or_404(record.revisions.all(), version=int(version))
@@ -376,7 +376,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise Http404
         return pdf_response(record, document if document.get('version') != record.version else None)
 
-    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\\d+)')
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)')
     def revision(self, request, pk=None, version=None):
         record = self._get(request, pk)
         revision = get_object_or_404(record.revisions.all(), version=int(version))
@@ -390,7 +390,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise Http404
         return Response(serialize_revision(record, revision))
 
-    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\\d+)/pdf')
+    @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)/pdf')
     def revision_pdf(self, request, pk=None, version=None):
         record = self._get(request, pk)
         revision = get_object_or_404(record.revisions.all(), version=int(version))
