@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -21,11 +21,15 @@ from client_profile.models import (
     MembershipApplication,
     MembershipInviteLink,
     Pharmacy,
+    Shift,
+    ShiftSlot,
+    ShiftSlotAssignment,
 )
 from client_profile.serializers import (
     MembershipApplicationReviewSerializer,
     MembershipApplicationSerializer,
 )
+from client_profile.services import validate_internal_invoice_shifts
 
 
 User = get_user_model()
@@ -324,3 +328,83 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         self.assertEqual(terms["payment_preference"], PAYMENT_TFN)
         self.assertEqual(terms["occurrences"][0]["agreed_rate"], "72.50")
         self.assertTrue(terms["acceptance_required"])
+
+
+class InvoiceSettlementBoundaryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="invoice-worker@example.com",
+            password="test-pass",
+            role="OTHER_STAFF",
+        )
+        self.pharmacy = Pharmacy.objects.create(name="Invoice Boundary Pharmacy")
+
+    def _assignment(self, *, settlement_channel, engagement_kind, day):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            role_needed="ASSISTANT",
+            employment_type="LOCUM",
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=day,
+            start_time=time(9, 0),
+            end_time=time(17, 0),
+        )
+        assignment = ShiftSlotAssignment.objects.create(
+            shift=shift,
+            slot=slot,
+            slot_date=day,
+            user=self.user,
+            unit_rate="70.00",
+            settlement_channel=settlement_channel,
+            engagement_kind=engagement_kind,
+            engagement_terms_accepted_at=timezone.now(),
+            engagement_terms_snapshot={
+                "occurrences": [{
+                    "slot_id": slot.id,
+                    "date": str(day),
+                    "agreed_rate": "70.00",
+                }]
+            },
+        )
+        return shift, assignment
+
+    def test_only_accepted_invoice_routed_assignment_can_enter_internal_invoice(self):
+        invoice_shift, _ = self._assignment(
+            settlement_channel=SETTLEMENT_INVOICE,
+            engagement_kind="INDEPENDENT_CONTRACTOR",
+            day=date(2026, 9, 20),
+        )
+        assignments = validate_internal_invoice_shifts(
+            self.user,
+            [invoice_shift.id],
+            pharmacy_id=self.pharmacy.id,
+        )
+        self.assertEqual(len(assignments), 1)
+        self.assertEqual(assignments[0].settlement_channel, SETTLEMENT_INVOICE)
+
+    def test_payroll_or_timesheet_assignment_cannot_enter_internal_invoice(self):
+        payroll_shift, _ = self._assignment(
+            settlement_channel=SETTLEMENT_PAYROLL,
+            engagement_kind="SHIFT_EMPLOYMENT",
+            day=date(2026, 9, 21),
+        )
+        with self.assertRaises(ValidationError):
+            validate_internal_invoice_shifts(
+                self.user,
+                [payroll_shift.id],
+                pharmacy_id=self.pharmacy.id,
+            )
+
+        timesheet_shift, _ = self._assignment(
+            settlement_channel=SETTLEMENT_TIMESHEET_ONLY,
+            engagement_kind="SHIFT_EMPLOYMENT",
+            day=date(2026, 9, 22),
+        )
+        with self.assertRaises(ValidationError):
+            validate_internal_invoice_shifts(
+                self.user,
+                [timesheet_shift.id],
+                pharmacy_id=self.pharmacy.id,
+            )
