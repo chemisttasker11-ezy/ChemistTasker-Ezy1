@@ -16,6 +16,8 @@ from client_profile.models import (
 )
 from client_profile.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
+from worker_finance.models import CatalogueItem
+from worker_finance.services import save_draft
 
 
 User = get_user_model()
@@ -119,6 +121,13 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(invoice.super_amount, Decimal("0.00"))
         self.assertEqual(invoice.total, Decimal("616.00"))
         self.assertFalse(invoice.line_items.filter(category_code="Superannuation").exists())
+        record = invoice.finance_record
+        self.assertEqual(record.source, "internal")
+        self.assertEqual(record.invoice_id, invoice.id)
+        locked_line = next(line for line in record.payload["lines"] if line.get("source_assignment_id"))
+        self.assertTrue(locked_line["locked"])
+        self.assertEqual(locked_line["source_assignment_id"], self.assignment.id)
+        self.assertEqual(record.source_snapshot if hasattr(record, "source_snapshot") else invoice.source_snapshot, invoice.source_snapshot)
 
     def test_same_accepted_assignment_cannot_be_invoiced_twice(self):
         first = self._generate()
@@ -206,3 +215,52 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(updated.subtotal, Decimal("610.00"))
         self.assertEqual(updated.gst_amount, Decimal("56.00"))
         self.assertEqual(updated.total, Decimal("666.00"))
+
+
+    def test_new_finance_workspace_edit_cannot_rewrite_accepted_shift_line(self):
+        invoice = self._generate()
+        record = invoice.finance_record
+        travel = CatalogueItem.objects.create(
+            owner=self.worker,
+            code="TRAVEL-EDIT",
+            name="Travel reimbursement",
+            category="Transportation",
+            unit="Lump Sum",
+            unit_price="0.00",
+            tax_code="OUT_OF_SCOPE",
+            super_eligible=False,
+        )
+        payload = dict(record.payload)
+        payload["version"] = record.version
+        payload["lines"] = [
+            {
+                **line,
+                "quantity": "1.00",
+                "unit_price": "1.00",
+            }
+            if line.get("source_assignment_id")
+            else line
+            for line in payload["lines"]
+        ]
+        payload["lines"].append({
+            "item_id": travel.id,
+            "description": "Travel reimbursement",
+            "quantity": "1.00",
+            "unit_price": "50.00",
+            "discount": "0.00",
+            "tax_code": "OUT_OF_SCOPE",
+            "super_eligible": False,
+            "worked_on": str(self.slot.date),
+        })
+
+        updated = save_draft(self.worker, payload, record.id)
+        invoice.refresh_from_db()
+        protected = invoice.line_items.get(
+            category_code="ProfessionalServices",
+            source_assignment=self.assignment,
+        )
+        self.assertEqual(protected.quantity, Decimal("8.00"))
+        self.assertEqual(protected.unit_price, Decimal("70.00"))
+        self.assertEqual(protected.total, Decimal("560.00"))
+        self.assertEqual(updated.calculation["payable"], "666.00")
+        self.assertEqual(invoice.total, Decimal("666.00"))
