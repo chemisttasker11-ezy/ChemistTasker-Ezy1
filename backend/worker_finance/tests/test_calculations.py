@@ -67,6 +67,21 @@ class CalculationTests(unittest.TestCase):
             with self.assertRaises(CalculationError):
                 calculate_invoice(lines, gst_registered=True)
 
+
+    def test_ad_hoc_description_line_does_not_require_saved_item(self):
+        result = calculate_invoice(
+            [line(
+                item_id=None,
+                description='One-off service',
+                unit='Visit',
+                quantity='1.00',
+                unit_price='55.00',
+                super_eligible=False,
+            )],
+            gst_registered=True,
+        )
+        self.assertEqual(result['payable'], '60.50')
+
     def test_rate_boundary(self):
         self.assertEqual(default_super_rate(date(2025, 6, 30)), Decimal('11.50'))
         self.assertEqual(default_super_rate(date(2025, 7, 1)), Decimal('12.00'))
