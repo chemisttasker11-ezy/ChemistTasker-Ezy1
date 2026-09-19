@@ -8,6 +8,8 @@ const forbidden = [
   'chemisttasker-Frontend-main',
   'frontend_web/vite.config copy.ts',
   'frontend_web/src/__tmp_talent_import.txt',
+  'frontend_web/landing_next/app/(public)/membership',
+  'frontend_web/landing_next/migrated/pages/MembershipApplyPage.tsx',
 ];
 
 const failures = [];
@@ -25,6 +27,18 @@ if (!main.includes('React.lazy(')) {
 }
 if (!main.includes('<React.Suspense')) {
   failures.push('frontend_web/src/main.tsx must retain a Suspense boundary for lazy routes');
+}
+
+const bridgePath = path.join(root, 'frontend_web/src/components/PublicRouteBridge.tsx');
+const bridge = fs.readFileSync(bridgePath, 'utf8');
+if (/\|membership\|?|membership\|/.test(bridge)) {
+  failures.push('Vite PublicRouteBridge must not redirect /membership/* into Next');
+}
+
+const nextConfigPath = path.join(root, 'frontend_web/landing_next/next.config.ts');
+const nextConfig = fs.readFileSync(nextConfigPath, 'utf8');
+if (!nextConfig.includes("'membership'")) {
+  failures.push('Next must proxy /membership/* to the Vite dashboard server');
 }
 
 if (failures.length) {
