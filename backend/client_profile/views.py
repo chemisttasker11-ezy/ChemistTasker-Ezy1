@@ -2954,114 +2954,226 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
     def approve(self, request, pk=None):
         app = self.get_object()
         user = request.user
-        # Permission for this pharmacy
         pharm_id = app.pharmacy_id
-        is_org_admin = OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN', organization_id=app.pharmacy.organization_id).exists()
+        is_org_admin = OrganizationMembership.objects.filter(
+            user=user,
+            role='ORG_ADMIN',
+            organization_id=app.pharmacy.organization_id,
+        ).exists()
         is_owner = Pharmacy.objects.filter(id=pharm_id, owner__user=user).exists()
         can_manage_staff = has_admin_capability(user, app.pharmacy, CAPABILITY_MANAGE_STAFF)
         if not (is_org_admin or is_owner or can_manage_staff):
             return Response({'detail': 'Not allowed to approve for this pharmacy.'}, status=403)
-        if app.status != 'PENDING':
-            return Response({'detail': f'Already {app.status.lower()}.'}, status=400)
 
-        # Need an email to attach/create the platform user (step 7):
-        email = (request.data.get('email') or app.email or '').strip().lower()
-        if not email:
-            return Response({'detail': 'email is required to approve (existing vs new user).'}, status=400)
-
-        existing_worker = User.objects.filter(email__iexact=email).first()
-        user_existed_before_approval = existing_worker is not None
-        if existing_worker:
-            onboarding = (
-                PharmacistOnboarding.objects.filter(user=existing_worker).first()
-                if app.role == 'PHARMACIST'
-                else OtherStaffOnboarding.objects.filter(user=existing_worker).first()
-            )
-            existing_dob = getattr(onboarding, 'date_of_birth', None) if onboarding else None
-            if existing_dob and existing_dob != app.date_of_birth:
-                return Response(
-                    {'date_of_birth': ['Application date of birth does not match the worker onboarding profile.']},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        # Build payload for your existing helper:
-
-        # Decide employment_type from category (+ optional override from request)
-        allowed_ftpt = {'FULL_TIME', 'PART_TIME', 'CASUAL'}       # Pharmacy staff
-        allowed_fav  = {'LOCUM', 'SHIFT_HERO'}                    # Favorite staff
+        allowed_ftpt = {'FULL_TIME', 'PART_TIME', 'CASUAL'}
+        allowed_fav = {'LOCUM', 'SHIFT_HERO'}
         req_emp = (request.data.get('employment_type') or '').strip().upper()
-
         if app.category == 'FULL_PART_TIME':
             employment_type = req_emp if req_emp in allowed_ftpt else 'CASUAL'
-        else:  # 'LOCUM_CASUAL'
-            employment_type = req_emp if req_emp in allowed_fav else 'LOCUM'
+        else:
+            employment_type = req_emp if req_emp in allowed_fav else (
+                'LOCUM' if app.role == 'PHARMACIST' else 'SHIFT_HERO'
+            )
 
-        data = {
-            'email': email,
-            'pharmacy': app.pharmacy_id,
-            'role': app.role,
-            # set employment type based on link category
-            'employment_type': employment_type,
-            'invited_name': f'{app.first_name} {app.last_name}',
-            'job_title': app.job_title if app.job_title else '',
-            # classification fields:
-            'pharmacist_award_level': app.pharmacist_award_level,
-            'otherstaff_classification_level': app.otherstaff_classification_level,
-            'intern_half': app.intern_half,
-            'student_year': app.student_year,
-            'activate_immediately': True,
-        }
-
-        membership, error = MembershipViewSet()._create_membership_invite(data, inviter=request.user)
-        if error:
-            return Response({'detail': error}, status=400)
-
-        worker_user = membership.user
-        if not user_existed_before_approval:
-            worker_user.first_name = app.first_name.strip()
-            worker_user.last_name = app.last_name.strip()
-            worker_user.username = (app.username or '').strip()
-            worker_user.mobile_number = (app.mobile_number or '').strip()
-            worker_user.save(update_fields=['first_name', 'last_name', 'username', 'mobile_number'])
-
-        onboarding = (
-            PharmacistOnboarding.objects.filter(user=worker_user).first()
-            if app.role == 'PHARMACIST'
-            else OtherStaffOnboarding.objects.filter(user=worker_user).first()
+        payroll_terms = request.data.get('employment_engagement')
+        payroll_required = bool(
+            app.category == 'FULL_PART_TIME'
+            and app.pharmacy.use_chemisttasker_payroll
         )
-        if onboarding and not onboarding.date_of_birth:
-            onboarding.date_of_birth = app.date_of_birth
-            onboarding.save(update_fields=['date_of_birth'])
+        if payroll_required and not isinstance(payroll_terms, dict):
+            return Response(
+                {
+                    'employment_engagement': [
+                        'ChemistTasker Payroll is enabled. Add the initial employment terms before approving this staff application.'
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        app.status = 'APPROVED'
-        app.decided_at = timezone.now()
-        app.decided_by = request.user
-        app.approved_membership = membership
-        app.pending_identity_key = None
-        app.save(update_fields=['status', 'decided_at', 'decided_by', 'approved_membership', 'pending_identity_key'])
-        transaction.on_commit(lambda: async_task('client_profile.tasks.email_membership_application_approved', app.id))
+        email = clean_email((app.email or '').strip().lower())
+        if not email:
+            return Response({'email': ['Application email is required.']}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'status': 'approved', 'membership_id': membership.id}, status=200)
+        employment_engagement_public_id = None
+        try:
+            with transaction.atomic():
+                app = (
+                    MembershipApplication.objects
+                    .select_for_update()
+                    .select_related('pharmacy')
+                    .get(pk=app.pk)
+                )
+                if app.status != 'PENDING':
+                    return Response({'detail': f'Already {app.status.lower()}.'}, status=400)
+
+                existing_worker = User.objects.filter(email__iexact=email).first()
+                user_existed_before_approval = existing_worker is not None
+                if existing_worker:
+                    onboarding = (
+                        PharmacistOnboarding.objects.filter(user=existing_worker).first()
+                        if app.role == 'PHARMACIST'
+                        else OtherStaffOnboarding.objects.filter(user=existing_worker).first()
+                    )
+                    existing_dob = getattr(onboarding, 'date_of_birth', None) if onboarding else None
+                    if existing_dob and existing_dob != app.date_of_birth:
+                        raise DjangoValidationError({
+                            'date_of_birth': ['Application date of birth does not match the worker onboarding profile.']
+                        })
+
+                data = {
+                    'email': email,
+                    'pharmacy': app.pharmacy_id,
+                    'role': app.role,
+                    'employment_type': employment_type,
+                    'invited_name': f'{app.first_name} {app.last_name}'.strip(),
+                    'job_title': app.job_title if app.job_title else '',
+                    'pharmacist_award_level': app.pharmacist_award_level,
+                    'otherstaff_classification_level': app.otherstaff_classification_level,
+                    'intern_half': app.intern_half,
+                    'student_year': app.student_year,
+                    'activate_immediately': True,
+                }
+
+                membership, error = MembershipViewSet()._create_membership_invite(
+                    data,
+                    inviter=request.user,
+                )
+                if error:
+                    raise DjangoValidationError({'detail': [error]})
+
+                worker_user = membership.user
+                if not user_existed_before_approval:
+                    worker_user.first_name = app.first_name.strip()
+                    worker_user.last_name = app.last_name.strip()
+                    worker_user.username = (app.username or '').strip()
+                    worker_user.mobile_number = (app.mobile_number or '').strip()
+                    worker_user.save(
+                        update_fields=['first_name', 'last_name', 'username', 'mobile_number']
+                    )
+
+                onboarding = (
+                    PharmacistOnboarding.objects.filter(user=worker_user).first()
+                    if app.role == 'PHARMACIST'
+                    else OtherStaffOnboarding.objects.filter(user=worker_user).first()
+                )
+                if onboarding and not onboarding.date_of_birth:
+                    onboarding.date_of_birth = app.date_of_birth
+                    onboarding.save(update_fields=['date_of_birth'])
+
+                if payroll_required:
+                    from workforce.employment_engagement_service import build_employment_engagement_payload
+                    from workforce.models import EmploymentEngagement
+
+                    engagement_data = dict(payroll_terms)
+                    engagement_data.setdefault('employment_type', employment_type)
+                    engagement_data.setdefault('job_title', app.job_title or '')
+                    engagement_data.setdefault(
+                        'award_classification',
+                        app.pharmacist_award_level
+                        or app.otherstaff_classification_level
+                        or app.intern_half
+                        or app.student_year
+                        or '',
+                    )
+                    engagement_data.setdefault('pay_basis', 'AWARD')
+
+                    effective_from_raw = engagement_data.get('effective_from') or str(timezone.localdate())
+                    try:
+                        effective_from = date.fromisoformat(str(effective_from_raw))
+                    except (TypeError, ValueError) as exc:
+                        raise DjangoValidationError({
+                            'effective_from': ['Use YYYY-MM-DD for the employment terms effective date.']
+                        }) from exc
+
+                    effective_to_raw = engagement_data.get('effective_to')
+                    effective_to = None
+                    if effective_to_raw:
+                        try:
+                            effective_to = date.fromisoformat(str(effective_to_raw))
+                        except (TypeError, ValueError) as exc:
+                            raise DjangoValidationError({
+                                'effective_to': ['Use YYYY-MM-DD for the employment terms end date.']
+                            }) from exc
+
+                    engagement_payload = build_employment_engagement_payload(
+                        engagement_data,
+                        membership,
+                        effective_from=effective_from,
+                        effective_to=effective_to,
+                    )
+                    engagement = EmploymentEngagement(
+                        membership=membership,
+                        effective_from=effective_from,
+                        effective_to=effective_to,
+                        created_by=request.user,
+                        updated_by=request.user,
+                        **engagement_payload,
+                    )
+                    engagement.full_clean()
+                    engagement.save()
+                    employment_engagement_public_id = str(engagement.public_id)
+
+                app.status = 'APPROVED'
+                app.decided_at = timezone.now()
+                app.decided_by = request.user
+                app.approved_membership = membership
+                app.pending_identity_key = None
+                app.save(update_fields=[
+                    'status',
+                    'decided_at',
+                    'decided_by',
+                    'approved_membership',
+                    'pending_identity_key',
+                ])
+                transaction.on_commit(
+                    lambda app_id=app.id: async_task(
+                        'client_profile.tasks.email_membership_application_approved',
+                        app_id,
+                    )
+                )
+        except DjangoValidationError as exc:
+            return Response(
+                getattr(exc, 'message_dict', {'detail': exc.messages}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            'status': 'approved',
+            'membership_id': membership.id,
+            'employment_engagement_public_id': employment_engagement_public_id,
+            'payroll_enabled': bool(app.pharmacy.use_chemisttasker_payroll),
+        }, status=200)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
-        app = self.get_object()
+        visible_app = self.get_object()
         user = request.user
-        pharm_id = app.pharmacy_id
-        is_org_admin = OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN', organization_id=app.pharmacy.organization_id).exists()
+        pharm_id = visible_app.pharmacy_id
+        is_org_admin = OrganizationMembership.objects.filter(
+            user=user,
+            role='ORG_ADMIN',
+            organization_id=visible_app.pharmacy.organization_id,
+        ).exists()
         is_owner = Pharmacy.objects.filter(id=pharm_id, owner__user=user).exists()
-        can_manage_staff = has_admin_capability(user, app.pharmacy, CAPABILITY_MANAGE_STAFF)
+        can_manage_staff = has_admin_capability(user, visible_app.pharmacy, CAPABILITY_MANAGE_STAFF)
         if not (is_org_admin or is_owner or can_manage_staff):
             return Response({'detail': 'Not allowed to reject for this pharmacy.'}, status=403)
-        if app.status != 'PENDING':
-            return Response({'detail': f'Already {app.status.lower()}.'}, status=400)
 
-        app.status = 'REJECTED'
-        app.decided_at = timezone.now()
-        app.decided_by = request.user
-        app.pending_identity_key = None
-        app.save(update_fields=['status', 'decided_at', 'decided_by', 'pending_identity_key'])
-        transaction.on_commit(lambda: async_task('client_profile.tasks.email_membership_application_rejected', app.id))
+        with transaction.atomic():
+            app = MembershipApplication.objects.select_for_update().get(pk=visible_app.pk)
+            if app.status != 'PENDING':
+                return Response({'detail': f'Already {app.status.lower()}.'}, status=400)
+            app.status = 'REJECTED'
+            app.decided_at = timezone.now()
+            app.decided_by = request.user
+            app.pending_identity_key = None
+            app.save(update_fields=['status', 'decided_at', 'decided_by', 'pending_identity_key'])
+            transaction.on_commit(
+                lambda app_id=app.id: async_task(
+                    'client_profile.tasks.email_membership_application_rejected',
+                    app_id,
+                )
+            )
         return Response({'status': 'rejected'}, status=200)
 
 
