@@ -1,0 +1,15 @@
+Hi {{ applicant_full_name }},
+
+{{ pharmacy_name }} reviewed your membership application and updated these employment-facing details:
+
+{% for change in changes %}- {{ change.label }}: {{ change.from|default:"—" }} -> {{ change.to|default:"—" }}
+{% endfor %}
+
+Your email, mobile number, date of birth and username remain locked identifiers and were not changed by the pharmacy.
+
+This is a review update only. Your application remains pending until the pharmacy approves or rejects it.
+
+Open ChemistTasker: {{ membership_url }}
+
+Regards,
+ChemistTasker
