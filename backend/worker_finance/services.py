@@ -49,6 +49,154 @@ def calculate(data, lines):
         raise ValidationError({'lines': str(exc)}) from exc
 
 
+def _system_item(owner, category):
+    defaults = {
+        "ProfessionalServices": ("LABOUR", "Professional services", "Hours", True),
+        "Transportation": ("TRAVEL", "Transportation", "Kilometres", False),
+        "Accommodation": ("STAY", "Accommodation", "Nights", False),
+        "Superannuation": ("SUPER", "Superannuation contribution", "Lump Sum", False),
+        "Miscellaneous": ("OTHER", "Other agreed charge", "Item", False),
+    }
+    code, name, unit, super_eligible = defaults.get(
+        category,
+        ("OTHER", "Other agreed charge", "Item", False),
+    )
+    item, _ = CatalogueItem.objects.get_or_create(
+        owner=owner,
+        code=code,
+        defaults={
+            "name": name,
+            "category": category if category in defaults else "Miscellaneous",
+            "unit": unit,
+            "super_eligible": super_eligible,
+            "unit_price": "0.00",
+            "tax_code": "OUT_OF_SCOPE",
+        },
+    )
+    return item
+
+
+def _customer_for_internal_invoice(owner, invoice):
+    abn = "".join(ch for ch in str(invoice.pharmacy_abn_snapshot or "") if ch.isdigit())
+    name = invoice.pharmacy_name_snapshot or invoice.custom_bill_to_name or "Pharmacy"
+    query = Customer.objects.filter(owner=owner)
+    customer = query.filter(abn=abn).first() if abn else query.filter(name=name).first()
+    if customer:
+        return customer
+    return Customer.objects.create(
+        owner=owner,
+        name=name,
+        legal_name=name,
+        abn=abn,
+        contact_name=(f"{invoice.bill_to_first_name} {invoice.bill_to_last_name}").strip(),
+        email=invoice.bill_to_email or "",
+        address=invoice.pharmacy_address_snapshot or invoice.custom_bill_to_address or "",
+        payment_terms_days=14,
+    )
+
+
+@transaction.atomic
+def adopt_internal_invoice(owner, invoice):
+    """Expose a canonical accepted-shift invoice in the newer finance workspace.
+
+    The existing client_profile Invoice/InvoiceLineItem rows remain authoritative.
+    Locked professional-service rows retain their source_assignment links; this
+    wrapper only adds finance workspace metadata, delivery/payment history and UI.
+    """
+    Invoice.objects.select_for_update().get(pk=invoice.pk)
+    existing = InvoiceRecord.objects.filter(invoice=invoice).first()
+    if existing:
+        return existing
+
+    source_snapshot = invoice.source_snapshot or {}
+    if source_snapshot.get("source") != "INTERNAL_ABN_SHIFT_ASSIGNMENTS":
+        raise ValidationError("Only accepted-shift internal invoices can be adopted into this internal workspace flow.")
+
+    customer = _customer_for_internal_invoice(owner, invoice)
+    request_key = uuid4()
+    payload_lines = []
+    for line in invoice.line_items.select_related("source_assignment").order_by("id"):
+        item = _system_item(owner, line.category_code)
+        worked_on = (
+            str(line.source_assignment.slot_date)
+            if line.source_assignment_id and line.source_assignment
+            else None
+        )
+        payload_lines.append({
+            "item_id": item.pk,
+            "description": line.description,
+            "quantity": str(line.quantity),
+            "unit_price": str(line.unit_price),
+            "discount": str(line.discount),
+            "tax_code": "GST" if invoice.gst_registered and line.gst_applicable else "OUT_OF_SCOPE",
+            "super_eligible": bool(line.super_applicable),
+            "worked_on": worked_on,
+            "category_code": line.category_code,
+            "unit": line.unit,
+            "locked": bool(line.source_assignment_id and line.category_code == "ProfessionalServices"),
+            "source_assignment_id": line.source_assignment_id,
+            "shift_id": line.shift_id,
+        })
+
+    super_mode = "summary" if invoice.super_amount > 0 else "none"
+    payload = {
+        "request_key": str(request_key),
+        "customer_id": customer.pk,
+        "invoice_date": str(invoice.invoice_date),
+        "due_date": str(invoice.due_date or invoice.invoice_date),
+        "issuer_name": (f"{invoice.issuer_first_name} {invoice.issuer_last_name}").strip() or owner.get_full_name() or owner.email,
+        "issuer_entity_type": "sole_trader",
+        "issuer_abn": "".join(ch for ch in str(invoice.issuer_abn or "") if ch.isdigit()),
+        "issuer_address": "",
+        "gst_registered": bool(invoice.gst_registered),
+        "price_mode": "exclusive",
+        "super_mode": super_mode,
+        "super_rate": str(invoice.super_rate_snapshot),
+        "super_confirmed": bool(invoice.super_amount > 0),
+        "bank_account_name": invoice.bank_account_name,
+        "bsb": invoice.bsb,
+        "account_number": invoice.account_number,
+        "super_fund_name": invoice.super_fund_name,
+        "super_usi": invoice.super_usi,
+        "super_member_number": invoice.super_member_number,
+        "reference": "Accepted ChemistTasker shift",
+        "notes": "Created from accepted ChemistTasker ABN shift terms. Locked labour rows preserve the accepted dates, hours and rates.",
+        "lines": payload_lines,
+        "customer": {
+            key: getattr(customer, key)
+            for key in ("name", "legal_name", "address", "abn", "email", "contact_name")
+        },
+        "source_snapshot": source_snapshot,
+    }
+    calc = calculate_invoice(
+        payload_lines,
+        gst_registered=payload["gst_registered"],
+        price_mode=payload["price_mode"],
+        super_mode=payload["super_mode"],
+        super_rate=payload["super_rate"],
+    )
+    if (
+        Decimal(calc["payable"]) != invoice.total
+        or Decimal(calc["gst"]) != invoice.gst_amount
+        or Decimal(calc["super"]) != invoice.super_amount
+    ):
+        raise ValidationError(
+            "The canonical invoice totals do not match the finance workspace calculation. "
+            "Resolve the invoice before exposing it in the workspace."
+        )
+
+    return InvoiceRecord.objects.create(
+        owner=owner,
+        invoice=invoice,
+        customer=customer,
+        kind="invoice",
+        source="internal",
+        request_key=request_key,
+        payload=json_safe(payload),
+        calculation=json_safe(calc),
+    )
+
+
 def write_canonical(record):
     """Snapshot amounts once. The new PDF and email use these same amounts."""
     invoice, data, calc = record.invoice, record.payload, record.calculation
