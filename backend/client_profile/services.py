@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta, date, time
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -508,9 +508,11 @@ def _invoice_line_from_assignment(assignment):
     slot = assignment.slot
     slot_date = assignment.slot_date
     start_dt, end_dt = _resolve_shift_bounds(slot_date, slot.start_time, slot.end_time)
-    hours = _decimal_hours(start_dt, end_dt)
+    # InvoiceLineItem.quantity is a 2-decimal field. Freeze the billed hours
+    # at that precision before calculating money so DB, workspace and PDF agree.
+    hours = _decimal_hours(start_dt, end_dt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     rate = _accepted_invoice_rate(assignment, slot_date)
-    total = (hours * rate).quantize(Decimal("0.01"))
+    total = (hours * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     snapshot = assignment.engagement_terms_snapshot or {}
     return {
         "id": f"{assignment.shift_id}-{slot.id}-{slot_date}",
