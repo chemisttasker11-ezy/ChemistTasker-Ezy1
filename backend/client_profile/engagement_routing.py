@@ -12,6 +12,7 @@ PHARMACY_STAFF_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
 PAYMENT_TFN = "TFN"
 PAYMENT_ABN = "ABN"
 SETTLEMENT_PAYROLL = "PAYROLL"
+SETTLEMENT_TIMESHEET_ONLY = "TIMESHEET_ONLY"
 SETTLEMENT_INVOICE = "INVOICE"
 KIND_STAFF_EMPLOYMENT = "STAFF_EMPLOYMENT"
 KIND_SHIFT_EMPLOYMENT = "SHIFT_EMPLOYMENT"
@@ -48,6 +49,29 @@ def staff_assignment_defaults(*, user, pharmacy, work_date):
                 "offer acceptance flow so engagement/payment terms are recorded."
             )
         })
+
+    if not getattr(pharmacy, "use_chemisttasker_payroll", False):
+        snapshot = {
+            "version": 1,
+            "engagement_kind": KIND_STAFF_EMPLOYMENT,
+            "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
+            "payment_preference": PAYMENT_TFN,
+            "membership_id": membership.id,
+            "employment_type": membership.employment_type,
+            "role": membership.role,
+            "payroll_enabled": False,
+            "notice": (
+                "ChemistTasker Payroll is disabled for this pharmacy. The assignment remains "
+                "in roster, attendance and timesheets without requiring ChemistTasker pay rates."
+            ),
+        }
+        return {
+            "payment_preference_snapshot": PAYMENT_TFN,
+            "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
+            "engagement_kind": KIND_STAFF_EMPLOYMENT,
+            "engagement_terms_snapshot": snapshot,
+            "engagement_terms_accepted_at": None,
+        }
 
     validate_tfn_payroll_profile(user)
 
@@ -158,7 +182,16 @@ def _offer_occurrences(shift, offer=None):
             "date": str(offer.offered_slot_date or offer.slot.date),
             "start_time": str(offer.offered_start_time or offer.slot.start_time),
             "end_time": str(offer.offered_end_time or offer.slot.end_time),
-            "agreed_rate": str(offer.offered_rate) if offer.offered_rate is not None else None,
+            "agreed_rate": str(
+                offer.offered_rate
+                if offer.offered_rate is not None
+                else (getattr(offer.slot, "rate", None) if offer.slot_id else None)
+                or getattr(shift, "fixed_rate", None)
+            ) if (
+                offer.offered_rate is not None
+                or (offer.slot_id and getattr(offer.slot, "rate", None) is not None)
+                or getattr(shift, "fixed_rate", None) is not None
+            ) else None,
         }]
     return [{
         "slot_id": slot.id,
@@ -175,11 +208,12 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
     pharmacy = shift.pharmacy
 
     if staff_membership:
+        payroll_enabled = bool(getattr(pharmacy, "use_chemisttasker_payroll", False))
         return {
             "version": 1,
             "acceptance_required": False,
             "engagement_kind": KIND_STAFF_EMPLOYMENT,
-            "settlement_channel": SETTLEMENT_PAYROLL,
+            "settlement_channel": SETTLEMENT_PAYROLL if payroll_enabled else SETTLEMENT_TIMESHEET_ONLY,
             "payment_preference": PAYMENT_TFN,
             "membership_id": staff_membership.id,
             "pharmacy_id": pharmacy.id,
@@ -188,7 +222,13 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
             "worker_name": user.get_full_name() or user.email,
             "role": shift.role_needed,
             "occurrences": occurrences,
-            "notice": "Existing pharmacy staff employment is governed by the worker's dated EmploymentEngagement; this roster allocation is not a separate contractor engagement.",
+            "payroll_enabled": payroll_enabled,
+            "notice": (
+                "Existing pharmacy staff employment uses the worker's dated EmploymentEngagement for ChemistTasker Payroll."
+                if payroll_enabled
+                else
+                "ChemistTasker Payroll is disabled. This shift remains available in roster, attendance and timesheets for the pharmacy's own payroll process."
+            ),
         }
 
     onboarding, pref = _external_payment_profile(user)
@@ -216,11 +256,13 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
     }
 
     if pref == PAYMENT_TFN:
+        payroll_enabled = bool(getattr(pharmacy, "use_chemisttasker_payroll", False))
         return {
             **base,
             "engagement_kind": KIND_SHIFT_EMPLOYMENT,
-            "settlement_channel": SETTLEMENT_PAYROLL,
+            "settlement_channel": SETTLEMENT_PAYROLL if payroll_enabled else SETTLEMENT_TIMESHEET_ONLY,
             "payment_preference": PAYMENT_TFN,
+            "payroll_enabled": payroll_enabled,
             "employment_type": "CASUAL",
             "award_code": "MA000012",
             "super": {
@@ -229,7 +271,12 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
                 "member_number_present": bool(onboarding.super_member_number),
             },
             "facilitator_notice": "ChemistTasker facilitates the connection and records acceptance. The employment engagement for this shift is between the pharmacy/employer and the worker.",
-            "relationship_notice": "The parties intend this shift to be an employee engagement settled through payroll. Applicable Award/NES, tax withholding and superannuation obligations are not displaced by these terms.",
+            "relationship_notice": (
+                "The parties intend this shift to be an employee engagement settled through ChemistTasker Payroll. Applicable Award/NES, tax withholding and superannuation obligations are not displaced by these terms."
+                if payroll_enabled
+                else
+                "The parties intend this shift to be an employee engagement. ChemistTasker records the agreed shift and timesheet, while the pharmacy processes payroll in its own system. Applicable Award/NES, tax withholding and superannuation obligations are not displaced by these terms."
+            ),
         }
 
     return {
