@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 
 import { Alert, Modal, RefreshControl, ScrollView, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Chip, IconButton, List, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { finance, financeStatus, financeToday, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput, type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import FinanceInvoiceEditor from './FinanceInvoiceEditor';
 
@@ -34,6 +36,18 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   }, [receivedMode]);
   useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
+  const sharePdf = async (invoice: FinanceInvoice, received = false) => {
+    if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
+    const blob = received ? await finance.receivedPdf(invoice.id) : await finance.pdf(invoice.id);
+    const file = new File(Paths.cache, invoice.number + '-revision-' + invoice.version + '.pdf');
+    file.create({ overwrite: true });
+    file.write(new Uint8Array(await blob.arrayBuffer()));
+    await Sharing.shareAsync(file.uri, {
+      dialogTitle: 'Share ' + invoice.number,
+      mimeType: 'application/pdf',
+      UTI: 'com.adobe.pdf',
+    });
+  };
   const afterSave = async () => { try { await load(); } catch { setError('Saved. Pull to refresh to update the list.'); } };
   const ask = (title: string, message: string, action: () => Promise<unknown>) => Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: () => void run(action) }]);
   const matches = (...values: string[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
@@ -106,11 +120,13 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
             <Text>Revision {selected.version} · GST {money(selected.calculation.gst)}</Text>
             {selected.payload.lines.map((line, i) => <List.Item key={i} title={line.description} description={line.quantity + ' ' + (line.unit || '') + ' × ' + money(line.unit_price)} />)}
             {receivedMode ? <View style={{ gap: 8 }}>
+              <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, true))}>Share PDF</Button>
               <Button mode="contained" onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
               <Button mode="outlined" textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
               <Button mode="outlined" disabled={selected.status === 'paid'} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
             </View> : <>
               <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit invoice</Button>
+              <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected))}>Share PDF</Button>
               {selected.kind === 'invoice' ? <Button onPress={() => {
                 const requestKey = key();
                 ask('Duplicate invoice?', 'Create a separate editable invoice without shift links or payment history.', async () => {
