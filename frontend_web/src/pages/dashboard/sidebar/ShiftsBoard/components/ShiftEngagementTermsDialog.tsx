@@ -25,6 +25,7 @@ type Props = {
   loading?: boolean;
   onClose: () => void;
   onConfirm: (payload: ShiftOfferAcceptancePayload) => Promise<void> | void;
+  onOpenPaymentProfile?: () => void;
 };
 
 const termsFor = (offer: ShiftOffer): ShiftEngagementTerms | null =>
@@ -36,6 +37,7 @@ export default function ShiftEngagementTermsDialog({
   loading = false,
   onClose,
   onConfirm,
+  onOpenPaymentProfile,
 }: Props) {
   const [accepted, setAccepted] = useState(false);
   const [contractorConfirmed, setContractorConfirmed] = useState(false);
@@ -69,7 +71,14 @@ export default function ShiftEngagementTermsDialog({
       <DialogContent dividers>
         <Stack spacing={2}>
           {blocked && (
-            <Alert severity="error">
+            <Alert
+              severity="error"
+              action={onOpenPaymentProfile ? (
+                <Button color="inherit" size="small" onClick={onOpenPaymentProfile}>
+                  Open private profile
+                </Button>
+              ) : undefined}
+            >
               These terms cannot be accepted yet. Complete the required payment/onboarding details first.
             </Alert>
           )}
@@ -90,11 +99,19 @@ export default function ShiftEngagementTermsDialog({
               {primary.facilitatorNotice && <Alert severity="info">{primary.facilitatorNotice}</Alert>}
               {primary.relationshipNotice && <Alert severity={contractor ? 'warning' : 'info'}>{primary.relationshipNotice}</Alert>}
               {primary.payrollSetupStatus === 'DEFERRED' && (
-                <Alert severity="warning">
+                <Alert
+                  severity="warning"
+                  action={onOpenPaymentProfile ? (
+                    <Button color="inherit" size="small" onClick={onOpenPaymentProfile}>
+                      Complete private profile
+                    </Button>
+                  ) : undefined}
+                >
                   {primary.payrollSetupNotice || 'ChemistTasker Payroll setup is deferred. The shift can still be assigned and timesheeted.'}
                   {primary.payrollMissingFields?.length
-                    ? ` Complete later: ${primary.payrollMissingFields.join(', ')}.`
+                    ? ` Complete later: ${primary.payrollMissingFields.map((field) => field.replaceAll('_', ' ')).join(', ')}.`
                     : ''}
+                  {' Your TFN and super identifiers remain private and are not shared with the pharmacy.'}
                 </Alert>
               )}
               {primary.awardPayrollReviewRequired && (
