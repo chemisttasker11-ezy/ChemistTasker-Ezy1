@@ -22,8 +22,6 @@ import {
   TextInput,
 } from 'react-native-paper';
 import {
-  UserAvailability,
-  UserAvailabilityPayload,
   fetchUserAvailabilityService,
   createUserAvailabilityService,
   deleteUserAvailabilityService,
@@ -34,66 +32,21 @@ import { useAuth } from '../../../context/AuthContext';
 import { Autocomplete as WebAutocomplete, Circle, GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import GooglePlacesInput from '../pharmacies/GooglePlacesInput';
 import AvailabilityRadiusMap from './AvailabilityRadiusMap';
-
-type AvailabilityEntry = UserAvailability & { notifyNewShifts?: boolean };
-type AvailabilityDraft = Omit<AvailabilityEntry, 'id'>;
-type AvailabilityPayload = UserAvailabilityPayload & { notify_new_shifts?: boolean };
-
-const createEmptyEntry = (): AvailabilityDraft => ({
-  date: '',
-  startTime: '09:00',
-  endTime: '17:00',
-  isAllDay: false,
-  isRecurring: false,
-  recurringDays: [],
-  recurringEndDate: '',
-  notifyNewShifts: false,
-  notes: '',
-});
-
-const weekDays = [
-  { value: 0, label: 'Sun' },
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
-];
-
-const radiusOptions = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 500, 1000];
-const stateOptions = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
-
-const toLocalIsoDate = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-const GOOGLE_LIBRARIES: Array<'places'> = ['places'];
-
-const DNA = {
-  ink: '#06123A',
-  muted: '#5E6B8D',
-  line: '#E5ECF7',
-  blue: '#063BDA',
-  violet: '#6D28D9',
-  magenta: '#EA0A8E',
-  cyan: '#08BEEA',
-  mint: '#00A878',
-};
+import {
+  type AvailabilityEntry,
+  type AvailabilityDraft,
+  type AvailabilityPayload,
+  createEmptyEntry,
+  weekDays,
+  radiusOptions,
+  stateOptions,
+  toLocalIsoDate,
+  GOOGLE_LIBRARIES,
+  DNA,
+  type LocationFormState,
+} from './availabilityModel';
 
 LogBox.ignoreLogs(['VirtualizedLists should never be nested']);
-
-type LocationFormState = {
-  streetAddress: string;
-  suburb: string;
-  state: string;
-  postcode: string;
-  openToTravel: boolean;
-  travelStates: string[];
-  latitude: number | null;
-  longitude: number | null;
-  googlePlaceId: string;
-  coverageRadiusKm: number;
-};
 
 function AvailabilityWebLocationField({
   placesApiKey,
