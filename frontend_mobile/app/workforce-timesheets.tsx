@@ -19,7 +19,11 @@ function currentFortnight() {
   monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
   const end = new Date(monday);
   end.setDate(monday.getDate() + 13);
-  const iso = (date: Date) => date.toISOString().slice(0, 10);
+  const iso = (date: Date) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
   return { start: iso(monday), end: iso(end) };
 }
 
