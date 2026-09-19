@@ -145,8 +145,8 @@ class EmploymentEngagement(models.Model):
         super().clean()
         if self.membership_id and not self.membership.pharmacy_id:
             raise ValidationError("Employment engagement requires a pharmacy membership.")
-        if self.membership_id and self.role and self.role != self.membership.role:
-            raise ValidationError({"role": "Engagement role must match the membership role."})
+        if self._state.adding and self.membership_id and self.role and self.role != self.membership.role:
+            raise ValidationError({"role": "A new engagement role must match the current membership role."})
 
         from .employment_terms import normalise_part_time_pattern
 
