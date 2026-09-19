@@ -361,6 +361,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Revision notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            check_version(record, request.data.get('version'))
             InvoiceReviewRequest.objects.create(
                 record=record,
                 requested_by=request.user,
@@ -394,6 +395,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            check_version(record, request.data.get('version'))
             record.review_status = 'APPROVED_FOR_PAYMENT'
             record.last_review_note = note
             record.last_reviewed_at = timezone.now()
@@ -416,8 +418,11 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     @action(detail=True, methods=['post'], url_path='mark-paid')
     def mark_paid(self, request, pk=None):
         note = str(request.data.get('note') or '').strip()
+        if len(note) > 3000:
+            raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            check_version(record, request.data.get('version'))
             record.invoice.status = 'paid'
             record.invoice.save(update_fields=['status'])
             record.invoice.refresh_from_db()
