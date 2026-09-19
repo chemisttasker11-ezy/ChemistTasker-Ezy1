@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import date
+
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import Membership, OtherStaffOnboarding, PharmacistOnboarding
@@ -29,6 +32,74 @@ def direct_pharmacy_staff_membership(*, user, pharmacy):
         status=Membership.Status.ACCEPTED,
         employment_type__in=PHARMACY_STAFF_TYPES,
     ).first()
+
+
+def staff_assignment_defaults(*, user, pharmacy, work_date):
+    """Build the immutable payroll snapshot for a direct pharmacy-staff roster assignment."""
+    if isinstance(work_date, str):
+        work_date = date.fromisoformat(work_date)
+
+    membership = direct_pharmacy_staff_membership(user=user, pharmacy=pharmacy)
+    if not membership:
+        raise ValidationError({
+            "user": (
+                "Only direct full-time, part-time or casual pharmacy staff can be assigned "
+                "through roster tools. Locum, Shift Hero and external workers must use the "
+                "offer acceptance flow so engagement/payment terms are recorded."
+            )
+        })
+
+    validate_tfn_payroll_profile(user)
+
+    from workforce.models import EmploymentEngagement
+
+    engagement = (
+        EmploymentEngagement.objects.filter(
+            membership=membership,
+            effective_from__lte=work_date,
+        )
+        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=work_date))
+        .order_by("-effective_from", "-id")
+        .first()
+    )
+    if not engagement:
+        raise ValidationError({
+            "employment_engagement": (
+                f"No dated EmploymentEngagement covers {work_date}. "
+                "Create the employee terms before rostering this worker."
+            )
+        })
+
+    snapshot = {
+        "version": 1,
+        "engagement_kind": KIND_STAFF_EMPLOYMENT,
+        "settlement_channel": SETTLEMENT_PAYROLL,
+        "payment_preference": PAYMENT_TFN,
+        "membership_id": membership.id,
+        "employment_engagement_public_id": str(engagement.public_id),
+        "effective_from": str(engagement.effective_from),
+        "effective_to": str(engagement.effective_to) if engagement.effective_to else None,
+        "employment_type": engagement.employment_type,
+        "role": engagement.role,
+        "pay_basis": engagement.pay_basis,
+        "award_code": engagement.award_code,
+        "award_classification": engagement.award_classification,
+        "rates": {
+            "weekday": str(engagement.rate_weekday),
+            "saturday": str(engagement.rate_saturday),
+            "sunday": str(engagement.rate_sunday),
+            "public_holiday": str(engagement.rate_public_holiday),
+            "early_morning": str(engagement.rate_early_morning) if engagement.rate_early_morning is not None else None,
+            "late_night": str(engagement.rate_late_night) if engagement.rate_late_night is not None else None,
+        },
+    }
+    return {
+        "payment_preference_snapshot": PAYMENT_TFN,
+        "settlement_channel": SETTLEMENT_PAYROLL,
+        "engagement_kind": KIND_STAFF_EMPLOYMENT,
+        "engagement_terms_snapshot": snapshot,
+        "engagement_terms_accepted_at": None,
+    }
 
 
 def _format_abn(value):
