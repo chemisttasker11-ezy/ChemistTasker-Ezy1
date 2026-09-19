@@ -132,6 +132,21 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(locked_line["source_assignment_id"], self.assignment.id)
         self.assertEqual(serialize_record(record)["source_snapshot"], invoice.source_snapshot)
 
+    def test_partial_hour_invoice_uses_same_precision_for_quantity_and_total(self):
+        self.slot.end_time = time(16, 37)
+        self.slot.save(update_fields=["end_time"])
+
+        invoice = self._generate()
+        line = invoice.line_items.get(category_code="ProfessionalServices")
+
+        self.assertEqual(line.quantity, Decimal("7.62"))
+        self.assertEqual(line.unit_price, Decimal("70.00"))
+        self.assertEqual(line.total, Decimal("533.40"))
+        self.assertEqual(invoice.subtotal, Decimal("533.40"))
+        self.assertEqual(invoice.gst_amount, Decimal("53.34"))
+        self.assertEqual(invoice.total, Decimal("586.74"))
+        self.assertEqual(invoice.finance_record.calculation["payable"], "586.74")
+
     def test_same_accepted_assignment_cannot_be_invoiced_twice(self):
         first = self._generate()
         with self.assertRaises(ValidationError):
