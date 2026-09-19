@@ -529,7 +529,7 @@ def _invoice_line_from_assignment(assignment):
         "discount": 0,
         "total": float(total),
         "gst_applicable": bool(snapshot.get("gst_registered", False)),
-        "super_applicable": bool(snapshot.get("super_review_required", False)),
+        "super_applicable": bool(snapshot.get("super_payable_confirmed", False)),
         "was_modified": False,
         "locked": True,
         "rate_reason": {
