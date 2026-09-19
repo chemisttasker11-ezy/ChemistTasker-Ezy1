@@ -172,6 +172,37 @@ class EmploymentTermsTests(SimpleTestCase):
                 }
             )
 
+    def test_part_time_pattern_rejects_ordinary_start_before_7am(self):
+        with self.assertRaises(ValidationError):
+            normalise_part_time_pattern(
+                {
+                    "days": [
+                        {
+                            "weekday": 0,
+                            "start_time": "06:30",
+                            "end_time": "10:00",
+                            "meal_break_minutes": 0,
+                        }
+                    ]
+                }
+            )
+
+    def test_part_time_pattern_accepts_midnight_as_end_of_day(self):
+        result = normalise_part_time_pattern(
+            {
+                "days": [
+                    {
+                        "weekday": 4,
+                        "start_time": "18:00",
+                        "end_time": "00:00",
+                        "meal_break_start": "21:00",
+                        "meal_break_minutes": 30,
+                    }
+                ]
+            }
+        )
+        self.assertEqual(result["days"][0]["ordinary_minutes"], 330)
+
 
 class EmploymentEngagementPayloadTests(SimpleTestCase):
     @staticmethod
