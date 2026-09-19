@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+  <body style="font-family:Arial,sans-serif;color:#172033;line-height:1.5">
+    <p>Hi {{ applicant_full_name }},</p>
+    <p>{{ pharmacy_name }} reviewed your membership application and updated the following employment-facing details:</p>
+    <ul>
+      {% for change in changes %}
+      <li><strong>{{ change.label }}</strong>: {{ change.from|default:"—" }} &rarr; {{ change.to|default:"—" }}</li>
+      {% endfor %}
+    </ul>
+    <p>Your email, mobile number, date of birth and username remain locked identifiers and were not changed by the pharmacy.</p>
+    <p>This is a review update only. Your application remains pending until the pharmacy approves or rejects it.</p>
+    <p><a href="{{ membership_url }}">Open ChemistTasker</a></p>
+    <p>Regards,<br>ChemistTasker</p>
+  </body>
+</html>
