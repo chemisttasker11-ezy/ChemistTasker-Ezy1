@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Typography, Snackbar, Alert, Box, Paper, Stack, Tabs, Tab, alpha, useTheme } from '@mui/material';
+import { Typography, Snackbar, Alert, Box, Button, Chip, Paper, Stack, Tabs, Tab, alpha, useTheme } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import ShiftsBoard from './ShiftsBoard';
@@ -15,6 +15,7 @@ import {
   fetchSavedShifts,
   fetchShiftInterests,
   acceptShiftOfferService,
+  activateShiftOfferPayrollService,
   declineShiftOfferService,
   saveShift,
   PaginatedResponse,
@@ -75,6 +76,12 @@ export default function PublicShiftsPage({
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
+  const workerOnboardingPath =
+    user.role === 'PHARMACIST'
+      ? '/dashboard/pharmacist/onboarding'
+      : user.role === 'OTHER_STAFF'
+        ? '/dashboard/otherstaff/onboarding'
+        : '/dashboard';
   const queryTab = useMemo(() => new URLSearchParams(location.search).get('tab'), [location.search]);
   const coerceVerified = (value: any) => {
     if (value === true || value === 'true' || value === 'True') return true;
@@ -104,9 +111,12 @@ export default function PublicShiftsPage({
     activeTabOverride ?? 'browse'
   );
   const [offers, setOffers] = useState<ShiftOffer[]>([]);
+  const [payrollActivationOffers, setPayrollActivationOffers] = useState<ShiftOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
   const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
   const [termsConfirming, setTermsConfirming] = useState(false);
+  const [payrollActivatingId, setPayrollActivatingId] = useState<number | null>(null);
+  const [payrollNotice, setPayrollNotice] = useState('');
 
   useEffect(() => {
     if (activeTabOverride) {
@@ -368,8 +378,23 @@ export default function PublicShiftsPage({
   const loadOffers = useCallback(async () => {
     setOffersLoading(true);
     try {
-      const pending = await fetchShiftOffersService({ status: 'PENDING' });
+      const [pending, accepted] = await Promise.all([
+        fetchShiftOffersService({ status: 'PENDING' }),
+        fetchShiftOffersService({ status: 'ACCEPTED' }),
+      ]);
       setOffers(pending as ShiftOffer[]);
+      setPayrollActivationOffers(
+        (accepted as ShiftOffer[]).filter((offer) => {
+          const preview = offer.engagementTermsPreview;
+          return (
+            offer.paymentPreferenceSnapshot === 'TFN'
+            && offer.engagementKind === 'SHIFT_EMPLOYMENT'
+            && !offer.payrollActivatedAt
+            && offer.settlementChannel !== 'PAYROLL'
+            && Boolean(preview?.payrollEnabled)
+          );
+        }),
+      );
     } catch (err) {
       console.error('Failed to load offers', err);
       showError('Failed to load offers.');
@@ -505,6 +530,20 @@ export default function PublicShiftsPage({
     await loadOffers();
   };
 
+  const handleActivatePayroll = async (offer: ShiftOffer) => {
+    setPayrollActivatingId(offer.id);
+    setPayrollNotice('');
+    try {
+      await activateShiftOfferPayrollService(offer.id);
+      setPayrollNotice('ChemistTasker Payroll is now active for this confirmed shift.');
+      await loadOffers();
+    } catch (err) {
+      showError(errorMessage(err, 'Payroll could not be activated yet. Complete your private TFN/super profile and try again.'));
+    } finally {
+      setPayrollActivatingId(null);
+    }
+  };
+
   const renderContent = () => {
     if (boardTab === 'accepted') {
       return (
@@ -518,40 +557,104 @@ export default function PublicShiftsPage({
         >
           {offersLoading ? (
             <Typography color="text.secondary">Loading offers...</Typography>
-          ) : offerShifts.length === 0 ? (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Offers
-              </Typography>
-              <Typography color="text.secondary">No offers yet.</Typography>
-            </>
           ) : (
-            <Stack spacing={2}>
-              <ShiftsBoard
-                title="Offers"
-                shifts={offerShifts}
-                loading={offersLoading}
-                onApplyAll={handleConfirmOfferShift}
-                onApplySlot={handleConfirmOfferSlot}
-                onSubmitCounterOffer={handleSubmitCounterOffer}
-                onRejectShift={handleDeclineOfferShift}
-                onRejectSlot={undefined}
-                enableSaved={false}
-                hideSaveToggle
-                hideFiltersAndSort
-                hideTabs
-                disableLocalPersistence
-                applyLabel="Confirm"
-                disableActionGuards
-                actionDisabledGuard={(shift) =>
-                  !(offersByShift.get(shift.id) ?? []).some(
-                    (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
-                  )
-                }
-                onRefresh={loadOffers}
-                fallbackToAllShiftsWhenEmpty
-                showAllSlots
-              />
+            <Stack spacing={3}>
+              {payrollNotice && <Alert severity="success">{payrollNotice}</Alert>}
+              {offerShifts.length === 0 ? (
+                <Box>
+                  <Typography variant="h6" gutterBottom>Offers</Typography>
+                  <Typography color="text.secondary">No pending offers.</Typography>
+                </Box>
+              ) : (
+                <ShiftsBoard
+                  title="Offers"
+                  shifts={offerShifts}
+                  loading={offersLoading}
+                  onApplyAll={handleConfirmOfferShift}
+                  onApplySlot={handleConfirmOfferSlot}
+                  onSubmitCounterOffer={handleSubmitCounterOffer}
+                  onRejectShift={handleDeclineOfferShift}
+                  onRejectSlot={undefined}
+                  enableSaved={false}
+                  hideSaveToggle
+                  hideFiltersAndSort
+                  hideTabs
+                  disableLocalPersistence
+                  applyLabel="Confirm"
+                  disableActionGuards
+                  actionDisabledGuard={(shift) =>
+                    !(offersByShift.get(shift.id) ?? []).some(
+                      (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+                    )
+                  }
+                  onRefresh={loadOffers}
+                  fallbackToAllShiftsWhenEmpty
+                  showAllSlots
+                />
+              )}
+
+              {payrollActivationOffers.length > 0 && (
+                <Box>
+                  <Typography variant="h6" fontWeight={800} gutterBottom>
+                    Payroll setup for confirmed shifts
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                    These TFN shifts are already confirmed and remain timesheet-only until your private TFN/super setup is complete. The pharmacy never receives your TFN or super member number.
+                  </Typography>
+                  <Stack spacing={1.25}>
+                    {payrollActivationOffers.map((offer) => {
+                      const preview = offer.engagementTermsPreview;
+                      const ready =
+                        preview?.payrollSetupStatus === 'READY'
+                        && !preview?.awardPayrollReviewRequired;
+                      const missing = preview?.payrollMissingFields || [];
+                      const shift = offer.shiftDetail as any;
+                      const pharmacyName = preview?.pharmacyName || shift?.pharmacyDetail?.name || shift?.pharmacyName || 'Confirmed shift';
+                      return (
+                        <Paper key={offer.id} variant="outlined" sx={{ p: 1.5 }}>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ sm: 'center' }}>
+                            <Box sx={{ flex: 1 }}>
+                              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 0.75 }}>
+                                <Chip size="small" label="TFN" color="primary" />
+                                <Chip size="small" label={ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'} color={ready ? 'success' : 'warning'} variant="outlined" />
+                              </Stack>
+                              <Typography fontWeight={800}>{pharmacyName}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {preview?.awardClassification ? `${preview.awardClassification.replaceAll('_', ' ')} · ` : ''}
+                                {offer.settlementChannel === 'TIMESHEET_ONLY' ? 'Currently timesheet only' : offer.settlementChannel}
+                              </Typography>
+                              {missing.length > 0 && (
+                                <Typography variant="caption" color="warning.main">
+                                  Private setup needed: {missing.map((field) => field.replaceAll('_', ' ')).join(', ')}
+                                </Typography>
+                              )}
+                              {preview?.awardPayrollReviewRequired && (
+                                <Typography variant="caption" color="warning.main" display="block">
+                                  Award/overtime review is required before payroll activation.
+                                </Typography>
+                              )}
+                            </Box>
+                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                              {!ready && (
+                                <Button variant="outlined" onClick={() => navigate(workerOnboardingPath)}>
+                                  Complete private profile
+                                </Button>
+                              )}
+                              <Button
+                                variant="contained"
+                                disabled={!ready || payrollActivatingId === offer.id}
+                                onClick={() => void handleActivatePayroll(offer)}
+                              >
+                                {payrollActivatingId === offer.id ? 'Activating…' : 'Activate payroll'}
+                              </Button>
+                            </Stack>
+                          </Stack>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
             </Stack>
           )}
         </Paper>
@@ -707,6 +810,7 @@ export default function PublicShiftsPage({
         loading={termsConfirming}
         onClose={() => setTermsOffers([])}
         onConfirm={(payload) => acceptOffers(termsOffers, payload)}
+        onOpenPaymentProfile={() => navigate(workerOnboardingPath)}
       />
 
       <Snackbar
