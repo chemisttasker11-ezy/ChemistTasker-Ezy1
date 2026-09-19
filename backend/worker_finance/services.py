@@ -217,14 +217,49 @@ def write_canonical(record):
     invoice.super_amount = calc['super']
     invoice.total = calc['payable']
     invoice.save()
-    invoice.line_items.all().delete()
-    InvoiceLineItem.objects.bulk_create([
-        InvoiceLineItem(invoice=invoice, description=line['description'], category_code=line['category_code'],
-                        unit=line['unit'], quantity=line['quantity'], unit_price=line['unit_price'],
-                        discount=line['discount'], total=line['net'], gst_applicable=line['tax_code'] == 'GST',
-                        super_applicable=line['super_eligible'], is_manual=True, was_modified=True)
-        for line in calc['lines']
-    ])
+    if record.source == "internal":
+        protected = {
+            line.source_assignment_id: line
+            for line in invoice.line_items.filter(
+                category_code="ProfessionalServices",
+                source_assignment__isnull=False,
+            )
+        }
+        invoice.line_items.filter(source_assignment__isnull=True).delete()
+        manual_rows = []
+        for line in calc['lines']:
+            source_assignment_id = line.get("source_assignment_id")
+            if source_assignment_id:
+                if source_assignment_id not in protected:
+                    raise ValidationError("Internal invoice source assignment no longer matches the canonical invoice.")
+                continue
+            manual_rows.append(
+                InvoiceLineItem(
+                    invoice=invoice,
+                    description=line['description'],
+                    category_code=line['category_code'],
+                    unit=line['unit'],
+                    quantity=line['quantity'],
+                    unit_price=line['unit_price'],
+                    discount=line['discount'],
+                    total=line['net'],
+                    gst_applicable=line['tax_code'] == 'GST',
+                    super_applicable=line['super_eligible'],
+                    is_manual=True,
+                    was_modified=True,
+                    shift_id=line.get("shift_id"),
+                )
+            )
+        InvoiceLineItem.objects.bulk_create(manual_rows)
+    else:
+        invoice.line_items.all().delete()
+        InvoiceLineItem.objects.bulk_create([
+            InvoiceLineItem(invoice=invoice, description=line['description'], category_code=line['category_code'],
+                            unit=line['unit'], quantity=line['quantity'], unit_price=line['unit_price'],
+                            discount=line['discount'], total=line['net'], gst_applicable=line['tax_code'] == 'GST',
+                            super_applicable=line['super_eligible'], is_manual=True, was_modified=True)
+            for line in calc['lines']
+        ])
 
 
 @transaction.atomic
@@ -242,6 +277,28 @@ def save_draft(owner, data, record_id=None, source='external'):
             raise ValidationError('Only unissued service-invoice drafts can be edited.')
         if str(record.request_key) != str(data['request_key']):
             raise ValidationError('The draft request key cannot change.')
+    if record_id is not None and record.source == "internal":
+        frozen = {
+            int(line["source_assignment_id"]): line
+            for line in record.payload.get("lines", [])
+            if line.get("source_assignment_id")
+        }
+        submitted_manual = []
+        for line in data.get("lines", []):
+            source_assignment_id = line.get("source_assignment_id")
+            if source_assignment_id:
+                source_assignment_id = int(source_assignment_id)
+                if source_assignment_id not in frozen:
+                    raise ValidationError("Internal shift source lines cannot be added or replaced.")
+                continue
+            submitted_manual.append(line)
+        data = {
+            **data,
+            "lines": [*frozen.values(), *submitted_manual],
+        }
+    elif any(line.get("source_assignment_id") or line.get("locked") for line in data.get("lines", [])):
+        raise ValidationError("Shift source identities are server-managed and cannot be supplied for an external invoice.")
+
     customer = get_object_or_404(Customer, pk=data['customer_id'], owner=owner, active=True)
     lines = snapshot_lines(owner, data)
     calc = calculate(data, lines)
@@ -271,6 +328,7 @@ def serialize_record(record):
     return {'id': record.pk, 'invoice_id': invoice.pk, 'number': f"{'SUP' if record.kind == 'super_request' else 'INV'}-{invoice.pk:06d}",
             'version': record.version, 'request_key': str(record.request_key), 'kind': record.kind,
             'source': record.source, 'payload': record.payload, 'calculation': record.calculation,
+            'source_snapshot': invoice.source_snapshot or {},
             'locked': bool(record.locked_at), 'voided': bool(record.voided_at),
             'status': 'void' if record.voided_at else invoice.status,
             'delivery_status': delivery.status if delivery else None,
@@ -290,7 +348,15 @@ def duplicate(owner, record_id, request_key):
     data['due_date'] = today + timedelta(days=source.customer.payment_terms_days)
     # Duplicate is always a new, editable external draft. Never copy shift links,
     # delivery/payment history or a claim that new work was already performed.
-    data['lines'] = [{**line, 'worked_on': None} for line in data['lines']]
+    data['lines'] = [
+        {
+            key: value
+            for key, value in {**line, 'worked_on': None}.items()
+            if key not in {'locked', 'source_assignment_id', 'shift_id'}
+        }
+        for line in data['lines']
+    ]
+    data.pop('source_snapshot', None)
     return save_draft(owner, data)
 
 
