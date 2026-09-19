@@ -114,6 +114,7 @@ def _serialize_engagement(row):
         "award_source_url": row.award_source_url,
         "award_effective_from": str(row.award_effective_from) if row.award_effective_from else None,
         "award_rate_snapshot": row.award_rate_snapshot,
+        "adult_rate_confirmed": row.award_rate_snapshot.get("adult_rate_confirmed"),
         "ordinary_hours_pattern": row.ordinary_hours_pattern,
         "correspondence": {
             **correspondence,
@@ -181,6 +182,37 @@ def _engagement_payload(request_data, membership, *, existing=None):
         or ""
     ).upper()
 
+    def request_bool(key, fallback=False):
+        raw = request_data.get(key, fallback)
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str):
+            lowered = raw.strip().lower()
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "off", ""}:
+                return False
+        return bool(raw)
+
+    existing_adult_confirmation = bool(
+        getattr(existing, "award_rate_snapshot", {}).get("adult_rate_confirmed")
+        if existing
+        else False
+    )
+    adult_rate_confirmed = request_bool("adult_rate_confirmed", existing_adult_confirmation)
+    adult_confirmation_required = (
+        role == "ASSISTANT" and classification in {"LEVEL_1", "LEVEL_2"}
+    )
+    if adult_confirmation_required and not adult_rate_confirmed:
+        raise DjangoValidationError(
+            {
+                "adult_rate_confirmed": (
+                    "Pharmacy assistant levels 1 and 2 have junior rates under age 21. "
+                    "Confirm the employee is 21 or older before using this adult Schedule B rate."
+                )
+            }
+        )
+
     if employment_type == "PART_TIME":
         raw_pattern = request_data.get(
             "ordinary_hours_pattern",
@@ -200,6 +232,7 @@ def _engagement_payload(request_data, membership, *, existing=None):
         classification=classification,
         employment_type=employment_type,
     )
+    resolved["adult_rate_confirmed"] = adult_rate_confirmed if adult_confirmation_required else None
 
     payload = {
         "role": role,
@@ -244,18 +277,6 @@ def _engagement_payload(request_data, membership, *, existing=None):
             raise DjangoValidationError({key: "Rate cannot be negative."})
         return value
 
-    def requested_bool(key, fallback=False):
-        raw = request_data.get(key, fallback)
-        if isinstance(raw, bool):
-            return raw
-        if isinstance(raw, str):
-            lowered = raw.strip().lower()
-            if lowered in {"true", "1", "yes", "on"}:
-                return True
-            if lowered in {"false", "0", "no", "off", ""}:
-                return False
-        return bool(raw)
-
     agreed = {
         "rate_weekday": required_rate("rate_weekday"),
         "rate_saturday": required_rate("rate_saturday"),
@@ -275,11 +296,11 @@ def _engagement_payload(request_data, membership, *, existing=None):
                 {key: "Above-award rate cannot be below the selected Award minimum of $" + f"{floor:.2f}/hr."}
             )
 
-    early_applies = requested_bool(
+    early_applies = request_bool(
         "early_morning_applicable",
         getattr(existing, "early_morning_applicable", False) if existing else False,
     )
-    late_applies = requested_bool(
+    late_applies = request_bool(
         "late_night_applicable",
         getattr(existing, "late_night_applicable", False) if existing else False,
     )
