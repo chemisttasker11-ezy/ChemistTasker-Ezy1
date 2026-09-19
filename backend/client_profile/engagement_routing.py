@@ -615,6 +615,7 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
         "provider_entity_name": getattr(onboarding, "abn_entity_name", None),
         "gst_registered": bool(getattr(onboarding, "gst_registered", False) or getattr(onboarding, "abn_gst_registered", False)),
         "super_review_required": True,
+        "super_payable_confirmed": False,
         "facilitator_notice": "ChemistTasker provides the technology that facilitates the connection and records the agreed shift terms. The services engagement is between the pharmacy/principal and the assignee/provider; ChemistTasker is not the employer or engaging principal for the shift.",
         "relationship_notice": "The parties confirm they intend an independent services engagement. An ABN or invoice does not by itself determine legal contractor status, and these terms do not waive workplace rights that apply by law.",
         "super_notice": "Invoice settlement does not by itself remove superannuation obligations. The pharmacy/principal must review whether super is payable for a labour-only contractor.",
