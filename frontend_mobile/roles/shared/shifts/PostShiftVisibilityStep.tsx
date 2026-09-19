@@ -31,8 +31,8 @@ type Props = {
   hideName: boolean;
   setHideName: Setter<boolean>;
   allowedVis: VisibilityTier[];
-  initialAudience: VisibilityTier;
-  setInitialAudience: Setter<VisibilityTier>;
+  initialAudience: string;
+  setInitialAudience: Setter<string>;
   audienceMenuVisible: boolean;
   setAudienceMenuVisible: Setter<boolean>;
   notifyPharmacyStaff: boolean;
@@ -64,7 +64,8 @@ export default function PostShiftVisibilityStep({
   escalationDates,
   setEscalationPicker,
 }: Props) {
-  const startIdx = allowedVis.indexOf(initialAudience);
+  const initialAudienceTier = initialAudience as VisibilityTier;
+  const startIdx = allowedVis.indexOf(initialAudienceTier);
   const upcomingTiers = startIdx > -1 ? allowedVis.slice(startIdx + 1) : allowedVis;
   const notificationItems = [
     {
@@ -104,7 +105,7 @@ export default function PostShiftVisibilityStep({
         </Text>
         {!isEmbedded && initialAudience ? (
           <Chip style={styles.visibilitySummaryChip} textStyle={styles.visibilitySummaryChipText}>
-            {`Starting with ${VISIBILITY_LABELS[initialAudience]}`}
+            {`Starting with ${VISIBILITY_LABELS[initialAudienceTier]}`}
           </Chip>
         ) : null}
       </Surface>
@@ -136,7 +137,7 @@ export default function PostShiftVisibilityStep({
                 onPress={() => setAudienceMenuVisible(true)}
               >
                 <Text style={styles.selectorText}>
-                  {VISIBILITY_LABELS[initialAudience] || 'Select audience'}
+                  {VISIBILITY_LABELS[initialAudienceTier] || 'Select audience'}
                 </Text>
                 <IconButton icon="chevron-down" size={18} />
               </TouchableOpacity>
