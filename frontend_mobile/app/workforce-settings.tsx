@@ -61,7 +61,8 @@ export default function WorkforceSettingsScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const currentEngagementByMembership = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
     const map = new Map<number, WorkforceEmploymentEngagement>();
     for (const row of engagements) {
       if (row.effective_from <= today && (!row.effective_to || row.effective_to >= today)) {
