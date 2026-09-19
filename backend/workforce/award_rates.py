@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from copy import deepcopy
 
 from django.core.exceptions import ValidationError
 
@@ -8,136 +8,204 @@ from django.core.exceptions import ValidationError
 AWARD_CODE = "MA000012"
 AWARD_SOURCE_LABEL = "Pharmacy Industry Award 2020"
 AWARD_SOURCE_URL = "https://calculate.fairwork.gov.au/payguides/fairwork/ma000012/pdf"
+AWARD_REFERENCE_URL = "https://awards.fairwork.gov.au/MA000012.html"
 AWARD_EFFECTIVE_FROM = "2026-07-01"
+AWARD_EFFECTIVE_BASIS = "Pay period commencing on or after 1 July 2026"
+AWARD_RATE_SCOPE = "adult"
 
-# Minimum hourly rates effective 1 July 2026. These are versioned here so an
-# EmploymentEngagement freezes the exact source/rates used at agreement time.
-BASE_HOURLY = {
-    "ASSISTANT": {
-        "LEVEL_1": "27.81",
-        "LEVEL_2": "28.45",
-        "LEVEL_3": "29.45",
-        "LEVEL_4": "30.66",
-    },
-    # Existing ChemistTasker technician classifications intentionally correspond
-    # to the same pharmacy/dispensary assistant wage levels.
-    "TECHNICIAN": {
-        "LEVEL_1": "27.81",
-        "LEVEL_2": "28.45",
-        "LEVEL_3": "29.45",
-        "LEVEL_4": "30.66",
-    },
-    "STUDENT": {
-        "YEAR_1": "27.81",
-        "YEAR_2": "28.45",
-        "YEAR_3": "29.45",
-        "YEAR_4": "30.66",
-    },
-    "INTERN": {
-        "FIRST_HALF": "33.99",
-        "SECOND_HALF": "35.14",
-    },
-    "PHARMACIST": {
-        "PHARMACIST": "41.74",
-        "EXPERIENCED_PHARMACIST": "45.72",
-        "PHARMACIST_IN_CHARGE": "46.80",
-        "PHARMACIST_MANAGER": "52.15",
-    },
+# Schedule B dollar amounts published by Fair Work for MA000012, ppc 01Jul26.
+# We store the published rounded dollar amounts rather than recomputing penalty
+# rates from percentages so the frozen engagement snapshot matches the source.
+#
+# Each canonical row contains:
+#   weekday: 8am-7pm, 7am-8am, 7pm-9pm, 9pm-midnight
+#   weekend: Sat 8am-6pm, Sat 7am-8am, Sat 6pm-9pm, Sat 9pm-midnight,
+#            Sun outside 7am-9pm, Sun 7am-9pm, public holiday all day
+#   overtime: Mon-Sat first 2h, Mon-Sat after 2h, Sunday, public holiday
+PERMANENT_WEEKDAY = {
+    "LEVEL_1": ("27.81", "41.72", "34.76", "41.72"),
+    "LEVEL_2": ("28.45", "42.68", "35.56", "42.68"),
+    "LEVEL_3": ("29.45", "44.18", "36.81", "44.18"),
+    "LEVEL_4": ("30.66", "45.99", "38.33", "45.99"),
+    "FIRST_HALF": ("33.99", "50.99", "42.49", "50.99"),
+    "SECOND_HALF": ("35.14", "52.71", "43.93", "52.71"),
+    "PHARMACIST": ("41.74", "62.61", "52.18", "62.61"),
+    "EXPERIENCED_PHARMACIST": ("45.72", "68.58", "57.15", "68.58"),
+    "PHARMACIST_IN_CHARGE": ("46.80", "70.20", "58.50", "70.20"),
+    "PHARMACIST_MANAGER": ("52.15", "78.23", "65.19", "78.23"),
+}
+
+PERMANENT_WEEKEND = {
+    "LEVEL_1": ("34.76", "55.62", "41.72", "48.67", "55.62", "41.72", "62.57"),
+    "LEVEL_2": ("35.56", "56.90", "42.68", "49.79", "56.90", "42.68", "64.01"),
+    "LEVEL_3": ("36.81", "58.90", "44.18", "51.54", "58.90", "44.18", "66.26"),
+    "LEVEL_4": ("38.33", "61.32", "45.99", "53.66", "61.32", "45.99", "68.99"),
+    "FIRST_HALF": ("42.49", "67.98", "50.99", "59.48", "67.98", "50.99", "76.48"),
+    "SECOND_HALF": ("43.93", "70.28", "52.71", "61.50", "70.28", "52.71", "79.07"),
+    "PHARMACIST": ("52.18", "83.48", "62.61", "73.05", "83.48", "62.61", "93.92"),
+    "EXPERIENCED_PHARMACIST": ("57.15", "91.44", "68.58", "80.01", "91.44", "68.58", "102.87"),
+    "PHARMACIST_IN_CHARGE": ("58.50", "93.60", "70.20", "81.90", "93.60", "70.20", "105.30"),
+    "PHARMACIST_MANAGER": ("65.19", "104.30", "78.23", "91.26", "104.30", "78.23", "117.34"),
+}
+
+CASUAL_WEEKDAY = {
+    "LEVEL_1": ("34.76", "48.67", "41.72", "48.67"),
+    "LEVEL_2": ("35.56", "49.79", "42.68", "49.79"),
+    "LEVEL_3": ("36.81", "51.54", "44.18", "51.54"),
+    "LEVEL_4": ("38.33", "53.66", "45.99", "53.66"),
+    "FIRST_HALF": ("42.49", "59.48", "50.99", "59.48"),
+    "SECOND_HALF": ("43.93", "61.50", "52.71", "61.50"),
+    "PHARMACIST": ("52.18", "73.05", "62.61", "73.05"),
+    "EXPERIENCED_PHARMACIST": ("57.15", "80.01", "68.58", "80.01"),
+    "PHARMACIST_IN_CHARGE": ("58.50", "81.90", "70.20", "81.90"),
+    "PHARMACIST_MANAGER": ("65.19", "91.26", "78.23", "91.26"),
+}
+
+CASUAL_WEEKEND = {
+    "LEVEL_1": ("41.72", "62.57", "48.67", "55.62", "62.57", "48.67", "69.53"),
+    "LEVEL_2": ("42.68", "64.01", "49.79", "56.90", "64.01", "49.79", "71.13"),
+    "LEVEL_3": ("44.18", "66.26", "51.54", "58.90", "66.26", "51.54", "73.63"),
+    "LEVEL_4": ("45.99", "68.99", "53.66", "61.32", "68.99", "53.66", "76.65"),
+    "FIRST_HALF": ("50.99", "76.48", "59.48", "67.98", "76.48", "59.48", "84.98"),
+    "SECOND_HALF": ("52.71", "79.07", "61.50", "70.28", "79.07", "61.50", "87.85"),
+    "PHARMACIST": ("62.61", "93.92", "73.05", "83.48", "93.92", "73.05", "104.35"),
+    "EXPERIENCED_PHARMACIST": ("68.58", "102.87", "80.01", "91.44", "102.87", "80.01", "114.30"),
+    "PHARMACIST_IN_CHARGE": ("70.20", "105.30", "81.90", "93.60", "105.30", "81.90", "117.00"),
+    "PHARMACIST_MANAGER": ("78.23", "117.34", "91.26", "104.30", "117.34", "91.26", "130.38"),
+}
+
+# Clause 21 states that casual loading is not payable on overtime, so these
+# published overtime dollar rates apply to adult employees regardless of
+# full-time, part-time or casual status.
+OVERTIME = {
+    "LEVEL_1": ("41.72", "55.62", "55.62", "69.53"),
+    "LEVEL_2": ("42.68", "56.90", "56.90", "71.13"),
+    "LEVEL_3": ("44.18", "58.90", "58.90", "73.63"),
+    "LEVEL_4": ("45.99", "61.32", "61.32", "76.65"),
+    "FIRST_HALF": ("50.99", "67.98", "67.98", "84.98"),
+    "SECOND_HALF": ("52.71", "70.28", "70.28", "87.85"),
+    "PHARMACIST": ("62.61", "83.48", "83.48", "104.35"),
+    "EXPERIENCED_PHARMACIST": ("68.58", "91.44", "91.44", "114.30"),
+    "PHARMACIST_IN_CHARGE": ("70.20", "93.60", "93.60", "117.00"),
+    "PHARMACIST_MANAGER": ("78.23", "104.30", "104.30", "130.38"),
+}
+
+# Student years use the same published dollar rows as assistant levels 1-4.
+RATE_ALIAS = {
+    "YEAR_1": "LEVEL_1",
+    "YEAR_2": "LEVEL_2",
+    "YEAR_3": "LEVEL_3",
+    "YEAR_4": "LEVEL_4",
 }
 
 CLASSIFICATION_LABELS = {
-    "LEVEL_1": "Level 1",
-    "LEVEL_2": "Level 2",
-    "LEVEL_3": "Level 3",
-    "LEVEL_4": "Level 4",
-    "YEAR_1": "1st year",
-    "YEAR_2": "2nd year",
-    "YEAR_3": "3rd year",
-    "YEAR_4": "4th year",
-    "FIRST_HALF": "1st half of training",
-    "SECOND_HALF": "2nd half of training",
+    "LEVEL_1": "Pharmacy assistant level 1",
+    "LEVEL_2": "Pharmacy assistant level 2",
+    "LEVEL_3": "Pharmacy assistant / dispensary assistant level 3",
+    "LEVEL_4": "Pharmacy assistant level 4",
+    "YEAR_1": "Pharmacy student — 1st year",
+    "YEAR_2": "Pharmacy student — 2nd year",
+    "YEAR_3": "Pharmacy student — 3rd year",
+    "YEAR_4": "Pharmacy student — 4th year",
+    "FIRST_HALF": "Pharmacy intern — 1st half of training",
+    "SECOND_HALF": "Pharmacy intern — 2nd half of training",
     "PHARMACIST": "Pharmacist",
-    "EXPERIENCED_PHARMACIST": "Experienced Pharmacist",
+    "EXPERIENCED_PHARMACIST": "Experienced pharmacist",
     "PHARMACIST_IN_CHARGE": "Pharmacist in charge",
     "PHARMACIST_MANAGER": "Pharmacist manager",
 }
 
-# Percentages of the minimum hourly rate under the Award. PART_TIME and
-# FULL_TIME share the permanent-employee penalty table.
-PERMANENT_MULTIPLIERS = {
-    "weekday": {
-        "daytime": "1.00",
-        "early_morning": "1.50",
-        "evening": "1.25",
-        "late_night": "1.50",
-    },
-    "saturday": {
-        "daytime": "1.25",
-        "early_morning": "2.00",
-        "evening": "1.50",
-        "late_night": "1.75",
-    },
-    "sunday": {
-        "daytime": "1.50",
-        "outside_daytime": "2.00",
-    },
-    "public_holiday": {"all_day": "2.25"},
+ROLE_CLASSIFICATIONS = {
+    "ASSISTANT": ("LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"),
+    # ChemistTasker's TECHNICIAN persona means dispensary work. MA000012 names
+    # "Dispensary assistant level 3" rather than "technician"; Level 4 remains
+    # selectable where the employee has the required Certificate IV competencies
+    # and is required to work at that level.
+    "TECHNICIAN": ("LEVEL_3", "LEVEL_4"),
+    "STUDENT": ("YEAR_1", "YEAR_2", "YEAR_3", "YEAR_4"),
+    "INTERN": ("FIRST_HALF", "SECOND_HALF"),
+    "PHARMACIST": (
+        "PHARMACIST",
+        "EXPERIENCED_PHARMACIST",
+        "PHARMACIST_IN_CHARGE",
+        "PHARMACIST_MANAGER",
+    ),
 }
 
-CASUAL_MULTIPLIERS = {
-    "weekday": {
-        "daytime": "1.25",
-        "early_morning": "1.75",
-        "evening": "1.50",
-        "late_night": "1.75",
-    },
-    "saturday": {
-        "daytime": "1.50",
-        "early_morning": "2.25",
-        "evening": "1.75",
-        "late_night": "2.00",
-    },
-    "sunday": {
-        "daytime": "1.75",
-        "outside_daytime": "2.25",
-    },
-    "public_holiday": {"all_day": "2.50"},
+CLASSIFICATION_HELP = {
+    "LEVEL_1": "No Community Pharmacy qualification competencies and not covered by another classification.",
+    "LEVEL_2": "Competencies required for Certificate II in Community Pharmacy.",
+    "LEVEL_3": "Certificate III competencies and required to work at this level; includes dispensary assistant duties under direct pharmacist supervision.",
+    "LEVEL_4": "Certificate IV competencies and required to work at this level.",
 }
 
 
 def classification_options(role: str) -> list[dict[str, str]]:
     role_key = str(role or "").upper()
     return [
-        {"value": key, "label": CLASSIFICATION_LABELS.get(key, key.replace("_", " ").title())}
-        for key in BASE_HOURLY.get(role_key, {})
+        {
+            "value": key,
+            "label": CLASSIFICATION_LABELS[key],
+            **({"help": CLASSIFICATION_HELP[key]} if key in CLASSIFICATION_HELP else {}),
+        }
+        for key in ROLE_CLASSIFICATIONS.get(role_key, ())
     ]
 
 
 def default_membership_classification(membership) -> str:
     role = str(membership.role or "").upper()
     if role == "PHARMACIST":
-        return membership.pharmacist_award_level or ""
-    if role in {"ASSISTANT", "TECHNICIAN"}:
-        return membership.otherstaff_classification_level or ""
-    if role == "INTERN":
-        return membership.intern_half or ""
-    if role == "STUDENT":
-        return membership.student_year or ""
-    return ""
+        value = membership.pharmacist_award_level or ""
+    elif role in {"ASSISTANT", "TECHNICIAN"}:
+        value = membership.otherstaff_classification_level or ""
+    elif role == "INTERN":
+        value = membership.intern_half or ""
+    elif role == "STUDENT":
+        value = membership.student_year or ""
+    else:
+        value = ""
+
+    value = str(value or "").upper()
+    return value if value in ROLE_CLASSIFICATIONS.get(role, ()) else ""
 
 
-def _money(value: Decimal) -> Decimal:
-    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def _canonical_classification(classification: str) -> str:
+    key = str(classification or "").upper()
+    return RATE_ALIAS.get(key, key)
 
 
-def _multiply_schedule(base: Decimal, multipliers: dict) -> dict:
-    schedule = {}
-    for day_key, windows in multipliers.items():
-        schedule[day_key] = {
-            window_key: str(_money(base * Decimal(multiplier)))
-            for window_key, multiplier in windows.items()
-        }
-    return schedule
+def _schedule(*, classification: str, employment_type: str) -> dict:
+    canonical = _canonical_classification(classification)
+    permanent = employment_type in {"FULL_TIME", "PART_TIME"}
+    weekday = (PERMANENT_WEEKDAY if permanent else CASUAL_WEEKDAY)[canonical]
+    weekend = (PERMANENT_WEEKEND if permanent else CASUAL_WEEKEND)[canonical]
+    overtime = OVERTIME[canonical]
+
+    return {
+        "weekday": {
+            "daytime_08_19": weekday[0],
+            "early_07_08": weekday[1],
+            "evening_19_21": weekday[2],
+            "late_21_24": weekday[3],
+        },
+        "saturday": {
+            "daytime_08_18": weekend[0],
+            "early_07_08": weekend[1],
+            "evening_18_21": weekend[2],
+            "late_21_24": weekend[3],
+        },
+        "sunday": {
+            "outside_07_21": weekend[4],
+            "daytime_07_21": weekend[5],
+        },
+        "public_holiday": {"all_day": weekend[6]},
+        "overtime": {
+            "monday_saturday_first_2_hours": overtime[0],
+            "monday_saturday_after_2_hours": overtime[1],
+            "sunday_all_day": overtime[2],
+            "public_holiday_all_day": overtime[3],
+        },
+    }
 
 
 def resolve_award_schedule(*, role: str, classification: str, employment_type: str) -> dict:
@@ -150,35 +218,73 @@ def resolve_award_schedule(*, role: str, classification: str, employment_type: s
             {"employment_type": "Award employment engagements support FULL_TIME, PART_TIME or CASUAL."}
         )
 
-    base_raw = BASE_HOURLY.get(role_key, {}).get(classification_key)
-    if not base_raw:
+    allowed = ROLE_CLASSIFICATIONS.get(role_key, ())
+    if classification_key not in allowed:
         raise ValidationError(
-            {"award_classification": "No configured Pharmacy Award rate exists for this role/classification."}
+            {
+                "award_classification": (
+                    "Select a Pharmacy Award classification that matches the employee's "
+                    "duties, competencies and qualifications."
+                )
+            }
         )
 
-    base = Decimal(base_raw)
-    multipliers = CASUAL_MULTIPLIERS if employment_key == "CASUAL" else PERMANENT_MULTIPLIERS
-    schedule = _multiply_schedule(base, multipliers)
+    schedule = _schedule(
+        classification=classification_key,
+        employment_type=employment_key,
+    )
+    minimum_hourly_rate = PERMANENT_WEEKDAY[_canonical_classification(classification_key)][0]
 
     return {
         "award_code": AWARD_CODE,
         "award_source_label": AWARD_SOURCE_LABEL,
         "award_source_url": AWARD_SOURCE_URL,
+        "award_reference_url": AWARD_REFERENCE_URL,
         "award_effective_from": AWARD_EFFECTIVE_FROM,
+        "award_effective_basis": AWARD_EFFECTIVE_BASIS,
+        "rate_scope": AWARD_RATE_SCOPE,
         "role": role_key,
         "classification": classification_key,
-        "classification_label": CLASSIFICATION_LABELS.get(classification_key, classification_key),
+        "classification_label": CLASSIFICATION_LABELS[classification_key],
         "employment_type": employment_key,
-        "minimum_hourly_rate": str(_money(base)),
-        "schedule": schedule,
-        # Flat summary fields retained for the engagement editor/reporting. The
-        # complete time-window correspondence above remains payroll-authoritative.
-        "rate_weekday": schedule["weekday"]["daytime"],
-        "rate_saturday": schedule["saturday"]["daytime"],
-        "rate_sunday": schedule["sunday"]["daytime"],
+        "minimum_hourly_rate": minimum_hourly_rate,
+        "schedule": deepcopy(schedule),
+        "window_labels": {
+            "weekday": {
+                "daytime_08_19": "Monday–Friday 8:00 am–7:00 pm",
+                "early_07_08": "Monday–Friday 7:00 am–8:00 am",
+                "evening_19_21": "Monday–Friday 7:00 pm–9:00 pm",
+                "late_21_24": "Monday–Friday 9:00 pm–midnight",
+            },
+            "saturday": {
+                "daytime_08_18": "Saturday 8:00 am–6:00 pm",
+                "early_07_08": "Saturday 7:00 am–8:00 am",
+                "evening_18_21": "Saturday 6:00 pm–9:00 pm",
+                "late_21_24": "Saturday 9:00 pm–midnight",
+            },
+            "sunday": {
+                "daytime_07_21": "Sunday 7:00 am–9:00 pm",
+                "outside_07_21": "Sunday before 7:00 am or after 9:00 pm",
+            },
+            "public_holiday": {"all_day": "Public holiday"},
+        },
+        "ordinary_hours_note": (
+            "Penalty windows shown are Schedule B ordinary-hour rates. Hours outside "
+            "ordinary hours are subject to the Award overtime provisions; overtime "
+            "rates are frozen separately in this snapshot."
+        ),
+        "junior_rate_note": (
+            "These are adult Schedule B rates. Pharmacy assistants at levels 1 or 2 "
+            "who are under 21 are subject to clause 16.2 junior percentages and must "
+            "not use this adult-rate snapshot."
+        ),
+        # Flat summary fields used by the engagement editor/reporting.
+        "rate_weekday": schedule["weekday"]["daytime_08_19"],
+        "rate_saturday": schedule["saturday"]["daytime_08_18"],
+        "rate_sunday": schedule["sunday"]["daytime_07_21"],
         "rate_public_holiday": schedule["public_holiday"]["all_day"],
-        "rate_early_morning": schedule["weekday"]["early_morning"],
-        "rate_late_night": schedule["weekday"]["late_night"],
+        "rate_early_morning": schedule["weekday"]["early_07_08"],
+        "rate_late_night": schedule["weekday"]["late_21_24"],
         "early_morning_applicable": True,
         "late_night_applicable": True,
     }
