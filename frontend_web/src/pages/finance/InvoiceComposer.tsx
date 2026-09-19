@@ -4,7 +4,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { createFinanceDraft, finance, financeDueDate, financeItemLine, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
+import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 import { CustomerEditor, ItemEditor } from './Editors';
 import { dollars, errorMessage } from './helpers';
 
@@ -103,10 +103,15 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
   const addItem = (item: FinanceItem) => { change('lines', [...value.lines, financeItemLine(item)]); setSelectedItem(null); };
   return <Box component="form" onSubmit={submit} noValidate sx={{ maxWidth: 1280, mx: 'auto', pb: 4 }}>
     <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ position: 'sticky', top: 0, zIndex: 5, bgcolor: 'background.default', py: 2, flexWrap: 'wrap' }}>
-      <Stack direction="row" alignItems="center" spacing={1}><IconButton aria-label="Back to invoices" onClick={close} disabled={busy}><ArrowBackIcon /></IconButton><Typography variant="h4">{initial ? `Invoice ${initial.number}` : 'Create invoice'}</Typography><Chip label="Draft" size="small" /></Stack>
-      <Stack direction="row" spacing={1}><Button onClick={close} disabled={busy}>Cancel</Button><Button variant="contained" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save invoice'}</Button></Stack>
+      <Stack direction="row" alignItems="center" spacing={1}><IconButton aria-label="Back to invoices" onClick={close} disabled={busy}><ArrowBackIcon /></IconButton><Box><Typography variant="h4">{initial ? `Invoice ${initial.number}` : 'Create invoice'}</Typography><Typography variant="caption" color="text.secondary">{initial ? `Revision ${initial.version}` : 'Nothing is stored until Save invoice'}</Typography></Box><Chip label={initial ? financeStatus(initial) : 'Unsaved'} size="small" color={initial?.review_status === 'REVISION_REQUESTED' ? 'warning' : initial?.status === 'paid' ? 'success' : 'default'} /></Stack>
+      <Stack direction="row" spacing={1}><Button onClick={close} disabled={busy}>Cancel</Button><Button variant="contained" type="submit" disabled={busy}>{busy ? 'Saving…' : initial ? 'Save new revision' : 'Save invoice'}</Button></Stack>
     </Stack>
     {error && <Alert severity="error" role="alert" sx={{ mb: 2 }}>{error}</Alert>}
+    {initial?.review_requests?.filter(request => !request.resolved_at).map(request => (
+      <Alert key={request.id} severity="warning" sx={{ mb: 2 }}>
+        <strong>Revision requested by {request.requested_by_name}:</strong> {request.note}
+      </Alert>
+    ))}
     {!initial && internalSources.length > 0 && (
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
         <Typography fontWeight={800}>Start from an internal ChemistTasker shift</Typography>
@@ -149,20 +154,26 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
       </Stack>
       <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(180px, 2.2fr) 1.1fr .7fr 1fr 1fr .8fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit', 'Unit price', 'Discount %', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
       {!value.lines.length && <Box sx={{ textAlign: 'center', py: 5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}><Typography fontWeight={600}>Add the work you’re billing for</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Choose a saved item, or add a free-entry row without saving a catalogue item.</Typography></Box>}
-      {value.lines.map((line, index) => <Box key={`${index}-${line.item_id}`} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
-        {line.locked && <Chip size="small" label="From ChemistTasker shift · editable · revision tracked" sx={{ mb: 1 }} />}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'minmax(180px, 2.5fr) 1.3fr .7fr 1fr .8fr 1.1fr 1fr 40px' }, gap: 1, alignItems: 'start', '& .MuiInputBase-root': { fontSize: 13 } }}>
+      {value.lines.map((line, index) => <Box key={`${index}-${line.source_assignment_id ?? line.item_id ?? 'adhoc'}`} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
+        {line.source_assignment_id && <Chip size="small" label="From ChemistTasker shift · source link preserved · values editable" sx={{ mb: 1 }} />}
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'minmax(180px, 2.2fr) 1.1fr .7fr 1fr 1fr .8fr 1.1fr 1fr 40px' }, gap: 1, alignItems: 'start', '& .MuiInputBase-root': { fontSize: 13 } }}>
           <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} onChange={e => changeLine(index, { description: e.target.value })} multiline />
           <TextField type="date" label="Work date" value={line.worked_on || ''} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
-          <TextField label={line.unit || 'Quantity'} value={line.quantity} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
+          <TextField label={line.unit || 'Quantity'} value={line.quantity} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
           <TextField label="Unit" value={line.unit || ''} onChange={e => changeLine(index, { unit: e.target.value })} />
-          <TextField label="Unit price" value={line.unit_price} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
-          <TextField label="Discount %" value={line.discount} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { discount: e.target.value })} />
-          <TextField select label="Tax code" disabled={line.locked} value={line.tax_code || 'OUT_OF_SCOPE'} onChange={e => changeLine(index, { tax_code: e.target.value as FinanceTaxCode })}>{Object.entries(taxLabels).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
+          <TextField label="Unit price" value={line.unit_price} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
+          <TextField label="Discount %" value={line.discount} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { discount: e.target.value })} />
+          <TextField select label="Tax code" value={line.tax_code || 'OUT_OF_SCOPE'} onChange={e => changeLine(index, { tax_code: e.target.value as FinanceTaxCode })}>{Object.entries(taxLabels).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
           <Typography sx={{ py: 1, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{preview?.lines[index] ? dollars(preview.lines[index].gross) : 'Pending'}</Typography>
-          <IconButton aria-label={`Remove item ${index + 1}`} disabled={line.locked} onClick={() => change('lines', value.lines.filter((_, i) => i !== index))}><DeleteOutlineIcon fontSize="small" /></IconButton>
+          <IconButton aria-label={`Remove item ${index + 1}`} disabled={Boolean(line.source_assignment_id)} title={line.source_assignment_id ? 'Internal source rows stay attached; edit their values instead.' : 'Remove row'} onClick={() => change('lines', value.lines.filter((_, i) => i !== index))}><DeleteOutlineIcon fontSize="small" /></IconButton>
         </Box>
-        <FormControlLabel sx={{ mt: .5 }} control={<Checkbox size="small" disabled={line.locked} checked={line.super_eligible || false} onChange={e => changeLine(index, { super_eligible: e.target.checked })} />} label={<Typography variant="caption">Include in reviewed super base</Typography>} />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }} sx={{ mt: 1 }}>
+          <TextField select size="small" label="Category" value={line.category_code || 'Miscellaneous'} onChange={e => changeLine(index, { category_code: e.target.value as FinanceCategory })} sx={{ minWidth: 210 }}>
+            {(['ProfessionalServices', 'Transportation', 'Accommodation', 'Miscellaneous', 'Superannuation'] as FinanceCategory[]).map(category => <MenuItem key={category} value={category}>{category.replace(/([A-Z])/g, ' $1').trim()}</MenuItem>)}
+          </TextField>
+          <FormControlLabel control={<Checkbox size="small" checked={line.super_eligible || false} onChange={e => changeLine(index, { super_eligible: e.target.checked })} />} label={<Typography variant="caption">Include in reviewed super base</Typography>} />
+          {line.source_assignment_id && <Typography variant="caption" color="text.secondary">Original accepted hours/rate remain in the source snapshot for audit.</Typography>}
+        </Stack>
       </Box>)}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 340px' }, gap: { xs: 3, md: 8 }, mt: 3 }}>
         <Stack spacing={1}>{field('notes', 'Notes to customer')}<Typography variant="caption" color="text.secondary">Save keeps the invoice editable. Sending changes the status to Sent; later edits create a new revision for re-review.</Typography></Stack>
@@ -176,6 +187,12 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
       <Accordion disableGutters><AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={650}>Calculate shift hours</Typography></AccordionSummary><AccordionDetails><Stack spacing={2}><Typography variant="caption">Using {Intl.DateTimeFormat().resolvedOptions().timeZone}. Check the timezone for interstate shifts.</Typography><Box sx={grid}><TextField type="datetime-local" label="Start" value={start} onChange={e => setStart(e.target.value)} /><TextField type="datetime-local" label="End" value={end} onChange={e => setEnd(e.target.value)} /><TextField label="Unpaid break (minutes)" type="number" value={breakMinutes} onChange={e => setBreak(e.target.value)} /><Button disabled={!start || !end} onClick={async () => { try { const result = await finance.shiftHours({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), break_minutes: Number(breakMinutes) }); setHours(result.hours); } catch (e) { setError(errorMessage(e)); } }}>Calculate hours</Button></Box>{hours && <Typography>{hours} billable hours. Enter this quantity on your labour item.</Typography>}</Stack></AccordionDetails></Accordion>
     </Stack>
     </Box>
+    {initial?.revisions?.length ? <Paper variant="outlined" sx={{ mt: 2, p: 2, borderRadius: 2 }}>
+      <Typography fontWeight={800}>Revision history</Typography>
+      <Stack spacing={1} sx={{ mt: 1 }}>
+        {initial.revisions.map(revision => <Stack key={revision.version} direction="row" justifyContent="space-between" gap={2}><Typography variant="body2">Revision {revision.version} · {new Date(revision.created_at).toLocaleString('en-AU')}</Typography><Typography variant="body2" color="text.secondary">{revision.invoice_status} · {dollars(revision.calculation.payable)}</Typography></Stack>)}
+      </Stack>
+    </Paper> : null}
     {inline === 'customer' && <CustomerEditor onClose={() => setInline(null)} onSaved={async saved => { setCustomers(current => [...current, saved]); setValue(current => ({ ...current, customer_id: saved.id, due_date: financeDueDate(current.invoice_date, saved.payment_terms_days) })); await onSaved(); }} />}
     {inline === 'item' && <ItemEditor onClose={() => setInline(null)} onSaved={async saved => { setItems(current => [...current, saved]); addItem(saved); await onSaved(); }} />}
   </Box>;
