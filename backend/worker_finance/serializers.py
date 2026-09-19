@@ -90,7 +90,7 @@ class LineInput(serializers.Serializer):
 class InvoiceInput(serializers.Serializer):
     request_key = serializers.UUIDField()
     version = serializers.IntegerField(min_value=1, required=False)
-    customer_id = serializers.IntegerField(min_value=1)
+    customer_id = serializers.IntegerField(min_value=0)
     source_assignment_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
@@ -119,6 +119,8 @@ class InvoiceInput(serializers.Serializer):
     lines = LineInput(many=True, min_length=1, max_length=100)
 
     def validate(self, data):
+        if not data.get('source_assignment_ids') and data.get('customer_id', 0) < 1:
+            raise serializers.ValidationError({'customer_id': 'Select a customer before saving an external invoice.'})
         if data['due_date'] < data['invoice_date']:
             raise serializers.ValidationError('Due date cannot precede invoice date.')
         try:
