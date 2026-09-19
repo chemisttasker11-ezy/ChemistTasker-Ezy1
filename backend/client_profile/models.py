@@ -2645,7 +2645,6 @@ class InvoiceLineItem(models.Model):
         indexes = [
             models.Index(fields=['invoice']),
             models.Index(fields=['shift']),
-            models.Index(fields=['source_assignment'], name='cp_invline_source_assn_idx'),
         ]
         constraints = [
             models.UniqueConstraint(
