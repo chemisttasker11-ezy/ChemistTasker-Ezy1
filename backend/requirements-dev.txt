@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Static typing support for Django when using Pyrefly.
+# Keep this out of production requirements; it is only needed by local/CI type checking.
+django-stubs==5.1.3
