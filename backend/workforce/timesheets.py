@@ -110,8 +110,15 @@ def _contracted_minutes(membership, period: TimesheetPeriod):
     return int(round(settings.contracted_weekly_minutes * (days / 7.0)))
 
 
+EMPLOYEE_ENGAGEMENT_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
+
+
 def _employment_engagements_for_period(membership, period: TimesheetPeriod):
-    if not membership or not membership.is_pharmacy_staff_member:
+    if (
+        not membership
+        or not membership.is_pharmacy_staff_member
+        or membership.employment_type not in EMPLOYEE_ENGAGEMENT_TYPES
+    ):
         return []
     return list(
         EmploymentEngagement.objects.filter(
@@ -173,7 +180,12 @@ def _attach_employment_engagements(day_rows, membership, period: TimesheetPeriod
             None,
         )
         day_row["employment_engagement_public_id"] = str(match.public_id) if match else None
-        if membership and membership.is_pharmacy_staff_member and match is None:
+        if (
+            membership
+            and membership.is_pharmacy_staff_member
+            and membership.employment_type in EMPLOYEE_ENGAGEMENT_TYPES
+            and match is None
+        ):
             missing_dates.add(work_date)
 
     return serialized, sorted(missing_dates)
