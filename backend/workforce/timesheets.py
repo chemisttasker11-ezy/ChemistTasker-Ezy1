@@ -1017,9 +1017,27 @@ def lock_period(period, user):
         if unapproved:
             raise ValidationError({"code": "UNAPPROVED_TIMESHEETS", "timesheet_ids": unapproved})
         snapshots = []
+        payroll_export = []
+        payroll_enabled = bool(getattr(period.pharmacy, "use_chemisttasker_payroll", False))
         for timesheet in period.timesheets.select_related("user").order_by("user_id"):
             revision = _latest_revision(timesheet)
-            snapshots.append({
+            roster_rows = revision.snapshot.get("roster", []) or []
+            payroll_assignment_ids = [
+                row.get("assignment_id")
+                for row in roster_rows
+                if row.get("assignment_id") and row.get("settlement_channel") == "PAYROLL"
+            ]
+            invoice_assignment_ids = [
+                row.get("assignment_id")
+                for row in roster_rows
+                if row.get("assignment_id") and row.get("settlement_channel") == "INVOICE"
+            ]
+            timesheet_only_assignment_ids = [
+                row.get("assignment_id")
+                for row in roster_rows
+                if row.get("assignment_id") and row.get("settlement_channel") == "TIMESHEET_ONLY"
+            ]
+            row_snapshot = {
                 "timesheet_id": timesheet.pk,
                 "worker_id": timesheet.user_id,
                 "revision_number": revision.revision_number,
@@ -1030,13 +1048,40 @@ def lock_period(period, user):
                 ],
                 "reviewed_minutes": timesheet.reviewed_minutes,
                 "approved_leave_minutes": timesheet.approved_leave_minutes,
-            })
+                "settlement_routing": {
+                    "payroll_assignment_ids": payroll_assignment_ids,
+                    "invoice_assignment_ids": invoice_assignment_ids,
+                    "timesheet_only_assignment_ids": timesheet_only_assignment_ids,
+                },
+            }
+            snapshots.append(row_snapshot)
+
+            if payroll_enabled and payroll_assignment_ids:
+                payroll_days = [
+                    day for day in (revision.snapshot.get("days", []) or [])
+                    if day.get("assignment_id") in payroll_assignment_ids
+                ]
+                payroll_export.append({
+                    "timesheet_id": timesheet.pk,
+                    "worker_id": timesheet.user_id,
+                    "revision_number": revision.revision_number,
+                    "assignment_ids": payroll_assignment_ids,
+                    "days": payroll_days,
+                    "employment_engagement_public_ids": row_snapshot["employment_engagement_public_ids"],
+                })
+
         manifest_snapshot = {
             "period_id": period.pk,
             "pharmacy_id": period.pharmacy_id,
             "start_date": str(period.start_date),
             "end_date": str(period.end_date),
+            "payroll_enabled": payroll_enabled,
             "timesheets": snapshots,
+            "payroll_export": payroll_export,
+            "payroll_exclusion_rule": (
+                "Only assignments whose frozen settlement_channel is PAYROLL appear in payroll_export. "
+                "INVOICE and TIMESHEET_ONLY assignments remain in the audit timesheet snapshot only."
+            ),
         }
         manifest_hash = _hash(manifest_snapshot)
         manifest, _ = TimesheetManifest.objects.get_or_create(

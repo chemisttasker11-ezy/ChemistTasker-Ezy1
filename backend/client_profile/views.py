@@ -9139,27 +9139,21 @@ class GenerateInvoiceView(APIView):
         else:
             shift_ids = []
 
-        # Enforce ABN-only for internal invoices.
-        external = data.get('external', False)
-        if isinstance(external, str):
-            external = external.lower() in ['true', '1', 'yes']
-        if not external and shift_ids:
-            non_abn = Shift.objects.filter(pk__in=shift_ids).exclude(payment_preference__iexact='ABN')
-            if non_abn.exists():
-                return Response(
-                    {'error': 'Internal invoices are only allowed for ABN shifts.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-        invoice = generate_invoice_from_shifts(
-            user=request.user,
-            pharmacy_id=data.get('pharmacy'),
-            shift_ids=shift_ids,
-            custom_lines=custom_lines,
-            external=data.get('external', False),
-            billing_data=data,
-            due_date=data.get('due_date')
-        )
+        try:
+            invoice = generate_invoice_from_shifts(
+                user=request.user,
+                pharmacy_id=data.get('pharmacy'),
+                shift_ids=shift_ids,
+                custom_lines=custom_lines,
+                external=data.get('external', False),
+                billing_data=data,
+                due_date=data.get('due_date')
+            )
+        except DjangoValidationError as exc:
+            payload = exc.message_dict if hasattr(exc, "message_dict") else {
+                "error": exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            }
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
@@ -9171,10 +9165,13 @@ def preview_invoice_lines(request, shift_id):
     except Shift.DoesNotExist:
         return Response({"error": "Shift not found"}, status=404)
 
-    if (shift.payment_preference or '').upper() != 'ABN':
-        return Response({"error": "Internal invoices are only allowed for ABN shifts."}, status=400)
-
-    line_items = generate_preview_invoice_lines(shift, request.user)
+    try:
+        line_items = generate_preview_invoice_lines(shift, request.user)
+    except DjangoValidationError as exc:
+        payload = exc.message_dict if hasattr(exc, "message_dict") else {
+            "error": exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+        }
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
     return Response(line_items)
 
 

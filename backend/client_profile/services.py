@@ -427,59 +427,132 @@ def expand_shift_slots(shift):
             })
     return entries
 
+INVOICE_SETTLEMENT_CHANNEL = "INVOICE"
+INDEPENDENT_CONTRACTOR_KIND = "INDEPENDENT_CONTRACTOR"
+
+
+def _invoice_routed_assignments(user, *, shift_ids=None, shift=None):
+    qs = ShiftSlotAssignment.objects.filter(
+        user=user,
+        settlement_channel=INVOICE_SETTLEMENT_CHANNEL,
+        engagement_kind=INDEPENDENT_CONTRACTOR_KIND,
+        engagement_terms_accepted_at__isnull=False,
+    ).select_related("shift", "slot", "shift__pharmacy", "source_offer")
+    if shift is not None:
+        qs = qs.filter(shift=shift)
+    if shift_ids is not None:
+        qs = qs.filter(shift_id__in=shift_ids)
+    return qs
+
+
+def validate_internal_invoice_shifts(user, shift_ids, pharmacy_id=None):
+    requested = {int(value) for value in (shift_ids or [])}
+    if not requested:
+        raise ValidationError("Select at least one accepted ABN shift to invoice.")
+
+    assignments = list(_invoice_routed_assignments(user, shift_ids=requested))
+    routed_shift_ids = {assignment.shift_id for assignment in assignments}
+    missing = sorted(requested - routed_shift_ids)
+    if missing:
+        raise ValidationError({
+            "shift_ids": (
+                "Only accepted assignments routed to invoicing can be billed. "
+                f"Not invoice-routed for this worker: {missing}."
+            )
+        })
+
+    if pharmacy_id not in (None, ""):
+        pharmacy_id = int(pharmacy_id)
+        wrong_pharmacy = sorted({
+            assignment.shift_id
+            for assignment in assignments
+            if assignment.shift.pharmacy_id != pharmacy_id
+        })
+        if wrong_pharmacy:
+            raise ValidationError({
+                "pharmacy": f"The selected shifts do not all belong to pharmacy {pharmacy_id}: {wrong_pharmacy}."
+            })
+    return assignments
+
+
+def _accepted_invoice_rate(assignment, slot_date):
+    snapshot = assignment.engagement_terms_snapshot or {}
+    for occurrence in snapshot.get("occurrences") or []:
+        if str(occurrence.get("slot_id") or "") != str(assignment.slot_id):
+            continue
+        if str(occurrence.get("date") or "") != str(slot_date):
+            continue
+        agreed_rate = occurrence.get("agreed_rate")
+        if agreed_rate not in (None, ""):
+            rate = Decimal(str(agreed_rate))
+            if rate > 0:
+                return rate
+
+    if assignment.unit_rate is not None and assignment.unit_rate > 0:
+        return Decimal(str(assignment.unit_rate))
+
+    raise ValidationError({
+        "rate": (
+            f"Accepted invoice terms for assignment {assignment.pk} do not contain a positive agreed rate. "
+            "Resolve the shift terms before invoicing."
+        )
+    })
+
+
 def generate_preview_invoice_lines(shift, user):
     line_items = []
+    assignments = {
+        (assignment.slot_id, assignment.slot_date): assignment
+        for assignment in _invoice_routed_assignments(user, shift=shift)
+    }
+    if not assignments:
+        raise ValidationError(
+            "This shift has no accepted ABN assignment routed to invoicing for the current worker."
+        )
+
     for entry in expand_shift_slots(shift):
-        slot = entry['slot']
-        slot_date = entry['date']
-        try:
-            assn = ShiftSlotAssignment.objects.get(slot=slot, slot_date=slot_date)
-        except ShiftSlotAssignment.DoesNotExist:
+        slot = entry["slot"]
+        slot_date = entry["date"]
+        assn = assignments.get((slot.id, slot_date))
+        if not assn:
             continue
 
-        if assn.user != user:
-            continue  # 🔒 Only include slots assigned to the current user
-
-        slot_date = entry['date']
-        start_time = entry['start_time']
-        end_time = entry['end_time']
-        hours = Decimal(str(entry['hours']))   # <--- ensure Decimal
-        rate = assn.unit_rate or Decimal('0.00')
-        reason = assn.rate_reason or {}
-
-        should_refresh_rate = rate <= 0 or bool(reason.get('error'))
-        if should_refresh_rate:
-            refreshed_rate, refreshed_reason = get_locked_rate_for_slot(
-                slot=slot,
-                shift=shift,
-                user=user,
-                override_date=slot_date,
-            )
-            rate = refreshed_rate or Decimal('0.00')
-            reason = refreshed_reason or {}
-            if rate > 0 or reason != (assn.rate_reason or {}):
-                assn.unit_rate = rate
-                assn.rate_reason = reason
-                assn.save(update_fields=['unit_rate', 'rate_reason'])
-
-        total = (hours * rate).quantize(Decimal('0.01'))
+        start_time = entry["start_time"]
+        end_time = entry["end_time"]
+        hours = Decimal(str(entry["hours"]))
+        rate = _accepted_invoice_rate(assn, slot_date)
+        total = (hours * rate).quantize(Decimal("0.01"))
 
         line_items.append({
             "id": f"{shift.id}-{slot.id}-{slot_date}",
+            "assignmentId": assn.id,
+            "shiftId": shift.id,
             "shiftSlotId": slot.id,
             "date": str(slot_date),
-            "start_time": start_time.strftime('%H:%M:%S'),
-            "end_time": end_time.strftime('%H:%M:%S'),
+            "start_time": start_time.strftime("%H:%M:%S"),
+            "end_time": end_time.strftime("%H:%M:%S"),
+            "description": f"{str(slot_date)} {start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}",
             "category": "ProfessionalServices",
+            "category_code": "ProfessionalServices",
             "unit": "Hours",
-            "quantity": float(hours),         # Only now convert for JSON
+            "quantity": float(hours),
             "unit_price": float(rate),
             "discount": 0,
             "total": float(total),
+            "gst_applicable": bool((assn.engagement_terms_snapshot or {}).get("gst_registered", False)),
+            "super_applicable": bool((assn.engagement_terms_snapshot or {}).get("super_review_required", False)),
             "was_modified": False,
-            "rate_reason": reason  # Optional: frontend may use
+            "locked": True,
+            "rate_reason": {
+                "source": "AcceptedShiftTerms",
+                "assignment_id": assn.id,
+                "offer_id": assn.source_offer_id,
+                "settlement_channel": assn.settlement_channel,
+            },
         })
 
+    if not line_items:
+        raise ValidationError("No invoice-routed occurrences are available for this shift.")
     return line_items
 
 def generate_invoice_from_shifts(
@@ -501,11 +574,11 @@ def generate_invoice_from_shifts(
     if isinstance(gst_registered, str):
         gst_registered = gst_registered.lower() in ['true', '1', 'yes']
 
-    # Parse shift_ids safely
-    shift_ids = billing_data.get('shift_ids')
-    if shift_ids:
-        if isinstance(shift_ids, str):
-            shift_ids = json.loads(shift_ids)
+    # Parse shift_ids safely. Respect the explicit argument when the transport
+    # has already parsed the list.
+    raw_shift_ids = billing_data.get('shift_ids', shift_ids)
+    if raw_shift_ids:
+        shift_ids = json.loads(raw_shift_ids) if isinstance(raw_shift_ids, str) else list(raw_shift_ids)
     else:
         shift_ids = []
 
@@ -513,10 +586,12 @@ def generate_invoice_from_shifts(
     if isinstance(external, str):
         external = external.lower() in ['true', '1', 'yes']
 
-    # Enforce ABN-only for internal invoices.
-    if not external and shift_ids:
-        if Shift.objects.filter(pk__in=shift_ids).exclude(payment_preference__iexact='ABN').exists():
-            raise ValidationError("Internal invoices are only allowed for ABN shifts.")
+    if not external:
+        validate_internal_invoice_shifts(
+            user,
+            shift_ids,
+            pharmacy_id=pharmacy_id,
+        )
 
     invoice = Invoice.objects.create(
         user=user,
@@ -569,44 +644,50 @@ def generate_invoice_from_shifts(
 
     invoice.save()
 
-    # --- USE ONLY THE PASSED LINE ITEMS ---
-    # Map and save fields as provided by the user
+    # Internal professional-service lines are canonical: rebuild them from the
+    # accepted invoice-routed assignments instead of trusting editable client
+    # quantities/rates. Reimbursements can still be added as manual lines.
     super_found = False
+    effective_lines = []
 
-    if custom_lines:
-        for ln in custom_lines:
-            # Map category code safely
-            category_code = ln.get('category_code') or ln.get('category') or 'ProfessionalServices'
-            if category_code.lower() == 'superannuation':
-                super_found = True
+    if not external:
+        for shift in Shift.objects.filter(pk__in=shift_ids).order_by("pk"):
+            effective_lines.extend(generate_preview_invoice_lines(shift, user))
+        for line in custom_lines or []:
+            category_code = line.get("category_code") or line.get("category") or "ProfessionalServices"
+            if category_code == "ProfessionalServices":
+                continue
+            effective_lines.append(line)
+    else:
+        effective_lines = list(custom_lines or [])
 
-            qty = Decimal(str(ln.get('quantity', 0)))
-            rate = Decimal(str(ln.get('unit_price', 0)))
-            discount = Decimal(str(ln.get('discount', 0))) / Decimal('100')
-            total = (qty * rate * (1 - discount)).quantize(Decimal('0.01'))
+    for ln in effective_lines:
+        category_code = ln.get("category_code") or ln.get("category") or "ProfessionalServices"
+        if category_code.lower() == "superannuation":
+            super_found = True
 
-            InvoiceLineItem.objects.create(
-                invoice=invoice,
-                description=ln.get('description', ''),
-                category_code=category_code,
-                unit=ln.get('unit', 'Item'),
-                quantity=qty,
-                unit_price=rate,
-                discount=discount * Decimal('100'),
-                total=total,
-                gst_applicable=ln.get('gst_applicable', True),
-                super_applicable=ln.get('super_applicable', True),
-                is_manual=True,
-                was_modified=True
-            )
-            subtotal += total
+        qty = Decimal(str(ln.get("quantity", 0)))
+        rate = Decimal(str(ln.get("unit_price", 0)))
+        discount = Decimal(str(ln.get("discount", 0))) / Decimal("100")
+        total = (qty * rate * (1 - discount)).quantize(Decimal("0.01"))
+        shift_id = ln.get("shiftId") or ln.get("shift_id")
 
-    elif not external and shift_ids:
-        # Legacy support: auto-generate from shift slots if no custom lines
-        for shift in Shift.objects.filter(pk__in=shift_ids):
-            for entry in expand_shift_slots(shift):
-                # ... your slot expansion logic ...
-                pass
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            shift_id=shift_id if shift_id else None,
+            description=ln.get("description", ""),
+            category_code=category_code,
+            unit=ln.get("unit", "Item"),
+            quantity=qty,
+            unit_price=rate,
+            discount=discount * Decimal("100"),
+            total=total,
+            gst_applicable=ln.get("gst_applicable", True),
+            super_applicable=ln.get("super_applicable", True),
+            is_manual=external or category_code != "ProfessionalServices",
+            was_modified=external or category_code != "ProfessionalServices",
+        )
+        subtotal += total
 
     # --- GST, super, totals ---
     gst_amt = (subtotal * Decimal('0.10')).quantize(Decimal('0.01')) if invoice.gst_registered else Decimal('0.00')
