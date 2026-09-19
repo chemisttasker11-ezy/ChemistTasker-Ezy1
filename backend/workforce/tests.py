@@ -1,8 +1,11 @@
+from types import SimpleNamespace
+
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from .award_rates import classification_options, resolve_award_schedule
 from .employment_terms import correspondence_profile, normalise_part_time_pattern
+from .views import _engagement_payload
 
 
 class PharmacyAwardResolverTests(SimpleTestCase):
@@ -168,3 +171,80 @@ class EmploymentTermsTests(SimpleTestCase):
                     ]
                 }
             )
+
+
+class EmploymentEngagementPayloadTests(SimpleTestCase):
+    @staticmethod
+    def _membership(**overrides):
+        values = {
+            "role": "PHARMACIST",
+            "employment_type": "FULL_TIME",
+            "job_title": "",
+            "pharmacist_award_level": "PHARMACIST",
+            "otherstaff_classification_level": "",
+            "intern_half": "",
+            "student_year": "",
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def test_level_1_assistant_requires_adult_rate_confirmation(self):
+        membership = self._membership(
+            role="ASSISTANT",
+            otherstaff_classification_level="LEVEL_1",
+        )
+        with self.assertRaises(ValidationError):
+            _engagement_payload(
+                {
+                    "pay_basis": "AWARD",
+                    "award_classification": "LEVEL_1",
+                },
+                membership,
+            )
+
+        payload = _engagement_payload(
+            {
+                "pay_basis": "AWARD",
+                "award_classification": "LEVEL_1",
+                "adult_rate_confirmed": True,
+            },
+            membership,
+        )
+        self.assertEqual(str(payload["rate_weekday"]), "27.81")
+        self.assertTrue(payload["award_rate_snapshot"]["adult_rate_confirmed"])
+
+    def test_above_award_cannot_undercut_award_summary_floor(self):
+        membership = self._membership()
+        with self.assertRaises(ValidationError):
+            _engagement_payload(
+                {
+                    "pay_basis": "ABOVE_AWARD",
+                    "award_classification": "PHARMACIST",
+                    "rate_weekday": "40.00",
+                    "rate_saturday": "60.00",
+                    "rate_sunday": "70.00",
+                    "rate_public_holiday": "100.00",
+                },
+                membership,
+            )
+
+    def test_above_award_snapshot_keeps_penalty_and_overtime_floors(self):
+        membership = self._membership()
+        payload = _engagement_payload(
+            {
+                "pay_basis": "ABOVE_AWARD",
+                "award_classification": "PHARMACIST",
+                "rate_weekday": "55.00",
+                "rate_saturday": "70.00",
+                "rate_sunday": "80.00",
+                "rate_public_holiday": "110.00",
+                "late_night_applicable": True,
+                "rate_late_night": "75.00",
+            },
+            membership,
+        )
+        snapshot = payload["award_rate_snapshot"]
+        self.assertEqual(snapshot["kind"], "ABOVE_AWARD")
+        self.assertEqual(snapshot["effective_ordinary_schedule"]["weekday"]["evening_19_21"], "55.00")
+        self.assertEqual(snapshot["effective_ordinary_schedule"]["weekday"]["late_21_24"], "75.00")
+        self.assertEqual(snapshot["overtime_floor"]["sunday_all_day"], "83.48")
