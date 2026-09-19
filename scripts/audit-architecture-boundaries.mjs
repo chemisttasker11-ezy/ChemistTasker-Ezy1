@@ -23,7 +23,7 @@ const byteBudgets = {
   'frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx': 75000,
   'frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx': 76000,
   'frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx': 47000,
-  'frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx': 68000,
+  'frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx': 31000,
   'frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx': 118000,
   'frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx': 88000,
   'frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx': 81000,
