@@ -25,6 +25,7 @@ from client_profile.roster_validation import work_interval
 from client_profile.timezone_utils import get_pharmacy_timezone
 
 from .models import (
+    EmploymentEngagement,
     MembershipWorkSettings,
     Timesheet,
     TimesheetApproval,
@@ -106,6 +107,71 @@ def _contracted_minutes(membership, period: TimesheetPeriod):
         return None
     days = (period.end_date - period.start_date).days + 1
     return int(round(settings.contracted_weekly_minutes * (days / 7.0)))
+
+
+def _employment_engagements_for_period(membership, period: TimesheetPeriod):
+    if not membership or not membership.is_pharmacy_staff_member:
+        return []
+    return list(
+        EmploymentEngagement.objects.filter(
+            membership=membership,
+            effective_from__lte=period.end_date,
+        )
+        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date))
+        .order_by("effective_from", "pk")
+    )
+
+
+def _serialize_pay_engagement(row: EmploymentEngagement):
+    return {
+        "public_id": str(row.public_id),
+        "membership_id": row.membership_id,
+        "effective_from": str(row.effective_from),
+        "effective_to": str(row.effective_to) if row.effective_to else None,
+        "role": row.role,
+        "employment_type": row.employment_type,
+        "job_title": row.job_title,
+        "pay_basis": row.pay_basis,
+        "award_code": row.award_code,
+        "award_classification": row.award_classification,
+        "award_source_label": row.award_source_label,
+        "award_source_url": row.award_source_url,
+        "award_effective_from": str(row.award_effective_from) if row.award_effective_from else None,
+        "award_rate_snapshot": row.award_rate_snapshot,
+        "rates": {
+            "weekday": str(row.rate_weekday),
+            "saturday": str(row.rate_saturday),
+            "sunday": str(row.rate_sunday),
+            "public_holiday": str(row.rate_public_holiday),
+            "early_morning": str(row.rate_early_morning) if row.rate_early_morning is not None else None,
+            "late_night": str(row.rate_late_night) if row.rate_late_night is not None else None,
+            "early_morning_applicable": row.early_morning_applicable,
+            "late_night_applicable": row.late_night_applicable,
+        },
+    }
+
+
+def _attach_employment_engagements(day_rows, membership, period: TimesheetPeriod):
+    engagements = _employment_engagements_for_period(membership, period)
+    serialized = [_serialize_pay_engagement(row) for row in engagements]
+    missing_dates = set()
+
+    for day_row in day_rows:
+        work_date = date.fromisoformat(day_row["date"])
+        match = next(
+            (
+                row
+                for row in engagements
+                if row.effective_from <= work_date
+                and (row.effective_to is None or row.effective_to >= work_date)
+            ),
+            None,
+        )
+        day_row["employment_engagement_public_id"] = str(match.public_id) if match else None
+        if membership and membership.is_pharmacy_staff_member and match is None:
+            missing_dates.add(work_date)
+
+    return serialized, sorted(missing_dates)
 
 
 def _roster_rows(user_id, period: TimesheetPeriod, tz):
@@ -493,6 +559,21 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
         day_rows, comparison_checks = _compare_roster_and_actual(session_rows, roster_rows, approved_leave_assignment_ids)
         checks.extend(comparison_checks)
 
+        engagement_rows, missing_engagement_dates = _attach_employment_engagements(
+            day_rows,
+            membership,
+            period,
+        )
+        for missing_date in missing_engagement_dates:
+            checks.append(_check(
+                "MISSING_EMPLOYMENT_ENGAGEMENT",
+                "WARNING",
+                "No dated employment engagement covers this worked/rostered date; payroll terms are not yet resolved.",
+                work_date=missing_date,
+                identity_parts=["employment-engagement", membership.pk, missing_date],
+                details={"membership_id": membership.pk},
+            ))
+
         pending_leave_count = _pending_leave_count(timesheet.user_id, period, start_bound, end_bound)
         if pending_leave_count:
             checks.append(_check(
@@ -577,6 +658,7 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
             "period": [period.pk, str(period.start_date), str(period.end_date)],
             "worker_id": timesheet.user_id,
             "membership_id": membership.pk if membership else None,
+            "employment_engagements": engagement_rows,
             "roster": [{**r, "start": r["start"].isoformat(), "end": r["end"].isoformat(), "date": str(r["date"])} for r in roster_rows],
             "sessions": [
                 {
@@ -615,6 +697,7 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
             "worker": {"id": timesheet.user_id, "name": timesheet.user.get_full_name() or timesheet.user.username},
             "pharmacy": {"id": period.pharmacy_id, "name": period.pharmacy.name},
             "period": {"id": period.pk, "start_date": str(period.start_date), "end_date": str(period.end_date), "timezone": period.timezone},
+            "employment_engagements": engagement_rows,
             "days": day_rows,
             "leave": leave_rows,
             "totals": {
@@ -908,6 +991,10 @@ def lock_period(period, user):
                 "worker_id": timesheet.user_id,
                 "revision_number": revision.revision_number,
                 "source_fingerprint": revision.source_fingerprint,
+                "employment_engagement_public_ids": [
+                    row["public_id"]
+                    for row in revision.snapshot.get("employment_engagements", [])
+                ],
                 "reviewed_minutes": timesheet.reviewed_minutes,
                 "approved_leave_minutes": timesheet.approved_leave_minutes,
             })
