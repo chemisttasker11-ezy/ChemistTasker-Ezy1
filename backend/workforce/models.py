@@ -137,7 +137,7 @@ class EmploymentEngagement(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["membership", "effective_from", "effective_to"]),
+            models.Index(fields=["membership", "effective_from", "effective_to"], name="workforce_e_membersh_34d64f_idx"),
         ]
 
     def clean(self):
