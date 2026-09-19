@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -10,17 +11,37 @@ import {
   DialogTitle,
   IconButton,
   Snackbar,
+  Stack,
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
+  activateShiftOfferPayrollService,
   fetchConfirmedShifts,
+  fetchShiftOffersService,
   type Shift,
   type ShiftUser,
   viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+
+type DeferredPayrollOffer = {
+  id: number;
+  shift?: number;
+  paymentPreferenceSnapshot?: string;
+  settlementChannel?: string;
+  engagementKind?: string;
+  payrollActivatedAt?: string | null;
+  engagementTermsSnapshot?: {
+    payrollActivationRequired?: boolean;
+    pharmacyId?: number;
+    pharmacyName?: string;
+    workerName?: string;
+    awardClassification?: string;
+    payBasis?: string;
+  };
+};
 
 export default function ConfirmedShiftsPage() {
   const { activePersona, activeAdminPharmacyId } = useAuth();
@@ -31,6 +52,8 @@ export default function ConfirmedShiftsPage() {
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loadingShifts, setLoadingShifts] = useState(true);
+  const [deferredPayrollOffers, setDeferredPayrollOffers] = useState<DeferredPayrollOffer[]>([]);
+  const [activatingPayrollOfferId, setActivatingPayrollOfferId] = useState<number | null>(null);
   const [profile, setProfile] = useState<ShiftUser | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -56,6 +79,54 @@ export default function ConfirmedShiftsPage() {
       .catch(() => setSnackbar({ open: true, msg: 'Failed to load confirmed shifts' }))
       .finally(() => setLoadingShifts(false));
   }, [scopedPharmacyId]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetchShiftOffersService({ status: 'ACCEPTED' }),
+      fetchShiftOffersService({ status: 'ACCEPTED_AWAITING_PAYMENT' }),
+    ])
+      .then(([accepted, awaiting]) => {
+        if (!active) return;
+        const rows = [...accepted, ...awaiting] as DeferredPayrollOffer[];
+        const filtered = rows.filter((offer) => {
+          const terms = offer.engagementTermsSnapshot;
+          const pharmacyMatches =
+            scopedPharmacyId == null || Number(terms?.pharmacyId ?? NaN) === scopedPharmacyId;
+          return (
+            pharmacyMatches &&
+            offer.paymentPreferenceSnapshot === 'TFN' &&
+            offer.engagementKind === 'SHIFT_EMPLOYMENT' &&
+            offer.settlementChannel === 'TIMESHEET_ONLY' &&
+            terms?.payrollActivationRequired === true &&
+            !offer.payrollActivatedAt
+          );
+        });
+        setDeferredPayrollOffers(filtered);
+      })
+      .catch(() => {
+        if (active) setSnackbar({ open: true, msg: 'Failed to load deferred payroll setup' });
+      });
+    return () => {
+      active = false;
+    };
+  }, [scopedPharmacyId]);
+
+  const activateDeferredPayroll = async (offer: DeferredPayrollOffer) => {
+    setActivatingPayrollOfferId(offer.id);
+    try {
+      await activateShiftOfferPayrollService(offer.id);
+      setDeferredPayrollOffers((rows) => rows.filter((row) => row.id !== offer.id));
+      setSnackbar({ open: true, msg: 'ChemistTasker Payroll activated for this accepted shift.' });
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        msg: err?.message || 'Complete the worker TFN/super details before activating payroll.',
+      });
+    } finally {
+      setActivatingPayrollOfferId(null);
+    }
+  };
 
   const closeSnackbar = () => setSnackbar((s) => ({ ...s, open: false }));
   const closeDialog = () => {
@@ -96,6 +167,50 @@ export default function ConfirmedShiftsPage() {
           Review booked shifts and assigned chemists
         </Typography>
       </Box>
+
+      {deferredPayrollOffers.length > 0 && (
+        <Stack spacing={1.5} sx={{ mb: 3 }}>
+          <Alert severity="warning">
+            These accepted TFN shifts are rostered and timesheet-only because ChemistTasker Payroll setup was deferred.
+            Assignment is preserved; activate payroll after the worker completes TFN and super details.
+          </Alert>
+          {deferredPayrollOffers.map((offer) => {
+            const terms = offer.engagementTermsSnapshot;
+            return (
+              <Box
+                key={offer.id}
+                sx={{
+                  display: 'flex',
+                  gap: 2,
+                  alignItems: { xs: 'stretch', sm: 'center' },
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  p: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography fontWeight={800}>
+                    {terms?.workerName || `Accepted worker · Offer #${offer.id}`}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {terms?.pharmacyName || 'Pharmacy'} · {terms?.awardClassification || 'Casual TFN'}
+                    {terms?.payBasis ? ` · ${terms.payBasis}` : ''}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  disabled={activatingPayrollOfferId === offer.id}
+                  onClick={() => void activateDeferredPayroll(offer)}
+                >
+                  {activatingPayrollOfferId === offer.id ? 'Checking…' : 'Activate payroll'}
+                </Button>
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
 
       <OwnerAssignedShiftBoard
         title="Confirmed Shifts"
