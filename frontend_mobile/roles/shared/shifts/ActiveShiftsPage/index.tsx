@@ -2,8 +2,8 @@
 // Mobile implementation aligned with web logic and hooks
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Alert, View, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { Text, Button, IconButton, Snackbar, ActivityIndicator, Card, Divider, Chip, Checkbox } from 'react-native-paper';
+import { Alert, View, ScrollView, Linking } from 'react-native';
+import { Text, Snackbar, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,22 +29,16 @@ import { useShareShift } from './hooks/useShareShift';
 // Components
 import DeleteConfirmDialog from './components/Dialogs/DeleteConfirmDialog';
 import CounterOfferDialog from './components/Dialogs/CounterOfferDialog';
-import EscalationStepper from './components/Escalation/EscalationStepper';
-import PublicLevelView from './components/Candidates/PublicLevelView';
-import CommunityLevelView from './components/Candidates/CommunityLevelView';
 import ActiveShiftCards from './ActiveShiftCards';
 
 // Utils
 import {
     PUBLIC_LEVEL_KEY,
     getCurrentLevelKey,
-    getShiftSummary,
     deriveLevelSequence,
-    getLocationText,
 } from './utils/shiftHelpers';
-import { dedupeMembers, findInterestForOffer } from './utils/candidateHelpers';
+import { findInterestForOffer } from './utils/candidateHelpers';
 import { mapOfferSlotsWithShift } from './utils/offerHelpers';
-import { getCardBorderColor } from './utils/displayHelpers';
 
 // Types
 import { ReviewOfferDialogState, DeleteConfirmDialogState } from './types';
@@ -54,21 +48,14 @@ import { customTheme } from './theme';
 import { styles } from './styles';
 import {
     ACTIVE_SHIFT_SLOT_SEEN_KEY_PREFIX,
-    toFiniteNumber,
-    resolveSlotIdAny,
     getSlotIds,
     slotHasAwaitingPayment,
     getSlotAwaitingPaymentOfferId,
-    formatAuSlotDateTime,
     getCandidateNameForPaymentSlot,
     shouldShowPaymentRequired,
-    offerBelongsToSlot,
-    interestBelongsToSlot,
     findInterestForMember,
     buildPublicSlotSignature,
     buildMemberSlotSignature,
-    countUniquePeople,
-    isActiveCounterOffer,
     getCandidateUserId,
 } from './utils/activeShiftRuntime';
 
