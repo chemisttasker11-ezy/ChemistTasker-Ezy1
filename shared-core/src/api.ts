@@ -4,6 +4,7 @@
  * Complete API functions for ChemistTasker
  */
 import { API_ENDPOINTS } from './constants/endpoints';
+import type { ShiftOfferAcceptancePayload } from './types';
 let config = null;
 export function configureApi(apiConfig) {
     config = apiConfig;
@@ -695,8 +696,16 @@ export function fetchShiftOffers(query = '') {
     return fetchApi(`/client-profile/shift-offers/${query}`);
 }
 
-export function acceptShiftOffer(offerId) {
-    return fetchApi(`/client-profile/shift-offers/${offerId}/accept/`, { method: 'POST' });
+export function acceptShiftOffer(offerId, data = {}) {
+    const body = {
+        engagement_terms_accepted: data?.engagementTermsAccepted ?? data?.engagement_terms_accepted ?? false,
+        independent_contractor_status_confirmed:
+            data?.independentContractorStatusConfirmed ?? data?.independent_contractor_status_confirmed ?? false,
+    };
+    return fetchApi(`/client-profile/shift-offers/${offerId}/accept/`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+    });
 }
 
 export function declineShiftOffer(offerId) {
@@ -989,8 +998,8 @@ export async function fetchShiftOffersService(filters?: { status?: string }) {
     const data = await fetchShiftOffers(query ? `?${query}` : '');
     return asList(data).map(camelCaseKeysDeep);
 }
-export async function acceptShiftOfferService(offerId: number) {
-    await acceptShiftOffer(offerId);
+export async function acceptShiftOfferService(offerId: number, payload: ShiftOfferAcceptancePayload = {}) {
+    return camelCaseKeysDeep(await acceptShiftOffer(offerId, payload));
 }
 export async function declineShiftOfferService(offerId: number) {
     await declineShiftOffer(offerId);
