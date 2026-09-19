@@ -163,3 +163,80 @@ export type WorkforceMyHoursRow = WorkforceTimesheetRow & {
   start_date: string;
   end_date: string;
 };
+
+
+export type WorkforceEngagementPayBasis = 'AWARD' | 'ABOVE_AWARD';
+
+export interface WorkforceEmploymentEngagement {
+  id: number;
+  public_id: string;
+  membership_id: number;
+  pharmacy_id: number;
+  worker_id: number;
+  worker_name: string;
+  role: string;
+  employment_type: 'FULL_TIME' | 'PART_TIME' | 'CASUAL';
+  job_title: string;
+  effective_from: string;
+  effective_to: string | null;
+  pay_basis: WorkforceEngagementPayBasis;
+  award_code: string;
+  award_classification: string;
+  award_source_label: string;
+  award_source_url: string;
+  award_effective_from: string | null;
+  award_rate_snapshot: Record<string, unknown>;
+  rate_weekday: string;
+  rate_saturday: string;
+  rate_sunday: string;
+  rate_public_holiday: string;
+  rate_early_morning: string | null;
+  rate_late_night: string | null;
+  early_morning_applicable: boolean;
+  late_night_applicable: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkforceAwardPreview {
+  award_code: string;
+  award_source_label: string;
+  award_source_url: string;
+  award_effective_from: string;
+  role: string;
+  classification: string;
+  classification_label: string;
+  employment_type: string;
+  minimum_hourly_rate: string;
+  schedule: Record<string, Record<string, string>>;
+  rate_weekday: string;
+  rate_saturday: string;
+  rate_sunday: string;
+  rate_public_holiday: string;
+  rate_early_morning: string;
+  rate_late_night: string;
+  early_morning_applicable: boolean;
+  late_night_applicable: boolean;
+  classification_options: Array<{ value: string; label: string }>;
+  default_classification: string;
+}
+
+export interface WorkforceEmploymentEngagementWrite {
+  membership_id: number;
+  effective_from: string;
+  effective_to?: string | null;
+  employment_type?: 'FULL_TIME' | 'PART_TIME' | 'CASUAL';
+  job_title?: string;
+  pay_basis: WorkforceEngagementPayBasis;
+  award_classification?: string;
+  rate_weekday?: string | number;
+  rate_saturday?: string | number;
+  rate_sunday?: string | number;
+  rate_public_holiday?: string | number;
+  rate_early_morning?: string | number | null;
+  rate_late_night?: string | number | null;
+  early_morning_applicable?: boolean;
+  late_night_applicable?: boolean;
+  notes?: string;
+}
