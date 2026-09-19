@@ -24,3 +24,4 @@ This document defines the canonical owner for each backend and shared-client dom
 5. Financial and permission-sensitive transitions require positive and negative tests.
 6. Vite and Next may remain separate routers, but duplicated business logic must move to shared modules rather than being copied.
 7. Historical source and build artifacts belong in Git history/releases, not beside the maintained application source.
+8. The magic-link pharmacy membership application is Vite-owned. Next may proxy `/membership/*` to Vite on the shared host, but must not contain a second membership page or migrated copy.
