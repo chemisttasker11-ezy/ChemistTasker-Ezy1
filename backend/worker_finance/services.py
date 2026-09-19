@@ -740,6 +740,27 @@ def serialize_revision(record, revision):
     return document
 
 
+def serialize_owner_revision(record, revision):
+    document = serialize_revision(record, revision)
+    visible_versions = set(
+        record.deliveries
+        .filter(status__in=["sent", "legacy_queued"])
+        .values_list("version", flat=True)
+    )
+    if (
+        record.invoice.status in {"sent", "paid"}
+        or record.review_status != "NONE"
+    ):
+        visible_versions.add(record.version)
+    document["revisions"] = [
+        item for item in document.get("revisions", [])
+        if item.get("version") in visible_versions
+    ]
+    latest_visible = max(visible_versions) if visible_versions else 0
+    document["has_unsent_revision"] = record.version > latest_visible
+    return document
+
+
 def owner_visible_document(record):
     """Return the current delivered revision, or the last successfully delivered revision.
 
@@ -775,13 +796,15 @@ def owner_visible_document(record):
         revision = record.revisions.filter(version=delivered.version).first()
         if revision is None:
             return None
-        document = serialize_revision(record, revision)
-        document["has_unsent_revision"] = record.version > revision.version
+        document = serialize_owner_revision(record, revision)
 
     document["revisions"] = [
         item for item in document.get("revisions", [])
         if item.get("version") in visible_versions
     ]
+    if "has_unsent_revision" not in document:
+        latest_visible = max(visible_versions) if visible_versions else 0
+        document["has_unsent_revision"] = record.version > latest_visible
     return document
 
 
