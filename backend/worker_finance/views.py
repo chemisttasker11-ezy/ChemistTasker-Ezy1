@@ -354,6 +354,25 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             qs = qs.select_for_update(of=('self',))
         return get_object_or_404(qs, pk=allowed)
 
+    @staticmethod
+    def _require_current_delivered(record):
+        delivered = record.deliveries.filter(
+            version=record.version,
+            status__in=['sent', 'legacy_queued'],
+        ).exists()
+        current_visible = (
+            delivered
+            or record.invoice.status in {'sent', 'paid'}
+            or record.review_status != 'NONE'
+        )
+        if not current_visible:
+            raise ValidationError({
+                'version': (
+                    'The contractor has a newer saved revision that has not been sent yet. '
+                    'Review actions remain attached to the last delivered revision until the new version is sent.'
+                )
+            })
+
     def list(self, request):
         from rest_framework.pagination import PageNumberPagination
         pager = PageNumberPagination()
@@ -411,6 +430,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Revision notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             InvoiceReviewRequest.objects.create(
                 record=record,
@@ -445,6 +465,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             record.review_status = 'APPROVED_FOR_PAYMENT'
             record.last_review_note = note
@@ -477,6 +498,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
         with transaction.atomic():
             record = self._get(request, pk, lock=True)
+            self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             record.invoice.status = 'paid'
             record.invoice.save(update_fields=['status'])
