@@ -20,6 +20,7 @@ import {
   Typography,
 } from '@mui/material';
 import { STAFF_ROLE_OPTIONS, fetchPharmaciesService } from '@chemisttasker/shared-core';
+import EmploymentEngagementsPanel from './EmploymentEngagementsPanel';
 import {
   createCoverageRequirement,
   deleteCoverageRequirement,
@@ -83,7 +84,7 @@ export default function WorkforceSettingsPage() {
         <FormControl size="small" sx={{ maxWidth: 320 }}><InputLabel>Pharmacy</InputLabel><Select value={pharmacyId ?? ''} label="Pharmacy" onChange={(e) => setPharmacyId(Number(e.target.value))}>{pharmacies.map((row) => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</Select></FormControl>
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper variant="outlined" sx={{ borderRadius: 3 }}>
-          <Tabs value={tab} onChange={(_, value) => setTab(value)}><Tab label="Coverage requirements" /><Tab label="Contracted hours" /></Tabs>
+          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" /><Tab label="Contracted hours" /><Tab label="Employment & pay" /></Tabs>
           <Box sx={{ p: 2 }}>
             {tab === 0 && <Stack spacing={1.5}>
               <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography fontWeight={900}>Coverage rules</Typography><Button variant="contained" onClick={() => setCoverageOpen(true)}>Add rule</Button></Stack>
@@ -94,6 +95,9 @@ export default function WorkforceSettingsPage() {
               <Alert severity="info">Contracted hours are displayed for comparison in timesheets. Leave blank when unknown rather than inventing a value.</Alert>
               {staff.map((row) => <Paper key={row.membership_id} variant="outlined" sx={{ p: 1.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}><Box flex={1}><Typography fontWeight={800}>{row.worker_name}</Typography><Typography variant="body2" color="text.secondary">{row.role} · {row.employment_type}</Typography></Box><TextField size="small" label="Contracted h/week" defaultValue={row.contracted_weekly_minutes == null ? '' : (row.contracted_weekly_minutes / 60).toFixed(2)} onBlur={(e) => saveHours(row.membership_id, e.target.value)} sx={{ width: 190 }} /></Stack></Paper>)}
             </Stack>}
+            {tab === 2 && pharmacyId && (
+              <EmploymentEngagementsPanel pharmacyId={pharmacyId} staff={staff} />
+            )}
           </Box>
         </Paper>
       </Stack>
