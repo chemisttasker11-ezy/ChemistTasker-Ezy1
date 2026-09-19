@@ -6,18 +6,13 @@ import {
   Chip,
   CircularProgress,
   Button,
-  FormControl,
   IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
   Tooltip,
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import {
-  approveMembershipApplicationService,
   fetchMembershipApplicationsService,
   rejectMembershipApplicationService,
   type MembershipApplication,
@@ -169,7 +164,6 @@ export default function MembershipApplicationsPanel({
 }: MembershipApplicationsPanelProps) {
   const [applications, setApplications] = useState<MembershipApplication[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [approveTypeById, setApproveTypeById] = useState<Record<number, string>>({});
   const [reviewing, setReviewing] = useState<MembershipApplication | null>(null);
   const isFetchingRef = useRef(false);
 
@@ -268,7 +262,6 @@ export default function MembershipApplicationsPanel({
         <Stack spacing={1.5}>
           {applications.map((app) => {
             const applicantName = [app.firstName, app.lastName].filter(Boolean).join(" ") || "Applicant";
-            const selectedType = approveTypeById[app.id] || defaultEmploymentType;
             const classification = formatClassification(app);
             const jobTitle = readValue(app, "jobTitle", "job_title");
             const username = readValue(app, "username", "username");
@@ -344,29 +337,6 @@ export default function MembershipApplicationsPanel({
                     spacing={1}
                     alignItems={{ xs: "stretch", sm: "center" }}
                   >
-                    {app.category === "FULL_PART_TIME" ? (
-                      <FormControl size="small" sx={{ minWidth: 160 }}>
-                        <InputLabel id={`employment-type-${app.id}`}>Approve as</InputLabel>
-                        <Select
-                          labelId={`employment-type-${app.id}`}
-                          label="Approve as"
-                          value={selectedType}
-                          onChange={(event) =>
-                            setApproveTypeById((prev) => ({
-                              ...prev,
-                              [app.id]: String(event.target.value),
-                            }))
-                          }
-                        >
-                          {allowedTypes.map((type) => (
-                            <MenuItem key={type} value={type}>
-                              {labelEmploymentType(type)}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    ) : null}
-
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Button variant="contained" size="small" onClick={() => setReviewing(app)}>
                         Review
@@ -393,7 +363,7 @@ export default function MembershipApplicationsPanel({
         defaultEmploymentType={
           reviewing?.category === "LOCUM_CASUAL"
             ? deriveLocumEmploymentType(reviewing?.role)
-            : (reviewing ? (approveTypeById[reviewing.id] || defaultEmploymentType) : defaultEmploymentType)
+            : defaultEmploymentType
         }
         allowedEmploymentTypes={allowedTypes}
         onClose={() => setReviewing(null)}
