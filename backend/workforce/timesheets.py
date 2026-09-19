@@ -131,7 +131,10 @@ def _employment_engagements_for_period(membership, period: TimesheetPeriod):
 
 
 def _serialize_pay_engagement(row: EmploymentEngagement):
-    correspondence = correspondence_profile(row.employment_type, row.pay_basis)
+    correspondence = (
+        row.award_rate_snapshot.get("correspondence")
+        or correspondence_profile(row.employment_type, row.pay_basis)
+    )
     return {
         "public_id": str(row.public_id),
         "membership_id": row.membership_id,
