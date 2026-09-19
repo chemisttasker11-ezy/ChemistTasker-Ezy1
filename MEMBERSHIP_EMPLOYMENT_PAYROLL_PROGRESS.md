@@ -1,6 +1,6 @@
 # EmploymentEngagement / Membership / Payroll Progress
 
-Last updated: 2026-09-19 16:00+ AEST (Australia/Brisbane)
+Last updated: 2026-09-19 17:45 AEST (Australia/Brisbane)
 
 ## Current branch
 
@@ -341,3 +341,120 @@ Functional code head before this documentation update: 55e1f62be010022e43e339265
   - Direct Mobile Lint retry: again zero steps.
 - The previous green CI remains evidence for the pre-fix stack only; it is not being misrepresented as validation of these new fixes.
 - Before merge: rerun the exact latest head once GitHub allocates runners, fix any real command/test failures if they appear, and only then mark PR #3 ready.
+
+
+## Invoice / Finance workspace direction confirmed — 2026-09-19 17:45 AEST
+
+This section supersedes the earlier assumption that issuing/sending an invoice makes the canonical invoice permanently immutable.
+
+### Canonical lifecycle and editability
+
+The intended user-facing lifecycle is:
+
+1. **Draft (unsaved workspace state)**
+   - A draft is the in-memory/editor state before the user presses Save.
+   - It is not yet an invoice record and must not consume an invoice number merely by opening/composing.
+   - Preview/calculation may run without persistence.
+
+2. **Saved**
+   - Save creates/persists the canonical invoice.
+   - A saved invoice remains editable.
+   - The worker may download/share the PDF by another method without changing the platform delivery status.
+   - Saving is therefore sufficient to obtain a durable invoice/PDF; platform Send is a separate action.
+   - Existing backend/legacy `draft` terminology may be retained internally during migration only if the shared-core/UI presents it consistently as Saved and no immutability is attached to it.
+
+3. **Sent**
+   - Send records a platform delivery event and makes the invoice visible/re-visible on the relevant pharmacy/owner side for internal platform invoices.
+   - Send does **not** make the invoice permanently immutable.
+   - Re-sending after a revision creates a new delivery against the latest invoice version.
+
+4. **Paid**
+   - Paid is a manually assignable next state (tick/action), with the existing payment ledger preserved where used.
+   - Paid also does **not** make the invoice permanently immutable.
+   - If an error is discovered, the worker can edit, save a new revision/version and send again.
+   - The audit trail must preserve the previously sent/paid version rather than silently rewriting history.
+
+### Revision/version model
+
+- Every save after the initial persistence increments/creates an auditable invoice revision/version.
+- Previously sent PDF/content remains reproducible from its revision snapshot.
+- Editing a sent or paid invoice creates a new current revision; it does not mutate historical delivery evidence.
+- For internal ChemistTasker invoices, sending the revised version must surface that new version to the pharmacy owner.
+- Payment/review history should remain attached to the canonical invoice and identify which invoice version it referred to.
+- Any current `locked_at`/issuance lock must be narrowed to transactional/concurrency protection only; it must not block legitimate later revision.
+- The legacy editor and the new finance workspace must share exactly the same editability rule so neither UI can bypass or over-restrict the other.
+
+### Internal ABN invoice prefill
+
+For accepted internal platform ABN work:
+
+- Pharmacy/bill-to details come from the pharmacy's canonical data and are prefilled, including ABN and available legal/contact/address details.
+- Shift/slot date, start/end time, worked hours and the frozen agreed rate come from the accepted assignment/slot/engagement snapshot.
+- Worker/contractor issuer details come from onboarding/profile data, including ABN, GST status, business/payment/super details where present.
+- Missing non-identity/business fields may be completed manually in the invoice editor.
+- The source assignment linkage remains auditable so the invoice can be traced back to the exact accepted work.
+- Prefill is a convenience and provenance feature, not a permanent field lock: the worker may correct invoice content when the real worked outcome differs, while the original accepted shift snapshot remains retained for audit/comparison.
+
+### Owner-side internal invoice workflow
+
+For invoices tied to platform shifts:
+
+- Owner receives the latest sent invoice/version.
+- Owner can choose **Accept / Process for payment** and optionally include a note/message to the contractor.
+- Owner can instead choose **Request revision** with a required note explaining the requested adjustment.
+- A revision request returns the invoice to the contractor as an actionable item without deleting or overwriting the submitted version.
+- Typical reasons include actual hours differing from scheduled hours, early finish, extra time, agreed reimbursement changes or another genuine correction.
+- Contractor edits, saves a new version, and may send again.
+- Owner notifications/history must make the version sequence and notes clear.
+
+### Flexible invoice items
+
+Invoice lines must support both saved catalogue items and true ad-hoc entry.
+
+- The item picker shows existing saved items and **+ Add new item**.
+- Choosing a saved item prefills defaults, but the invoice line remains freely editable for that invoice.
+- A user may type a description, unit, quantity and price directly without creating a catalogue item or entering a code.
+- Item code is optional.
+- Units are custom/free text (for example Hours, Each, Kilometres, Nights, Lump Sum, or another user-entered unit).
+- Tax treatment is selected per invoice line and may differ from the saved-item default.
+- Supported tax codes must continue to include the current finance engine values such as GST, GST-free, input taxed and out-of-scope/non-taxable, with user-facing labels that are understandable.
+- Creating/editing a line must not require first modifying the catalogue item.
+- Saving a new catalogue item is an explicit convenience action, not a prerequisite for invoicing.
+
+### Workforce-engine boundary
+
+- This invoicing workflow remains under the new workforce/finance engine and continues to wrap/reuse the canonical `client_profile.Invoice` / `InvoiceLineItem` records rather than introducing a second invoice truth.
+- ABN-routed assignments feed INVOICE settlement; PAYROLL and TIMESHEET_ONLY assignments remain excluded from contractor invoice selection.
+- Accepted engagement/shift terms remain immutable evidence; invoice revisions represent billing corrections and do not rewrite the accepted engagement record.
+
+### UI/UX implementation requirements
+
+Web and mobile should use one shared interaction model and shared-core contracts:
+
+- modern invoice document/composer layout rather than a settings-form appearance;
+- clear top-level status/version badge and last-sent/last-reviewed context;
+- bill-from and bill-to summary cards with sensible prefilling;
+- line-item table/cards with inline editable description, unit, quantity, price, tax and totals;
+- saved-item autocomplete with an adjacent **+ Add new item** path;
+- invoice summary with subtotal, GST/tax breakdown, total and separate super treatment where applicable;
+- prominent actions appropriate to state: Save, Download PDF, Send/Resend, Mark paid;
+- visible revision history and owner revision-request messages for internal invoices;
+- internal source provenance shown without preventing legitimate correction;
+- responsive parity between Vite web and mobile; do not introduce a competing Next-only finance implementation.
+
+### Required implementation/test corrections against current PR #3
+
+Current PR #3 already contains InvoiceRevision, InvoiceReviewRequest, owner review statuses, free-entry line support and internal shift prefilling. The remaining work is to align those pieces with the lifecycle above:
+
+- remove permanent issuance immutability assumptions from new and legacy editors/services;
+- distinguish unsaved Draft from persisted Saved in the presentation/state contract;
+- permit edit/save after Sent and Paid while creating a new immutable revision snapshot;
+- preserve historical sent PDFs/delivery/version evidence;
+- make Resend surface the newest internal version to the owner;
+- bind owner Accept/Process and Request revision decisions to the relevant invoice version;
+- allow internal labour lines to be corrected when actual worked outcomes differ, while retaining original assignment snapshot/provenance;
+- ensure saved-item defaults never lock description/price/unit/tax on the invoice line;
+- expose explicit + Add new item and ad-hoc line entry on both web and mobile;
+- add regression coverage for Saved -> Sent -> Edited -> Saved -> Resent and Paid -> Edited -> Saved -> Resent;
+- add cross-UI tests proving legacy and finance-workspace editors enforce the same version/revision semantics;
+- keep PR #3 draft until these corrections and the latest-head executable CI complete.
