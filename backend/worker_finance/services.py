@@ -299,6 +299,9 @@ def save_draft(owner, data, record_id=None, source='external'):
     elif any(line.get("source_assignment_id") or line.get("locked") for line in data.get("lines", [])):
         raise ValidationError("Shift source identities are server-managed and cannot be supplied for an external invoice.")
 
+    if record_id is not None and record.source == "internal" and int(data["customer_id"]) != record.customer_id:
+        raise ValidationError("The pharmacy/customer on an accepted-shift invoice is locked to the original engagement.")
+
     customer = get_object_or_404(Customer, pk=data['customer_id'], owner=owner, active=True)
     lines = snapshot_lines(owner, data)
     calc = calculate(data, lines)
