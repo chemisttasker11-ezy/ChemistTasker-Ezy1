@@ -34,10 +34,6 @@ class Migration(migrations.Migration):
                 to="client_profile.shiftslotassignment",
             ),
         ),
-        migrations.AddIndex(
-            model_name="invoicelineitem",
-            index=models.Index(fields=["source_assignment"], name="cp_invline_source_assn_idx"),
-        ),
         migrations.AddConstraint(
             model_name="invoicelineitem",
             constraint=models.UniqueConstraint(
