@@ -11,7 +11,6 @@ import {
     Menu,
     Snackbar,
     Checkbox,
-    List,
 } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,16 +23,9 @@ import {
     updateOwnerShiftService,
     calculateShiftRates,
 } from '@chemisttasker/shared-core';
-import skillsCatalog from '@chemisttasker/shared-core/skills_catalog.json';
 import apiClient from '@/utils/apiClient';
 
 import {
-    ROLE_OPTIONS,
-    EMPLOYMENT_TYPES,
-    WORKLOAD_TAGS,
-    PRIMARY,
-    PRIMARY_LIGHT,
-    PRIMARY_TEXT,
     VISIBILITY_LABELS,
     VISIBILITY_META,
     RATE_TYPE_DESCRIPTIONS,
