@@ -9126,11 +9126,23 @@ def _invoice_queryset_for_user(user):
     admin_pharmacy_ids = pharmacies_user_admins(user).values_list("id", flat=True)
     org_pharmacy_ids = _get_org_pharmacies_queryset(user).values_list("id", flat=True)
 
-    return Invoice.objects.filter(
-        Q(user=user)
-        | Q(pharmacy_id__in=owned_pharmacy_ids)
+    managed_pharmacy_invoice = (
+        Q(pharmacy_id__in=owned_pharmacy_ids)
         | Q(pharmacy_id__in=admin_pharmacy_ids)
         | Q(pharmacy_id__in=org_pharmacy_ids)
+    )
+    manager_visible_state = (
+        Q(finance_record__isnull=True)
+        | Q(
+            finance_record__deliveries__version=F("finance_record__version"),
+            finance_record__deliveries__status__in=["sent", "legacy_queued"],
+        )
+        | Q(status__in=["sent", "paid"])
+        | ~Q(finance_record__review_status="NONE")
+    )
+
+    return Invoice.objects.filter(
+        Q(user=user) | (managed_pharmacy_invoice & manager_visible_state)
     ).select_related("finance_record").distinct()
 
 
