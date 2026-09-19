@@ -66,4 +66,8 @@ Final validation was rerun from this canonical tree after the Post Shift extract
 - Kiosk Rust tests passed: 2 passed.
 - Strict shared-core boundary and architecture audits passed.
 
+After using the local PostgreSQL env configuration and supplied password, the disposable PostgreSQL migration rehearsal completed successfully and both PostgreSQL concurrency tests passed. The disposable database was then removed. The normal backend suite was rerun afterward and passed again.
+
+The PostgreSQL fix was a real production-path correction: invoice assignment and invoice adoption locks now clear nullable eager joins before `FOR UPDATE`, avoiding PostgreSQL's nullable-side lock error while retaining row-level concurrency protection.
+
 Generated validation output was removed after the run. The canonical `git status` is clean and only the canonical worktree remains registered.

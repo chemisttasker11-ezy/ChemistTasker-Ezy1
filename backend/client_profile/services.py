@@ -444,7 +444,9 @@ def _invoice_routed_assignments(user, *, shift_ids=None, shift=None, for_update=
     if shift_ids is not None:
         qs = qs.filter(shift_id__in=shift_ids)
     if for_update:
-        qs = qs.select_for_update()
+        # ``source_offer`` is optional. Clear eager joins before locking so
+        # PostgreSQL does not reject FOR UPDATE on the nullable outer join.
+        qs = qs.select_related(None).select_for_update()
     return qs
 
 

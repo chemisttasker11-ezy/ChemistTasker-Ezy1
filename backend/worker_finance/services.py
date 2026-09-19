@@ -214,7 +214,11 @@ def _assignment_queryset(owner, assignment_ids=None, lock=False):
     if assignment_ids is not None:
         qs = qs.filter(id__in=assignment_ids)
     if lock:
-        qs = qs.select_for_update()
+        # Clear the eager joins before locking. ``source_offer`` is optional,
+        # and PostgreSQL rejects FOR UPDATE when a nullable outer join is in
+        # the lock query. The related rows are fetched lazily after the
+        # assignment row is locked.
+        qs = qs.select_related(None).select_for_update()
     return qs
 
 
@@ -486,7 +490,9 @@ def write_canonical(record):
 @transaction.atomic
 def adopt_internal_invoice(owner, invoice):
     owner.__class__.objects.select_for_update().get(pk=owner.pk)
-    invoice = Invoice.objects.select_for_update().select_related("pharmacy").get(pk=invoice.pk)
+    # The pharmacy link is nullable for external invoices. Keep the lock query
+    # on the invoice row so PostgreSQL does not reject a nullable outer join.
+    invoice = Invoice.objects.select_related(None).select_for_update().get(pk=invoice.pk)
     existing = InvoiceRecord.objects.filter(invoice=invoice).first()
     if existing:
         return existing
