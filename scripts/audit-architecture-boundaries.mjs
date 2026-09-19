@@ -18,10 +18,12 @@ const byteBudgets = {
   'frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx': 138000,
   'frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx': 116000,
   'frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx': 94000,
-  'frontend_web/src/pages/attendance/KioskPage.tsx': 105000,
+  'frontend_web/src/pages/attendance/KioskPage.tsx': 95000,
   'frontend_web/src/layouts/TopBarActions.tsx': 48000,
   'frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx': 75000,
   'frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx': 76000,
+  'frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx': 47000,
+  'frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx': 74000,
   'frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx': 118000,
 };
 
