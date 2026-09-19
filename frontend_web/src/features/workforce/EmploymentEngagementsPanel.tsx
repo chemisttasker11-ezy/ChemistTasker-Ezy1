@@ -683,7 +683,24 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                     <Select
                       value={form.pay_basis}
                       label="Pay basis"
-                      onChange={(event) => setAndPreview({ pay_basis: String(event.target.value) as WorkforceEngagementPayBasis })}
+                      onChange={(event) => {
+                        const payBasis = String(event.target.value) as WorkforceEngagementPayBasis;
+                        if (payBasis === 'ABOVE_AWARD') {
+                          setAndPreview({
+                            pay_basis: payBasis,
+                            rate_weekday: '',
+                            rate_saturday: '',
+                            rate_sunday: '',
+                            rate_public_holiday: '',
+                            rate_early_morning: '',
+                            rate_late_night: '',
+                            early_morning_applicable: false,
+                            late_night_applicable: false,
+                          });
+                        } else {
+                          setAndPreview({ pay_basis: payBasis });
+                        }
+                      }}
                     >
                       <MenuItem value="AWARD">Award rate</MenuItem>
                       <MenuItem value="ABOVE_AWARD">Above award / agreed rates</MenuItem>
