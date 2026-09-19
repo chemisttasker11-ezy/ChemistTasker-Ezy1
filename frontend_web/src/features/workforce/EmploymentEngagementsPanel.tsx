@@ -181,6 +181,14 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
     () => staff.filter((worker) => worker.employment_engagement_eligible),
     [staff],
   );
+  const visibleStaff = useMemo(
+    () => staff.filter(
+      (worker) =>
+        worker.employment_engagement_eligible
+        || (grouped.get(worker.membership_id) || []).length > 0,
+    ),
+    [staff, grouped],
+  );
   const excludedStaff = useMemo(
     () => staff.filter((worker) => !worker.employment_engagement_eligible),
     [staff],
@@ -264,12 +272,21 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
           ...current,
           public_id: '',
           supersedes_public_id: current.public_id,
+          role: worker.role,
+          employment_type: worker.employment_type as EmploymentType,
+          award_classification:
+            current.role === worker.role
+              ? current.award_classification
+              : worker.default_award_classification || '',
           effective_from: effectiveFrom,
           effective_to: '',
           award_effective_from: current.award_effective_from || '',
           rate_early_morning: current.rate_early_morning || '',
           rate_late_night: current.rate_late_night || '',
-          ordinary_hours_days: partTimeDaysFromEngagement(current),
+          ordinary_hours_days:
+            worker.employment_type === 'PART_TIME'
+              ? partTimeDaysFromEngagement(current)
+              : blankPartTimeDays(),
           terms_editable: true,
         }
       : {
@@ -452,7 +469,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
-      {eligibleStaff.map((worker) => {
+      {visibleStaff.map((worker) => {
         const rows = grouped.get(worker.membership_id) || [];
         const current = rows.find((row) => isActiveOn(row, isoToday()));
         return (
@@ -465,9 +482,13 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                     {worker.role.replaceAll('_', ' ')} · {worker.employment_type.replaceAll('_', ' ')} · membership #{worker.membership_id}
                   </Typography>
                 </Box>
-                <Button variant="contained" onClick={() => startNew(worker)}>
-                  {current ? 'New terms' : 'New engagement'}
-                </Button>
+                {worker.employment_engagement_eligible ? (
+                  <Button variant="contained" onClick={() => startNew(worker)}>
+                    {current ? 'New terms' : 'New engagement'}
+                  </Button>
+                ) : (
+                  <Chip size="small" label="Historical employee terms only" variant="outlined" />
+                )}
               </Stack>
 
               {!rows.length && (
