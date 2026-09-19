@@ -14,7 +14,15 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from client_profile.models import AttendanceSession, Membership, Pharmacy, RosterPeriod
+from client_profile.models import (
+    AttendanceSession,
+    Membership,
+    MembershipApplication,
+    OtherStaffOnboarding,
+    PharmacistOnboarding,
+    Pharmacy,
+    RosterPeriod,
+)
 from client_profile.timezone_utils import get_pharmacy_timezone
 
 from .attendance_edits import append_missing_punch
@@ -159,7 +167,25 @@ def _engagement_membership(pk):
         raise DjangoValidationError({"membership_id": "Valid membership_id is required."})
 
 
-def _engagement_payload(request_data, membership, *, existing=None):
+def _membership_date_of_birth(membership):
+    user = membership.user
+    onboarding = (
+        PharmacistOnboarding.objects.filter(user=user).only("date_of_birth").first()
+        if str(membership.role or "").upper() == "PHARMACIST"
+        else OtherStaffOnboarding.objects.filter(user=user).only("date_of_birth").first()
+    )
+    if onboarding and onboarding.date_of_birth:
+        return onboarding.date_of_birth
+    application = MembershipApplication.objects.filter(
+        pharmacy=membership.pharmacy,
+        role=membership.role,
+        email__iexact=user.email,
+        status="APPROVED",
+    ).order_by("-decided_at", "-id").only("date_of_birth").first()
+    return application.date_of_birth if application else None
+
+
+def _engagement_payload(request_data, membership, *, effective_from=None, effective_to=None, existing=None):
     role = str(request_data.get("role") or getattr(existing, "role", None) or membership.role or "").upper()
     employment_type = str(
         request_data.get("employment_type")
@@ -197,24 +223,9 @@ def _engagement_payload(request_data, membership, *, existing=None):
                 return False
         return bool(raw)
 
-    existing_adult_confirmation = bool(
-        getattr(existing, "award_rate_snapshot", {}).get("adult_rate_confirmed")
-        if existing
-        else False
-    )
-    adult_rate_confirmed = request_bool("adult_rate_confirmed", existing_adult_confirmation)
-    adult_confirmation_required = (
-        role == "ASSISTANT" and classification in {"LEVEL_1", "LEVEL_2"}
-    )
-    if adult_confirmation_required and not adult_rate_confirmed:
-        raise DjangoValidationError(
-            {
-                "adult_rate_confirmed": (
-                    "Pharmacy assistant levels 1 and 2 have junior rates under age 21. "
-                    "Confirm the employee is 21 or older before using this adult Schedule B rate."
-                )
-            }
-        )
+    effective_from = effective_from or getattr(existing, "effective_from", None) or timezone.localdate()
+    effective_to = effective_to if effective_to is not None else getattr(existing, "effective_to", None)
+    date_of_birth = _membership_date_of_birth(membership)
 
     if employment_type == "PART_TIME":
         raw_pattern = request_data.get(
@@ -235,9 +246,19 @@ def _engagement_payload(request_data, membership, *, existing=None):
         role=role,
         classification=classification,
         employment_type=employment_type,
+        date_of_birth=date_of_birth,
+        as_of=effective_from,
     )
-    resolved["adult_rate_confirmed"] = adult_rate_confirmed if adult_confirmation_required else None
+    resolved["adult_rate_confirmed"] = None
     resolved["correspondence"] = correspondence
+    next_review = parse_date(resolved.get("next_rate_review_date") or "")
+    if next_review and (effective_to is None or effective_to >= next_review):
+        raise DjangoValidationError({
+            "effective_to": (
+                "Junior Award rates change on the employee's next birthday. "
+                f"End this dated engagement by {next_review - timedelta(days=1)} and create successor terms from {next_review}."
+            )
+        })
 
     payload = {
         "role": role,
@@ -390,7 +411,7 @@ def _engagement_payload(request_data, membership, *, existing=None):
     payload.update(
         award_rate_snapshot={
             "kind": "ABOVE_AWARD",
-            "adult_rate_confirmed": adult_rate_confirmed if adult_confirmation_required else None,
+            "adult_rate_confirmed": None,
             "correspondence": correspondence,
             "award_floor": resolved,
             "agreed_rates": agreed_snapshot,
@@ -428,10 +449,16 @@ class EmploymentEngagementAwardPreviewView(APIView):
                 or default_membership_classification(membership)
                 or ""
             ).upper()
+            effective_from = _parse_required_date(
+                request.data.get("effective_from") or timezone.localdate(),
+                "effective_from",
+            )
             resolved = resolve_award_schedule(
                 role=role,
                 classification=classification,
                 employment_type=employment_type,
+                date_of_birth=_membership_date_of_birth(membership),
+                as_of=effective_from,
             )
             return Response({
                 **resolved,
@@ -471,7 +498,7 @@ class EmploymentEngagementListCreateView(APIView):
             effective_from = _parse_required_date(request.data.get("effective_from"), "effective_from")
             effective_to_raw = request.data.get("effective_to")
             effective_to = _parse_required_date(effective_to_raw, "effective_to") if effective_to_raw else None
-            payload = _engagement_payload(request.data, membership)
+            payload = _engagement_payload(request.data, membership, effective_from=effective_from, effective_to=effective_to)
             supersedes_public_id = request.data.get("supersedes_public_id")
 
             with transaction.atomic():
@@ -585,7 +612,13 @@ class EmploymentEngagementDetailView(APIView):
                             if request.data.get("effective_to")
                             else None
                         )
-                    payload = _engagement_payload(request.data, row.membership, existing=row)
+                    payload = _engagement_payload(
+                        request.data,
+                        row.membership,
+                        effective_from=row.effective_from,
+                        effective_to=row.effective_to,
+                        existing=row,
+                    )
                     for key, value in payload.items():
                         setattr(row, key, value)
 

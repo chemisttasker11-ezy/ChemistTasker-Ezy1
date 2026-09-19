@@ -4004,7 +4004,7 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
         model = MembershipApplication
         fields = [
             'id', 'invite_link', 'pharmacy', 'pharmacy_name', 'category',
-            'role', 'first_name', 'last_name', 'username', 'mobile_number', 'job_title',
+            'role', 'first_name', 'last_name', 'username', 'mobile_number', 'date_of_birth', 'job_title',
             'pharmacist_award_level', 'otherstaff_classification_level',
             'intern_half', 'student_year', 'email',
             'submitted_by', 'status', 'submitted_at', 'decided_at', 'decided_by'
@@ -4020,6 +4020,13 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
         invite_link = attrs.get('invite_link')
         role = attrs.get('role')
         email_value = (attrs.get('email') or '').strip().lower()
+        date_of_birth = attrs.get('date_of_birth')
+        if not date_of_birth:
+            raise serializers.ValidationError({'date_of_birth': 'Date of birth is required.'})
+        if date_of_birth > timezone.localdate():
+            raise serializers.ValidationError({'date_of_birth': 'Date of birth cannot be in the future.'})
+        if date_of_birth < date(1900, 1, 1):
+            raise serializers.ValidationError({'date_of_birth': 'Enter a valid date of birth.'})
 
         if authenticated_user:
             user_role = getattr(authenticated_user, 'role', None)
@@ -4041,7 +4048,17 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
                     'role': f'Your account is registered as {actual_label} and cannot apply as {role_label}.'
                 })
 
+            pharmacist_onboard = getattr(authenticated_user, 'pharmacistonboarding', None)
             otherstaff_onboard = getattr(authenticated_user, 'otherstaffonboarding', None)
+            onboarding_dob = getattr(
+                pharmacist_onboard if user_role == 'PHARMACIST' else otherstaff_onboard,
+                'date_of_birth',
+                None,
+            )
+            if onboarding_dob and onboarding_dob != date_of_birth:
+                raise serializers.ValidationError({
+                    'date_of_birth': 'Date of birth must match your verified onboarding profile.'
+                })
             if user_role == 'OTHER_STAFF' and otherstaff_onboard:
                 onboard_role = getattr(otherstaff_onboard, 'role_type', None)
                 if onboard_role in ('INTERN', 'TECHNICIAN', 'ASSISTANT') and role != onboard_role:

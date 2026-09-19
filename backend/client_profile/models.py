@@ -1294,6 +1294,9 @@ class MembershipApplication(models.Model):
     last_name = models.CharField(max_length=150)
     username = models.CharField(max_length=150, blank=True)
     mobile_number = models.CharField(max_length=32)
+    date_of_birth = models.DateField(
+        help_text="Candidate date of birth used for age-dependent Award rates and identity matching."
+    )
     job_title = models.CharField(max_length=255, blank=True)
 
     # LEVEL – we keep your existing per-role fields so approval can map 1:1 into Membership

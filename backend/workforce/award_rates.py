@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 
@@ -12,6 +14,7 @@ AWARD_REFERENCE_URL = "https://awards.fairwork.gov.au/MA000012.html"
 AWARD_EFFECTIVE_FROM = "2026-07-01"
 AWARD_EFFECTIVE_BASIS = "Pay period commencing on or after 1 July 2026"
 AWARD_RATE_SCOPE = "adult"
+JUNIOR_PERCENTAGES = {15: Decimal("0.45"), 16: Decimal("0.50"), 17: Decimal("0.60"), 18: Decimal("0.70"), 19: Decimal("0.80"), 20: Decimal("0.90")}
 
 # Schedule B dollar amounts published by Fair Work for MA000012, ppc 01Jul26.
 # We store the published rounded dollar amounts rather than recomputing penalty
@@ -174,6 +177,60 @@ def _canonical_classification(classification: str) -> str:
     return RATE_ALIAS.get(key, key)
 
 
+def _money(value: Decimal) -> str:
+    return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _age_on(date_of_birth: date, as_of: date) -> int:
+    return as_of.year - date_of_birth.year - ((as_of.month, as_of.day) < (date_of_birth.month, date_of_birth.day))
+
+
+def _next_birthday(date_of_birth: date, as_of: date) -> date:
+    year = as_of.year + 1 if (as_of.month, as_of.day) >= (date_of_birth.month, date_of_birth.day) else as_of.year
+    try:
+        return date(year, date_of_birth.month, date_of_birth.day)
+    except ValueError:
+        return date(year, 2, 28)
+
+
+def _junior_schedule(*, classification: str, employment_type: str, percentage: Decimal) -> tuple[dict, str]:
+    canonical = _canonical_classification(classification)
+    adult_base = Decimal(PERMANENT_WEEKDAY[canonical][0])
+    junior_base = (adult_base * percentage).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    permanent = employment_type in {"FULL_TIME", "PART_TIME"}
+    weekday_multipliers = (
+        (Decimal("1.00"), Decimal("1.50"), Decimal("1.25"), Decimal("1.50"))
+        if permanent else
+        (Decimal("1.25"), Decimal("1.75"), Decimal("1.50"), Decimal("1.75"))
+    )
+    weekend_multipliers = (
+        (Decimal("1.25"), Decimal("2.00"), Decimal("1.50"), Decimal("1.75"), Decimal("2.00"), Decimal("1.50"), Decimal("2.25"))
+        if permanent else
+        (Decimal("1.50"), Decimal("2.25"), Decimal("1.75"), Decimal("2.00"), Decimal("2.25"), Decimal("1.75"), Decimal("2.50"))
+    )
+    overtime_multipliers = (Decimal("1.50"), Decimal("2.00"), Decimal("2.00"), Decimal("2.50"))
+    weekday = tuple(_money(junior_base * m) for m in weekday_multipliers)
+    weekend = tuple(_money(junior_base * m) for m in weekend_multipliers)
+    overtime = tuple(_money(junior_base * m) for m in overtime_multipliers)
+    return ({
+        "weekday": {
+            "daytime_08_19": weekday[0], "early_07_08": weekday[1],
+            "evening_19_21": weekday[2], "late_21_24": weekday[3],
+        },
+        "saturday": {
+            "daytime_08_18": weekend[0], "early_07_08": weekend[1],
+            "evening_18_21": weekend[2], "late_21_24": weekend[3],
+        },
+        "sunday": {"outside_07_21": weekend[4], "daytime_07_21": weekend[5]},
+        "public_holiday": {"all_day": weekend[6]},
+        "overtime": {
+            "monday_saturday_first_2_hours": overtime[0],
+            "monday_saturday_after_2_hours": overtime[1],
+            "sunday_all_day": overtime[2], "public_holiday_all_day": overtime[3],
+        },
+    }, _money(junior_base))
+
+
 def _schedule(*, classification: str, employment_type: str) -> dict:
     canonical = _canonical_classification(classification)
     permanent = employment_type in {"FULL_TIME", "PART_TIME"}
@@ -208,7 +265,7 @@ def _schedule(*, classification: str, employment_type: str) -> dict:
     }
 
 
-def resolve_award_schedule(*, role: str, classification: str, employment_type: str) -> dict:
+def resolve_award_schedule(*, role: str, classification: str, employment_type: str, date_of_birth: date | None = None, as_of: date | None = None) -> dict:
     role_key = str(role or "").upper()
     classification_key = str(classification or "").upper()
     employment_key = str(employment_type or "").upper()
@@ -229,11 +286,31 @@ def resolve_award_schedule(*, role: str, classification: str, employment_type: s
             }
         )
 
-    schedule = _schedule(
-        classification=classification_key,
-        employment_type=employment_key,
-    )
-    minimum_hourly_rate = PERMANENT_WEEKDAY[_canonical_classification(classification_key)][0]
+    junior_percentage = None
+    age_at_effective_date = None
+    next_rate_review_date = None
+    is_junior_classification = role_key == "ASSISTANT" and classification_key in {"LEVEL_1", "LEVEL_2"}
+    if is_junior_classification:
+        if not date_of_birth or not as_of:
+            raise ValidationError({"date_of_birth": "Date of birth is required to resolve Pharmacy Assistant level 1 or 2 rates."})
+        if date_of_birth > as_of:
+            raise ValidationError({"date_of_birth": "Date of birth cannot be after the engagement effective date."})
+        age_at_effective_date = _age_on(date_of_birth, as_of)
+        if age_at_effective_date < 21:
+            pct_key = min(age_at_effective_date, 15)
+            junior_percentage = JUNIOR_PERCENTAGES[pct_key]
+            schedule, minimum_hourly_rate = _junior_schedule(
+                classification=classification_key,
+                employment_type=employment_key,
+                percentage=junior_percentage,
+            )
+            next_rate_review_date = _next_birthday(date_of_birth, as_of)
+        else:
+            schedule = _schedule(classification=classification_key, employment_type=employment_key)
+            minimum_hourly_rate = PERMANENT_WEEKDAY[_canonical_classification(classification_key)][0]
+    else:
+        schedule = _schedule(classification=classification_key, employment_type=employment_key)
+        minimum_hourly_rate = PERMANENT_WEEKDAY[_canonical_classification(classification_key)][0]
 
     return {
         "award_code": AWARD_CODE,
@@ -242,7 +319,11 @@ def resolve_award_schedule(*, role: str, classification: str, employment_type: s
         "award_reference_url": AWARD_REFERENCE_URL,
         "award_effective_from": AWARD_EFFECTIVE_FROM,
         "award_effective_basis": AWARD_EFFECTIVE_BASIS,
-        "rate_scope": AWARD_RATE_SCOPE,
+        "rate_scope": "junior" if junior_percentage is not None else AWARD_RATE_SCOPE,
+        "date_of_birth": str(date_of_birth) if date_of_birth else None,
+        "age_at_effective_date": age_at_effective_date,
+        "junior_percentage": _money(junior_percentage * Decimal("100")) if junior_percentage is not None else None,
+        "next_rate_review_date": str(next_rate_review_date) if next_rate_review_date else None,
         "role": role_key,
         "classification": classification_key,
         "classification_label": CLASSIFICATION_LABELS[classification_key],
@@ -274,9 +355,9 @@ def resolve_award_schedule(*, role: str, classification: str, employment_type: s
             "rates are frozen separately in this snapshot."
         ),
         "junior_rate_note": (
-            "These are adult Schedule B rates. Pharmacy assistants at levels 1 or 2 "
-            "who are under 21 are subject to clause 16.2 junior percentages and must "
-            "not use this adult-rate snapshot."
+            f"Clause 16.2 junior rate applied at {str(junior_percentage * Decimal('100')).rstrip('0').rstrip('.')}% of the level minimum; review on {next_rate_review_date}."
+            if junior_percentage is not None
+            else "Adult rate applies. Pharmacy Assistant levels 1 and 2 use DOB-driven clause 16.2 junior percentages until age 21."
         ),
         # Flat summary fields used by the engagement editor/reporting.
         "rate_weekday": schedule["weekday"]["daytime_08_19"],

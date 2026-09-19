@@ -2950,7 +2950,20 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         if not email:
             return Response({'detail': 'email is required to approve (existing vs new user).'}, status=400)
 
-        user_existed_before_approval = User.objects.filter(email__iexact=email).exists()
+        existing_worker = User.objects.filter(email__iexact=email).first()
+        user_existed_before_approval = existing_worker is not None
+        if existing_worker:
+            onboarding = (
+                PharmacistOnboarding.objects.filter(user=existing_worker).first()
+                if app.role == 'PHARMACIST'
+                else OtherStaffOnboarding.objects.filter(user=existing_worker).first()
+            )
+            existing_dob = getattr(onboarding, 'date_of_birth', None) if onboarding else None
+            if existing_dob and existing_dob != app.date_of_birth:
+                return Response(
+                    {'date_of_birth': ['Application date of birth does not match the worker onboarding profile.']},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Build payload for your existing helper:
 
@@ -2984,13 +2997,22 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         if error:
             return Response({'detail': error}, status=400)
 
+        worker_user = membership.user
         if not user_existed_before_approval:
-            worker_user = membership.user
             worker_user.first_name = app.first_name.strip()
             worker_user.last_name = app.last_name.strip()
             worker_user.username = (app.username or '').strip()
             worker_user.mobile_number = (app.mobile_number or '').strip()
             worker_user.save(update_fields=['first_name', 'last_name', 'username', 'mobile_number'])
+
+        onboarding = (
+            PharmacistOnboarding.objects.filter(user=worker_user).first()
+            if app.role == 'PHARMACIST'
+            else OtherStaffOnboarding.objects.filter(user=worker_user).first()
+        )
+        if onboarding and not onboarding.date_of_birth:
+            onboarding.date_of_birth = app.date_of_birth
+            onboarding.save(update_fields=['date_of_birth'])
 
         app.status = 'APPROVED'
         app.decided_at = timezone.now()
