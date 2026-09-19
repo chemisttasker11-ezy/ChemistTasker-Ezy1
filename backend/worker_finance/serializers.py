@@ -6,7 +6,6 @@ from .calculations import TAX_CODES, CalculationError, normalise_abn, expense_gs
 from .models import Customer, CatalogueItem, Expense
 
 CATEGORIES = ('ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous')
-UNITS = ('Hours', 'Lump Sum', 'Item', 'Kilometres', 'Nights')
 
 
 class StrictDecimalField(serializers.DecimalField):
@@ -50,8 +49,9 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(max_length=40, allow_blank=True, required=False, default='')
     category = serializers.ChoiceField(choices=CATEGORIES)
-    unit = serializers.ChoiceField(choices=UNITS)
+    unit = serializers.CharField(max_length=30)
     tax_code = serializers.ChoiceField(choices=TAX_CODES)
     unit_price = MoneyField()
 
@@ -68,25 +68,35 @@ class ItemSerializer(serializers.ModelSerializer):
 
 
 class LineInput(serializers.Serializer):
-    item_id = serializers.IntegerField(min_value=1)
-    description = serializers.CharField(max_length=255, required=False)
+    item_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    description = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    category_code = serializers.ChoiceField(choices=CATEGORIES, required=False, default='ProfessionalServices')
+    unit = serializers.CharField(max_length=30, required=False, default='Item')
     quantity = StrictDecimalField(max_digits=6, decimal_places=2, min_value=Decimal('0.01'))
     unit_price = MoneyField()
     discount = StrictDecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=100, default=0)
-    tax_code = serializers.ChoiceField(choices=TAX_CODES, required=False)
-    super_eligible = serializers.BooleanField(required=False)
+    tax_code = serializers.ChoiceField(choices=TAX_CODES, required=False, default='OUT_OF_SCOPE')
+    super_eligible = serializers.BooleanField(required=False, default=False)
     worked_on = serializers.DateField(required=False, allow_null=True)
-    # Internal accepted-shift drafts carry server-issued source identities.
-    # save_draft validates these against the frozen record before preserving them.
-    locked = serializers.BooleanField(required=False, default=False)
     source_assignment_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     shift_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if not attrs.get('item_id') and not str(attrs.get('description') or '').strip():
+            raise serializers.ValidationError('Enter a description or choose a saved item.')
+        return attrs
 
 
 class InvoiceInput(serializers.Serializer):
     request_key = serializers.UUIDField()
     version = serializers.IntegerField(min_value=1, required=False)
     customer_id = serializers.IntegerField(min_value=1)
+    source_assignment_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=False,
+        max_length=100,
+    )
     invoice_date = serializers.DateField()
     due_date = serializers.DateField()
     issuer_name = serializers.CharField(max_length=150)
