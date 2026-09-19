@@ -39,11 +39,9 @@ import RestaurantIcon from "@mui/icons-material/Restaurant";
 import CoffeeIcon from "@mui/icons-material/Coffee";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import PersonIcon from "@mui/icons-material/Person";
-import axios from "axios";
 import KioskSetup from "../../kiosk/KioskSetup";
 import { API_BASE_URL } from "../../constants/api";
-import { csrfToken } from "../../../landing_next/shared/browser-session";
-import { clearTokens, getAccessToken } from "../../utils/tokenService";
+import { clearTokens } from "../../utils/tokenService";
 import {
   getDesktopKioskStatus,
   isDesktopKiosk,
@@ -52,27 +50,12 @@ import {
   prepareDesktopCaptureRequest,
   confirmDesktopCaptureReceipt,
 } from "../../kiosk/desktopBridge";
-
-const kioskClient = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: !isDesktopKiosk(),
-});
-
-kioskClient.interceptors.request.use(async (config) => {
-  const desktop = isDesktopKiosk();
-  config.withCredentials = !desktop;
-  const token = desktop ? null : getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  } else if (!desktop && !["get", "head", "options"].includes((config.method || "get").toLowerCase())) {
-    config.headers["X-CSRFToken"] = await csrfToken(API_BASE_URL);
-  }
-  return config;
-});
-
-const KIOSK_TOKEN_KEY = "ctk_kiosk_device_token";
-const KIOSK_PHARMACY_NAME_KEY = "ctk_kiosk_pharmacy_name";
-const KIOSK_PHARMACY_ID_KEY = "ctk_kiosk_pharmacy_id";
+import {
+  kioskClient,
+  KIOSK_TOKEN_KEY,
+  KIOSK_PHARMACY_NAME_KEY,
+  KIOSK_PHARMACY_ID_KEY,
+} from "./KioskPage.runtime";
 
 export default function KioskPage() {
   const desktopRuntime = isDesktopKiosk();
