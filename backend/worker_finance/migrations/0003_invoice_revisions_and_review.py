@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="invoicerevision",
-            constraint=models.UniqueConstraint(fields=("record", "version"), name="finance_invoice_revision_version"),
+            constraint=models.UniqueConstraint(fields=("record", "version"), name="finance_inv_revision_ver"),
         ),
         migrations.CreateModel(
             name="InvoiceReviewRequest",
