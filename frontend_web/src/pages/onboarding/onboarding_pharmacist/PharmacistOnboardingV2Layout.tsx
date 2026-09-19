@@ -1,5 +1,6 @@
 // src/pages/onboardingV2/PharmacistOnboardingV2Layout.tsx
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Box,
   Button,
@@ -94,6 +95,7 @@ import RatesV2 from "./RatesV2";
 import IdentityV2 from "./IdentityV2";
 
 type StepKey = "basic" | "identity" | "skills" | "payment" | "rate" | "referees" | "profile";
+const isStepKey = (value: string | null): value is StepKey => STEPS.some((item) => item.key === value);
 const STEPS: Array<{ key: StepKey; label: string }> = [
   { key: "basic",    label: "Basic Info" },
   { key: "identity", label: "Identity" },
@@ -107,10 +109,19 @@ const STEPS: Array<{ key: StepKey; label: string }> = [
 export default function PharmacistOnboardingV2Layout() {
   const { mode } = useColorMode();
   const theme = React.useMemo(() => createOnboardingTheme(mode), [mode]);
-  const [step, setStep] = React.useState<StepKey>("basic");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedStep = searchParams.get("step");
+  const [step, setStep] = React.useState<StepKey>(() => isStepKey(requestedStep) ? requestedStep : "basic");
   const [progress, setProgress] = React.useState<number>(0);
   const idx = STEPS.findIndex(s => s.key === step);
   // const stepLabel = STEPS[idx]?.label ?? "";
+
+  React.useEffect(() => {
+    const next = searchParams.get("step");
+    if (isStepKey(next) && next !== step) {
+      setStep(next);
+    }
+  }, [searchParams, step]);
 
   // Load real progress from backend on mount
   React.useEffect(() => {
@@ -130,6 +141,9 @@ return (
         const requestStepChange = async (nextStep: StepKey) => {
           if (nextStep === step || (await confirmIfNeeded())) {
             setStep(nextStep);
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set("step", nextStep);
+            setSearchParams(nextParams, { replace: true });
           }
         };
         const goNext = () => void requestStepChange(STEPS[Math.min(idx + 1, STEPS.length - 1)].key);
