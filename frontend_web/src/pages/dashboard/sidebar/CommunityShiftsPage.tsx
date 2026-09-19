@@ -23,6 +23,8 @@ import {
 } from '@chemisttasker/shared-core';
 import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import { submitCounterOfferDirect } from './ShiftsBoard/utils/submitCounterOffer';
+import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
+import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
 
 type FilterConfig = {
   city: string[];
@@ -100,6 +102,8 @@ export default function CommunityShiftsPage({
   );
   const [offers, setOffers] = useState<ShiftOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
+  const [termsConfirming, setTermsConfirming] = useState(false);
   const showError = (message: string) =>
     setError(message && message.trim().length > 0 ? message : 'Something went wrong. Please try again.');
   const errorMessage = (err: unknown, fallback: string) =>
@@ -439,13 +443,38 @@ export default function CommunityShiftsPage({
     }
   }, [boardTab, loadOffers]);
 
+  const acceptOffers = async (list: ShiftOffer[], payload?: ShiftOfferAcceptancePayload) => {
+    if (list.length === 0) return;
+    if (!payload) {
+      const blocked = list.some((offer) => Boolean(offer.engagementTermsPreview?.blocked));
+      if (blocked) {
+        showError('This offer cannot be confirmed until the required onboarding/payment details are completed.');
+        return;
+      }
+      const requiresAcceptance = list.some((offer) => Boolean(offer.engagementTermsPreview?.acceptanceRequired));
+      if (requiresAcceptance) {
+        setTermsOffers(list);
+        return;
+      }
+    }
+    setTermsConfirming(true);
+    try {
+      await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
+      setTermsOffers([]);
+      await loadOffers();
+    } catch (err) {
+      showError(errorMessage(err, 'Failed to confirm the shift offer.'));
+      throw err;
+    } finally {
+      setTermsConfirming(false);
+    }
+  };
+
   const handleConfirmOfferShift = async (targetShift: Shift) => {
     const list = (offersByShift.get(targetShift.id) ?? []).filter(
       (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
     );
-    if (list.length === 0) return;
-    await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id)));
-    await loadOffers();
+    await acceptOffers(list);
   };
 
   const handleDeclineOfferShift = async (targetShift: Shift) => {
@@ -657,6 +686,14 @@ export default function CommunityShiftsPage({
           ) : null}
         </Box>
       </Paper>
+
+      <ShiftEngagementTermsDialog
+        open={termsOffers.length > 0}
+        offers={termsOffers}
+        loading={termsConfirming}
+        onClose={() => setTermsOffers([])}
+        onConfirm={(payload) => acceptOffers(termsOffers, payload)}
+      />
     </Box>
   );
 }
