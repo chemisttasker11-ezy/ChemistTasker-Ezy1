@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
 import {
     Text,
     TextInput,
@@ -25,8 +25,6 @@ import {
 import apiClient from '@/utils/apiClient';
 
 import {
-    RATE_TYPE_DESCRIPTIONS,
-    GOVERNMENT_AWARD_GUIDE_URL,
     BASE_STEP_ORDER,
     type StepKey,
     type RateType,
@@ -44,8 +42,6 @@ import {
     toLocalIsoDate,
     formatAuDate,
     formatLongSlotDate,
-    formatClockTime,
-    getSlotDurationHours,
     normalizePrefillRole,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
