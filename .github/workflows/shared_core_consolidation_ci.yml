@@ -159,6 +159,41 @@ jobs:
       - name: Workforce and finance contracts
         run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
 
+  postgres-concurrency:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: chemisttasker_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d chemisttasker_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      LOCAL_DB_NAME: chemisttasker_ci
+      LOCAL_DB_USER: postgres
+      LOCAL_DB_PASSWORD: postgres
+      LOCAL_DB_HOST: 127.0.0.1
+      LOCAL_DB_PORT: 5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: PostgreSQL migration rehearsal
+        run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
+      - name: PostgreSQL concurrency contracts
+        run: python backend/manage.py test client_profile.test_postgres_concurrency --settings=core.postgres_test_settings
+
   boundary-audit:
     runs-on: ubuntu-latest
     steps:
@@ -206,6 +241,7 @@ jobs:
       - web-next
       - mobile
       - backend
+      - postgres-concurrency
       - boundary-audit
       - architecture-audit
       - kiosk
@@ -217,6 +253,7 @@ jobs:
           test "${{ needs.web-next.result }}" = "success"
           test "${{ needs.mobile.result }}" = "success"
           test "${{ needs.backend.result }}" = "success"
+          test "${{ needs.postgres-concurrency.result }}" = "success"
           test "${{ needs.boundary-audit.result }}" = "success"
           test "${{ needs.architecture-audit.result }}" = "success"
           test "${{ needs.kiosk.result }}" = "success"
