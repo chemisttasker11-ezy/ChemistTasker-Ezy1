@@ -5,7 +5,7 @@
 **Execution Timestamp**: 2026-09-15T20:10:00+10:00  
 **Phase**: Checkpoint 7 — Frontend Repair and Product Design  
 **Plan Reference**: `docs/roster-attendance/ROSTER-ATTENDANCE-FINALIZATION-PLAN.md`  
-**Brand Guidance Source**: `chemisttasker-Frontend-main/landing next/landing_lightweight-handoff/landing_lightweight/BRAND-DESIGN-GUIDE.md`  
+**Brand Guidance Source**: `frontend_web/src/constants/brandTheme.ts`
 **Design Intelligence**: `.agents/skills/ui-ux-pro-max/SKILL.md` (Product: Healthcare/Pharmacy, UX: Calendar/Schedule Roster, Stack: React/MUI)
 
 ---

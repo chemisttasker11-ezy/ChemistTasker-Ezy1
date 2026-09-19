@@ -1,6 +1,6 @@
 # Running the consolidated web project
 
-All maintained browser code is in `frontend_web`: the existing Vite dashboard in `src`, and the Next.js public site in `landing_next`. These remain two applications with one public origin. Do not edit the reference package in `chemisttasker-Frontend-main`.
+All maintained browser code is in `frontend_web`: the existing Vite dashboard in `src`, and the Next.js public site in `landing_next`. These remain two applications with one public origin. The former duplicate reference package has been removed.
 
 ## Local startup
 

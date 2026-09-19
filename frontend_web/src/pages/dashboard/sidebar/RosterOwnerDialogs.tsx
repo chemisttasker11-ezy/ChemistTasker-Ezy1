@@ -344,9 +344,9 @@ export default function RosterOwnerDialogs({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setIsAddAssignmentDialogOpen(false)} disabled={isCreatingShift}>Cancel</Button>
-          <Button 
-            onClick={postAsOpenShift ? handleCreateOpenShift : handleCreateShiftAndAssign} 
-            variant="contained" 
+          <Button
+            onClick={postAsOpenShift ? handleCreateOpenShift : handleCreateShiftAndAssign}
+            variant="contained"
             color="primary"
             disabled={isCreatingShift}
           >
@@ -354,7 +354,7 @@ export default function RosterOwnerDialogs({
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Existing Options Dialog (Unchanged) */}
       <Dialog open={isOptionsDialogOpen} onClose={() => setIsOptionsDialogOpen(false)}>
         <DialogTitle>Manage Assignment</DialogTitle>
@@ -598,7 +598,7 @@ export default function RosterOwnerDialogs({
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* NEW: Leave Management Dialog */}
       <Dialog open={isLeaveManageDialogOpen} onClose={() => setIsLeaveManageDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Manage Leave Request</DialogTitle>
@@ -729,7 +729,7 @@ export default function RosterOwnerDialogs({
               </Button>
           </DialogActions>
       </Dialog>
-      
+
       {/* Escalate Dialog */}
       <Dialog
         open={isEscalateDialogOpen}

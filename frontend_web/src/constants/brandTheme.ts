@@ -1,6 +1,6 @@
 /**
  * ChemistTasker Brand Design Tokens
- * Source of Truth: chemisttasker-Frontend-main/landing next/landing_lightweight-handoff/landing_lightweight/BRAND-DESIGN-GUIDE.md
+ * Source of truth: this maintained module.
  */
 
 export const BRAND_COLORS = {

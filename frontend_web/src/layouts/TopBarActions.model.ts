@@ -510,4 +510,3 @@ export const normalizeNotification = (raw: any): NotificationItem => ({
   createdAt: raw.createdAt ?? raw.created_at ?? "",
   readAt: raw.readAt ?? raw.read_at ?? null,
 });
-
