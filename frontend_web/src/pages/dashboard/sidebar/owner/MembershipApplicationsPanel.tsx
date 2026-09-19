@@ -69,6 +69,30 @@ const formatClassification = (app: MembershipApplication) => {
     .join(" ");
 };
 
+const paymentProfile = (app: MembershipApplication) =>
+  ((app as any).paymentProfileStatus ?? (app as any).payment_profile_status ?? null) as null | {
+    accountLinked?: boolean;
+    onboardingComplete?: boolean;
+    paymentPreference?: string | null;
+    status?: string;
+    payrollReady?: boolean;
+    invoiceReady?: boolean;
+    missingFields?: string[];
+  };
+
+const paymentProfileLabel = (status: ReturnType<typeof paymentProfile>) => {
+  if (!status) return 'Payment profile unavailable';
+  if (status.paymentPreference === 'TFN') {
+    return status.payrollReady ? 'TFN · payroll ready' : 'TFN · payroll setup incomplete';
+  }
+  if (status.paymentPreference === 'ABN') {
+    return status.invoiceReady ? 'ABN · invoice ready' : 'ABN · invoice setup incomplete';
+  }
+  if (status.status === 'ACCOUNT_NOT_LINKED') return 'Worker account not linked';
+  if (status.status === 'ONBOARDING_INCOMPLETE') return 'Worker onboarding incomplete';
+  return 'Payment preference required';
+};
+
 const formatTimestamp = (value?: string | null) => {
   if (!value) return "-";
   const parsed = dayjs.utc(value);
@@ -266,6 +290,9 @@ export default function MembershipApplicationsPanel({
             const jobTitle = readValue(app, "jobTitle", "job_title");
             const username = readValue(app, "username", "username");
             const mobileNumber = readValue(app, "mobileNumber", "mobile_number");
+            const dateOfBirth = readValue(app, "dateOfBirth", "date_of_birth");
+            const profile = paymentProfile(app);
+            const payrollEnabled = Boolean((app as any).payrollEnabled ?? (app as any).payroll_enabled);
 
             return (
               <Card key={app.id} variant="outlined">
@@ -289,6 +316,20 @@ export default function MembershipApplicationsPanel({
                       <Chip size="small" label={labelCategory(app.category)} color="primary" variant="outlined" />
                       {classification && (
                         <Chip size="small" label={classification} variant="outlined" />
+                      )}
+                      <Chip
+                        size="small"
+                        label={paymentProfileLabel(profile)}
+                        color={profile?.paymentPreference === 'TFN' && profile?.payrollReady ? 'success' : profile?.paymentPreference === 'ABN' && profile?.invoiceReady ? 'success' : 'warning'}
+                        variant="outlined"
+                      />
+                      {app.category === 'FULL_PART_TIME' && (
+                        <Chip
+                          size="small"
+                          label={payrollEnabled ? 'ChemistTasker Payroll on' : 'External payroll'}
+                          color={payrollEnabled ? 'primary' : 'default'}
+                          variant="outlined"
+                        />
                       )}
                     </Stack>
                     <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
@@ -319,6 +360,11 @@ export default function MembershipApplicationsPanel({
                           Mobile: {mobileNumber}
                         </Typography>
                       ) : null}
+                      {dateOfBirth ? (
+                        <Typography variant="body2">
+                          Date of birth: {dateOfBirth}
+                        </Typography>
+                      ) : null}
                       {username ? (
                         <Typography variant="body2">
                           Username: {username}
@@ -327,6 +373,11 @@ export default function MembershipApplicationsPanel({
                       {classification ? (
                         <Typography variant="body2">
                           Classification: {classification}
+                        </Typography>
+                      ) : null}
+                      {profile?.missingFields?.length ? (
+                        <Typography variant="body2" color="warning.main" sx={{ mt: 0.5 }}>
+                          Payment setup still needed: {profile.missingFields.map((field) => field.replaceAll('_', ' ')).join(', ')}
                         </Typography>
                       ) : null}
                     </Box>
