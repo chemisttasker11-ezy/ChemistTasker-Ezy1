@@ -821,6 +821,11 @@ def generate_invoice_from_shifts(
                 )
 
             recalculate_invoice_totals(invoice)
+            if not external:
+                # The newer finance workspace wraps the same canonical invoice;
+                # it does not create a second invoice or duplicate the accepted work.
+                from worker_finance.services import adopt_internal_invoice
+                adopt_internal_invoice(user, invoice)
             return invoice
     except IntegrityError as exc:
         raise ValidationError({
