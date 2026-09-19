@@ -738,6 +738,9 @@ export default function StaffManager({
       <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Invite Staff to {pharmacyName || pharmacyId}</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
+          <Alert severity="info">
+            Pharmacy staff use the TFN employee pathway. This owner form records the worker's role and employment type only; date of birth, TFN and super details are completed by the worker in their private ChemistTasker profile and are never exposed to the pharmacy. If ChemistTasker Payroll is enabled, payroll activation waits until that private setup is complete.
+          </Alert>
           {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
             <Box key={idx} sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, pt: 1 }}>
