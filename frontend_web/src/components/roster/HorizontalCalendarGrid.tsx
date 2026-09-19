@@ -977,6 +977,19 @@ export default function HorizontalCalendarGrid({
                     }
 
                     const topPosition = item.lane * 58 + 8;
+                    const workforce = item.event.resource?.workforceStatus;
+                    const settlementLabel =
+                      workforce?.settlementChannel === 'PAYROLL'
+                        ? 'Payroll'
+                        : workforce?.settlementChannel === 'TIMESHEET_ONLY'
+                          ? 'Timesheet only'
+                          : workforce?.settlementChannel === 'INVOICE'
+                            ? 'Invoice'
+                            : '';
+                    const payLabel = [workforce?.payBasis, workforce?.awardClassification]
+                      .filter(Boolean)
+                      .map((value: string) => value.replaceAll('_', ' '))
+                      .join(' · ');
 
                     return (
                       <Tooltip
@@ -994,6 +1007,26 @@ export default function HorizontalCalendarGrid({
                             <Typography variant="caption" sx={{ display: 'block' }}>
                               Time: {item.startTimeStr} – {item.endTimeStr} ({item.durationHours}h)
                             </Typography>
+                            {settlementLabel && (
+                              <Typography variant="caption" sx={{ display: 'block' }}>
+                                Settlement: {settlementLabel}{workforce?.agreedRate ? ` · ${workforce.agreedRate}/hr` : ''}
+                              </Typography>
+                            )}
+                            {payLabel && (
+                              <Typography variant="caption" sx={{ display: 'block' }}>
+                                Terms: {payLabel}
+                              </Typography>
+                            )}
+                            {workforce?.timesheet && (
+                              <Typography variant="caption" sx={{ display: 'block' }}>
+                                Timesheet: {workforce.timesheet.status.replaceAll('_', ' ')} · worked {(workforce.timesheet.workedMinutes / 60).toFixed(2)}h · reviewed {(workforce.timesheet.reviewedMinutes / 60).toFixed(2)}h
+                              </Typography>
+                            )}
+                            {workforce?.payrollActivationRequired && !workforce?.payrollReady && (
+                              <Typography variant="caption" sx={{ color: '#FDE68A', display: 'block' }}>
+                                Payroll setup still required
+                              </Typography>
+                            )}
                             {item.isLeave && (
                               <Typography variant="caption" sx={{ color: '#E2E8F0', display: 'block' }}>
                                 Leave Request Attached
@@ -1153,6 +1186,20 @@ export default function HorizontalCalendarGrid({
                               >
                                 ({item.durationHours}h)
                               </Typography>
+                              {settlementLabel && (
+                                <Typography
+                                  variant="caption"
+                                  noWrap
+                                  sx={{
+                                    fontSize: 9,
+                                    color: cardTextColor,
+                                    fontWeight: 700,
+                                    ml: 'auto',
+                                  }}
+                                >
+                                  {settlementLabel}
+                                </Typography>
+                              )}
                             </Stack>
                           </Box>
                         </Box>
