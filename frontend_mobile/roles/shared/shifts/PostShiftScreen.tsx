@@ -52,6 +52,7 @@ import { styles } from './PostShiftScreen.styles';
 import PostShiftDetailsStep from './PostShiftDetailsStep';
 import PostShiftSkillsStep from './PostShiftSkillsStep';
 import PostShiftVisibilityStep from './PostShiftVisibilityStep';
+import PostShiftPayRateStep from './PostShiftPayRateStep';
 
 export default function PostShiftScreen() {
     const router = useRouter();
@@ -1081,191 +1082,6 @@ export default function PostShiftScreen() {
     const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipSelected : styles.chipUnselected];
     const chipTextStyle = (selected: boolean) => (selected ? styles.chipTextSelected : styles.chipText);
 
-    const renderPayRate = () => {
-        const showSlotPreview = isLocumLike && !(roleNeeded === 'PHARMACIST' && rateType === 'PHARMACIST_PROVIDED');
-        const renderSlotPreviewList = () => {
-            if (!showSlotPreview || expandedSlots.length === 0) return null;
-            return (
-                <View style={styles.slotRatePreviewPanel}>
-                    <Text style={styles.label}>Slot rate preview</Text>
-                    {expandedSlots.map((slot, idx) => {
-                        const row = slotRateRows[idx] ?? { rate: '', status: 'idle' as const };
-                        const baseNum = Number(row.rate);
-                        const rateValid = Number.isFinite(baseNum);
-                        const bonusNum = Number(ownerBonus);
-                        const bonusValid = Number.isFinite(bonusNum);
-                        const finalNum = roleNeeded === 'PHARMACIST'
-                            ? (rateValid ? baseNum : null)
-                            : (rateValid ? baseNum : 0) + (bonusValid ? bonusNum : 0);
-                        const durationHours = getSlotDurationHours(slot.startTime, slot.endTime);
-                        const totalNum =
-                            finalNum != null && Number.isFinite(finalNum) && durationHours > 0
-                                ? finalNum * durationHours
-                                : null;
-                        const totalLabel =
-                            totalNum != null && Number.isFinite(totalNum)
-                                ? `$${totalNum.toFixed(2)}`
-                                : '$0.00';
-                        return (
-                            <View key={`${slot.date}-${slot.startTime}-${idx}`} style={styles.slotRatePreviewCard}>
-                                <View style={styles.slotRatePreviewInfo}>
-                                    <Text style={styles.slotText}>{formatLongSlotDate(slot.date)}</Text>
-                                    <Text style={styles.helper}>{`${formatClockTime(slot.startTime)} - ${formatClockTime(slot.endTime)}`}</Text>
-                                </View>
-                                <View style={styles.slotRatePreviewControls}>
-                                    <TextInput
-                                        mode="outlined"
-                                        label="Rate"
-                                        value={row.rate}
-                                        onChangeText={(value) => handleSlotRateChange(idx, value)}
-                                        keyboardType="numeric"
-                                        left={<TextInput.Affix text="$" />}
-                                        right={<TextInput.Affix text="/hr" />}
-                                        style={styles.slotRateInput}
-                                        dense
-                                    />
-                                    <Text style={styles.slotRateBadge}>
-                                        {row.status === 'loading' ? '...' : totalLabel.replace('.00', '')}
-                                    </Text>
-                                </View>
-                                {row.status === 'error' && row.error ? (
-                                    <Text style={{ color: '#B91C1C', fontSize: 12 }}>{row.error}</Text>
-                                ) : null}
-                            </View>
-                        );
-                    })}
-                </View>
-            );
-        };
-
-        return (
-            <Surface style={styles.card} elevation={1}>
-                <Text style={styles.label}>Pay Rate</Text>
-                {!isLocumLike ? (
-                    <>
-                        <Text style={[styles.label, { marginTop: 16 }]}>Salary Range</Text>
-                        <View style={styles.pills}>
-                            {['HOURLY', 'ANNUAL'].map((mode) => {
-                                const selected = ftptPayMode === mode;
-                                return (
-                                    <Chip
-                                        key={mode}
-                                        selected={selected}
-                                        onPress={() => setFtptPayMode(mode as 'HOURLY' | 'ANNUAL')}
-                                        style={chipStyle(selected)}
-                                        textStyle={chipTextStyle(selected)}
-                                    >
-                                        {mode === 'HOURLY' ? 'Hourly' : 'Annual Package'}
-                                    </Chip>
-                                );
-                            })}
-                        </View>
-                        {ftptPayMode === 'HOURLY' ? (
-                            <>
-                                <TextInput mode="outlined" label="Min Hourly Rate ($/hr)" value={minHourly} onChangeText={setMinHourly} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Max Hourly Rate ($/hr)" value={maxHourly} onChangeText={setMaxHourly} keyboardType="numeric" style={styles.input} />
-                            </>
-                        ) : (
-                            <>
-                                <TextInput mode="outlined" label="Min Annual Package ($)" value={minAnnual} onChangeText={setMinAnnual} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Max Annual Package ($)" value={maxAnnual} onChangeText={setMaxAnnual} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Super (%)" value={superPercent} onChangeText={setSuperPercent} keyboardType="numeric" style={styles.input} />
-                            </>
-                        )}
-                    </>
-                ) : roleNeeded === 'PHARMACIST' ? (
-                    <>
-                        <View style={styles.pills}>
-                            {(['FLEXIBLE', 'FIXED', 'PHARMACIST_PROVIDED'] as RateType[]).map((mode) => {
-                                const selected = rateType === mode;
-                                return (
-                                    <Chip key={mode} selected={selected} onPress={() => setRateType(mode)} style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
-                                        {mode === 'FLEXIBLE' ? 'Flexible Rate' : mode === 'FIXED' ? 'Fixed Rate' : 'Pharmacist Provided'}
-                                    </Chip>
-                                );
-                            })}
-                        </View>
-                        <Text style={styles.helper}>{RATE_TYPE_DESCRIPTIONS[rateType]}</Text>
-                        <Text style={[styles.label, { marginTop: 16 }]}>Payment Type</Text>
-                        <View style={styles.pills}>
-                            {(['ABN', 'TFN'] as const).map((pref) => {
-                                const selected = paymentPreference === pref;
-                                return (
-                                    <Chip
-                                        key={pref}
-                                        selected={selected}
-                                        onPress={() => setPaymentPreference(pref)}
-                                        style={chipStyle(selected)}
-                                        textStyle={chipTextStyle(selected)}
-                                    >
-                                        {pref}
-                                    </Chip>
-                                );
-                            })}
-                        </View>
-                        <TouchableOpacity style={styles.checkboxRow} onPress={() => setLocumSuperIncluded((v) => !v)}>
-                            <Checkbox status={locumSuperIncluded ? 'checked' : 'unchecked'} />
-                            <Text style={styles.rowText}>+ superannuation </Text>
-                        </TouchableOpacity>
-
-                        {rateType !== 'PHARMACIST_PROVIDED' ? (
-                            <>
-                                <Text style={[styles.label, { marginTop: 16 }]}>
-                                    Base rates ($/hr){hasOutsidePharmacyMemberAudience ? '' : ' (optional)'}
-                                </Text>
-                                {!hasOutsidePharmacyMemberAudience ? (
-                                    <Text style={styles.helper}>
-                                        These pay rates will be displayed whenever the shift is visible outside Pharmacy Members.
-                                    </Text>
-                                ) : null}
-                                <TextInput mode="outlined" label="Weekday" value={rateWeekday} onChangeText={setRateWeekday} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Saturday" value={rateSaturday} onChangeText={setRateSaturday} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Sunday" value={rateSunday} onChangeText={setRateSunday} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Public Holiday" value={ratePublicHoliday} onChangeText={setRatePublicHoliday} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Early Morning" value={rateEarlyMorning} onChangeText={setRateEarlyMorning} keyboardType="numeric" style={styles.input} />
-                                <TextInput mode="outlined" label="Late Night" value={rateLateNight} onChangeText={setRateLateNight} keyboardType="numeric" style={styles.input} />
-                                <Button
-                                    mode="outlined"
-                                    onPress={handleSavePharmacyRateDefaults}
-                                    loading={savingPharmacyRates}
-                                    disabled={savingPharmacyRates || !pharmacyId}
-                                    style={styles.defaultRatesButton}
-                                >
-                                    Update Pharmacy Default Rates
-                                </Button>
-                            </>
-                        ) : null}
-                        {renderSlotPreviewList()}
-                    </>
-                ) : (
-                    <>
-                        <TouchableOpacity onPress={() => Linking.openURL(GOVERNMENT_AWARD_GUIDE_URL)}>
-                            <Text style={styles.helper}>Rate is set by government award</Text>
-                            <Text style={styles.helper}>published 6 February 2026</Text>
-                        </TouchableOpacity>
-                        <Text style={[styles.label, { marginTop: 16 }]}>Payment Type</Text>
-                        <View style={styles.pills}>
-                            {(['ABN', 'TFN'] as const).map((pref) => {
-                                const selected = paymentPreference === pref;
-                                return (
-                                    <Chip key={pref} selected={selected} onPress={() => setPaymentPreference(pref)} style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
-                                        {pref}
-                                    </Chip>
-                                );
-                            })}
-                        </View>
-                        <TouchableOpacity style={styles.checkboxRow} onPress={() => setLocumSuperIncluded((v) => !v)}>
-                            <Checkbox status={locumSuperIncluded ? 'checked' : 'unchecked'} />
-                            <Text style={styles.rowText}>+ superannuation </Text>
-                        </TouchableOpacity>
-                        <TextInput mode="outlined" label="Owner Bonus ($/hr, optional)" value={ownerBonus} onChangeText={setOwnerBonus} keyboardType="numeric" style={styles.input} />
-                        {renderSlotPreviewList()}
-                    </>
-                )}
-            </Surface>
-        );
-    };
-
     const renderTimetable = () => (
         <Surface style={styles.card} elevation={1}>
             <View style={styles.slotHeader}>
@@ -1575,7 +1391,52 @@ export default function PostShiftScreen() {
                     />
                 );
             case 'timetable': return renderTimetable();
-            case 'payrate': return renderPayRate();
+            case 'payrate':
+                return (
+                    <PostShiftPayRateStep
+                        isLocumLike={isLocumLike}
+                        roleNeeded={roleNeeded}
+                        ftptPayMode={ftptPayMode}
+                        setFtptPayMode={setFtptPayMode}
+                        minHourly={minHourly}
+                        setMinHourly={setMinHourly}
+                        maxHourly={maxHourly}
+                        setMaxHourly={setMaxHourly}
+                        minAnnual={minAnnual}
+                        setMinAnnual={setMinAnnual}
+                        maxAnnual={maxAnnual}
+                        setMaxAnnual={setMaxAnnual}
+                        superPercent={superPercent}
+                        setSuperPercent={setSuperPercent}
+                        rateType={rateType}
+                        setRateType={setRateType}
+                        paymentPreference={paymentPreference}
+                        setPaymentPreference={setPaymentPreference}
+                        locumSuperIncluded={locumSuperIncluded}
+                        setLocumSuperIncluded={setLocumSuperIncluded}
+                        hasOutsidePharmacyMemberAudience={hasOutsidePharmacyMemberAudience}
+                        rateWeekday={rateWeekday}
+                        setRateWeekday={setRateWeekday}
+                        rateSaturday={rateSaturday}
+                        setRateSaturday={setRateSaturday}
+                        rateSunday={rateSunday}
+                        setRateSunday={setRateSunday}
+                        ratePublicHoliday={ratePublicHoliday}
+                        setRatePublicHoliday={setRatePublicHoliday}
+                        rateEarlyMorning={rateEarlyMorning}
+                        setRateEarlyMorning={setRateEarlyMorning}
+                        rateLateNight={rateLateNight}
+                        setRateLateNight={setRateLateNight}
+                        handleSavePharmacyRateDefaults={handleSavePharmacyRateDefaults}
+                        savingPharmacyRates={savingPharmacyRates}
+                        pharmacyId={pharmacyId}
+                        expandedSlots={expandedSlots}
+                        slotRateRows={slotRateRows}
+                        ownerBonus={ownerBonus}
+                        setOwnerBonus={setOwnerBonus}
+                        handleSlotRateChange={handleSlotRateChange}
+                    />
+                );
             default: return null;
         }
     };
