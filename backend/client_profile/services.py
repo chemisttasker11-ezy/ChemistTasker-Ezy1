@@ -824,8 +824,12 @@ def generate_invoice_from_shifts(
             if not external:
                 # The newer finance workspace wraps the same canonical invoice;
                 # it does not create a second invoice or duplicate the accepted work.
+                from rest_framework.exceptions import ValidationError as DRFValidationError
                 from worker_finance.services import adopt_internal_invoice
-                adopt_internal_invoice(user, invoice)
+                try:
+                    adopt_internal_invoice(user, invoice)
+                except DRFValidationError as exc:
+                    raise ValidationError({"finance_workspace": str(exc.detail)}) from exc
             return invoice
     except IntegrityError as exc:
         raise ValidationError({
