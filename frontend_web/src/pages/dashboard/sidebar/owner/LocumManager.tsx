@@ -692,6 +692,9 @@ export default function LocumManager({
       <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Invite Favourite Locums to {pharmacyName || pharmacyId}</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
+          <Alert severity="info">
+            Favourite workers keep their own payment source of truth. Do not enter TFN or ABN details here: the worker's private ChemistTasker Payment Profile determines each accepted shift. TFN work routes to payroll/timesheets; verified ABN work routes to invoicing, with the accepted terms frozen on the shift.
+          </Alert>
           {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
             <Box
