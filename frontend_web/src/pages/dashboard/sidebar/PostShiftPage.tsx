@@ -1,47 +1,24 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Box,
   Container,
   Paper,
-  TextField,
-  FormControlLabel,
-  Checkbox,
-  Select,
-  InputLabel,
-  FormControl,
-  Button,
   Snackbar,
-  IconButton,
-  Typography,
-  Stack,
-  Alert,
-  Tooltip,
   createTheme,
   ThemeProvider,
   useMediaQuery,
-  Chip,
   // Switch,
   // Divider,
 } from '@mui/material';
 import {
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Add as AddIcon,
   Work as WorkIcon,
   Visibility as VisibilityIcon,
   VerifiedUser as SkillsIcon,
   AttachMoney as RateIcon,
   Schedule as ScheduleIcon,
-  Block as BlockIcon,
 } from '@mui/icons-material';
 import Grid from '@mui/material/Grid';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Calendar } from 'react-big-calendar';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dayjs from 'dayjs';
 import {
   Shift,
@@ -67,23 +44,16 @@ import {
   type SlotEntry,
   type CalendarEvent,
   type CalendarViewOption,
-  type CalendarSlotSelection,
   toRateInputString,
   getSlotRateValue,
   firstPresent,
-  CALENDAR_VIEWS,
-  localizer,
-  WEEK_DAYS,
   DEFAULT_SUPER_PERCENT,
   toIsoDate,
   isValidDate,
   applyTimeToDate,
-  formatSlotDate,
   formatSlotTime,
-  formatSlotDisplayDate,
   toInputDateTimeLocal,
   normalizePrefillRole,
-  describeRecurringDays,
   pharmacyHoursForDate,
   ORG_ROLE_VALUES,
 } from './PostShiftPage.helpers';
@@ -1258,12 +1228,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
 
   const renderStepContent = (step: number) => {
     const stepKey = steps[step]?.key;
-    const fieldSx = {
-      '& .MuiOutlinedInput-root': {
-        borderRadius: 2,
-        bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.78)' : 'background.paper',
-      },
-    };
     switch (stepKey) {
       case 'details':
         return (
