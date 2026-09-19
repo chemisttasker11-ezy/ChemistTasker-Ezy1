@@ -78,9 +78,9 @@ export default function PublicShiftsPage({
   const theme = useTheme();
   const workerOnboardingPath =
     user.role === 'PHARMACIST'
-      ? '/dashboard/pharmacist/onboarding'
+      ? '/dashboard/pharmacist/onboarding?step=payment'
       : user.role === 'OTHER_STAFF'
-        ? '/dashboard/otherstaff/onboarding'
+        ? '/dashboard/otherstaff/onboarding?step=payment'
         : '/dashboard';
   const queryTab = useMemo(() => new URLSearchParams(location.search).get('tab'), [location.search]);
   const coerceVerified = (value: any) => {
