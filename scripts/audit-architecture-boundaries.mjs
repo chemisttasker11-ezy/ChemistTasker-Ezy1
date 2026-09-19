@@ -27,6 +27,9 @@ const byteBudgets = {
   'frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx': 118000,
   'frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx': 88000,
   'frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx': 81000,
+  'frontend_mobile/roles/shared/calendar/index.tsx': 55000,
+  'frontend_mobile/roles/shared/hub/HubScreen.tsx': 56000,
+  'frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx': 40000,
 };
 
 const failures = [];
