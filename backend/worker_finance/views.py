@@ -400,6 +400,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record.last_review_note = note
             record.last_reviewed_at = timezone.now()
             record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
+            record_revision_state(record)
             Notification.objects.create(
                 user=record.owner,
                 type='alert',
