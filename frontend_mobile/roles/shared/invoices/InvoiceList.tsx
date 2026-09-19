@@ -38,6 +38,7 @@ type Invoice = {
   issuer_first_name?: string;
   issuer_last_name?: string;
   issuer_email?: string;
+  finance_record_id?: number | null;
 };
 
 const PAGE_SIZE = 10;
@@ -207,10 +208,17 @@ function LegacyInvoiceList({ basePath }: Props) {
     }
   };
 
-  const renderItem = ({ item }: { item: Invoice }) => (
+  const renderItem = ({ item }: { item: Invoice }) => {
+    const financeManaged = Boolean(item.finance_record_id);
+    const statusLabel = financeManaged && String(item.status || '').toLowerCase() === 'draft' ? 'Saved' : (item.status || 'Unknown');
+    const useWorkspace = () => {
+      setMenuFor(null);
+      setSnackbar(`This invoice is managed in the ${isReceivedMode ? 'Received' : 'Invoices'} tab.`);
+    };
+    return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => router.push(`${resolvedBase}/${item.id}` as any)}
+      onPress={() => financeManaged ? useWorkspace() : router.push(`${resolvedBase}/${item.id}` as any)}
     >
       <Card style={styles.card}>
         <Card.Content style={styles.cardContent}>
@@ -241,7 +249,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                 {amountFor(item)}
               </Text>
               <Text variant="labelMedium" style={[styles.status, statusStyle(item.status)]}>
-                {item.status || 'Unknown'}
+                {statusLabel}
               </Text>
             </View>
             <Menu
@@ -255,7 +263,13 @@ function LegacyInvoiceList({ basePath }: Props) {
                 />
               }
             >
-              {!isReceivedMode ? (
+              {financeManaged ? (
+                <Menu.Item
+                  leadingIcon="information-outline"
+                  title={`Use ${isReceivedMode ? 'Received' : 'Invoices'} tab`}
+                  onPress={useWorkspace}
+                />
+              ) : !isReceivedMode ? (
                 <>
                   <Menu.Item
                     leadingIcon="pencil"
@@ -276,7 +290,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                   />
                 </>
               ) : null}
-              <Menu.Item
+              {!financeManaged ? <Menu.Item
                 leadingIcon={String(item.status || '').toLowerCase() === 'paid' ? 'undo' : 'cash-check'}
                 title={String(item.status || '').toLowerCase() === 'paid' ? 'Mark as unpaid' : 'Mark as paid'}
                 disabled={String(item.status || '').toLowerCase() !== 'paid' && !canMarkPaid(item.status)}
@@ -288,7 +302,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                     void onMarkPaid(item.id);
                   }
                 }}
-              />
+              /> : null}
               <Menu.Item
                 leadingIcon="file-pdf-box"
                 title="Open PDF"
@@ -297,7 +311,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                   onOpenPdf(item.id);
                 }}
               />
-              {isReceivedMode ? (
+              {!financeManaged && (isReceivedMode ? (
                 <Menu.Item
                   leadingIcon="alert-circle-outline"
                   title="Report issue to sender"
@@ -315,13 +329,14 @@ function LegacyInvoiceList({ basePath }: Props) {
                     onDelete(item.id);
                   }}
                 />
-              )}
+              ))}
             </Menu>
           </View>
         </Card.Content>
       </Card>
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
@@ -332,18 +347,11 @@ function LegacyInvoiceList({ basePath }: Props) {
           </Text>
           <Text variant="bodyMedium" style={styles.headerSubtitle}>
             {isReceivedMode
-              ? 'Review invoices received from pharmacists'
-              : 'Manage draft, sent, and paid invoices'}
+              ? 'Historical received-invoice tools; use Received for current review'
+              : 'Historical invoice tools; use Invoices for current work'}
           </Text>
         </View>
-        {!isReceivedMode ? (
-          <IconButton
-            icon="plus-circle"
-            size={28}
-            iconColor="#4F46E5"
-            onPress={() => router.push(`${resolvedBase}/new` as any)}
-          />
-        ) : null}
+
       </View>
 
       {loading && !refreshing ? (
