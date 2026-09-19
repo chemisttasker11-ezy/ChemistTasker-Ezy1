@@ -4121,6 +4121,15 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
                 "email": "You already have a membership or pending invitation for this pharmacy."
             })
 
+        if MembershipApplication.objects.filter(
+            pharmacy=invite_link.pharmacy,
+            email__iexact=email_value,
+            status="PENDING",
+        ).exists():
+            raise serializers.ValidationError({
+                "email": "An application for this email is already pending with this pharmacy."
+            })
+
         pending_key = f"{invite_link.pharmacy_id}:{email_value}"
         if MembershipApplication.objects.filter(
             pending_identity_key=pending_key,
