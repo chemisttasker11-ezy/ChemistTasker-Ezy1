@@ -3,6 +3,7 @@
 // Exact web parity with all hooks and API calls
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { FlatList, StyleSheet, View, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -132,6 +133,7 @@ export default function StaffManager({
     messagingMemberId = null,
 }: StaffManagerProps) {
     const { user } = useAuth();
+    const router = useRouter();
     const baseInviteUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'https://www.chemisttasker.com';
 
     // Derive staff from memberships
@@ -680,8 +682,16 @@ export default function StaffManager({
                     <ScrollView>
                         <Text style={styles.modalTitle}>Invite Staff to {pharmacyName || pharmacyId}</Text>
                         <Text style={styles.helperText}>
-                            Pharmacy staff use the TFN employee pathway. This owner form records role and employment type only; DOB, TFN and super details are completed by the worker in their private profile and are never shown to the pharmacy. ChemistTasker Payroll activates only after that private setup is complete.
+                            Pharmacy staff use the TFN employee pathway. This owner form records role and employment type only; DOB, TFN and super details are completed by the worker in their private profile and never shown to the pharmacy. If you use ChemistTasker Payroll, add the dated employment terms after the worker's private setup is ready.
                         </Text>
+                        <Button
+                            mode="text"
+                            compact
+                            onPress={() => router.push('/workforce-settings')}
+                            style={{ alignSelf: 'flex-start' }}
+                        >
+                            Open Workforce & Payroll
+                        </Button>
                         {inviteError ? <Text style={styles.dialogErrorText}>{inviteError}</Text> : null}
                         {inviteRows.map((row, idx) => (
                             <View key={idx} style={styles.inviteRow}>
