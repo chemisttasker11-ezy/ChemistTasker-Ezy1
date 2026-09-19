@@ -34,6 +34,7 @@ from client_profile.serializers import (
 )
 from client_profile.services import validate_internal_invoice_shifts
 from client_profile.views import ShiftOfferViewSet
+from client_profile.utils import finalize_shift_offer
 
 
 User = get_user_model()
@@ -622,3 +623,67 @@ class DeferredPayrollActivationTests(TestCase):
         self.assertIsNotNone(self.offer.payroll_activated_at)
         self.assertIsNotNone(self.assignment.payroll_activated_at)
         self.assertEqual(self.offer.engagement_terms_snapshot, frozen)
+
+
+    def test_activation_before_fulfillment_is_copied_to_later_assignment(self):
+        self.onboarding.tfn_number = "123456789"
+        self.onboarding.super_fund_name = "Example Super"
+        self.onboarding.super_usi = "EXAMPLE123"
+        self.onboarding.super_member_number = "MEMBER123"
+        self.onboarding.save()
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.manager,
+            role_needed="ASSISTANT",
+            employment_type="LOCUM",
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=date(2026, 9, 22),
+            start_time=time(9, 0),
+            end_time=time(17, 0),
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift,
+            slot=slot,
+            user=self.worker,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            payment_preference_snapshot=PAYMENT_TFN,
+            settlement_channel=SETTLEMENT_TIMESHEET_ONLY,
+            engagement_kind="SHIFT_EMPLOYMENT",
+            engagement_terms_snapshot={
+                "version": 1,
+                "payroll_setup_status": "DEFERRED",
+                "award_payroll_review_required": False,
+                "occurrences": [{
+                    "slot_id": slot.id,
+                    "date": str(slot.date),
+                    "agreed_rate": "45.00",
+                }],
+            },
+            engagement_terms_accepted_at=timezone.now(),
+        )
+
+        request = self.factory.post(
+            f"/client-profile/shift-offers/{offer.id}/activate-payroll/",
+            {},
+            format="json",
+        )
+        force_authenticate(request, user=self.manager)
+        view = ShiftOfferViewSet.as_view({"post": "activate_payroll"})
+        with patch(
+            "client_profile.views.BaseShiftViewSet._user_can_manage_pharmacy",
+            return_value=True,
+        ):
+            response = view(request, pk=offer.id)
+
+        self.assertEqual(response.status_code, 200)
+        offer.refresh_from_db()
+        self.assertEqual(offer.settlement_channel, SETTLEMENT_PAYROLL)
+        self.assertIsNotNone(offer.payroll_activated_at)
+
+        assignment_ids, _ = finalize_shift_offer(offer)
+        assignment = ShiftSlotAssignment.objects.get(pk=assignment_ids[0])
+        self.assertEqual(assignment.settlement_channel, SETTLEMENT_PAYROLL)
+        self.assertEqual(assignment.payroll_activated_at, offer.payroll_activated_at)
