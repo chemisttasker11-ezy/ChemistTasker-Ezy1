@@ -10,7 +10,7 @@ from django.core.mail import EmailMessage, get_connection
 from django.db import transaction, IntegrityError
 from django.db.models import Sum
 from django.db import models
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.cache import patch_vary_headers
@@ -32,6 +32,7 @@ from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
     make_super_document, record_payment, check_version, json_safe,
     invoice_defaults, internal_invoice_sources, internal_invoice_prefill,
+    record_revision_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -327,10 +328,13 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         )
 
     def _get(self, request, pk, lock=False):
-        qs = self.queryset(request)
+        allowed = self.queryset(request).filter(pk=pk).values_list('pk', flat=True).first()
+        if allowed is None:
+            raise Http404
+        qs = InvoiceRecord.objects.select_related('invoice', 'customer', 'owner')
         if lock:
             qs = qs.select_for_update(of=('self',))
-        return get_object_or_404(qs, pk=pk)
+        return get_object_or_404(qs, pk=allowed)
 
     def list(self, request):
         from rest_framework.pagination import PageNumberPagination
