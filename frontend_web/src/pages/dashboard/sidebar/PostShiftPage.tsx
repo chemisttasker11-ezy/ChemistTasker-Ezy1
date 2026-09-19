@@ -21,11 +21,6 @@ import {
   ThemeProvider,
   useMediaQuery,
   Chip,
-  ToggleButton,
-  ToggleButtonGroup,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   // Switch,
   // Divider,
 } from '@mui/material';
@@ -39,7 +34,6 @@ import {
   VerifiedUser as SkillsIcon,
   AttachMoney as RateIcon,
   Schedule as ScheduleIcon,
-  ExpandMore as ExpandMoreIcon,
   Block as BlockIcon,
 } from '@mui/icons-material';
 import Grid from '@mui/material/Grid';
@@ -1266,7 +1260,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
 
   const renderStepContent = (step: number) => {
     const stepKey = steps[step]?.key;
-    const workloadOptions = ['Sole Pharmacist', 'High Script Load', 'Webster Packs'];
     const ESCALATION_LABELS: Record<string, string> = { FULL_PART_TIME: 'Pharmacy Members', LOCUM_CASUAL: 'Favourite Staff', OWNER_CHAIN: 'Owner Chain', ORG_CHAIN: 'Organization', PLATFORM: 'Platform (Public)' };
     const fieldSx = {
       '& .MuiOutlinedInput-root': {
@@ -1274,19 +1267,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.78)' : 'background.paper',
       },
     };
-    const embeddedPanelSx = isEmbedded
-      ? {
-          p: 1.5,
-          borderRadius: 2,
-          borderColor: 'rgba(15, 23, 42, 0.08)',
-          bgcolor: 'transparent',
-          boxShadow: 'none',
-        }
-      : {
-          p: 2,
-          borderRadius: 3,
-          borderColor: 'grey.200',
-        };
     const VISIBILITY_META: Record<string, { eyebrow: string; description: string; accent: string }> = {
       FULL_PART_TIME: {
         eyebrow: 'Internal first',
