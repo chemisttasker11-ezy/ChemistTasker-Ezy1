@@ -619,6 +619,12 @@ export function reviewMembershipApplication(id, data) {
         body: JSON.stringify(data),
     });
 }
+export function previewMembershipApplicationAward(id, data) {
+    return fetchApi(`/client-profile/membership-applications/${id}/award-preview/`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
 export function approveMembershipApplication(id, data) {
     return fetchApi(`/client-profile/membership-applications/${id}/approve/`, {
         method: 'POST',
@@ -1384,6 +1390,9 @@ export async function fetchMembershipApplicationsService(params) {
 }
 export async function reviewMembershipApplicationService(applicationId, payload) {
     return mapMembershipApplication(await reviewMembershipApplication(applicationId, payload));
+}
+export async function previewMembershipApplicationAwardService(applicationId, payload) {
+    return camelCaseKeysDeep(await previewMembershipApplicationAward(applicationId, payload));
 }
 export async function approveMembershipApplicationService(applicationId, payload) {
     return camelCaseKeysDeep(await approveMembershipApplication(applicationId, payload));

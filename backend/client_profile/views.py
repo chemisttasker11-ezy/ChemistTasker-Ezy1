@@ -2950,6 +2950,63 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         status_q = self.request.query_params.get('status')
         return qs.filter(status=status_q) if status_q else qs
 
+    @action(detail=True, methods=['post'], url_path='award-preview')
+    def award_preview(self, request, pk=None):
+        app = self.get_object()
+        if app.category != 'FULL_PART_TIME':
+            return Response(
+                {'detail': 'Award preview is only available for pharmacy-staff applications.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        employment_type = str(request.data.get('employment_type') or 'CASUAL').upper()
+        if employment_type not in {'FULL_TIME', 'PART_TIME', 'CASUAL'}:
+            return Response(
+                {'employment_type': ['Choose FULL_TIME, PART_TIME or CASUAL.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        classification = str(
+            request.data.get('award_classification')
+            or app.pharmacist_award_level
+            or app.otherstaff_classification_level
+            or app.intern_half
+            or app.student_year
+            or ''
+        ).upper()
+        effective_from_raw = request.data.get('effective_from') or str(timezone.localdate())
+        try:
+            effective_from = date.fromisoformat(str(effective_from_raw))
+        except (TypeError, ValueError):
+            return Response(
+                {'effective_from': ['Use YYYY-MM-DD.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from workforce.award_rates import classification_options, resolve_award_schedule
+
+        try:
+            resolved = resolve_award_schedule(
+                role=app.role,
+                classification=classification,
+                employment_type=employment_type,
+                date_of_birth=app.date_of_birth,
+                as_of=effective_from,
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                getattr(exc, 'message_dict', {'detail': exc.messages}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            **resolved,
+            'classification_options': classification_options(app.role),
+            'default_classification': classification,
+            'payroll_enabled': bool(app.pharmacy.use_chemisttasker_payroll),
+        })
+
+
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         app = self.get_object()
