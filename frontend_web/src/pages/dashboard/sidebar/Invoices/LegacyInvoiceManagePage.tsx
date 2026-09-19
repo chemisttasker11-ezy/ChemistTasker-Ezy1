@@ -63,6 +63,7 @@ interface Invoice {
   issuer_first_name?: string;
   issuer_last_name?: string;
   issuer_email?: string;
+  finance_record_id?: number | null;
 }
 
 const ITEMS_PER_PAGE = 8;
@@ -319,13 +320,19 @@ export default function InvoiceManagePage() {
             <TableBody>
               {paginated.map((invoice) => {
                 const tone = getStatusTone(invoice.status);
+                const financeManaged = Boolean(invoice.finance_record_id);
+                const displayStatus = financeManaged && String(invoice.status || '').toLowerCase() === 'draft'
+                  ? 'Saved'
+                  : tone.label;
 
                 return (
                   <TableRow
                     key={invoice.id}
                     hover
                     sx={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`${invoice.id}`)}
+                    onClick={() => financeManaged
+                      ? navigate(`?tool=${isOwner ? 'received' : 'invoices'}`)
+                      : navigate(`${invoice.id}`)}
                   >
                     <TableCell>{invoice.id}</TableCell>
                     <TableCell>
@@ -339,7 +346,7 @@ export default function InvoiceManagePage() {
                     <TableCell>${getInvoiceAmount(invoice)}</TableCell>
                     <TableCell>
                       <Chip
-                        label={tone.label}
+                        label={displayStatus}
                         size="small"
                         sx={{
                           backgroundColor: tone.bg,
@@ -350,7 +357,19 @@ export default function InvoiceManagePage() {
                     </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                        {isOwner && (
+                        {financeManaged ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              navigate(`?tool=${isOwner ? 'received' : 'invoices'}`);
+                            }}
+                            sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+                          >
+                            Open finance workspace
+                          </Button>
+                        ) : isOwner ? (
                           <Button
                             size="small"
                             variant="outlined"
@@ -364,7 +383,7 @@ export default function InvoiceManagePage() {
                           >
                             Report Issue
                           </Button>
-                        )}
+                        ) : null}
                         <IconButton onClick={(event) => handleMenuOpen(event, invoice.id)}>
                           <MoreVertIcon />
                         </IconButton>
@@ -402,7 +421,16 @@ export default function InvoiceManagePage() {
       </Stack>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        {!isOwner && (
+        {selectedInvoice?.finance_record_id && (
+          <MenuItem onClick={() => {
+            navigate(`?tool=${isOwner ? 'received' : 'invoices'}`);
+            handleMenuClose();
+          }}>
+            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+            Open in Invoices & finances
+          </MenuItem>
+        )}
+        {!selectedInvoice?.finance_record_id && !isOwner && (
           <MenuItem
             onClick={() => {
               if (menuInvoiceId) navigate(`${menuInvoiceId}`);
@@ -413,7 +441,7 @@ export default function InvoiceManagePage() {
             Edit
           </MenuItem>
         )}
-        {!isOwner && (
+        {!selectedInvoice?.finance_record_id && !isOwner && (
           <MenuItem
             onClick={handleSend}
             disabled={String(selectedInvoice?.status || '').toLowerCase() !== 'draft'}
@@ -422,7 +450,7 @@ export default function InvoiceManagePage() {
             Send
           </MenuItem>
         )}
-        {String(selectedInvoice?.status || '').toLowerCase() === 'paid' ? (
+        {!selectedInvoice?.finance_record_id && (String(selectedInvoice?.status || '').toLowerCase() === 'paid' ? (
           <MenuItem onClick={handleMarkUnpaid}>
             <UndoIcon fontSize="small" sx={{ mr: 1 }} />
             Mark as Unpaid
@@ -435,12 +463,12 @@ export default function InvoiceManagePage() {
             <CheckCircleOutlineIcon fontSize="small" sx={{ mr: 1 }} />
             Mark as Paid
           </MenuItem>
-        )}
+        ))}
         <MenuItem onClick={handleDownloadPdf}>
           <PictureAsPdfIcon fontSize="small" sx={{ mr: 1 }} />
           Download PDF
         </MenuItem>
-        {isOwner ? (
+        {!selectedInvoice?.finance_record_id && (isOwner ? (
           <MenuItem onClick={handleReportIssue}>
             <ReportProblemIcon fontSize="small" sx={{ mr: 1 }} />
             Report Issue to Sender
@@ -450,7 +478,7 @@ export default function InvoiceManagePage() {
             <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
             Delete
           </MenuItem>
-        )}
+        ))}
       </Menu>
 
       <Snackbar
