@@ -720,6 +720,10 @@ export function acceptShiftOffer(offerId, data = {}) {
     });
 }
 
+export function activateShiftOfferPayroll(offerId) {
+    return fetchApi(`/client-profile/shift-offers/${offerId}/activate-payroll/`, { method: 'POST' });
+}
+
 export function declineShiftOffer(offerId) {
     return fetchApi(`/client-profile/shift-offers/${offerId}/decline/`, { method: 'POST' });
 }
@@ -1012,6 +1016,9 @@ export async function fetchShiftOffersService(filters?: { status?: string }) {
 }
 export async function acceptShiftOfferService(offerId: number, payload: ShiftOfferAcceptancePayload = {}) {
     return camelCaseKeysDeep(await acceptShiftOffer(offerId, payload));
+}
+export async function activateShiftOfferPayrollService(offerId: number) {
+    return camelCaseKeysDeep(await activateShiftOfferPayroll(offerId));
 }
 export async function declineShiftOfferService(offerId: number) {
     await declineShiftOffer(offerId);
