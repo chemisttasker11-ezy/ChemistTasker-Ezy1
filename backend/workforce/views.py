@@ -466,7 +466,21 @@ class EmploymentEngagementListCreateView(APIView):
                         raise DjangoValidationError(
                             {"effective_from": "Successor engagement must start after the engagement it supersedes."}
                         )
-                    previous.effective_to = effective_from - timedelta(days=1)
+                    if effective_from < timezone.localdate():
+                        raise DjangoValidationError(
+                            {"effective_from": "A successor cannot retroactively rewrite historical employment terms."}
+                        )
+                    previous_end_target = effective_from - timedelta(days=1)
+                    if previous.effective_to and previous.effective_to < previous_end_target:
+                        raise DjangoValidationError(
+                            {
+                                "supersedes_public_id": (
+                                    "The selected engagement ended before these new terms. "
+                                    "Create the new engagement without superseding it."
+                                )
+                            }
+                        )
+                    previous.effective_to = previous_end_target
                     previous.updated_by = request.user
                     previous.full_clean()
                     previous.save(update_fields=["effective_to", "updated_by", "updated_at"])
