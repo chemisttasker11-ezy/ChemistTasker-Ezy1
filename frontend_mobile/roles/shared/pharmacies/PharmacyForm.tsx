@@ -37,64 +37,27 @@ import {
     updatePharmacy,
     getPharmacyById,
     lookupPharmacyAbn,
-    type PharmacyDTO,
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
 import GooglePlacesInput from './GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
-
-type Mode = 'create' | 'edit';
-
-type Props = {
-    mode: Mode;
-    pharmacyId?: string;
-    onSuccess?: () => void;
-    onCancel?: () => void;
-    onContinueLater?: () => void | Promise<void>;
-    showSetupHero?: boolean;
-};
-
-const STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
-const EMPLOYMENT_TYPES = ["PART_TIME", "FULL_TIME", "LOCUMS"];
-const ROLE_OPTIONS = ["PHARMACIST", "INTERN", "ASSISTANT", "TECHNICIAN", "STUDENT", "ADMIN", "DRIVER"];
-const prettifyOptionLabel = (value: string) =>
-    value
-        .split('_')
-        .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-        .join(' ');
-const RATE_TYPES = [
-    { value: 'FIXED', label: 'Fixed (Hourly)' },
-    { value: 'FLEXIBLE', label: 'Flexible' },
-    { value: 'PHARMACIST_PROVIDED', label: 'Pharmacist Provided' },
-];
-const RATE_MINIMUM_EXAMPLE = '55';
-const GOVERNMENT_AWARD_GUIDE_URL = 'https://calculate.fairwork.gov.au/payguides/fairwork/ma000012/pdf';
-
-const TABS = [
-    { label: 'Basic', shortLabel: 'Basic', icon: 'domain' },
-    { label: 'Regulatory', shortLabel: 'Reg', icon: 'check-decagram' },
-    { label: 'Docs', shortLabel: 'Docs', icon: 'file-document' },
-    { label: 'Employment', shortLabel: 'Staff', icon: 'account-group' },
-    { label: 'Hours', shortLabel: 'Hours', icon: 'clock-outline' },
-    { label: 'Rate', shortLabel: 'Rate', icon: 'cash' },
-    { label: 'About', shortLabel: 'About', icon: 'message' },
-];
-
-const parseTimeValue = (value?: string) => {
-    const match = /^(\d{1,2}):(\d{2})$/.exec(value ?? '');
-    if (!match) {
-        return { hours: 9, minutes: 0 };
-    }
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-        return { hours: 9, minutes: 0 };
-    }
-    return { hours: Math.min(23, Math.max(0, hours)), minutes: Math.min(59, Math.max(0, minutes)) };
-};
-
-const formatTimeValue = (hours: number, minutes: number) =>
-    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+import {
+    type PharmacyFormProps,
+    STATES,
+    EMPLOYMENT_TYPES,
+    ROLE_OPTIONS,
+    prettifyOptionLabel,
+    RATE_TYPES,
+    RATE_MINIMUM_EXAMPLE,
+    GOVERNMENT_AWARD_GUIDE_URL,
+    TABS,
+    parseTimeValue,
+    formatTimeValue,
+    normalizeCoord,
+    formatApiError,
+    formatDate,
+    formatDateTime,
+} from './PharmacyForm.config';
 
 export default function PharmacyForm({
     mode,
@@ -103,7 +66,7 @@ export default function PharmacyForm({
     onCancel,
     onContinueLater,
     showSetupHero = false,
-}: Props) {
+}: PharmacyFormProps) {
     const router = useRouter();
     const initialPharmacyId = pharmacyId ? String(pharmacyId) : null;
     const initialStateRef = useRef({
@@ -267,41 +230,6 @@ export default function PharmacyForm({
         { form, employmentTypes, rolesNeeded, files },
         { enabled: !loading, onDiscard: resetToSavedState, saving }
     );
-
-    const normalizeCoord = (value: number | null) => {
-        if (value === null || value === undefined) return value;
-        const rounded = Number(value.toFixed(6));
-        return Number.isFinite(rounded) ? rounded : value;
-    };
-
-    const formatApiError = (data: any) => {
-        if (!data) return '';
-        if (typeof data === 'string') return data;
-        if (data.detail && typeof data.detail === 'string') return data.detail;
-        if (Array.isArray(data)) return data.join('\n');
-        if (typeof data === 'object') {
-            return Object.entries(data)
-                .map(([key, value]) => {
-                    if (Array.isArray(value)) return `${key}: ${value.join(' ')}`;
-                    if (typeof value === 'string') return `${key}: ${value}`;
-                    return `${key}: ${JSON.stringify(value)}`;
-                })
-                .join('\n');
-        }
-        return String(data);
-    };
-
-    const formatDate = (value?: string | null) => {
-        if (!value) return '-';
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
-    };
-
-    const formatDateTime = (value?: string | null) => {
-        if (!value) return '-';
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-    };
 
     const applyAbnMeta = (data?: any) => {
         setAbnEntityName(data?.abn_entity_name ?? null);
