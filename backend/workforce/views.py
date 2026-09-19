@@ -326,6 +326,25 @@ def _engagement_payload(request_data, membership, *, existing=None):
             }
         )
 
+    is_genuinely_above_award = any(
+        agreed[key] > floor
+        for key, floor in floor_by_field.items()
+    )
+    if early_rate is not None:
+        is_genuinely_above_award = (
+            is_genuinely_above_award
+            or early_rate > Decimal(resolved["rate_early_morning"])
+        )
+    if late_rate is not None:
+        is_genuinely_above_award = (
+            is_genuinely_above_award
+            or late_rate > Decimal(resolved["rate_late_night"])
+        )
+    if not is_genuinely_above_award:
+        raise DjangoValidationError(
+            {"pay_basis": "Above-award terms must contain at least one agreed rate above the selected Award minimum."}
+        )
+
     def max_rate(agreed_rate, award_rate):
         return str(max(Decimal(str(agreed_rate)), Decimal(str(award_rate))).quantize(Decimal("0.01")))
 
