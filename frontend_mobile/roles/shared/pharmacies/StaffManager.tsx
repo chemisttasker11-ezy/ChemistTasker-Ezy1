@@ -679,6 +679,9 @@ export default function StaffManager({
                 >
                     <ScrollView>
                         <Text style={styles.modalTitle}>Invite Staff to {pharmacyName || pharmacyId}</Text>
+                        <Text style={styles.helperText}>
+                            Pharmacy staff use the TFN employee pathway. This owner form records role and employment type only; DOB, TFN and super details are completed by the worker in their private profile and are never shown to the pharmacy. ChemistTasker Payroll activates only after that private setup is complete.
+                        </Text>
                         {inviteError ? <Text style={styles.dialogErrorText}>{inviteError}</Text> : null}
                         {inviteRows.map((row, idx) => (
                             <View key={idx} style={styles.inviteRow}>
