@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -7,7 +8,12 @@ from django.test import TestCase
 from django.utils import timezone
 
 from client_profile.engagement_routing import (
+    PAYMENT_ABN,
+    PAYMENT_TFN,
+    SETTLEMENT_INVOICE,
+    SETTLEMENT_PAYROLL,
     SETTLEMENT_TIMESHEET_ONLY,
+    build_shift_engagement_terms,
     staff_assignment_defaults,
 )
 from client_profile.models import (
@@ -192,3 +198,129 @@ class PayrollOptInRosterRoutingTests(TestCase):
                 pharmacy=self.pharmacy,
                 work_date=date(2026, 9, 19),
             )
+
+
+class ExternalShiftSettlementRoutingTests(TestCase):
+    @staticmethod
+    def _objects(*, payroll_enabled, payment_preference):
+        pharmacy = SimpleNamespace(
+            id=91,
+            name="External Shift Pharmacy",
+            abn="51824753556",
+            use_chemisttasker_payroll=payroll_enabled,
+        )
+        slot = SimpleNamespace(
+            id=501,
+            date=date(2026, 9, 20),
+            start_time="09:00:00",
+            end_time="17:00:00",
+            rate=None,
+        )
+        shift = SimpleNamespace(
+            id=401,
+            pharmacy=pharmacy,
+            role_needed="PHARMACIST",
+            visibility="PUBLIC",
+            payment_preference=payment_preference,
+            fixed_rate=None,
+        )
+        offer = SimpleNamespace(
+            slot_id=slot.id,
+            slot=slot,
+            offered_slot_date=slot.date,
+            offered_start_time=slot.start_time,
+            offered_end_time=slot.end_time,
+            offered_rate="72.50",
+        )
+        user = SimpleNamespace(
+            id=301,
+            email="external@example.com",
+            get_full_name=lambda: "External Worker",
+        )
+        return pharmacy, shift, offer, user
+
+    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.engagement_routing._external_payment_profile")
+    def test_abn_external_shift_is_invoice_routed_with_frozen_agreed_rate(
+        self,
+        external_profile,
+        _direct_membership,
+    ):
+        _, shift, offer, user = self._objects(
+            payroll_enabled=True,
+            payment_preference=PAYMENT_ABN,
+        )
+        external_profile.return_value = (
+            SimpleNamespace(
+                abn="51824753556",
+                abn_entity_name="External Services Pty Ltd",
+                gst_registered=True,
+                abn_gst_registered=True,
+            ),
+            PAYMENT_ABN,
+        )
+
+        terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
+
+        self.assertEqual(terms["settlement_channel"], SETTLEMENT_INVOICE)
+        self.assertEqual(terms["engagement_kind"], "INDEPENDENT_CONTRACTOR")
+        self.assertEqual(terms["payment_preference"], PAYMENT_ABN)
+        self.assertEqual(terms["occurrences"][0]["agreed_rate"], "72.50")
+        self.assertTrue(terms["acceptance_required"])
+        self.assertTrue(terms["super_review_required"])
+
+    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.engagement_routing._external_payment_profile")
+    def test_tfn_external_shift_routes_to_chemisttasker_payroll_when_enabled(
+        self,
+        external_profile,
+        _direct_membership,
+    ):
+        _, shift, offer, user = self._objects(
+            payroll_enabled=True,
+            payment_preference=PAYMENT_TFN,
+        )
+        external_profile.return_value = (
+            SimpleNamespace(
+                super_fund_name="Example Super",
+                super_usi="EXAMPLE123",
+                super_member_number="MEMBER123",
+            ),
+            PAYMENT_TFN,
+        )
+
+        terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
+
+        self.assertEqual(terms["settlement_channel"], SETTLEMENT_PAYROLL)
+        self.assertEqual(terms["engagement_kind"], "SHIFT_EMPLOYMENT")
+        self.assertEqual(terms["payment_preference"], PAYMENT_TFN)
+        self.assertEqual(terms["occurrences"][0]["agreed_rate"], "72.50")
+        self.assertTrue(terms["acceptance_required"])
+
+    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.engagement_routing._external_payment_profile")
+    def test_tfn_external_shift_routes_to_timesheet_only_when_payroll_disabled(
+        self,
+        external_profile,
+        _direct_membership,
+    ):
+        _, shift, offer, user = self._objects(
+            payroll_enabled=False,
+            payment_preference=PAYMENT_TFN,
+        )
+        external_profile.return_value = (
+            SimpleNamespace(
+                super_fund_name="Example Super",
+                super_usi="EXAMPLE123",
+                super_member_number="MEMBER123",
+            ),
+            PAYMENT_TFN,
+        )
+
+        terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
+
+        self.assertEqual(terms["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
+        self.assertEqual(terms["engagement_kind"], "SHIFT_EMPLOYMENT")
+        self.assertEqual(terms["payment_preference"], PAYMENT_TFN)
+        self.assertEqual(terms["occurrences"][0]["agreed_rate"], "72.50")
+        self.assertTrue(terms["acceptance_required"])
