@@ -862,6 +862,19 @@ def clean_email(email):
     return re.sub(r'[\u200e\u200f\u202a-\u202e\u200b\s]', '', email)
 
 
+def _accepted_offer_rate_for_occurrence(offer, slot_id, slot_date):
+    snapshot = getattr(offer, "engagement_terms_snapshot", None) or {}
+    for occurrence in snapshot.get("occurrences") or []:
+        if str(occurrence.get("slot_id") or "") != str(slot_id or ""):
+            continue
+        if str(occurrence.get("date") or "") != str(slot_date):
+            continue
+        value = occurrence.get("agreed_rate")
+        if value not in (None, ""):
+            return Decimal(str(value))
+    return None
+
+
 def finalize_shift_offer(offer: ShiftOffer):
     """
     Finalize a worker-confirmed offer by creating slot assignments exactly once.
@@ -891,7 +904,20 @@ def finalize_shift_offer(offer: ShiftOffer):
                     user=offer.user,
                     override_date=slot_date,
                 )
-                if getattr(offer, "offered_rate", None) is not None:
+                accepted_terms_rate = _accepted_offer_rate_for_occurrence(
+                    offer,
+                    slot.id,
+                    slot_date,
+                )
+                if accepted_terms_rate is not None:
+                    rate = accepted_terms_rate
+                    reason = {
+                        "type": "AcceptedTerms",
+                        "source": "AcceptedShiftTerms",
+                        "offer_id": offer.id,
+                        "settlement_channel": offer.settlement_channel,
+                    }
+                elif getattr(offer, "offered_rate", None) is not None:
                     rate = Decimal(str(offer.offered_rate))
                     reason = {
                         "type": "Offer",
