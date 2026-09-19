@@ -245,7 +245,7 @@ function AuthGate() {
     const isPublic = publicRoutes.has(top ?? '');
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
-    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave']);
+    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave', 'workforce-timesheets', 'workforce-settings']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
     const expectedTopByRole: Record<string, string> = {
