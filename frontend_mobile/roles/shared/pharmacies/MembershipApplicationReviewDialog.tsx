@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import {
     Button,
     Checkbox,
+    Chip,
     Dialog,
     Divider,
     Menu,
@@ -177,6 +178,26 @@ export default function MembershipApplicationReviewDialog({
 
     const payrollEnabled = Boolean(read(localApp, 'payrollEnabled', 'payroll_enabled'));
     const isStaff = localApp?.category === 'FULL_PART_TIME';
+    const paymentProfile = (
+        (localApp as any)?.paymentProfileStatus
+        ?? (localApp as any)?.payment_profile_status
+        ?? null
+    ) as null | {
+        accountLinked?: boolean;
+        onboardingComplete?: boolean;
+        paymentPreference?: 'TFN' | 'ABN' | null;
+        status?: string;
+        payrollReady?: boolean;
+        invoiceReady?: boolean;
+        missingFields?: string[];
+    };
+    const staffPaymentPathReady =
+        !isStaff
+        || (
+            paymentProfile?.paymentPreference === 'TFN'
+            && (!payrollEnabled || Boolean(paymentProfile?.payrollReady))
+        );
+    const paymentMissing = paymentProfile?.missingFields || [];
     const classificationOptions = CLASSIFICATIONS[role] || [];
     const roleLabel = ROLE_OPTIONS.find((item) => item.value === role)?.label || role;
     const classificationLabel = classificationOptions.find((item) => item.value === classification)?.label || classification;
@@ -314,6 +335,7 @@ export default function MembershipApplicationReviewDialog({
         && (!isStaff || !payrollEnabled || Boolean(preview))
         && (!isStaff || !payrollEnabled || payBasis !== 'ABOVE_AWARD' || aboveAwardChanged)
         && (!isStaff || !payrollEnabled || employmentType !== 'PART_TIME' || days.some((day) => day.enabled))
+        && staffPaymentPathReady
         && !saving;
 
     return (
@@ -323,7 +345,7 @@ export default function MembershipApplicationReviewDialog({
                 <Dialog.ScrollArea style={styles.scrollArea}>
                     <ScrollView contentContainerStyle={styles.content}>
                         <Text style={styles.notice}>
-                            Email, mobile, date of birth and username are locked after submission. Review edits are recorded and sent to the applicant on approval.
+                            Email, mobile, date of birth and username are locked after submission. Review edits are recorded and emailed to the applicant when saved, then included again in the final approval notification.
                         </Text>
 
                         <Text style={styles.sectionTitle}>Locked identifiers</Text>
@@ -331,6 +353,60 @@ export default function MembershipApplicationReviewDialog({
                         <TextInput label="Mobile" value={String(read(localApp, 'mobileNumber', 'mobile_number'))} disabled mode="outlined" />
                         <TextInput label="Date of birth" value={String(read(localApp, 'dateOfBirth', 'date_of_birth'))} disabled mode="outlined" />
                         <TextInput label="Username" value={String(read(localApp, 'username', 'username'))} disabled mode="outlined" />
+
+                        <Divider />
+                        <Text style={styles.sectionTitle}>Worker payment profile · source of truth</Text>
+                        <Text style={styles.notice}>
+                            Readiness only. Raw TFN and super member numbers remain private to the worker and are never shown to the pharmacy.
+                        </Text>
+                        <View style={styles.chipRow}>
+                            <Chip compact>
+                                {paymentProfile?.paymentPreference || 'Payment preference not set'}
+                            </Chip>
+                            {paymentProfile?.paymentPreference === 'TFN' ? (
+                                <Chip compact>
+                                    {paymentProfile.payrollReady ? 'Payroll profile ready' : 'Payroll profile incomplete'}
+                                </Chip>
+                            ) : null}
+                            {paymentProfile?.paymentPreference === 'ABN' ? (
+                                <Chip compact>
+                                    {paymentProfile.invoiceReady ? 'Invoice profile ready' : 'Invoice profile incomplete'}
+                                </Chip>
+                            ) : null}
+                        </View>
+                        {!paymentProfile?.accountLinked ? (
+                            <Text style={styles.warning}>
+                                Worker account not linked. The applicant must create/sign in to ChemistTasker using this application email before staff approval.
+                            </Text>
+                        ) : null}
+                        {paymentProfile?.accountLinked && !paymentProfile?.onboardingComplete ? (
+                            <Text style={styles.warning}>Worker onboarding is incomplete.</Text>
+                        ) : null}
+                        {paymentMissing.length ? (
+                            <Text style={styles.warning}>
+                                Private setup still needed: {paymentMissing.map((field) => field.replaceAll('_', ' ')).join(', ')}.
+                            </Text>
+                        ) : null}
+                        {isStaff && paymentProfile?.paymentPreference === 'ABN' ? (
+                            <Text style={styles.error}>
+                                Pharmacy staff use the TFN employee pathway. ABN is reserved for independent-contractor shift work.
+                            </Text>
+                        ) : null}
+                        {isStaff && payrollEnabled && paymentProfile?.paymentPreference === 'TFN' && !paymentProfile?.payrollReady ? (
+                            <Text style={styles.warning}>
+                                ChemistTasker Payroll is enabled. Approval stays blocked until the worker completes private TFN and super setup.
+                            </Text>
+                        ) : null}
+                        {isStaff && !payrollEnabled && paymentProfile?.paymentPreference === 'TFN' ? (
+                            <Text style={styles.success}>
+                                TFN employee pathway confirmed. ChemistTasker will keep roster, attendance and timesheets while this pharmacy processes payroll externally.
+                            </Text>
+                        ) : null}
+                        {!isStaff ? (
+                            <Text style={styles.notice}>
+                                Favourite workers can be TFN or ABN. The verified worker profile decides each accepted shift: TFN routes to payroll/timesheet employment terms; ABN routes to invoice settlement.
+                            </Text>
+                        ) : null}
 
                         <Divider />
                         <Text style={styles.sectionTitle}>Reviewed details</Text>
@@ -395,7 +471,7 @@ export default function MembershipApplicationReviewDialog({
 
                         {existingChanges.length ? (
                             <Text style={styles.warning}>
-                                {existingChanges.length} review change(s) already recorded. The full change list will be included in the approval notification.
+                                {existingChanges.length} review change(s) already recorded. Saved edits are emailed immediately and the full change list is included in the approval notification.
                             </Text>
                         ) : null}
 
@@ -489,6 +565,7 @@ export default function MembershipApplicationReviewDialog({
 const styles = StyleSheet.create({
     scrollArea: { maxHeight: 650 },
     content: { paddingVertical: 16, gap: 12 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 4 },
     notice: { color: surfaceTokens.textMuted, lineHeight: 20 },
     success: { color: '#166534', lineHeight: 20 },
