@@ -94,7 +94,10 @@ def _parse_required_datetime(value, label):
 def _serialize_engagement(row):
     membership = row.membership
     user = membership.user
-    correspondence = correspondence_profile(row.employment_type, row.pay_basis)
+    correspondence = (
+        row.award_rate_snapshot.get("correspondence")
+        or correspondence_profile(row.employment_type, row.pay_basis)
+    )
     return {
         "id": row.pk,
         "public_id": str(row.public_id),
@@ -222,8 +225,9 @@ def _engagement_payload(request_data, membership, *, existing=None):
     else:
         ordinary_hours_pattern = {}
 
-    # Fail closed if the employment/pay combination has no correspondence profile.
-    correspondence_profile(employment_type, pay_basis)
+    # Fail closed if the employment/pay combination has no correspondence profile,
+    # then freeze that selection with the engagement's rate snapshot.
+    correspondence = correspondence_profile(employment_type, pay_basis)
 
     # Always resolve the Award underpinning. For above-award engagements this is
     # retained as the correspondence/minimum floor rather than discarded.
@@ -233,6 +237,7 @@ def _engagement_payload(request_data, membership, *, existing=None):
         employment_type=employment_type,
     )
     resolved["adult_rate_confirmed"] = adult_rate_confirmed if adult_confirmation_required else None
+    resolved["correspondence"] = correspondence
 
     payload = {
         "role": role,
@@ -386,6 +391,7 @@ def _engagement_payload(request_data, membership, *, existing=None):
         award_rate_snapshot={
             "kind": "ABOVE_AWARD",
             "adult_rate_confirmed": adult_rate_confirmed if adult_confirmation_required else None,
+            "correspondence": correspondence,
             "award_floor": resolved,
             "agreed_rates": agreed_snapshot,
             "effective_ordinary_schedule": effective_ordinary_schedule,
