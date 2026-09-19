@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { surfaceTokens } from './types';
 
 export const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: surfaceTokens.bgDark },
