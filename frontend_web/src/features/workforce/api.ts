@@ -21,6 +21,8 @@ export const decideTimesheetCheck = (checkId: number, decision: 'RESOLVED' | 'WA
 export const addTimesheetComment = (timesheetId: number, body: string, workerVisible = true) => workforce.addTimesheetComment(timesheetId, body, workerVisible);
 export const fetchMyHours = (params?: { pharmacy_id?: number; period_id?: number }) => workforce.getMyHours(params);
 export const addMissingPunch = (timesheetId: number, args: { sessionId: number; eventType: 'CLOCK_IN' | 'CLOCK_OUT'; occurredAt?: string; occurredAtLocal?: string; reason: string }) => workforce.addMissingPunch(timesheetId, { session_id: args.sessionId, event_type: args.eventType, ...(args.occurredAt ? { occurred_at: args.occurredAt } : {}), ...(args.occurredAtLocal ? { occurred_at_local: args.occurredAtLocal } : {}), reason: args.reason });
+export const getPayrollConfiguration = (pharmacyId: number) => workforce.getPayrollConfiguration(pharmacyId);
+export const updatePayrollConfiguration = (pharmacyId: number, enabled: boolean) => workforce.updatePayrollConfiguration({ pharmacy_id: pharmacyId, use_chemisttasker_payroll: enabled });
 export const listCoverageRequirements = (pharmacyId: number) => workforce.listCoverageRequirements(pharmacyId);
 export const createCoverageRequirement = (payload: { pharmacy_id: number; weekday: number; start_time: string; end_time: string; role: string; minimum_staff: number; active?: boolean }) => workforce.createCoverageRequirement(payload);
 export const deleteCoverageRequirement = (id: number) => workforce.deleteCoverageRequirement(id);

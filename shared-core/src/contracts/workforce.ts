@@ -128,6 +128,18 @@ export interface WorkforceTimesheetDetail extends WorkforceTimesheetRow {
   comments: Array<{ id: number; author_id: number; author_name: string; body: string; worker_visible: boolean; created_at: string }>;
 }
 
+export interface WorkforcePayrollConfiguration {
+  pharmacy_id: number;
+  pharmacy_name: string;
+  use_chemisttasker_payroll: boolean;
+  requirements: {
+    staff_employment_terms: string;
+    worker_payment_details: string;
+    when_disabled: string;
+    abn_workers: string;
+  };
+}
+
 export interface WorkforceCoverageRequirement {
   id: number;
   weekday: number;

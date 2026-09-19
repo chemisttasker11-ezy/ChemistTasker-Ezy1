@@ -1204,9 +1204,33 @@ export interface MembershipApplicationApi {
     otherstaff_classification_level?: string | null;
     intern_half?: string | null;
     student_year?: string | null;
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+    submitted_snapshot?: Record<string, unknown>;
+    review_changes?: Array<{
+        field: string;
+        from: unknown;
+        to: unknown;
+        edited_at?: string | null;
+        edited_by_user_id?: number | null;
+    }>;
+    reviewed_at?: string | null;
+    reviewed_by?: number | null;
+    approved_membership?: number | null;
+    payroll_enabled?: boolean;
 }
 
 export type MembershipApplication = CamelCasedPropertiesDeep<MembershipApplicationApi>;
+
+export interface MembershipApplicationReviewPayload {
+    role?: string;
+    first_name?: string;
+    last_name?: string;
+    job_title?: string | null;
+    pharmacist_award_level?: string | null;
+    otherstaff_classification_level?: string | null;
+    intern_half?: string | null;
+    student_year?: string | null;
+}
 
 export interface Invoice {
     id: number;
