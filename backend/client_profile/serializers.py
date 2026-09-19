@@ -6065,8 +6065,6 @@ class MyShiftSerializer(serializers.ModelSerializer):
         qs = obj.slots.filter(id__in=slot_ids)
 
         return ShiftSlotSerializer(qs, many=True).data
-
-        return ShiftSlotSerializer(qs, many=True).data
     def get_line_items(self, obj):
         user = self.context['request'].user
         from client_profile.services import generate_preview_invoice_lines
@@ -6271,13 +6269,15 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
     shift_detail = RosterShiftDetailSerializer(source='shift', read_only=True)
     leave_request = serializers.SerializerMethodField()
     origin = serializers.SerializerMethodField()
+    workforce_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ShiftSlotAssignment
         fields = [
             "id", "slot_date", "unit_rate", "rate_reason", "is_rostered",
             "payment_preference_snapshot", "settlement_channel", "engagement_kind",
-            "engagement_terms_accepted_at",
+            "engagement_terms_snapshot", "engagement_terms_accepted_at", "payroll_activated_at",
+            "workforce_status",
             "user", "slot", "shift",
             "user_detail",
             "slot_detail",
@@ -6285,6 +6285,68 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
             "leave_request",
             "origin",
         ]
+
+    def get_workforce_status(self, obj):
+        snapshot = obj.engagement_terms_snapshot or {}
+        timesheet = None
+        if obj.user_id and obj.shift_id and obj.slot_date:
+            from workforce.models import Timesheet
+            timesheet = (
+                Timesheet.objects
+                .filter(
+                    user_id=obj.user_id,
+                    period__pharmacy_id=obj.shift.pharmacy_id,
+                    period__start_date__lte=obj.slot_date,
+                    period__end_date__gte=obj.slot_date,
+                )
+                .select_related("period")
+                .order_by("-period__start_date", "-id")
+                .first()
+            )
+
+        rates = snapshot.get("rates") or {}
+        occurrences = snapshot.get("occurrences") or []
+        occurrence = next(
+            (item for item in occurrences if str(item.get("date") or "") == str(obj.slot_date)),
+            occurrences[0] if occurrences else {},
+        )
+        agreed_rate = (
+            occurrence.get("agreed_rate")
+            or snapshot.get("agreed_rate")
+            or obj.unit_rate
+        )
+        return {
+            "payment_preference": obj.payment_preference_snapshot or snapshot.get("payment_preference") or "",
+            "settlement_channel": obj.settlement_channel or snapshot.get("settlement_channel") or "",
+            "engagement_kind": obj.engagement_kind or snapshot.get("engagement_kind") or "",
+            "employment_type": snapshot.get("employment_type") or "",
+            "pay_basis": snapshot.get("pay_basis") or "",
+            "award_code": snapshot.get("award_code") or "",
+            "award_classification": snapshot.get("award_classification") or "",
+            "employment_engagement_public_id": snapshot.get("employment_engagement_public_id"),
+            "rates": rates,
+            "agreed_rate": str(agreed_rate) if agreed_rate not in (None, "") else None,
+            "payroll_ready": (
+                (obj.settlement_channel or snapshot.get("settlement_channel")) != "PAYROLL"
+                or bool(obj.payroll_activated_at)
+                or not bool(snapshot.get("payroll_activation_required"))
+            ),
+            "payroll_activation_required": bool(snapshot.get("payroll_activation_required")),
+            "payroll_missing_fields": snapshot.get("payroll_missing_fields") or [],
+            "payroll_activated_at": obj.payroll_activated_at.isoformat() if obj.payroll_activated_at else None,
+            "timesheet": {
+                "id": timesheet.id,
+                "period_id": timesheet.period_id,
+                "period_status": timesheet.period.status,
+                "status": timesheet.status,
+                "needs_rebuild": timesheet.needs_rebuild,
+                "rostered_minutes": timesheet.rostered_minutes,
+                "worked_minutes": timesheet.worked_minutes,
+                "reviewed_minutes": timesheet.reviewed_minutes,
+                "blocking_checks": timesheet.blocking_checks,
+                "warning_checks": timesheet.warning_checks,
+            } if timesheet else None,
+        }
 
     def get_leave_request(self, obj):
         # Get latest leave request with status PENDING or APPROVED
