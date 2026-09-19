@@ -1,0 +1,73 @@
+name: Build Kiosk Acceptance EXE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend_web/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend_web/src-tauri -> target
+          cache-on-failure: true
+
+      - name: Install frontend dependencies
+        working-directory: frontend_web
+        shell: pwsh
+        run: npm ci
+
+      - name: Typecheck kiosk
+        working-directory: frontend_web
+        shell: pwsh
+        run: npm run typecheck:kiosk
+
+      - name: Build acceptance kiosk EXE
+        working-directory: frontend_web
+        shell: pwsh
+        env:
+          KIOSK_BUILD_PROFILE: acceptance
+          VITE_API_URL: http://127.0.0.1:8000
+          CARGO_BUILD_JOBS: '2'
+          CARGO_INCREMENTAL: '0'
+        run: node scripts/run-tauri.mjs build --no-bundle
+
+      - name: Stage acceptance artifact
+        shell: pwsh
+        run: |
+          $source = 'frontend_web/src-tauri/target/release/chemisttasker-kiosk.exe'
+          if (-not (Test-Path $source)) { throw "Compiled EXE not found at $source" }
+          New-Item -ItemType Directory -Force -Path build-output | Out-Null
+          Copy-Item $source 'build-output/chemisttasker-kiosk-acceptance.exe' -Force
+          $hash = (Get-FileHash 'build-output/chemisttasker-kiosk-acceptance.exe' -Algorithm SHA256).Hash.ToLower()
+          $size = (Get-Item 'build-output/chemisttasker-kiosk-acceptance.exe').Length
+          "SHA256=$hash`nSIZE_BYTES=$size`nAPI_URL=http://127.0.0.1:8000`nPROFILE=acceptance`nSOURCE_SHA=${{ github.sha }}" | Set-Content 'build-output/BUILD-INFO.txt'
+          Get-Content 'build-output/BUILD-INFO.txt'
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chemisttasker-kiosk-acceptance-windows
+          path: |
+            build-output/chemisttasker-kiosk-acceptance.exe
+            build-output/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 7
