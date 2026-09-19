@@ -24,7 +24,6 @@ from client_profile.models import (
     RosterPeriod,
 )
 from client_profile.timezone_utils import get_pharmacy_timezone
-from client_profile.engagement_routing import validate_tfn_payroll_profile
 
 from .attendance_edits import append_missing_punch
 from .award_rates import (
@@ -200,7 +199,6 @@ def _engagement_payload(request_data, membership, *, effective_from=None, effect
         raise DjangoValidationError(
             {"employment_type": "Employment engagement must be FULL_TIME, PART_TIME or CASUAL."}
         )
-    validate_tfn_payroll_profile(membership.user)
 
     pay_basis = str(request_data.get("pay_basis") or getattr(existing, "pay_basis", None) or "").upper()
     if pay_basis not in {EmploymentEngagement.PayBasis.AWARD, EmploymentEngagement.PayBasis.ABOVE_AWARD}:
@@ -435,6 +433,64 @@ def _engagement_payload(request_data, membership, *, effective_from=None, effect
         late_night_applicable=late_applies,
     )
     return payload
+
+
+class PharmacyPayrollConfigurationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @staticmethod
+    def _serialize(pharmacy):
+        return {
+            "pharmacy_id": pharmacy.pk,
+            "pharmacy_name": pharmacy.name,
+            "use_chemisttasker_payroll": bool(pharmacy.use_chemisttasker_payroll),
+            "requirements": {
+                "staff_employment_terms": (
+                    "When enabled, each TFN pharmacy staff member needs a dated EmploymentEngagement "
+                    "with employment type, Award classification, Award or above-award rates, and "
+                    "part-time ordinary hours where applicable."
+                ),
+                "worker_payment_details": (
+                    "Before ChemistTasker payroll can process a worker, their onboarding must contain "
+                    "TFN details plus super fund name, USI and member number."
+                ),
+                "when_disabled": (
+                    "Award classifications and ChemistTasker pay rates are not required. Roster, "
+                    "attendance and timesheets continue and can be handed to the pharmacy's own payroll system."
+                ),
+                "abn_workers": (
+                    "ABN assignees remain outside payroll and are routed to invoicing after their "
+                    "per-shift terms are accepted."
+                ),
+            },
+        }
+
+    def get(self, request):
+        try:
+            pharmacy = _pharmacy(request.query_params.get("pharmacy_id"))
+            require_manage_pharmacy(request.user, pharmacy)
+            return Response(self._serialize(pharmacy))
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+
+    def patch(self, request):
+        try:
+            pharmacy = _pharmacy(request.data.get("pharmacy_id"))
+            require_manage_pharmacy(request.user, pharmacy)
+            raw = request.data.get("use_chemisttasker_payroll")
+            if not isinstance(raw, bool):
+                raise DjangoValidationError({
+                    "use_chemisttasker_payroll": "Provide true or false."
+                })
+            pharmacy.use_chemisttasker_payroll = raw
+            pharmacy.save(update_fields=["use_chemisttasker_payroll"])
+            return Response(self._serialize(pharmacy))
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
 
 
 class EmploymentEngagementAwardPreviewView(APIView):

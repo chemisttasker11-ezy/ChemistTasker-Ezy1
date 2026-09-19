@@ -115,7 +115,8 @@ EMPLOYEE_ENGAGEMENT_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
 
 def _employment_engagements_for_period(membership, period: TimesheetPeriod):
     if (
-        not membership
+        not getattr(period.pharmacy, "use_chemisttasker_payroll", False)
+        or not membership
         or not membership.is_pharmacy_staff_member
         or membership.employment_type not in EMPLOYEE_ENGAGEMENT_TYPES
     ):
@@ -187,6 +188,7 @@ def _attach_employment_engagements(day_rows, membership, period: TimesheetPeriod
             membership
             and membership.is_pharmacy_staff_member
             and membership.employment_type in EMPLOYEE_ENGAGEMENT_TYPES
+            and getattr(period.pharmacy, "use_chemisttasker_payroll", False)
             and match is None
         ):
             missing_dates.add(work_date)
@@ -722,7 +724,11 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
         reviewed_minutes = 0
         snapshot = {
             "worker": {"id": timesheet.user_id, "name": timesheet.user.get_full_name() or timesheet.user.username},
-            "pharmacy": {"id": period.pharmacy_id, "name": period.pharmacy.name},
+            "pharmacy": {
+                "id": period.pharmacy_id,
+                "name": period.pharmacy.name,
+                "use_chemisttasker_payroll": bool(getattr(period.pharmacy, "use_chemisttasker_payroll", False)),
+            },
             "period": {"id": period.pk, "start_date": str(period.start_date), "end_date": str(period.end_date), "timezone": period.timezone},
             "employment_engagements": engagement_rows,
             "days": day_rows,
