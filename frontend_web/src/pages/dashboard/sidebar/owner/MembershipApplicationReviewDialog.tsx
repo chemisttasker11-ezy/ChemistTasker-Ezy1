@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -204,6 +205,26 @@ export default function MembershipApplicationReviewDialog({
     dateOfBirth: read(localApp, 'dateOfBirth', 'date_of_birth'),
     username: read(localApp, 'username', 'username'),
   };
+  const paymentProfile = (
+    (localApp as any)?.paymentProfileStatus
+    ?? (localApp as any)?.payment_profile_status
+    ?? null
+  ) as null | {
+    accountLinked?: boolean;
+    onboardingComplete?: boolean;
+    paymentPreference?: 'TFN' | 'ABN' | null;
+    status?: string;
+    payrollReady?: boolean;
+    invoiceReady?: boolean;
+    missingFields?: string[];
+  };
+  const staffPaymentPathReady =
+    !isStaff
+    || (
+      paymentProfile?.paymentPreference === 'TFN'
+      && (!payrollEnabled || Boolean(paymentProfile?.payrollReady))
+    );
+  const paymentMissing = paymentProfile?.missingFields || [];
 
   useEffect(() => {
     if (!open || !localApp || !isStaff || !payrollEnabled || !classification || !effectiveFrom) {
@@ -342,6 +363,7 @@ export default function MembershipApplicationReviewDialog({
     && (!isStaff || !payrollEnabled || Boolean(preview))
     && (!isStaff || !payrollEnabled || payBasis !== 'ABOVE_AWARD' || aboveAwardChanged)
     && (!isStaff || !payrollEnabled || partTimeReady)
+    && staffPaymentPathReady
     && !saving;
 
   return (
@@ -361,6 +383,67 @@ export default function MembershipApplicationReviewDialog({
               <TextField label="Date of birth" value={identifiers.dateOfBirth} disabled fullWidth />
               <TextField label="Username" value={identifiers.username} disabled fullWidth />
             </Box>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <Stack spacing={1.25}>
+              <Box>
+                <Typography fontWeight={900}>Worker payment profile · source of truth</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  This is a readiness summary only. Raw TFN and super member numbers remain private to the worker and are never shown to the pharmacy.
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                <Chip
+                  size="small"
+                  label={paymentProfile?.paymentPreference || 'Payment preference not set'}
+                  color={paymentProfile?.paymentPreference === 'TFN' ? 'primary' : paymentProfile?.paymentPreference === 'ABN' ? 'secondary' : 'warning'}
+                />
+                {paymentProfile?.paymentPreference === 'TFN' && (
+                  <Chip
+                    size="small"
+                    label={paymentProfile.payrollReady ? 'Payroll profile ready' : 'Payroll profile incomplete'}
+                    color={paymentProfile.payrollReady ? 'success' : 'warning'}
+                    variant="outlined"
+                  />
+                )}
+                {paymentProfile?.paymentPreference === 'ABN' && (
+                  <Chip
+                    size="small"
+                    label={paymentProfile.invoiceReady ? 'Invoice profile ready' : 'Invoice profile incomplete'}
+                    color={paymentProfile.invoiceReady ? 'success' : 'warning'}
+                    variant="outlined"
+                  />
+                )}
+                {!paymentProfile?.accountLinked && <Chip size="small" label="Worker account not linked" color="warning" variant="outlined" />}
+                {paymentProfile?.accountLinked && !paymentProfile?.onboardingComplete && <Chip size="small" label="Onboarding incomplete" color="warning" variant="outlined" />}
+              </Stack>
+              {paymentMissing.length > 0 && (
+                <Typography variant="body2" color="warning.main">
+                  Still required in the worker's private profile: {paymentMissing.map((field) => field.replaceAll('_', ' ')).join(', ')}.
+                </Typography>
+              )}
+              {isStaff && paymentProfile?.paymentPreference === 'ABN' && (
+                <Alert severity="error">
+                  This is a pharmacy-staff application. Full-time, part-time and casual pharmacy staff use the TFN employee pathway; ABN is reserved for independent-contractor shift work.
+                </Alert>
+              )}
+              {isStaff && payrollEnabled && paymentProfile?.paymentPreference === 'TFN' && !paymentProfile?.payrollReady && (
+                <Alert severity="warning">
+                  ChemistTasker Payroll is enabled. Approval will stay blocked until the worker completes the missing TFN/super setup in their private profile.
+                </Alert>
+              )}
+              {isStaff && !payrollEnabled && paymentProfile?.paymentPreference === 'TFN' && (
+                <Alert severity="info">
+                  The worker is on the TFN employee pathway. ChemistTasker will keep roster, attendance and timesheets as the operational source while this pharmacy processes payroll externally.
+                </Alert>
+              )}
+              {!isStaff && (
+                <Alert severity="info">
+                  Favourite-list workers can be TFN or ABN. Their worker profile decides the pathway for each accepted shift: TFN routes to payroll/timesheet employment terms; ABN routes to invoice settlement.
+                </Alert>
+              )}
+            </Stack>
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 1.5 }}>
