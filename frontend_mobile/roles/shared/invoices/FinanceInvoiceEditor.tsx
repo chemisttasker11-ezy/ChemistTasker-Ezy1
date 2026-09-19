@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextInput, useTheme } from 'react-native-paper';
-import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine } from '@chemisttasker/shared-core';
+import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 
@@ -14,6 +14,13 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [busy, setBusy] = useState(false); const running = useRef(false);
   const [error, setError] = useState(''); const [preview, setPreview] = useState<FinanceCalculation | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false); const [itemOpen, setItemOpen] = useState(false);
+  const [itemOptions, setItemOptions] = useState<FinanceItem[]>(items);
+  const [newItemOpen, setNewItemOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemUnit, setNewItemUnit] = useState('Item');
+  const [newItemPrice, setNewItemPrice] = useState('0.00');
+  const [newItemCategory, setNewItemCategory] = useState<FinanceCategory>('Miscellaneous');
+  const [newItemTax, setNewItemTax] = useState<FinanceTaxCode>('OUT_OF_SCOPE');
   const [businessOpen, setBusinessOpen] = useState(!value.issuer_name);
   const [query, setQuery] = useState('');
   const [internalSources, setInternalSources] = useState<FinanceInternalSource[]>([]);
@@ -44,6 +51,38 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     }).catch((e: any) => setError(e.message || 'Unable to load invoice defaults.'));
     return () => { active = false; };
   }, [initial]);
+  useEffect(() => { setItemOptions(items); }, [items]);
+  const saveNewItem = async () => {
+    const name = newItemName.trim();
+    const unit = newItemUnit.trim() || 'Item';
+    if (!name) { setError('Enter an item name before saving it to your list.'); return; }
+    setBusy(true); setError('');
+    try {
+      const saved = await finance.saveItem({
+        code: '',
+        name,
+        category: newItemCategory,
+        unit,
+        unit_price: newItemPrice || '0.00',
+        tax_code: newItemTax,
+        super_eligible: false,
+        active: true,
+      });
+      setItemOptions(current => [...current, saved]);
+      setValue(current => ({ ...current, lines: [...current.lines, financeItemLine(saved)] }));
+      setNewItemName('');
+      setNewItemUnit('Item');
+      setNewItemPrice('0.00');
+      setNewItemCategory('Miscellaneous');
+      setNewItemTax('OUT_OF_SCOPE');
+      setNewItemOpen(false);
+      setItemOpen(false);
+    } catch (e: any) {
+      setError(e.message || 'Unable to save the new item.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const applyInternalSource = async (source: FinanceInternalSource) => {
     setBusy(true); setError('');
     try {
@@ -99,8 +138,19 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         {field('invoice_date', 'Issue date (YYYY-MM-DD)')}{field('due_date', 'Due date (YYYY-MM-DD)')}
         <View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.price_mode === 'exclusive'} onPress={() => change('price_mode', 'exclusive')}>GST exclusive</Chip><Chip selected={value.price_mode === 'inclusive'} onPress={() => change('price_mode', 'inclusive')}>GST inclusive</Chip></View>
       </Surface>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Text variant="titleMedium" style={{ flex: 1 }}>Items & services</Text><Button compact icon="plus" onPress={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Blank row</Button><Button compact icon="playlist-plus" onPress={() => { setItemOpen(!itemOpen); setCustomerOpen(false); setQuery(''); }}>Saved item</Button></View>
-      {itemOpen && <Surface elevation={0} style={{ borderRadius: 8, padding: 12 }}><TextInput mode="outlined" dense label="Search items" value={query} onChangeText={setQuery} />{items.filter(i => i.active && `${i.code} ${i.name}`.toLowerCase().includes(query.toLowerCase())).map(item => <List.Item key={item.id} title={item.name} description={`${item.code} · ${money(item.unit_price)} / ${item.unit}`} onPress={() => { change('lines', [...value.lines, financeItemLine(item)]); setItemOpen(false); }} />)}{!items.length && <Text>Add saved items from the Items tab.</Text>}</Surface>}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Text variant="titleMedium" style={{ flex: 1 }}>Items & services</Text><Button compact icon="plus" onPress={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Ad-hoc row</Button><Button compact icon="playlist-plus" onPress={() => { setItemOpen(!itemOpen); setNewItemOpen(false); setCustomerOpen(false); setQuery(''); }}>Saved item</Button><Button compact icon="plus-box-outline" onPress={() => { setNewItemOpen(!newItemOpen); setItemOpen(false); setCustomerOpen(false); }}>Add new saved item</Button></View>
+      {itemOpen && <Surface elevation={0} style={{ borderRadius: 8, padding: 12 }}><TextInput mode="outlined" dense label="Search items" value={query} onChangeText={setQuery} />{itemOptions.filter(i => i.active && `${i.code} ${i.name}`.toLowerCase().includes(query.toLowerCase())).map(item => <List.Item key={item.id} title={item.name} description={`${item.code ? `${item.code} · ` : ''}${money(item.unit_price)} / ${item.unit}`} onPress={() => { setValue(current => ({ ...current, lines: [...current.lines, financeItemLine(item)] })); setItemOpen(false); }} />)}{!itemOptions.length && <Text style={{ padding: 8 }}>No saved items yet. Use “Add new saved item”, or add an ad-hoc row.</Text>}</Surface>}
+      {newItemOpen && <Surface elevation={0} style={{ borderRadius: 8, padding: 12, gap: 10 }}>
+        <Text variant="titleSmall">Add reusable item</Text>
+        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>These are defaults only. Description, unit, price and tax can still be changed freely on this invoice.</Text>
+        <TextInput mode="outlined" dense label="Item name *" value={newItemName} onChangeText={setNewItemName} />
+        <View style={{ flexDirection: 'row', gap: 8 }}><TextInput mode="outlined" dense style={{ flex: 1 }} label="Unit" value={newItemUnit} onChangeText={setNewItemUnit} /><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Default price" value={newItemPrice} onChangeText={setNewItemPrice} /></View>
+        <Text variant="labelMedium">Category</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(['ProfessionalServices', 'Transportation', 'Accommodation', 'Miscellaneous', 'Superannuation'] as FinanceCategory[]).map(category => <Chip key={category} compact selected={newItemCategory === category} onPress={() => setNewItemCategory(category)}>{category.replace(/([A-Z])/g, ' $1').trim()}</Chip>)}</View>
+        <Text variant="labelMedium">Tax default</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'] as FinanceTaxCode[]).map((tax, i) => <Chip key={tax} compact selected={newItemTax === tax} onPress={() => setNewItemTax(tax)}>{['GST 10%', 'GST-free', 'Input taxed', 'N-T / not taxable'][i]}</Chip>)}</View>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}><Button disabled={busy} onPress={() => setNewItemOpen(false)}>Cancel</Button><Button mode="contained" loading={busy} disabled={busy || !newItemName.trim()} onPress={() => void saveNewItem()}>Save & add</Button></View>
+      </Surface>}
       {!value.lines.length && <Text style={{ padding: 24, textAlign: 'center', color: theme.colors.onSurfaceVariant }}>Add the work you’re billing for.</Text>}
       {value.lines.map((line, index) => <Surface key={`${index}-${line.item_id}`} elevation={0} style={{ padding: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}><Text variant="titleSmall" style={{ flex: 1 }}>Item {index + 1}</Text>{line.source_assignment_id ? <Chip compact>Shift source · revision tracked</Chip> : null}<IconButton icon="delete-outline" disabled={Boolean(line.source_assignment_id)} accessibilityLabel={`Remove item ${index + 1}`} onPress={() => change('lines', value.lines.filter((_, i) => i !== index))} /></View>
