@@ -33,13 +33,21 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   };
   const field = (key: keyof FinanceDraft, label: string, decimal = false) => <TextInput key={key} mode="outlined" dense label={label} value={String(value[key] ?? '')} disabled={busy} keyboardType={decimal ? 'decimal-pad' : 'default'} onChangeText={text => change(key, text as never)} style={{ marginBottom: 12 }} />;
   const customer = customers.find(c => c.id === value.customer_id);
+  const internalSource = initial?.source === 'internal';
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: theme.colors.background }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, borderBottomWidth: 1, borderColor: theme.colors.outlineVariant }}><IconButton icon="arrow-left" accessibilityLabel="Back to invoices" onPress={close} disabled={busy} /><Text variant="titleLarge" style={{ flex: 1 }}>{initial ? initial.number : 'Create invoice'}</Text><Button mode="contained" loading={busy} disabled={busy} onPress={save}>Save draft</Button></View>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
       {!!error && <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{error}</Text>}
+      {internalSource ? (
+        <Surface elevation={0} style={{ padding: 12, borderRadius: 8, backgroundColor: theme.colors.secondaryContainer }}>
+          <Text style={{ color: theme.colors.onSecondaryContainer }}>
+            Accepted-shift invoice: the pharmacy/customer and accepted labour rows are locked. Reimbursements and reviewed super remain editable.
+          </Text>
+        </Surface>
+      ) : null}
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
         <Chip style={{ alignSelf: 'flex-start', marginBottom: 16 }}>Draft</Chip>
-        <Button mode="outlined" icon="account-outline" onPress={() => { setCustomerOpen(!customerOpen); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
+        <Button mode="outlined" icon="account-outline" disabled={internalSource} onPress={() => { setCustomerOpen(!customerOpen); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
         {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customers.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customers.length && <Text style={{ padding: 12 }}>Add a customer from Customers before creating an invoice.</Text>}</View>}
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 16 }}>{customer?.address || 'Customer billing address'}</Text>
         {field('reference', 'Customer PO / reference')}
