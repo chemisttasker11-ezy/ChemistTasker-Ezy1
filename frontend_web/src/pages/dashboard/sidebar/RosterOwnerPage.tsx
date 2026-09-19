@@ -11,31 +11,21 @@ import {
   Button,
   ButtonGroup,
   Box,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   SelectChangeEvent,
-  TextField,
-  List,
   ListItem,
   ListItemText,
   CircularProgress,
   Checkbox,
   OutlinedInput,
-  FormControlLabel,
-  Paper,
-  Chip,
   Snackbar,
   IconButton,
 } from '@mui/material';
 
-import { Close as CloseIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
-import PostShiftPage from './PostShiftPage';
+import { Close as CloseIcon } from '@mui/icons-material';
 import RosterOwnerDialogs from './RosterOwnerDialogs';
 
 // Calendar Imports
