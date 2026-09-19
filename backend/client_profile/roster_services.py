@@ -26,6 +26,7 @@ from client_profile.models import (
     UserAvailability,
 )
 from client_profile.attendance_approvals import is_authorized_attendance_manager
+from client_profile.engagement_routing import staff_assignment_defaults
 
 User = get_user_model()
 
@@ -670,6 +671,11 @@ def copy_roster_week(source_period, target_week_start, user, include_assignments
                         user=assignment.user,
                         unit_rate=assignment.unit_rate,
                         is_rostered=True,
+                        **staff_assignment_defaults(
+                            user=assignment.user,
+                            pharmacy=source_period.pharmacy,
+                            work_date=new_date,
+                        ),
                     )
                     assignments_copied += 1
 
@@ -859,6 +865,11 @@ def apply_roster_template(pharmacy, template, target_week_start, user, include_a
                         slot_date=entry_date,
                         user=worker,
                         is_rostered=True,
+                        **staff_assignment_defaults(
+                            user=worker,
+                            pharmacy=pharmacy,
+                            work_date=entry_date,
+                        ),
                     )
                     assignments_created += 1
 
@@ -997,6 +1008,11 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         slot_date=shift_date,
                         user=worker,
                         is_rostered=True,
+                        **staff_assignment_defaults(
+                            user=worker,
+                            pharmacy=roster_period.pharmacy,
+                            work_date=shift_date,
+                        ),
                     )
                 changed_slots.add(new_slot.pk)
                 summary["created"] += 1
@@ -1018,6 +1034,11 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 if not worker:
                     raise ValidationError(f"Operation {idx}: User {user_id} not found.")
 
+                assignment_defaults = staff_assignment_defaults(
+                    user=worker,
+                    pharmacy=roster_period.pharmacy,
+                    work_date=slot.date,
+                )
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot.date,
@@ -1025,6 +1046,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         "shift": slot.shift,
                         "user": worker,
                         "is_rostered": True,
+                        **assignment_defaults,
                     },
                 )
                 changed_slots.add(slot.pk)
@@ -1130,6 +1152,11 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         worker = User.objects.filter(pk=target_user_id).first()
                         if not worker:
                             raise ValidationError(f"Operation {idx}: User {target_user_id} not found.")
+                        assignment_defaults = staff_assignment_defaults(
+                            user=worker,
+                            pharmacy=roster_period.pharmacy,
+                            work_date=target_date,
+                        )
                         ShiftSlotAssignment.objects.update_or_create(
                             slot=slot,
                             defaults={
@@ -1137,6 +1164,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                                 "user": worker,
                                 "slot_date": target_date,
                                 "is_rostered": True,
+                                **assignment_defaults,
                             },
                         )
                 changed_slots.add(slot.pk)
