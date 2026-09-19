@@ -21,6 +21,7 @@ export interface FinanceLine {
   item_id: number; description?: string; quantity: string; unit_price: FinanceMoney;
   discount: string; tax_code?: FinanceTaxCode; super_eligible?: boolean; worked_on?: string | null;
   category_code?: FinanceCategory; unit?: FinanceUnit;
+  locked?: boolean; source_assignment_id?: number | null; shift_id?: number | null;
 }
 export interface FinanceDraft {
   request_key: string; version?: number; customer_id: number; invoice_date: string; due_date: string;
@@ -38,7 +39,8 @@ export interface FinanceCalculation {
 export interface FinanceInvoice {
   id: number; invoice_id: number; number: string; version: number; request_key: string;
   kind: 'invoice' | 'super_request'; source: 'external' | 'internal'; payload: FinanceDraft;
-  calculation: FinanceCalculation; locked: boolean; voided: boolean; status: 'draft' | 'sent' | 'paid' | 'void';
+  calculation: FinanceCalculation; source_snapshot?: Record<string, unknown>;
+  locked: boolean; voided: boolean; status: 'draft' | 'sent' | 'paid' | 'void';
   delivery_status: string | null; paid: string; balance: string; super_document_id: number | null;
   payments: { id: number; date: string; amount: string; reference: string }[];
 }
