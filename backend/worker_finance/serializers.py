@@ -76,6 +76,11 @@ class LineInput(serializers.Serializer):
     tax_code = serializers.ChoiceField(choices=TAX_CODES, required=False)
     super_eligible = serializers.BooleanField(required=False)
     worked_on = serializers.DateField(required=False, allow_null=True)
+    # Internal accepted-shift drafts carry server-issued source identities.
+    # save_draft validates these against the frozen record before preserving them.
+    locked = serializers.BooleanField(required=False, default=False)
+    source_assignment_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    shift_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
 
 
 class InvoiceInput(serializers.Serializer):
