@@ -9,6 +9,7 @@ from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
 from django.db import transaction, IntegrityError
 from django.db.models import Sum
+from django.db import models
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -23,11 +24,15 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from django.apps import apps
 Invoice = apps.get_model('client_profile', 'Invoice')
+Notification = apps.get_model('client_profile', 'Notification')
 from .calculations import CalculationError, expense_gst_credit, shift_hours, ZERO
-from .models import Customer, CatalogueItem, InvoiceRecord, Expense, Receipt, Delivery, Payment
+from .models import Customer, CatalogueItem, InvoiceRecord, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
 from .serializers import CustomerSerializer, ItemSerializer, InvoiceInput, ExpenseSerializer, MoneyField
-from .services import (save_draft, snapshot_lines, calculate, serialize_record, duplicate,
-                       make_super_document, record_payment, check_version, json_safe)
+from .services import (
+    save_draft, snapshot_lines, calculate, serialize_record, duplicate,
+    make_super_document, record_payment, check_version, json_safe,
+    invoice_defaults, internal_invoice_sources, internal_invoice_prefill,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -151,12 +156,27 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         pager = PageNumberPagination()
         records = (InvoiceRecord.objects.filter(owner=request.user)
                    .select_related('invoice', 'owner', 'customer')
-                   .prefetch_related('payments', 'deliveries', 'super_document'))
+                   .prefetch_related('payments', 'deliveries', 'super_document', 'revisions', 'review_requests__requested_by'))
         page = pager.paginate_queryset(records, request)
         return pager.get_paginated_response([serialize_record(record) for record in page])
 
     def retrieve(self, request, pk=None):
         return Response(serialize_record(self.owned(request, pk)))
+
+    @action(detail=False, methods=['get'], url_path='defaults')
+    def defaults(self, request):
+        return Response(invoice_defaults(request.user))
+
+    @action(detail=False, methods=['get'], url_path='internal-sources')
+    def internal_sources(self, request):
+        return Response(internal_invoice_sources(request.user))
+
+    @action(detail=False, methods=['post'], url_path='internal-prefill')
+    def internal_prefill(self, request):
+        assignment_ids = request.data.get('assignment_ids')
+        if not isinstance(assignment_ids, list) or not assignment_ids:
+            raise ValidationError({'assignment_ids': 'Choose at least one accepted ABN shift assignment.'})
+        return Response(internal_invoice_prefill(request.user, assignment_ids))
 
     def create(self, request):
         schema = InvoiceInput(data=request.data)
@@ -193,18 +213,27 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
 
     @action(detail=True, methods=['post'])
     def issue(self, request, pk=None):
+        # Backward-compatible review action. Issuing no longer makes an invoice
+        # immutable; Save creates the next audited revision instead.
+        record = self.owned(request, pk, lock=True)
+        check_version(record, request.data.get('version'))
+        if request.data.get('confirmed') is not True or record.voided_at:
+            raise ValidationError('Confirm the reviewed document.')
+        if date.fromisoformat(record.payload['invoice_date']) > timezone.localdate():
+            raise ValidationError('A future-dated invoice cannot be issued yet.')
+        return Response(serialize_record(record))
+
+    @action(detail=True, methods=['post'], url_path='mark-paid')
+    def mark_paid(self, request, pk=None):
         with transaction.atomic():
             record = self.owned(request, pk, lock=True)
-            check_version(record, request.data.get('version'))
-            if request.data.get('confirmed') is not True or record.voided_at:
-                raise ValidationError('Confirm the reviewed document before issuing it.')
-            if date.fromisoformat(record.payload['invoice_date']) > timezone.localdate():
-                raise ValidationError('A future-dated draft cannot be issued yet.')
-            if not record.payload.get('issuer_abn'):
-                raise ValidationError('This workspace is for ABN-based services. Save the issuer ABN before issuing.')
-            if not record.locked_at:
-                record.locked_at = timezone.now()
-                record.save(update_fields=['locked_at', 'updated_at'])
+            version = request.data.get('version')
+            if version is not None:
+                check_version(record, version)
+            if record.voided_at:
+                raise ValidationError('A void invoice cannot be marked paid.')
+            record.invoice.status = 'paid'
+            record.invoice.save(update_fields=['status'])
         return Response(serialize_record(record))
 
     @action(detail=True, methods=['post'])
@@ -225,8 +254,8 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         with transaction.atomic():
             record = self.owned(request, pk, lock=True)
             check_version(record, request.data.get('version'))
-            if request.data.get('confirmed') is not True or not record.locked_at or record.voided_at:
-                raise ValidationError('Issue the document, then explicitly confirm sending it.')
+            if request.data.get('confirmed') is not True or record.voided_at:
+                raise ValidationError('Confirm sending this saved invoice.')
             recipient = record.payload['customer']['email']
             serializers.EmailField().run_validation(recipient)
             delivery, created = Delivery.objects.get_or_create(record=record, version=record.version,
@@ -266,10 +295,141 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             return Response({'detail': 'Email acceptance is uncertain. Do not resend until checked with your mail provider.'}, status=503)
         with transaction.atomic():
             Delivery.objects.filter(pk=delivery.pk).update(status='sent', sent_at=timezone.now())
-            Invoice.objects.filter(pk=record.invoice_id, status='draft').update(status='sent')
+            Invoice.objects.filter(pk=record.invoice_id).update(status='sent')
         record.invoice.refresh_from_db()
         return Response({'detail': 'Accepted by the email provider; inbox delivery is not guaranteed.',
                          'document': serialize_record(record)})
+
+
+class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
+    """Owner/admin view of internal invoices sent by workers."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _managed_pharmacies(self, user):
+        # Local import avoids a module import cycle while reusing the same
+        # pharmacy object-level authorization boundary as roster/shift tools.
+        from client_profile.views import BaseShiftViewSet
+        return BaseShiftViewSet._managed_pharmacies(user)
+
+    def queryset(self, request):
+        managed = self._managed_pharmacies(request.user)
+        return (
+            InvoiceRecord.objects.filter(source='internal', invoice__pharmacy__in=managed)
+            .filter(
+                models.Q(deliveries__isnull=False)
+                | models.Q(invoice__status__in=['sent', 'paid'])
+                | ~models.Q(review_status='NONE')
+            )
+            .select_related('invoice', 'customer', 'owner')
+            .prefetch_related('payments', 'deliveries', 'revisions', 'review_requests__requested_by')
+            .distinct()
+        )
+
+    def _get(self, request, pk, lock=False):
+        qs = self.queryset(request)
+        if lock:
+            qs = qs.select_for_update(of=('self',))
+        return get_object_or_404(qs, pk=pk)
+
+    def list(self, request):
+        from rest_framework.pagination import PageNumberPagination
+        pager = PageNumberPagination()
+        page = pager.paginate_queryset(self.queryset(request), request)
+        return pager.get_paginated_response([serialize_record(record) for record in page])
+
+    def retrieve(self, request, pk=None):
+        return Response(serialize_record(self._get(request, pk)))
+
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        return pdf_response(self._get(request, pk))
+
+    @action(detail=True, methods=['post'], url_path='request-revision')
+    def request_revision(self, request, pk=None):
+        note = str(request.data.get('note') or '').strip()
+        if not note:
+            raise ValidationError({'note': 'Add a note explaining what needs to be revised.'})
+        if len(note) > 3000:
+            raise ValidationError({'note': 'Revision notes are limited to 3000 characters.'})
+        with transaction.atomic():
+            record = self._get(request, pk, lock=True)
+            InvoiceReviewRequest.objects.create(
+                record=record,
+                requested_by=request.user,
+                requested_version=record.version,
+                note=note,
+            )
+            record.review_status = 'REVISION_REQUESTED'
+            record.last_review_note = note
+            record.last_reviewed_at = timezone.now()
+            record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
+            Notification.objects.create(
+                user=record.owner,
+                type='alert',
+                title=f'Revision requested for INV-{record.invoice_id:06d}',
+                body=note,
+                action_url='/dashboard/invoices',
+                payload={
+                    'kind': 'invoice_revision_requested',
+                    'finance_invoice_id': record.id,
+                    'invoice_id': record.invoice_id,
+                    'requested_version': record.version,
+                },
+            )
+        return Response(serialize_record(record))
+
+    @action(detail=True, methods=['post'], url_path='approve-payment')
+    def approve_payment(self, request, pk=None):
+        note = str(request.data.get('note') or '').strip()
+        if len(note) > 3000:
+            raise ValidationError({'note': 'Notes are limited to 3000 characters.'})
+        with transaction.atomic():
+            record = self._get(request, pk, lock=True)
+            record.review_status = 'APPROVED_FOR_PAYMENT'
+            record.last_review_note = note
+            record.last_reviewed_at = timezone.now()
+            record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
+            Notification.objects.create(
+                user=record.owner,
+                type='alert',
+                title=f'Invoice INV-{record.invoice_id:06d} approved for payment',
+                body=note or 'The pharmacy approved this invoice for payment.',
+                action_url='/dashboard/invoices',
+                payload={
+                    'kind': 'invoice_approved_for_payment',
+                    'finance_invoice_id': record.id,
+                    'invoice_id': record.invoice_id,
+                    'version': record.version,
+                },
+            )
+        return Response(serialize_record(record))
+
+    @action(detail=True, methods=['post'], url_path='mark-paid')
+    def mark_paid(self, request, pk=None):
+        note = str(request.data.get('note') or '').strip()
+        with transaction.atomic():
+            record = self._get(request, pk, lock=True)
+            record.invoice.status = 'paid'
+            record.invoice.save(update_fields=['status'])
+            if note:
+                record.last_review_note = note
+                record.last_reviewed_at = timezone.now()
+                record.save(update_fields=['last_review_note', 'last_reviewed_at', 'updated_at'])
+            Notification.objects.create(
+                user=record.owner,
+                type='alert',
+                title=f'Invoice INV-{record.invoice_id:06d} marked paid',
+                body=note or 'The pharmacy marked this invoice as paid.',
+                action_url='/dashboard/invoices',
+                payload={
+                    'kind': 'invoice_paid',
+                    'finance_invoice_id': record.id,
+                    'invoice_id': record.invoice_id,
+                    'version': record.version,
+                },
+            )
+        return Response(serialize_record(record))
 
 
 class ExpenseViewSet(OwnedViewSet):
@@ -364,7 +524,12 @@ def bas_worksheet(request):
     basis = request.query_params.get('basis', 'cash')
     if end < start or (end - start).days > 366 or basis not in ('cash', 'accrual'):
         raise ValidationError('Choose cash/accrual and a period of at most 366 days.')
-    records = InvoiceRecord.objects.filter(owner=request.user, kind='invoice', locked_at__isnull=False, voided_at__isnull=True)
+    records = InvoiceRecord.objects.filter(
+        owner=request.user,
+        kind='invoice',
+        voided_at__isnull=True,
+        invoice__status__in=['sent', 'paid'],
+    )
     sales = gst = credit = ZERO
     if basis == 'cash':
         totals = Payment.objects.filter(record__in=records, date__range=(start, end)).aggregate(sales=Sum('sales'), gst=Sum('gst'))
