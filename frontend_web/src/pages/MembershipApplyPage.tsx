@@ -348,6 +348,19 @@ export default function MembershipApplyPage() {
             <Alert severity="success" sx={{ mb: 2 }}>
               Application submitted! The pharmacy will review your details and contact you.
             </Alert>
+            {info?.category === 'FULL_PART_TIME' && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Your application is pending. Staff approval requires a ChemistTasker worker account using this same email and the TFN pathway in your private Payment Profile.
+                {info.payroll_enabled
+                  ? ' Because this pharmacy uses ChemistTasker Payroll, complete the TFN and super setup before the pharmacy can approve the application.'
+                  : ' The pharmacy will process payroll externally, but TFN remains the employee source-of-truth while ChemistTasker manages roster, attendance and timesheets.'}
+              </Alert>
+            )}
+            {info?.category === 'LOCUM_CASUAL' && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Favourite-list approval does not choose TFN or ABN for you. Your private worker Payment Profile remains the source of truth when you later accept a shift.
+              </Alert>
+            )}
             <Typography variant="body2" sx={{ mt: 1 }}>
               You can now close this page. Back to{' '}
               <Link component={RouterLink} to="/login" fontWeight="bold" color="#00a99d">
@@ -373,8 +386,8 @@ export default function MembershipApplyPage() {
             {info?.category === 'FULL_PART_TIME' && (
               <Alert severity={info.payroll_enabled ? 'info' : 'success'} sx={{ mb: 2 }}>
                 {info.payroll_enabled
-                  ? 'This pharmacy uses ChemistTasker Payroll. Your Award classification will be reviewed by the pharmacy and used to prepare your employment terms.'
-                  : 'This pharmacy manages payroll outside ChemistTasker. You do not need to enter Award classification or pay rates here; ChemistTasker can still manage roster, attendance and timesheets.'}
+                  ? 'This is a TFN pharmacy-staff pathway. The pharmacy will review your Award classification and prepare dated employment terms. Before final approval, use this same email for your ChemistTasker worker account, select TFN in your private Payment Profile, and complete TFN/super setup. Those identifiers stay private and are never entered in this pharmacy application.'
+                  : 'This is a TFN pharmacy-staff pathway. ChemistTasker will manage roster, attendance and timesheets while the pharmacy processes payroll externally. Before final approval, use this same email for your ChemistTasker worker account and select TFN in your private Payment Profile; private TFN details are never shown to the pharmacy.'}
               </Alert>
             )}
             {info?.category === 'LOCUM_CASUAL' && (
