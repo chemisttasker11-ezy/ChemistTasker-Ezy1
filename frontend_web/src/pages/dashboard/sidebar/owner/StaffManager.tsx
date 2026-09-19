@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -182,6 +183,7 @@ export default function StaffManager({
   pharmacyName,
 }: StaffManagerProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const derivedStaff: Staff[] = useMemo(() => {
     const currentUserId = typeof user?.id === "number" ? user.id : null;
@@ -738,8 +740,19 @@ export default function StaffManager({
       <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Invite Staff to {pharmacyName || pharmacyId}</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
-          <Alert severity="info">
-            Pharmacy staff use the TFN employee pathway. This owner form records the worker's role and employment type only; date of birth, TFN and super details are completed by the worker in their private ChemistTasker profile and are never exposed to the pharmacy. If ChemistTasker Payroll is enabled, payroll activation waits until that private setup is complete.
+          <Alert
+            severity="info"
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${pharmacyId}`)}
+              >
+                Workforce & Payroll
+              </Button>
+            }
+          >
+            Pharmacy staff use the TFN employee pathway. This owner form records role and employment type only; DOB, TFN and super details are completed by the worker in their private profile and never exposed to the pharmacy. If you use ChemistTasker Payroll, add the dated EmploymentEngagement in Workforce & Payroll after the worker's private TFN/super setup is ready.
           </Alert>
           {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
