@@ -82,6 +82,7 @@ type EngagementForm = {
   award_source_label: string;
   award_source_url: string;
   award_effective_from: string;
+  adult_rate_confirmed: boolean;
   rate_weekday: string;
   rate_saturday: string;
   rate_sunday: string;
@@ -111,6 +112,7 @@ const blankForm = (): EngagementForm => ({
   award_source_label: '',
   award_source_url: '',
   award_effective_from: '',
+  adult_rate_confirmed: false,
   rate_weekday: '',
   rate_saturday: '',
   rate_sunday: '',
@@ -294,6 +296,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
       supersedes_public_id: '',
       effective_to: row.effective_to || '',
       award_effective_from: row.award_effective_from || '',
+      adult_rate_confirmed: Boolean(row.adult_rate_confirmed),
       rate_early_morning: row.rate_early_morning || '',
       rate_late_night: row.rate_late_night || '',
       ordinary_hours_days: partTimeDaysFromEngagement(row),
@@ -331,6 +334,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
           job_title: form.job_title,
           pay_basis: form.pay_basis,
           award_classification: form.award_classification,
+          adult_rate_confirmed: form.adult_rate_confirmed,
           ...(form.employment_type === 'PART_TIME'
             ? {
                 ordinary_hours_pattern: {
@@ -410,6 +414,10 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
       && (!form.early_morning_applicable || form.rate_early_morning)
       && (!form.late_night_applicable || form.rate_late_night),
     );
+  const adultConfirmationRequired =
+    form.role === 'ASSISTANT'
+    && ['LEVEL_1', 'LEVEL_2'].includes(form.award_classification);
+
   const partTimePatternComplete =
     form.employment_type !== 'PART_TIME'
     || form.ordinary_hours_days.some(
@@ -424,6 +432,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
     || Boolean(
       form.effective_from
       && form.award_classification
+      && (!adultConfirmationRequired || form.adult_rate_confirmed)
       && aboveAwardComplete
       && partTimePatternComplete
       && !loadingAward,
@@ -703,6 +712,25 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                   </Alert>
                 )}
 
+                {adultConfirmationRequired && (
+                  <Alert severity={form.adult_rate_confirmed ? 'success' : 'warning'}>
+                    <FormControlLabel
+                      control={(
+                        <Checkbox
+                          checked={form.adult_rate_confirmed}
+                          onChange={(_, checked) => setForm((current) => ({ ...current, adult_rate_confirmed: checked }))}
+                        />
+                      )}
+                      label="Confirm this Pharmacy Assistant is 21 or older, so adult Schedule B rates apply"
+                    />
+                    {!form.adult_rate_confirmed && (
+                      <Typography variant="body2">
+                        Levels 1 and 2 have separate junior percentages under age 21. ChemistTasker will not save an adult Award-rate engagement until this is confirmed.
+                      </Typography>
+                    )}
+                  </Alert>
+                )}
+
                 {awardPreview && (
                   <Alert severity={form.pay_basis === 'AWARD' ? 'success' : 'info'}>
                     <strong>{awardPreview.classification_label}</strong> · {form.pay_basis === 'AWARD' ? 'Award schedule' : 'Award minimum underpinning'} · {awardPreview.award_effective_basis || 'effective ' + awardPreview.award_effective_from}.{' '}
@@ -711,6 +739,18 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                     </Link>
                   </Alert>
                 )}
+
+                <Alert severity="info">
+                  Correspondence selected: <strong>
+                    {form.employment_type === 'FULL_TIME'
+                      ? 'Full-time employment terms'
+                      : form.employment_type === 'PART_TIME'
+                        ? 'Part-time employment terms'
+                        : 'Casual employment terms'}
+                    {' — '}
+                    {form.pay_basis === 'AWARD' ? 'Award rates' : 'Above-award agreed rates'}
+                  </strong>. The saved correspondence payload will include the selected classification, frozen rate schedule, and part-time ordinary-hours agreement where applicable.
+                </Alert>
 
                 <Box>
                   <Typography fontWeight={900} sx={{ mb: 1 }}>
