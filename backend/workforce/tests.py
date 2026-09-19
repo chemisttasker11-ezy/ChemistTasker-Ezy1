@@ -259,6 +259,21 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
                 membership,
             )
 
+    def test_above_award_requires_at_least_one_rate_above_the_floor(self):
+        membership = self._membership()
+        with self.assertRaises(ValidationError):
+            _engagement_payload(
+                {
+                    "pay_basis": "ABOVE_AWARD",
+                    "award_classification": "PHARMACIST",
+                    "rate_weekday": "41.74",
+                    "rate_saturday": "52.18",
+                    "rate_sunday": "62.61",
+                    "rate_public_holiday": "93.92",
+                },
+                membership,
+            )
+
     def test_above_award_snapshot_keeps_penalty_and_overtime_floors(self):
         membership = self._membership()
         payload = _engagement_payload(
