@@ -5,6 +5,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Button,
   FormControl,
   IconButton,
   InputLabel,
@@ -14,7 +15,6 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import DoneIcon from "@mui/icons-material/Done";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   approveMembershipApplicationService,
@@ -24,6 +24,7 @@ import {
   type MembershipDTO,
 } from "@chemisttasker/shared-core";
 import dayjs from "dayjs";
+import MembershipApplicationReviewDialog from "./MembershipApplicationReviewDialog";
 import utc from "dayjs/plugin/utc";
 
 dayjs.extend(utc);
@@ -169,6 +170,7 @@ export default function MembershipApplicationsPanel({
   const [applications, setApplications] = useState<MembershipApplication[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [approveTypeById, setApproveTypeById] = useState<Record<number, string>>({});
+  const [reviewing, setReviewing] = useState<MembershipApplication | null>(null);
   const isFetchingRef = useRef(false);
 
   const notify = useCallback(
@@ -234,31 +236,6 @@ export default function MembershipApplicationsPanel({
     }
     return Array.from(new Set([...allowedEmploymentTypes, defaultEmploymentType]));
   }, [allowedEmploymentTypes, defaultEmploymentType]);
-
-  const handleApprove = useCallback(
-    async (app: MembershipApplication) => {
-      const employmentType =
-        app.category === "LOCUM_CASUAL"
-          ? deriveLocumEmploymentType(app.role)
-          : approveTypeById[app.id] || defaultEmploymentType;
-      try {
-        await approveMembershipApplicationService(app.id, { employment_type: employmentType });
-        notify("Application approved.", "success");
-        await fetchApplications();
-        onApproved?.();
-      } catch (error: any) {
-        const data = error?.response?.data;
-        const firstFieldError =
-          data && typeof data === "object"
-            ? Object.values(data as Record<string, unknown>)
-                .map(getFirstErrorMessage)
-                .find((value): value is string => Boolean(value))
-            : null;
-        notify(data?.detail || firstFieldError || "Failed to approve application.", "error");
-      }
-    },
-    [approveTypeById, defaultEmploymentType, fetchApplications, notify, onApproved]
-  );
 
   const handleReject = useCallback(
     async (app: MembershipApplication) => {
@@ -390,14 +367,10 @@ export default function MembershipApplicationsPanel({
                       </FormControl>
                     ) : null}
 
-                    <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="Approve">
-                        <span>
-                          <IconButton color="success" onClick={() => handleApprove(app)}>
-                            <DoneIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Button variant="contained" size="small" onClick={() => setReviewing(app)}>
+                        Review
+                      </Button>
                       <Tooltip title="Reject">
                         <span>
                           <IconButton color="error" onClick={() => handleReject(app)}>
@@ -413,6 +386,28 @@ export default function MembershipApplicationsPanel({
           })}
         </Stack>
       )}
+
+      <MembershipApplicationReviewDialog
+        open={Boolean(reviewing)}
+        application={reviewing}
+        defaultEmploymentType={
+          reviewing?.category === "LOCUM_CASUAL"
+            ? deriveLocumEmploymentType(reviewing?.role)
+            : (reviewing ? (approveTypeById[reviewing.id] || defaultEmploymentType) : defaultEmploymentType)
+        }
+        allowedEmploymentTypes={allowedTypes}
+        onClose={() => setReviewing(null)}
+        onUpdated={(updated) => {
+          setReviewing(updated);
+          setApplications((rows) => rows.map((row) => row.id === updated.id ? updated : row));
+        }}
+        onApproved={async () => {
+          setReviewing(null);
+          await fetchApplications();
+          onApproved?.();
+        }}
+        onNotification={notify}
+      />
     </Box>
   );
 }
