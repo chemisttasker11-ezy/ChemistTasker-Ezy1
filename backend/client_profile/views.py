@@ -7169,7 +7169,9 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         controlled_pharmacies = (owned_pharmacies | org_pharmacies | admin_pharmacies).distinct()
         qs = qs.filter(
             shift__pharmacy__in=controlled_pharmacies
-        ).select_related('shift__pharmacy', 'slot', 'user').distinct()
+        ).select_related('shift__pharmacy', 'slot', 'user').prefetch_related(
+            'user__workforce_timesheets__period'
+        ).distinct()
 
         # <<< --- START OF FIX --- >>>
         # Filter by the specific pharmacy ID if provided in the request
@@ -7651,7 +7653,9 @@ class RosterWorkerViewSet(viewsets.ReadOnlyModelViewSet):
         # OR explicitly assigned to the current user (to surface public-pool assignments).
         qs = ShiftSlotAssignment.objects.filter(
             Q(shift__pharmacy_id__in=member_pharmacy_ids) | Q(user=user)
-        ).select_related('shift__pharmacy', 'slot', 'user').distinct()
+        ).select_related('shift__pharmacy', 'slot', 'user').prefetch_related(
+            'user__workforce_timesheets__period'
+        ).distinct()
 
         # --- START OF FIX (This part is correct, but the following part needs to be removed) ---
 
