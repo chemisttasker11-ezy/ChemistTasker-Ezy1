@@ -133,84 +133,45 @@ Implemented:
 - `245f55ae048e40bd89e0718aca6cff0c655d1ffd` dated employee engagement boundary for direct roster assignment.
 - `aed92651f83a09da1e2c2274b5bcf0bd4d43033b` external workers forced through offer acceptance.
 
-## Important unfinished work — resume here
+## Current remaining work after green validation
 
-Do not mark the feature complete until all items below are resolved.
+The earlier unfinished checklist below has been closed by the implementation and test passes recorded later in this file. The following are the only material follow-ups still intentionally open:
 
-1. **Acceptance/rejection correspondence**
-   - Implement `email_membership_application_rejected`.
-   - Add rejected HTML + text templates.
-   - Extend approved email + in-app notification with:
-     - owner/admin edits from `review_changes`;
-     - accepted role/employment type/job title;
-     - EmploymentEngagement/pay rates when ChemistTasker Payroll is enabled.
-   - Do not expose TFN or full super member number in email.
+1. **External TFN Award floor before production ChemistTasker payroll for marketplace/favourite shifts**
+   - Per-shift TFN acceptance already freezes the final agreed rate, dates, role, employee relationship, super readiness and settlement route.
+   - When the pharmacy does **not** use ChemistTasker Payroll, its own payroll system remains responsible for Award classification/floor processing.
+   - Before ChemistTasker itself calculates wages for an external TFN shift, add an explicit, non-guessed Award classification source and floor comparison. Do not infer an Experienced Pharmacist / higher classification from role name alone.
 
-2. **Owner/admin application review UI**
-   - Web MembershipApplicationsPanel:
-     - show complete submitted data;
-     - show locked identifier fields clearly;
-     - edit allowed review/employment fields;
-     - save review before approve;
-     - show review-change summary;
-     - show payroll ON/OFF status;
-     - only request Award classification/rate workflow when payroll is ON.
-   - Mobile equivalent needs parity.
-   - Shared-core needs PATCH/update service + expanded application types.
+2. **Future payroll engine settlement filter**
+   - There is currently no separate ChemistTasker payroll export/processor in this repository.
+   - When that processor is introduced, it must accept only assignments explicitly routed as `PAYROLL`; `INVOICE` and `TIMESHEET_ONLY` must fail closed.
+   - The current invoice path already fails closed to accepted `INVOICE + INDEPENDENT_CONTRACTOR` assignments.
 
-3. **Payroll opt-in UI**
-   - Add the switch/card in Manage Staff / pharmacy detail (web, then mobile):
-     - “Use ChemistTasker Payroll”
-     - explanatory requirements when enabling.
-   - Surface payroll mode in Workforce Settings.
-   - Hide/disable Employment & Pay setup when payroll is OFF, with explanatory text.
-   - When payroll is ON, guide manager into missing EmploymentEngagement setup.
+3. **Re-enable/refine source-size budgets after functional validation**
+   - The owner explicitly requested the “capped at xx KB” gate be removed temporarily.
+   - Large-file splitting remains a refactor target, but byte size is no longer a blocking CI condition during this validation cycle.
 
-4. **Acceptance-time EmploymentEngagement**
-   - For TFN pharmacy staff with payroll ON, owner/admin needs to enter/confirm dated employment/pay terms before approval is final.
-   - Acceptance email must include the final frozen terms/rates.
-   - Determine clean transaction boundary so Membership + EmploymentEngagement + application decision cannot partially succeed.
-   - Do not require worker TFN/super merely to record the employment agreement; require TFN/super before ChemistTasker payroll processing.
+4. **Next phase: preservation/security audit**
+   - Endpoint permission matrix / anonymous-route preservation.
+   - Object-level authorization / IDOR tests.
+   - Continue the security-hardening backlog after this membership/employment/payroll workflow is accepted.
 
-5. **Shift model compatibility bug**
-   - `Shift.EMPLOYMENT_TYPE_CHOICES` currently lacks `CASUAL`.
-   - A direct casual employee shift can therefore conflict with model validation.
-   - Inspect all serializers/UI assumptions and fix without conflating CASUAL employee with LOCUM/SHIFT_HERO.
+### Completed from the prior unfinished checklist
 
-6. **Direct staff offer validation**
-   - When payroll ON, direct pharmacy staff offer path should validate that a dated EmploymentEngagement covers the occurrence(s).
-   - When payroll OFF, no pay-rate/EmploymentEngagement gate.
-
-7. **External TFN per-shift Award floor**
-   - Current per-shift TFN terms carry agreed rate + employee status but do not yet resolve/freeze an Award classification/floor.
-   - Need a non-duplicative classification source and floor check before production.
-
-8. **ABN invoice integration**
-   - ABN assignments/timesheets are marked INVOICE.
-   - Still need to connect completed/approved worked time into the existing invoice system instead of creating a second invoice model.
-
-9. **Payroll exclusion**
-   - Explicitly verify that ABN/INVOICE and TIMESHEET_ONLY assignments cannot enter any ChemistTasker payroll export/processing path.
-   - Metadata alone is not sufficient.
-
-10. **Tests**
-    - Membership application duplicate guards.
-    - Locked identifier PATCH rejection.
-    - Owner/admin review audit trail.
-    - Approval links canonical Membership.
-    - Rejection notification.
-    - Payroll OFF direct roster without EmploymentEngagement.
-    - Payroll ON direct roster requires dated EmploymentEngagement.
-    - Timesheet missing-engagement warning only when payroll ON.
-    - ABN invoice routing.
-    - External TFN PAYROLL vs TIMESHEET_ONLY based on pharmacy setting.
-    - Junior DOB cases and birthday successor.
-    - Web/mobile/shared-core type checks.
-
-11. **CI and migration verification**
-    - Run/check current PR CI after all above work.
-    - Verify migration graph and model state.
-    - Keep PR draft until green.
+- Acceptance + rejection correspondence — COMPLETE.
+- Owner/admin application review UI (web + mobile) — COMPLETE.
+- Shared-core application PATCH/types — COMPLETE.
+- Pharmacy “Use ChemistTasker Payroll” switch and explanatory UI — COMPLETE.
+- Payroll mode surfaced in Workforce Settings — COMPLETE.
+- Acceptance-time initial EmploymentEngagement for payroll-enabled pharmacy staff — COMPLETE and transactional.
+- Shift CASUAL model compatibility — COMPLETE.
+- Direct staff offer validation with payroll ON/OFF behavior — COMPLETE.
+- ABN accepted-shift integration into the existing invoice system — COMPLETE.
+- Duplicate guards / locked identifiers / review audit tests — COMPLETE.
+- DOB junior-rate tests and birthday successor guard — COMPLETE.
+- ABN/TFN settlement routing tests — COMPLETE.
+- Invoice boundary tests excluding PAYROLL/TIMESHEET_ONLY assignments — COMPLETE.
+- Full CI/migration verification — COMPLETE on functional head `7f2f11b53f544f345acbdc159bf15ce6a6d425d4`.
 
 ## Known design constraints
 
@@ -291,3 +252,38 @@ All gates passed:
 - PR #3 remains DRAFT intentionally.
 - Functional code at `c4ce7aef...` passed the entire current CI/release gate.
 - Remaining work should now be preservation/security review rather than fixing failing functional tests.
+
+## Final command-level validation — 2026-09-19
+
+Functional head: `7f2f11b53f544f345acbdc159bf15ce6a6d425d4`.
+
+Additional regression coverage added after the first green run:
+
+- external ABN shift -> `INVOICE` + independent-contractor route, with accepted rate frozen;
+- external TFN shift -> `PAYROLL` when ChemistTasker Payroll is enabled;
+- external TFN shift -> `TIMESHEET_ONLY` when ChemistTasker Payroll is disabled;
+- internal invoice accepts only accepted `INVOICE + INDEPENDENT_CONTRACTOR` assignments;
+- `PAYROLL` and `TIMESHEET_ONLY` assignments are rejected by internal invoice selection.
+
+Authoritative clean-checkout validation:
+
+- Shared Core Consolidation run `35422029915` — **PASS**
+  - backend — PASS
+  - Django check — PASS
+  - migration drift — PASS
+  - auth/account contracts — PASS
+  - marketplace contracts — PASS
+  - public-content contracts — PASS
+  - membership/engagement/settlement contracts — PASS
+  - workforce + finance contracts — PASS
+  - shared-core typecheck/tests/build — PASS
+  - Vite typecheck/auth-flow/build — PASS
+  - Next typecheck/build — PASS
+  - mobile lint/typecheck — PASS
+  - shared-core boundary audit — PASS
+  - architecture audit with byte cap disabled — PASS
+  - kiosk Cargo tests — PASS
+  - release gate — PASS
+- Standalone Mobile Lint run `35422029920` — **PASS**
+
+The private repository cannot be cloned from the local container because that runtime cannot resolve `github.com`; GitHub Actions therefore served as the clean CLI runner for the exact branch commands.
