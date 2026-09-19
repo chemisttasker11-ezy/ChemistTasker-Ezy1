@@ -215,7 +215,7 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         )
         slot = SimpleNamespace(
             id=501,
-            date=date(2026, 9, 20),
+            date=date(2026, 9, 21),
             start_time="09:00:00",
             end_time="17:00:00",
             rate=None,
@@ -275,7 +275,7 @@ class ExternalShiftSettlementRoutingTests(TestCase):
 
     @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
     @patch("client_profile.engagement_routing._external_payment_profile")
-    def test_tfn_external_shift_routes_to_chemisttasker_payroll_when_enabled(
+    def test_tfn_external_shift_can_defer_payroll_setup_without_blocking_acceptance(
         self,
         external_profile,
         _direct_membership,
@@ -286,9 +286,46 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         )
         external_profile.return_value = (
             SimpleNamespace(
+                tfn_number=None,
+                super_fund_name=None,
+                super_usi=None,
+                super_member_number=None,
+                date_of_birth=date(1990, 1, 1),
+            ),
+            PAYMENT_TFN,
+        )
+
+        terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
+
+        self.assertEqual(terms["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
+        self.assertEqual(terms["engagement_kind"], "SHIFT_EMPLOYMENT")
+        self.assertEqual(terms["payment_preference"], PAYMENT_TFN)
+        self.assertEqual(terms["pay_basis"], "ABOVE_AWARD")
+        self.assertEqual(terms["award_classification"], "PHARMACIST")
+        self.assertEqual(terms["occurrences"][0]["agreed_rate"], "72.50")
+        self.assertEqual(terms["payroll_setup_status"], "DEFERRED")
+        self.assertTrue(terms["payroll_activation_required"])
+        self.assertIn("tfn", terms["payroll_missing_fields"])
+        self.assertTrue(terms["acceptance_required"])
+
+    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.engagement_routing._external_payment_profile")
+    def test_tfn_external_shift_routes_to_payroll_when_profile_is_ready(
+        self,
+        external_profile,
+        _direct_membership,
+    ):
+        _, shift, offer, user = self._objects(
+            payroll_enabled=True,
+            payment_preference=PAYMENT_TFN,
+        )
+        external_profile.return_value = (
+            SimpleNamespace(
+                tfn_number="encrypted-value",
                 super_fund_name="Example Super",
                 super_usi="EXAMPLE123",
                 super_member_number="MEMBER123",
+                date_of_birth=date(1990, 1, 1),
             ),
             PAYMENT_TFN,
         )
@@ -296,10 +333,76 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
 
         self.assertEqual(terms["settlement_channel"], SETTLEMENT_PAYROLL)
-        self.assertEqual(terms["engagement_kind"], "SHIFT_EMPLOYMENT")
-        self.assertEqual(terms["payment_preference"], PAYMENT_TFN)
-        self.assertEqual(terms["occurrences"][0]["agreed_rate"], "72.50")
-        self.assertTrue(terms["acceptance_required"])
+        self.assertEqual(terms["payroll_setup_status"], "READY")
+        self.assertFalse(terms["payroll_activation_required"])
+
+    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.engagement_routing._external_payment_profile")
+    def test_other_staff_tfn_uses_onboarding_classification_and_owner_bonus(
+        self,
+        external_profile,
+        _direct_membership,
+    ):
+        pharmacy, shift, offer, user = self._objects(
+            payroll_enabled=True,
+            payment_preference=PAYMENT_TFN,
+        )
+        pharmacy.state = "QLD"
+        shift.role_needed = "ASSISTANT"
+        shift.owner_adjusted_rate = "2.50"
+        offer.offered_rate = "35.00"
+        user.role = "OTHER_STAFF"
+        external_profile.return_value = (
+            SimpleNamespace(
+                role_type="ASSISTANT",
+                classification_level="LEVEL_4",
+                intern_half=None,
+                student_year=None,
+                date_of_birth=date(1990, 1, 1),
+                tfn_number=None,
+                super_fund_name=None,
+                super_usi=None,
+                super_member_number=None,
+            ),
+            PAYMENT_TFN,
+        )
+
+        terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
+
+        occurrence = terms["occurrences"][0]
+        self.assertEqual(terms["award_classification"], "LEVEL_4")
+        self.assertEqual(terms["pay_basis"], "AWARD_PLUS_BONUS")
+        self.assertEqual(occurrence["award_floor_rate"], "38.33")
+        self.assertEqual(occurrence["owner_bonus"], "2.50")
+        self.assertEqual(occurrence["minimum_with_bonus"], "40.83")
+        self.assertEqual(occurrence["agreed_rate"], "40.83")
+        self.assertEqual(terms["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
+
+    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.engagement_routing._external_payment_profile")
+    def test_pharmacist_tfn_must_be_above_applicable_award_floor(
+        self,
+        external_profile,
+        _direct_membership,
+    ):
+        _, shift, offer, user = self._objects(
+            payroll_enabled=False,
+            payment_preference=PAYMENT_TFN,
+        )
+        offer.offered_rate = "52.18"
+        external_profile.return_value = (
+            SimpleNamespace(
+                date_of_birth=date(1990, 1, 1),
+                tfn_number=None,
+                super_fund_name=None,
+                super_usi=None,
+                super_member_number=None,
+            ),
+            PAYMENT_TFN,
+        )
+
+        with self.assertRaises(ValidationError):
+            build_shift_engagement_terms(shift=shift, user=user, offer=offer)
 
     @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
     @patch("client_profile.engagement_routing._external_payment_profile")
