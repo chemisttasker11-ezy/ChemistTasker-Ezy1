@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import {
     ActivityIndicator,
     Button,
+    Card,
     Dialog,
     Portal,
     Snackbar,
@@ -10,12 +11,30 @@ import {
 } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import {
+    activateShiftOfferPayrollService,
     fetchConfirmedShifts,
+    fetchShiftOffersService,
     type Shift,
     type ShiftUser,
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+
+type DeferredPayrollOffer = {
+    id: number;
+    paymentPreferenceSnapshot?: string;
+    settlementChannel?: string;
+    engagementKind?: string;
+    payrollActivatedAt?: string | null;
+    engagementTermsSnapshot?: {
+        payrollActivationRequired?: boolean;
+        pharmacyId?: number;
+        pharmacyName?: string;
+        workerName?: string;
+        awardClassification?: string;
+        payBasis?: string;
+    };
+};
 
 export default function ConfirmedShiftsView() {
     const { user } = useAuth();
@@ -28,6 +47,8 @@ export default function ConfirmedShiftsView() {
 
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deferredPayrollOffers, setDeferredPayrollOffers] = useState<DeferredPayrollOffer[]>([]);
+    const [activatingPayrollOfferId, setActivatingPayrollOfferId] = useState<number | null>(null);
     const [snackbar, setSnackbar] = useState<string>('');
     const [profile, setProfile] = useState<ShiftUser | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
@@ -63,6 +84,49 @@ export default function ConfirmedShiftsView() {
         void loadShifts();
     }, [loadShifts]);
 
+    const loadDeferredPayroll = useCallback(async () => {
+        try {
+            const [accepted, awaiting] = await Promise.all([
+                fetchShiftOffersService({ status: 'ACCEPTED' }),
+                fetchShiftOffersService({ status: 'ACCEPTED_AWAITING_PAYMENT' }),
+            ]);
+            const rows = [...accepted, ...awaiting] as DeferredPayrollOffer[];
+            const filtered = rows.filter((offer) => {
+                const terms = offer.engagementTermsSnapshot;
+                const pharmacyMatches =
+                    scopedPharmacyId == null || Number(terms?.pharmacyId ?? NaN) === scopedPharmacyId;
+                return (
+                    pharmacyMatches &&
+                    offer.paymentPreferenceSnapshot === 'TFN' &&
+                    offer.engagementKind === 'SHIFT_EMPLOYMENT' &&
+                    offer.settlementChannel === 'TIMESHEET_ONLY' &&
+                    terms?.payrollActivationRequired === true &&
+                    !offer.payrollActivatedAt
+                );
+            });
+            setDeferredPayrollOffers(filtered);
+        } catch (err: any) {
+            setSnackbar(err?.message || 'Failed to load deferred payroll setup');
+        }
+    }, [scopedPharmacyId]);
+
+    useEffect(() => {
+        void loadDeferredPayroll();
+    }, [loadDeferredPayroll]);
+
+    const activateDeferredPayroll = async (offer: DeferredPayrollOffer) => {
+        setActivatingPayrollOfferId(offer.id);
+        try {
+            await activateShiftOfferPayrollService(offer.id);
+            setDeferredPayrollOffers((rows) => rows.filter((row) => row.id !== offer.id));
+            setSnackbar('ChemistTasker Payroll activated for this accepted shift.');
+        } catch (err: any) {
+            setSnackbar(err?.message || 'Complete the worker TFN/super details before activating payroll.');
+        } finally {
+            setActivatingPayrollOfferId(null);
+        }
+    };
+
     const openProfile = async (shiftId: number, slotId: number | null, userId: number) => {
         setProfile(null);
         setProfileDialog(true);
@@ -89,6 +153,46 @@ export default function ConfirmedShiftsView() {
                 <Text style={styles.pageTitle}>Confirmed Shifts</Text>
                 <Text style={styles.pageSubtitle}>Review booked shifts and assigned chemists</Text>
             </View>
+
+            {deferredPayrollOffers.length > 0 ? (
+                <View style={styles.deferredSection}>
+                    <Card mode="outlined" style={styles.deferredNotice}>
+                        <Card.Content>
+                            <Text style={styles.deferredTitle}>Payroll setup deferred</Text>
+                            <Text style={styles.deferredText}>
+                                These accepted TFN shifts remain rostered and timesheet-only.
+                                Activate ChemistTasker Payroll after the worker completes TFN and super details.
+                            </Text>
+                        </Card.Content>
+                    </Card>
+                    {deferredPayrollOffers.map((offer) => {
+                        const terms = offer.engagementTermsSnapshot;
+                        return (
+                            <Card key={offer.id} mode="outlined" style={styles.deferredCard}>
+                                <Card.Content style={styles.deferredCardContent}>
+                                    <View style={{ flex: 1, gap: 2 }}>
+                                        <Text style={styles.bold}>
+                                            {terms?.workerName || `Accepted worker · Offer #${offer.id}`}
+                                        </Text>
+                                        <Text style={styles.deferredText}>
+                                            {terms?.pharmacyName || 'Pharmacy'} · {terms?.awardClassification || 'Casual TFN'}
+                                            {terms?.payBasis ? ` · ${terms.payBasis}` : ''}
+                                        </Text>
+                                    </View>
+                                    <Button
+                                        mode="contained"
+                                        loading={activatingPayrollOfferId === offer.id}
+                                        disabled={activatingPayrollOfferId === offer.id}
+                                        onPress={() => void activateDeferredPayroll(offer)}
+                                    >
+                                        Activate payroll
+                                    </Button>
+                                </Card.Content>
+                            </Card>
+                        );
+                    })}
+                </View>
+            ) : null}
 
             <OwnerAssignedShiftBoard
                 title="Confirmed Shifts"
@@ -155,4 +259,10 @@ const styles = StyleSheet.create({
     pageSubtitle: { color: '#64748B', fontSize: 14, fontWeight: '600' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     bold: { fontWeight: '700' },
+    deferredSection: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
+    deferredNotice: { backgroundColor: '#FFF7ED' },
+    deferredTitle: { fontWeight: '800', color: '#9A3412', marginBottom: 4 },
+    deferredText: { color: '#64748B', fontSize: 13 },
+    deferredCard: { backgroundColor: '#FFFFFF' },
+    deferredCardContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });
