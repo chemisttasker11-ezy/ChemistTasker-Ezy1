@@ -35,103 +35,21 @@ import {
   subMonths,
 } from 'date-fns';
 import { fetchMembershipsByPharmacy, fetchMyMemberships } from '@chemisttasker/shared-core';
-import apiClient from '@/utils/apiClient';
-
-type ItemType = 'all' | 'events' | 'notes' | 'birthdays';
-
-type CalendarItem = {
-  id: number | string;
-  seriesId?: number;
-  isOccurrence?: boolean;
-  type: 'event' | 'note' | 'birthday';
-  title: string;
-  date: Date;
-  time?: string;
-  allDay?: boolean;
-  source: string;
-  assignees?: string[];
-  assigneeMembershipIds?: number[];
-  status?: string;
-  completedBy?: string[];
-  readOnly?: boolean;
-  description?: string;
-  eventData?: any;
-  noteData?: any;
-};
-
-const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-
-const normalizeList = (data: any) =>
-  Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-
-const fetchJson = async (path: string, params?: Record<string, any>) => {
-  const res = await apiClient.get(path, { params });
-  return res.data;
-};
-
-const postJson = async (
-  path: string,
-  body: any = null,
-  method: 'POST' | 'PATCH' | 'DELETE' = 'POST'
-) => {
-  if (method === 'DELETE') {
-    const res = await apiClient.delete(path);
-    return res.data;
-  }
-  const res = await apiClient.request({ url: path, method, data: body });
-  return res.data;
-};
-
-const toDate = (value?: string | null) => {
-  if (!value) return null;
-  const base = String(value);
-  const normalized = base.includes('T') ? base : `${base}T00:00:00`;
-  const parsed = new Date(normalized);
-  return isValid(parsed) ? parsed : null;
-};
-
-const formatTimeRange = (start?: string | null, end?: string | null) => {
-  if (!start && !end) return undefined;
-  const trim = (t?: string | null) => (t ? t.slice(0, 5) : '');
-  return [trim(start), trim(end)].filter(Boolean).join(' - ');
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  PHARMACIST: 'Pharmacist',
-  INTERN: 'Intern Pharmacist',
-  TECHNICIAN: 'Dispensary Technician',
-  ASSISTANT: 'Pharmacy Assistant',
-  STUDENT: 'Pharmacy Student',
-  CONTACT: 'Contact',
-};
-
-const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
-  FULL_TIME: 'Full-time',
-  PART_TIME: 'Part-time',
-  LOCUM: 'Locum',
-  CASUAL: 'Casual',
-  SHIFT_HERO: 'Shift Hero',
-};
-
-const formatChoiceLabel = (value: any, labels: Record<string, string>) => {
-  const key = String(value ?? '').trim().toUpperCase();
-  return key ? labels[key] ?? key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()) : '';
-};
-
-const parseTime = (value?: string | null) => {
-  if (!value) return { hours: 9, minutes: 0 };
-  const [h, m] = value.split(':').map((v) => Number(v));
-  return {
-    hours: Number.isFinite(h) ? h : 9,
-    minutes: Number.isFinite(m) ? m : 0,
-  };
-};
-
-const formatTime = (hours: number, minutes: number) => {
-  const hh = String(hours).padStart(2, '0');
-  const mm = String(minutes).padStart(2, '0');
-  return `${hh}:${mm}`;
-};
+import {
+  type ItemType,
+  type CalendarItem,
+  WEEKDAYS,
+  normalizeList,
+  fetchJson,
+  postJson,
+  toDate,
+  formatTimeRange,
+  ROLE_LABELS,
+  EMPLOYMENT_TYPE_LABELS,
+  formatChoiceLabel,
+  parseTime,
+  formatTime,
+} from './calendarModel';
 
 export default function SharedCalendarScreen() {
   const theme = useTheme();
