@@ -46,8 +46,12 @@ type Props = { basePath?: string };
 
 export default function InvoiceList({ basePath }: Props) {
   const segments = useSegments();
-  if (segments[0] === 'owner') return <LegacyInvoiceList basePath={basePath} />;
-  return <FinanceWorkspace existingTools={<LegacyInvoiceList basePath={basePath} />} />;
+  return (
+    <FinanceWorkspace
+      receivedMode={segments[0] === 'owner'}
+      existingTools={<LegacyInvoiceList basePath={basePath} />}
+    />
+  );
 }
 
 function LegacyInvoiceList({ basePath }: Props) {
