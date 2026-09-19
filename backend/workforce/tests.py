@@ -102,6 +102,41 @@ class PharmacyAwardResolverTests(SimpleTestCase):
             )
 
 
+    def test_level_1_junior_percentages_follow_clause_16_2_by_age(self):
+        as_of = date(2026, 9, 19)
+        cases = [
+            (15, date(2011, 9, 19), "45.00", "12.51"),
+            (16, date(2010, 9, 19), "50.00", "13.91"),
+            (17, date(2009, 9, 19), "60.00", "16.69"),
+            (18, date(2008, 9, 19), "70.00", "19.47"),
+            (19, date(2007, 9, 19), "80.00", "22.25"),
+            (20, date(2006, 9, 19), "90.00", "25.03"),
+        ]
+        for age, dob, percentage, weekday_rate in cases:
+            with self.subTest(age=age):
+                result = resolve_award_schedule(
+                    role="ASSISTANT",
+                    classification="LEVEL_1",
+                    employment_type="FULL_TIME",
+                    date_of_birth=dob,
+                    as_of=as_of,
+                )
+                self.assertEqual(result["age_at_effective_date"], age)
+                self.assertEqual(result["junior_percentage"], percentage)
+                self.assertEqual(result["rate_weekday"], weekday_rate)
+
+        adult = resolve_award_schedule(
+            role="ASSISTANT",
+            classification="LEVEL_1",
+            employment_type="FULL_TIME",
+            date_of_birth=date(2005, 9, 19),
+            as_of=as_of,
+        )
+        self.assertEqual(adult["age_at_effective_date"], 21)
+        self.assertIsNone(adult["junior_percentage"])
+        self.assertEqual(adult["rate_weekday"], "27.81")
+
+
 class EmploymentTermsTests(SimpleTestCase):
     def test_correspondence_is_selected_by_employment_type_and_pay_basis(self):
         self.assertEqual(
@@ -255,7 +290,7 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
             effective_from=date(2026, 9, 19),
             effective_to=date(2026, 9, 30),
         )
-        self.assertEqual(str(payload["rate_weekday"]), "25.03")
+        self.assertEqual(str(payload["rate_weekday"]), "22.25")
         self.assertEqual(payload["award_rate_snapshot"]["rate_scope"], "junior")
         self.assertEqual(payload["award_rate_snapshot"]["age_at_effective_date"], 19)
         self.assertEqual(payload["award_rate_snapshot"]["junior_percentage"], "80.00")
