@@ -160,6 +160,66 @@ def _tfn_payroll_status(onboarding):
     }
 
 
+def _abn_invoice_status(onboarding):
+    missing = []
+    if not getattr(onboarding, "abn", None):
+        missing.append("abn")
+    if not getattr(onboarding, "abn_verified", False):
+        missing.append("abn_verified")
+    if not getattr(onboarding, "abn_entity_confirmed", False):
+        missing.append("abn_entity_confirmed")
+    return {
+        "ready": not missing,
+        "missing_fields": missing,
+    }
+
+
+def worker_payment_profile_status(user):
+    """Return a safe payment-path readiness summary without exposing secret identifiers."""
+    onboarding = worker_onboarding(user)
+    if not onboarding:
+        return {
+            "onboarding_complete": False,
+            "payment_preference": None,
+            "status": "ONBOARDING_INCOMPLETE",
+            "payroll_ready": False,
+            "invoice_ready": False,
+            "missing_fields": ["onboarding", "payment_preference"],
+        }
+
+    preference = str(getattr(onboarding, "payment_preference", "") or "").strip().upper()
+    if preference == PAYMENT_TFN:
+        readiness = _tfn_payroll_status(onboarding)
+        return {
+            "onboarding_complete": True,
+            "payment_preference": PAYMENT_TFN,
+            "status": "READY" if readiness["ready"] else "TFN_SETUP_INCOMPLETE",
+            "payroll_ready": readiness["ready"],
+            "invoice_ready": False,
+            "missing_fields": list(readiness["missing_fields"]),
+        }
+
+    if preference == PAYMENT_ABN:
+        readiness = _abn_invoice_status(onboarding)
+        return {
+            "onboarding_complete": True,
+            "payment_preference": PAYMENT_ABN,
+            "status": "READY" if readiness["ready"] else "ABN_SETUP_INCOMPLETE",
+            "payroll_ready": False,
+            "invoice_ready": readiness["ready"],
+            "missing_fields": list(readiness["missing_fields"]),
+        }
+
+    return {
+        "onboarding_complete": True,
+        "payment_preference": None,
+        "status": "PAYMENT_PREFERENCE_REQUIRED",
+        "payroll_ready": False,
+        "invoice_ready": False,
+        "missing_fields": ["payment_preference"],
+    }
+
+
 def validate_tfn_payroll_profile(user):
     onboarding = worker_onboarding(user)
     if not onboarding:
@@ -188,15 +248,17 @@ def _external_payment_profile(user):
     if pref not in {PAYMENT_TFN, PAYMENT_ABN}:
         raise ValidationError({"payment_preference": "Select TFN or ABN in onboarding before accepting this shift."})
     if pref == PAYMENT_ABN:
-        errors = {}
-        if not getattr(onboarding, "abn", None):
-            errors["abn"] = "ABN is required for invoice settlement."
-        if not getattr(onboarding, "abn_verified", False):
-            errors["abn_verified"] = "ABN must be verified before invoice settlement."
-        if not getattr(onboarding, "abn_entity_confirmed", False):
-            errors["abn_entity_confirmed"] = "Confirm the ABN entity before invoice settlement."
-        if errors:
-            raise ValidationError(errors)
+        readiness = _abn_invoice_status(onboarding)
+        labels = {
+            "abn": "ABN is required for invoice settlement.",
+            "abn_verified": "ABN must be verified before invoice settlement.",
+            "abn_entity_confirmed": "Confirm the ABN entity before invoice settlement.",
+        }
+        if readiness["missing_fields"]:
+            raise ValidationError({
+                key: labels[key]
+                for key in readiness["missing_fields"]
+            })
     return onboarding, pref
 
 
