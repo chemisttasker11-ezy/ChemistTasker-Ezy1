@@ -24,7 +24,6 @@ import {
   previewMembershipApplicationAwardService,
   reviewMembershipApplicationService,
   type MembershipApplication,
-  type ShiftOfferAcceptancePayload,
 } from '@chemisttasker/shared-core';
 
 type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CASUAL' | 'LOCUM' | 'SHIFT_HERO';

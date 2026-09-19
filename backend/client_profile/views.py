@@ -2441,6 +2441,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @transaction.atomic
     def _create_membership_invite(self, data, inviter):
         """
         Helper to create or invite a user as a membership and send emails.
@@ -2460,7 +2461,12 @@ class MembershipViewSet(viewsets.ModelViewSet):
                 return None, 'Use the pharmacy admin management endpoint to invite admins.'
 
             try:
-                pharmacy = Pharmacy.objects.select_related("owner__user").get(id=pharmacy_id)
+                pharmacy = (
+                    Pharmacy.objects
+                    .select_for_update()
+                    .select_related("owner__user")
+                    .get(id=pharmacy_id)
+                )
             except Pharmacy.DoesNotExist:
                 return None, 'Pharmacy not found.'
 
@@ -2891,19 +2897,23 @@ class SubmitMembershipApplication(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-        serializer = MembershipApplicationSerializer(data=payload, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        app = serializer.save(
-            pharmacy=link.pharmacy,
-            category=link.category,
-            invite_link=link,
-            submitted_by=request.user if request.user.is_authenticated else None,
-        )
+        with transaction.atomic():
+            # Serialize direct invites and link applications for the same pharmacy
+            # so both paths cannot pass duplicate checks concurrently.
+            Pharmacy.objects.select_for_update().get(pk=link.pharmacy_id)
+            serializer = MembershipApplicationSerializer(data=payload, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            app = serializer.save(
+                pharmacy=link.pharmacy,
+                category=link.category,
+                invite_link=link,
+                submitted_by=request.user if request.user.is_authenticated else None,
+            )
 
-        # async notify owner + admins
-        transaction.on_commit(lambda: async_task(
-            'client_profile.tasks.email_membership_application_submitted', app.id
-        ))
+            # async notify owner + admins only after the application commits
+            transaction.on_commit(lambda app_id=app.id: async_task(
+                'client_profile.tasks.email_membership_application_submitted', app_id
+            ))
 
         return Response(MembershipApplicationSerializer(app).data, status=201)
 
