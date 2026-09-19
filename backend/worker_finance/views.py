@@ -403,10 +403,10 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             version=revision.version,
             status__in=['sent', 'legacy_queued'],
         ).exists()
-        if not delivered and revision.version != record.version:
-            raise Http404
-        if revision.version == record.version and owner_visible_document(record) is None:
-            raise Http404
+        if not delivered:
+            visible = owner_visible_document(record)
+            if visible is None or visible.get('version') != revision.version:
+                raise Http404
         return Response(serialize_owner_revision(record, revision))
 
     @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)/pdf')
