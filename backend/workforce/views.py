@@ -366,6 +366,7 @@ def _engagement_payload(request_data, membership, *, existing=None):
     payload.update(
         award_rate_snapshot={
             "kind": "ABOVE_AWARD",
+            "adult_rate_confirmed": adult_rate_confirmed if adult_confirmation_required else None,
             "award_floor": resolved,
             "agreed_rates": agreed_snapshot,
             "effective_ordinary_schedule": effective_ordinary_schedule,
