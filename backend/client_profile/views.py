@@ -2964,6 +2964,19 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         status_q = self.request.query_params.get('status')
         return qs.filter(status=status_q) if status_q else qs
 
+    def perform_update(self, serializer):
+        before = list(getattr(serializer.instance, "review_changes", None) or [])
+        application = serializer.save()
+        after = list(getattr(application, "review_changes", None) or [])
+        new_changes = after[len(before):] if len(after) >= len(before) else []
+        if new_changes:
+            app_id = application.id
+            transaction.on_commit(lambda: async_task(
+                'client_profile.tasks.email_membership_application_review_updated',
+                app_id,
+                new_changes,
+            ))
+
     @action(detail=True, methods=['post'], url_path='award-preview')
     def award_preview(self, request, pk=None):
         app = self.get_object()
