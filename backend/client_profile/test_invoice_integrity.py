@@ -216,6 +216,66 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(revision.review_status, "APPROVED_FOR_PAYMENT")
         self.assertEqual(response.data["last_review_note"], "Approved after checking the shift.")
 
+    def test_finance_revision_visibility_requires_current_successful_delivery(self):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+        self.assertEqual(InvoiceSerializer(record.invoice).data["finance_record_id"], record.id)
+
+        delivery = Delivery.objects.create(
+            record=record,
+            version=record.version,
+            recipient=self.owner.email,
+            status="failed",
+        )
+        factory = APIRequestFactory()
+
+        received_request = factory.get("/client-profile/finance/received-invoices/")
+        force_authenticate(received_request, user=self.owner)
+        received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
+        self.assertEqual(received.status_code, 200)
+        self.assertEqual(received.data["count"], 0)
+
+        legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        force_authenticate(legacy_request, user=self.owner)
+        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
+        self.assertEqual(legacy.status_code, 404)
+
+        delivery.status = "sent"
+        delivery.sent_at = timezone.now()
+        delivery.save(update_fields=["status", "sent_at"])
+
+        received_request = factory.get("/client-profile/finance/received-invoices/")
+        force_authenticate(received_request, user=self.owner)
+        received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
+        self.assertEqual(received.data["count"], 1)
+
+        legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        force_authenticate(legacy_request, user=self.owner)
+        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
+        self.assertEqual(legacy.status_code, 200)
+
+        payload = dict(record.payload)
+        payload["version"] = record.version
+        payload["notes"] = "Saved correction not sent yet"
+        revised = save_draft(self.worker, payload, record.id)
+        self.assertEqual(revised.version, 2)
+        self.assertEqual(revised.invoice.status, "draft")
+
+        received_request = factory.get("/client-profile/finance/received-invoices/")
+        force_authenticate(received_request, user=self.owner)
+        received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
+        self.assertEqual(received.data["count"], 0)
+
+        legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        force_authenticate(legacy_request, user=self.owner)
+        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
+        self.assertEqual(legacy.status_code, 404)
+
+        worker_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        force_authenticate(worker_request, user=self.worker)
+        worker_view = InvoiceDetailView.as_view()(worker_request, pk=record.invoice_id)
+        self.assertEqual(worker_view.status_code, 200)
+
     def test_owner_can_request_revision_and_worker_save_resolves_request(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)
