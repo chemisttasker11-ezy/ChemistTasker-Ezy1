@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.engagement_routing import (
     PAYMENT_ABN,
@@ -20,8 +21,10 @@ from client_profile.models import (
     Membership,
     MembershipApplication,
     MembershipInviteLink,
+    OtherStaffOnboarding,
     Pharmacy,
     Shift,
+    ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
 )
@@ -30,6 +33,7 @@ from client_profile.serializers import (
     MembershipApplicationSerializer,
 )
 from client_profile.services import validate_internal_invoice_shifts
+from client_profile.views import ShiftOfferViewSet
 
 
 User = get_user_model()
@@ -511,3 +515,110 @@ class InvoiceSettlementBoundaryTests(TestCase):
                 [timesheet_shift.id],
                 pharmacy_id=self.pharmacy.id,
             )
+
+
+class DeferredPayrollActivationTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(
+            email="payroll-manager@example.com",
+            password="test-pass",
+            role="OWNER",
+        )
+        self.worker = User.objects.create_user(
+            email="payroll-worker@example.com",
+            password="test-pass",
+            role="OTHER_STAFF",
+        )
+        self.onboarding = OtherStaffOnboarding.objects.create(
+            user=self.worker,
+            role_type="ASSISTANT",
+            classification_level="LEVEL_3",
+            payment_preference="TFN",
+            date_of_birth=date(1990, 1, 1),
+        )
+        self.pharmacy = Pharmacy.objects.create(
+            name="Deferred Payroll Pharmacy",
+            use_chemisttasker_payroll=True,
+        )
+        self.shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.manager,
+            role_needed="ASSISTANT",
+            employment_type="LOCUM",
+        )
+        self.slot = ShiftSlot.objects.create(
+            shift=self.shift,
+            date=date(2026, 9, 21),
+            start_time=time(9, 0),
+            end_time=time(17, 0),
+        )
+        self.offer = ShiftOffer.objects.create(
+            shift=self.shift,
+            slot=self.slot,
+            user=self.worker,
+            status=ShiftOffer.Status.ACCEPTED,
+            payment_preference_snapshot=PAYMENT_TFN,
+            settlement_channel=SETTLEMENT_TIMESHEET_ONLY,
+            engagement_kind="SHIFT_EMPLOYMENT",
+            engagement_terms_snapshot={
+                "version": 1,
+                "payroll_setup_status": "DEFERRED",
+                "award_payroll_review_required": False,
+                "occurrences": [{
+                    "slot_id": self.slot.id,
+                    "date": str(self.slot.date),
+                    "agreed_rate": "45.00",
+                }],
+            },
+            engagement_terms_accepted_at=timezone.now(),
+        )
+        self.assignment = ShiftSlotAssignment.objects.create(
+            shift=self.shift,
+            slot=self.slot,
+            slot_date=self.slot.date,
+            user=self.worker,
+            unit_rate="45.00",
+            payment_preference_snapshot=PAYMENT_TFN,
+            settlement_channel=SETTLEMENT_TIMESHEET_ONLY,
+            engagement_kind="SHIFT_EMPLOYMENT",
+            engagement_terms_snapshot=self.offer.engagement_terms_snapshot,
+            engagement_terms_accepted_at=self.offer.engagement_terms_accepted_at,
+            source_offer=self.offer,
+        )
+        self.factory = APIRequestFactory()
+
+    def _activate(self):
+        request = self.factory.post(
+            f"/client-profile/shift-offers/{self.offer.id}/activate-payroll/",
+            {},
+            format="json",
+        )
+        force_authenticate(request, user=self.manager)
+        view = ShiftOfferViewSet.as_view({"post": "activate_payroll"})
+        with patch(
+            "client_profile.views.BaseShiftViewSet._user_can_manage_pharmacy",
+            return_value=True,
+        ):
+            return view(request, pk=self.offer.id)
+
+    def test_activation_waits_for_tfn_and_super_but_does_not_change_accepted_terms(self):
+        frozen = dict(self.offer.engagement_terms_snapshot)
+        blocked = self._activate()
+        self.assertEqual(blocked.status_code, 400)
+
+        self.onboarding.tfn_number = "123456789"
+        self.onboarding.super_fund_name = "Example Super"
+        self.onboarding.super_usi = "EXAMPLE123"
+        self.onboarding.super_member_number = "MEMBER123"
+        self.onboarding.save()
+
+        response = self._activate()
+        self.assertEqual(response.status_code, 200)
+
+        self.offer.refresh_from_db()
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.offer.settlement_channel, SETTLEMENT_PAYROLL)
+        self.assertEqual(self.assignment.settlement_channel, SETTLEMENT_PAYROLL)
+        self.assertIsNotNone(self.offer.payroll_activated_at)
+        self.assertIsNotNone(self.assignment.payroll_activated_at)
+        self.assertEqual(self.offer.engagement_terms_snapshot, frozen)
