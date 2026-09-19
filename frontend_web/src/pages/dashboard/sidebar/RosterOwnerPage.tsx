@@ -986,6 +986,30 @@ export default function RosterOwnerPage() {
         ))}
       </Tabs>
 
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          disabled={!selectedPharmacyId}
+          onClick={() => navigate(`/dashboard/workforce/timesheets?pharmacy_id=${selectedPharmacyId ?? ''}`)}
+        >
+          Timesheets
+        </Button>
+        <Button
+          variant="outlined"
+          disabled={!selectedPharmacyId}
+          onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${selectedPharmacyId ?? ''}`)}
+        >
+          Workforce settings
+        </Button>
+        <Button
+          variant="text"
+          disabled={!selectedPharmacyId}
+          onClick={() => navigate(`/dashboard/attendance/reviews?pharmacy_id=${selectedPharmacyId ?? ''}`)}
+        >
+          Attendance review
+        </Button>
+      </Stack>
+
       {/* Roster V2 Weekly Planning, Draft/Publish, Validation & Templates Toolbar */}
       <RosterPlanningToolbar
         pharmacyId={selectedPharmacyId}
@@ -1216,6 +1240,8 @@ export default function RosterOwnerPage() {
           setEscalationLevel,
           setIsEscalateDialogOpen,
           handleDeleteAssignment,
+          onOpenTimesheets: () => navigate(`/dashboard/workforce/timesheets?pharmacy_id=${selectedPharmacyId ?? ''}`),
+          onOpenWorkforce: () => navigate(`/dashboard/workforce/settings?pharmacy_id=${selectedPharmacyId ?? ''}`),
         }}
         duplicate={{
           open: isDuplicateDialogOpen,
