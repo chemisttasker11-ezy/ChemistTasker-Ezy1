@@ -287,6 +287,17 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertTrue(revision.data["has_unsent_revision"])
         self.assertEqual([row["version"] for row in revision.data["revisions"]], [1])
 
+        hidden_revision_request = factory.get(
+            f"/client-profile/finance/received-invoices/{record.id}/revisions/2/"
+        )
+        force_authenticate(hidden_revision_request, user=self.owner)
+        hidden_revision = ReceivedInvoiceViewSet.as_view({"get": "revision"})(
+            hidden_revision_request,
+            pk=record.id,
+            version="2",
+        )
+        self.assertEqual(hidden_revision.status_code, 404)
+
         legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
         force_authenticate(legacy_request, user=self.owner)
         legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
