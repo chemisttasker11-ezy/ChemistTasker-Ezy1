@@ -26,7 +26,7 @@ const byteBudgets = {
   'frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx': 31000,
   'frontend_web/src/components/roster/RosterGridViews.tsx': 53000,
   'frontend_web/src/components/roster/HorizontalCalendarGrid.tsx': 49000,
-  'frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx': 96000,
+  'frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx': 63000,
   'frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx': 43000,
   'frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx': 81000,
   'frontend_mobile/roles/shared/calendar/index.tsx': 55000,
