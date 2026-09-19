@@ -492,7 +492,12 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                         </Typography>
                       </Stack>
                       <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        {row.effective_from} → {row.effective_to || 'Current'} · Weekday {'
+                        {row.effective_from} → {row.effective_to || 'Current'} · Weekday {'$'}{row.rate_weekday}/hr · Sat {'$'}{row.rate_saturday}/hr · Sun {'$'}{row.rate_sunday}/hr · Public holiday {'$'}{row.rate_public_holiday}/hr
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Correspondence: {row.correspondence.label}
+                      </Typography>
+                      {row.late_night_applicable && row.rate_late_night && (
                         <Typography variant="body2" color="text.secondary">
                           Weekday 9 pm–midnight: {'$'}{row.rate_late_night}/hr
                         </Typography>
