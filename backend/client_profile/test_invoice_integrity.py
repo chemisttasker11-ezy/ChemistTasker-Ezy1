@@ -173,7 +173,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         factory = APIRequestFactory()
         request = factory.post(
             f"/client-profile/finance/received-invoices/{record.id}/request-revision/",
-            {"note": "Please use the actual 7.5 hours worked."},
+            {"version": record.version, "note": "Please use the actual 7.5 hours worked."},
             format="json",
         )
         force_authenticate(request, user=self.owner)
@@ -202,6 +202,39 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(request_row.resolved_by_version, revised.version)
         self.assertEqual(revised.review_status, "NONE")
         self.assertEqual(revised.invoice.status, "draft")
+
+    def test_owner_review_action_rejects_stale_invoice_version(self):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+        Delivery.objects.create(
+            record=record,
+            version=record.version,
+            recipient=self.owner.email,
+            status="sent",
+            sent_at=timezone.now(),
+        )
+        record.invoice.status = "sent"
+        record.invoice.save(update_fields=["status"])
+
+        payload = dict(record.payload)
+        payload["version"] = record.version
+        payload["notes"] = "Worker saved a newer correction"
+        revised = save_draft(self.worker, payload, record.id)
+        self.assertEqual(revised.version, 2)
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            f"/client-profile/finance/received-invoices/{record.id}/request-revision/",
+            {"version": 1, "note": "This action came from a stale owner screen."},
+            format="json",
+        )
+        force_authenticate(request, user=self.owner)
+        response = ReceivedInvoiceViewSet.as_view({"post": "request_revision"})(request, pk=record.id)
+
+        self.assertEqual(response.status_code, 400)
+        revised.refresh_from_db()
+        self.assertEqual(revised.review_status, "NONE")
+        self.assertFalse(revised.review_requests.exists())
 
     def test_partial_hour_invoice_uses_same_precision_for_quantity_and_total(self):
         self.slot.end_time = time(16, 37)
