@@ -34,6 +34,11 @@ class Migration(migrations.Migration):
                 to="client_profile.shiftslotassignment",
             ),
         ),
+        migrations.AlterField(
+            model_name="invoice",
+            name="super_rate_snapshot",
+            field=models.DecimalField(decimal_places=2, default=12.0, max_digits=5),
+        ),
         migrations.AddConstraint(
             model_name="invoicelineitem",
             constraint=models.UniqueConstraint(
