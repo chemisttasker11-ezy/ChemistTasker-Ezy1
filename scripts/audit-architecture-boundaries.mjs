@@ -15,9 +15,9 @@ const byteBudgets = {
   'backend/client_profile/serializers.py': 348000,
   'backend/client_profile/models.py': 182000,
   'shared-core/src/api.ts': 105000,
-  'frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx': 146000,
-  'frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx': 125000,
-  'frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx': 100000,
+  'frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx': 138000,
+  'frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx': 116000,
+  'frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx': 94000,
   'frontend_web/src/pages/attendance/KioskPage.tsx': 107000,
   'frontend_web/src/layouts/TopBarActions.tsx': 62000,
 };
