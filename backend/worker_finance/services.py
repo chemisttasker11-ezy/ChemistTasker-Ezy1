@@ -103,6 +103,7 @@ def adopt_internal_invoice(owner, invoice):
     Locked professional-service rows retain their source_assignment links; this
     wrapper only adds finance workspace metadata, delivery/payment history and UI.
     """
+    owner.__class__.objects.select_for_update().get(pk=owner.pk)
     Invoice.objects.select_for_update().get(pk=invoice.pk)
     existing = InvoiceRecord.objects.filter(invoice=invoice).first()
     if existing:
