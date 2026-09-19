@@ -1,6 +1,6 @@
 # EmploymentEngagement / Membership / Payroll Progress
 
-Last updated: 2026-09-19 17:45 AEST (Australia/Brisbane)
+Last updated: 2026-09-19 18:12 AEST (Australia/Brisbane)
 
 ## Current branch
 
@@ -458,3 +458,108 @@ Current PR #3 already contains InvoiceRevision, InvoiceReviewRequest, owner revi
 - add regression coverage for Saved -> Sent -> Edited -> Saved -> Resent and Paid -> Edited -> Saved -> Resent;
 - add cross-UI tests proving legacy and finance-workspace editors enforce the same version/revision semantics;
 - keep PR #3 draft until these corrections and the latest-head executable CI complete.
+
+
+## Invoice lifecycle implementation checkpoint — 2026-09-19 18:12 AEST
+
+Functional head at this checkpoint: `3ebb40a00a706eafa7c7c45df37c7eb8c1d25260`.
+
+The invoice lifecycle direction recorded earlier in this document is now implemented across the canonical finance backend, web/mobile finance workspaces and legacy compatibility boundary.
+
+### Lifecycle now implemented
+
+- **Unsaved Draft is editor state only.**
+  - Internal ABN prefill returns pharmacy/shift/worker snapshots without creating an Invoice, InvoiceRecord or Customer merely by opening the composer.
+  - Invoice number/durable record is created only on Save.
+- **Saved is durable and editable.**
+  - The canonical database may retain legacy `draft` internally, but shared presentation shows **Saved**.
+  - PDF download/share is available independently of ChemistTasker Send.
+- **Sent remains editable.**
+  - Editing and saving a sent invoice captures the outgoing revision, creates the next version and returns the live version to Saved.
+  - The next Send/Resend records delivery against that exact version.
+- **Paid remains editable.**
+  - A paid invoice can be corrected and saved as a new revision without destroying the prior paid revision/payment history.
+  - The corrected version may be sent again.
+- `locked_at` is no longer a permanent business immutability rule for service invoices.
+
+### Internal ABN provenance and editable actuals
+
+- Pharmacy identity, ABN/legal/contact/address details are prefilled from canonical pharmacy data.
+- Shift/slot date, start/end, calculated hours and frozen agreed rate are prefilled from accepted INVOICE + INDEPENDENT_CONTRACTOR assignment terms.
+- Worker issuer/business/payment/super defaults are prefilled from onboarding.
+- Source assignment IDs cannot be removed/replaced, so the exact accepted work remains traceable.
+- Invoice date, description, actual hours, rate, unit, tax treatment and legitimate billing adjustments can be corrected and saved as a new invoice revision.
+- Source snapshot version 3 now retains the original pharmacy identity separately from editable invoice bill-to details.
+
+### Invoice-only recipient overrides
+
+- Web and mobile allow invoice-only bill-to corrections/completion for:
+  - display name,
+  - legal name,
+  - ABN,
+  - accounts contact,
+  - invoice email,
+  - billing address.
+- These overrides update the invoice/PDF/send snapshot only; they do **not** rewrite the saved Pharmacy/Customer master.
+- Original pharmacy provenance remains in `Invoice.source_snapshot.pharmacy`.
+
+### Owner review / revision loop
+
+- Owner/admin received-invoice actions are version-bound:
+  - **Approve / process for payment** with optional note,
+  - **Request revision** with required note,
+  - **Mark paid** with optional note.
+- Stale owner actions cannot be applied to a newer worker revision.
+- Approvals, revision requests and paid state are snapshotted against the exact invoice version.
+- When a contractor saves the next revision after a revision request, the old request is resolved with the resolving version.
+- An unsent newer revision is not exposed as the received invoice. The pharmacy sees/actionably receives the current revision only after successful delivery state.
+- Failed/preparing send attempts do not make a finance revision visible to the pharmacy.
+
+### Saved items and ad-hoc lines
+
+- Item code is optional.
+- Saved items act as defaults only; invoice line description, unit, quantity, price, category, tax and super-base flags remain editable.
+- Ad-hoc invoice lines require no catalogue item.
+- Custom/free-text units are supported.
+- Per-line tax choices include GST, GST-free, input taxed and out-of-scope/N-T.
+- Web has saved-item search, blank/ad-hoc row and inline **Add new saved item**.
+- Mobile now has equivalent **Ad-hoc row**, **Saved item** and **Add new saved item → Save & add** flows.
+
+### Legacy compatibility boundary
+
+- Finance-managed invoices expose their finance workspace ownership to legacy clients.
+- Legacy web/mobile lists remain available for historical pre-workspace invoices.
+- New invoice creation from the web legacy view now routes to the new finance workspace; the mobile historical view no longer creates new legacy invoices.
+- Finance-managed records are directed back to the Invoices/Received workspace for current edit/review actions.
+- Backend protection does not rely on the UI:
+  - legacy PATCH cannot mark a finance-managed invoice sent/paid or edit its content;
+  - manager legacy status mutation is blocked for finance-managed invoices;
+  - legacy generic issue reporting is blocked for finance-managed invoices in favour of versioned **Request revision**;
+  - manager legacy reads cannot expose an unsent newer finance revision;
+  - legacy Send remains compatibility-safe because it records the current finance revision/delivery rather than locking future edits.
+
+### Regression coverage added
+
+Coverage now includes:
+
+- Saved -> Sent -> Edited -> Saved -> Resent;
+- Paid -> Edited -> Saved -> Resent;
+- stale owner review action after worker creates a newer revision;
+- owner approval snapshot on the exact revision;
+- invoice-only recipient override without mutating pharmacy/customer master;
+- original pharmacy provenance retained while invoice bill-to data changes;
+- failed delivery does not expose an invoice to the pharmacy;
+- successful current-version delivery does expose it;
+- next unsent revision is hidden from both Received invoices and legacy manager endpoints;
+- worker legacy status PATCH cannot fake Send;
+- manager legacy status PATCH cannot bypass versioned owner review.
+
+### Validation state
+
+- PR #3 remains DRAFT.
+- Latest head at this checkpoint: `3ebb40a00a706eafa7c7c45df37c7eb8c1d25260`.
+- Earlier latest-head workflow attempts repeatedly terminated with zero steps/no logs, which is a runner-allocation failure rather than a code-test result.
+- Fresh runs for this head have now been created:
+  - Shared Core Consolidation run `35431365854` — pending at checkpoint time.
+  - Mobile Lint run `35431365882` — queued at checkpoint time.
+- Do not mark this head green until those jobs actually allocate steps and execute.
