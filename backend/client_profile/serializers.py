@@ -4033,11 +4033,7 @@ def _application_snapshot(source):
 
 
 def _application_payment_profile_status(application):
-    """Safe owner-facing readiness summary.
-
-    The worker onboarding profile remains the payment source of truth. Never expose
-    the TFN, super member number or other secret identifiers through membership review.
-    """
+    """Safe owner-facing readiness summary from the canonical workforce resolver."""
     worker = getattr(application, "submitted_by", None)
     if not worker and getattr(application, "email", None):
         worker = User.objects.filter(email__iexact=application.email).first()
@@ -4053,71 +4049,13 @@ def _application_payment_profile_status(application):
             "missing_fields": ["worker_account", "onboarding", "payment_preference"],
         }
 
-    onboarding = (
-        PharmacistOnboarding.objects.filter(user=worker).first()
-        if str(getattr(worker, "role", "") or "").upper() == "PHARMACIST"
-        else OtherStaffOnboarding.objects.filter(user=worker).first()
-    )
-    if not onboarding:
-        return {
-            "account_linked": True,
-            "onboarding_complete": False,
-            "payment_preference": None,
-            "status": "ONBOARDING_INCOMPLETE",
-            "payroll_ready": False,
-            "invoice_ready": False,
-            "missing_fields": ["onboarding", "payment_preference"],
-        }
+    from client_profile.engagement_routing import worker_payment_profile_status
 
-    preference = str(getattr(onboarding, "payment_preference", "") or "").strip().upper()
-    if preference == "TFN":
-        missing = []
-        if not getattr(onboarding, "tfn_number", None):
-            missing.append("tfn")
-        if not getattr(onboarding, "super_fund_name", None):
-            missing.append("super_fund_name")
-        if not getattr(onboarding, "super_usi", None):
-            missing.append("super_usi")
-        if not getattr(onboarding, "super_member_number", None):
-            missing.append("super_member_number")
-        return {
-            "account_linked": True,
-            "onboarding_complete": True,
-            "payment_preference": "TFN",
-            "status": "READY" if not missing else "TFN_SETUP_INCOMPLETE",
-            "payroll_ready": not missing,
-            "invoice_ready": False,
-            "missing_fields": missing,
-        }
-
-    if preference == "ABN":
-        missing = []
-        if not getattr(onboarding, "abn", None):
-            missing.append("abn")
-        if not getattr(onboarding, "abn_verified", False):
-            missing.append("abn_verified")
-        if not getattr(onboarding, "abn_entity_confirmed", False):
-            missing.append("abn_entity_confirmed")
-        return {
-            "account_linked": True,
-            "onboarding_complete": True,
-            "payment_preference": "ABN",
-            "status": "READY" if not missing else "ABN_SETUP_INCOMPLETE",
-            "payroll_ready": False,
-            "invoice_ready": not missing,
-            "missing_fields": missing,
-        }
-
+    status = worker_payment_profile_status(worker)
     return {
         "account_linked": True,
-        "onboarding_complete": True,
-        "payment_preference": None,
-        "status": "PAYMENT_PREFERENCE_REQUIRED",
-        "payroll_ready": False,
-        "invoice_ready": False,
-        "missing_fields": ["payment_preference"],
+        **status,
     }
-
 
 def _normalise_application_role_fields(attrs, *, role, payroll_enabled, category):
     require_classification = bool(payroll_enabled and category == "FULL_PART_TIME")
