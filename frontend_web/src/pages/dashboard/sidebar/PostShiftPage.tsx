@@ -55,13 +55,10 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Calendar, momentLocalizer } from 'react-big-calendar';
-import moment from 'moment';
+import { Calendar } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dayjs from 'dayjs';
-import { ORG_ROLES } from '../../../constants/roles';
 import {
-  PharmacySummary,
   Shift,
   EscalationLevelKey,
   fetchPharmaciesService,
@@ -74,238 +71,35 @@ import skillsCatalog from '../../../../../shared-core/skills_catalog.json';
 import { useColorMode } from '../../../theme/sleekTheme';
 import apiClient from '../../../utils/apiClient';
 
-// --- Interface Definitions ---
-type PharmacyOption = PharmacySummary & { hasChain?: boolean; claimed?: boolean };
-type ShiftDescriptionTemplate = {
-  id: number;
-  pharmacy: number;
-  role_needed: string;
-  description: string;
-};
-type SlotTime = { startTime: string; endTime: string };
-type PharmacyHoursForDate = SlotTime & {
-  closed: boolean;
-  label: string;
-  isPublicHoliday: boolean;
-};
-interface SlotEntry {
-  date: string; startTime: string; endTime: string; isRecurring: boolean;
-  recurringDays: number[]; recurringEndDate: string;
-}
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  resource?: {
-    slotIndex: number;
-    occurrenceIndex: number;
-  };
-}
-
-const toRateInputString = (value: unknown): string =>
-  value === null || value === undefined ? '' : String(value);
-
-const getSlotRateValue = (slot: any): unknown =>
-  slot?.rate ?? slot?.rate_per_hour ?? slot?.ratePerHour ?? slot?.hourly_rate ?? slot?.hourlyRate;
-
-const firstPresent = (...values: unknown[]): unknown =>
-  values.find((value) => value !== null && value !== undefined && value !== '');
-
-type CalendarViewOption = 'month' | 'week' | 'day';
-const CALENDAR_VIEWS: CalendarViewOption[] = ['month', 'week', 'day'];
-const GOVERNMENT_AWARD_GUIDE_URL = 'https://calculate.fairwork.gov.au/payguides/fairwork/ma000012/pdf';
-
-interface CalendarSlotSelection {
-  start: Date;
-  end: Date;
-  slots: Date[];
-  action?: 'select' | 'click' | 'doubleClick';
-  bounds?: DOMRect | ClientRect;
-  box?: DOMRect | ClientRect;
-}
-
-const localizer = momentLocalizer(moment);
-
-const WEEK_DAYS = [
-  { v: 1, l: 'M', full: 'Monday' },
-  { v: 2, l: 'T', full: 'Tuesday' },
-  { v: 3, l: 'W', full: 'Wednesday' },
-  { v: 4, l: 'T', full: 'Thursday' },
-  { v: 5, l: 'F', full: 'Friday' },
-  { v: 6, l: 'S', full: 'Saturday' },
-  { v: 0, l: 'S', full: 'Sunday' },
-];
-
-const DAY_LABELS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DEFAULT_SUPER_PERCENT = 11.5;
-
-const toIsoDate = (value: string): Date | null => {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  const parsed = dayjs(trimmed);
-  if (parsed.isValid()) {
-    return parsed.startOf('day').toDate();
-  }
-
-  const datePortion = trimmed.split('T')[0];
-  if (datePortion) {
-    const [year, month, day] = datePortion.split('-').map((part) => Number.parseInt(part, 10));
-    if ([year, month, day].every((part) => Number.isFinite(part))) {
-      return new Date(year, month - 1, day);
-    }
-  }
-
-  return null;
-};
-
-const isValidDate = (date: Date | null | undefined): date is Date => {
-  return Boolean(date && !Number.isNaN(date.getTime()));
-};
-
-const applyTimeToDate = (date: Date, time: string) => {
-  const [hour, minute] = time.split(':').map(Number);
-  const next = new Date(date.getTime());
-  next.setHours(hour, minute, 0, 0);
-  return next;
-};
-
-const formatSlotDate = (value: string) => (value ? dayjs(value).format('DD/MM/YYYY') : '');
-const formatSlotTime = (value: string) => dayjs(`1970-01-01T${value}`).format('h:mm A');
-const getSlotDurationHours = (startTime?: string, endTime?: string) => {
-  if (!startTime || !endTime) return 0;
-  const start = dayjs(`1970-01-01T${startTime.slice(0, 5)}`);
-  let end = dayjs(`1970-01-01T${endTime.slice(0, 5)}`);
-  if (!start.isValid() || !end.isValid()) return 0;
-  if (end.isBefore(start) || end.isSame(start)) end = end.add(1, 'day');
-  return Math.max(0, end.diff(start, 'minute') / 60);
-};
-const formatSlotDisplayDate = (value: string) => {
-  if (!value) return '';
-  const parsed = dayjs(value);
-  if (!parsed.isValid()) return value;
-  const day = parsed.date();
-  const suffix =
-    day >= 11 && day <= 13
-      ? 'th'
-      : day % 10 === 1
-        ? 'st'
-        : day % 10 === 2
-          ? 'nd'
-          : day % 10 === 3
-            ? 'rd'
-            : 'th';
-  return `${parsed.format('ddd')}, ${day}${suffix} of ${parsed.format('MMMM YYYY')}`;
-};
-const RATE_TYPE_DESCRIPTIONS: Record<string, string> = {
-  FLEXIBLE: 'The rate is flexible and negotiable with the candidate.',
-  FIXED: 'The rate is fixed in advanceand  and not negotiable',
-  PHARMACIST_PROVIDED: 'Use the candidate’s preset rate. You’ll always see it before assigning the shift.',
-};
-const toInputDateTimeLocal = (value?: string | null) =>
-  value ? dayjs(value).local().format('YYYY-MM-DDTHH:mm') : '';
-
-const normalizePrefillRole = (value?: string | null) => {
-  if (!value) return '';
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, '_');
-  if (['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT', 'EXPLORER'].includes(normalized)) {
-    return normalized;
-  }
-  if (normalized.includes('OTHER_STAFF')) return 'ASSISTANT';
-  if (normalized.includes('COMMUNITY_PHARMACIST')) return 'PHARMACIST';
-  if (normalized.includes('DISPENSARY_TECHNICIAN')) return 'TECHNICIAN';
-  if (normalized.includes('PHARMACY_TECHNICIAN')) return 'TECHNICIAN';
-  if (normalized.includes('PHARMACY_ASSISTANT')) return 'ASSISTANT';
-  if (normalized.includes('PHARMACIST')) return 'PHARMACIST';
-  if (normalized.includes('TECHNICIAN')) return 'TECHNICIAN';
-  if (normalized.includes('ASSISTANT')) return 'ASSISTANT';
-  if (normalized.includes('INTERN')) return 'INTERN';
-  if (normalized.includes('STUDENT')) return 'STUDENT';
-  return '';
-};
-
-const describeRecurringDays = (days: number[]) => {
-  if (!days?.length) return '';
-  const ordered = [...days].sort((a, b) => ((a === 0 ? 7 : a) - (b === 0 ? 7 : b)));
-  return ordered.map((day) => DAY_LABELS_SHORT[day]).join(' / ');
-};
-
-const readPharmacyValue = (pharmacy: any, snake: string, camel?: string) =>
-  pharmacy?.[snake] ?? (camel ? pharmacy?.[camel] : undefined);
-
-const normalizeHour = (value: unknown): string => {
-  if (typeof value !== 'string') return '';
-  return value ? value.slice(0, 5) : '';
-};
-
-const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
-  `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
-
-const pharmacyPublicHolidayDates = (pharmacy: any): string[] => {
-  const raw =
-    pharmacy?.public_holiday_dates ??
-    pharmacy?.publicHolidayDates ??
-    pharmacy?.public_holidays_dates ??
-    pharmacy?.publicHolidaysDates ??
-    pharmacy?.public_holidays ??
-    pharmacy?.publicHolidays;
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((value) => (typeof value === 'string' ? value.slice(0, 10) : ''))
-    .filter(Boolean);
-};
-
-const isPublicHolidayDate = (date: string, pharmacy: any) =>
-  pharmacyPublicHolidayDates(pharmacy).includes(date);
-
-const pharmacyHoursForDate = (
-  pharmacy: PharmacyOption | undefined,
-  date: string,
-  fallback: SlotTime
-): PharmacyHoursForDate => {
-  if (!pharmacy || !date) {
-    return { ...fallback, closed: false, label: 'selected day', isPublicHoliday: false };
-  }
-
-  const parsed = dayjs(date);
-  const isPublicHoliday = isPublicHolidayDate(date, pharmacy);
-  const weekday = parsed.isValid() ? parsed.day() : -1;
-  const prefix = isPublicHoliday
-    ? 'public_holidays'
-    : weekday === 0
-      ? 'sundays'
-      : weekday === 6
-        ? 'saturdays'
-        : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][weekday - 1] || '';
-  const label = isPublicHoliday
-    ? 'public holiday'
-    : weekday === 0
-      ? 'Sunday'
-      : weekday === 6
-        ? 'Saturday'
-        : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][weekday - 1] || 'selected day';
-
-  if (!prefix) {
-    return { ...fallback, closed: false, label, isPublicHoliday };
-  }
-
-  const start = normalizeHour(readPharmacyValue(pharmacy, `${prefix}_start`, toCamelHoursKey(prefix, 'start')));
-  const end = normalizeHour(readPharmacyValue(pharmacy, `${prefix}_end`, toCamelHoursKey(prefix, 'end')));
-  const closed = Boolean(readPharmacyValue(pharmacy, `${prefix}_closed`, toCamelHoursKey(prefix, 'closed')));
-
-  return {
-    startTime: start || fallback.startTime,
-    endTime: end || fallback.endTime,
-    closed,
-    label,
-    isPublicHoliday,
-  };
-};
-
-const ORG_ROLE_VALUES = ORG_ROLES as readonly string[];
+import {
+  type PharmacyOption,
+  type ShiftDescriptionTemplate,
+  type SlotEntry,
+  type CalendarEvent,
+  type CalendarViewOption,
+  type CalendarSlotSelection,
+  toRateInputString,
+  getSlotRateValue,
+  firstPresent,
+  CALENDAR_VIEWS,
+  GOVERNMENT_AWARD_GUIDE_URL,
+  localizer,
+  WEEK_DAYS,
+  DEFAULT_SUPER_PERCENT,
+  toIsoDate,
+  isValidDate,
+  applyTimeToDate,
+  formatSlotDate,
+  formatSlotTime,
+  getSlotDurationHours,
+  formatSlotDisplayDate,
+  RATE_TYPE_DESCRIPTIONS,
+  toInputDateTimeLocal,
+  normalizePrefillRole,
+  describeRecurringDays,
+  pharmacyHoursForDate,
+  ORG_ROLE_VALUES,
+} from './PostShiftPage.helpers';
 
 type PostShiftPageProps = {
   onCompleted?: () => void;
