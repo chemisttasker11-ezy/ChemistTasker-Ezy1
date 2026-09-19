@@ -79,6 +79,8 @@ export default function ShiftEngagementTermsDialog({
               <Stack direction="row" gap={1} flexWrap="wrap">
                 {primary.paymentPreference && <Chip label={`Payment: ${primary.paymentPreference}`} />}
                 {primary.settlementChannel && <Chip label={`Settlement: ${primary.settlementChannel}`} />}
+                {primary.awardClassification && <Chip label={`Award: ${primary.awardClassification}`} />}
+                {primary.payBasis && <Chip label={`Basis: ${primary.payBasis}`} />}
                 <Chip
                   label={primary.engagementKind === 'INDEPENDENT_CONTRACTOR' ? 'Independent services' : 'Employee engagement'}
                   variant="outlined"
@@ -87,15 +89,40 @@ export default function ShiftEngagementTermsDialog({
 
               {primary.facilitatorNotice && <Alert severity="info">{primary.facilitatorNotice}</Alert>}
               {primary.relationshipNotice && <Alert severity={contractor ? 'warning' : 'info'}>{primary.relationshipNotice}</Alert>}
+              {primary.payrollSetupStatus === 'DEFERRED' && (
+                <Alert severity="warning">
+                  {primary.payrollSetupNotice || 'ChemistTasker Payroll setup is deferred. The shift can still be assigned and timesheeted.'}
+                  {primary.payrollMissingFields?.length
+                    ? ` Complete later: ${primary.payrollMissingFields.join(', ')}.`
+                    : ''}
+                </Alert>
+              )}
+              {primary.awardPayrollReviewRequired && (
+                <Alert severity="warning">
+                  Assignment can proceed, but ChemistTasker Payroll needs an Award/overtime review before activation.
+                  {primary.awardPayrollReviewReasons?.length
+                    ? ` ${primary.awardPayrollReviewReasons.join(' ')}`
+                    : ''}
+                </Alert>
+              )}
 
               <Box>
                 <Typography fontWeight={800} gutterBottom>Agreed shift details</Typography>
                 <Stack spacing={0.75}>
                   {occurrences.map((item, index) => (
-                    <Typography key={`${item.slotId ?? 'shift'}-${item.date}-${index}`} variant="body2">
-                      {item.date} · {item.startTime}–{item.endTime}
-                      {item.agreedRate ? ` · $${item.agreedRate}/hr` : ''}
-                    </Typography>
+                    <Box key={`${item.slotId ?? 'shift'}-${item.date}-${index}`}>
+                      <Typography variant="body2">
+                        {item.date} · {item.startTime}–{item.endTime}
+                        {item.agreedRate ? ` · Final ${item.agreedRate}/hr` : ''}
+                      </Typography>
+                      {(item.awardFloorRate || item.ownerBonus || item.postedRate) && (
+                        <Typography variant="caption" color="text.secondary">
+                          {item.awardFloorRate ? `Award floor ${item.awardFloorRate}/hr` : ''}
+                          {item.ownerBonus && Number(item.ownerBonus) > 0 ? ` + bonus ${item.ownerBonus}/hr` : ''}
+                          {item.postedRate ? ` · posted/agreed input ${item.postedRate}/hr` : ''}
+                        </Typography>
+                      )}
+                    </Box>
                   ))}
                 </Stack>
               </Box>
