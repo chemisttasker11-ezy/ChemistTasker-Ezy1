@@ -890,6 +890,14 @@ export interface ShiftEngagementOccurrenceApi {
     start_time: string;
     end_time: string;
     agreed_rate?: string | null;
+    posted_rate?: string | null;
+    award_floor_rate?: string | null;
+    award_classification?: string | null;
+    owner_bonus?: string | null;
+    minimum_with_bonus?: string | null;
+    award_review_required?: boolean;
+    award_review_reason?: string | null;
+    award_floor_segments?: Array<Record<string, unknown>>;
 }
 
 export interface ShiftEngagementTermsApi {
@@ -898,8 +906,15 @@ export interface ShiftEngagementTermsApi {
     error?: unknown;
     acceptance_required?: boolean;
     engagement_kind?: 'STAFF_EMPLOYMENT' | 'SHIFT_EMPLOYMENT' | 'INDEPENDENT_CONTRACTOR' | string;
-    settlement_channel?: 'PAYROLL' | 'INVOICE' | string;
+    settlement_channel?: 'PAYROLL' | 'INVOICE' | 'TIMESHEET_ONLY' | string;
     payment_preference?: 'TFN' | 'ABN' | string;
+    payroll_enabled?: boolean;
+    payroll_requested?: boolean;
+    payroll_setup_status?: 'READY' | 'DEFERRED' | 'NOT_USED' | string;
+    payroll_target_settlement_channel?: 'PAYROLL' | null | string;
+    payroll_missing_fields?: string[];
+    payroll_activation_required?: boolean;
+    payroll_setup_notice?: string | null;
     pharmacy_id?: number;
     pharmacy_name?: string;
     pharmacy_abn?: string | null;
@@ -910,10 +925,23 @@ export interface ShiftEngagementTermsApi {
     source_visibility?: string;
     employment_type?: string;
     award_code?: string;
+    award_classification?: string | null;
+    pay_basis?: string | null;
+    owner_bonus?: string | null;
+    award_floor?: Record<string, unknown> | null;
+    award_payroll_review_required?: boolean;
+    award_payroll_review_reasons?: string[];
+    casual_agreement?: Record<string, unknown> | null;
+    super?: {
+        fund_name?: string | null;
+        usi?: string | null;
+        member_number_present?: boolean;
+    } | null;
     provider_abn?: string | null;
     provider_entity_name?: string | null;
     gst_registered?: boolean;
     super_review_required?: boolean;
+    super_payable_confirmed?: boolean;
     occurrences?: ShiftEngagementOccurrenceApi[];
     facilitator_notice?: string;
     relationship_notice?: string;
@@ -945,6 +973,7 @@ export interface ShiftOfferApi {
     engagement_kind?: string | null;
     engagement_terms_snapshot?: ShiftEngagementTermsApi | Record<string, unknown> | null;
     engagement_terms_accepted_at?: string | null;
+    payroll_activated_at?: string | null;
     expires_at?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
