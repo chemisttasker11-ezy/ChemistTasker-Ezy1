@@ -101,6 +101,12 @@ export default function MembershipApplyPage() {
 
   const isAuthenticatedWorker = user?.role === 'PHARMACIST' || user?.role === 'OTHER_STAFF';
   const authenticatedRoleBlocked = Boolean(user && !isAuthenticatedWorker);
+  const workerPaymentPath =
+    user?.role === 'PHARMACIST'
+      ? '/dashboard/pharmacist/onboarding?step=payment'
+      : user?.role === 'OTHER_STAFF'
+        ? '/dashboard/otherstaff/onboarding?step=payment'
+        : null;
   const payrollClassificationRequired =
     info?.category === 'FULL_PART_TIME' && Boolean(info?.payroll_enabled);
   const roleOptions = useMemo(() => {
@@ -361,11 +367,31 @@ export default function MembershipApplyPage() {
                 Favourite-list approval does not choose TFN or ABN for you. Your private worker Payment Profile remains the source of truth when you later accept a shift.
               </Alert>
             )}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+              {workerPaymentPath ? (
+                <Button component={RouterLink} to={workerPaymentPath} variant="contained">
+                  Complete Payment Profile
+                </Button>
+              ) : (
+                <>
+                  <Button component={RouterLink} to="/register" variant="contained">
+                    Create worker account
+                  </Button>
+                  <Button component={RouterLink} to="/login" variant="outlined">
+                    Log in
+                  </Button>
+                </>
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.25 }}>
+              Use the same email address as this application so ChemistTasker can link the worker profile to the pharmacy request.
+            </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              You can now close this page. Back to{' '}
+              You can also return to{' '}
               <Link component={RouterLink} to={user?'/dashboard':'/login'} fontWeight="bold" color="#5222B8">
                 {user?'My dashboard':'Log in'}
               </Link>
+              .
             </Typography>
           </>
         ) : (
