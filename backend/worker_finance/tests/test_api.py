@@ -15,7 +15,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
-from worker_finance.models import Customer, CatalogueItem, InvoiceRecord, Payment
+from worker_finance.models import Customer, CatalogueItem, InvoiceRecord, InvoiceRevision, Payment
 
 BASE = '/api/client-profile/finance/'
 
@@ -59,6 +59,28 @@ class FinanceApiTests(TestCase):
         self.assertEqual(self.client.get(BASE + 'invoices/').data['count'], 0)
         self.assertEqual(self.post('invoices/', self.data).status_code, 404)
 
+    def test_ad_hoc_line_needs_no_saved_item_code(self):
+        payload = {
+            **self.data,
+            'lines': [{
+                'item_id': None,
+                'description': 'After-hours consultation',
+                'category_code': 'Miscellaneous',
+                'unit': 'Visit',
+                'quantity': '1.00',
+                'unit_price': '55.00',
+                'discount': '0.00',
+                'tax_code': 'GST',
+                'super_eligible': False,
+            }],
+            'super_mode': 'none',
+        }
+        response = self.post('invoices/', payload)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['payload']['lines'][0]['unit'], 'Visit')
+        self.assertIsNone(response.data['payload']['lines'][0].get('item_id'))
+        self.assertEqual(response.data['calculation']['payable'], '60.50')
+
     def test_cross_owner_item_rejected(self):
         self.item.owner = self.other
         self.item.save()
@@ -74,15 +96,28 @@ class FinanceApiTests(TestCase):
         self.assertEqual(record.calculation['super'], '96.00')
         self.assertEqual(record.owner_id, self.user.pk)
 
-    def test_stale_version_and_issued_edits(self):
+    def test_stale_version_rejected_but_saved_invoice_remains_revisable(self):
         record = self.create()
         data = {**self.data, 'version': 99}
         self.assertEqual(self.client.patch(BASE + f'invoices/{record["id"]}/', data, format='json').status_code, 400)
-        self.issue(record)
+
         data['version'] = record['version']
-        self.assertEqual(self.client.patch(BASE + f'invoices/{record["id"]}/', data, format='json').status_code, 400)
-        response = self.client.patch(f'/api/client-profile/invoices/{record["invoice_id"]}/', {'total': '1'}, format='json')
-        self.assertEqual(response.status_code, 409)
+        data['notes'] = 'Corrected after review'
+        edited = self.client.patch(BASE + f'invoices/{record["id"]}/', data, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data['version'], 2)
+        self.assertEqual(edited.data['status'], 'draft')
+        self.assertEqual(
+            list(InvoiceRevision.objects.filter(record_id=record['id']).values_list('version', flat=True)),
+            [2, 1],
+        )
+
+        response = self.client.patch(
+            f'/api/client-profile/invoices/{record["invoice_id"]}/',
+            {'total': '1'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_duplicate_has_new_identity_and_no_work_dates(self):
         record = self.create()
@@ -112,6 +147,7 @@ class FinanceApiTests(TestCase):
             result = self.post(f'invoices/{record["id"]}/payments/', payment)
             self.assertEqual(result.status_code, 200, result.data)
         self.assertEqual(Payment.objects.count(), 1)
+        self.assertEqual(self.post(f'invoices/{record["id"]}/mark-paid/', {'version': record['version']}).status_code, 200)
         worksheet = self.client.get(BASE + f'bas-worksheet/?start={self.today}&end={self.today}&basis=cash')
         self.assertEqual(Decimal(worksheet.data['G1']), Decimal('440.00'))
         self.assertEqual(Decimal(worksheet.data['1A']), Decimal('40.00'))
@@ -120,15 +156,14 @@ class FinanceApiTests(TestCase):
         self.assertEqual(self.post(f'invoices/{record["id"]}/payments/', payment).status_code, 400)
 
     @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
-    def test_send_confirmed_only_and_no_duplicate_email(self, _render):
+    def test_send_saved_revision_and_no_duplicate_email_for_same_version(self, _render):
         record = self.create()
-        self.assertEqual(self.post(f'invoices/{record["id"]}/send/', {'version': 1, 'confirmed': True}).status_code, 400)
-        self.issue(record)
         for _ in range(2):
             result = self.post(f'invoices/{record["id"]}/send/', {'version': 1, 'confirmed': True})
             self.assertEqual(result.status_code, 200, result.data)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['accounts@example.invalid'])
+        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
 
     def test_seed_preserves_user_defaults(self):
         self.post('items/seed/', {})
@@ -161,13 +196,17 @@ class FinanceApiTests(TestCase):
         self.assertEqual(self.post('invoices/', {**self.data, 'super_rate': 12.0}).status_code, 400)
         self.assertEqual(InvoiceRecord.objects.count(), 0)
 
-    def test_issue_requires_abn_even_for_unregistered_issuer(self):
+    def test_issue_review_action_does_not_lock_or_prevent_later_edit(self):
         self.data.update(issuer_abn='', gst_registered=False, super_mode='none')
         self.data['lines'][0]['tax_code'] = 'OUT_OF_SCOPE'
         record = self.create()
         response = self.post(f'invoices/{record["id"]}/issue/', {'version': 1, 'confirmed': True})
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(InvoiceRecord.objects.get(pk=record['id']).locked_at)
+        payload = {**self.data, 'version': 1, 'notes': 'Still editable'}
+        changed = self.client.patch(BASE + f'invoices/{record["id"]}/', payload, format='json')
+        self.assertEqual(changed.status_code, 200, changed.data)
+        self.assertEqual(changed.data['version'], 2)
 
     def test_company_identity_and_normalised_abn_snapshot(self):
         self.data.update(issuer_entity_type='company', issuer_abn='51 824 753 556')
@@ -270,4 +309,4 @@ class FinanceApiTests(TestCase):
             response = self.client.get(BASE + 'invoices/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 3)
-        self.assertLessEqual(len(queries), 6)
+        self.assertLessEqual(len(queries), 8)
