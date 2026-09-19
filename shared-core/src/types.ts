@@ -1334,6 +1334,43 @@ export type WorkerShiftRequest = CamelCasedPropertiesDeep<WorkerShiftRequestApi>
 export interface RosterAssignmentApi {
     id: number;
     slot_date: string;
+    unit_rate?: string | number | null;
+    rate_reason?: Record<string, unknown> | null;
+    is_rostered?: boolean;
+    payment_preference_snapshot?: string | null;
+    settlement_channel?: 'PAYROLL' | 'TIMESHEET_ONLY' | 'INVOICE' | string | null;
+    engagement_kind?: string | null;
+    engagement_terms_snapshot?: Record<string, any> | null;
+    engagement_terms_accepted_at?: string | null;
+    payroll_activated_at?: string | null;
+    workforce_status?: {
+        payment_preference?: string;
+        settlement_channel?: 'PAYROLL' | 'TIMESHEET_ONLY' | 'INVOICE' | string;
+        engagement_kind?: string;
+        employment_type?: string;
+        pay_basis?: string;
+        award_code?: string;
+        award_classification?: string;
+        employment_engagement_public_id?: string | null;
+        rates?: Record<string, string | null>;
+        agreed_rate?: string | null;
+        payroll_ready?: boolean;
+        payroll_activation_required?: boolean;
+        payroll_missing_fields?: string[];
+        payroll_activated_at?: string | null;
+        timesheet?: {
+            id: number;
+            period_id: number;
+            period_status: string;
+            status: string;
+            needs_rebuild: boolean;
+            rostered_minutes: number;
+            worked_minutes: number;
+            reviewed_minutes: number;
+            blocking_checks: number;
+            warning_checks: number;
+        } | null;
+    } | null;
     user: number | null;
     slot?: number | null;
     shift?: number | null;
