@@ -7,7 +7,6 @@ import {
   FormControlLabel,
   Checkbox,
   Select,
-  MenuItem,
   InputLabel,
   FormControl,
   Button,
@@ -25,7 +24,6 @@ import {
   // Divider,
 } from '@mui/material';
 import {
-  InfoOutlined as InfoIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
   Add as AddIcon,
@@ -73,7 +71,6 @@ import {
   getSlotRateValue,
   firstPresent,
   CALENDAR_VIEWS,
-  GOVERNMENT_AWARD_GUIDE_URL,
   localizer,
   WEEK_DAYS,
   DEFAULT_SUPER_PERCENT,
@@ -82,9 +79,7 @@ import {
   applyTimeToDate,
   formatSlotDate,
   formatSlotTime,
-  getSlotDurationHours,
   formatSlotDisplayDate,
-  RATE_TYPE_DESCRIPTIONS,
   toInputDateTimeLocal,
   normalizePrefillRole,
   describeRecurringDays,
