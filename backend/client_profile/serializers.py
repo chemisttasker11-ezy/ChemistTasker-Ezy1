@@ -6276,8 +6276,7 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
         fields = [
             "id", "slot_date", "unit_rate", "rate_reason", "is_rostered",
             "payment_preference_snapshot", "settlement_channel", "engagement_kind",
-            "engagement_terms_snapshot", "engagement_terms_accepted_at", "payroll_activated_at",
-            "workforce_status",
+            "engagement_terms_accepted_at", "workforce_status",
             "user", "slot", "shift",
             "user_detail",
             "slot_detail",
@@ -6287,6 +6286,12 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
         ]
 
     def get_workforce_status(self, obj):
+        request = self.context.get("request")
+        if request is not None and obj.user_id != request.user.id:
+            from workforce.permissions import can_manage_pharmacy
+            if not can_manage_pharmacy(request.user, obj.shift.pharmacy):
+                return None
+
         snapshot = obj.engagement_terms_snapshot or {}
         timesheet = None
         if obj.user_id and obj.shift_id and obj.slot_date:
