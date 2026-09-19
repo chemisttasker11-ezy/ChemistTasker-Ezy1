@@ -4,12 +4,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { createFinanceDraft, finance, financeDueDate, financeItemLine, type FinanceCalculation, type FinanceCustomer, type FinanceDraft, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
+import { createFinanceDraft, finance, financeDueDate, financeItemLine, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 import { CustomerEditor, ItemEditor } from './Editors';
 import { dollars, errorMessage } from './helpers';
 
 const grid = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 };
-const taxLabels: Record<FinanceTaxCode, string> = { GST: 'GST 10%', GST_FREE: 'GST-free', INPUT_TAXED: 'Input taxed', OUT_OF_SCOPE: 'No GST' };
+const taxLabels: Record<FinanceTaxCode, string> = { GST: 'GST 10%', GST_FREE: 'GST-free', INPUT_TAXED: 'Input taxed', OUT_OF_SCOPE: 'N-T / not taxable' };
 
 export default function InvoiceComposer({ initial, previous, customers, items, onClose, onSaved }: {
   initial?: FinanceInvoice; previous?: FinanceInvoice; customers: FinanceCustomer[]; items: FinanceItem[]; onClose: () => void; onSaved: () => Promise<void>;
@@ -28,8 +28,10 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
   const [businessOpen, setBusinessOpen] = useState(!value.issuer_name);
   const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [breakMinutes, setBreak] = useState('0');
   const [hours, setHours] = useState('');
+  const [internalSources, setInternalSources] = useState<FinanceInternalSource[]>([]);
+  const [selectedInternalSource, setSelectedInternalSource] = useState<FinanceInternalSource | null>(null);
   const customer = customerOptions.find(c => c.id === value.customer_id);
-  const internalSource = initial?.source === 'internal';
+  const internalSource = initial?.source === 'internal' || Boolean(value.source_assignment_ids?.length);
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
   const changeLine = (index: number, patch: Partial<FinanceLine>) => change('lines', value.lines.map((line, i) => i === index ? { ...line, ...patch } : line));
   const close = () => { if (!busy && (JSON.stringify(value) === original.current || window.confirm('Discard unsaved invoice changes?'))) onClose(); };
@@ -38,6 +40,44 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
     window.addEventListener('beforeunload', beforeUnload);
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [value]);
+  useEffect(() => {
+    if (initial) return;
+    let active = true;
+    Promise.all([finance.invoiceDefaults(), finance.internalSources()]).then(([defaults, sources]) => {
+      if (!active) return;
+      setInternalSources(sources);
+      setValue(current => ({
+        ...current,
+        issuer_name: current.issuer_name || defaults.issuer_name,
+        issuer_abn: current.issuer_abn || defaults.issuer_abn,
+        issuer_address: current.issuer_address || defaults.issuer_address,
+        gst_registered: current.gst_registered || defaults.gst_registered,
+        bank_account_name: current.bank_account_name || defaults.bank_account_name,
+        bsb: current.bsb || defaults.bsb,
+        account_number: current.account_number || defaults.account_number,
+        super_fund_name: current.super_fund_name || defaults.super_fund_name,
+        super_usi: current.super_usi || defaults.super_usi,
+        super_member_number: current.super_member_number || defaults.super_member_number,
+        super_rate: defaults.super_rate || current.super_rate,
+      }));
+    }).catch(failure => setError(errorMessage(failure)));
+    return () => { active = false; };
+  }, [initial]);
+  const applyInternalSource = async (source: FinanceInternalSource | null) => {
+    setSelectedInternalSource(source);
+    if (!source) return;
+    try {
+      const draft = await finance.internalPrefill([source.assignment_id]);
+      setValue(draft);
+      if (draft.customer && !customerOptions.some(item => item.id === draft.customer_id)) {
+        setCustomers(current => [...current, {
+          id: draft.customer_id, name: draft.customer!.name, legal_name: draft.customer!.legal_name,
+          abn: draft.customer!.abn, contact_name: draft.customer!.contact_name, email: draft.customer!.email,
+          phone: '', address: draft.customer!.address, payment_terms_days: 14, notes: '', active: true,
+        }]);
+      }
+    } catch (failure) { setError(errorMessage(failure)); }
+  };
   useEffect(() => {
     let active = true;
     setPreview(null);
@@ -64,12 +104,23 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
   return <Box component="form" onSubmit={submit} noValidate sx={{ maxWidth: 1280, mx: 'auto', pb: 4 }}>
     <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ position: 'sticky', top: 0, zIndex: 5, bgcolor: 'background.default', py: 2, flexWrap: 'wrap' }}>
       <Stack direction="row" alignItems="center" spacing={1}><IconButton aria-label="Back to invoices" onClick={close} disabled={busy}><ArrowBackIcon /></IconButton><Typography variant="h4">{initial ? `Invoice ${initial.number}` : 'Create invoice'}</Typography><Chip label="Draft" size="small" /></Stack>
-      <Stack direction="row" spacing={1}><Button onClick={close} disabled={busy}>Cancel</Button><Button variant="contained" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button></Stack>
+      <Stack direction="row" spacing={1}><Button onClick={close} disabled={busy}>Cancel</Button><Button variant="contained" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save invoice'}</Button></Stack>
     </Stack>
     {error && <Alert severity="error" role="alert" sx={{ mb: 2 }}>{error}</Alert>}
+    {!initial && internalSources.length > 0 && (
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
+        <Typography fontWeight={800}>Start from an internal ChemistTasker shift</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Pharmacy details, shift date/hours/rate and your onboarding business details are prefilled. Nothing is saved until you press Save invoice.</Typography>
+        <Autocomplete options={internalSources} value={selectedInternalSource}
+          getOptionLabel={source => `${source.pharmacy.name} · ${source.date} · ${source.hours}h × ${source.rate}`}
+          isOptionEqualToValue={(a,b) => a.assignment_id === b.assignment_id}
+          onChange={(_, next) => void applyInternalSource(next)}
+          renderInput={props => <TextField {...props} label="Accepted ABN shift" placeholder="Choose shift to prefill" />} />
+      </Paper>
+    )}
     {internalSource && (
       <Alert severity="info" sx={{ mb: 2 }}>
-        This invoice comes from accepted ChemistTasker shift terms. The pharmacy/customer and accepted labour rows are locked; reimbursements and reviewed super remain editable.
+        This invoice comes from accepted ChemistTasker shift terms. The pharmacy is fixed by the accepted shift, but invoice date/hours/rate/description/tax values remain editable. Every save creates an auditable revision while the original shift snapshot is preserved.
       </Alert>
     )}
     <Box component="fieldset" disabled={busy} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
@@ -92,17 +143,19 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
       <Divider sx={{ mb: 3 }} />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>Items & services</Typography>
-        <Autocomplete sx={{ width: { xs: '100%', sm: 320 } }} options={itemOptions.filter(i => i.active)} value={selectedItem} getOptionLabel={i => `${i.code} · ${i.name}`} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => { if (next) addItem(next); }} renderInput={props => <TextField {...props} label="Add saved item" placeholder="Search your catalogue" />} />
-        <Button startIcon={<AddIcon />} onClick={() => setInline('item')}>New item</Button>
+        <Autocomplete sx={{ width: { xs: '100%', sm: 320 } }} options={itemOptions.filter(i => i.active)} value={selectedItem} getOptionLabel={i => i.code ? `${i.code} · ${i.name}` : i.name} isOptionEqualToValue={(a, b) => a.id === b.id} onChange={(_, next) => { if (next) addItem(next); }} renderInput={props => <TextField {...props} label="Add saved item" placeholder="Search your catalogue" />} />
+        <Button startIcon={<AddIcon />} onClick={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Blank row</Button>
+        <Button startIcon={<AddIcon />} onClick={() => setInline('item')}>Save new item</Button>
       </Stack>
-      <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(180px, 2.5fr) 1.3fr .7fr 1fr .8fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit price', 'Discount %', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
-      {!value.lines.length && <Box sx={{ textAlign: 'center', py: 5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}><Typography fontWeight={600}>Add the work you’re billing for</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Choose a saved item above, or create an item with your rate.</Typography></Box>}
+      <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(180px, 2.2fr) 1.1fr .7fr 1fr 1fr .8fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit', 'Unit price', 'Discount %', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
+      {!value.lines.length && <Box sx={{ textAlign: 'center', py: 5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}><Typography fontWeight={600}>Add the work you’re billing for</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Choose a saved item, or add a free-entry row without saving a catalogue item.</Typography></Box>}
       {value.lines.map((line, index) => <Box key={`${index}-${line.item_id}`} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
-        {line.locked && <Chip size="small" label="Accepted shift terms · locked" sx={{ mb: 1 }} />}
+        {line.locked && <Chip size="small" label="From ChemistTasker shift · editable · revision tracked" sx={{ mb: 1 }} />}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'minmax(180px, 2.5fr) 1.3fr .7fr 1fr .8fr 1.1fr 1fr 40px' }, gap: 1, alignItems: 'start', '& .MuiInputBase-root': { fontSize: 13 } }}>
-          <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} disabled={line.locked} onChange={e => changeLine(index, { description: e.target.value })} multiline />
-          <TextField type="date" label="Work date" value={line.worked_on || ''} disabled={line.locked} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
+          <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} onChange={e => changeLine(index, { description: e.target.value })} multiline />
+          <TextField type="date" label="Work date" value={line.worked_on || ''} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
           <TextField label={line.unit || 'Quantity'} value={line.quantity} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
+          <TextField label="Unit" value={line.unit || ''} onChange={e => changeLine(index, { unit: e.target.value })} />
           <TextField label="Unit price" value={line.unit_price} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
           <TextField label="Discount %" value={line.discount} disabled={line.locked} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { discount: e.target.value })} />
           <TextField select label="Tax code" disabled={line.locked} value={line.tax_code || 'OUT_OF_SCOPE'} onChange={e => changeLine(index, { tax_code: e.target.value as FinanceTaxCode })}>{Object.entries(taxLabels).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
@@ -112,7 +165,7 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
         <FormControlLabel sx={{ mt: .5 }} control={<Checkbox size="small" disabled={line.locked} checked={line.super_eligible || false} onChange={e => changeLine(index, { super_eligible: e.target.checked })} />} label={<Typography variant="caption">Include in reviewed super base</Typography>} />
       </Box>)}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 340px' }, gap: { xs: 3, md: 8 }, mt: 3 }}>
-        <Stack spacing={1}>{field('notes', 'Notes to customer')}<Typography variant="caption" color="text.secondary">Saved as a draft. Review and issue from the invoice list before sending.</Typography></Stack>
+        <Stack spacing={1}>{field('notes', 'Notes to customer')}<Typography variant="caption" color="text.secondary">Save keeps the invoice editable. Sending changes the status to Sent; later edits create a new revision for re-review.</Typography></Stack>
         <Stack spacing={1.5} aria-live="polite">{[['Subtotal', preview?.subtotal], ['GST', preview?.gst], ['Invoice total', preview?.payable], ['Super contribution', preview?.super]].map(([label, amount]) => <Stack key={label} direction="row" justifyContent="space-between" sx={{ ...(label === 'Invoice total' ? { borderTop: '1px solid', borderColor: 'divider', pt: 1.5, fontWeight: 700 } : {}) }}><Typography fontWeight="inherit" variant="body2">{label}</Typography><Typography fontWeight="inherit" variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>{amount !== undefined ? dollars(amount) : value.lines.length ? 'Pending' : dollars('0')}</Typography></Stack>)}<Typography variant="caption" color="text.secondary">{calculating ? 'Updating totals…' : preview ? 'Totals up to date. Super is paid separately to the fund.' : value.lines.length ? 'Complete the invoice details to calculate totals.' : 'All amounts in Australian dollars.'}</Typography></Stack>
       </Box>
     </Paper>
