@@ -4,12 +4,30 @@ Hi {{ applicant_full_name }},
 
 Your application has been approved.
 
-Role: {{ role|title }}
+Role: {{ role }}
 Category: {{ category }}
 
-View memberships: {{ membership_url }}
+{% if has_review_changes %}Details updated during review:
+{% for change in review_changes %}- {{ change.label }}: {% if change.from %}{{ change.from }}{% else %}-{% endif %} -> {% if change.to %}{{ change.to }}{% else %}-{% endif %}
+{% endfor %}
+{% endif %}
+{% if employment_terms %}Employment and pay terms:
+Effective from: {{ employment_terms.effective_from }}
+{% if employment_terms.effective_to %}Effective to: {{ employment_terms.effective_to }}
+{% endif %}Employment type: {{ employment_terms.employment_type }}
+{% if employment_terms.job_title %}Job title: {{ employment_terms.job_title }}
+{% endif %}Pay basis: {{ employment_terms.pay_basis }}
+Award classification: {{ employment_terms.award_classification }}
+Weekday: AUD {{ employment_terms.rate_weekday }}/hr
+Saturday: AUD {{ employment_terms.rate_saturday }}/hr
+Sunday: AUD {{ employment_terms.rate_sunday }}/hr
+Public holiday: AUD {{ employment_terms.rate_public_holiday }}/hr
+{% if employment_terms.rate_early_morning %}Early morning: AUD {{ employment_terms.rate_early_morning }}/hr
+{% endif %}{% if employment_terms.rate_late_night %}Late night: AUD {{ employment_terms.rate_late_night }}/hr
+{% endif %}
+{% endif %}View memberships: {{ membership_url }}
 
-If you already have a ChemistTasker account, just sign in and you'll see the pharmacy under your memberships.
-If you're new, check your inbox for the password setup or magic link.
-
+{% if payroll_enabled %}ChemistTasker Payroll is enabled for this pharmacy. Payroll processing also requires your TFN and super details to be complete in onboarding.
+{% else %}This pharmacy manages payroll outside ChemistTasker. Roster, attendance and timesheets can still be managed in ChemistTasker.
+{% endif %}
 The ChemistTasker Team

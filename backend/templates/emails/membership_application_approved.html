@@ -1,35 +1,53 @@
 {% extends "emails/base.html" %}
-
 {% block title %}Your Application Was Approved{% endblock %}
-
 {% block content %}
-    <div class="wave">Approved</div>
-    <h2 style="margin:8px 0 0;">You're approved to join {{ pharmacy_name }}</h2>
-    <div class="subtitle" style="margin:0 0 18px; color:#475569;">
-      Welcome aboard, <strong>{{ applicant_full_name }}</strong>.
-    </div>
-
-    <div class="card">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
-        <tr>
-          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Role:</td>
-          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ role|title }}</td>
-        </tr>
-        <tr>
-          <td style="padding:7px 14px 7px 0; width:130px; color:#0f3f46; font-weight:700; vertical-align:top;">Category:</td>
-          <td style="padding:7px 0; color:#14343a; vertical-align:top;">{{ category }}</td>
-        </tr>
-      </table>
-    </div>
-
-    <a href="{{ membership_url }}" class="btn">View memberships</a>
-
-    <div class="muted" style="color:#64748b; margin-top:8px;">
-      If you already have a ChemistTasker account, just sign in and you'll see the pharmacy under your memberships.
-      If you're new, check your inbox for the password setup or magic link.
-    </div>
-
-    <div class="footer" style="color:#64748b; margin-top:18px; font-size:13px;">
-      The ChemistTasker Team
-    </div>
+<div class="wave">Approved</div>
+<h2 style="margin:8px 0 0;">You're approved to join {{ pharmacy_name }}</h2>
+<div class="subtitle" style="margin:0 0 18px; color:#475569;">Welcome, <strong>{{ applicant_full_name }}</strong>.</div>
+<div class="card">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+<tr><td style="padding:7px 14px 7px 0; width:150px; color:#0f3f46; font-weight:700;">Role:</td><td style="padding:7px 0;">{{ role }}</td></tr>
+<tr><td style="padding:7px 14px 7px 0; color:#0f3f46; font-weight:700;">Category:</td><td style="padding:7px 0;">{{ category }}</td></tr>
+</table>
+</div>
+{% if has_review_changes %}
+<div class="card">
+<h3 style="margin-top:0;">Details updated during review</h3>
+<p style="color:#475569;">The pharmacy reviewed your application and changed the following employment-facing details before approval:</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+{% for change in review_changes %}
+<tr>
+<td style="padding:7px 14px 7px 0; width:150px; color:#0f3f46; font-weight:700; vertical-align:top;">{{ change.label }}:</td>
+<td style="padding:7px 0; vertical-align:top;">{% if change.from %}{{ change.from }}{% else %}&mdash;{% endif %} &rarr; {% if change.to %}<strong>{{ change.to }}</strong>{% else %}&mdash;{% endif %}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endif %}
+{% if employment_terms %}
+<div class="card">
+<h3 style="margin-top:0;">Employment and pay terms</h3>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+<tr><td style="padding:6px 12px 6px 0; width:165px; font-weight:700;">Effective from:</td><td>{{ employment_terms.effective_from }}</td></tr>
+{% if employment_terms.effective_to %}<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Effective to:</td><td>{{ employment_terms.effective_to }}</td></tr>{% endif %}
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Employment type:</td><td>{{ employment_terms.employment_type }}</td></tr>
+{% if employment_terms.job_title %}<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Job title:</td><td>{{ employment_terms.job_title }}</td></tr>{% endif %}
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Pay basis:</td><td>{{ employment_terms.pay_basis }}</td></tr>
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Award classification:</td><td>{{ employment_terms.award_classification }}</td></tr>
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Weekday:</td><td>&#36;{{ employment_terms.rate_weekday }}/hr</td></tr>
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Saturday:</td><td>&#36;{{ employment_terms.rate_saturday }}/hr</td></tr>
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Sunday:</td><td>&#36;{{ employment_terms.rate_sunday }}/hr</td></tr>
+<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Public holiday:</td><td>&#36;{{ employment_terms.rate_public_holiday }}/hr</td></tr>
+{% if employment_terms.rate_early_morning %}<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Early morning:</td><td>&#36;{{ employment_terms.rate_early_morning }}/hr</td></tr>{% endif %}
+{% if employment_terms.rate_late_night %}<tr><td style="padding:6px 12px 6px 0; font-weight:700;">Late night:</td><td>&#36;{{ employment_terms.rate_late_night }}/hr</td></tr>{% endif %}
+</table>
+{% if employment_terms.correspondence_label %}<p style="color:#64748b; margin-bottom:0;">Terms profile: {{ employment_terms.correspondence_label }}</p>{% endif %}
+</div>
+{% endif %}
+<a href="{{ membership_url }}" class="btn">View memberships</a>
+<div class="muted" style="color:#64748b; margin-top:8px;">
+{% if payroll_enabled %}ChemistTasker Payroll is enabled for this pharmacy. Payroll processing also requires your TFN and super details to be complete in onboarding.
+{% else %}This pharmacy manages payroll outside ChemistTasker. Your roster, attendance and timesheets can still be managed in ChemistTasker.{% endif %}
+</div>
+<div class="footer" style="color:#64748b; margin-top:18px; font-size:13px;">The ChemistTasker Team</div>
 {% endblock %}
