@@ -60,10 +60,11 @@ import {
   createOwnerShiftService,
   updateOwnerShiftService,
 } from '@chemisttasker/shared-core';
-import skillsCatalog from '../../../../../shared-core/skills_catalog.json';
 import { useColorMode } from '../../../theme/sleekTheme';
 import apiClient from '../../../utils/apiClient';
 import PostShiftWizardShell from './PostShiftWizardShell';
+import PostShiftDetailsStep from './PostShiftDetailsStep';
+import PostShiftSkillsStep from './PostShiftSkillsStep';
 
 import {
   type PharmacyOption,
@@ -1317,325 +1318,47 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       value ? dayjs(value).format('ddd, MMM D - h:mm A') : 'Choose a date and time';
 
     switch (stepKey) {
-      case 'details': return (
-        <Grid container rowSpacing={3} columnSpacing={{ xs: 0, md: 3 }}>
-          <Grid size={12}>
-            <FormControl fullWidth size="small" sx={fieldSx}>
-              <InputLabel>Pharmacy *</InputLabel>
-              <Select
-                value={pharmacyId}
-                label="Pharmacy *"
-                onChange={e => setPharmacyId(Number(e.target.value))}
-                disabled={scopedPharmacyId != null}
-              >
-                {pharmacies.map(p => (
-                  <MenuItem key={p.id} value={p.id}>
-                    {p.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth size="small" sx={fieldSx}>
-              <InputLabel>Role Needed *</InputLabel>
-              <Select
-                value={roleNeeded}
-                label="Role Needed *"
-                onChange={e => setRoleNeeded(e.target.value)}
-              >
-                <MenuItem value="PHARMACIST">Pharmacist</MenuItem>
-                <MenuItem value="TECHNICIAN">Dispensary Technician</MenuItem>
-                <MenuItem value="ASSISTANT">Assistant</MenuItem>
-                <MenuItem value="INTERN">Intern Pharmacist</MenuItem>
-                <MenuItem value="STUDENT">Pharmacy Student</MenuItem>
-                <MenuItem value="EXPLORER">Explorer</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth size="small" sx={fieldSx}>
-              <InputLabel>Employment Type *</InputLabel>
-              <Select
-                value={employmentType}
-                label="Employment Type *"
-                onChange={e => setEmploymentType(e.target.value)}
-              >
-                <MenuItem value="LOCUM">
-                  {roleNeeded === 'PHARMACIST' ? 'Locum' : 'Casual'}
-                </MenuItem>
-                <MenuItem value="FULL_TIME">Full-Time</MenuItem>
-                <MenuItem value="PART_TIME">Part-Time</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={12}>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1}
-              justifyContent="space-between"
-              alignItems={{ xs: 'stretch', sm: 'center' }}
-              sx={{ mb: 1 }}
-            >
-              <Typography variant="subtitle2" color="text.secondary">
-                {descriptionTemplateLoading
-                  ? 'Loading role description template...'
-                  : descriptionTemplate?.description
-                    ? 'Role description template available'
-                    : 'No role description template saved yet'}
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  disabled={!descriptionTemplate?.description}
-                  onClick={handleUseDescriptionTemplate}
-                >
-                  Use Template
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  disabled={descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
-                  onClick={handleSaveDescriptionTemplate}
-                >
-                  {descriptionTemplateSaving ? 'Saving...' : 'Save as Template'}
-                </Button>
-              </Stack>
-            </Stack>
-            <TextField
-              label="Shift Description"
-              multiline
-              minRows={4}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              fullWidth
-              placeholder="Provide key responsibilities or context..."
-              size="small"
-              sx={fieldSx}
-            />
-          </Grid>
-          <Grid size={12}>
-            <Paper variant="outlined" sx={embeddedPanelSx}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Shift Flags
-              </Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isEmbedded ? 1.5 : 2}>
-                <FormControlLabel
-                  control={<Checkbox checked={hasTravel} onChange={(_, checked) => setHasTravel(checked)} />}
-                  label="Travel allowance"
-                />
-                <FormControlLabel
-                  control={<Checkbox checked={hasAccommodation} onChange={(_, checked) => setHasAccommodation(checked)} />}
-                  label="Accommodation provided"
-                />
-                <FormControlLabel
-                  control={<Checkbox checked={isUrgent} onChange={(_, checked) => setIsUrgent(checked)} />}
-                  label="Mark as urgent"
-                />
-              </Stack>
-            </Paper>
-          </Grid>
-          <Grid size={12}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Workload Tags
-            </Typography>
-            <Stack direction="row" flexWrap="wrap" gap={1.5}>
-              {workloadOptions.map(tag => {
-                const selected = workloadTags.includes(tag);
-                return (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    onClick={() =>
-                      setWorkloadTags(current =>
-                        selected ? current.filter(x => x !== tag) : [...current, tag]
-                      )
-                    }
-                    variant={selected ? 'filled' : 'outlined'}
-                    color={selected ? 'primary' : 'default'}
-                    clickable
-                    sx={{
-                      borderRadius: '999px',
-                      fontWeight: 600,
-                      px: 1.5,
-                      py: 0.5,
-                    }}
-                  />
-                );
-              })}
-            </Stack>
-          </Grid>
-        </Grid>
-      );
-      case 'skills': {
-        const roleKey = roleNeeded === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
-        const roleCatalog = (skillsCatalog as any)[roleKey] || {};
-        
-        const categories = [
-          { key: 'clinical_services', title: 'Clinical Services', items: roleCatalog.clinical_services || [] },
-          { key: 'dispense_software', title: 'Dispense Software', items: roleCatalog.dispense_software || [] },
-          { key: 'expanded_scope', title: 'Expanded Scope', items: roleCatalog.expanded_scope || [] },
-        ].filter(cat => cat.items.length > 0);
-
+      case 'details':
         return (
-          <Stack spacing={3}>
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
-              Select which skills are <strong>Required</strong> (must have to apply) or <strong>Favorable</strong> (nice to have, but not mandatory).
-            </Alert>
-            
-            <Box sx={{ width: '100%' }}>
-              {categories.map((category, index) => {
-                const selectedCount = category.items.filter((s: any) => mustHave.includes(s.code) || niceToHave.includes(s.code)).length;
-
-                return (
-                  <Accordion 
-                    key={category.key} 
-                    disableGutters 
-                    elevation={0}
-                    defaultExpanded={index === 0}
-                    sx={{
-                      border: '1px solid',
-                      borderColor: 'grey.200',
-                      '&:not(:last-child)': { borderBottom: 0 },
-                      '&:before': { display: 'none' },
-                      '&:first-of-type': { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
-                      '&:last-of-type': { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
-                    }}
-                  >
-                    <AccordionSummary
-                      expandIcon={<ExpandMoreIcon />}
-                      sx={{
-                        bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.84)' : 'grey.50',
-                        borderBottom: '1px solid',
-                        borderColor: 'grey.200',
-                        '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1.5, my: 1.5 }
-                      }}
-                    >
-                      <Typography variant="subtitle1" fontWeight={600}>
-                        {category.title}
-                      </Typography>
-                      {selectedCount > 0 && (
-                        <Chip 
-                          size="small" 
-                          label={`${selectedCount} selected`} 
-                          color="primary" 
-                          variant="outlined"
-                          sx={{ height: 22, fontWeight: 600, bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'white' }} 
-                        />
-                      )}
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ p: 0 }}>
-                      <Box
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
-                        }}
-                      >
-                        {category.items.map((s: any, idx: number) => {
-                          const value = mustHave.includes(s.code) 
-                            ? 'required' 
-                            : niceToHave.includes(s.code) 
-                              ? 'favorable' 
-                              : null;
-                              
-                          return (
-                            <Box
-                              key={s.code}
-                              sx={{
-                                display: 'flex',
-                                flexDirection: { xs: 'column', xl: 'row' },
-                                alignItems: { xs: 'flex-start', xl: 'center' },
-                                justifyContent: 'space-between',
-                                p: 2.5,
-                                gap: 2,
-                                minHeight: 124,
-                                minWidth: 0,
-                                borderBottom: idx < category.items.length - 1 ? '1px solid' : 'none',
-                                borderRight: {
-                                  lg: idx % 2 === 0 && idx < category.items.length - 1 ? '1px solid' : 'none',
-                                },
-                                borderColor: 'grey.100',
-                                bgcolor: value === 'required' ? 'rgba(109, 40, 217, 0.06)' : value === 'favorable' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
-                                transition: 'all 0.2s ease-in-out',
-                                '&:hover': {
-                                  bgcolor: value ? undefined : isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'grey.50'
-                                }
-                              }}
-                            >
-                              <Box sx={{ flex: '1 1 auto', minWidth: 0, pr: { xl: 1 } }}>
-                                <Typography
-                                  variant="body1"
-                                  fontWeight={value ? 600 : 500}
-                                  color={value ? 'text.primary' : 'text.secondary'}
-                                  sx={{ overflowWrap: 'anywhere' }}
-                                >
-                                  {s.label}
-                                </Typography>
-                                {s.description && (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
-                                    {s.description}
-                                  </Typography>
-                                )}
-                              </Box>
-                              
-                              <ToggleButtonGroup
-                                size="small"
-                                value={value}
-                                exclusive
-                                onChange={(_, newVal) => {
-                                  setMustHave(prev => prev.filter(x => x !== s.code));
-                                  setNiceToHave(prev => prev.filter(x => x !== s.code));
-                                  if (newVal === 'required') {
-                                    setMustHave(prev => [...prev, s.code]);
-                                  } else if (newVal === 'favorable') {
-                                    setNiceToHave(prev => [...prev, s.code]);
-                                  }
-                                }}
-                                sx={{
-                                  flex: '0 0 auto',
-                                  width: { xs: '100%', sm: 'auto' },
-                                  bgcolor: 'background.paper',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                                  '& .MuiToggleButtonGroup-grouped': {
-                                    border: '1px solid',
-                                    borderColor: 'grey.300',
-                                  },
-                                  '& .MuiToggleButton-root': {
-                                    flex: { xs: 1, sm: '0 0 auto' },
-                                    minWidth: 108,
-                                    px: 2,
-                                    py: 0.75,
-                                    textTransform: 'none',
-                                    fontWeight: 600,
-                                    color: 'text.secondary',
-                                  },
-                                  '& .Mui-selected': {
-                                    bgcolor: value === 'required' ? 'primary.main' : 'secondary.dark',
-                                    color: 'white !important',
-                                    borderColor: value === 'required' ? 'primary.main' : 'secondary.dark',
-                                    zIndex: 1,
-                                    '&:hover': {
-                                      bgcolor: value === 'required' ? 'primary.dark' : '#03694b',
-                                    }
-                                  }
-                                }}
-                              >
-                                <ToggleButton value="required">Required</ToggleButton>
-                                <ToggleButton value="favorable">Favorable</ToggleButton>
-                              </ToggleButtonGroup>
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    </AccordionDetails>
-                  </Accordion>
-                );
-              })}
-            </Box>
-          </Stack>
+          <PostShiftDetailsStep
+            isDarkMode={isDarkMode}
+            isEmbedded={isEmbedded}
+            pharmacies={pharmacies}
+            pharmacyId={pharmacyId}
+            setPharmacyId={setPharmacyId}
+            scopedPharmacyId={scopedPharmacyId}
+            roleNeeded={roleNeeded}
+            setRoleNeeded={setRoleNeeded}
+            employmentType={employmentType}
+            setEmploymentType={setEmploymentType}
+            descriptionTemplateLoading={descriptionTemplateLoading}
+            descriptionTemplate={descriptionTemplate}
+            descriptionTemplateSaving={descriptionTemplateSaving}
+            handleUseDescriptionTemplate={handleUseDescriptionTemplate}
+            handleSaveDescriptionTemplate={handleSaveDescriptionTemplate}
+            description={description}
+            setDescription={setDescription}
+            hasTravel={hasTravel}
+            setHasTravel={setHasTravel}
+            hasAccommodation={hasAccommodation}
+            setHasAccommodation={setHasAccommodation}
+            isUrgent={isUrgent}
+            setIsUrgent={setIsUrgent}
+            workloadTags={workloadTags}
+            setWorkloadTags={setWorkloadTags}
+          />
         );
-      }
+      case 'skills':
+        return (
+          <PostShiftSkillsStep
+            roleNeeded={roleNeeded}
+            mustHave={mustHave}
+            setMustHave={setMustHave}
+            niceToHave={niceToHave}
+            setNiceToHave={setNiceToHave}
+            isDarkMode={isDarkMode}
+          />
+        );
       case 'visibility':
         const startIdx = allowedVis.indexOf(visibility);
         const upcomingTiers = !isEmbedded && startIdx > -1 ? allowedVis.slice(startIdx + 1) : [];
