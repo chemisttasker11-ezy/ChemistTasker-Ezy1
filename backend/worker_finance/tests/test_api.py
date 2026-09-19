@@ -117,7 +117,9 @@ class FinanceApiTests(TestCase):
             {'total': '1'},
             format='json',
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data['finance_record_id'], record['id'])
+        self.assertEqual(InvoiceRecord.objects.get(pk=record['id']).invoice.total, Decimal('880.00'))
 
     def test_duplicate_has_new_identity_and_no_work_dates(self):
         record = self.create()

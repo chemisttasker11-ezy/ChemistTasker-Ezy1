@@ -4,7 +4,34 @@ from django.conf import settings
 from django.db import models
 
 
+class Pharmacy(models.Model):
+    name = models.CharField(max_length=255)
+
+
+class Notification(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    type = models.CharField(max_length=32, default='task')
+    title = models.CharField(max_length=255)
+    body = models.TextField(blank=True)
+    action_url = models.CharField(max_length=512, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+
+
+class ShiftSlotAssignment(models.Model):
+    slot_date = models.DateField(default=date.today)
+
+
+class PharmacistOnboarding(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+
+class OtherStaffOnboarding(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+
 class Invoice(models.Model):
+    pharmacy = models.ForeignKey(Pharmacy, null=True, on_delete=models.SET_NULL)
+    source_snapshot = models.JSONField(default=dict, blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     external = models.BooleanField(default=False)
     custom_bill_to_name = models.CharField(max_length=255, blank=True)
@@ -34,6 +61,7 @@ class Invoice(models.Model):
 
 
 class InvoiceLineItem(models.Model):
+    source_assignment = models.ForeignKey(ShiftSlotAssignment, null=True, on_delete=models.PROTECT)
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='line_items')
     description = models.CharField(max_length=255)
     category_code = models.CharField(max_length=20)

@@ -703,10 +703,10 @@ def serialize_record(record):
     payments = list(record.payments.all())
     paid = sum((payment.amount for payment in payments), ZERO)
     invoice = record.invoice
-    delivery = record.deliveries.filter(version=record.version).first()
+    delivery = next((item for item in record.deliveries.all() if item.version == record.version), None)
     companion = getattr(record, "super_document", None)
     revisions = list(record.revisions.all()[:20])
-    requests = list(record.review_requests.select_related("requested_by").all()[:20])
+    requests = list(record.review_requests.all()[:20])
     return {
         "id": record.pk,
         "invoice_id": invoice.pk,

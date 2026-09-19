@@ -1,5 +1,18 @@
 # EmploymentEngagement / Membership / Payroll Progress
 
+## Local running project checkpoint — 2026-09-19
+
+- User confirmed the final project location: `C:\ChemistTasker_Ezy\chemisttasker-ezy`.
+- Local source HEAD: `dcd7796093aa59bd6aa7d13994a4703de9805dc6`; no remote operations performed.
+- Backed up the existing local `chemisttasker` PostgreSQL database to `C:\ChemistTasker_Ezy\backups\before-pr3-local-20260919-214848.dump` (1,794,110 bytes; pg_dump succeeded).
+- Applied all ten pending migrations normally: billing 0002, client_profile 0052–0056, worker_finance 0003, workforce 0002–0004. Django system checks passed.
+- Confirmed existing Django, Vite and Next processes serve this canonical project. An attempted additional startup encountered occupied ports; existing services were preserved.
+- HTTP smoke checks: home, login, dashboard and direct Vite return 200; backend `/health/` returns 200. Through the public gateway, `/api/users/me/`, finance invoices and received invoices correctly return 401 without authentication.
+- Open the local project at **http://localhost:3000**.
+- These checks establish local startup and routing, not complete signed-in invoice/payroll acceptance. Earlier backend results were 90 discovered, 62 executed successfully and 28 skipped; skipped cases are not passes. Full cleanup and all business-flow acceptance are not claimed complete.
+
+The earlier checkpoints below are historical.
+
 Last updated: 2026-09-19 17:45 AEST (Australia/Brisbane)
 
 ## Current branch
