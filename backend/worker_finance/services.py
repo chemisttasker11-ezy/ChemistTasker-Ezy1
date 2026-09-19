@@ -716,6 +716,62 @@ def save_draft(owner, data, record_id=None, source="external"):
     return record
 
 
+def serialize_revision(record, revision):
+    """Read-only historical invoice view for an exact audited revision."""
+    document = serialize_record(record)
+    payments = list(record.payments.all())
+    paid = sum((payment.amount for payment in payments), ZERO)
+    delivery = record.deliveries.filter(version=revision.version).first()
+    payable = Decimal(str(revision.calculation.get("payable") or "0.00"))
+    document.update({
+        "version": revision.version,
+        "current_version": record.version,
+        "is_current": revision.version == record.version,
+        "payload": revision.payload,
+        "calculation": revision.calculation,
+        "source_snapshot": revision.source_snapshot or {},
+        "locked": True,
+        "editable": False,
+        "status": "void" if record.voided_at else revision.invoice_status,
+        "review_status": revision.review_status,
+        "delivery_status": delivery.status if delivery else None,
+        "balance": str(payable - paid),
+    })
+    return document
+
+
+def owner_visible_document(record):
+    """Return the current delivered revision, or the last successfully delivered revision.
+
+    Saving a newer worker revision must not expose that unsent draft to the pharmacy,
+    but it also must not make the previously sent invoice disappear from history.
+    """
+    current_delivery = record.deliveries.filter(
+        version=record.version,
+        status__in=["sent", "legacy_queued"],
+    ).first()
+    current_is_visible = (
+        current_delivery is not None
+        or record.invoice.status in {"sent", "paid"}
+        or record.review_status != "NONE"
+    )
+    if current_is_visible:
+        return serialize_record(record)
+
+    delivered = (
+        record.deliveries
+        .filter(status__in=["sent", "legacy_queued"])
+        .order_by("-version")
+        .first()
+    )
+    if delivered is None:
+        return None
+    revision = record.revisions.filter(version=delivered.version).first()
+    if revision is None:
+        return None
+    return serialize_revision(record, revision)
+
+
 def serialize_record(record):
     payments = list(record.payments.all())
     paid = sum((payment.amount for payment in payments), ZERO)
