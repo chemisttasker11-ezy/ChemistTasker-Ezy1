@@ -9330,11 +9330,10 @@ def send_invoice_email(request, invoice_id):
 
         # If the invoice has already been adopted by the new finance workspace,
         # freeze that wrapper too. Both UIs now represent the same document.
+        from worker_finance.models import Delivery, InvoiceRecord
         try:
-            from worker_finance.models import Delivery, InvoiceRecord
-
             record = InvoiceRecord.objects.select_for_update().get(invoice=invoice)
-        except Exception:
+        except InvoiceRecord.DoesNotExist:
             record = None
         if record is not None:
             if not record.locked_at:
