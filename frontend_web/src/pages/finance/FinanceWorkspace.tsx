@@ -214,9 +214,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       </DialogContent>
       <DialogActions><Button disabled={busy} onClick={() => setReviewAction(null)}>Cancel</Button><Button variant="contained" color={reviewAction?.kind === 'revise' ? 'warning' : 'primary'} disabled={busy || (reviewAction?.kind === 'revise' && !reviewAction.note.trim())} onClick={() => void run(async () => {
         if (!reviewAction) return;
-        if (reviewAction.kind === 'revise') await finance.requestRevision(reviewAction.invoice.id, reviewAction.note.trim());
-        else if (reviewAction.kind === 'paid') await finance.markReceivedPaid(reviewAction.invoice.id, reviewAction.note.trim());
-        else await finance.approveForPayment(reviewAction.invoice.id, reviewAction.note.trim());
+        if (reviewAction.kind === 'revise') await finance.requestRevision(reviewAction.invoice.id, reviewAction.invoice.version, reviewAction.note.trim());
+        else if (reviewAction.kind === 'paid') await finance.markReceivedPaid(reviewAction.invoice.id, reviewAction.invoice.version, reviewAction.note.trim());
+        else await finance.approveForPayment(reviewAction.invoice.id, reviewAction.invoice.version, reviewAction.note.trim());
         setReviewAction(null); await load();
       }, reviewAction?.kind === 'revise' ? 'Revision request sent to the contractor.' : reviewAction?.kind === 'paid' ? 'Invoice marked paid.' : 'Invoice approved for payment.')}>Confirm</Button></DialogActions>
     </Dialog>
