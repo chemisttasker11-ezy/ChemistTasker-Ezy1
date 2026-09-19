@@ -18,7 +18,7 @@ from client_profile.models import (
 )
 from client_profile.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
-from client_profile.views import send_invoice_email
+from client_profile.views import InvoiceDetailView, send_invoice_email
 from worker_finance.models import CatalogueItem, Delivery
 from worker_finance.services import save_draft, serialize_record
 
@@ -249,6 +249,25 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         delivery = Delivery.objects.get(record=record, version=record.version)
         self.assertEqual(delivery.recipient, self.owner.email)
         self.assertEqual(delivery.status, "legacy_queued")
+
+    def test_legacy_editor_cannot_bypass_new_workspace_issue_lock(self):
+        invoice = self._generate()
+        record = invoice.finance_record
+        record.locked_at = timezone.now()
+        record.save(update_fields=["locked_at", "updated_at"])
+
+        factory = APIRequestFactory()
+        request = factory.patch(
+            f"/client-profile/invoices/{invoice.id}/",
+            {"cc_emails": "changed@example.com"},
+            format="json",
+        )
+        force_authenticate(request, user=self.worker)
+        response = InvoiceDetailView.as_view()(request, pk=invoice.id)
+
+        self.assertEqual(response.status_code, 403)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.cc_emails, "")
 
     def test_new_finance_workspace_edit_cannot_rewrite_accepted_shift_line(self):
         invoice = self._generate()
