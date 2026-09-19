@@ -62,6 +62,115 @@ class MembershipWorkSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class EmploymentEngagement(models.Model):
+    """Dated employment/pay agreement for one pharmacy membership.
+
+    Membership remains the stable worker-at-pharmacy identity. Engagements are
+    immutable historical periods whose pay snapshot can be used by timesheets
+    and payroll without rewriting prior terms when award rates change.
+    """
+
+    class PayBasis(models.TextChoices):
+        AWARD = "AWARD", "Award"
+        ABOVE_AWARD = "ABOVE_AWARD", "Above award"
+
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    membership = models.ForeignKey(
+        "client_profile.Membership",
+        on_delete=models.PROTECT,
+        related_name="employment_engagements",
+    )
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+
+    role = models.CharField(max_length=50)
+    employment_type = models.CharField(max_length=20)
+    job_title = models.CharField(max_length=255, blank=True)
+
+    pay_basis = models.CharField(max_length=20, choices=PayBasis.choices)
+    award_code = models.CharField(max_length=32, default="MA000012")
+    award_classification = models.CharField(max_length=80, blank=True)
+    award_source_label = models.CharField(
+        max_length=255,
+        default="Pharmacy Industry Award 2020",
+    )
+    award_source_url = models.URLField(
+        max_length=500,
+        default="https://calculate.fairwork.gov.au/payguides/fairwork/ma000012/pdf",
+    )
+    award_effective_from = models.DateField(null=True, blank=True)
+
+    rate_weekday = models.DecimalField(max_digits=8, decimal_places=2)
+    rate_saturday = models.DecimalField(max_digits=8, decimal_places=2)
+    rate_sunday = models.DecimalField(max_digits=8, decimal_places=2)
+    rate_public_holiday = models.DecimalField(max_digits=8, decimal_places=2)
+    rate_early_morning = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    rate_late_night = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    early_morning_applicable = models.BooleanField(default=False)
+    late_night_applicable = models.BooleanField(default=False)
+
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_employment_engagements",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="updated_employment_engagements",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["membership_id", "-effective_from", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["membership", "effective_from"],
+                name="wf_engagement_membership_start_unique",
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_to__isnull=True) | Q(effective_to__gte=models.F("effective_from")),
+                name="wf_engagement_valid_date_range",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["membership", "effective_from", "effective_to"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.membership_id and not self.membership.pharmacy_id:
+            raise ValidationError("Employment engagement requires a pharmacy membership.")
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({"effective_to": "Must be on or after effective_from."})
+        for field in ("rate_weekday", "rate_saturday", "rate_sunday", "rate_public_holiday"):
+            value = getattr(self, field, None)
+            if value is None or value < 0:
+                raise ValidationError({field: "A non-negative agreed rate is required."})
+        if self.early_morning_applicable and self.rate_early_morning is None:
+            raise ValidationError({"rate_early_morning": "Required when early-morning rates apply."})
+        if self.late_night_applicable and self.rate_late_night is None:
+            raise ValidationError({"rate_late_night": "Required when late-night rates apply."})
+
+        if self.membership_id and self.effective_from:
+            overlap = EmploymentEngagement.objects.filter(membership_id=self.membership_id)
+            if self.pk:
+                overlap = overlap.exclude(pk=self.pk)
+            overlap = overlap.filter(
+                Q(effective_to__isnull=True) | Q(effective_to__gte=self.effective_from)
+            )
+            if self.effective_to:
+                overlap = overlap.filter(effective_from__lte=self.effective_to)
+            if overlap.exists():
+                raise ValidationError("Employment engagement dates overlap an existing engagement.")
+
+    @property
+    def pharmacy_id(self):
+        return self.membership.pharmacy_id
+
+
 class CoverageRequirement(models.Model):
     pharmacy = models.ForeignKey(
         "client_profile.Pharmacy",
