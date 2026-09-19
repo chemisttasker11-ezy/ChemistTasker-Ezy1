@@ -210,8 +210,12 @@ export default function MembershipApplicationsPanel({
       );
       setApplications(filtered);
     } catch (error: any) {
-      console.error(error);
-      notify(error?.response?.data?.detail || "Failed to load membership applications.", "error");
+      console.error("Membership application load failed", error);
+      const apiDetail = error?.response?.data?.detail;
+      notify(
+        apiDetail || (error instanceof Error ? error.message : "Failed to load membership applications."),
+        "error"
+      );
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
