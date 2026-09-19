@@ -235,6 +235,8 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                 raise ValidationError('A void invoice cannot be marked paid.')
             record.invoice.status = 'paid'
             record.invoice.save(update_fields=['status'])
+            record.invoice.refresh_from_db()
+            record_revision_state(record)
         return Response(serialize_record(record))
 
     @action(detail=True, methods=['post'])
@@ -298,6 +300,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             Delivery.objects.filter(pk=delivery.pk).update(status='sent', sent_at=timezone.now())
             Invoice.objects.filter(pk=record.invoice_id).update(status='sent')
         record.invoice.refresh_from_db()
+        record_revision_state(record)
         return Response({'detail': 'Accepted by the email provider; inbox delivery is not guaranteed.',
                          'document': serialize_record(record)})
 
@@ -368,6 +371,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record.last_review_note = note
             record.last_reviewed_at = timezone.now()
             record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
+            record_revision_state(record)
             Notification.objects.create(
                 user=record.owner,
                 type='alert',
@@ -416,10 +420,12 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record = self._get(request, pk, lock=True)
             record.invoice.status = 'paid'
             record.invoice.save(update_fields=['status'])
+            record.invoice.refresh_from_db()
             if note:
                 record.last_review_note = note
                 record.last_reviewed_at = timezone.now()
                 record.save(update_fields=['last_review_note', 'last_reviewed_at', 'updated_at'])
+            record_revision_state(record)
             Notification.objects.create(
                 user=record.owner,
                 type='alert',
