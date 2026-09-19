@@ -8,7 +8,6 @@ import { today, dueDate, dollars, errorMessage } from './helpers';
 
 const taxes: FinanceTaxCode[] = ['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'];
 const categories: FinanceCategory[] = ['ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous'];
-const units: FinanceUnit[] = ['Hours', 'Lump Sum', 'Item', 'Kilometres', 'Nights'];
 const taxLabel: Record<FinanceTaxCode, string> = { GST: 'GST 10%', GST_FREE: 'GST-free', INPUT_TAXED: 'Input taxed', OUT_OF_SCOPE: 'Out of scope / not registered' };
 const grid = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 };
 
@@ -53,17 +52,15 @@ export function CustomerEditor({ initial, onClose, onSaved }: { initial?: Financ
 export function ItemEditor({ initial, onClose, onSaved }: { initial?: FinanceItem; onClose: () => void; onSaved: (saved: FinanceItem) => Promise<void> }) {
   const [value, setValue] = useState<FinanceItemInput>(initial || { code: '', name: '', category: 'ProfessionalServices', unit: 'Hours', unit_price: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, active: true });
   return <FormDialog title={initial ? 'Edit saved item' : 'New reusable item'} onClose={onClose} onSave={async () => { const saved = await finance.saveItem(value, initial?.id); await onSaved(saved); }}>
-    <Alert severity="info">Item defaults are copied onto new invoice lines. Editing an item never changes an issued invoice. Review GST treatment rather than assuming all pharmacy work is GST-free.</Alert>
+    <Alert severity="info">Item defaults are copied onto invoice rows only. You can freely change description, unit, price and tax treatment on each invoice without changing this saved item. Review GST treatment rather than assuming all pharmacy work is GST-free.</Alert>
     <Box sx={grid}>
-      <TextField label="Item code" required value={value.code} onChange={event => setValue({ ...value, code: event.target.value })} />
+      <TextField label="Item code (optional)" value={value.code} helperText="Only for your own catalogue/search. One-off invoice rows do not need a code." onChange={event => setValue({ ...value, code: event.target.value })} />
       <TextField label="Item name" required value={value.name} onChange={event => setValue({ ...value, name: event.target.value })} />
       <TextField select label="Category" value={value.category} onChange={event => { const category = event.target.value as FinanceCategory; setValue({ ...value, category,
         ...(category === 'Superannuation' ? { tax_code: 'OUT_OF_SCOPE' as const, super_eligible: false, unit: 'Lump Sum' as const } : {}) }); }}>
         {categories.map(category => <MenuItem key={category} value={category}>{category}</MenuItem>)}
       </TextField>
-      <TextField select label="Unit" value={value.unit} onChange={event => setValue({ ...value, unit: event.target.value as FinanceUnit })}>
-        {units.map(unit => <MenuItem key={unit} value={unit}>{unit}</MenuItem>)}
-      </TextField>
+      <TextField label="Default unit" value={value.unit} placeholder="Hours, km, each, visit…" onChange={event => setValue({ ...value, unit: event.target.value as FinanceUnit })} />
       <TextField label="Default unit price (AUD)" required inputProps={{ inputMode: 'decimal' }} value={value.unit_price} onChange={event => setValue({ ...value, unit_price: event.target.value })} />
       <TextField select label="Default tax treatment" value={value.tax_code} disabled={value.category === 'Superannuation'} onChange={event => setValue({ ...value, tax_code: event.target.value as FinanceTaxCode })}>
         {taxes.map(tax => <MenuItem key={tax} value={tax}>{taxLabel[tax]}</MenuItem>)}
