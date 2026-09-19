@@ -498,6 +498,44 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.cc_emails, "")
 
+    def test_legacy_status_patch_cannot_bypass_finance_send_or_review_actions(self):
+        invoice = self._generate()
+        record = invoice.finance_record
+        factory = APIRequestFactory()
+
+        worker_request = factory.patch(
+            f"/client-profile/invoices/{invoice.id}/",
+            {"status": "sent"},
+            format="json",
+        )
+        force_authenticate(worker_request, user=self.worker)
+        worker_response = InvoiceDetailView.as_view()(worker_request, pk=invoice.id)
+        self.assertEqual(worker_response.status_code, 403)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "draft")
+        self.assertFalse(record.deliveries.exists())
+
+        Delivery.objects.create(
+            record=record,
+            version=record.version,
+            recipient=self.owner.email,
+            status="sent",
+            sent_at=timezone.now(),
+        )
+        invoice.status = "sent"
+        invoice.save(update_fields=["status"])
+
+        owner_request = factory.patch(
+            f"/client-profile/invoices/{invoice.id}/",
+            {"status": "paid"},
+            format="json",
+        )
+        force_authenticate(owner_request, user=self.owner)
+        owner_response = InvoiceDetailView.as_view()(owner_request, pk=invoice.id)
+        self.assertEqual(owner_response.status_code, 403)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "sent")
+
     def test_new_finance_workspace_can_correct_shift_values_but_preserves_source_identity(self):
         invoice = self._generate()
         record = invoice.finance_record
