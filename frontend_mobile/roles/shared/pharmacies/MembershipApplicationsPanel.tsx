@@ -8,7 +8,6 @@ import {
     Text,
     Button,
     ActivityIndicator,
-    Menu,
 } from 'react-native-paper';
 import {
     fetchMembershipApplicationsService,
@@ -18,13 +17,6 @@ import {
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
 import MembershipApplicationReviewDialog from './MembershipApplicationReviewDialog';
-
-const getFirstErrorMessage = (value: unknown): string | null => {
-    if (Array.isArray(value)) {
-        return typeof value[0] === 'string' ? value[0] : null;
-    }
-    return null;
-};
 
 type ApplicationCategory = 'FULL_PART_TIME' | 'LOCUM_CASUAL';
 
@@ -117,8 +109,6 @@ export default function MembershipApplicationsPanel({
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [processingId, setProcessingId] = useState<string | number | null>(null);
-    const [employmentMenuVisible, setEmploymentMenuVisible] = useState<string | number | null>(null);
-    const [selectedEmployment, setSelectedEmployment] = useState<Record<string | number, string>>({});
     const [reviewing, setReviewing] = useState<MembershipApplication | null>(null);
 
     const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
@@ -218,36 +208,6 @@ export default function MembershipApplicationsPanel({
                                     {classification ? <Text style={styles.detailText}>Classification: {classification}</Text> : null}
                                 </View>
 
-                                {category === 'FULL_PART_TIME' && (
-                                    <View style={styles.employmentSelector}>
-                                        <Text style={styles.label}>Employment Type:</Text>
-                                        <Menu
-                                            visible={employmentMenuVisible === app.id}
-                                            onDismiss={() => setEmploymentMenuVisible(null)}
-                                            anchor={
-                                                <Button
-                                                    mode="outlined"
-                                                    onPress={() => setEmploymentMenuVisible(app.id)}
-                                                    compact
-                                                >
-                                                    {selectedEmployment[app.id] || defaultEmploymentType}
-                                                </Button>
-                                            }
-                                        >
-                                            {allowedEmploymentTypes.map((type) => (
-                                                <Menu.Item
-                                                    key={type}
-                                                    onPress={() => {
-                                                        setSelectedEmployment((prev) => ({ ...prev, [app.id]: type }));
-                                                        setEmploymentMenuVisible(null);
-                                                    }}
-                                                    title={type.replace('_', ' ')}
-                                                />
-                                            ))}
-                                        </Menu>
-                                    </View>
-                                )}
-
                                 <View style={styles.actions}>
                                     <Button
                                         mode="contained"
@@ -279,7 +239,7 @@ export default function MembershipApplicationsPanel({
                 defaultEmploymentType={
                     reviewing?.category === 'LOCUM_CASUAL'
                         ? deriveLocumEmploymentType(reviewing?.role)
-                        : (reviewing ? (selectedEmployment[reviewing.id] || defaultEmploymentType) : defaultEmploymentType)
+                        : defaultEmploymentType
                 }
                 onDismiss={() => setReviewing(null)}
                 onUpdated={(updated) => {
@@ -350,14 +310,6 @@ const styles = StyleSheet.create({
     detailText: {
         fontSize: 14,
         marginBottom: 4,
-    },
-    employmentSelector: {
-        marginBottom: 12,
-    },
-    label: {
-        fontSize: 14,
-        marginBottom: 8,
-        color: surfaceTokens.textMuted,
     },
     actions: {
         flexDirection: 'row',
