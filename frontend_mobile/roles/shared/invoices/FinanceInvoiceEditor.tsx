@@ -26,6 +26,17 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [internalSources, setInternalSources] = useState<FinanceInternalSource[]>([]);
   const [sourceOpen, setSourceOpen] = useState(false);
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
+  const snapshotCustomer = (item: FinanceCustomer) => ({
+    name: item.name, legal_name: item.legal_name, address: item.address, abn: item.abn,
+    email: item.email, contact_name: item.contact_name,
+  });
+  const changeCustomer = (key: keyof NonNullable<FinanceDraft['customer']>, next: string) => setValue(current => ({
+    ...current,
+    customer: {
+      ...(current.customer || { name: '', legal_name: '', address: '', abn: '', email: '', contact_name: '' }),
+      [key]: next,
+    },
+  }));
   const changeLine = (index: number, patch: Partial<FinanceLine>) => change('lines', value.lines.map((line, i) => i === index ? { ...line, ...patch } : line));
   const close = () => { if (busy) return; if (JSON.stringify(value) === original.current) onClose(); else Alert.alert('Discard changes?', 'Your unsaved invoice changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: onClose }]); };
   useEffect(() => {
@@ -132,8 +143,18 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
         <Chip style={{ alignSelf: 'flex-start', marginBottom: 16 }}>{initial ? financeStatus(initial) : 'Unsaved'}</Chip>
         <Button mode="outlined" icon="account-outline" disabled={internalSource} onPress={() => { setCustomerOpen(!customerOpen); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
-        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customers.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customers.length && <Text style={{ padding: 12 }}>Add a customer from Customers before creating an invoice.</Text>}</View>}
-        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 16 }}>{customer?.address || 'Customer billing address'}</Text>
+        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customers.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customers.length && <Text style={{ padding: 12 }}>Add a customer from Customers before creating an invoice.</Text>}</View>}
+        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 16 }}>{value.customer?.address || customer?.address || 'Customer billing address'}</Text>
+        {value.customer ? <List.Accordion title="Invoice recipient details" description="Optional overrides for this invoice only">
+          <View style={{ padding: 12 }}>
+            <TextInput mode="outlined" dense label="Bill-to name" value={value.customer.name} onChangeText={text => changeCustomer('name', text)} style={{ marginBottom: 10 }} />
+            <TextInput mode="outlined" dense label="Legal name" value={value.customer.legal_name} onChangeText={text => changeCustomer('legal_name', text)} style={{ marginBottom: 10 }} />
+            <TextInput mode="outlined" dense label="ABN" value={value.customer.abn} onChangeText={text => changeCustomer('abn', text)} style={{ marginBottom: 10 }} />
+            <TextInput mode="outlined" dense label="Accounts contact" value={value.customer.contact_name} onChangeText={text => changeCustomer('contact_name', text)} style={{ marginBottom: 10 }} />
+            <TextInput mode="outlined" dense keyboardType="email-address" autoCapitalize="none" label="Invoice email" value={value.customer.email} onChangeText={text => changeCustomer('email', text)} style={{ marginBottom: 10 }} />
+            <TextInput mode="outlined" dense multiline label="Billing address" value={value.customer.address} onChangeText={text => changeCustomer('address', text)} />
+          </View>
+        </List.Accordion> : null}
         {field('reference', 'Customer PO / reference')}
         {field('invoice_date', 'Issue date (YYYY-MM-DD)')}{field('due_date', 'Due date (YYYY-MM-DD)')}
         <View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.price_mode === 'exclusive'} onPress={() => change('price_mode', 'exclusive')}>GST exclusive</Chip><Chip selected={value.price_mode === 'inclusive'} onPress={() => change('price_mode', 'inclusive')}>GST inclusive</Chip></View>
