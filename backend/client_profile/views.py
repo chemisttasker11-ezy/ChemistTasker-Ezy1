@@ -3062,6 +3062,31 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
             app.category == 'FULL_PART_TIME'
             and app.pharmacy.use_chemisttasker_payroll
         )
+
+        if app.category == 'FULL_PART_TIME':
+            from client_profile.serializers import _application_payment_profile_status
+            payment_profile = _application_payment_profile_status(app)
+            if payment_profile.get('payment_preference') != 'TFN':
+                return Response(
+                    {
+                        'payment_profile': [
+                            'Pharmacy staff are employees and must use the TFN pathway in their private ChemistTasker worker profile before approval.'
+                        ],
+                        'payment_profile_status': payment_profile,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if payroll_required and not payment_profile.get('payroll_ready'):
+                return Response(
+                    {
+                        'payment_profile': [
+                            'ChemistTasker Payroll is enabled. The worker must complete TFN and super setup in their private profile before final approval.'
+                        ],
+                        'payment_profile_status': payment_profile,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         if payroll_required and not isinstance(payroll_terms, dict):
             return Response(
                 {
