@@ -25,6 +25,7 @@ interface MagicInfo {
   pharmacy_name: string;
   category: 'FULL_PART_TIME' | 'LOCUM_CASUAL';
   expires_at: string;
+  payroll_enabled: boolean;
 }
 
 const getFirstErrorMessage = (value: unknown): string | null => {
@@ -100,6 +101,8 @@ export default function MembershipApplyPage() {
 
   const isAuthenticatedWorker = user?.role === 'PHARMACIST' || user?.role === 'OTHER_STAFF';
   const authenticatedRoleBlocked = Boolean(user && !isAuthenticatedWorker);
+  const payrollClassificationRequired =
+    info?.category === 'FULL_PART_TIME' && Boolean(info?.payroll_enabled);
   const roleOptions = useMemo(() => {
     if (user?.role === 'PHARMACIST') {
       return ROLE_OPTIONS.filter((option) => option.value === 'PHARMACIST');
@@ -205,7 +208,7 @@ export default function MembershipApplyPage() {
         return;
       }
 
-      if (activeLevelField && !activeLevelField.value) {
+      if (payrollClassificationRequired && activeLevelField && !activeLevelField.value) {
         setSubmitError(`Please select ${activeLevelField.label.toLowerCase()}.`);
         setSubmitting(false);
         return;
@@ -255,10 +258,10 @@ export default function MembershipApplyPage() {
         mobile_number: mobile.trim(),
         date_of_birth: dateOfBirth,
         email: email.trim().toLowerCase(),
-        pharmacist_award_level: pharmacistLevel || null,
-        otherstaff_classification_level: otherStaffLevel || null,
-        intern_half: internHalf || null,
-        student_year: studentYear || null,
+        pharmacist_award_level: payrollClassificationRequired ? (pharmacistLevel || null) : null,
+        otherstaff_classification_level: payrollClassificationRequired ? (otherStaffLevel || null) : null,
+        intern_half: payrollClassificationRequired ? (internHalf || null) : null,
+        student_year: payrollClassificationRequired ? (studentYear || null) : null,
       };
 
       if (requiresJobTitle) {
@@ -367,6 +370,19 @@ export default function MembershipApplyPage() {
             )}
             {submitError && <Alert severity="error" sx={{ mb: 2 }}>{submitError}</Alert>}
 
+            {info?.category === 'FULL_PART_TIME' && (
+              <Alert severity={info.payroll_enabled ? 'info' : 'success'} sx={{ mb: 2 }}>
+                {info.payroll_enabled
+                  ? 'This pharmacy uses ChemistTasker Payroll. Your Award classification will be reviewed by the pharmacy and used to prepare your employment terms.'
+                  : 'This pharmacy manages payroll outside ChemistTasker. You do not need to enter Award classification or pay rates here; ChemistTasker can still manage roster, attendance and timesheets.'}
+              </Alert>
+            )}
+            {info?.category === 'LOCUM_CASUAL' && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Favourite-list membership does not set a standing pay rate. If you accept a shift, the final posted or negotiated rate and ABN/TFN engagement terms are confirmed for that shift.
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit}>
               <TextField
                 select
@@ -457,7 +473,7 @@ export default function MembershipApplyPage() {
                 />
               )}
 
-              {activeLevelField && (
+              {payrollClassificationRequired && activeLevelField && (
                 <TextField
                   select
                   fullWidth
