@@ -38,7 +38,7 @@ export interface FinanceCalculation {
   subtotal: string; gst: string; payable: string; sales_gross: string; super: string; automatic_super: string;
 }
 export interface FinanceInvoice {
-  id: number; invoice_id: number; number: string; version: number; current_version?: number; is_current?: boolean; request_key: string;
+  id: number; invoice_id: number; number: string; version: number; current_version?: number; is_current?: boolean; has_unsent_revision?: boolean; request_key: string;
   kind: 'invoice' | 'super_request'; source: 'external' | 'internal'; payload: FinanceDraft;
   calculation: FinanceCalculation; source_snapshot?: Record<string, unknown>;
   locked: boolean; editable?: boolean; voided: boolean; status: 'draft' | 'sent' | 'paid' | 'void';
