@@ -187,6 +187,22 @@ class EmploymentTermsTests(SimpleTestCase):
                 }
             )
 
+    def test_part_time_pattern_allows_12_paid_hours_plus_meal_break(self):
+        result = normalise_part_time_pattern(
+            {
+                "days": [
+                    {
+                        "weekday": 1,
+                        "start_time": "10:00",
+                        "end_time": "22:30",
+                        "meal_break_start": "14:00",
+                        "meal_break_minutes": 30,
+                    }
+                ]
+            }
+        )
+        self.assertEqual(result["days"][0]["ordinary_minutes"], 720)
+
     def test_part_time_pattern_accepts_midnight_as_end_of_day(self):
         result = normalise_part_time_pattern(
             {
