@@ -1359,7 +1359,7 @@ class MembershipApplication(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['pharmacy', 'status']),
-            models.Index(fields=['pharmacy', 'email', 'status']),
+            models.Index(fields=['pharmacy', 'email', 'status'], name='cp_memapp_email_status_idx'),
         ]
 
     def __str__(self):
