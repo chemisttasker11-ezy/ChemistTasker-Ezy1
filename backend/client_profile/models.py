@@ -2007,6 +2007,15 @@ class ShiftSlotAssignment(models.Model):
         blank=True,
         help_text="Details explaining how the rate was calculated"
     )
+    payment_preference_snapshot = models.CharField(max_length=10, blank=True)
+    settlement_channel = models.CharField(max_length=16, blank=True)
+    engagement_kind = models.CharField(max_length=32, blank=True)
+    engagement_terms_snapshot = models.JSONField(default=dict, blank=True)
+    engagement_terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    source_offer = models.ForeignKey(
+        'ShiftOffer', on_delete=models.PROTECT, related_name='slot_assignments',
+        null=True, blank=True,
+    )
     class Meta:
         unique_together = ('slot', 'slot_date')
         indexes = [
@@ -2195,6 +2204,11 @@ class ShiftOffer(models.Model):
     )
     expires_at = models.DateTimeField(null=True, blank=True)
     last_buzzed_at = models.DateTimeField(null=True, blank=True)
+    payment_preference_snapshot = models.CharField(max_length=10, blank=True)
+    settlement_channel = models.CharField(max_length=16, blank=True)
+    engagement_kind = models.CharField(max_length=32, blank=True)
+    engagement_terms_snapshot = models.JSONField(default=dict, blank=True)
+    engagement_terms_accepted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
