@@ -4032,6 +4032,93 @@ def _application_snapshot(source):
     return {field: _application_snapshot_value(source, field) for field in fields}
 
 
+def _application_payment_profile_status(application):
+    """Safe owner-facing readiness summary.
+
+    The worker onboarding profile remains the payment source of truth. Never expose
+    the TFN, super member number or other secret identifiers through membership review.
+    """
+    worker = getattr(application, "submitted_by", None)
+    if not worker and getattr(application, "email", None):
+        worker = User.objects.filter(email__iexact=application.email).first()
+
+    if not worker:
+        return {
+            "account_linked": False,
+            "onboarding_complete": False,
+            "payment_preference": None,
+            "status": "ACCOUNT_NOT_LINKED",
+            "payroll_ready": False,
+            "invoice_ready": False,
+            "missing_fields": ["worker_account", "onboarding", "payment_preference"],
+        }
+
+    onboarding = (
+        PharmacistOnboarding.objects.filter(user=worker).first()
+        if str(getattr(worker, "role", "") or "").upper() == "PHARMACIST"
+        else OtherStaffOnboarding.objects.filter(user=worker).first()
+    )
+    if not onboarding:
+        return {
+            "account_linked": True,
+            "onboarding_complete": False,
+            "payment_preference": None,
+            "status": "ONBOARDING_INCOMPLETE",
+            "payroll_ready": False,
+            "invoice_ready": False,
+            "missing_fields": ["onboarding", "payment_preference"],
+        }
+
+    preference = str(getattr(onboarding, "payment_preference", "") or "").strip().upper()
+    if preference == "TFN":
+        missing = []
+        if not getattr(onboarding, "tfn_number", None):
+            missing.append("tfn")
+        if not getattr(onboarding, "super_fund_name", None):
+            missing.append("super_fund_name")
+        if not getattr(onboarding, "super_usi", None):
+            missing.append("super_usi")
+        if not getattr(onboarding, "super_member_number", None):
+            missing.append("super_member_number")
+        return {
+            "account_linked": True,
+            "onboarding_complete": True,
+            "payment_preference": "TFN",
+            "status": "READY" if not missing else "TFN_SETUP_INCOMPLETE",
+            "payroll_ready": not missing,
+            "invoice_ready": False,
+            "missing_fields": missing,
+        }
+
+    if preference == "ABN":
+        missing = []
+        if not getattr(onboarding, "abn", None):
+            missing.append("abn")
+        if not getattr(onboarding, "abn_verified", False):
+            missing.append("abn_verified")
+        if not getattr(onboarding, "abn_entity_confirmed", False):
+            missing.append("abn_entity_confirmed")
+        return {
+            "account_linked": True,
+            "onboarding_complete": True,
+            "payment_preference": "ABN",
+            "status": "READY" if not missing else "ABN_SETUP_INCOMPLETE",
+            "payroll_ready": False,
+            "invoice_ready": not missing,
+            "missing_fields": missing,
+        }
+
+    return {
+        "account_linked": True,
+        "onboarding_complete": True,
+        "payment_preference": None,
+        "status": "PAYMENT_PREFERENCE_REQUIRED",
+        "payroll_ready": False,
+        "invoice_ready": False,
+        "missing_fields": ["payment_preference"],
+    }
+
+
 def _normalise_application_role_fields(attrs, *, role, payroll_enabled, category):
     require_classification = bool(payroll_enabled and category == "FULL_PART_TIME")
 
@@ -4077,6 +4164,7 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True, allow_blank=False)
     pharmacy_name = serializers.CharField(source="pharmacy.name", read_only=True)
     payroll_enabled = serializers.BooleanField(source="pharmacy.use_chemisttasker_payroll", read_only=True)
+    payment_profile_status = serializers.SerializerMethodField()
 
     class Meta:
         model = MembershipApplication
@@ -4087,14 +4175,17 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
             "intern_half", "student_year", "email",
             "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
             "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
-            "approved_membership", "payroll_enabled",
+            "approved_membership", "payroll_enabled", "payment_profile_status",
         ]
         read_only_fields = [
             "id", "pharmacy", "pharmacy_name", "category",
             "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
             "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
-            "approved_membership", "payroll_enabled",
+            "approved_membership", "payroll_enabled", "payment_profile_status",
         ]
+
+    def get_payment_profile_status(self, obj):
+        return _application_payment_profile_status(obj)
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -4235,6 +4326,7 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
 class MembershipApplicationReviewSerializer(serializers.ModelSerializer):
     pharmacy_name = serializers.CharField(source="pharmacy.name", read_only=True)
     payroll_enabled = serializers.BooleanField(source="pharmacy.use_chemisttasker_payroll", read_only=True)
+    payment_profile_status = serializers.SerializerMethodField()
 
     class Meta:
         model = MembershipApplication
@@ -4245,15 +4337,18 @@ class MembershipApplicationReviewSerializer(serializers.ModelSerializer):
             "intern_half", "student_year", "email",
             "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
             "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
-            "approved_membership", "payroll_enabled",
+            "approved_membership", "payroll_enabled", "payment_profile_status",
         ]
         read_only_fields = [
             "id", "pharmacy", "pharmacy_name", "category",
             "username", "mobile_number", "date_of_birth", "email",
             "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
             "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
-            "approved_membership", "payroll_enabled",
+            "approved_membership", "payroll_enabled", "payment_profile_status",
         ]
+
+    def get_payment_profile_status(self, obj):
+        return _application_payment_profile_status(obj)
 
     def validate(self, attrs):
         if self.instance.status != "PENDING":
