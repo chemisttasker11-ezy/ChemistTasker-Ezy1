@@ -2,9 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -26,11 +23,6 @@ import {
   Stack,
   Tab,
   Tabs,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -38,7 +30,6 @@ import { alpha } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/AddCircleOutline";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
@@ -80,7 +71,6 @@ import {
   normalizePharmacy,
   toOwnerPharmacyDTO,
   initialOwnerDialogState,
-  CLAIM_STATUS_COLORS,
   formatDateTime,
   formatDate,
   membershipIsVisibleCategoryMember,
