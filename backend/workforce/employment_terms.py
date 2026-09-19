@@ -112,9 +112,6 @@ def normalise_part_time_pattern(raw_pattern) -> dict:
             )
         span_minutes = _minutes_between(start, end)
 
-        if span_minutes > 12 * 60:
-            raise ValidationError({prefix: "A part-time ordinary-hours day cannot exceed 12 hours."})
-
         meal_raw = raw_day.get("meal_break_minutes", 0)
         try:
             meal_minutes = int(meal_raw or 0)
@@ -145,9 +142,13 @@ def normalise_part_time_pattern(raw_pattern) -> dict:
                 {f"{prefix}.meal_break_start": "Meal break start must be blank when duration is 0."}
             )
 
-        # Award clause 15 uses paid hours worked (the meal break itself is
-        # unpaid) to determine the break entitlement.
+        # Award clauses 13 and 15 apply the 12-hour daily maximum and break
+        # entitlements to ordinary hours worked; the meal break itself is unpaid.
         worked_minutes = span_minutes - meal_minutes
+        if worked_minutes > 12 * 60:
+            raise ValidationError(
+                {prefix: "Part-time ordinary hours worked cannot exceed 12 hours in a day."}
+            )
         if worked_minutes > 5 * 60 and not meal_minutes:
             raise ValidationError(
                 {f"{prefix}.meal_break_minutes": "A 30–60 minute meal break is required when paid work exceeds 5 hours."}
