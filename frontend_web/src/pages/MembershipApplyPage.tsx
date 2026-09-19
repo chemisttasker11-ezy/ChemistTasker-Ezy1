@@ -101,6 +101,12 @@ export default function MembershipApplyPage() {
 
   const isAuthenticatedWorker = user?.role === 'PHARMACIST' || user?.role === 'OTHER_STAFF';
   const authenticatedRoleBlocked = Boolean(user && !isAuthenticatedWorker);
+  const workerPaymentPath =
+    user?.role === 'PHARMACIST'
+      ? '/dashboard/pharmacist/onboarding?step=payment'
+      : user?.role === 'OTHER_STAFF'
+        ? '/dashboard/otherstaff/onboarding?step=payment'
+        : null;
   const payrollClassificationRequired =
     info?.category === 'FULL_PART_TIME' && Boolean(info?.payroll_enabled);
   const roleOptions = useMemo(() => {
@@ -361,11 +367,31 @@ export default function MembershipApplyPage() {
                 Favourite-list approval does not choose TFN or ABN for you. Your private worker Payment Profile remains the source of truth when you later accept a shift.
               </Alert>
             )}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+              {workerPaymentPath ? (
+                <Button component={RouterLink} to={workerPaymentPath} variant="contained">
+                  Complete Payment Profile
+                </Button>
+              ) : (
+                <>
+                  <Button component={RouterLink} to="/register" variant="contained">
+                    Create worker account
+                  </Button>
+                  <Button component={RouterLink} to="/login" variant="outlined">
+                    Log in
+                  </Button>
+                </>
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.25 }}>
+              Use the same email address as this application so ChemistTasker can link the worker profile to the pharmacy request.
+            </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              You can now close this page. Back to{' '}
-              <Link component={RouterLink} to="/login" fontWeight="bold" color="#00a99d">
-                Login
+              You can also return to{' '}
+              <Link component={RouterLink} to={user?'/dashboard':'/login'} fontWeight="bold" color="#00a99d">
+                {user?'My dashboard':'Log in'}
               </Link>
+              .
             </Typography>
           </>
         ) : (
@@ -392,7 +418,7 @@ export default function MembershipApplyPage() {
             )}
             {info?.category === 'LOCUM_CASUAL' && (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Favourite-list membership does not set a standing pay rate. If you accept a shift, the final posted or negotiated rate and ABN/TFN engagement terms are confirmed for that shift.
+                Favourite-list membership does not set a standing pay rate or payment method. Your private ChemistTasker Payment Profile remains the source of truth for TFN vs ABN. Each accepted shift freezes the final rate and routes TFN work to payroll/timesheet processing or verified ABN work to invoicing.
               </Alert>
             )}
 
