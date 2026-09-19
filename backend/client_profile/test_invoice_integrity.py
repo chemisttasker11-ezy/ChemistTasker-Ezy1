@@ -10,7 +10,9 @@ from unittest.mock import patch
 
 from client_profile.models import (
     InvoiceLineItem,
+    Notification,
     OtherStaffOnboarding,
+    OwnerOnboarding,
     Pharmacy,
     Shift,
     ShiftSlot,
@@ -19,8 +21,9 @@ from client_profile.models import (
 from client_profile.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
 from client_profile.views import InvoiceDetailView, send_invoice_email
-from worker_finance.models import CatalogueItem, Delivery
-from worker_finance.services import save_draft, serialize_record
+from worker_finance.views import ReceivedInvoiceViewSet
+from worker_finance.models import CatalogueItem, Delivery, InvoiceRevision
+from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record
 
 
 User = get_user_model()
@@ -51,9 +54,15 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
             first_name="Invoice",
             last_name="Owner",
         )
+        self.owner_onboarding = OwnerOnboarding.objects.create(
+            user=self.owner,
+            phone_number="0400000000",
+            role="MANAGER",
+        )
         self.pharmacy = Pharmacy.objects.create(
             name="Invoice Integrity Pharmacy",
             abn="51824753556",
+            owner=self.owner_onboarding,
         )
         self.shift = Shift.objects.create(
             pharmacy=self.pharmacy,
@@ -127,10 +136,68 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         record = invoice.finance_record
         self.assertEqual(record.source, "internal")
         self.assertEqual(record.invoice_id, invoice.id)
-        locked_line = next(line for line in record.payload["lines"] if line.get("source_assignment_id"))
-        self.assertTrue(locked_line["locked"])
-        self.assertEqual(locked_line["source_assignment_id"], self.assignment.id)
+        source_line = next(line for line in record.payload["lines"] if line.get("source_assignment_id"))
+        self.assertEqual(source_line["source_assignment_id"], self.assignment.id)
         self.assertEqual(serialize_record(record)["source_snapshot"], invoice.source_snapshot)
+
+    def test_internal_prefill_uses_pharmacy_shift_and_worker_onboarding_without_saving_invoice(self):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+
+        self.assertEqual(draft["source_assignment_ids"], [self.assignment.id])
+        self.assertEqual(draft["customer"]["name"], self.pharmacy.name)
+        self.assertEqual(draft["customer"]["abn"], self.pharmacy.abn)
+        self.assertEqual(draft["issuer_abn"], "51824753556")
+        line = draft["lines"][0]
+        self.assertEqual(line["source_assignment_id"], self.assignment.id)
+        self.assertEqual(line["worked_on"], str(self.slot.date))
+        self.assertEqual(line["quantity"], "8.00")
+        self.assertEqual(line["unit_price"], "70.00")
+        self.assertEqual(InvoiceRevision.objects.count(), 0)
+
+        record = save_draft(self.worker, draft)
+        self.assertEqual(record.source, "internal")
+        self.assertEqual(record.version, 1)
+        self.assertEqual(record.invoice.pharmacy_id, self.pharmacy.id)
+        self.assertEqual(InvoiceRevision.objects.filter(record=record).count(), 1)
+
+    def test_owner_can_request_revision_and_worker_save_resolves_request(self):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+        record.invoice.status = "sent"
+        record.invoice.save(update_fields=["status"])
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            f"/client-profile/finance/received-invoices/{record.id}/request-revision/",
+            {"note": "Please use the actual 7.5 hours worked."},
+            format="json",
+        )
+        force_authenticate(request, user=self.owner)
+        response = ReceivedInvoiceViewSet.as_view({"post": "request_revision"})(request, pk=record.id)
+        self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.review_status, "REVISION_REQUESTED")
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.worker,
+                payload__kind="invoice_revision_requested",
+            ).exists()
+        )
+
+        payload = dict(record.payload)
+        payload["version"] = record.version
+        payload["lines"] = [
+            {**line, "quantity": "7.50"}
+            if line.get("source_assignment_id")
+            else line
+            for line in payload["lines"]
+        ]
+        revised = save_draft(self.worker, payload, record.id)
+        request_row = revised.review_requests.get()
+        self.assertIsNotNone(request_row.resolved_at)
+        self.assertEqual(request_row.resolved_by_version, revised.version)
+        self.assertEqual(revised.review_status, "NONE")
+        self.assertEqual(revised.invoice.status, "draft")
 
     def test_partial_hour_invoice_uses_same_precision_for_quantity_and_total(self):
         self.slot.end_time = time(16, 37)
@@ -235,7 +302,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(updated.total, Decimal("666.00"))
 
 
-    def test_legacy_send_locks_new_workspace_and_cannot_send_twice(self):
+    def test_legacy_send_records_current_revision_without_locking_future_edits(self):
         invoice = self._generate()
         invoice.bill_to_email = self.owner.email
         invoice.save(update_fields=["bill_to_email"])
@@ -260,16 +327,14 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         invoice.refresh_from_db()
         record.refresh_from_db()
         self.assertEqual(invoice.status, "sent")
-        self.assertIsNotNone(record.locked_at)
+        self.assertIsNone(record.locked_at)
+        self.assertEqual(InvoiceRevision.objects.get(record=record, version=record.version).invoice_status, "sent")
         delivery = Delivery.objects.get(record=record, version=record.version)
         self.assertEqual(delivery.recipient, self.owner.email)
         self.assertEqual(delivery.status, "legacy_queued")
 
-    def test_legacy_editor_cannot_bypass_new_workspace_issue_lock(self):
+    def test_legacy_editor_cannot_bypass_new_workspace_revision_history(self):
         invoice = self._generate()
-        record = invoice.finance_record
-        record.locked_at = timezone.now()
-        record.save(update_fields=["locked_at", "updated_at"])
 
         factory = APIRequestFactory()
         request = factory.patch(
@@ -284,9 +349,10 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.cc_emails, "")
 
-    def test_new_finance_workspace_edit_cannot_rewrite_accepted_shift_line(self):
+    def test_new_finance_workspace_can_correct_shift_values_but_preserves_source_identity(self):
         invoice = self._generate()
         record = invoice.finance_record
+        original_snapshot = dict(invoice.source_snapshot)
         travel = CatalogueItem.objects.create(
             owner=self.worker,
             code="TRAVEL-EDIT",
@@ -302,8 +368,9 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         payload["lines"] = [
             {
                 **line,
-                "quantity": "1.00",
-                "unit_price": "1.00",
+                "description": "Corrected actual shift",
+                "quantity": "7.50",
+                "unit_price": "75.00",
             }
             if line.get("source_assignment_id")
             else line
@@ -312,6 +379,8 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         payload["lines"].append({
             "item_id": travel.id,
             "description": "Travel reimbursement",
+            "category_code": "Transportation",
+            "unit": "Lump Sum",
             "quantity": "1.00",
             "unit_price": "50.00",
             "discount": "0.00",
@@ -322,12 +391,11 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
         updated = save_draft(self.worker, payload, record.id)
         invoice.refresh_from_db()
-        protected = invoice.line_items.get(
-            category_code="ProfessionalServices",
-            source_assignment=self.assignment,
-        )
-        self.assertEqual(protected.quantity, Decimal("8.00"))
-        self.assertEqual(protected.unit_price, Decimal("70.00"))
-        self.assertEqual(protected.total, Decimal("560.00"))
-        self.assertEqual(updated.calculation["payable"], "666.00")
-        self.assertEqual(invoice.total, Decimal("666.00"))
+        source_line = invoice.line_items.get(source_assignment=self.assignment)
+        self.assertEqual(source_line.quantity, Decimal("7.50"))
+        self.assertEqual(source_line.unit_price, Decimal("75.00"))
+        self.assertEqual(source_line.total, Decimal("562.50"))
+        self.assertEqual(invoice.source_snapshot, original_snapshot)
+        self.assertEqual(updated.version, 2)
+        self.assertEqual(updated.invoice.status, "draft")
+        self.assertEqual(InvoiceRevision.objects.filter(record=updated).count(), 2)
