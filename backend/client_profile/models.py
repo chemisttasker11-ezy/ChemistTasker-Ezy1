@@ -1421,6 +1421,7 @@ class Shift(models.Model):
     EMPLOYMENT_TYPE_CHOICES = [
         ('FULL_TIME', 'Full-Time'),
         ('PART_TIME', 'Part-Time'),
+        ('CASUAL', 'Casual employee'),
         ('LOCUM', 'Locum'),
     ]
 
