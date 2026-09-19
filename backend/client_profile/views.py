@@ -2464,6 +2464,16 @@ class MembershipViewSet(viewsets.ModelViewSet):
             except Pharmacy.DoesNotExist:
                 return None, 'Pharmacy not found.'
 
+            if MembershipApplication.objects.filter(
+                pharmacy=pharmacy,
+                email__iexact=email,
+                status="PENDING",
+            ).exists():
+                return None, (
+                    "This person already has a pending membership application for this pharmacy. "
+                    "Review that application instead of creating a duplicate invitation."
+                )
+
             # Find or create user
             user = User.objects.filter(email__iexact=email).first()
             user_created = False
@@ -2901,10 +2911,16 @@ class SubmitMembershipApplication(APIView):
 class MembershipApplicationViewSet(viewsets.ModelViewSet):
     """
     Owners/Org Admins/Pharmacy Admins can list pending apps for their pharmacies,
-    and approve/reject.
+    edit employment-facing fields, and approve/reject.
+    Applicant identifiers are immutable after submission.
     """
     serializer_class = MembershipApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in {"update", "partial_update"}:
+            return MembershipApplicationReviewSerializer
+        return MembershipApplicationSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -3018,7 +3034,9 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         app.status = 'APPROVED'
         app.decided_at = timezone.now()
         app.decided_by = request.user
-        app.save(update_fields=['status', 'decided_at', 'decided_by'])
+        app.approved_membership = membership
+        app.pending_identity_key = None
+        app.save(update_fields=['status', 'decided_at', 'decided_by', 'approved_membership', 'pending_identity_key'])
         transaction.on_commit(lambda: async_task('client_profile.tasks.email_membership_application_approved', app.id))
 
         return Response({'status': 'approved', 'membership_id': membership.id}, status=200)
@@ -3039,7 +3057,9 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         app.status = 'REJECTED'
         app.decided_at = timezone.now()
         app.decided_by = request.user
-        app.save(update_fields=['status', 'decided_at', 'decided_by'])
+        app.pending_identity_key = None
+        app.save(update_fields=['status', 'decided_at', 'decided_by', 'pending_identity_key'])
+        transaction.on_commit(lambda: async_task('client_profile.tasks.email_membership_application_rejected', app.id))
         return Response({'status': 'rejected'}, status=200)
 
 

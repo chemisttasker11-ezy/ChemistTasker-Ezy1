@@ -3307,6 +3307,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             # arrays:
             "employment_types",
             "roles_needed",
+            "use_chemisttasker_payroll",
             # rates & about:
             "default_rate_type",
             "default_fixed_rate",
@@ -3990,158 +3991,330 @@ class MembershipInviteLinkSerializer(serializers.ModelSerializer):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
 
+APPLICATION_IDENTIFIER_FIELDS = ("email", "mobile_number", "date_of_birth", "username")
+APPLICATION_REVIEW_FIELDS = (
+    "role",
+    "first_name",
+    "last_name",
+    "job_title",
+    "pharmacist_award_level",
+    "otherstaff_classification_level",
+    "intern_half",
+    "student_year",
+)
+
+
+def _application_snapshot_value(source, field_name):
+    if isinstance(source, dict):
+        value = source.get(field_name)
+    else:
+        value = getattr(source, field_name, None)
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _application_snapshot(source):
+    fields = (
+        "role",
+        "first_name",
+        "last_name",
+        "username",
+        "mobile_number",
+        "date_of_birth",
+        "job_title",
+        "pharmacist_award_level",
+        "otherstaff_classification_level",
+        "intern_half",
+        "student_year",
+        "email",
+    )
+    return {field: _application_snapshot_value(source, field) for field in fields}
+
+
+def _normalise_application_role_fields(attrs, *, role, payroll_enabled, category):
+    require_classification = bool(payroll_enabled and category == "FULL_PART_TIME")
+
+    if role == "PHARMACIST":
+        attrs["otherstaff_classification_level"] = None
+        attrs["intern_half"] = None
+        attrs["student_year"] = None
+        if require_classification and not attrs.get("pharmacist_award_level"):
+            raise serializers.ValidationError({
+                "pharmacist_award_level": "Pharmacist Award classification is required while ChemistTasker Payroll is enabled."
+            })
+    elif role in ("ASSISTANT", "TECHNICIAN"):
+        attrs["pharmacist_award_level"] = None
+        attrs["intern_half"] = None
+        attrs["student_year"] = None
+        if require_classification and not attrs.get("otherstaff_classification_level"):
+            raise serializers.ValidationError({
+                "otherstaff_classification_level": "Classification level is required while ChemistTasker Payroll is enabled."
+            })
+    elif role == "INTERN":
+        attrs["pharmacist_award_level"] = None
+        attrs["otherstaff_classification_level"] = None
+        attrs["student_year"] = None
+        if require_classification and not attrs.get("intern_half"):
+            raise serializers.ValidationError({
+                "intern_half": "Intern training half is required while ChemistTasker Payroll is enabled."
+            })
+    elif role == "STUDENT":
+        attrs["pharmacist_award_level"] = None
+        attrs["otherstaff_classification_level"] = None
+        attrs["intern_half"] = None
+        if require_classification and not attrs.get("student_year"):
+            raise serializers.ValidationError({
+                "student_year": "Student year is required while ChemistTasker Payroll is enabled."
+            })
+
+
 class MembershipApplicationSerializer(serializers.ModelSerializer):
     invite_link = serializers.PrimaryKeyRelatedField(
-    queryset=MembershipInviteLink.objects.all(),
-    write_only=True
+        queryset=MembershipInviteLink.objects.all(),
+        write_only=True,
     )
     email = serializers.EmailField(required=True, allow_blank=False)
-
-    
-    pharmacy_name = serializers.CharField(source='pharmacy.name', read_only=True)
+    pharmacy_name = serializers.CharField(source="pharmacy.name", read_only=True)
+    payroll_enabled = serializers.BooleanField(source="pharmacy.use_chemisttasker_payroll", read_only=True)
 
     class Meta:
         model = MembershipApplication
         fields = [
-            'id', 'invite_link', 'pharmacy', 'pharmacy_name', 'category',
-            'role', 'first_name', 'last_name', 'username', 'mobile_number', 'date_of_birth', 'job_title',
-            'pharmacist_award_level', 'otherstaff_classification_level',
-            'intern_half', 'student_year', 'email',
-            'submitted_by', 'status', 'submitted_at', 'decided_at', 'decided_by'
+            "id", "invite_link", "pharmacy", "pharmacy_name", "category",
+            "role", "first_name", "last_name", "username", "mobile_number", "date_of_birth", "job_title",
+            "pharmacist_award_level", "otherstaff_classification_level",
+            "intern_half", "student_year", "email",
+            "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
+            "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
+            "approved_membership", "payroll_enabled",
         ]
         read_only_fields = [
-            'id', 'pharmacy', 'pharmacy_name', 'category',
-            'submitted_by', 'status', 'submitted_at', 'decided_at', 'decided_by'
+            "id", "pharmacy", "pharmacy_name", "category",
+            "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
+            "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
+            "approved_membership", "payroll_enabled",
         ]
 
     def validate(self, attrs):
-        request = self.context.get('request')
+        request = self.context.get("request")
         authenticated_user = request.user if request and request.user.is_authenticated else None
-        invite_link = attrs.get('invite_link')
-        role = attrs.get('role')
-        email_value = (attrs.get('email') or '').strip().lower()
-        date_of_birth = attrs.get('date_of_birth')
+        invite_link = attrs.get("invite_link")
+        role = attrs.get("role")
+        email_value = clean_email((attrs.get("email") or "").strip().lower())
+        attrs["email"] = email_value
+        attrs["mobile_number"] = (attrs.get("mobile_number") or "").strip()
+        date_of_birth = attrs.get("date_of_birth")
+
+        if not invite_link:
+            raise serializers.ValidationError({"invite_link": "A valid membership invite link is required."})
         if not date_of_birth:
-            raise serializers.ValidationError({'date_of_birth': 'Date of birth is required.'})
+            raise serializers.ValidationError({"date_of_birth": "Date of birth is required."})
         if date_of_birth > timezone.localdate():
-            raise serializers.ValidationError({'date_of_birth': 'Date of birth cannot be in the future.'})
+            raise serializers.ValidationError({"date_of_birth": "Date of birth cannot be in the future."})
         if date_of_birth < date(1900, 1, 1):
-            raise serializers.ValidationError({'date_of_birth': 'Enter a valid date of birth.'})
+            raise serializers.ValidationError({"date_of_birth": "Enter a valid date of birth."})
+
+        existing_user = User.objects.filter(email__iexact=email_value).first()
+        if existing_user and Membership.objects.filter(user=existing_user, pharmacy=invite_link.pharmacy).exists():
+            raise serializers.ValidationError({
+                "email": "You already have a membership or pending invitation for this pharmacy."
+            })
+
+        pending_key = f"{invite_link.pharmacy_id}:{email_value}"
+        if MembershipApplication.objects.filter(
+            pending_identity_key=pending_key,
+            status="PENDING",
+        ).exists():
+            raise serializers.ValidationError({
+                "email": "An application for this email is already pending with this pharmacy."
+            })
+
+        duplicate_identity = MembershipApplication.objects.filter(
+            pharmacy=invite_link.pharmacy,
+            status="PENDING",
+            mobile_number__iexact=attrs["mobile_number"],
+            date_of_birth=date_of_birth,
+        )
+        if duplicate_identity.exists():
+            raise serializers.ValidationError({
+                "mobile_number": "An application with these identity details is already pending for this pharmacy."
+            })
 
         if authenticated_user:
-            user_role = getattr(authenticated_user, 'role', None)
-            if user_role not in ('PHARMACIST', 'OTHER_STAFF'):
+            user_role = getattr(authenticated_user, "role", None)
+            if user_role not in ("PHARMACIST", "OTHER_STAFF"):
                 raise serializers.ValidationError({
-                    'email': 'Only pharmacist and other staff accounts can submit an authenticated membership application.'
+                    "email": "Only pharmacist and other staff accounts can submit an authenticated membership application."
                 })
 
-            if email_value and email_value != (authenticated_user.email or '').strip().lower():
-                raise serializers.ValidationError({
-                    'email': 'Use the email address on your signed-in account.'
-                })
+            if email_value != (authenticated_user.email or "").strip().lower():
+                raise serializers.ValidationError({"email": "Use the email address on your signed-in account."})
 
             required_user_role = required_user_role_for_membership(role)
             if required_user_role and user_role != required_user_role:
                 role_label = dict(Membership.ROLE_CHOICES).get(role, role)
                 actual_label = dict(User.ROLE_CHOICES).get(user_role, user_role)
                 raise serializers.ValidationError({
-                    'role': f'Your account is registered as {actual_label} and cannot apply as {role_label}.'
+                    "role": f"Your account is registered as {actual_label} and cannot apply as {role_label}."
                 })
 
-            pharmacist_onboard = getattr(authenticated_user, 'pharmacistonboarding', None)
-            otherstaff_onboard = getattr(authenticated_user, 'otherstaffonboarding', None)
+            pharmacist_onboard = getattr(authenticated_user, "pharmacistonboarding", None)
+            otherstaff_onboard = getattr(authenticated_user, "otherstaffonboarding", None)
             onboarding_dob = getattr(
-                pharmacist_onboard if user_role == 'PHARMACIST' else otherstaff_onboard,
-                'date_of_birth',
+                pharmacist_onboard if user_role == "PHARMACIST" else otherstaff_onboard,
+                "date_of_birth",
                 None,
             )
             if onboarding_dob and onboarding_dob != date_of_birth:
                 raise serializers.ValidationError({
-                    'date_of_birth': 'Date of birth must match your verified onboarding profile.'
+                    "date_of_birth": "Date of birth must match your verified onboarding profile."
                 })
-            if user_role == 'OTHER_STAFF' and otherstaff_onboard:
-                onboard_role = getattr(otherstaff_onboard, 'role_type', None)
-                if onboard_role in ('INTERN', 'TECHNICIAN', 'ASSISTANT') and role != onboard_role:
+            if user_role == "OTHER_STAFF" and otherstaff_onboard:
+                onboard_role = getattr(otherstaff_onboard, "role_type", None)
+                if onboard_role in ("INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT") and role != onboard_role:
                     role_label = dict(Membership.ROLE_CHOICES).get(onboard_role, onboard_role)
                     raise serializers.ValidationError({
-                        'role': f'Your account is onboarded as {role_label} and cannot apply as another role.'
+                        "role": f"Your account is onboarded as {role_label} and cannot apply as another role."
                     })
 
             identity_checks = {
-                'first_name': authenticated_user.first_name,
-                'last_name': authenticated_user.last_name,
-                'username': authenticated_user.username,
-                'mobile_number': authenticated_user.mobile_number,
+                "first_name": authenticated_user.first_name,
+                "last_name": authenticated_user.last_name,
+                "username": authenticated_user.username,
+                "mobile_number": authenticated_user.mobile_number,
             }
             for field_name, current_value in identity_checks.items():
-                submitted_value = (attrs.get(field_name) or '').strip()
-                current_value = (current_value or '').strip()
+                submitted_value = (attrs.get(field_name) or "").strip()
+                current_value = (current_value or "").strip()
                 if current_value and submitted_value and submitted_value != current_value:
-                    raise serializers.ValidationError({
-                        field_name: 'Use the value on your signed-in account.'
-                    })
+                    raise serializers.ValidationError({field_name: "Use the value on your signed-in account."})
 
-        username_value = (attrs.get('username') or '').strip()
+        username_value = (attrs.get("username") or "").strip()
         if not username_value:
-            raise serializers.ValidationError({
-                'username': 'Username is required.'
-            })
-        attrs['username'] = username_value
+            raise serializers.ValidationError({"username": "Username is required."})
+        attrs["username"] = username_value
 
-        job_title_value = (attrs.get('job_title') or '').strip()
-        if invite_link and invite_link.category == 'FULL_PART_TIME':
+        job_title_value = (attrs.get("job_title") or "").strip()
+        if invite_link.category == "FULL_PART_TIME":
             if not job_title_value:
-                raise serializers.ValidationError({
-                    'job_title': 'Job title is required for full/part-time applications.'
-                })
+                raise serializers.ValidationError({"job_title": "Job title is required for pharmacy staff applications."})
         else:
-            job_title_value = ''
-        attrs['job_title'] = job_title_value
+            job_title_value = ""
+        attrs["job_title"] = job_title_value
 
-        if role == 'PHARMACIST':
-            attrs['otherstaff_classification_level'] = None
-            attrs['intern_half'] = None
-            attrs['student_year'] = None
-            if not attrs.get('pharmacist_award_level'):
-                raise serializers.ValidationError({
-                    'pharmacist_award_level': 'Pharmacist award level is required for pharmacists.'
-                })
-        elif role in ('ASSISTANT', 'TECHNICIAN'):
-            attrs['pharmacist_award_level'] = None
-            attrs['intern_half'] = None
-            attrs['student_year'] = None
-            if not attrs.get('otherstaff_classification_level'):
-                raise serializers.ValidationError({
-                    'otherstaff_classification_level': 'Classification level is required for assistants and technicians.'
-                })
-        elif role == 'INTERN':
-            attrs['pharmacist_award_level'] = None
-            attrs['otherstaff_classification_level'] = None
-            attrs['student_year'] = None
-            if not attrs.get('intern_half'):
-                raise serializers.ValidationError({
-                    'intern_half': 'Intern half is required for intern pharmacists.'
-                })
-        elif role == 'STUDENT':
-            attrs['pharmacist_award_level'] = None
-            attrs['otherstaff_classification_level'] = None
-            attrs['intern_half'] = None
-            if not attrs.get('student_year'):
-                raise serializers.ValidationError({
-                    'student_year': 'Student year is required for pharmacy students.'
-                })
-
-        return super().validate(attrs)
+        _normalise_application_role_fields(
+            attrs,
+            role=role,
+            payroll_enabled=invite_link.pharmacy.use_chemisttasker_payroll,
+            category=invite_link.category,
+        )
+        return attrs
 
     def create(self, validated_data):
-        request = self.context.get('request')
+        request = self.context.get("request")
         if request and request.user.is_authenticated:
-            validated_data['submitted_by'] = request.user
-        # Freeze category from the link at submission time
-        link = validated_data['invite_link']
-        validated_data['category'] = link.category
-        validated_data['pharmacy'] = link.pharmacy
+            validated_data["submitted_by"] = request.user
+        link = validated_data["invite_link"]
+        validated_data["category"] = link.category
+        validated_data["pharmacy"] = link.pharmacy
+        validated_data["pending_identity_key"] = f"{link.pharmacy_id}:{validated_data['email']}"
+        validated_data["submitted_snapshot"] = _application_snapshot(validated_data)
         return super().create(validated_data)
+
+
+class MembershipApplicationReviewSerializer(serializers.ModelSerializer):
+    pharmacy_name = serializers.CharField(source="pharmacy.name", read_only=True)
+    payroll_enabled = serializers.BooleanField(source="pharmacy.use_chemisttasker_payroll", read_only=True)
+
+    class Meta:
+        model = MembershipApplication
+        fields = [
+            "id", "pharmacy", "pharmacy_name", "category",
+            "role", "first_name", "last_name", "username", "mobile_number", "date_of_birth", "job_title",
+            "pharmacist_award_level", "otherstaff_classification_level",
+            "intern_half", "student_year", "email",
+            "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
+            "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
+            "approved_membership", "payroll_enabled",
+        ]
+        read_only_fields = [
+            "id", "pharmacy", "pharmacy_name", "category",
+            "username", "mobile_number", "date_of_birth", "email",
+            "submitted_by", "status", "submitted_at", "decided_at", "decided_by",
+            "submitted_snapshot", "review_changes", "reviewed_at", "reviewed_by",
+            "approved_membership", "payroll_enabled",
+        ]
+
+    def validate(self, attrs):
+        if self.instance.status != "PENDING":
+            raise serializers.ValidationError({"detail": "Only pending applications can be edited."})
+
+        for field_name in APPLICATION_IDENTIFIER_FIELDS:
+            if field_name in self.initial_data:
+                incoming = self.initial_data.get(field_name)
+                current = _application_snapshot_value(self.instance, field_name)
+                if str(incoming or "") != str(current or ""):
+                    raise serializers.ValidationError({
+                        field_name: "This identifier is locked after the applicant submits the application."
+                    })
+
+        role = attrs.get("role", self.instance.role)
+        merged = {
+            field: attrs.get(field, getattr(self.instance, field, None))
+            for field in APPLICATION_REVIEW_FIELDS
+        }
+        merged["role"] = role
+        merged["job_title"] = (merged.get("job_title") or "").strip()
+
+        if self.instance.category == "FULL_PART_TIME" and not merged["job_title"]:
+            raise serializers.ValidationError({"job_title": "Job title is required for pharmacy staff applications."})
+        if self.instance.category != "FULL_PART_TIME":
+            merged["job_title"] = ""
+
+        worker = self.instance.submitted_by or User.objects.filter(email__iexact=self.instance.email).first()
+        if worker:
+            required_user_role = required_user_role_for_membership(role)
+            if required_user_role and worker.role != required_user_role:
+                raise serializers.ValidationError({
+                    "role": "The reviewed role conflicts with the applicant's ChemistTasker account role."
+                })
+
+        _normalise_application_role_fields(
+            merged,
+            role=role,
+            payroll_enabled=self.instance.pharmacy.use_chemisttasker_payroll,
+            category=self.instance.category,
+        )
+        attrs.update(merged)
+        return attrs
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        changes = []
+        for field in APPLICATION_REVIEW_FIELDS:
+            if field not in validated_data:
+                continue
+            old_value = _application_snapshot_value(instance, field)
+            new_value = validated_data[field]
+            if isinstance(new_value, (date, datetime)):
+                new_value = new_value.isoformat()
+            if old_value != new_value:
+                changes.append({
+                    "field": field,
+                    "from": old_value,
+                    "to": new_value,
+                    "edited_at": timezone.now().isoformat(),
+                    "edited_by_user_id": getattr(getattr(request, "user", None), "id", None),
+                })
+
+        instance = super().update(instance, validated_data)
+        if changes:
+            instance.review_changes = [*(instance.review_changes or []), *changes]
+            instance.reviewed_at = timezone.now()
+            instance.reviewed_by = request.user if request and request.user.is_authenticated else None
+            instance.save(update_fields=["review_changes", "reviewed_at", "reviewed_by"])
+        return instance
 
 
 class PharmacyAdminSerializer(serializers.ModelSerializer):

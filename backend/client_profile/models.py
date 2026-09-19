@@ -770,6 +770,13 @@ class Pharmacy(models.Model):
     # Employment & roles
     employment_types       = models.JSONField(default=list, blank=True)
     roles_needed           = models.JSONField(default=list, blank=True)
+    use_chemisttasker_payroll = models.BooleanField(
+        default=False,
+        help_text=(
+            "Opt in to ChemistTasker payroll. When disabled, roster and attendance still "
+            "produce timesheets without requiring Award classifications or pay rates."
+        ),
+    )
 
     # Default shift rate settings
     default_rate_type      = models.CharField(
@@ -1323,6 +1330,27 @@ class MembershipApplication(models.Model):
 
     submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='membership_applications')
 
+    # Canonical application/audit state. The application is the review record only;
+    # accepted staff data lives on User + Membership rather than being copied again.
+    pending_identity_key = models.CharField(max_length=320, unique=True, null=True, blank=True, editable=False)
+    submitted_snapshot = models.JSONField(default=dict, blank=True)
+    review_changes = models.JSONField(default=list, blank=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='membership_applications_reviewed',
+    )
+    approved_membership = models.ForeignKey(
+        'Membership',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='source_applications',
+    )
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     submitted_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(blank=True, null=True)
@@ -1331,6 +1359,7 @@ class MembershipApplication(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['pharmacy', 'status']),
+            models.Index(fields=['pharmacy', 'email', 'status']),
         ]
 
     def __str__(self):
