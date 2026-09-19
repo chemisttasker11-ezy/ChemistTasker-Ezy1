@@ -32,7 +32,7 @@ from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
     make_super_document, record_payment, check_version, json_safe,
     invoice_defaults, internal_invoice_sources, internal_invoice_prefill,
-    record_revision_state, serialize_revision, owner_visible_document,
+    record_revision_state, serialize_revision, serialize_owner_revision, owner_visible_document,
 )
 
 logger = logging.getLogger(__name__)
@@ -388,7 +388,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             raise Http404
         if revision.version == record.version and owner_visible_document(record) is None:
             raise Http404
-        return Response(serialize_revision(record, revision))
+        return Response(serialize_owner_revision(record, revision))
 
     @action(detail=True, methods=['get'], url_path=r'revisions/(?P<version>\d+)/pdf')
     def revision_pdf(self, request, pk=None, version=None):
