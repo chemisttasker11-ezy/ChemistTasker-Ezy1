@@ -1,7 +1,7 @@
 /** Worker finance uses the same base URL, credentials and token provider as core API. */
 export type FinanceTaxCode = 'GST' | 'GST_FREE' | 'INPUT_TAXED' | 'OUT_OF_SCOPE';
 export type FinanceCategory = 'ProfessionalServices' | 'Superannuation' | 'Transportation' | 'Accommodation' | 'Miscellaneous';
-export type FinanceUnit = 'Hours' | 'Lump Sum' | 'Item' | 'Kilometres' | 'Nights';
+export type FinanceUnit = string;
 export type FinanceMoney = string;
 export interface FinanceConfig {
   baseURL: string;
@@ -18,7 +18,7 @@ export interface FinanceItem {
   unit_price: FinanceMoney; tax_code: FinanceTaxCode; super_eligible: boolean; active: boolean;
 }
 export interface FinanceLine {
-  item_id: number; description?: string; quantity: string; unit_price: FinanceMoney;
+  item_id?: number | null; description?: string; quantity: string; unit_price: FinanceMoney;
   discount: string; tax_code?: FinanceTaxCode; super_eligible?: boolean; worked_on?: string | null;
   category_code?: FinanceCategory; unit?: FinanceUnit;
   locked?: boolean; source_assignment_id?: number | null; shift_id?: number | null;
@@ -30,6 +30,7 @@ export interface FinanceDraft {
   super_rate: string; super_confirmed: boolean; bank_account_name: string; bsb: string; account_number: string;
   super_fund_name: string; super_usi: string; super_member_number: string; reference: string; notes: string;
   lines: FinanceLine[];
+  source_assignment_ids?: number[];
   customer?: Pick<FinanceCustomer, 'name' | 'legal_name' | 'address' | 'abn' | 'email' | 'contact_name'>;
 }
 export interface FinanceCalculation {
@@ -40,9 +41,23 @@ export interface FinanceInvoice {
   id: number; invoice_id: number; number: string; version: number; request_key: string;
   kind: 'invoice' | 'super_request'; source: 'external' | 'internal'; payload: FinanceDraft;
   calculation: FinanceCalculation; source_snapshot?: Record<string, unknown>;
-  locked: boolean; voided: boolean; status: 'draft' | 'sent' | 'paid' | 'void';
+  locked: boolean; editable?: boolean; voided: boolean; status: 'draft' | 'sent' | 'paid' | 'void';
+  review_status?: 'NONE' | 'APPROVED_FOR_PAYMENT' | 'REVISION_REQUESTED';
+  last_review_note?: string; last_reviewed_at?: string | null;
   delivery_status: string | null; paid: string; balance: string; super_document_id: number | null;
   payments: { id: number; date: string; amount: string; reference: string }[];
+  revisions?: Array<{ version: number; invoice_status: string; review_status: string; created_at: string; calculation: FinanceCalculation }>;
+  review_requests?: Array<{ id: number; requested_version: number; note: string; requested_by_name: string; created_at: string; resolved_at: string | null; resolved_by_version: number | null }>;
+}
+export interface FinanceInvoiceDefaults {
+  issuer_name: string; issuer_abn: string; issuer_address: string; gst_registered: boolean;
+  bank_account_name: string; bsb: string; account_number: string;
+  super_fund_name: string; super_usi: string; super_member_number: string; super_rate: string;
+}
+export interface FinanceInternalSource {
+  assignment_id: number; shift_id: number; slot_id: number; date: string; start_time: string; end_time: string;
+  hours: string; rate: string;
+  pharmacy: { id: number; name: string; abn: string; legal_name: string; email: string; address: string };
 }
 export interface FinanceExpense {
   id: number; request_key: string; version: number; supplier: string; description: string; category: string;
@@ -120,6 +135,11 @@ export const finance = {
   saveItem: (value: FinanceItemInput, id?: number) => request<FinanceItem>(`items/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
   seedItems: () => request<{ detail: string }>('items/seed/', 'POST', {}),
   invoices: () => listAll<FinanceInvoice>('invoices/'),
+  receivedInvoices: () => listAll<FinanceInvoice>('received-invoices/'),
+  receivedInvoice: (id: number) => request<FinanceInvoice>(`received-invoices/${id}/`),
+  invoiceDefaults: () => request<FinanceInvoiceDefaults>('invoices/defaults/'),
+  internalSources: () => request<FinanceInternalSource[]>('invoices/internal-sources/'),
+  internalPrefill: (assignment_ids: number[]) => request<FinanceDraft>('invoices/internal-prefill/', 'POST', { assignment_ids }),
   invoice: (id: number) => request<FinanceInvoice>(`invoices/${id}/`),
   saveInvoice: (value: FinanceDraft, id?: number) => request<FinanceInvoice>(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
   preview: (value: FinanceDraft) => request<FinanceCalculation>('invoices/preview/', 'POST', value),
@@ -127,6 +147,11 @@ export const finance = {
   issue: (id: number, version: number) => request<FinanceInvoice>(`invoices/${id}/issue/`, 'POST', { version, confirmed: true }),
   superDocument: (id: number, version: number) => request<FinanceInvoice>(`invoices/${id}/super-document/`, 'POST', { version }),
   send: (id: number, version: number) => request<{ detail: string; document: FinanceInvoice }>(`invoices/${id}/send/`, 'POST', { version, confirmed: true }),
+  markPaid: (id: number, version?: number) => request<FinanceInvoice>(`invoices/${id}/mark-paid/`, 'POST', version == null ? {} : { version }),
+  requestRevision: (id: number, note: string) => request<FinanceInvoice>(`received-invoices/${id}/request-revision/`, 'POST', { note }),
+  approveForPayment: (id: number, note = '') => request<FinanceInvoice>(`received-invoices/${id}/approve-payment/`, 'POST', { note }),
+  markReceivedPaid: (id: number, note = '') => request<FinanceInvoice>(`received-invoices/${id}/mark-paid/`, 'POST', { note }),
+  receivedPdf: (id: number) => request<Blob>(`received-invoices/${id}/pdf/`, 'GET', undefined, true),
   payment: (id: number, value: { request_key: string; date: string; amount: string; reference: string; fund_payment_confirmed: boolean }) => request<FinanceInvoice>(`invoices/${id}/payments/`, 'POST', value),
   pdf: (id: number) => request<Blob>(`invoices/${id}/pdf/`, 'GET', undefined, true),
   expenses: () => listAll<FinanceExpense>('expenses/'),
