@@ -140,6 +140,7 @@ def _serialize_pay_engagement(row: EmploymentEngagement):
         "award_source_url": row.award_source_url,
         "award_effective_from": str(row.award_effective_from) if row.award_effective_from else None,
         "award_rate_snapshot": row.award_rate_snapshot,
+        "adult_rate_confirmed": row.award_rate_snapshot.get("adult_rate_confirmed"),
         "ordinary_hours_pattern": row.ordinary_hours_pattern,
         "correspondence": correspondence,
         "rates": {
