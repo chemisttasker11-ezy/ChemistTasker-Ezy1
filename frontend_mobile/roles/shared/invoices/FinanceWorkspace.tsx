@@ -8,14 +8,16 @@ import FinanceInvoiceEditor from './FinanceInvoiceEditor';
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
 const key = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const n = Math.floor(Math.random() * 16); return (c === 'x' ? n : (n & 3) | 8).toString(16); });
-const tabs = ['Invoices', 'Customers', 'Items', 'Expenses', 'GST / BAS', 'Existing tools'];
+const workerTabs = ['Invoices', 'Customers', 'Items', 'Expenses', 'GST / BAS', 'Existing tools'];
+const ownerTabs = ['Received', 'Existing tools'];
 type Form = { title: string; fields: Record<string, string>; booleans: Record<string, boolean>; save: (fields: Record<string, string>, flags: Record<string, boolean>) => Promise<unknown> };
 
-export default function FinanceWorkspace({ existingTools }: { existingTools?: ReactNode }) {
+export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: ReactNode; receivedMode?: boolean }) {
   const theme = useTheme();
-  const [tab, setTab] = useState('Invoices'); const [search, setSearch] = useState(''); const [status, setStatus] = useState('All');
+  const tabs = receivedMode ? ownerTabs : workerTabs;
+  const [tab, setTab] = useState(receivedMode ? 'Received' : 'Invoices'); const [search, setSearch] = useState(''); const [status, setStatus] = useState('All');
   const [customers, setCustomers] = useState<FinanceCustomer[]>([]); const [items, setItems] = useState<FinanceItem[]>([]);
-  const [invoices, setInvoices] = useState<FinanceInvoice[]>([]); const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
+  const [invoices, setInvoices] = useState<FinanceInvoice[]>([]); const [receivedInvoices, setReceivedInvoices] = useState<FinanceInvoice[]>([]); const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const running = useRef(false); const [error, setError] = useState('');
   const [editor, setEditor] = useState<{ invoice?: FinanceInvoice; key: string } | null>(null);
   const [form, setForm] = useState<Form | null>(null); const [formError, setFormError] = useState('');
@@ -23,9 +25,13 @@ export default function FinanceWorkspace({ existingTools }: { existingTools?: Re
   const [start, setStart] = useState(`${financeToday().slice(0, 4)}-01-01`); const [end, setEnd] = useState(financeToday());
   const [basis, setBasis] = useState<'cash' | 'accrual'>('cash'); const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
   const load = useCallback(async () => {
+    if (receivedMode) {
+      setReceivedInvoices(await finance.receivedInvoices());
+      return;
+    }
     const [c, i, inv, e] = await Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]);
     setCustomers(c); setItems(i); setInvoices(inv); setExpenses(e);
-  }, []);
+  }, [receivedMode]);
   useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
   const afterSave = async () => { try { await load(); } catch { setError('Saved. Pull to refresh to update the list.'); } };
@@ -45,10 +51,20 @@ export default function FinanceWorkspace({ existingTools }: { existingTools?: Re
     setFormError(''); setForm({ title: 'Expense details', fields: { supplier: value.supplier, description: value.description, category: value.category, incurred_on: value.incurred_on, paid_on: value.paid_on || '', amount: value.amount, gst_amount: value.gst_amount, tax_code: value.tax_code, business_use_percent: value.business_use_percent, reference: value.reference, notes: value.notes }, booleans: { gst_registered: value.gst_registered, evidence_confirmed: value.evidence_confirmed, reimbursable: value.reimbursable }, save: (fields, flags) => finance.saveExpense({ ...value, ...fields, ...flags, paid_on: fields.paid_on || null } as FinanceExpenseInput, initial?.id) });
   };
   const paymentForm = (invoice: FinanceInvoice) => { const requestKey = key(); setSelected(null); setFormError(''); setForm({ title: `Record payment · ${invoice.number}`, fields: { amount: invoice.balance, date: financeToday(), reference: '' }, booleans: invoice.kind === 'super_request' ? { fund_payment_confirmed: false } : {}, save: (fields, flags) => finance.payment(invoice.id, { request_key: requestKey, date: fields.date, amount: fields.amount, reference: fields.reference, fund_payment_confirmed: !!flags.fund_payment_confirmed }) }); };
+  const reviewForm = (invoice: FinanceInvoice, kind: 'approve' | 'revise' | 'paid') => {
+    setSelected(null); setFormError('');
+    setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: {}, save: async fields => {
+      const note = fields.note.trim();
+      if (kind === 'revise' && !note) throw new Error('Add a revision note for the contractor.');
+      if (kind === 'revise') return finance.requestRevision(invoice.id, note);
+      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, note);
+      return finance.approveForPayment(invoice.id, note);
+    }});
+  };
   const closeForm = () => { if (!busy) Alert.alert('Discard changes?', 'Unsaved changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => setForm(null) }]); };
   if (editor) return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}><FinanceInvoiceEditor requestKey={editor.key} initial={editor.invoice} previous={invoices.find(i => i.kind === 'invoice')} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={afterSave} /></SafeAreaView>;
-  const fieldOptions: Record<string, string[]> = { tax_code: ['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'], unit: ['Hours', 'Lump Sum', 'Item', 'Kilometres', 'Nights'], ...(form?.title.includes('item') ? { category: ['ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous'] } : {}) };
-  const labels: Record<string, string> = { name: 'Name', legal_name: 'Legal entity name', abn: 'ABN', contact_name: 'Accounts contact', email: 'Invoice email', phone: 'Phone', address: 'Billing address', payment_terms_days: 'Payment terms (days)', notes: 'Notes', active: 'Active', code: 'Item code', category: 'Category', unit: 'Unit', unit_price: 'Unit price (AUD)', tax_code: 'Tax treatment', super_eligible: 'Include in reviewed super base', supplier: 'Supplier', description: 'Description', incurred_on: 'Incurred date (YYYY-MM-DD)', paid_on: 'Paid date (YYYY-MM-DD, optional)', amount: 'Amount (AUD)', gst_amount: 'Actual GST (AUD)', business_use_percent: 'Business use %', reference: 'Reference', gst_registered: 'I am registered for GST for this acquisition', evidence_confirmed: 'I hold the required tax invoice / evidence', reimbursable: 'Potentially reimbursable', fund_payment_confirmed: 'Payment went to the super fund', date: 'Payment date (YYYY-MM-DD)' };
+  const fieldOptions: Record<string, string[]> = { tax_code: ['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'], ...(form?.title.toLowerCase().includes('item') ? { category: ['ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous'] } : {}) };
+  const labels: Record<string, string> = { name: 'Name', legal_name: 'Legal entity name', abn: 'ABN', contact_name: 'Accounts contact', email: 'Invoice email', phone: 'Phone', address: 'Billing address', payment_terms_days: 'Payment terms (days)', notes: 'Notes', active: 'Active', code: 'Item code (optional)', category: 'Category', unit: 'Unit', unit_price: 'Unit price (AUD)', tax_code: 'Tax treatment', super_eligible: 'Include in reviewed super base', supplier: 'Supplier', description: 'Description', incurred_on: 'Incurred date (YYYY-MM-DD)', paid_on: 'Paid date (YYYY-MM-DD, optional)', amount: 'Amount (AUD)', gst_amount: 'Actual GST (AUD)', business_use_percent: 'Business use %', reference: 'Reference', gst_registered: 'I am registered for GST for this acquisition', evidence_confirmed: 'I hold the required tax invoice / evidence', reimbursable: 'Potentially reimbursable', fund_payment_confirmed: 'Payment went to the super fund', date: 'Payment date (YYYY-MM-DD)' };
   return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: theme.colors.background }}>
     <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}><Text variant="titleLarge" style={{ flex: 1, fontWeight: '700' }}>Invoices & finances</Text><IconButton icon="plus" accessibilityLabel="Create invoice" disabled={loading || busy} onPress={() => setEditor({ key: key() })} /></View>
     <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>{tabs.filter(t => t !== 'Existing tools' || existingTools).map(t => <Chip key={t} selected={tab === t} onPress={() => { setTab(t); setSearch(''); }}>{t}</Chip>)}</ScrollView></View>
