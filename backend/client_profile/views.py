@@ -55,6 +55,7 @@ from client_profile.utils import (
 from client_profile.notifications import mark_notifications_read, broadcast_message_read, broadcast_message_badge, notify_users
 from client_profile.shift_notifications import notify_shift_managers, notify_shift_users
 from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
+from client_profile.engagement_routing import staff_assignment_defaults
 from django.utils.crypto import get_random_string
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
@@ -4916,9 +4917,13 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         candidate = get_object_or_404(User, pk=user_id)
         membership = Membership.objects.filter(user=candidate, pharmacy=shift.pharmacy).first()
 
-        # Optionally: keep employment_type check or adjust as needed
-        if not membership or membership.employment_type not in ['FULL_TIME', 'PART_TIME']:
-            return Response({"detail": "Only Full/Part-Time employees can be rostered to this slot."}, status=400)
+        if not membership or membership.employment_type not in ['FULL_TIME', 'PART_TIME', 'CASUAL']:
+            return Response({
+                "detail": (
+                    "Only direct full-time, part-time or casual pharmacy staff can be rostered here. "
+                    "Locum, Shift Hero and external workers must accept a shift offer."
+                )
+            }, status=400)
 
         assignment_ids = []
 
@@ -4932,6 +4937,17 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
             slot = get_object_or_404(shift.slots, pk=slot_id)
 
+            try:
+                assignment_defaults = staff_assignment_defaults(
+                    user=candidate,
+                    pharmacy=shift.pharmacy,
+                    work_date=slot_date,
+                )
+            except DjangoValidationError as exc:
+                return Response(
+                    getattr(exc, "message_dict", {"detail": exc.messages}),
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             assn, _ = ShiftSlotAssignment.objects.update_or_create(
                 slot=slot,
                 slot_date=slot_date,
@@ -4940,7 +4956,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                     "user": candidate,
                     "unit_rate": Decimal('0.00'),
                     "rate_reason": {"source": "Rostered manual assign"},
-                    "is_rostered": True
+                    "is_rostered": True,
+                    **assignment_defaults,
                 }
             )
             assignment_ids.append(assn.id)
@@ -5189,6 +5206,17 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         # --- 3. Tier eligibility check ---
         allowed_ftpt = {'FULL_TIME', 'PART_TIME', 'CASUAL'}
         allowed_locum = {'LOCUM', 'SHIFT_HERO'}
+
+        if membership and membership.employment_type in allowed_locum:
+            return Response(
+                {
+                    "detail": (
+                        "Locum and Shift Hero workers must express interest and accept the final shift offer "
+                        "so ABN/TFN engagement terms are recorded before assignment."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if shift.visibility == 'FULL_PART_TIME':
             ok = membership and membership.employment_type in allowed_ftpt
@@ -6974,6 +7002,16 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     user=newly_assigned_user,
                     override_date=slot_date
                 )
+                try:
+                    assignment_defaults = staff_assignment_defaults(
+                        user=newly_assigned_user,
+                        pharmacy=shift_instance.pharmacy,
+                        work_date=slot_date,
+                    )
+                except DjangoValidationError as exc:
+                    raise DRFValidationError(
+                        getattr(exc, "message_dict", {"detail": exc.messages})
+                    ) from exc
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot_date,
@@ -6983,6 +7021,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                         'unit_rate': rate,
                         'rate_reason': rate_reason,
                         'is_rostered': True,
+                        **assignment_defaults,
                     }
                 )
 
@@ -7221,11 +7260,22 @@ class CreateShiftAndAssignView(APIView):
         if not has_permission:
             return Response({'detail': 'Permission denied: Not authorized to create shifts for this pharmacy.'}, status=status.HTTP_403_FORBIDDEN)
 
+        try:
+            assignment_defaults = staff_assignment_defaults(
+                user=candidate_user,
+                pharmacy=pharmacy,
+                work_date=slot_date,
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                getattr(exc, "message_dict", {"detail": exc.messages}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         shift_data = {
             "pharmacy": pharmacy,
             "role_needed": role_needed,
-            # Use LOCUM to bypass FT/PT pay-band validation for roster-created slots
-            "employment_type": "LOCUM",
+            "employment_type": assignment_defaults["engagement_terms_snapshot"]["employment_type"],
             "visibility": "FULL_PART_TIME",
             "single_user_only": True,
             "created_by": requesting_user,
@@ -7259,7 +7309,8 @@ class CreateShiftAndAssignView(APIView):
             user=candidate_user,
             unit_rate=rate,
             rate_reason=rate_reason,
-            is_rostered=True
+            is_rostered=True,
+            **assignment_defaults,
         )
 
         notify_shift_users(
