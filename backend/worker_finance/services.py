@@ -382,6 +382,10 @@ def _record_revision(record):
     )
 
 
+def record_revision_state(record):
+    _record_revision(record)
+
+
 def write_canonical(record):
     """Write the current editable invoice while preserving source identity."""
     invoice, data, calc = record.invoice, record.payload, record.calculation
@@ -576,6 +580,8 @@ def save_draft(owner, data, record_id=None, source="external"):
             owner=owner,
         )
         check_version(record, data.get("version"))
+        # Capture the outgoing live state before creating the next revision.
+        _record_revision(record)
         if record.voided_at or record.kind != "invoice":
             raise ValidationError("Only active service invoices can be edited.")
         if str(record.request_key) != str(data["request_key"]):
@@ -685,7 +691,7 @@ def serialize_record(record):
     payments = list(record.payments.all())
     paid = sum((payment.amount for payment in payments), ZERO)
     invoice = record.invoice
-    delivery = next(iter(record.deliveries.all()), None)
+    delivery = record.deliveries.filter(version=record.version).first()
     companion = getattr(record, "super_document", None)
     revisions = list(record.revisions.all()[:20])
     requests = list(record.review_requests.select_related("requested_by").all()[:20])
