@@ -2470,11 +2470,15 @@ class MembershipViewSet(viewsets.ModelViewSet):
             except Pharmacy.DoesNotExist:
                 return None, 'Pharmacy not found.'
 
-            if MembershipApplication.objects.filter(
+            source_application_id = data.get('source_application_id')
+            pending_application_qs = MembershipApplication.objects.filter(
                 pharmacy=pharmacy,
                 email__iexact=email,
                 status="PENDING",
-            ).exists():
+            )
+            if source_application_id:
+                pending_application_qs = pending_application_qs.exclude(pk=source_application_id)
+            if pending_application_qs.exists():
                 return None, (
                     "This person already has a pending membership application for this pharmacy. "
                     "Review that application instead of creating a duplicate invitation."
@@ -3098,6 +3102,7 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
                     'intern_half': app.intern_half,
                     'student_year': app.student_year,
                     'activate_immediately': True,
+                    'source_application_id': app.id,
                 }
 
                 membership, error = MembershipViewSet()._create_membership_invite(
