@@ -59,36 +59,36 @@ export const formatTimeValue = (hours: number, minutes: number) =>
     `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 
 export const normalizeCoord = (value: number | null) => {
-    if (value == null || Number.isNaN(value)) return null;
+    if (value === null || value === undefined) return value;
     const rounded = Number(value.toFixed(6));
-    return Object.is(rounded, -0) ? 0 : rounded;
+    return Number.isFinite(rounded) ? rounded : value;
 };
 
 export const formatApiError = (data: any) => {
     if (!data) return '';
     if (typeof data === 'string') return data;
-    if (typeof data.detail === 'string') return data.detail;
-    return Object.entries(data)
-        .flatMap(([key, value]) => {
-            if (Array.isArray(value)) {
-                return value.map((item) => `${key}: ${String(item)}`);
-            }
-            if (value != null && typeof value !== 'object') {
-                return [`${key}: ${String(value)}`];
-            }
-            return [];
-        })
-        .join('\n');
+    if (data.detail && typeof data.detail === 'string') return data.detail;
+    if (Array.isArray(data)) return data.join('\n');
+    if (typeof data === 'object') {
+        return Object.entries(data)
+            .map(([key, value]) => {
+                if (Array.isArray(value)) return `${key}: ${value.join(' ')}`;
+                if (typeof value === 'string') return `${key}: ${value}`;
+                return `${key}: ${JSON.stringify(value)}`;
+            })
+            .join('\n');
+    }
+    return String(data);
 };
 
 export const formatDate = (value?: string | null) => {
-    if (!value) return 'Not checked';
+    if (!value) return '-';
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 };
 
 export const formatDateTime = (value?: string | null) => {
-    if (!value) return 'Not checked';
+    if (!value) return '-';
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 };
