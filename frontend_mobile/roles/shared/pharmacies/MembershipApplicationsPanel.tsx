@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
     Card,
+    Chip,
     Text,
     Button,
     ActivityIndicator,
@@ -114,6 +115,28 @@ export default function MembershipApplicationsPanel({
     const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
         (app as any)?.[camelKey] ?? (app as any)?.[snakeKey] ?? '';
 
+    const paymentProfile = (app: MembershipApplication) =>
+        ((app as any)?.paymentProfileStatus ?? (app as any)?.payment_profile_status ?? null) as null | {
+            paymentPreference?: string | null;
+            payrollReady?: boolean;
+            invoiceReady?: boolean;
+            missingFields?: string[];
+            status?: string;
+        };
+
+    const paymentLabel = (profile: ReturnType<typeof paymentProfile>) => {
+        if (!profile) return 'Payment profile unavailable';
+        if (profile.paymentPreference === 'TFN') {
+            return profile.payrollReady ? 'TFN · payroll ready' : 'TFN · payroll setup incomplete';
+        }
+        if (profile.paymentPreference === 'ABN') {
+            return profile.invoiceReady ? 'ABN · invoice ready' : 'ABN · invoice setup incomplete';
+        }
+        if (profile.status === 'ACCOUNT_NOT_LINKED') return 'Worker account not linked';
+        if (profile.status === 'ONBOARDING_INCOMPLETE') return 'Worker onboarding incomplete';
+        return 'Payment preference required';
+    };
+
     const loadApplications = async () => {
         setLoading(true);
         setLoadError('');
@@ -184,6 +207,9 @@ export default function MembershipApplicationsPanel({
                     const username = readValue(app, 'username', 'username');
                     const jobTitle = readValue(app, 'jobTitle', 'job_title');
                     const mobileNumber = readValue(app, 'mobileNumber', 'mobile_number');
+                    const dateOfBirth = readValue(app, 'dateOfBirth', 'date_of_birth');
+                    const profile = paymentProfile(app);
+                    const payrollEnabled = Boolean((app as any)?.payrollEnabled ?? (app as any)?.payroll_enabled);
                     const classification =
                         readValue(app, 'pharmacistAwardLevel', 'pharmacist_award_level') ||
                         readValue(app, 'otherstaffClassificationLevel', 'otherstaff_classification_level') ||
@@ -205,7 +231,19 @@ export default function MembershipApplicationsPanel({
                                     {username ? <Text style={styles.detailText}>Username: {username}</Text> : null}
                                     {jobTitle ? <Text style={styles.detailText}>Job title: {jobTitle}</Text> : null}
                                     {mobileNumber ? <Text style={styles.detailText}>Mobile: {mobileNumber}</Text> : null}
+                                    {dateOfBirth ? <Text style={styles.detailText}>Date of birth: {dateOfBirth}</Text> : null}
                                     {classification ? <Text style={styles.detailText}>Classification: {classification}</Text> : null}
+                                    <View style={styles.chipRow}>
+                                        <Chip compact>{paymentLabel(profile)}</Chip>
+                                        {app.category === 'FULL_PART_TIME' ? (
+                                            <Chip compact>{payrollEnabled ? 'ChemistTasker Payroll on' : 'External payroll'}</Chip>
+                                        ) : null}
+                                    </View>
+                                    {profile?.missingFields?.length ? (
+                                        <Text style={styles.warningText}>
+                                            Payment setup still needed: {profile.missingFields.map((field) => field.replaceAll('_', ' ')).join(', ')}
+                                        </Text>
+                                    ) : null}
                                 </View>
 
                                 <View style={styles.actions}>
@@ -306,10 +344,22 @@ const styles = StyleSheet.create({
     },
     details: {
         marginBottom: 12,
+        gap: 4,
     },
     detailText: {
         fontSize: 14,
         marginBottom: 4,
+    },
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 4,
+    },
+    warningText: {
+        fontSize: 13,
+        color: '#92400E',
+        marginTop: 4,
     },
     actions: {
         flexDirection: 'row',
