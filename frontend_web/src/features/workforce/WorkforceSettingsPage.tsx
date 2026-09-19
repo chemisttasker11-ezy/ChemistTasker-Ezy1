@@ -14,20 +14,24 @@ import {
   Paper,
   Select,
   Stack,
+  Switch,
+  FormControlLabel,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from '@mui/material';
 import { STAFF_ROLE_OPTIONS, fetchPharmaciesService } from '@chemisttasker/shared-core';
-import type { WorkforceWorkSettings } from '@chemisttasker/shared-core';
+import type { WorkforcePayrollConfiguration, WorkforceWorkSettings } from '@chemisttasker/shared-core';
 import EmploymentEngagementsPanel from './EmploymentEngagementsPanel';
 import {
   createCoverageRequirement,
   deleteCoverageRequirement,
+  getPayrollConfiguration,
   listCoverageRequirements,
   listWorkSettings,
   saveWorkSettings,
+  updatePayrollConfiguration,
 } from './api';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -38,6 +42,8 @@ export default function WorkforceSettingsPage() {
   const [tab, setTab] = useState(0);
   const [coverage, setCoverage] = useState<any[]>([]);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
+  const [payrollConfig, setPayrollConfig] = useState<WorkforcePayrollConfiguration | null>(null);
+  const [payrollSaving, setPayrollSaving] = useState(false);
   const [error, setError] = useState('');
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [coverageForm, setCoverageForm] = useState({ weekday: 0, start_time: '08:00', end_time: '18:00', role: 'PHARMACIST', minimum_staff: 1 });
@@ -54,9 +60,14 @@ export default function WorkforceSettingsPage() {
     if (!pharmacyId) return;
     setError('');
     try {
-      const [coverageRows, staffRows] = await Promise.all([listCoverageRequirements(pharmacyId), listWorkSettings(pharmacyId)]);
+      const [coverageRows, staffRows, payroll] = await Promise.all([
+        listCoverageRequirements(pharmacyId),
+        listWorkSettings(pharmacyId),
+        getPayrollConfiguration(pharmacyId),
+      ]);
       setCoverage(coverageRows);
       setStaff(staffRows);
+      setPayrollConfig(payroll);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to load workforce settings.');
     }
@@ -84,6 +95,51 @@ export default function WorkforceSettingsPage() {
         </Box>
         <FormControl size="small" sx={{ maxWidth: 320 }}><InputLabel>Pharmacy</InputLabel><Select value={pharmacyId ?? ''} label="Pharmacy" onChange={(e) => setPharmacyId(Number(e.target.value))}>{pharmacies.map((row) => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</Select></FormControl>
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+
+        {pharmacyId && payrollConfig && (
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+            <Stack spacing={1.5}>
+              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2} alignItems={{ md: 'center' }}>
+                <Box>
+                  <Typography fontWeight={900}>Use ChemistTasker Payroll</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Optional. Leave this off while you continue using your existing payroll system; ChemistTasker will still manage rosters, attendance and timesheets.
+                  </Typography>
+                </Box>
+                <FormControlLabel
+                  control={(
+                    <Switch
+                      checked={payrollConfig.use_chemisttasker_payroll}
+                      disabled={payrollSaving}
+                      onChange={async (_, checked) => {
+                        setPayrollSaving(true);
+                        setError('');
+                        try {
+                          const next = await updatePayrollConfiguration(pharmacyId, checked);
+                          setPayrollConfig(next);
+                        } catch (err: any) {
+                          setError(err?.message || 'Unable to update payroll configuration.');
+                        } finally {
+                          setPayrollSaving(false);
+                        }
+                      }}
+                    />
+                  )}
+                  label={payrollConfig.use_chemisttasker_payroll ? 'Enabled' : 'Disabled'}
+                />
+              </Stack>
+              {payrollConfig.use_chemisttasker_payroll ? (
+                <Alert severity="info">
+                  <strong>Before ChemistTasker processes payroll:</strong> each TFN staff member needs dated employment terms with employment type, Award classification and Award/above-award rates; part-time staff also need agreed ordinary hours. The worker must complete TFN and super fund name, USI and member number in onboarding. ABN workers continue through invoicing.
+                </Alert>
+              ) : (
+                <Alert severity="success">
+                  Timesheet-only mode: Award classifications and ChemistTasker pay rates are not required. Approved hours remain available for export/hand-off to your existing payroll process. ABN shift workers continue through invoicing.
+                </Alert>
+              )}
+            </Stack>
+          </Paper>
+        )}
         <Paper variant="outlined" sx={{ borderRadius: 3 }}>
           <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" /><Tab label="Contracted hours" /><Tab label="Employment & pay" /></Tabs>
           <Box sx={{ p: 2 }}>
@@ -97,7 +153,13 @@ export default function WorkforceSettingsPage() {
               {staff.map((row) => <Paper key={row.membership_id} variant="outlined" sx={{ p: 1.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}><Box flex={1}><Typography fontWeight={800}>{row.worker_name}</Typography><Typography variant="body2" color="text.secondary">{row.role} · {row.employment_type}</Typography></Box><TextField size="small" label="Contracted h/week" defaultValue={row.contracted_weekly_minutes == null ? '' : (row.contracted_weekly_minutes / 60).toFixed(2)} onBlur={(e) => saveHours(row.membership_id, e.target.value)} sx={{ width: 190 }} /></Stack></Paper>)}
             </Stack>}
             {tab === 2 && pharmacyId && (
-              <EmploymentEngagementsPanel pharmacyId={pharmacyId} staff={staff} />
+              payrollConfig?.use_chemisttasker_payroll ? (
+                <EmploymentEngagementsPanel pharmacyId={pharmacyId} staff={staff} />
+              ) : (
+                <Alert severity="info">
+                  ChemistTasker Payroll is currently disabled for this pharmacy, so employment pay rates and Award classifications are optional and are not required to roster staff. Enable payroll above when you are ready to move payroll calculations into ChemistTasker.
+                </Alert>
+              )
             )}
           </Box>
         </Paper>
