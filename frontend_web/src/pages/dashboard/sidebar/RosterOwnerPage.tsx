@@ -72,63 +72,18 @@ import {
   approveWorkerShiftRequestService,
   rejectWorkerShiftRequestService,
 } from '@chemisttasker/shared-core';
+import {
+  DEFAULT_ESCALATION_LEVELS,
+  getVisibilityLabel,
+  type OpenShiftViewModel,
+  type AssignmentViewModel,
+  type ShiftForEdit,
+  ROLES,
+  ALL_STAFF,
+  LEAVE_TYPES_MAP,
+} from './RosterOwnerPage.model';
 
 const localizer = momentLocalizer(moment);
-
-const DEFAULT_ESCALATION_LEVELS = [
-  'FULL_PART_TIME',
-  'LOCUM_CASUAL',
-  'OWNER_CHAIN',
-  'ORG_CHAIN',
-  'PLATFORM',
-];
-
-const getVisibilityLabel = (visibility?: string | null) => {
-  switch (visibility) {
-    case 'FULL_PART_TIME': return 'Full/Part Time';
-    case 'LOCUM_CASUAL': return 'Locum/Casual';
-    case 'OWNER_CHAIN': return 'Owner Chain';
-    case 'ORG_CHAIN': return 'Organization Chain';
-    case 'PLATFORM': return 'ChemistTasker';
-    default: return 'ChemistTasker';
-  }
-};
-
-type OpenShiftViewModel = OpenShift & {
-  visibility?: string | null;
-  allowedEscalationLevels?: string[];
-  pharmacyName?: string | null;
-};
-
-type AssignmentViewModel = RosterAssignment & {
-  isOpenShift?: boolean;
-  isCoverRequest?: boolean;
-  origin?: {
-    label?: string;
-  };
-  originalShift?: OpenShiftViewModel;
-};
-
-interface ShiftForEdit {
-  id: number;
-  roleNeeded?: string | null;
-  slots: RosterSlotDetail[];
-}
-
-
-// --- Constants for Roles, Colors, and Leave (Updated) ---
-const ROLES = ['PHARMACIST', 'ASSISTANT', 'INTERN', 'TECHNICIAN', 'STUDENT'];
-const ALL_STAFF = 'ALL';
-const LEAVE_TYPES_MAP: { [key: string]: string } = {
-    SICK: 'Sick Leave',
-    ANNUAL: 'Annual Leave',
-    COMPASSIONATE: 'Compassionate Leave',
-    STUDY: 'Study Leave',
-    CARER: 'Carer\'s Leave',
-    UNPAID: 'Unpaid Leave',
-    OTHER: 'Other',
-};
-
 
 // --- Skeleton Component for Unified Loading ---
 const RosterPageSkeleton = () => (
