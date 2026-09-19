@@ -47,7 +47,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
-import { BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
+import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import { type RosterGridViewsProps, getRoleStyle } from './RosterGridViews.model';
 export type { StaffShiftItem, StaffMemberSummary, StackedShiftItem, DayStackedBucket, RosterGridViewsProps } from './RosterGridViews.model';
 
