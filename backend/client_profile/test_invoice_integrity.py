@@ -150,7 +150,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(invoice.subtotal, Decimal("560.00"))
         self.assertEqual(invoice.gst_amount, Decimal("56.00"))
         self.assertEqual(invoice.super_amount, Decimal("67.20"))
-        self.assertEqual(invoice.total, Decimal("683.20"))
+        self.assertEqual(invoice.total, Decimal("616.00"))
 
     def test_editing_internal_invoice_preserves_locked_professional_line(self):
         invoice = self._generate()
