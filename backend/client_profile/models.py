@@ -2541,7 +2541,7 @@ class Invoice(models.Model):
     issuer_abn           = models.CharField(max_length=20, blank=True, default="")
     issuer_email = models.EmailField(blank=True, default="")
     gst_registered       = models.BooleanField(default=False)
-    super_rate_snapshot  = models.DecimalField(max_digits=5, decimal_places=2, default=11.5)
+    super_rate_snapshot  = models.DecimalField(max_digits=5, decimal_places=2, default=12.0)
 
     # —────────── Recipient snapshot (who’s billed) ──────────—
     bill_to_first_name       = models.CharField(max_length=150, blank=True, default="")
