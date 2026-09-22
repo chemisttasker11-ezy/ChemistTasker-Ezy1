@@ -150,7 +150,7 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
     {!expense?<EmptyState title="Expense not found" body="The requested expense is unavailable."/>:<>
       <DataRow title={expense.supplier} subtitle={`${expense.description} · ${money(expense.amount)}`} status={expense.evidence_confirmed?'Evidence confirmed':'Evidence pending'}/>
       <Button mode="contained" icon="camera" loading={busy} onPress={()=>void upload()}>Capture / add receipt</Button>
-      <Section title="Receipts">{expense.receipts?.length?expense.receipts.map(r=><DataRow key={r.id} title={r.filename} subtitle={`${Math.ceil(r.size/1024)} KB · ${dateLabel(r.created_at)}`} onPress={()=>router.push(`/finance/receipts/${r.id}` as any)}/>):<EmptyState title="No receipts" body="Add at least one receipt when evidence is required."/>)}</Section>
+      <Section title="Receipts">{expense.receipts?.length?expense.receipts.map(r=><DataRow key={r.id} title={r.filename} subtitle={`${Math.ceil(r.size/1024)} KB · ${dateLabel(r.created_at)}`} onPress={()=>router.push(`/finance/receipts/${r.id}` as any)}/>):<EmptyState title="No receipts" body="Add at least one receipt when evidence is required."/>}</Section>
     </>}
   </ParityPage>;
 }

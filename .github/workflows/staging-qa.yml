@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   qa:
-    runs-on: [self-hosted, linux, x64, chemisttasker-staging]
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - name: Checkout staging

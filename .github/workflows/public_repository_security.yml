@@ -42,7 +42,7 @@ jobs:
               ("private key", re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
               ("GitHub classic token", re.compile(rb"ghp_[A-Za-z0-9]{30,}")),
               ("GitHub fine-grained token", re.compile(rb"github_pat_[A-Za-z0-9_]{40,}")),
-              ("OpenAI-style secret", re.compile(rb"sk-[A-Za-z0-9_-]{20,}")),
+              ("OpenAI-style secret", re.compile(rb"(?<![A-Za-z0-9_])sk-[A-Za-z0-9_-]{20,}")),
               ("AWS access key", re.compile(rb"AKIA[0-9A-Z]{16}")),
               ("Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{30,}")),
           ]
@@ -65,6 +65,7 @@ jobs:
                       findings.append((str(path), label))
           if findings:
               for path, label in findings:
+                  print(f"Credential pattern detected in {path}: {label}")
                   print(f"::error file={path}::{label} pattern detected")
               sys.exit(1)
           print("No high-confidence credential patterns found in tracked text files.")
