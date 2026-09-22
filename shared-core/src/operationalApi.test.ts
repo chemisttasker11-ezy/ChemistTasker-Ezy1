@@ -101,4 +101,94 @@ describe('authenticated operational api.ts domains', () => {
       },
     ]);
   });
+
+  it('rejects cross-origin and out-of-boundary finance pagination before sending credentials', async () => {
+    const externalFetch = vi.fn(async () => json({
+      count: 1,
+      next: 'https://evil.example/api/client-profile/finance/customers/?page=2',
+      previous: null,
+      results: [{ id: 1 }],
+    })) as unknown as typeof fetch;
+    configure(externalFetch);
+
+    await expect(financeApi.customers()).rejects.toThrow('Finance requests cannot leave the configured finance API.');
+    expect(externalFetch).toHaveBeenCalledTimes(1);
+
+    const escapedFetch = vi.fn(async () => json({
+      count: 1,
+      next: 'https://example.test/api/users/me/',
+      previous: null,
+      results: [{ id: 1 }],
+    })) as unknown as typeof fetch;
+    configure(escapedFetch);
+
+    await expect(financeApi.customers()).rejects.toThrow('Finance requests cannot leave the configured finance API.');
+    expect(escapedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts same-origin finance pagination and preserves the authenticated core configuration', async () => {
+    const calls: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(String(input));
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer operational-token');
+      expect(init?.credentials).toBe('include');
+      if (calls.length === 1) {
+        return json({
+          count: 2,
+          next: 'https://example.test/api/client-profile/finance/customers/?page=2',
+          previous: null,
+          results: [{ id: 1 }],
+        });
+      }
+      return json({
+        count: 2,
+        next: null,
+        previous: 'https://example.test/api/client-profile/finance/customers/',
+        results: [{ id: 2 }],
+      });
+    }) as unknown as typeof fetch;
+    configure(fetchImpl);
+
+    await expect(financeApi.customers()).resolves.toEqual([{ id: 1 }, { id: 2 }]);
+    expect(calls).toEqual([
+      'https://example.test/api/client-profile/finance/customers/',
+      'https://example.test/api/client-profile/finance/customers/?page=2',
+    ]);
+  });
+
+  it('returns finance PDFs as blobs through the shared authenticated request engine', async () => {
+    const pdf = new Blob(['%PDF-test'], { type: 'application/pdf' });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('https://example.test/api/client-profile/finance/invoices/7/pdf/');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer operational-token');
+      return new Response(pdf, { status: 200, headers: { 'content-type': 'application/pdf' } });
+    }) as unknown as typeof fetch;
+    configure(fetchImpl);
+
+    const result = await financeApi.pdf(7);
+    expect(result).toBeInstanceOf(Blob);
+    expect(await result.text()).toBe('%PDF-test');
+  });
+
+  it('keeps receipt uploads multipart without forcing a JSON content type', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('https://example.test/api/client-profile/finance/expenses/8/receipts/');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('Authorization')).toBe('Bearer operational-token');
+      expect(headers.has('Content-Type')).toBe(false);
+      expect(init?.body).toBeInstanceOf(FormData);
+      return json({ id: 9, filename: 'receipt.pdf' }, 201);
+    }) as unknown as typeof fetch;
+    configure(fetchImpl);
+
+    await financeApi.uploadReceipt(8, new Blob(['receipt'], { type: 'application/pdf' }), 'receipt.pdf');
+  });
+
+  it('uses the common API error parser for finance failures', async () => {
+    const fetchImpl = vi.fn(async () => json({ detail: 'Invoice version is stale.' }, 409)) as unknown as typeof fetch;
+    configure(fetchImpl);
+
+    await expect(financeApi.issue(4, 1)).rejects.toThrow('Invoice version is stale.');
+  });
+
 });
