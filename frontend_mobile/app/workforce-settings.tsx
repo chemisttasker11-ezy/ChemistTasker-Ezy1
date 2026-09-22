@@ -8,8 +8,8 @@ import {
   type WorkforceEmploymentEngagement,
   type WorkforcePayrollConfiguration,
   type WorkforceWorkSettings,
+  workforce,
 } from '@chemisttasker/shared-core';
-import { chemistTaskerApi } from '../config/api';
 
 const hours = (minutes?: number | null) => minutes == null ? '' : (minutes / 60).toFixed(2);
 const pretty = (value?: string | null) => String(value || '').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
@@ -45,9 +45,9 @@ export default function WorkforceSettingsScreen() {
     setError('');
     try {
       const [nextPayroll, nextStaff, nextEngagements] = await Promise.all([
-        chemistTaskerApi.workforce.getPayrollConfiguration(pharmacyId),
-        chemistTaskerApi.workforce.listWorkSettings(pharmacyId),
-        chemistTaskerApi.workforce.listEmploymentEngagements(pharmacyId),
+        workforce.getPayrollConfiguration(pharmacyId),
+        workforce.listWorkSettings(pharmacyId),
+        workforce.listEmploymentEngagements(pharmacyId),
       ]);
       setPayroll(nextPayroll);
       setStaff(nextStaff);
@@ -84,7 +84,7 @@ export default function WorkforceSettingsScreen() {
     }
     setBusyKey(`hours-${row.membership_id}`); setError('');
     try {
-      await chemistTaskerApi.workforce.saveWorkSettings({
+      await workforce.saveWorkSettings({
         membership_id: row.membership_id,
         contracted_weekly_minutes: numeric == null ? null : Math.round(numeric * 60),
       });
@@ -100,7 +100,7 @@ export default function WorkforceSettingsScreen() {
     if (!pharmacyId || !payroll) return;
     setBusyKey('payroll'); setError('');
     try {
-      const next = await chemistTaskerApi.workforce.updatePayrollConfiguration({
+      const next = await workforce.updatePayrollConfiguration({
         pharmacy_id: pharmacyId,
         use_chemisttasker_payroll: enabled,
       });
