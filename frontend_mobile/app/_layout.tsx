@@ -297,15 +297,16 @@ function AuthGate() {
           const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
 
           const isManagerRoute = top === 'manager';
-          const isWorkforceRoute = top === 'workforce' || top === 'workforce-timesheets' || top === 'workforce-settings';
+          const isRosterWorkforceRoute = top === 'workforce-timesheets';
+          const isStaffWorkforceRoute = top === 'workforce' || top === 'workforce-settings';
           const isAttendanceReviewRoute = top === 'attendance' && second === 'reviews';
 
-          if ((isManagerRoute || isAttendanceReviewRoute) && !rosterCapability) {
+          if ((isManagerRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
             router.replace(getRoleHome(user.role) as any);
             return;
           }
 
-          if (isWorkforceRoute && !workforceCapability) {
+          if (isStaffWorkforceRoute && !workforceCapability) {
             router.replace(getRoleHome(user.role) as any);
             return;
           }
