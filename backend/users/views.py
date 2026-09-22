@@ -267,7 +267,13 @@ def _is_web_client(request):
         or request.headers.get("x-client-platform")
         or ""
     ).strip().lower()
-    return platform in {"web", "browser"}
+    if platform in {"mobile", "app", "expo"}:
+        return False
+    if platform in {"web", "browser"}:
+        return True
+    # Browser state-changing requests send Origin. Keep legacy/API clients that
+    # do not send Origin on the token-response contract.
+    return bool(request.headers.get("Origin"))
 
 def _cookie_kwargs():
     kwargs = {
@@ -533,29 +539,33 @@ class VerifyOTPView(APIView):
     throttle_scope = "otp_verify"
 
     def post(self, request):
+        from .authentication import enforce_browser_csrf
+        enforce_browser_csrf(request)
         email = request.data.get("email", "").strip().lower()
         otp = request.data.get("otp")
         user = User.objects.filter(email__iexact=email).first()
+        invalid_response = lambda: Response(
+            {"detail": "Invalid or expired verification code."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
         if not user or not otp:
-            return Response({"detail": "Invalid credentials."}, status=400)
+            return invalid_response()
 
         if not user.is_active:
-            return Response({"detail": "Invalid credentials."}, status=400)
+            return invalid_response()
 
         if user.otp_locked_until and timezone.now() < user.otp_locked_until:
-            return _get_lockout_response(user.otp_locked_until)
+            return invalid_response()
 
         # --- Check if OTP is expired ---
         if not user.otp_created_at or (timezone.now() - user.otp_created_at > timedelta(minutes=self.OTP_EXPIRY_MINUTES)):
-            return Response({"detail": "OTP has expired. Please request a new code."}, status=400)
+            return invalid_response()
 
         # --- Check if OTP matches ---
         if not _otp_matches(otp, user.otp_code):
             just_locked = _register_email_otp_failure(user)
-            if just_locked:
-                return _get_lockout_response(user.otp_locked_until)
-            return Response({"detail": "Incorrect OTP."}, status=400)
+            return invalid_response()
 
         # --- Success: verify user and clear OTP ---
         user.is_otp_verified = True
@@ -582,7 +592,12 @@ class VerifyOTPView(APIView):
             text_template="emails/welcome_email.txt"
         )
 
-        # --- Also return tokens + user payload so frontend can call mobile-verify authenticated ---
+        # Web verifies email only, then follows the existing UI flow back to login.
+        # Mobile/API clients still receive tokens so they can continue to mobile verification.
+        if _is_web_client(request):
+            return Response({"detail": "Email verified successfully."}, status=status.HTTP_200_OK)
+
+        # --- Also return tokens + user payload so mobile can call mobile-verify authenticated ---
         refresh = RefreshToken.for_user(user)
 
         # Build memberships payload exactly like your serializers
