@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -91,6 +91,7 @@ export default function AddItemWizard() {
   const [amount, setAmount] = useState('');
   const [desiredSwap, setDesiredSwap] = useState('');
   const [photos, setPhotos] = useState<{ file: File; url: string }[]>([]);
+  const photoUrls = useRef(new Set<string>());
 
   const [suburb, setSuburb] = useState('');
   const [state, setState] = useState('QLD');
@@ -108,6 +109,11 @@ export default function AddItemWizard() {
   const [lookupMessage, setLookupMessage] = useState('');
   const [created, setCreated] = useState<{ id: string; publication_status?: string }>();
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => () => {
+    for (const url of photoUrls.current) URL.revokeObjectURL(url);
+    photoUrls.current.clear();
+  }, []);
 
   useEffect(() => {
     if (session.status !== 'authenticated') return;
@@ -134,17 +140,21 @@ export default function AddItemWizard() {
   function handlePhotoAdd(files: FileList | null) {
     if (!files) return;
     const incoming = Array.from(files).slice(0, 6 - photos.length);
-    const newItems = incoming.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-    }));
+    const newItems = incoming.map((file) => {
+      const url = URL.createObjectURL(file);
+      photoUrls.current.add(url);
+      return { file, url };
+    });
     setPhotos((prev) => [...prev, ...newItems].slice(0, 6));
   }
 
   function handlePhotoRemove(index: number) {
     setPhotos((prev) => {
       const target = prev[index];
-      if (target?.url) URL.revokeObjectURL(target.url);
+      if (target?.url) {
+        URL.revokeObjectURL(target.url);
+        photoUrls.current.delete(target.url);
+      }
       return prev.filter((_, i) => i !== index);
     });
   }
@@ -234,6 +244,9 @@ export default function AddItemWizard() {
       }
 
       setCreated({ id: listing.id, publication_status: finalStatus });
+      for (const url of photoUrls.current) URL.revokeObjectURL(url);
+      photoUrls.current.clear();
+      setPhotos([]);
     } catch (reason) {
       setError((reason as Error).message);
     } finally {
