@@ -69,9 +69,9 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
 
   useEffect(()=>{void load();},[load]);
 
-  if(screen==='customer-new') return <CustomerEditor loading={loading} error={error} onSaved={load}/>;
-  if(screen==='item-new') return <ItemEditor loading={loading} error={error} onSaved={load}/>;
-  if(screen==='expense-new') return <ExpenseEditor loading={loading} error={error} onSaved={load}/>;
+  if(screen==='customer-new') return <CustomerEditor customer={customers.find(x=>Number(x.id)===id)} loading={loading} error={error} onSaved={load}/>;
+  if(screen==='item-new') return <ItemEditor item={items.find(x=>Number(x.id)===id)} loading={loading} error={error} onSaved={load}/>;
+  if(screen==='expense-new') return <ExpenseEditor expense={expenses.find(x=>Number(x.id)===id)} loading={loading} error={error} onSaved={load}/>;
   if(screen==='bas') return <BasScreen/>;
   if(screen==='expense-receipt') return <ExpenseReceipt expense={expenses.find(x=>Number(x.id)===id)} loading={loading} error={error} onReload={load}/>;
   if(screen==='receipt') return <ReceiptScreen receiptId={id} loading={loading} error={error}/>;
@@ -82,7 +82,7 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
   const common={loading,error,onRetry:load,onRefresh:()=>{setRefreshing(true);void load();},refreshing};
 
   if(screen==='customers') return <ParityPage title={titles[screen]} subtitle="Reusable billing contacts for invoices." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/customers/new' as any)}/>}>
-    <Section title="Saved customers">{customers.length?customers.map(c=><DataRow key={c.id} title={c.name||c.legal_name} subtitle={`${c.email||'No invoice email'} · ${c.payment_terms_days}-day terms · ABN ${c.abn||'not supplied'}`} status={c.active?'Active':'Inactive'}/>):<EmptyState title="No customers" body="Create a customer before issuing invoices." actionLabel="Create customer" onAction={()=>router.push('/finance/customers/new' as any)}/>}</Section>
+    <Section title="Saved customers">{customers.length?customers.map(c=><DataRow key={c.id} title={c.name||c.legal_name} subtitle={`${c.email||'No invoice email'} · ${c.payment_terms_days}-day terms · ABN ${c.abn||'not supplied'}`} status={c.active?'Active':'Inactive'} onPress={()=>router.push(`/finance/customers/new?id=${c.id}` as any)}/>):<EmptyState title="No customers" body="Create a customer before issuing invoices." actionLabel="Create customer" onAction={()=>router.push('/finance/customers/new' as any)}/>}</Section>
   </ParityPage>;
 
   if(screen==='items') return <ParityPage title={titles[screen]} subtitle="Reusable invoice line items and tax treatment." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/items/new' as any)}/>}>
@@ -91,7 +91,7 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
 
   if(screen==='expenses') return <ParityPage title={titles[screen]} subtitle="Business expenses, evidence and GST treatment." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/expenses/new' as any)}/>}>
     <MetricGrid items={[{label:'Expenses',value:expenses.length},{label:'Evidence missing',value:expenses.filter(e=>!e.evidence_confirmed).length,tone:expenses.some(e=>!e.evidence_confirmed)?'warning':'success'}]}/>
-    <Section title="Expenses">{expenses.length?expenses.map(e=><DataRow key={e.id} title={e.supplier||e.description} subtitle={`${e.description} · ${money(e.amount)} · ${e.incurred_on}`} status={e.receipts?.length?`${e.receipts.length} receipt(s)`:'No receipt'} onPress={()=>router.push(`/finance/expenses/${e.id}/receipt` as any)}/>):<EmptyState title="No expenses" body="Record business expenses and attach evidence for your GST worksheet."/>}</Section>
+    <Section title="Expenses">{expenses.length?expenses.map(e=><DataRow key={e.id} title={e.supplier||e.description} subtitle={`${e.description} · ${money(e.amount)} · ${e.incurred_on}`} status={e.receipts?.length?`${e.receipts.length} receipt(s)`:'No receipt'} onPress={()=>router.push(`/finance/expenses/new?id=${e.id}` as any)}/>):<EmptyState title="No expenses" body="Record business expenses and attach evidence for your GST worksheet."/>}</Section>
   </ParityPage>;
 
   if(screen==='received') return <ParityPage title={titles[screen]} subtitle="Review contractor invoices, request revision and record payment." {...common}>
@@ -101,34 +101,90 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
   return <ParityPage title={titles[screen]} subtitle="Finance workspace" loading={loading} error={error}><EmptyState title="No data" body="No records are available for this view."/></ParityPage>;
 }
 
-function CustomerEditor({loading,error,onSaved}:{loading:boolean;error:string;onSaved:()=>Promise<void>}) {
+function CustomerEditor({customer,loading,error,onSaved}:{customer?:FinanceCustomer;loading:boolean;error:string;onSaved:()=>Promise<void>}) {
   const router=useRouter();
-  const [form,setForm]=useState<FinanceCustomerInput>({name:'',legal_name:'',abn:'',contact_name:'',email:'',phone:'',address:'',payment_terms_days:14,notes:'',active:true});
+  const [form,setForm]=useState<FinanceCustomerInput>(()=>customer?{
+    name:customer.name,legal_name:customer.legal_name,abn:customer.abn,contact_name:customer.contact_name,email:customer.email,phone:customer.phone,address:customer.address,payment_terms_days:customer.payment_terms_days,notes:customer.notes,active:customer.active,
+  }:{name:'',legal_name:'',abn:'',contact_name:'',email:'',phone:'',address:'',payment_terms_days:14,notes:'',active:true});
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const save=async()=>{setBusy(true);setLocalError('');try{await finance.saveCustomer(form);await onSaved();router.replace('/finance/customers' as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+  useEffect(()=>{if(customer)setForm({name:customer.name,legal_name:customer.legal_name,abn:customer.abn,contact_name:customer.contact_name,email:customer.email,phone:customer.phone,address:customer.address,payment_terms_days:customer.payment_terms_days,notes:customer.notes,active:customer.active});},[customer]);
+  const save=async()=>{
+    setBusy(true);setLocalError('');
+    try{
+      const saved:any=await finance.saveCustomer(form,customer?.id);
+      if(form.abn.trim() && saved?.id) {
+        try { await finance.lookupAbn(saved.id); } catch { /* Save remains valid if the external lookup is unavailable. */ }
+      }
+      await onSaved();router.replace('/finance/customers' as any);
+    }catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}
+  };
+  const lookup=async()=>{
+    if(!customer?.id||busy)return;setBusy(true);setLocalError('');
+    try{await finance.lookupAbn(customer.id);await onSaved();}catch(e){setLocalError(errorMessage(e,'Unable to verify this ABN.'));}finally{setBusy(false);}
+  };
   const patch=(key:keyof FinanceCustomerInput,value:any)=>setForm(v=>({...v,[key]:value}));
-  return <ParityPage title="New customer" subtitle="Create a reusable invoice customer." loading={loading} error={error||localError}>
-    <Field label="Display name" value={form.name} onChangeText={v=>patch('name',v)}/><Field label="Legal entity name" value={form.legal_name} onChangeText={v=>patch('legal_name',v)}/><Field label="ABN" value={form.abn} keyboardType="numeric" onChangeText={v=>patch('abn',v)}/><Field label="Accounts contact" value={form.contact_name} onChangeText={v=>patch('contact_name',v)}/><Field label="Invoice email" value={form.email} keyboardType="email-address" onChangeText={v=>patch('email',v)}/><Field label="Phone" value={form.phone} keyboardType="phone-pad" onChangeText={v=>patch('phone',v)}/><Field label="Billing address" value={form.address} multiline onChangeText={v=>patch('address',v)}/><Field label="Payment terms (days)" value={String(form.payment_terms_days)} keyboardType="numeric" onChangeText={v=>patch('payment_terms_days',toNumber(v,14))}/><Field label="Notes" value={form.notes} multiline onChangeText={v=>patch('notes',v)}/><Button mode="contained" loading={busy} disabled={!form.name.trim()||busy} onPress={()=>void save()}>Save customer</Button>
+  return <ParityPage title={customer?'Edit customer':'New customer'} subtitle="Maintain reusable invoice customer details and ABN verification." loading={loading} error={error||localError}>
+    <Field label="Display name" value={form.name} onChangeText={v=>patch('name',v)}/>
+    <Field label="Legal entity name" value={form.legal_name} onChangeText={v=>patch('legal_name',v)}/>
+    <Field label="ABN" value={form.abn} keyboardType="numeric" onChangeText={v=>patch('abn',v)}/>
+    {customer?.abn_checked_at?<InfoNote title="ABN checked">{dateLabel(customer.abn_checked_at)}</InfoNote>:null}
+    <Field label="Accounts contact" value={form.contact_name} onChangeText={v=>patch('contact_name',v)}/>
+    <Field label="Invoice email" value={form.email} keyboardType="email-address" onChangeText={v=>patch('email',v)}/>
+    <Field label="Phone" value={form.phone} keyboardType="phone-pad" onChangeText={v=>patch('phone',v)}/>
+    <Field label="Billing address" value={form.address} multiline onChangeText={v=>patch('address',v)}/>
+    <Field label="Payment terms (days)" value={String(form.payment_terms_days)} keyboardType="numeric" onChangeText={v=>patch('payment_terms_days',toNumber(v,14))}/>
+    <ChoiceChips value={form.active?'ACTIVE':'INACTIVE'} onChange={v=>patch('active',v==='ACTIVE')} options={[{value:'ACTIVE',label:'Active'},{value:'INACTIVE',label:'Inactive'}]}/>
+    <Field label="Notes" value={form.notes} multiline onChangeText={v=>patch('notes',v)}/>
+    <ActionButtons>
+      <Button mode="contained" loading={busy} disabled={!form.name.trim()||busy} onPress={()=>void save()}>{customer?'Save changes':'Save customer'}</Button>
+      {customer?.id&&form.abn.trim()?<Button mode="outlined" disabled={busy} onPress={()=>void lookup()}>Verify ABN</Button>:null}
+    </ActionButtons>
   </ParityPage>;
 }
 
-function ItemEditor({loading,error,onSaved}:{loading:boolean;error:string;onSaved:()=>Promise<void>}) {
+function ItemEditor({item,loading,error,onSaved}:{item?:FinanceItem;loading:boolean;error:string;onSaved:()=>Promise<void>}) {
   const router=useRouter();
-  const [form,setForm]=useState<FinanceItemInput>({code:'',name:'',category:'ProfessionalServices',unit:'Hours',unit_price:'0.00',tax_code:'OUT_OF_SCOPE',super_eligible:false,active:true});
+  const [form,setForm]=useState<FinanceItemInput>(()=>item?{code:item.code,name:item.name,category:item.category,unit:item.unit,unit_price:item.unit_price,tax_code:item.tax_code,super_eligible:item.super_eligible,active:item.active}:{code:'',name:'',category:'ProfessionalServices',unit:'Hours',unit_price:'0.00',tax_code:'OUT_OF_SCOPE',super_eligible:false,active:true});
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const save=async()=>{setBusy(true);setLocalError('');try{await finance.saveItem(form);await onSaved();router.replace('/finance/items' as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
-  return <ParityPage title="New reusable item" subtitle="Create an invoice line template." loading={loading} error={error||localError}>
-    <Field label="Code" value={form.code} onChangeText={v=>setForm(x=>({...x,code:v}))}/><Field label="Name" value={form.name} onChangeText={v=>setForm(x=>({...x,name:v}))}/><ChoiceChips value={form.category} onChange={v=>setForm(x=>({...x,category:v as any}))} options={[{value:'ProfessionalServices',label:'Professional services'},{value:'Superannuation',label:'Super'},{value:'Transportation',label:'Transport'},{value:'Accommodation',label:'Accommodation'},{value:'Miscellaneous',label:'Misc'}]}/><Field label="Unit" value={form.unit} onChangeText={v=>setForm(x=>({...x,unit:v}))}/><Field label="Unit price (AUD)" value={String(form.unit_price)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,unit_price:v}))}/><ChoiceChips value={form.tax_code} onChange={v=>setForm(x=>({...x,tax_code:v as any}))} options={[{value:'GST',label:'GST'},{value:'GST_FREE',label:'GST free'},{value:'INPUT_TAXED',label:'Input taxed'},{value:'OUT_OF_SCOPE',label:'Out of scope'}]}/><Button mode="contained" loading={busy} disabled={!form.name.trim()||busy} onPress={()=>void save()}>Save item</Button>
+  useEffect(()=>{if(item)setForm({code:item.code,name:item.name,category:item.category,unit:item.unit,unit_price:item.unit_price,tax_code:item.tax_code,super_eligible:item.super_eligible,active:item.active});},[item]);
+  const save=async()=>{setBusy(true);setLocalError('');try{await finance.saveItem(form,item?.id);await onSaved();router.replace('/finance/items' as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+  return <ParityPage title={item?'Edit reusable item':'New reusable item'} subtitle="Maintain an invoice line template and its tax/super treatment." loading={loading} error={error||localError}>
+    <Field label="Code" value={form.code} onChangeText={v=>setForm(x=>({...x,code:v}))}/>
+    <Field label="Name" value={form.name} onChangeText={v=>setForm(x=>({...x,name:v}))}/>
+    <ChoiceChips value={form.category} onChange={v=>setForm(x=>({...x,category:v as any}))} options={[{value:'ProfessionalServices',label:'Professional services'},{value:'Superannuation',label:'Super'},{value:'Transportation',label:'Transport'},{value:'Accommodation',label:'Accommodation'},{value:'Miscellaneous',label:'Misc'}]}/>
+    <Field label="Unit" value={form.unit} onChangeText={v=>setForm(x=>({...x,unit:v}))}/>
+    <Field label="Unit price (AUD)" value={String(form.unit_price)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,unit_price:v}))}/>
+    <ChoiceChips value={form.tax_code} onChange={v=>setForm(x=>({...x,tax_code:v as any}))} options={[{value:'GST',label:'GST'},{value:'GST_FREE',label:'GST free'},{value:'INPUT_TAXED',label:'Input taxed'},{value:'OUT_OF_SCOPE',label:'Out of scope'}]}/>
+    <ChoiceChips value={form.super_eligible?'YES':'NO'} onChange={v=>setForm(x=>({...x,super_eligible:v==='YES'}))} options={[{value:'YES',label:'Super eligible'},{value:'NO',label:'Not super eligible'}]}/>
+    <ChoiceChips value={form.active?'ACTIVE':'INACTIVE'} onChange={v=>setForm(x=>({...x,active:v==='ACTIVE'}))} options={[{value:'ACTIVE',label:'Active'},{value:'INACTIVE',label:'Inactive'}]}/>
+    <Button mode="contained" loading={busy} disabled={!form.name.trim()||busy} onPress={()=>void save()}>{item?'Save changes':'Save item'}</Button>
   </ParityPage>;
 }
 
-function ExpenseEditor({loading,error,onSaved}:{loading:boolean;error:string;onSaved:()=>Promise<void>}) {
+function ExpenseEditor({expense,loading,error,onSaved}:{expense?:FinanceExpense;loading:boolean;error:string;onSaved:()=>Promise<void>}) {
   const router=useRouter();
-  const [form,setForm]=useState<FinanceExpenseInput>({request_key:idempotencyKey('expense'),version:1,supplier:'',description:'',category:'Other',incurred_on:financeToday(),paid_on:null,amount:'',gst_amount:'0.00',tax_code:'OUT_OF_SCOPE',business_use_percent:'100.00',gst_registered:false,evidence_confirmed:false,reimbursable:false,reference:'',notes:''});
+  const [form,setForm]=useState<FinanceExpenseInput>(()=>expense?{
+    request_key:expense.request_key,version:expense.version,supplier:expense.supplier,description:expense.description,category:expense.category,incurred_on:expense.incurred_on,paid_on:expense.paid_on,amount:expense.amount,gst_amount:expense.gst_amount,tax_code:expense.tax_code,business_use_percent:expense.business_use_percent,gst_registered:expense.gst_registered,evidence_confirmed:expense.evidence_confirmed,reimbursable:expense.reimbursable,reference:expense.reference,notes:expense.notes,
+  }:{request_key:idempotencyKey('expense'),version:1,supplier:'',description:'',category:'Other',incurred_on:financeToday(),paid_on:null,amount:'',gst_amount:'0.00',tax_code:'OUT_OF_SCOPE',business_use_percent:'100.00',gst_registered:false,evidence_confirmed:false,reimbursable:false,reference:'',notes:''});
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const save=async()=>{setBusy(true);setLocalError('');try{const saved=await finance.saveExpense(form);await onSaved();router.replace(`/finance/expenses/${saved.id}/receipt` as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
-  return <ParityPage title="New expense" subtitle="Record business expense and GST evidence." loading={loading} error={error||localError}>
-    <Field label="Supplier" value={form.supplier} onChangeText={v=>setForm(x=>({...x,supplier:v}))}/><Field label="Description" value={form.description} multiline onChangeText={v=>setForm(x=>({...x,description:v}))}/><Field label="Category" value={form.category} onChangeText={v=>setForm(x=>({...x,category:v}))}/><Field label="Incurred date (YYYY-MM-DD)" value={form.incurred_on} onChangeText={v=>setForm(x=>({...x,incurred_on:v}))}/><Field label="Amount (AUD)" value={String(form.amount)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,amount:v}))}/><Field label="GST amount (AUD)" value={String(form.gst_amount)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,gst_amount:v}))}/><ChoiceChips value={form.tax_code} onChange={v=>setForm(x=>({...x,tax_code:v as any}))} options={[{value:'GST',label:'GST'},{value:'GST_FREE',label:'GST free'},{value:'INPUT_TAXED',label:'Input taxed'},{value:'OUT_OF_SCOPE',label:'Out of scope'}]}/><Button mode="contained" loading={busy} disabled={!form.supplier.trim()||!String(form.amount).trim()||busy} onPress={()=>void save()}>Save & add receipt</Button>
+  useEffect(()=>{if(expense)setForm({request_key:expense.request_key,version:expense.version,supplier:expense.supplier,description:expense.description,category:expense.category,incurred_on:expense.incurred_on,paid_on:expense.paid_on,amount:expense.amount,gst_amount:expense.gst_amount,tax_code:expense.tax_code,business_use_percent:expense.business_use_percent,gst_registered:expense.gst_registered,evidence_confirmed:expense.evidence_confirmed,reimbursable:expense.reimbursable,reference:expense.reference,notes:expense.notes});},[expense]);
+  const save=async()=>{setBusy(true);setLocalError('');try{const saved=await finance.saveExpense(form,expense?.id);await onSaved();router.replace(`/finance/expenses/${saved.id}/receipt` as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+  return <ParityPage title={expense?'Edit expense':'New expense'} subtitle="Record business expense, GST treatment and supporting evidence." loading={loading} error={error||localError}>
+    <Field label="Supplier" value={form.supplier} onChangeText={v=>setForm(x=>({...x,supplier:v}))}/>
+    <Field label="Description" value={form.description} multiline onChangeText={v=>setForm(x=>({...x,description:v}))}/>
+    <Field label="Category" value={form.category} onChangeText={v=>setForm(x=>({...x,category:v}))}/>
+    <Field label="Incurred date (YYYY-MM-DD)" value={form.incurred_on} onChangeText={v=>setForm(x=>({...x,incurred_on:v}))}/>
+    <Field label="Paid date (optional, YYYY-MM-DD)" value={form.paid_on||''} onChangeText={v=>setForm(x=>({...x,paid_on:v||null}))}/>
+    <Field label="Amount (AUD)" value={String(form.amount)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,amount:v}))}/>
+    <Field label="GST amount (AUD)" value={String(form.gst_amount)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,gst_amount:v}))}/>
+    <ChoiceChips value={form.tax_code} onChange={v=>setForm(x=>({...x,tax_code:v as any}))} options={[{value:'GST',label:'GST'},{value:'GST_FREE',label:'GST free'},{value:'INPUT_TAXED',label:'Input taxed'},{value:'OUT_OF_SCOPE',label:'Out of scope'}]}/>
+    <Field label="Business use %" value={String(form.business_use_percent)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,business_use_percent:v}))}/>
+    <ChoiceChips value={form.gst_registered?'YES':'NO'} onChange={v=>setForm(x=>({...x,gst_registered:v==='YES'}))} options={[{value:'YES',label:'GST registered'},{value:'NO',label:'Not GST registered'}]}/>
+    <ChoiceChips value={form.evidence_confirmed?'YES':'NO'} onChange={v=>setForm(x=>({...x,evidence_confirmed:v==='YES'}))} options={[{value:'YES',label:'Evidence confirmed'},{value:'NO',label:'Evidence pending'}]}/>
+    <ChoiceChips value={form.reimbursable?'YES':'NO'} onChange={v=>setForm(x=>({...x,reimbursable:v==='YES'}))} options={[{value:'YES',label:'Reimbursable'},{value:'NO',label:'Not reimbursable'}]}/>
+    <Field label="Reference" value={form.reference} onChangeText={v=>setForm(x=>({...x,reference:v}))}/>
+    <Field label="Notes" value={form.notes} multiline onChangeText={v=>setForm(x=>({...x,notes:v}))}/>
+    <Button mode="contained" loading={busy} disabled={!form.supplier.trim()||!String(form.amount).trim()||busy} onPress={()=>void save()}>{expense?'Save & manage receipt':'Save & add receipt'}</Button>
   </ParityPage>;
 }
 
