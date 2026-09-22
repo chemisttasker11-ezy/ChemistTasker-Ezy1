@@ -13,6 +13,7 @@ const targets = [
 // may configure an API origin, but feature code must not construct backend
 // domain routes or use generic shared-core escape hatches.
 const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//;
+const requestCallPattern = /(?:\.(?:get|post|put|patch|delete|request)\s*(?:<[^>]*>)?\s*\(|\b(?:fetch|fetchJson|postJson|axios)\s*\()/;
 const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
 // Authenticated operational domains are intentionally owned by legacy api.ts.
 // Do not reintroduce them through the request-scoped Next/platform facade.
@@ -93,7 +94,8 @@ for (const line of diff.split(/\r?\n/)) {
   }
   if (!line.startsWith('+') || line.startsWith('+++')) continue;
   const added = line.slice(1);
-  if (routePattern.test(added) || escapeHatchPattern.test(added) || operationalPlatformPattern.test(added)) {
+  const directRequestRoute = routePattern.test(added) && requestCallPattern.test(added);
+  if (directRequestRoute || escapeHatchPattern.test(added) || operationalPlatformPattern.test(added)) {
     findings.push({ file: currentFile || '(unknown)', text: added.trim() });
   }
 }
