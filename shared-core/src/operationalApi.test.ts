@@ -45,6 +45,37 @@ describe('authenticated operational api.ts domains', () => {
     ]);
   });
 
+  it('refreshes once after a 401 and retries the authenticated operational request', async () => {
+    const calls: Array<{ authorization: string | null; body: string | null }> = [];
+    const refreshToken = vi.fn(async () => 'refreshed-token');
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        authorization: new Headers(init?.headers).get('Authorization'),
+        body: typeof init?.body === 'string' ? init.body : null,
+      });
+      if (calls.length === 1) {
+        return json({ detail: 'Token expired.' }, 401);
+      }
+      return json({ status: 'ok' });
+    }) as unknown as typeof fetch;
+
+    vi.stubGlobal('fetch', fetchImpl);
+    configureApi({
+      baseURL: 'https://example.test/api',
+      credentials: 'include',
+      getToken: async () => 'expired-token',
+      refreshToken,
+    });
+
+    await attendance.clockOut('qr-token');
+
+    expect(refreshToken).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      { authorization: 'Bearer expired-token', body: JSON.stringify({ qr_token: 'qr-token' }) },
+      { authorization: 'Bearer refreshed-token', body: JSON.stringify({ qr_token: 'qr-token' }) },
+    ]);
+  });
+
   it('owns workforce, employment engagement and timesheet calls in api.ts', async () => {
     const calls: Array<{ url: string; method: string }> = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
