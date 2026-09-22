@@ -48,7 +48,7 @@ export default function WorkforceSettingsScreen() {
         workforce.getPayrollConfiguration(pharmacyId),
         workforce.listWorkSettings(pharmacyId),
         workforce.listEmploymentEngagements(pharmacyId),
-      ]);
+      ]) as [WorkforcePayrollConfiguration, WorkforceWorkSettings[], WorkforceEmploymentEngagement[]];
       setPayroll(nextPayroll);
       setStaff(nextStaff);
       setEngagements(nextEngagements);
