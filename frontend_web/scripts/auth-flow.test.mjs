@@ -53,3 +53,10 @@ test('public hub attachment URLs stay on the protected same-site endpoint',()=>{
   assert.equal(safeHubAttachmentUrl(value,42),undefined);
  }
 });
+
+
+test('capability-gated manager routes reject authenticated users without the capability',()=>{
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requiresCapability:true,hasRequiredCapability:false}),false);
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requiresCapability:true,hasRequiredCapability:true}),true);
+ assert.equal(canAccessRoute({userRole:'OWNER',requiresCapability:true,hasRequiredCapability:true}),true);
+});
