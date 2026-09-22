@@ -15,16 +15,19 @@ const allowed = new Set([
 ]);
 const ignoredDirs = new Set(['node_modules', 'dist', 'dist-kiosk', '.next', '.expo', 'build', 'coverage']);
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-// Match both absolute `/api/...` routes and the relative `/<domain>/...`
-// literals used with Axios instances whose base URL already ends at `/api`.
+// Match both absolute `/api/...` routes and relative `/<domain>/...`
+// literals, but only when they appear on an actual request-call line.
+// Client-side navigation such as router.push('/marketplace/...') is not
+// transport debt and must not change the reviewed shared-core baseline.
 const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//g;
+const requestCallPattern = /(?:\.(?:get|post|put|patch|delete|request)\s*(?:<[^>]*>)?\s*\(|\b(?:fetch|fetchJson|postJson|axios)\s*\()/;
 // Generic request helpers can hide relative routes from the literal matcher.
 // Keep those escape hatches in the reviewed baseline too; new domain work must
 // add a named shared-core operation instead of extending one of these helpers.
 const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
 // This digest records the reviewed legacy route and escape-hatch backlog.
 // Strict mode fails on any added, removed or changed finding.
-const REVIEWED_BASELINE_DIGEST = '6ce745a3cf8fde6ff61b4fcebcb69a96ab41b36eaaef101ca8b032fa7d6cbf1b';
+const REVIEWED_BASELINE_DIGEST = '92ff2039cabc561883b5679c9de853709850bc9082949b06d11adf5f0c276af0';
 
 function walk(directory, output = []) {
   if (!fs.existsSync(directory)) return output;
@@ -44,7 +47,10 @@ for (const target of targets) {
     if (allowed.has(relative)) continue;
     const text = fs.readFileSync(file, 'utf8');
     text.split(/\r?\n/).forEach((line, index) => {
-      if (routePattern.test(line) || escapeHatchPattern.test(line)) findings.push({ file: relative, line: index + 1, text: line.trim() });
+      const directRequestRoute = routePattern.test(line) && requestCallPattern.test(line);
+      if (directRequestRoute || escapeHatchPattern.test(line)) {
+        findings.push({ file: relative, line: index + 1, text: line.trim() });
+      }
       routePattern.lastIndex = 0;
     });
   }
@@ -60,7 +66,7 @@ if (process.argv.includes('--baseline-digest')) {
 }
 
 if (findings.length === 0) {
-  console.log('Shared-core boundary audit: no direct internal /api route literals found.');
+  console.log('Shared-core boundary audit: no reviewed direct request routes or generic-request escape hatches found.');
   process.exit(0);
 }
 

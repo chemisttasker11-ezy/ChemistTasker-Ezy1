@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { Button, Card, Checkbox, IconButton, Text } from 'react-native-paper';
+import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService } from '@chemisttasker/shared-core';
 import { chemistTaskerApi } from '@/config/api';
