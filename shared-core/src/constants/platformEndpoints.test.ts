@@ -39,6 +39,15 @@ describe('PLATFORM_ENDPOINTS', () => {
 });
 
 describe('legacy API_ENDPOINTS reconciliation', () => {
+  it('owns authenticated Worker Finance routes in API_ENDPOINTS', () => {
+    expect(API_ENDPOINTS.finance.root).toBe('/client-profile/finance/');
+    expect(API_ENDPOINTS.finance.customer(3)).toBe('/client-profile/finance/customers/3/');
+    expect(API_ENDPOINTS.finance.invoiceRevisionPdf(4, 2)).toBe('/client-profile/finance/invoices/4/revisions/2/pdf/');
+    expect(API_ENDPOINTS.finance.receivedApprovePayment(5)).toBe('/client-profile/finance/received-invoices/5/approve-payment/');
+    expect(API_ENDPOINTS.finance.expenseReceipts(6)).toBe('/client-profile/finance/expenses/6/receipts/');
+    expect(API_ENDPOINTS.finance.basWorksheet).toBe('/client-profile/finance/bas-worksheet/');
+  });
+
   it('owns authenticated attendance, roster and workforce routes', () => {
     expect(API_ENDPOINTS.attendance.managerTimeline(11)).toBe('/client-profile/attendance/manager/timeline/11/');
     expect(API_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/client-profile/attendance/roster/acknowledgements/12/');
