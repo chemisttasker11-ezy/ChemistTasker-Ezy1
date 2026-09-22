@@ -7,7 +7,7 @@ import crashlytics from '@react-native-firebase/crashlytics';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
-import { WorkspaceProvider } from '../context/WorkspaceContext';
+import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
@@ -215,7 +215,8 @@ function UpdatePrompt() {
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasCapability } = useAuth();
+  const { selectedPharmacyId } = useWorkspace();
 
   const getRoleHome = (role?: string | null) => {
     const normalized = String(role || '').toUpperCase();
@@ -290,13 +291,26 @@ function AuthGate() {
 
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
-          if (top === 'manager') {
-            const normalizedSharedRole = String(user.role || '').toUpperCase();
-            const canManageRoster = normalizedSharedRole === 'OWNER' || hasOrganizationAccess(user) || hasAdminAccess(user);
-            if (!canManageRoster) {
-              router.replace(getRoleHome(user.role) as any);
-            }
+          const normalizedSharedRole = String(user.role || '').toUpperCase();
+          const orgAccess = hasOrganizationAccess(user);
+          const ownerAccess = normalizedSharedRole === 'OWNER';
+          const rosterCapability = ownerAccess || orgAccess || hasCapability('MANAGE_ROSTER', selectedPharmacyId);
+          const workforceCapability = ownerAccess || orgAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+
+          const isManagerRoute = top === 'manager';
+          const isWorkforceRoute = top === 'workforce' || top === 'workforce-timesheets' || top === 'workforce-settings';
+          const isAttendanceReviewRoute = top === 'attendance' && second === 'reviews';
+
+          if ((isManagerRoute || isAttendanceReviewRoute) && !rosterCapability) {
+            router.replace(getRoleHome(user.role) as any);
+            return;
           }
+
+          if (isWorkforceRoute && !workforceCapability) {
+            router.replace(getRoleHome(user.role) as any);
+            return;
+          }
+
           return;
         }
 
@@ -362,7 +376,7 @@ function AuthGate() {
     return () => {
       active = false;
     };
-  }, [isLoading, segments, router, user]);
+  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user]);
 
   return null;
 }
