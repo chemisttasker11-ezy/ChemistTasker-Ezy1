@@ -46,3 +46,23 @@ jobs:
             echo ""
             echo "This deployment runs on the OVH self-hosted runner and uses staging-only PostgreSQL, Redis, volumes and containers."
           } >> "$GITHUB_STEP_SUMMARY"
+
+
+      - name: Smoke-test deployed staging
+        shell: bash
+        run: |
+          cd "$STAGING_DIR"
+          bash scripts/smoke-staging.sh "${{ steps.deploy.outputs.preview_url }}"
+
+      - name: Smoke-test summary
+        shell: bash
+        run: |
+          {
+            echo ""
+            echo "Smoke tests: PASS"
+            echo "- HTTPS security headers"
+            echo "- public login/app-config reachability"
+            echo "- anonymous protected-route denial"
+            echo "- refresh CSRF enforcement"
+            echo "- email OTP CSRF enforcement"
+          } >> "$GITHUB_STEP_SUMMARY"
