@@ -12,15 +12,21 @@ Third-party services are intentionally blank in staging by default: email, SMS, 
 
 ## One-time GitHub setup
 
-Add these repository Actions secrets:
+The OVH host/user come from the existing server runbook. Add only one repository Actions secret:
 
-- `STAGING_SSH_HOST` — OVH server hostname or IP.
-- `STAGING_SSH_USER` — SSH user that can run Docker Compose.
-- `STAGING_SSH_KEY` — private SSH key for that restricted deployment user.
+- `STAGING_SSH_KEY` — a dedicated private SSH deployment key for the staging workflow.
 
-The server needs Docker with the Compose plugin, `openssl`, `curl` and `rsync`. The workflow syncs files to `~/chemisttasker-staging`; server-generated staging secrets live under its ignored `env/` directory and are preserved between deployments.
+Enter that key directly in GitHub Actions secrets. Do not paste it into chat or commit it.
 
-After the three secrets exist, run **Staging Preview** manually once from GitHub Actions. Every later push to `staging` redeploys the preview automatically.
+The matching public key must be present in the OVH user's `~/.ssh/authorized_keys`.
+
+The workflow deploys to:
+
+`/opt/apps/chemisttasker-staging`
+
+The server-generated staging database/Django secrets live under the ignored `env/` directory in that staging folder and are preserved between deployments.
+
+After `STAGING_SSH_KEY` exists, run **Staging Preview** manually once. Every later push to `staging` redeploys the preview automatically.
 
 ## Review workflow
 
