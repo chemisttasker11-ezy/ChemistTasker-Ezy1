@@ -4,10 +4,9 @@
 **Inventory commit:** `77060bdc1b692bd68c1b2c0f8f472eb837ab4b01`  
 **Inventory date:** 17 September 2026
 
-This is the migration ledger for the single Django API boundary. Rows group DRF
-standard list/detail/actions where the same endpoint registry and consumer pattern
-applies; dynamic path parameters are shown in braces. Django serializers and views
-remain the wire-contract authority.
+This is the original SC00 migration ledger for the single Django API boundary. Rows preserve the 17 September 2026 inventory so the migration history remains auditable; individual `DUPLICATED_CLIENT` labels below are historical findings, not a claim about the final CP4 branch state.
+
+The current enforcement state is recorded in **Final CP4 reconciliation** below. Django serializers and views remain the wire-contract authority.
 
 ## Status legend
 
@@ -86,11 +85,23 @@ the broader duplicate surfaces found by the inventory:
    live in shared-core.
 4. Expo attendance PIN and onboarding-location calls now use shared operations;
    device lifecycle, app-update bootstrap, and kiosk pairing remain mobile-owned.
-5. All clients install `@chemisttasker/shared-core` 1.1.1 from the single root
-   tarball; obsolete 1.0.0 artifacts were removed.
+5. All clients link the repository `shared-core` directory for local development. CI builds one shared-core tarball, verifies its SHA-256, and installs those same bytes into Vite, Next and Expo. No shared-core tarball is committed to the repository.
 
 SC01 through SC12 are complete. Strict boundary enforcement is enabled in CI;
 new Django business routes must be added to shared-core before client adoption.
+
+## Final CP4 reconciliation
+
+The CP1-CP4 hardening pass made the following current-state corrections to the historical ledger:
+
+- Workforce, EmploymentEngagement, Timesheets, Attendance and Roster V2 use the established authenticated `api.ts` surface and `API_ENDPOINTS`; they are not exposed through the Next/platform facade.
+- Worker Finance uses the same authenticated request engine as `api.ts`, with additional same-origin and `/client-profile/finance/` path confinement.
+- Public Article comments/reactions/reports and public/community Hub reads use named shared-core operations. The generic Next Hub wrapper and `publicContent.request` escape hatch were removed.
+- Original authenticated Pharmacy Hub mutations reuse the original `API_ENDPOINTS` route authority rather than creating duplicate platform endpoints.
+- Vite, Next and Expo no longer depend on a checked-in `shared-core/*.tgz`. Local development links source; CI packs once and verifies one artifact across all clients.
+- The boundary audit is a ratchet: newly introduced client-local business routes/generic escape hatches fail CI, while removal of historical debt is allowed.
+- Kiosk native device credentials, encrypted persistence and offline sync remain intentionally native and outside end-user bearer transport.
+
 
 ## SC08 Job Board / Talent Board reconciliation
 
