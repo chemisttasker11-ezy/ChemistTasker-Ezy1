@@ -41,16 +41,22 @@ export default function ParityToolsCard() {
   const role = String(user?.role || '').toUpperCase();
   const tools = useMemo(() => {
     if (role === 'EXPLORER') return explorerTools;
-    if (managerRoles.has(role)) return managerTools;
+    if (role === 'OWNER') return managerTools;
 
     const canManageRoster = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
     const canManageStaff = canManageRoster || hasCapability('MANAGE_STAFF', selectedPharmacyId);
-    if (!canManageRoster && !canManageStaff) return workerTools;
+    const isOrganizationRole = managerRoles.has(role);
 
     const delegated: Tool[] = [];
     if (canManageStaff) delegated.push(managerTools[0]);
-    if (canManageRoster) delegated.push(managerTools[1]);
-    delegated.push(...workerTools);
+    if (canManageRoster) {
+      delegated.push(managerTools[1]);
+      delegated.push(managerTools[2]);
+    }
+
+    // Preserve the existing non-management tools for organization personas, but
+    // never expose staff/roster controls solely because the user has an org role.
+    delegated.push(...(isOrganizationRole ? managerTools.slice(3) : workerTools));
     return delegated.filter((tool, index, rows) => rows.findIndex((candidate) => candidate.route === tool.route) === index);
   }, [hasCapability, role, selectedPharmacyId]);
 
