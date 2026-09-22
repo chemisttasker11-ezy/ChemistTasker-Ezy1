@@ -337,11 +337,15 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
     setError('');
     try {
       const historical = Boolean(form.public_id && !form.terms_editable);
+  const completedHistorical = Boolean(historical && form.effective_to && form.effective_to < isoToday());
       if (historical) {
-        await updateEmploymentEngagement(form.public_id, {
-          effective_to: form.effective_to || null,
-          notes: form.notes,
-        });
+        const completedHistorical = Boolean(form.effective_to && form.effective_to < isoToday());
+        await updateEmploymentEngagement(
+          form.public_id,
+          completedHistorical
+            ? { notes: form.notes }
+            : { effective_to: form.effective_to || null, notes: form.notes },
+        );
       } else {
         const payload: WorkforceEmploymentEngagementWrite = {
           membership_id: form.membership_id,
@@ -539,7 +543,9 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
 
       <Dialog open={open} onClose={() => !saving && setOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {historical
+          {completedHistorical
+            ? 'Update historical engagement notes'
+            : historical
             ? 'Update engagement end date / notes'
             : form.public_id
               ? 'Edit future employment engagement'
@@ -587,6 +593,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                 label="Effective to (optional)"
                 InputLabelProps={{ shrink: true }}
                 value={form.effective_to}
+                disabled={completedHistorical}
                 onChange={(event) => setForm((current) => ({ ...current, effective_to: event.target.value }))}
               />
             </Stack>
