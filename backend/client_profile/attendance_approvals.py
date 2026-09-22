@@ -43,22 +43,11 @@ from client_profile.models import (
 
 
 def is_authorized_attendance_manager(user, pharmacy: Pharmacy) -> bool:
-    """Validate whether user is the owner or an authorized manager for this specific destination pharmacy."""
-    if not user or not pharmacy or not user.is_active:
-        return False
-    if user.is_superuser:
-        return True
-
-    # Owner check
-    owner = getattr(pharmacy, "owner", None)
-    if owner and getattr(owner, "user_id", None) == user.id:
-        return True
-
-    # Reuse the existing destination-pharmacy roster capability.
-    from .admin_helpers import can_manage_roster
-    if can_manage_roster(user, pharmacy):
-        return True
-    return False
+    """Validate roster-management authority for this destination pharmacy."""
+    # Keep attendance, roster and workforce route authorization on one capability
+    # contract, including scoped organisation memberships.
+    from workforce.permissions import can_manage_roster_pharmacy
+    return bool(can_manage_roster_pharmacy(user, pharmacy))
 
 
 def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:
