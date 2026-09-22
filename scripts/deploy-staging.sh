@@ -47,7 +47,10 @@ fi
 
 if [[ ! -f "$RUNTIME_FILE" ]]; then
   umask 077
-  printf 'STAGING_PUBLIC_URL=%q\n' "https://preview.invalid" > "$RUNTIME_FILE"
+  {
+    printf 'STAGING_PUBLIC_URL=%q\n' "https://preview.invalid"
+    printf 'STAGING_ALLOWED_HOSTS=%q\n' "localhost,127.0.0.1,web"
+  } > "$RUNTIME_FILE"
 fi
 
 if [[ ! -f "$INTEGRATIONS_FILE" ]]; then
@@ -113,10 +116,15 @@ if [[ -z "$preview_url" ]]; then
   exit 1
 fi
 
-if [[ "${STAGING_PUBLIC_URL:-}" != "$preview_url" ]]; then
+preview_host="${preview_url#https://}"
+if [[ "${STAGING_PUBLIC_URL:-}" != "$preview_url" || "${STAGING_ALLOWED_HOSTS:-}" != "$preview_host" ]]; then
   umask 077
-  printf 'STAGING_PUBLIC_URL=%q\n' "$preview_url" > "$RUNTIME_FILE"
+  {
+    printf 'STAGING_PUBLIC_URL=%q\n' "$preview_url"
+    printf 'STAGING_ALLOWED_HOSTS=%q\n' "$preview_host"
+  } > "$RUNTIME_FILE"
   export STAGING_PUBLIC_URL="$preview_url"
+  export STAGING_ALLOWED_HOSTS="$preview_host"
   compose up -d --build landing web celery_worker celery_beat gateway
 fi
 
