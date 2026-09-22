@@ -46,20 +46,15 @@ This branch deliberately does not move or duplicate backend business logic.
    - no global user token required for new clients.
 
 2. `shared-core/src/constants/platformEndpoints.ts`
-   - exact route catalogue for the newer surfaces that had outgrown the old endpoint file;
-   - Public Hub/blog/news;
-   - content management;
-   - Marketplace;
-   - Ethical Marketplace;
-   - attendance;
-   - Roster V2;
-   - kiosk server routes.
+   - request-scoped/public route catalogue for Public Hub/blog/news, content management, Marketplace and Ethical Marketplace;
+   - kiosk server endpoint identities only;
+   - authenticated Attendance, Roster V2 and Workforce routes were moved back to `API_ENDPOINTS` in CP2 so operational domains have one owner.
 
 3. `shared-core/src/platformApi.ts`
-   - grouped cross-platform API facade for public content, Marketplace, Ethical Marketplace, attendance, Roster V2 and content management;
-   - generic return types by default so this consolidation does not invent serializer fields that are not yet formally captured;
-   - escape-hatch `request()` per domain while DTO contracts are migrated;
-   - kiosk endpoint identities exposed without incorrectly routing native restricted device calls through a user bearer-token client.
+   - grouped request-scoped API facade for public content, Marketplace, Ethical Marketplace and content management;
+   - named Article/Hub/community operations replace the former generic public-content escape hatch;
+   - Django's Article reaction contract is preserved exactly (`PUT` create/change, `DELETE` remove);
+   - authenticated operational domains remain on the established `api.ts` transport.
 
 4. `shared-core/src/index.ts`
    - exports the new transport, platform API and endpoint registry;
@@ -69,17 +64,19 @@ This branch deliberately does not move or duplicate backend business logic.
 
 ### React SPA
 
-Already depends on `@chemisttasker/shared-core` via the packaged tarball. Existing shared calls must be reused first. Local files such as `src/api/hub.ts` may remain only as thin UI adapters if they perform no independent networking/business mapping.
+Consumes the repository-linked `@chemisttasker/shared-core` package. Existing shared calls remain canonical; local files such as `src/api/hub.ts` may remain only as thin presentation adapters with no independent backend route construction.
 
 ### Expo mobile
 
-Already consumes the shared package. Mobile-specific SecureStore/session/bootstrap code stays mobile-specific, but ChemistTasker route construction, wire types and DTO mapping belong in shared-core.
+Consumes the same repository-linked shared package. SecureStore/session/bootstrap and native permissions remain mobile-specific, while ChemistTasker route construction and cross-client DTO contracts stay in shared-core.
 
 ### Next.js/public app
 
-Currently does not declare `@chemisttasker/shared-core` and has its own Axios dependency. It must become a first-class shared-core consumer. Server rendering must use a new API instance per request rather than a module-global token/configuration.
+Is a first-class shared-core consumer. Server-side requests create request-scoped API instances; browser requests use the cookie/CSRF bridge. Named shared-core operations own Public Hub/articles/content/Marketplace/Ethical Marketplace integration rather than a copied SDK or generic Hub wrapper.
 
-Do not switch Next.js to the new source until the shared package is rebuilt/repacked in the same change set; otherwise it will install the old tarball.
+### Package model
+
+For local development all three clients link the repository `shared-core` directory and automatically build it before installation. CI builds and packs shared-core once, publishes one workflow artifact plus SHA-256, then Vite, Next and Expo all verify and install those exact package bytes. No checked-in shared-core tarball remains.
 
 ## Migration rule: reuse before create
 
@@ -206,19 +203,17 @@ Django serializer JSON is the wire truth. Shared-core owns the TypeScript wire i
 
 During migration, new platform functions intentionally default to `unknown`/caller-supplied generic types rather than guessing serializer schemas. Replace those generics with formal shared contracts only after confirming the serializer output and consumer requirements.
 
-## Packaging warning
+## Packaging convergence
 
-The repository currently uses packaged `chemisttasker-shared-core-1.0.0.tgz` artifacts. Editing `shared-core/src` does not update installed consumers by itself. Before consumer migration:
+The stale checked-in tarball model has been removed.
 
-1. typecheck/test/build shared-core;
-2. bump the shared-core version;
-3. run `npm pack` once;
-4. replace all consumer package references with that exact artifact/version;
-5. regenerate lockfiles;
-6. verify artifact checksums match;
-7. build React, Next and Expo.
+Repository development uses local source links:
+- Vite and Expo: `file:../shared-core`;
+- Next: `file:../../shared-core`.
 
-Do not hand-edit a second copy of the package for mobile.
+Each client `preinstall` calls `scripts/prepare-shared-core.mjs`, which runs a clean shared-core install and build. CI sets `CT_SHARED_CORE_SKIP_PREPARE=1` because its package path is different: the `shared-core` job builds and packs once, generates a SHA-256 file, uploads the package artifact, and all three client jobs download, verify and install that exact tarball.
+
+`scripts/audit-shared-core-package.mjs` fails if a checked-in `.tgz` reappears, a client stops linking the repository package, or the three lockfiles drift from the shared-core package version/link model.
 
 ## Definition of done
 
