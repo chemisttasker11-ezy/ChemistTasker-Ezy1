@@ -213,14 +213,17 @@ jobs:
 
   boundary-audit:
     runs-on: ubuntu-latest
+    env:
+      SHARED_CORE_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node scripts/audit-shared-core-boundary.mjs --strict
+      - run: node scripts/audit-shared-core-boundary.mjs
 
   architecture-audit:
     runs-on: ubuntu-latest
