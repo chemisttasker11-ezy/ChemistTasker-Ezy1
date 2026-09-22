@@ -18,7 +18,7 @@ User = get_user_model()
 owner, _ = User.objects.get_or_create(email="owner@kiosk-acceptance.invalid", defaults={
     "username": "kiosk_acceptance_owner", "role": "OWNER", "is_active": True,
 })
-worker, _ = User.objects.get_or_create(email="chemisttasker@gmail.com", defaults={
+worker, _ = User.objects.get_or_create(email="worker@kiosk-acceptance.invalid", defaults={
     "username": "kiosk_acceptance_worker", "role": "PHARMACIST", "is_active": True,
     "first_name": "Kiosk", "last_name": "Acceptance",
 })
