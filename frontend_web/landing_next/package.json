@@ -6,10 +6,11 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "preinstall": "node ../../scripts/prepare-shared-core.mjs"
   },
   "dependencies": {
-    "@chemisttasker/shared-core": "file:../../shared-core/chemisttasker-shared-core-1.1.1.tgz",
+    "@chemisttasker/shared-core": "file:../../shared-core",
     "@emotion/cache": "11.14.0",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
