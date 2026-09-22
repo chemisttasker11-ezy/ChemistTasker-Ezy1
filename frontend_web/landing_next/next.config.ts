@@ -6,6 +6,19 @@ const api=process.env.PLATFORM_API_URL||'http://127.0.0.1:8000/api';
 const isDev=process.env.NODE_ENV==='development';
 
 const viteOwnedPrefixes=['onboarding','setup','kiosk','membership'];
+const viteDashboardPrefixes=[
+ 'attendance',
+ 'workforce',
+ 'my-hours',
+ 'my-leave',
+ 'organization',
+ 'pharmacy-hub',
+ 'admin',
+ 'owner',
+ 'pharmacist',
+ 'otherstaff',
+ 'explorer',
+];
 
 const config:NextConfig={
  poweredByHeader:false,
@@ -17,15 +30,15 @@ const config:NextConfig={
   if(!isDev)return [];
 
   return [
-   // Keep /dashboard on Next so DashboardGate can resolve the signed-in role.
-   // Once it resolves to a real dashboard path, move the browser itself to
-   // Vite :5173. This matters for Google Maps/Places referrer restrictions:
-   // a rewrite through :3000 would still look like localhost:3000 to Google.
-   {
-    source:'/dashboard/:path+',
-    destination:`${dashboardPublic}/dashboard/:path+`,
+   // Keep the exact /dashboard URL on Next so DashboardGate can resolve the
+   // signed-in user's role. All real dashboard workspaces then move the
+   // browser itself to Vite :5173. A proxy rewrite would leave the browser
+   // origin at :3000 and Google Maps/Places would still see localhost:3000.
+   ...viteDashboardPrefixes.map(prefix=>({
+    source:`/dashboard/${prefix}/:path*`,
+    destination:`${dashboardPublic}/dashboard/${prefix}/:path*`,
     permanent:false,
-   },
+   })),
    ...viteOwnedPrefixes.map(prefix=>({
     source:`/${prefix}/:path*`,
     destination:`${dashboardPublic}/${prefix}/:path*`,
