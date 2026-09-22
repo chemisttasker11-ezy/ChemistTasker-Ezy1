@@ -101,6 +101,31 @@ describe('createChemistTaskerApi public content', () => {
     ]);
   });
 
+describe('createChemistTaskerApi named community operations', () => {
+  it('uses canonical login and original Hub endpoint owners without client-local routes', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? 'GET' });
+      return json({ ok: true });
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+
+    await api.account.login({ email: 'user@example.test', password: 'secret' });
+    await api.publicContent.createCommunityComment(4, { body: 'Reply', parent_comment: 2 });
+    await api.publicContent.updateCommunityComment(4, 5, { body: 'Updated' });
+    await api.publicContent.reactToCommunityPost(4, 'LIKE');
+    await api.publicContent.removeCommunityCommentReaction(4, 5);
+
+    expect(calls).toEqual([
+      { url: 'https://example.test/api/users/login/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/5/', method: 'PATCH' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/reactions/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/5/reactions/', method: 'DELETE' },
+    ]);
+  });
+});
+
 describe('createChemistTaskerApi content management', () => {
   it('routes document and invitation actions through named operations', async () => {
     const urls: string[] = [];
