@@ -4,8 +4,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.utils import timezone
 from datetime import timedelta
 import jwt
+from unittest.mock import patch
 
 
 class LoginFailureAttemptCountTests(TestCase):
@@ -307,3 +309,81 @@ class LoginEnumerationSafetyTests(TestCase):
         self.assertEqual(wrong.json()["code"], "invalid_credentials")
         self.assertEqual(correct.status_code, 401)
         self.assertEqual(correct.json()["code"], "email_not_verified")
+
+
+class EmailOtpSecurityTests(TestCase):
+    @patch("users.views.async_task")
+    def test_web_otp_verification_does_not_expose_or_set_auth_tokens(self, _async_task):
+        user = get_user_model().objects.create_user(
+            email="web-otp@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=False,
+            is_mobile_verified=False,
+        )
+        user.otp_code = "123456"
+        user.otp_created_at = timezone.now()
+        user.save(update_fields=["otp_code", "otp_created_at"])
+
+        response = self.client.post(
+            "/api/users/verify-otp/",
+            {"email": user.email, "otp": "123456"},
+            content_type="application/json",
+            HTTP_X_CLIENT_PLATFORM="web",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("access", response.json())
+        self.assertNotIn("refresh", response.json())
+        self.assertNotIn("ct_access", response.cookies)
+        self.assertNotIn("ct_refresh", response.cookies)
+        user.refresh_from_db()
+        self.assertTrue(user.is_otp_verified)
+
+    @patch("users.views.async_task")
+    def test_mobile_otp_verification_keeps_token_contract(self, _async_task):
+        user = get_user_model().objects.create_user(
+            email="mobile-otp@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=False,
+            is_mobile_verified=False,
+        )
+        user.otp_code = "654321"
+        user.otp_created_at = timezone.now()
+        user.save(update_fields=["otp_code", "otp_created_at"])
+
+        response = self.client.post(
+            "/api/users/verify-otp/",
+            {"email": user.email, "otp": "654321"},
+            content_type="application/json",
+            HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.json())
+        self.assertIn("refresh", response.json())
+
+    def test_unknown_email_and_wrong_otp_have_same_failure(self):
+        user = get_user_model().objects.create_user(
+            email="otp-known@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=False,
+            is_mobile_verified=False,
+        )
+        user.otp_code = "123456"
+        user.otp_created_at = timezone.now()
+        user.save(update_fields=["otp_code", "otp_created_at"])
+
+        missing = self.client.post(
+            "/api/users/verify-otp/",
+            {"email": "otp-missing@example.com", "otp": "000000"},
+            content_type="application/json",
+        )
+        wrong = self.client.post(
+            "/api/users/verify-otp/",
+            {"email": user.email, "otp": "000000"},
+            content_type="application/json",
+        )
+        self.assertEqual(missing.status_code, 400)
+        self.assertEqual(wrong.status_code, 400)
+        self.assertEqual(missing.json(), wrong.json())
