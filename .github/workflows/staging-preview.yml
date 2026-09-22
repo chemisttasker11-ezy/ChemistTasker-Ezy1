@@ -1,0 +1,88 @@
+name: Staging Preview
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chemisttasker-staging-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check staging connection
+        id: preflight
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        shell: bash
+        run: |
+          if [[ -n "$STAGING_SSH_HOST" && -n "$STAGING_SSH_USER" && -n "$STAGING_SSH_KEY" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## ChemistTasker staging is prepared but not connected"
+              echo ""
+              echo "Add repository Actions secrets: STAGING_SSH_HOST, STAGING_SSH_USER and STAGING_SSH_KEY."
+              echo "Then run this workflow manually once, or push the next approved preview change to the staging branch."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Checkout staging
+        if: steps.preflight.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        shell: bash
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$STAGING_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$STAGING_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync staging source to OVH
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+        shell: bash
+        run: |
+          ssh "$STAGING_SSH_USER@$STAGING_SSH_HOST" 'mkdir -p ~/chemisttasker-staging'
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude 'env/' \
+            ./ "$STAGING_SSH_USER@$STAGING_SSH_HOST:~/chemisttasker-staging/"
+
+      - name: Deploy isolated staging stack
+        if: steps.preflight.outputs.configured == 'true'
+        id: deploy
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+        shell: bash
+        run: |
+          output="$(ssh "$STAGING_SSH_USER@$STAGING_SSH_HOST" 'cd ~/chemisttasker-staging && bash scripts/deploy-staging.sh')"
+          printf '%s\n' "$output"
+          preview_url="$(printf '%s\n' "$output" | sed -n 's/^PREVIEW_URL=//p' | tail -n 1)"
+          test -n "$preview_url"
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+          {
+            echo "## ChemistTasker staging preview"
+            echo ""
+            echo "Preview: $preview_url"
+            echo ""
+            echo "This deployment uses staging-only PostgreSQL, Redis, volumes and containers."
+          } >> "$GITHUB_STEP_SUMMARY"
