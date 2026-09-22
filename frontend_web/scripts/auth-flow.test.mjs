@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
+import {canAccessRoute} from '../src/components/routeAccess.ts';
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
@@ -34,4 +35,11 @@ test('failed logout does not announce success and can be retried',async()=>{
  const store=new Map();globalThis.localStorage={getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)};
  await logoutSession();assert.equal(announcements,1);}
  finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
+});
+
+test('frontend role gate does not treat a pharmacy admin as an owner',()=>{
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'OWNER',isAdminUser:true}),false);
+ assert.equal(canAccessRoute({userRole:'OWNER',requiredRole:'OWNER',isAdminUser:false}),true);
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requireAdmin:true,isAdminUser:true}),true);
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'ORG_ADMIN',hasOrgRole:true}),true);
 });

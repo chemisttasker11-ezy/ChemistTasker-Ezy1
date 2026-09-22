@@ -5,6 +5,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ORG_ROLES } from "../constants/roles";
 import { resolveDashboardPath } from "../utils/dashboardPath";
+import { canAccessRoute } from "./routeAccess";
 
 type ProtectedRouteProps = {
   children: React.ReactElement;
@@ -36,12 +37,9 @@ export default function ProtectedRoute({
     return <div role="status">Opening sign in…</div>;
   }
 
-
-  const hasBaseRole = user.role === requiredRole;
   const hasOrgRole =
     Array.isArray(user.memberships) &&
     user.memberships.some((m: any) => ORG_ROLES.includes(m.role as any));
-  const hasOwnerAccess = isAdminUser || user.role === "OWNER";
 
   const isMobileVerificationRoute = location.pathname.startsWith(MOBILE_VERIFY_PATH);
 
@@ -59,35 +57,15 @@ export default function ProtectedRoute({
     );
   }
 
-  // If the route requires admin and the user is an admin, allow access.
-  // This is the key fix: it prevents the role-based checks below from incorrectly
-  // redirecting an admin user who is in their 'admin' persona.
-  if (requireAdmin && isAdminUser) {
-    return children;
-  }
-
-  if (requireAdmin && !isAdminUser) {
-    return (
-      <Navigate
-        to={resolveDashboardPath(user.role)}
-        replace
-      />
-    );
-  }
-
-  if (!requiredRole && !requireAdmin) {
-    return children;
-  }
-
-  if (hasBaseRole) {
-    return children;
-  }
-
-  if (requiredRole === "ORG_ADMIN" && hasOrgRole) {
-    return children;
-  }
-
-  if (requiredRole === "OWNER" && hasOwnerAccess) {
+  if (
+    canAccessRoute({
+      userRole: user.role,
+      requiredRole,
+      requireAdmin,
+      isAdminUser,
+      hasOrgRole,
+    })
+  ) {
     return children;
   }
 
