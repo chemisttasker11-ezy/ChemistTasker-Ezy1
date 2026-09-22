@@ -6,6 +6,7 @@ import {FileText,Download,Globe,Pin,ThumbsUp,MessageCircle,Share2} from 'lucide-
 import RichContent from '@/components/rich-content';
 import {chemistTaskerApi} from '@/lib/chemisttasker-api';
 import type {PublicPost} from './community-client';
+import {safeHubAttachmentUrl} from '@/lib/safe-hub-attachment';
 
 export default function PostEntry({post,feed=false,onChange}:{post:PublicPost;feed?:boolean;onChange?:()=>Promise<void>}) {
  const session=useSession();
@@ -19,9 +20,9 @@ export default function PostEntry({post,feed=false,onChange}:{post:PublicPost;fe
   {post.editorial?<article className="ct-preview"><h2>{post.editorial.title}</h2><RichContent document={post.editorial.body_document}/></article>:<p className="ct-post-body">{post.body}</p>}
   {!!post.attachments.length&&<div className="ct-post-media" data-multiple={post.attachments.length>1}>{post.attachments.map(a=>{
    const kind=a.kind.toLowerCase(),type=a.content_type||'';
-   const url=a.url.replace('/public-hub/','/hub/');
+   const url=safeHubAttachmentUrl(a.url,a.id);
    const name=a.name||`Attachment ${a.id}`;
-   if(failed.includes(a.id)) return <div className="ct-file-preview" key={a.id}><FileText size={24}/><strong>{name}</strong><small>This attachment is currently unavailable.</small></div>;
+   if(!url||failed.includes(a.id)) return <div className="ct-file-preview" key={a.id}><FileText size={24}/><strong>{name}</strong><small>This attachment is currently unavailable.</small></div>;
    if(['image','gif'].includes(kind)||type.startsWith('image/')) return <a key={a.id} className="ct-photo" href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`Photo shared by ${post.author_name}`} loading="lazy" onError={()=>setFailed(ids=>[...ids,a.id])}/></a>;
    if(type.startsWith('video/')) return <video key={a.id} controls onError={()=>setFailed(ids=>[...ids,a.id])} preload="metadata" aria-label={name} src={url}>Your browser cannot play this video. <a href={url}>Download video</a></video>;
    if(type.startsWith('audio/')) return <div key={a.id} className="ct-file-preview"><strong>{name}</strong><audio controls onError={()=>setFailed(ids=>[...ids,a.id])} preload="metadata" src={url}/></div>;
