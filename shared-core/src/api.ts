@@ -86,7 +86,13 @@ function assertRequestPolicy(baseURL, targetUrl, policy = {}) {
     }
 }
 async function performApiRequest(endpoint, options = {}, policy = {}) {
-    const { baseURL, getToken, credentials = 'include' } = getApiConfig();
+    const {
+        baseURL,
+        getToken,
+        refreshToken,
+        onAuthFailure,
+        credentials = 'include',
+    } = getApiConfig();
     const { skipAuth = false, ...requestOptions } = options;
     const includeAuth = !skipAuth;
     const targetUrl = buildRequestUrl(baseURL, endpoint);
@@ -95,21 +101,40 @@ async function performApiRequest(endpoint, options = {}, policy = {}) {
     if (body && !(body instanceof FormData) && typeof body !== 'string') {
         body = JSON.stringify(body);
     }
-    const token = includeAuth ? await getToken() : null;
-    const headers = new Headers(requestOptions.headers || {});
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    }
     const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
-    if (!multipart && (body !== undefined || policy.jsonContentTypeWithoutBody)) {
-        if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    const send = async (token) => {
+        const headers = new Headers(requestOptions.headers || {});
+        if (token) {
+            headers.set('Authorization', `Bearer ${token}`);
+        }
+        if (!multipart && (body !== undefined || policy.jsonContentTypeWithoutBody)) {
+            if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+        }
+        return fetch(targetUrl, {
+            ...requestOptions,
+            body,
+            headers,
+            credentials,
+        });
+    };
+
+    let response = await send(includeAuth ? await getToken() : null);
+    if (response.status === 401 && includeAuth && refreshToken) {
+        let refreshedToken = null;
+        try {
+            refreshedToken = await refreshToken();
+        }
+        catch (error) {
+            if (onAuthFailure) await onAuthFailure();
+            throw error;
+        }
+        if (refreshedToken) {
+            response = await send(refreshedToken);
+        }
     }
-    const response = await fetch(targetUrl, {
-        ...requestOptions,
-        body,
-        headers,
-        credentials,
-    });
+    if (response.status === 401 && includeAuth && onAuthFailure) {
+        await onAuthFailure();
+    }
     if (!response.ok) {
         throw new Error(await parseApiError(response));
     }
