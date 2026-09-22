@@ -29,13 +29,14 @@ async function decode<T>(response:Response):Promise<T>{
  if(!response.ok)throw Object.assign(new Error(typeof data.detail==='string'?data.detail:Object.entries(data).map(([key,v])=>`${key}: ${Array.isArray(v)?v.join(' '):JSON.stringify(v)}`).join(' ')||'Request failed.'),{status:response.status});
  return data;
 }
-export async function csrfToken(root='/api') {const result=await decode<{csrfToken:string}>(await fetch(`${root}/users/csrf/`,{credentials:'include',cache:'no-store'}));return result.csrfToken;}
+export async function csrfToken(root='/api') {const result=await decode<{csrfToken:string}>(await fetch(`${root}/users/csrf/`,{credentials:'include',cache:'no-store',headers:{'X-Client-Platform':'web'}}));return result.csrfToken;}
 let signingOut:Promise<void>|undefined;
-let pending:Promise<{access:string;refresh:string}>|undefined;
+type BrowserRefresh={access:string;refresh?:string};
+let pending:Promise<BrowserRefresh>|undefined;
 export function refreshBrowserSession(root='/api') {
  if(signingOut)return Promise.reject(Object.assign(new Error('You have signed out.'),{status:401}));
  if(pending)return pending;
- const renew=async()=>decode<{access:string;refresh:string}>(await fetch(`${root}/users/token/refresh/`,{method:'POST',credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root)},body:'{}'}));
+ const renew=async()=>decode<BrowserRefresh>(await fetch(`${root}/users/token/refresh/`,{method:'POST',credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root),'X-Client-Platform':'web'},body:'{}'}));
  // Read cookies only once the lock is acquired, so rotation in another tab is visible.
  pending=(async()=>navigator.locks?await navigator.locks.request('chemisttasker-refresh',renew):await refreshWithLease(renew))().finally(()=>{pending=undefined;});return pending;
 }
@@ -55,7 +56,7 @@ async function refreshWithLease<T>(renew:()=>Promise<T>):Promise<T>{
  throw new Error('Your session is busy in another tab. Please retry.');
 }
 export async function browserRequest<T>(url:string,method='GET',body?:unknown,retry=true):Promise<T>{
- const headers:Record<string,string>={};const multipart=body instanceof FormData;
+ const headers:Record<string,string>={'X-Client-Platform':'web'};const multipart=body instanceof FormData;
  if(!['GET','HEAD'].includes(method))headers['X-CSRFToken']=await csrfToken();
  if(!multipart)headers['Content-Type']='application/json';
  const response=await fetch(url,{method,headers,credentials:'include',cache:'no-store',body:body===undefined?undefined:multipart?body:JSON.stringify(body)});
@@ -67,7 +68,7 @@ export async function browserRequest<T>(url:string,method='GET',body?:unknown,re
 }
 export function logoutSession(root='/api'):Promise<void> {
  if(signingOut)return signingOut;
- const clear=async()=>{await decode(await fetch(`${root}/users/logout/`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root)},body:'{}'}));announceSession('logout');};
+ const clear=async()=>{await decode(await fetch(`${root}/users/logout/`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root),'X-Client-Platform':'web'},body:'{}'}));announceSession('logout');};
  signingOut=(async()=>{if(pending)await pending.catch(()=>{});if(navigator.locks)await navigator.locks.request('chemisttasker-refresh',clear);else await refreshWithLease(clear);})().finally(()=>{signingOut=undefined;});
  return signingOut;
 }

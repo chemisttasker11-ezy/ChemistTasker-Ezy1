@@ -6,6 +6,7 @@ import { csrfToken, refreshBrowserSession } from '@/shared/browser-session';
 const browserFetch: typeof fetch = async (input, init = {}) => {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
+  headers.set('X-Client-Platform', 'web');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !headers.has('X-CSRFToken')) {
     headers.set('X-CSRFToken', await csrfToken());
   }

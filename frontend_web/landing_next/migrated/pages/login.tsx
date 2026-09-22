@@ -76,14 +76,16 @@ export default function Login() {
       const { data } = await axios.post(
         `${API_BASE_URL}${API_ENDPOINTS.login}`,
         { email: email.toLowerCase(), password, remember_me: rememberMe },
-        { withCredentials: true, headers: { "X-CSRFToken": csrfSession.data.csrfToken } }
+        { withCredentials: true, headers: { "X-CSRFToken": csrfSession.data.csrfToken, "X-Client-Platform": "web" } }
       );
       const { access, refresh, user: userInfo } = data;
-      if (!access || !refresh) {
-        throw new Error('Both access and refresh tokens are required');
+      if (!access || !userInfo) {
+        throw new Error('Login response is missing the authenticated session');
       }
 
-      login(access, refresh, userInfo, rememberMe);
+      // The refresh credential remains in the HttpOnly cookie for web clients.
+      // Only the short-lived access token is intentionally exposed to JS memory.
+      login(access, refresh || '', userInfo, rememberMe);
       announceSession('login');
       const destination=returnDestination();
       if(destination){rememberDestination(destination);finishDestination(destination);return;}

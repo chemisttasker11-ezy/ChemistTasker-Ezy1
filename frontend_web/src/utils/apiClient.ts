@@ -12,11 +12,12 @@ const apiClient = axios.create({
 
 /**
  * REQUEST interceptor
- * - Injects the JWT Bearer token from localStorage.
+ * - Injects the short-lived JWT Bearer token from in-memory auth state.
  */
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     config.withCredentials = true;
+    config.headers['X-Client-Platform'] = 'web';
     const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
