@@ -100,6 +100,7 @@ describe('createChemistTaskerApi public content', () => {
       { url: 'https://example.test/api/public-hub/comments/9/report/', method: 'POST', body: JSON.stringify({ reason: 'unsafe' }) },
     ]);
   });
+});
 
 describe('createChemistTaskerApi named community operations', () => {
   it('uses canonical login and original Hub endpoint owners without client-local routes', async () => {
