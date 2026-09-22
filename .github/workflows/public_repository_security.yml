@@ -30,7 +30,7 @@ jobs:
             exit 1
           fi
 
-      - name: Reject high-confidence credential patterns
+      - name: Reject high-confidence credential patterns in tracked files
         shell: bash
         run: |
           set -euo pipefail
@@ -48,6 +48,7 @@ jobs:
           ]
           allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
           findings = []
+
           for raw in files:
               if not raw:
                   continue
@@ -63,29 +64,21 @@ jobs:
               for label, pattern in patterns:
                   if pattern.search(data):
                       findings.append((str(path), label))
+
           if findings:
               for path, label in findings:
                   print(f"Credential pattern detected in {path}: {label}")
                   print(f"::error file={path}::{label} pattern detected")
               sys.exit(1)
+
           print("No high-confidence credential patterns found in tracked text files.")
           PY
-
 
       - name: Reject secret-bearing filenames anywhere in Git history
         shell: bash
         run: |
           set -euo pipefail
-          bad="$(git log --all --name-only --pretty=format: | sed '/^$/d' | sort -u | grep -Ei '(^|/)(\.env($|\.)|google-services\.json$|GoogleService-Info\.plist$|.*firebase-adminsdk.*\.json$|.*service-account.*\.json$|id_rsa$|id_ed25519$|.*\.(pem|key|p8|p12|pfx|jks|keystore|mobileprovision|ovpn)$)' | grep -Ev '(^|/)\.env\.(example|sample|template)        shell: bash
-        run: |
-          set -euo pipefail
-          bad="$(git ls-files | grep -Ei '\.(sqlite3?|db|sql|dump)$' || true)"
-          if [ -n "$bad" ]; then
-            echo "::error::Database/runtime data files are tracked:"
-            printf '%s\n' "$bad"
-            exit 1
-          fi
- || true)"
+          bad="$(git log --all --name-only --pretty=format: | sed '/^$/d' | sort -u | grep -Ei '(^|/)(\.env($|\.)|google-services\.json$|GoogleService-Info\.plist$|.*firebase-adminsdk.*\.json$|.*service-account.*\.json$|id_rsa$|id_ed25519$|.*\.(pem|key|p8|p12|pfx|jks|keystore|mobileprovision|ovpn)$)' | grep -Ev '(^|/)\.env\.(example|sample|template)$' || true)"
           if [ -n "$bad" ]; then
             echo "::error::Secret-bearing or deployment credential filenames exist in Git history:"
             printf '%s\n' "$bad"
@@ -108,13 +101,15 @@ jobs:
               ("Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{30,}")),
           ]
           allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
+
           objects = {}
-          for line in subprocess.check_output(["git", "rev-list", "--objects", "--all"], text=True, errors="surrogateescape").splitlines():
+          output = subprocess.check_output(["git", "rev-list", "--objects", "--all"], text=True, errors="surrogateescape")
+          for line in output.splitlines():
               sha, sep, path = line.partition(" ")
               if sep and path and sha not in objects:
                   objects[sha] = path
 
-          batch = subprocess.run(
+          checked = subprocess.run(
               ["git", "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
               input="\n".join(objects) + "\n",
               text=True,
@@ -123,13 +118,17 @@ jobs:
           ).stdout
 
           candidates = []
-          for row in batch.splitlines():
+          for row in checked.splitlines():
               parts = row.split()
-              if len(parts) != 3 or parts[1] != "blob":
+              if len(parts) != 3:
                   continue
-              sha, _, size = parts
+              sha, object_type, object_size = parts
+              if object_type != "blob":
+                  continue
               path = objects.get(sha, "")
-              if not path or int(size) > 5_000_000 or pathlib.Path(path).suffix.lower() in allow_suffixes:
+              if not path or int(object_size) > 5_000_000:
+                  continue
+              if pathlib.Path(path).suffix.lower() in allow_suffixes:
                   continue
               candidates.append((sha, path))
 
