@@ -89,20 +89,32 @@ backend_run python manage.py test workforce.tests worker_finance.tests --setting
 backend_run python manage.py test worker_finance.tests --settings=worker_finance.tests.settings
 
 echo "== PostgreSQL migration / concurrency QA =="
-docker network create "$qa_network" >/dev/null
-docker run -d --rm   --name "$pg_container"   --network "$qa_network"   -e POSTGRES_DB=chemisttasker_ci   -e POSTGRES_USER=postgres   -e POSTGRES_PASSWORD=postgres   postgres:16-alpine >/dev/null
+# GitHub Actions provides the healthy PostgreSQL service on localhost.
+# Backend tests stay containerised; host networking lets that container use
+# the same proven database service as the canonical consolidation workflow.
+docker run --rm \
+  --network host \
+  "${common_env[@]}" \
+  -e USE_PROD_DB=False \
+  -e LOCAL_DB_NAME=chemisttasker_ci \
+  -e LOCAL_DB_USER=postgres \
+  -e LOCAL_DB_PASSWORD=postgres \
+  -e LOCAL_DB_HOST=127.0.0.1 \
+  -e LOCAL_DB_PORT=5432 \
+  "$backend_image" \
+  python manage.py migrate --noinput --settings=core.postgres_test_settings
 
-for _ in $(seq 1 60); do
-  if docker exec "$pg_container" pg_isready -U postgres -d chemisttasker_ci >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-docker exec "$pg_container" pg_isready -U postgres -d chemisttasker_ci >/dev/null
-
-docker run --rm   --network "$qa_network"   "${common_env[@]}"   -e USE_PROD_DB=False   -e LOCAL_DB_NAME=chemisttasker_ci   -e LOCAL_DB_USER=postgres   -e LOCAL_DB_PASSWORD=postgres   -e LOCAL_DB_HOST="$pg_container"   -e LOCAL_DB_PORT=5432   "$backend_image"   python manage.py migrate --noinput --settings=core.postgres_test_settings
-
-docker run --rm   --network "$qa_network"   "${common_env[@]}"   -e USE_PROD_DB=False   -e LOCAL_DB_NAME=chemisttasker_ci   -e LOCAL_DB_USER=postgres   -e LOCAL_DB_PASSWORD=postgres   -e LOCAL_DB_HOST="$pg_container"   -e LOCAL_DB_PORT=5432   "$backend_image"   python manage.py test client_profile.test_postgres_concurrency --settings=core.postgres_test_settings
+docker run --rm \
+  --network host \
+  "${common_env[@]}" \
+  -e USE_PROD_DB=False \
+  -e LOCAL_DB_NAME=chemisttasker_ci \
+  -e LOCAL_DB_USER=postgres \
+  -e LOCAL_DB_PASSWORD=postgres \
+  -e LOCAL_DB_HOST=127.0.0.1 \
+  -e LOCAL_DB_PORT=5432 \
+  "$backend_image" \
+  python manage.py test client_profile.test_postgres_concurrency --settings=core.postgres_test_settings
 
 echo "== Tauri / Rust QA =="
 docker run --rm   -v "$ROOT_DIR:/src:ro"   rust:1-bookworm   bash -lc '
