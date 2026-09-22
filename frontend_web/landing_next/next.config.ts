@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import path from 'node:path';
 
 const dashboard=process.env.DASHBOARD_INTERNAL_URL||'http://127.0.0.1:5173';
 const dashboardPublic=process.env.DASHBOARD_PUBLIC_URL||'http://localhost:5173';
@@ -24,7 +25,9 @@ const config:NextConfig={
  poweredByHeader:false,
  output:'standalone',
  skipTrailingSlashRedirect:true,
- turbopack:{root:__dirname},
+ // Include the repository root so Turbopack can resolve the linked
+ // file:../../shared-core package used by local installs.
+ turbopack:{root:path.resolve(__dirname,'../..')},
 
  async redirects(){
   if(!isDev)return [];

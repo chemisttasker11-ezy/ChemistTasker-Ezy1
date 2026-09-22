@@ -16,7 +16,7 @@ const pretty = (value?: string | null) => String(value || '').replaceAll('_', ' 
 
 export default function WorkforceSettingsScreen() {
   const router = useRouter();
-  const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
+  const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [payroll, setPayroll] = useState<WorkforcePayrollConfiguration | null>(null);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);

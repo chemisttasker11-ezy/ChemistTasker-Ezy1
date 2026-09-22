@@ -16,6 +16,9 @@ function run(args) {
     cwd: sharedCore,
     stdio: 'inherit',
     env: process.env,
+    // Windows does not execute .cmd shims directly through spawnSync.
+    // Run the npm shim through the platform shell while keeping Unix direct.
+    shell: process.platform === 'win32',
   });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);

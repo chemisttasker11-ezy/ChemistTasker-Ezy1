@@ -36,7 +36,11 @@ from client_profile.serializers import (
     RosterAssignmentSerializer,
 )
 from client_profile.services import validate_internal_invoice_shifts
-from client_profile.views import MembershipApplicationViewSet, ShiftOfferViewSet
+from client_profile.views import (
+    MembershipApplicationViewSet,
+    ShiftOfferViewSet,
+    SubmitMembershipApplication,
+)
 from client_profile.utils import finalize_shift_offer
 from workforce.models import Timesheet, TimesheetPeriod
 
@@ -176,6 +180,36 @@ class MembershipApplicationIntegrityTests(TestCase):
         self.assertEqual(args[1], app.id)
         self.assertEqual(args[2][0]["field"], "job_title")
         self.assertEqual(args[2][0]["to"], "Senior Pharmacist")
+
+    def test_public_application_succeeds_when_notification_queue_is_unavailable(self):
+        factory = APIRequestFactory()
+        payload = self._payload()
+        payload.pop("invite_link")
+        request = factory.post(
+            f"/client-profile/magic/memberships/{self.staff_link.token}/apply/",
+            payload,
+            format="json",
+        )
+
+        with patch(
+            "client_profile.views.async_task",
+            side_effect=ConnectionError("notification queue unavailable"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = SubmitMembershipApplication.as_view()(
+                    request,
+                    token=str(self.staff_link.token),
+                )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            MembershipApplication.objects.filter(
+                pharmacy=self.pharmacy,
+                email="candidate@example.com",
+                status="PENDING",
+            ).count(),
+            1,
+        )
 
     def test_payment_profile_summary_is_safe_and_reports_tfn_readiness(self):
         worker = User.objects.create_user(

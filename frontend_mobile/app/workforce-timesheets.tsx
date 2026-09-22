@@ -30,7 +30,7 @@ function currentFortnight() {
 
 export default function WorkforceTimesheetsScreen() {
   const router = useRouter();
-  const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
+  const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [periods, setPeriods] = useState<WorkforceTimesheetPeriod[]>([]);
   const [periodId, setPeriodId] = useState<number | null>(null);

@@ -2916,9 +2916,12 @@ class SubmitMembershipApplication(APIView):
             )
 
             # async notify owner + admins only after the application commits
-            transaction.on_commit(lambda app_id=app.id: async_task(
-                'client_profile.tasks.email_membership_application_submitted', app_id
-            ))
+            transaction.on_commit(
+                lambda app_id=app.id: async_task(
+                    'client_profile.tasks.email_membership_application_submitted', app_id
+                ),
+                robust=True,
+            )
 
         return Response(MembershipApplicationSerializer(app).data, status=201)
 
