@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Card, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
 
 type Tool = { title: string; subtitle: string; icon: string; route: string };
 
@@ -35,9 +36,23 @@ const managerRoles = new Set(['OWNER','ORGANIZATION','ORG_ADMIN','ORG_OWNER','OR
 
 export default function ParityToolsCard() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, hasCapability } = useAuth();
+  const { selectedPharmacyId } = useWorkspace();
   const role = String(user?.role || '').toUpperCase();
-  const tools = useMemo(() => managerRoles.has(role) ? managerTools : role === 'EXPLORER' ? explorerTools : workerTools, [role]);
+  const tools = useMemo(() => {
+    if (role === 'EXPLORER') return explorerTools;
+    if (managerRoles.has(role)) return managerTools;
+
+    const canManageRoster = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
+    const canManageStaff = canManageRoster || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+    if (!canManageRoster && !canManageStaff) return workerTools;
+
+    const delegated: Tool[] = [];
+    if (canManageStaff) delegated.push(managerTools[0]);
+    if (canManageRoster) delegated.push(managerTools[1]);
+    delegated.push(...workerTools);
+    return delegated.filter((tool, index, rows) => rows.findIndex((candidate) => candidate.route === tool.route) === index);
+  }, [hasCapability, role, selectedPharmacyId]);
 
   return (
     <View style={styles.section}>
