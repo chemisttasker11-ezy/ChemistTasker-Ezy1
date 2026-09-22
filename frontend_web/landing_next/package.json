@@ -15,7 +15,7 @@
     "@emotion/styled": "11.14.1",
     "@fontsource/inter": "^5.2.0",
     "@fontsource/outfit": "^5.2.0",
-    "@mui/icons-material": "7.3.11",
+    "@mui/icons-material": "9.4.0",
     "@mui/material": "7.3.11",
     "@mui/x-date-pickers": "8.29.0",
     "@react-google-maps/api": "2.20.8",
