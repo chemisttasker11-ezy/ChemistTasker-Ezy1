@@ -17,7 +17,7 @@
     "@fontsource/inter": "^5.2.0",
     "@fontsource/outfit": "^5.2.0",
     "@mui/icons-material": "7.3.11",
-    "@mui/material": "7.3.11",
+    "@mui/material": "9.4.0",
     "@mui/x-date-pickers": "8.29.0",
     "@react-google-maps/api": "2.20.8",
     "@tiptap/extension-image": "^3.31.3",
