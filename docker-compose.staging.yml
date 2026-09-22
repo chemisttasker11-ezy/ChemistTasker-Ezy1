@@ -65,7 +65,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:8-alpine
+    image: redis:8.8.2-alpine
     container_name: chemisttasker_redis_staging
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
@@ -191,7 +191,7 @@ services:
       start_period: 30s
 
   gateway:
-    image: nginx:1.27-alpine
+    image: nginx:1.27.5-alpine
     container_name: chemisttasker_gateway_staging
     restart: unless-stopped
     depends_on:
@@ -214,7 +214,7 @@ services:
       start_period: 30s
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.9.1
     container_name: chemisttasker_cloudflared_staging
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "--url", "http://gateway:8080"]

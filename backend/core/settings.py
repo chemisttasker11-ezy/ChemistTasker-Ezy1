@@ -423,11 +423,11 @@ BACKEND_CSP_POLICY = env(
     "BACKEND_CSP_POLICY",
     default=(
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com http://cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com http://cdnjs.cloudflare.com; "
+        "script-src 'self' https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
         "img-src 'self' data: https://*.blob.core.windows.net; "
         "font-src 'self' data:; "
-        "connect-src 'self' https://cdnjs.cloudflare.com http://cdnjs.cloudflare.com; "
+        "connect-src 'self'; "
         "frame-ancestors 'none'; "
         "object-src 'none'; "
         "base-uri 'self'; "
