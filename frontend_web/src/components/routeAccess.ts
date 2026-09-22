@@ -4,6 +4,8 @@ export type RouteAccessInput = {
   requireAdmin?: boolean;
   isAdminUser?: boolean;
   hasOrgRole?: boolean;
+  requiresCapability?: boolean;
+  hasRequiredCapability?: boolean;
 };
 
 export function canAccessRoute({
@@ -12,7 +14,10 @@ export function canAccessRoute({
   requireAdmin = false,
   isAdminUser = false,
   hasOrgRole = false,
+  requiresCapability = false,
+  hasRequiredCapability = false,
 }: RouteAccessInput): boolean {
+  if (requiresCapability && !hasRequiredCapability) return false;
   if (requireAdmin) return isAdminUser;
   if (!requiredRole) return true;
   if (userRole === requiredRole) return true;
