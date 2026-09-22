@@ -54,6 +54,15 @@ const ratePairs = (row: any) => [
   ['Late night', row?.rate_late_night],
 ].filter(([, value]) => value != null && value !== '');
 
+const engagementStatus = (row: any) => {
+  const today = isoDate();
+  const start = String(row?.effective_from || '');
+  const end = String(row?.effective_to || '');
+  if (start && start > today) return 'Future';
+  if (end && end < today) return 'Historical';
+  return 'Current';
+};
+
 function usePharmacy() {
   const workspace = useWorkspace();
   const router = useRouter();
@@ -237,7 +246,7 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
                 { label: 'Effective from', value: target.effective_from || '—' },
                 { label: 'Effective to', value: target.effective_to || 'Current', tone: target.effective_to ? 'warning' : 'success' },
               ]} />
-              <DataRow title="Classification" subtitle={target.award_classification || 'Not recorded'} status={target.terms_editable ? 'Editable future terms' : 'Historical'} />
+              <DataRow title="Classification" subtitle={target.award_classification || 'Not recorded'} status={target.terms_editable ? 'Editable future terms' : engagementStatus(target)} />
               {ratePairs(target).map(([label, value]) => <DataRow key={label} title={label} right={<Text variant="titleSmall">{money(value)}/hr</Text>} />)}
               {target.notes ? <InfoNote title="Notes">{target.notes}</InfoNote> : null}
             </Section>
@@ -302,7 +311,7 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
             key={row.public_id || row.id}
             title={row.worker_name || row.worker?.name || `Membership #${row.membership_id}`}
             subtitle={`${replaceUnderscore(row.employment_type)} · ${row.award_classification || replaceUnderscore(row.role)} · ${row.effective_from || '—'} → ${row.effective_to || 'Current'}`}
-            status={row.effective_to ? 'Historical' : 'Active'}
+            status={engagementStatus(row)}
             onPress={() => router.push(`/workforce/employment-engagements/${row.public_id || row.id}` as any)}
           />
         )) : <EmptyState title="No employment engagements" body="Add dated employment terms for eligible employee memberships." actionLabel="New engagement" onAction={() => router.push('/workforce/employment-engagements/new' as any)} />}
@@ -459,11 +468,16 @@ function EngagementEditor({
   const superseded = params.supersedes ? engagements.find((row) => String(row.public_id || row.id) === String(params.supersedes)) : null;
   const source = editing || superseded;
   const historical = Boolean(editing && editing.terms_editable === false);
+  const completedHistorical = Boolean(historical && editing?.effective_to && String(editing.effective_to) < isoDate());
+  const today = isoDate();
+  const successorEffectiveFrom = superseded && String(superseded.effective_from || '') === today
+    ? isoDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
+    : today;
   const initialMembership = params.membershipId ? Number(params.membershipId) : source?.membership_id ? Number(source.membership_id) : null;
   const [membershipId, setMembershipId] = useState<number | null>(initialMembership);
   const worker = staff.find((row) => Number(row.membership_id) === membershipId);
   const [employmentType, setEmploymentType] = useState(String(source?.employment_type || worker?.employment_type || 'FULL_TIME'));
-  const [effectiveFrom, setEffectiveFrom] = useState(String(editing?.effective_from || isoDate()));
+  const [effectiveFrom, setEffectiveFrom] = useState(String(editing?.effective_from || successorEffectiveFrom));
   const [effectiveTo, setEffectiveTo] = useState(String(editing?.effective_to || ''));
   const [jobTitle, setJobTitle] = useState(String(source?.job_title || ''));
   const [payBasis, setPayBasis] = useState(String(source?.pay_basis || 'AWARD'));
@@ -535,10 +549,12 @@ function EngagementEditor({
     setLocalError('');
     try {
       if (historical && editing) {
-        await workforce.updateEmploymentEngagement(editing.public_id, {
-          effective_to: effectiveTo || null,
-          notes,
-        });
+        await workforce.updateEmploymentEngagement(
+          editing.public_id,
+          completedHistorical
+            ? { notes }
+            : { effective_to: effectiveTo || null, notes },
+        );
       } else {
         const payload: any = {
           membership_id: membershipId,
@@ -587,12 +603,37 @@ function EngagementEditor({
     }
   };
 
-  const title = historical ? 'End engagement / notes' : editing ? 'Edit future engagement' : params.supersedes ? 'Create successor terms' : 'Create engagement';
+  const enabledPartTimeDays = partTimeDays.filter((day) => day.enabled);
+  const partTimePatternComplete = employmentType !== 'PART_TIME' || (
+    enabledPartTimeDays.length > 0
+    && enabledPartTimeDays.every(
+      (day) => Boolean(day.start_time && day.end_time && (!day.meal_break_minutes || day.meal_break_start)),
+    )
+  );
+  const aboveAwardComplete = payBasis !== 'ABOVE_AWARD' || Boolean(
+    rates.rate_weekday
+    && rates.rate_saturday
+    && rates.rate_sunday
+    && rates.rate_public_holiday
+    && (!rates.early_morning_applicable || rates.rate_early_morning)
+    && (!rates.late_night_applicable || rates.rate_late_night)
+  );
+  const canSave = historical || Boolean(
+    membershipId
+    && classification
+    && effectiveFrom
+    && partTimePatternComplete
+    && aboveAwardComplete
+  );
+
+  const title = completedHistorical ? 'Update historical notes' : historical ? 'End engagement / notes' : editing ? 'Edit future engagement' : params.supersedes ? 'Create successor terms' : 'Create engagement';
 
   return (
     <ParityPage title={title} subtitle={subtitleFor['engagement-new']} loading={loading} error={error || localError}>
       <InfoNote title={pharmacyName || `Pharmacy #${pharmacyId}`}>
-        {historical
+        {completedHistorical
+          ? 'Completed employment terms are locked for payroll history. The end date is immutable; only notes can be amended.'
+          : historical
           ? 'Started employment terms are locked for payroll history. Only the end date and notes can be amended.'
           : params.supersedes
             ? 'Saving successor terms atomically ends the current engagement on the day before the new effective date.'
@@ -617,7 +658,7 @@ function EngagementEditor({
       {worker ? (
         <>
           <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} disabled={historical} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
-          <Field label="Effective to (optional, YYYY-MM-DD)" value={effectiveTo} onChangeText={setEffectiveTo} />
+          <Field label="Effective to (optional, YYYY-MM-DD)" value={effectiveTo} disabled={completedHistorical} onChangeText={setEffectiveTo} />
 
           {!historical ? (
             <>
@@ -734,7 +775,7 @@ function EngagementEditor({
           <Button
             mode="contained"
             loading={busy}
-            disabled={busy || !membershipId || (!historical && (!classification || !effectiveFrom))}
+            disabled={busy || !canSave}
             onPress={() => void save()}
           >
             {historical ? 'Save end date / notes' : editing ? 'Save changes' : 'Save engagement'}
