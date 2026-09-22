@@ -8,7 +8,33 @@ The staging stack uses its own PostgreSQL database, Redis instance, media/static
 
 The public preview is provided by a Cloudflare Quick Tunnel, so the initial staging setup does not require a DNS change or a production Nginx change. The generated `trycloudflare.com` URL is HTTPS. If the tunnel container is recreated the URL can change; a permanent `staging.chemisttasker.com.au` hostname can be added later.
 
-Third-party services are intentionally blank in staging by default: email, SMS, Stripe, OCR, ScrapingBee and Azure storage are not connected. This prevents staging activity from triggering real external actions.
+Email, SMS, Stripe, OCR, ScrapingBee and Azure storage remain intentionally disconnected in staging by default so preview activity cannot trigger real messages, payments, paid lookups or production file writes.
+
+## Browser integrations
+
+The staging build now requires all browser variables that the consolidated web applications actually use:
+
+- Vite uses same-origin `/api`, the Maps/Places browser key, the reCAPTCHA site key and the public-site bridge flag.
+- Next uses the exact preview origin for both site and platform URLs, plus the same Maps/Places browser key and reCAPTCHA site key.
+- Django uses the matching reCAPTCHA secret and the exact preview origin for CORS/CSRF/frontend URLs.
+
+Values are kept in ignored server-side files under `env/`; they are never committed.
+
+On first deployment, `scripts/deploy-staging.sh` attempts to copy only these three values from the existing production env files without printing them:
+
+- `VITE_Maps_API_KEY`
+- `VITE_RECAPTCHA_SITE_KEY`
+- `RECAPTCHA_SECRET_KEY`
+
+It stores them as `env/staging.integrations.env`. A dedicated staging key pair can replace that file later without changing code.
+
+Because the temporary preview hostname changes, Google-side restrictions must also allow the staging host:
+
+- Google Maps browser key: allow the HTTPS referrer `https://*.trycloudflare.com`. Google supports wildcard subdomains for website restrictions.
+- reCAPTCHA: add `trycloudflare.com` to the allowed Domains list; Google treats its subdomains as allowed too.
+- For local consolidated development, also allow `http://localhost:3000` for the Maps browser key and add `localhost` to reCAPTCHA. Add `http://127.0.0.1:3000` as a Maps referrer if you use that hostname.
+
+A permanent `staging.chemisttasker.com.au` origin is preferable later because it lets both Google services use a narrow, stable allowlist instead of the broad temporary tunnel domain.
 
 ## One-time self-hosted runner setup
 
@@ -30,7 +56,7 @@ The workflow deploys the isolated stack to:
 
 `/opt/apps/chemisttasker-staging`
 
-Server-generated staging database/Django secrets live under the ignored `env/` directory in that staging folder and are preserved between deployments.
+Server-generated staging database/Django secrets and browser-integration values live under the ignored `env/` directory in that staging folder and are preserved between deployments.
 
 Once the runner shows **Idle** in GitHub, the queued **Staging Preview** workflow can run. Every later push to `staging` redeploys the preview automatically.
 

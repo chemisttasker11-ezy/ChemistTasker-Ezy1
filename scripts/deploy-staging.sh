@@ -7,18 +7,76 @@ cd "$ROOT_DIR"
 mkdir -p env
 SECRETS_FILE="env/staging.secrets.env"
 RUNTIME_FILE="env/staging.runtime.env"
+INTEGRATIONS_FILE="env/staging.integrations.env"
+PRODUCTION_ENV_DIR="${PRODUCTION_ENV_DIR:-/opt/apps/chemisttasker/env}"
+
+read_dotenv_value() {
+  local file="$1"
+  local key="$2"
+  python3 - "$file" "$key" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+if not path.exists():
+    raise SystemExit(0)
+
+for raw in path.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    name, value = line.split("=", 1)
+    if name.strip() != key:
+        continue
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    print(value)
+    break
+PY
+}
 
 if [[ ! -f "$SECRETS_FILE" ]]; then
   umask 077
   {
-    printf 'STAGING_POSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)"
-    printf 'STAGING_DJANGO_SECRET_KEY=%s\n' "$(openssl rand -hex 48)"
+    printf 'STAGING_POSTGRES_PASSWORD=%q\n' "$(openssl rand -hex 24)"
+    printf 'STAGING_DJANGO_SECRET_KEY=%q\n' "$(openssl rand -hex 48)"
   } > "$SECRETS_FILE"
 fi
 
 if [[ ! -f "$RUNTIME_FILE" ]]; then
   umask 077
-  printf 'STAGING_PUBLIC_URL=https://preview.invalid\n' > "$RUNTIME_FILE"
+  printf 'STAGING_PUBLIC_URL=%q\n' "https://preview.invalid" > "$RUNTIME_FILE"
+fi
+
+if [[ ! -f "$INTEGRATIONS_FILE" ]]; then
+  prod_web="$PRODUCTION_ENV_DIR/web.prod.env"
+  prod_backend="$PRODUCTION_ENV_DIR/backend.prod.env"
+
+  maps_key="$(read_dotenv_value "$prod_web" "VITE_Maps_API_KEY")"
+  recaptcha_site_key="$(read_dotenv_value "$prod_web" "VITE_RECAPTCHA_SITE_KEY")"
+  recaptcha_secret_key="$(read_dotenv_value "$prod_backend" "RECAPTCHA_SECRET_KEY")"
+
+  if [[ -z "$maps_key" || -z "$recaptcha_site_key" || -z "$recaptcha_secret_key" ]]; then
+    cat >&2 <<'EOF'
+Staging browser integrations are not configured.
+Create env/staging.integrations.env with:
+  STAGING_WEB_MAPS_API_KEY
+  STAGING_RECAPTCHA_SITE_KEY
+  STAGING_RECAPTCHA_SECRET_KEY
+
+No key value is written to Git, logs, or the workflow summary.
+EOF
+    exit 1
+  fi
+
+  umask 077
+  {
+    printf 'STAGING_WEB_MAPS_API_KEY=%q\n' "$maps_key"
+    printf 'STAGING_RECAPTCHA_SITE_KEY=%q\n' "$recaptcha_site_key"
+    printf 'STAGING_RECAPTCHA_SECRET_KEY=%q\n' "$recaptcha_secret_key"
+  } > "$INTEGRATIONS_FILE"
 fi
 
 set -a
@@ -26,7 +84,13 @@ set -a
 source "$SECRETS_FILE"
 # shellcheck disable=SC1090
 source "$RUNTIME_FILE"
+# shellcheck disable=SC1090
+source "$INTEGRATIONS_FILE"
 set +a
+
+: "${STAGING_WEB_MAPS_API_KEY:?STAGING_WEB_MAPS_API_KEY is required}"
+: "${STAGING_RECAPTCHA_SITE_KEY:?STAGING_RECAPTCHA_SITE_KEY is required}"
+: "${STAGING_RECAPTCHA_SECRET_KEY:?STAGING_RECAPTCHA_SECRET_KEY is required}"
 
 compose() {
   docker compose -f docker-compose.staging.yml "$@"
@@ -51,7 +115,7 @@ fi
 
 if [[ "${STAGING_PUBLIC_URL:-}" != "$preview_url" ]]; then
   umask 077
-  printf 'STAGING_PUBLIC_URL=%s\n' "$preview_url" > "$RUNTIME_FILE"
+  printf 'STAGING_PUBLIC_URL=%q\n' "$preview_url" > "$RUNTIME_FILE"
   export STAGING_PUBLIC_URL="$preview_url"
   compose up -d --build landing web celery_worker celery_beat gateway
 fi
