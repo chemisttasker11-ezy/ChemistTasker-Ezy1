@@ -3,7 +3,7 @@ name: Staging Preview
 on:
   push:
     branches:
-      - staging
+      - main
   workflow_dispatch:
 
 permissions:
