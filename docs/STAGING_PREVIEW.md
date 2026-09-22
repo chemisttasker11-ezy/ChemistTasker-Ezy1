@@ -6,27 +6,33 @@ The `staging` branch is the review environment. It is deliberately separate from
 
 The staging stack uses its own PostgreSQL database, Redis instance, media/static/verification volumes, Docker network and container names. It does not connect to the production PostgreSQL database or the production `shared_redis` service.
 
-The public preview is provided by a Cloudflare Quick Tunnel, so the first staging setup does not require a DNS change or a production Nginx change. The generated `trycloudflare.com` URL is HTTPS. If the tunnel container is recreated the URL can change; a permanent `staging.chemisttasker.com.au` hostname can be added later.
+The public preview is provided by a Cloudflare Quick Tunnel, so the initial staging setup does not require a DNS change or a production Nginx change. The generated `trycloudflare.com` URL is HTTPS. If the tunnel container is recreated the URL can change; a permanent `staging.chemisttasker.com.au` hostname can be added later.
 
 Third-party services are intentionally blank in staging by default: email, SMS, Stripe, OCR, ScrapingBee and Azure storage are not connected. This prevents staging activity from triggering real external actions.
 
-## One-time GitHub setup
+## One-time self-hosted runner setup
 
-The OVH host/user come from the existing server runbook. Add only one repository Actions secret:
+GitHub-hosted staging jobs did not start, so staging uses a self-hosted GitHub Actions runner on the existing OVH server. This avoids GitHub-hosted runner capacity/minute limits and does not require storing the OVH private SSH key in GitHub.
 
-- `STAGING_SSH_KEY` — a dedicated private SSH deployment key for the staging workflow.
+In the repository, open:
 
-Enter that key directly in GitHub Actions secrets. Do not paste it into chat or commit it.
+`Settings -> Actions -> Runners -> New self-hosted runner -> Linux -> x64`
 
-The matching public key must be present in the OVH user's `~/.ssh/authorized_keys`.
+On the OVH server, follow GitHub's displayed installation commands as the existing `ubuntu` user. When running the configuration command, add:
 
-The workflow deploys to:
+`--name chemisttasker-staging --labels chemisttasker-staging`
+
+Install/start it as a service using the commands GitHub displays.
+
+The runner user must be able to run Docker without sudo. The existing VPS setup already configures the `ubuntu` user in the Docker group.
+
+The workflow deploys the isolated stack to:
 
 `/opt/apps/chemisttasker-staging`
 
-The server-generated staging database/Django secrets live under the ignored `env/` directory in that staging folder and are preserved between deployments.
+Server-generated staging database/Django secrets live under the ignored `env/` directory in that staging folder and are preserved between deployments.
 
-After `STAGING_SSH_KEY` exists, run **Staging Preview** manually once. Every later push to `staging` redeploys the preview automatically.
+Once the runner shows **Idle** in GitHub, the queued **Staging Preview** workflow can run. Every later push to `staging` redeploys the preview automatically.
 
 ## Review workflow
 
