@@ -70,6 +70,7 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
 
     publicContent: {
       listHubs: () => client.get<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community, undefined, { auth: false }),
+      getSitemap: <T = Array<{ loc: string; lastmod?: string }>>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.sitemap, undefined, { auth: false }),
       listCommunityPosts: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query, { auth: false }),
       listCommunityPolls: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query, { auth: false }),
       getPost: (id: number) => client.get<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id), undefined, { auth: false }),
