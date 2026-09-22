@@ -336,10 +336,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
     setSaving(true);
     setError('');
     try {
-      const historical = Boolean(form.public_id && !form.terms_editable);
-  const completedHistorical = Boolean(historical && form.effective_to && form.effective_to < isoToday());
       if (historical) {
-        const completedHistorical = Boolean(form.effective_to && form.effective_to < isoToday());
         await updateEmploymentEngagement(
           form.public_id,
           completedHistorical
@@ -426,6 +423,9 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
   };
 
   const historical = Boolean(form.public_id && !form.terms_editable);
+  const completedHistorical = Boolean(
+    historical && form.effective_to && form.effective_to < isoToday(),
+  );
   const aboveAwardComplete =
     form.pay_basis !== 'ABOVE_AWARD'
     || Boolean(
@@ -565,7 +565,9 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
 
             {historical && (
               <Alert severity="info">
-                This engagement has started, so its classification and pay terms are locked for payroll history. You may close it or amend notes. Use “New terms” to create a dated successor.
+                {completedHistorical
+                  ? 'This engagement is completed payroll history. Its end date is immutable; only notes may be amended.'
+                  : 'This engagement has started, so its classification and pay terms are locked for payroll history. You may close it or amend notes. Use “New terms” to create a dated successor.'}
               </Alert>
             )}
 

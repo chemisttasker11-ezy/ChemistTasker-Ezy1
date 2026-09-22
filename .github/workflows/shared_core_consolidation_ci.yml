@@ -91,7 +91,8 @@ jobs:
       - name: Use freshly packed shared core
         run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
         working-directory: frontend_web
-      - run: npx tsc --noEmit
+      - name: Typecheck Vite application
+        run: npx tsc -p tsconfig.app.json --noEmit
         working-directory: frontend_web
       - name: Cross-frontend auth flow tests
         run: node --test scripts/auth-flow.test.mjs

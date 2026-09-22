@@ -63,6 +63,14 @@ const engagementStatus = (row: any) => {
   return 'Current';
 };
 
+const nextIsoDate = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+};
+
 function usePharmacy() {
   const workspace = useWorkspace();
   const router = useRouter();
@@ -234,6 +242,15 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
   }
 
   const target = params.id ? engagements.find((row: any) => String(row.public_id || row.id) === String(params.id)) : null;
+  const targetStatus = target ? engagementStatus(target) : null;
+  const currentForTargetMembership = target
+    ? engagements.find(
+        (row: any) =>
+          Number(row.membership_id) === Number(target.membership_id)
+          && engagementStatus(row) === 'Current',
+      )
+    : null;
+  const successorTarget = targetStatus === 'Current' ? target : currentForTargetMembership;
 
   if (screen === 'engagement-detail' || screen === 'rates') {
     return (
@@ -262,7 +279,23 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
               </Section>
             ) : null}
             <ActionButtons>
-              <Button mode="contained" onPress={() => router.push(`/workforce/employment-engagements/new?membershipId=${target.membership_id}&supersedes=${target.public_id}` as any)}>New terms</Button>
+              {targetStatus !== 'Future' ? (
+                successorTarget ? (
+                  <Button
+                    mode="contained"
+                    onPress={() => router.push(`/workforce/employment-engagements/new?membershipId=${target.membership_id}&supersedes=${successorTarget.public_id}` as any)}
+                  >
+                    New terms
+                  </Button>
+                ) : (
+                  <Button
+                    mode="contained"
+                    onPress={() => router.push(`/workforce/employment-engagements/new?membershipId=${target.membership_id}` as any)}
+                  >
+                    New engagement
+                  </Button>
+                )
+              ) : null}
               <Button mode="outlined" onPress={() => router.push(`/workforce/employment-engagements/new?membershipId=${target.membership_id}&edit=${target.public_id}` as any)}>
                 {target.terms_editable ? 'Edit future' : 'End / notes'}
               </Button>
@@ -285,7 +318,7 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
               key={row.public_id || row.id}
               title={row.award_classification || replaceUnderscore(row.role)}
               subtitle={`${row.effective_from || '—'} → ${row.effective_to || 'Current'} · Weekday ${money(row.rate_weekday)}/hr`}
-              status={row.effective_to ? 'Historical' : 'Current'}
+              status={engagementStatus(row)}
               onPress={() => router.push(`/workforce/employment-engagements/${row.public_id || row.id}` as any)}
             />
           )) : <EmptyState title="No history" body="No dated employment terms were found." />}
@@ -470,8 +503,11 @@ function EngagementEditor({
   const historical = Boolean(editing && editing.terms_editable === false);
   const completedHistorical = Boolean(historical && editing?.effective_to && String(editing.effective_to) < isoDate());
   const today = isoDate();
-  const successorEffectiveFrom = superseded && String(superseded.effective_from || '') === today
-    ? isoDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
+  const supersededStart = String(superseded?.effective_from || '');
+  const successorEffectiveFrom = superseded
+    ? supersededStart >= today
+      ? nextIsoDate(supersededStart)
+      : today
     : today;
   const initialMembership = params.membershipId ? Number(params.membershipId) : source?.membership_id ? Number(source.membership_id) : null;
   const [membershipId, setMembershipId] = useState<number | null>(initialMembership);
