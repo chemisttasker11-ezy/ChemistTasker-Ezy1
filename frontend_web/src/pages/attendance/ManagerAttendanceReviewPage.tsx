@@ -32,7 +32,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import HistoryIcon from "@mui/icons-material/History";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
-import apiClient from "../../utils/apiClient";
+import { attendance, fetchPharmaciesService } from "@chemisttasker/shared-core";
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from "../../constants/brandTheme";
 
 type PendingReview = {
@@ -104,8 +104,7 @@ export default function ManagerAttendanceReviewPage() {
   useEffect(() => {
     const loadPharmacies = async () => {
       try {
-        const res = await apiClient.get("/client-profile/pharmacies/");
-        const list = Array.isArray(res.data) ? res.data : res.data.results || [];
+        const list = await fetchPharmaciesService({}) as Array<{ id: number; name: string }>;
         setPharmacies(list);
         if (list.length > 0) {
           setSelectedPharmacyId(list[0].id);
@@ -123,14 +122,12 @@ export default function ManagerAttendanceReviewPage() {
     try {
       setLoadingReviews(true);
       setAlertMsg(null);
-      const res = await apiClient.get(
-        `/client-profile/attendance/manager/pending/?pharmacy_id=${selectedPharmacyId}`
-      );
-      setPendingReviews(res.data);
+      const rows = await attendance.getManagerPending(Number(selectedPharmacyId));
+      setPendingReviews(rows as PendingReview[]);
     } catch (err: any) {
       setAlertMsg({
         type: "error",
-        text: err.response?.data?.error || "Failed to load pending attendance reviews.",
+        text: err?.message || "Failed to load pending attendance reviews.",
       });
     } finally {
       setLoadingReviews(false);
@@ -148,10 +145,10 @@ export default function ManagerAttendanceReviewPage() {
     if (!approvingItem) return;
     setIsApproving(true);
     try {
-      await apiClient.post("/client-profile/attendance/manager/approve/", {
-        provisional_id: approvingItem.provisional_id,
-        reason: approvalReason.trim() || "Approved cover shift by pharmacy manager.",
-      });
+      await attendance.approve(
+        approvingItem.provisional_id,
+        approvalReason.trim() || "Approved cover shift by pharmacy manager."
+      );
       setAlertMsg({
         type: "success",
         text: `Successfully approved shift for ${approvingItem.worker_name}. Retroactive shift backfilled.`,
@@ -162,7 +159,7 @@ export default function ManagerAttendanceReviewPage() {
     } catch (err: any) {
       setAlertMsg({
         type: "error",
-        text: err.response?.data?.error || "Failed to approve attendance.",
+        text: err?.message || "Failed to approve attendance.",
       });
     } finally {
       setIsApproving(false);
@@ -174,10 +171,7 @@ export default function ManagerAttendanceReviewPage() {
     if (!rejectingItem || !rejectionReason.trim()) return;
     setIsRejecting(true);
     try {
-      await apiClient.post("/client-profile/attendance/manager/reject/", {
-        provisional_id: rejectingItem.provisional_id,
-        reason: rejectionReason.trim(),
-      });
+      await attendance.reject(rejectingItem.provisional_id, rejectionReason.trim());
       setAlertMsg({
         type: "success",
         text: `Rejected attendance for ${rejectingItem.worker_name}. Raw audit records retained.`,
@@ -188,7 +182,7 @@ export default function ManagerAttendanceReviewPage() {
     } catch (err: any) {
       setAlertMsg({
         type: "error",
-        text: err.response?.data?.error || "Failed to reject attendance.",
+        text: err?.message || "Failed to reject attendance.",
       });
     } finally {
       setIsRejecting(false);
@@ -200,14 +194,12 @@ export default function ManagerAttendanceReviewPage() {
     setTimelineSessionId(sessionId);
     setLoadingTimeline(true);
     try {
-      const res = await apiClient.get(
-        `/client-profile/attendance/manager/timeline/${sessionId}/`
-      );
-      setTimelineData(res.data);
+      const data = await attendance.getManagerTimeline(sessionId);
+      setTimelineData(data as SessionTimelineData);
     } catch (err: any) {
       setAlertMsg({
         type: "error",
-        text: err.response?.data?.error || "Failed to load session timeline.",
+        text: err?.message || "Failed to load session timeline.",
       });
     } finally {
       setLoadingTimeline(false);
@@ -219,11 +211,11 @@ export default function ManagerAttendanceReviewPage() {
     if (!editingEventId || !correctedTimestamp || !correctionReason.trim()) return;
     setSubmittingCorrection(true);
     try {
-      await apiClient.post("/client-profile/attendance/manager/correct/", {
-        event_id: editingEventId,
-        corrected_timestamp: new Date(correctedTimestamp).toISOString(),
-        reason: correctionReason.trim(),
-      });
+      await attendance.correct(
+        editingEventId,
+        new Date(correctedTimestamp).toISOString(),
+        correctionReason.trim()
+      );
       setAlertMsg({
         type: "success",
         text: "Manual correction appended to audit history.",
@@ -238,7 +230,7 @@ export default function ManagerAttendanceReviewPage() {
     } catch (err: any) {
       setAlertMsg({
         type: "error",
-        text: err.response?.data?.error || "Failed to save correction.",
+        text: err?.message || "Failed to save correction.",
       });
     } finally {
       setSubmittingCorrection(false);
