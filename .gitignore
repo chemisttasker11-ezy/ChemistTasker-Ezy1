@@ -113,3 +113,66 @@ frontend_mobile/steps.txt
 # Local preview process logs
 .local-run/
 frontend_web/src-tauri/target/
+
+
+# ─── Public repository secret hygiene ─────────────────────────────
+# Ignore every dotenv variant by default; only explicit examples/templates may be committed.
+.env.*
+!.env.example
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+
+# Runtime / deployment secret directories and credentials
+env/
+secrets/
+**/secrets/
+credentials/
+**/credentials/
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+*.crt
+*.cer
+*.der
+*.ovpn
+*.kubeconfig
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+*firebase-adminsdk*.json
+**/*firebase-adminsdk*.json
+*service-account*.json
+**/*service-account*.json
+
+# Package-manager auth files must stay local.
+.npmrc.local
+**/.npmrc.local
+.yarnrc.local
+**/.yarnrc.local
+.pypirc
+.netrc
+
+# Never commit editor/runtime backups that can retain removed credentials.
+*.bak
+*.backup
+*.old
+*.orig
+*~
+*.swp
+*.swo
+
+# Internal security review material is kept outside the public source tree.
+BACKEND_FRONTEND_FULL_COVERAGE_AUDIT.md
+END_TO_END_DOMAIN_LOGIC_AUDIT.md

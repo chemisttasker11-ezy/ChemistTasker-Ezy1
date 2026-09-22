@@ -1,0 +1,81 @@
+name: Public Repository Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository-secret-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Reject secret-bearing tracked filenames
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(git ls-files | grep -Ei '(^|/)(\.env($|\.)|google-services\.json$|GoogleService-Info\.plist$|.*firebase-adminsdk.*\.json$|.*service-account.*\.json$|id_rsa$|id_ed25519$|.*\.(pem|key|p8|p12|pfx|jks|keystore|mobileprovision|ovpn)$)' | grep -Ev '(^|/)\.env\.(example|sample|template)$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::Secret-bearing or deployment credential files are tracked:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+
+      - name: Reject high-confidence credential patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib, re, subprocess, sys
+
+          files = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          patterns = [
+              ("private key", re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+              ("GitHub classic token", re.compile(rb"ghp_[A-Za-z0-9]{30,}")),
+              ("GitHub fine-grained token", re.compile(rb"github_pat_[A-Za-z0-9_]{40,}")),
+              ("OpenAI-style secret", re.compile(rb"sk-[A-Za-z0-9_-]{20,}")),
+              ("AWS access key", re.compile(rb"AKIA[0-9A-Z]{16}")),
+              ("Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{30,}")),
+          ]
+          allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
+          findings = []
+          for raw in files:
+              if not raw:
+                  continue
+              path = pathlib.Path(raw.decode("utf-8", "surrogateescape"))
+              if path.suffix.lower() in allow_suffixes:
+                  continue
+              try:
+                  data = path.read_bytes()
+              except OSError:
+                  continue
+              if len(data) > 5_000_000:
+                  continue
+              for label, pattern in patterns:
+                  if pattern.search(data):
+                      findings.append((str(path), label))
+          if findings:
+              for path, label in findings:
+                  print(f"::error file={path}::{label} pattern detected")
+              sys.exit(1)
+          print("No high-confidence credential patterns found in tracked text files.")
+          PY
+
+      - name: Check for accidental runtime data
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(git ls-files | grep -Ei '\.(sqlite3?|db|sql|dump)$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::Database/runtime data files are tracked:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
