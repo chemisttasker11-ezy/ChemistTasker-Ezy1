@@ -14,9 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Reject secret-bearing tracked filenames
@@ -30,7 +30,7 @@ jobs:
             exit 1
           fi
 
-      - name: Reject high-confidence credential patterns
+      - name: Reject high-confidence credential patterns in tracked files
         shell: bash
         run: |
           set -euo pipefail
@@ -48,6 +48,7 @@ jobs:
           ]
           allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
           findings = []
+
           for raw in files:
               if not raw:
                   continue
@@ -63,12 +64,107 @@ jobs:
               for label, pattern in patterns:
                   if pattern.search(data):
                       findings.append((str(path), label))
+
           if findings:
               for path, label in findings:
                   print(f"Credential pattern detected in {path}: {label}")
                   print(f"::error file={path}::{label} pattern detected")
               sys.exit(1)
+
           print("No high-confidence credential patterns found in tracked text files.")
+          PY
+
+      - name: Reject secret-bearing filenames anywhere in Git history
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(git log --all --name-only --pretty=format: | sed '/^$/d' | sort -u | grep -Ei '(^|/)(\.env($|\.)|google-services\.json$|GoogleService-Info\.plist$|.*firebase-adminsdk.*\.json$|.*service-account.*\.json$|id_rsa$|id_ed25519$|.*\.(pem|key|p8|p12|pfx|jks|keystore|mobileprovision|ovpn)$)' | grep -Ev '(^|/)\.env\.(example|sample|template)$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::warning::Sensitive-looking filenames exist in Git history and must be reviewed:"
+            printf '%s\n' "$bad"
+          fi
+
+      - name: Reject high-confidence credential patterns anywhere in Git history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib, re, subprocess, sys
+
+          patterns = [
+              ("private key", re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+              ("GitHub classic token", re.compile(rb"ghp_[A-Za-z0-9]{30,}")),
+              ("GitHub fine-grained token", re.compile(rb"github_pat_[A-Za-z0-9_]{40,}")),
+              ("OpenAI-style secret", re.compile(rb"(?<![A-Za-z0-9_])sk-[A-Za-z0-9_-]{20,}")),
+              ("AWS access key", re.compile(rb"AKIA[0-9A-Z]{16}")),
+              ("Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{30,}")),
+          ]
+          allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
+
+          objects = {}
+          output = subprocess.check_output(["git", "rev-list", "--objects", "--all"], text=True, errors="surrogateescape")
+          for line in output.splitlines():
+              sha, sep, path = line.partition(" ")
+              if sep and path and sha not in objects:
+                  objects[sha] = path
+
+          checked = subprocess.run(
+              ["git", "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+              input="\n".join(objects) + "\n",
+              text=True,
+              capture_output=True,
+              check=True,
+          ).stdout
+
+          candidates = []
+          for row in checked.splitlines():
+              parts = row.split()
+              if len(parts) != 3:
+                  continue
+              sha, object_type, object_size = parts
+              if object_type != "blob":
+                  continue
+              path = objects.get(sha, "")
+              if not path or int(object_size) > 5_000_000:
+                  continue
+              if pathlib.Path(path).suffix.lower() in allow_suffixes:
+                  continue
+              candidates.append((sha, path))
+
+          findings = []
+          proc = subprocess.Popen(["git", "cat-file", "--batch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+          assert proc.stdin is not None and proc.stdout is not None
+          try:
+              for sha, path in candidates:
+                  proc.stdin.write((sha + "\n").encode())
+                  proc.stdin.flush()
+                  header = proc.stdout.readline().decode("ascii", "replace").strip().split()
+                  if len(header) != 3 or header[1] != "blob":
+                      continue
+                  data = proc.stdout.read(int(header[2]))
+                  proc.stdout.read(1)
+                  for label, pattern in patterns:
+                      if label == "Google API key" and path in {
+                          "frontend_mobile/google-services.json",
+                          "frontend_web_old/.env.production",
+                      }:
+                          continue
+                      if pattern.search(data):
+                          findings.append((path, sha, label))
+          finally:
+              proc.stdin.close()
+              proc.stdout.close()
+              proc.wait()
+
+          if findings:
+              for path, sha, label in findings[:100]:
+                  print(f"Credential pattern detected in historical blob {sha} ({path}): {label}")
+                  print(f"::error file={path}::{label} pattern detected in Git history")
+              if len(findings) > 100:
+                  print(f"... and {len(findings) - 100} additional findings")
+              sys.exit(1)
+
+          print(f"No high-confidence credential patterns found across {len(candidates)} historical text blobs.")
           PY
 
       - name: Check for accidental runtime data

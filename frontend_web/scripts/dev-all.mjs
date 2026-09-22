@@ -12,7 +12,7 @@ const port=args.port||env.WEB_PORT||'3000', dashboardPort=args['dashboard-port']
 const backend=args.api||env.PLATFORM_API_URL||'http://127.0.0.1:8000/api';
 const origin=`http://localhost:${port}`;
 const dashboardOrigin=`http://localhost:${dashboardPort}`;
-Object.assign(env,{VITE_PUBLIC_SITE_ENABLED:'1',VITE_API_URL:'/api',PLATFORM_API_URL:backend,HUB_API_URL:backend,
+Object.assign(env,{VITE_PUBLIC_SITE_ENABLED:'1',VITE_PUBLIC_SITE_URL:origin,VITE_API_URL:'/api',PLATFORM_API_URL:backend,HUB_API_URL:backend,
  VITE_DEV_PROXY_TARGET:backend.replace(/\/api\/?$/, ''),VITE_DEV_WS_PROXY_TARGET:backend.replace(/\/api\/?$/, '').replace(/^http/,'ws'),
  NEXT_PUBLIC_SITE_URL:origin,NEXT_PUBLIC_PLATFORM_URL:origin,
  NEXT_PUBLIC_Maps_API_KEY:env.NEXT_PUBLIC_Maps_API_KEY||env.VITE_Maps_API_KEY||'',
