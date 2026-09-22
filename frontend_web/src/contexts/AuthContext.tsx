@@ -383,20 +383,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const hasCapability = useCallback(
     (capability: AdminCapability, pharmacyId?: number) => {
+      if (user?.role === "OWNER") {
+        return true;
+      }
+
+      const orgMemberships = (user?.memberships ?? []).filter(
+        (membership): membership is OrgMembership =>
+          Boolean(membership && typeof membership === "object" && "organization_id" in membership)
+      );
+      const orgHasCapability = orgMemberships.some((membership) => {
+        const capabilities = Array.isArray(membership.capabilities) ? membership.capabilities : [];
+        const hasRequested = capabilities.some(
+          (value) => String(value).replaceAll("-", "_").toUpperCase() === capability
+        );
+        if (!hasRequested) return false;
+        if (typeof pharmacyId !== "number") return true;
+        if (String(membership.role || "").toUpperCase() === "ORG_ADMIN") return true;
+        const scoped = Array.isArray(membership.pharmacies) ? membership.pharmacies : [];
+        return scoped.some((pharmacy) => Number(pharmacy.id) === pharmacyId);
+      });
+
       if (typeof pharmacyId === "number") {
-        if (ownedPharmacyIds.has(pharmacyId) || user?.role === "OWNER") {
+        if (ownedPharmacyIds.has(pharmacyId)) {
           return true;
         }
         const match = adminAssignments.find(
           (assignment) => assignment.pharmacy_id === pharmacyId
         );
-        return match ? match.capabilities.includes(capability) : false;
+        return Boolean(match?.capabilities.includes(capability) || orgHasCapability);
       }
 
-      if (user?.role === "OWNER") {
-        return true;
-      }
-      if (ownedPharmacyIds.size > 0) {
+      if (ownedPharmacyIds.size > 0 || orgHasCapability) {
         return true;
       }
       if (activeAdminAssignment) {
@@ -406,7 +423,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         assignment.capabilities.includes(capability)
       );
     },
-    [activeAdminAssignment, adminAssignments, ownedPharmacyIds, user?.role]
+    [activeAdminAssignment, adminAssignments, ownedPharmacyIds, user]
   );
 
   const selectRolePersona = useCallback(
