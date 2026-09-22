@@ -4,6 +4,7 @@
  * Complete API functions for ChemistTasker
  */
 import { API_ENDPOINTS } from './constants/endpoints';
+import { PLATFORM_ENDPOINTS } from './constants/platformEndpoints';
 import type { ShiftOfferAcceptancePayload } from './types';
 let config = null;
 export function configureApi(apiConfig) {
@@ -295,38 +296,232 @@ const mapNotification = (api) => ({
     createdAt: api.created_at,
     readAt: api.read_at,
 });
-const mapMembershipSummary = (api) => ({
-    id: Number(api.id),
-    pharmacyId: api.pharmacy_id ?? api.pharmacy?.id ?? null,
-    pharmacyName: api.pharmacy_name ?? api.pharmacy?.name ?? null,
-    pharmacyDetail: api.pharmacy_detail ? camelCaseKeysDeep(api.pharmacy_detail) : null,
-    role: api.role ?? null,
-    user: api.user ?? null,
-    email: api.email ?? api.user_details?.email ?? null,
-    name: api.name ?? null,
-    invited_name: api.invited_name ?? null,
-    user_details: api.user_details ? camelCaseKeysDeep(api.user_details) : null,
-    employment_type: api.employment_type ?? null,
-    job_title: api.job_title ?? null,
-    is_active: api.is_active ?? false,
-    status: api.status ?? null,
-    is_pharmacy_owner: api.is_pharmacy_owner ?? false,
-    is_pharmacy_admin: api.is_pharmacy_admin ?? false,
-    admin_level: api.admin_level ?? null,
-    admin_level_label: api.admin_level_label ?? null,
-    admin_level_description: api.admin_level_description ?? null,
-    employmentType: api.employment_type ?? null,
-    jobTitle: api.job_title ?? null,
-    isActive: api.is_active ?? false,
-    userDetails: api.user_details ? camelCaseKeysDeep(api.user_details) : null,
-    invitedName: api.invited_name ?? null,
-    isPharmacyOwner: api.is_pharmacy_owner ?? false,
-    isPharmacyAdmin: api.is_pharmacy_admin ?? false,
-    adminLevel: api.admin_level ?? null,
-    adminLevelLabel: api.admin_level_label ?? null,
-    adminLevelDescription: api.admin_level_description ?? null,
-});
+const mapMembershipSummary = (api) => {
+    const rawUserDetails = api.user_details ? { ...api.user_details } : null;
+    const rawPharmacyDetail = api.pharmacy_detail ? { ...api.pharmacy_detail } : null;
+    const pharmacyId = api.pharmacy_id ?? (typeof api.pharmacy === 'object' ? api.pharmacy?.id : api.pharmacy) ?? null;
+    const pharmacyName = api.pharmacy_name ?? rawPharmacyDetail?.name ?? null;
+    return {
+        // Preserve the raw serializer fields for the established Vite/mobile
+        // authenticated flows while also exposing camelCase domain aliases.
+        // This lets clients share one mapper without losing legacy behavior.
+        ...api,
+        id: Number(api.id),
+        user: api.user ?? rawUserDetails?.id ?? null,
+        pharmacy_id: pharmacyId,
+        pharmacy_name: pharmacyName,
+        pharmacyId,
+        pharmacyName,
+        pharmacy_detail: rawPharmacyDetail,
+        pharmacyDetail: rawPharmacyDetail ? camelCaseKeysDeep(rawPharmacyDetail) : null,
+        role: api.role ?? null,
+        email: api.email ?? rawUserDetails?.email ?? null,
+        name: api.name ?? null,
+        invited_name: api.invited_name ?? null,
+        invitedName: api.invited_name ?? null,
+        user_details: rawUserDetails,
+        userDetails: rawUserDetails ? camelCaseKeysDeep(rawUserDetails) : null,
+        employment_type: api.employment_type ?? null,
+        employmentType: api.employment_type ?? null,
+        job_title: api.job_title ?? null,
+        jobTitle: api.job_title ?? null,
+        is_active: api.is_active ?? false,
+        isActive: api.is_active ?? false,
+        status: api.status ?? null,
+        is_pharmacy_owner: api.is_pharmacy_owner ?? false,
+        isPharmacyOwner: api.is_pharmacy_owner ?? false,
+        is_pharmacy_admin: api.is_pharmacy_admin ?? false,
+        isPharmacyAdmin: api.is_pharmacy_admin ?? false,
+        admin_level: api.admin_level ?? null,
+        adminLevel: api.admin_level ?? null,
+        admin_level_label: api.admin_level_label ?? null,
+        adminLevelLabel: api.admin_level_label ?? null,
+        admin_level_description: api.admin_level_description ?? null,
+        adminLevelDescription: api.admin_level_description ?? null,
+    };
+};
 const mapMembershipApplication = (api) => camelCaseKeysDeep(api);
+
+// ============ AUTHENTICATED OPERATIONAL DOMAINS ============
+// These APIs belong to the established authenticated Vite/mobile surface.
+// Next/public platform APIs remain request-scoped in platformApi.ts.
+function operationalRequest(path, { method = 'GET', query, body } = {}) {
+    const endpoint = `${path}${buildQuery(query)}`;
+    const options = { method };
+    if (body !== undefined) {
+        options.body = body instanceof FormData ? body : JSON.stringify(body);
+    }
+    return fetchApi(endpoint, options);
+}
+
+export const attendance = {
+    getWorkerStatus: () => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerStatus),
+    clockIn: (qrToken) => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerClockIn, { method: 'POST', body: { qr_token: qrToken } }),
+    breakStart: () => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerBreakStart, { method: 'POST', body: {} }),
+    breakEnd: () => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerBreakEnd, { method: 'POST', body: {} }),
+    clockOut: (qrToken) => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerClockOut, { method: 'POST', body: { qr_token: qrToken } }),
+    getPinPharmacies: () => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerPinUpdate),
+    updatePin: (pharmacyId, newPin) => operationalRequest(PLATFORM_ENDPOINTS.attendance.workerPinUpdate, { method: 'POST', body: { pharmacy_id: pharmacyId, new_pin: newPin } }),
+    getManagerPending: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.attendance.managerPending, { query: { pharmacy_id: pharmacyId } }),
+    approve: (provisionalId, reason = '') => operationalRequest(PLATFORM_ENDPOINTS.attendance.managerApprove, { method: 'POST', body: { provisional_id: provisionalId, reason } }),
+    reject: (provisionalId, reason) => operationalRequest(PLATFORM_ENDPOINTS.attendance.managerReject, { method: 'POST', body: { provisional_id: provisionalId, reason } }),
+    correct: (eventId, correctedTimestamp, reason) => operationalRequest(PLATFORM_ENDPOINTS.attendance.managerCorrect, { method: 'POST', body: { event_id: eventId, corrected_timestamp: correctedTimestamp, reason } }),
+    getManagerTimeline: (sessionId) => operationalRequest(PLATFORM_ENDPOINTS.attendance.managerTimeline(sessionId)),
+};
+
+export const rosterV2 = {
+    getPeriod: (pharmacyId, weekStart) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.period, { query: { pharmacy_id: pharmacyId, week_start: weekStart } }),
+    initializePeriod: (pharmacyId, weekStart) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.period, { method: 'POST', body: { pharmacy_id: pharmacyId, week_start: weekStart } }),
+    validate: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.validate, { method: 'POST', body }),
+    publish: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.publish, { method: 'POST', body }),
+    unpublish: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.unpublish, { method: 'POST', body }),
+    archive: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.archive, { method: 'POST', body }),
+    getWorkerRoster: (query) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.worker, { query }),
+    acknowledge: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.acknowledge, { method: 'POST', body }),
+    getAcknowledgements: (periodId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.acknowledgements(periodId)),
+    copyWeek: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.copyWeek, { method: 'POST', body }),
+    getTemplates: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.templates, { query: { pharmacy_id: pharmacyId } }),
+    createTemplate: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.templates, { method: 'POST', body }),
+    applyTemplate: (body) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.templateApply, { method: 'POST', body }),
+    bulkEdit: (periodId, operations) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.bulkEdit, { method: 'POST', body: { period_id: periodId, operations } }),
+    requestSwap: (assignmentId, targetUserId, notes = '') => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.workerSwapRequest, { method: 'POST', body: { assignment_id: assignmentId, target_user_id: targetUserId, notes } }),
+    requestCover: (assignmentId, reason = '') => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.workerCoverRequest, { method: 'POST', body: { assignment_id: assignmentId, reason } }),
+    approveSwap: (requestId, targetUserId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerApproveSwap, { method: 'POST', body: { request_id: requestId, ...(targetUserId ? { target_user_id: targetUserId } : {}) } }),
+    approveReplacement: (requestId, replacementUserId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerApproveReplacement, { method: 'POST', body: { request_id: requestId, replacement_user_id: replacementUserId } }),
+    releaseWorker: (requestId, escalateToVisibility) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerReleaseWorker, { method: 'POST', body: { request_id: requestId, escalate_to_visibility: escalateToVisibility ?? null } }),
+    rejectRequest: (requestId, reason = '') => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerRejectRequest, { method: 'POST', body: { request_id: requestId, reason } }),
+    getAudits: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.audits, { query: { pharmacy_id: pharmacyId } }),
+};
+
+export const workforce = {
+    getRosterWorkspace: (pharmacyId, weekStart) => operationalRequest(PLATFORM_ENDPOINTS.workforce.rosterWorkspace, { query: { pharmacy_id: pharmacyId, week_start: weekStart } }),
+    validateRoster: (periodId, expectedRevision) => operationalRequest(PLATFORM_ENDPOINTS.workforce.rosterValidate, { method: 'POST', body: { period_id: periodId, expected_revision: expectedRevision } }),
+    publishRoster: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.rosterPublish, { method: 'POST', body }),
+    getPayrollConfiguration: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.payrollConfiguration, { query: { pharmacy_id: pharmacyId } }),
+    updatePayrollConfiguration: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.payrollConfiguration, { method: 'PATCH', body }),
+    listWorkSettings: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.workSettings, { query: { pharmacy_id: pharmacyId } }),
+    saveWorkSettings: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.workSettings, { method: 'POST', body }),
+    listEmploymentEngagements: (pharmacyId, membershipId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { query: { pharmacy_id: pharmacyId, ...(membershipId ? { membership_id: membershipId } : {}) } }),
+    previewEmploymentEngagementAward: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagementAwardPreview, { method: 'POST', body }),
+    createEmploymentEngagement: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { method: 'POST', body }),
+    updateEmploymentEngagement: (publicId, body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagement(publicId), { method: 'PATCH', body }),
+    listCoverageRequirements: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { query: { pharmacy_id: pharmacyId } }),
+    createCoverageRequirement: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { method: 'POST', body }),
+    deleteCoverageRequirement: (id) => operationalRequest(PLATFORM_ENDPOINTS.workforce.coverageRequirement(id), { method: 'DELETE' }),
+    listLeave: (query) => operationalRequest(PLATFORM_ENDPOINTS.workforce.leave, { query }),
+    createLeave: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.leave, { method: 'POST', body }),
+    decideLeave: (id, decision, managerNote = '') => operationalRequest(PLATFORM_ENDPOINTS.workforce.leaveDecision(id), { method: 'POST', body: { decision, manager_note: managerNote } }),
+    listTimesheetPeriods: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { query: { pharmacy_id: pharmacyId } }),
+    openTimesheetPeriod: (pharmacyId, startDate, endDate) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { method: 'POST', body: { pharmacy_id: pharmacyId, start_date: startDate, end_date: endDate } }),
+    getTimesheetPeriodSummary: (id) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetPeriodSummary(id)),
+    recalculateTimesheetPeriod: (id, sync = false) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetPeriodRecalculate(id), { method: 'POST', body: { sync } }),
+    lockTimesheetPeriod: (id) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetPeriodLock(id), { method: 'POST', body: {} }),
+    listTimesheets: (periodId, query = {}) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheets, { query: { period_id: periodId, ...query } }),
+    getTimesheet: (id) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheet(id)),
+    recalculateTimesheet: (id) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetRecalculate(id), { method: 'POST', body: {} }),
+    addMissingPunch: (id, body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetMissingPunch(id), { method: 'POST', body }),
+    submitTimesheet: (id, revisionNumber) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetSubmit(id), { method: 'POST', body: { revision_number: revisionNumber } }),
+    approveTimesheet: (id, revisionNumber, reason = '') => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetApprove(id), { method: 'POST', body: { revision_number: revisionNumber, reason } }),
+    reopenTimesheet: (id, reason) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetReopen(id), { method: 'POST', body: { reason } }),
+    addTimesheetComment: (id, body, workerVisible = true) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetComments(id), { method: 'POST', body: { body, worker_visible: workerVisible } }),
+    decideTimesheetCheck: (id, decision, reason) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetCheckDecision(id), { method: 'POST', body: { decision, reason } }),
+    getMyHours: (query) => operationalRequest(PLATFORM_ENDPOINTS.workforce.myHours, { query }),
+};
+
+// Finance remains a separate domain surface, but its authenticated request
+// machinery is owned by api.ts so Vite/mobile do not maintain a third transport.
+function financeEndpoint(path) {
+    const { baseURL } = getApiConfig();
+    const base = new URL('client-profile/finance/', baseURL.replace(/\/?$/, '/'));
+    const target = new URL(path, base);
+    if (!['http:', 'https:'].includes(target.protocol) ||
+        target.username ||
+        target.password ||
+        target.origin !== base.origin ||
+        !target.pathname.startsWith(base.pathname)) {
+        throw new Error('Finance requests cannot leave the configured finance API.');
+    }
+    return target;
+}
+async function financeRequest(path, method = 'GET', body, binary = false) {
+    const url = financeEndpoint(path);
+    const { getToken, credentials = 'include' } = getApiConfig();
+    const token = await getToken();
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
+    if (body !== undefined && !multipart) headers.set('Content-Type', 'application/json');
+    const response = await fetch(url, {
+        method,
+        redirect: 'error',
+        credentials,
+        headers,
+        body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(await parseApiError(response));
+    if (binary) return response.blob();
+    if (response.status === 204) return undefined;
+    return response.json();
+}
+async function financeListAll(path) {
+    const results = [];
+    const seen = new Set();
+    let next = path;
+    while (next) {
+        if (seen.has(next) || seen.size >= 100) {
+            throw new Error('List is too large or pagination repeated. Narrow the server query.');
+        }
+        seen.add(next);
+        const page = await financeRequest(next);
+        if (!Array.isArray(page?.results)) throw new Error('Unexpected finance list response.');
+        results.push(...page.results);
+        next = page.next;
+    }
+    return results;
+}
+export const financeApi = {
+    customers: () => financeListAll('customers/'),
+    saveCustomer: (value, id) => financeRequest(`customers/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    lookupAbn: (id) => financeRequest(`customers/${id}/lookup_abn/`, 'POST', {}),
+    items: () => financeListAll('items/'),
+    saveItem: (value, id) => financeRequest(`items/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    seedItems: () => financeRequest('items/seed/', 'POST', {}),
+    invoices: () => financeListAll('invoices/'),
+    receivedInvoices: () => financeListAll('received-invoices/'),
+    receivedInvoice: (id) => financeRequest(`received-invoices/${id}/`),
+    receivedRevision: (id, version) => financeRequest(`received-invoices/${id}/revisions/${version}/`),
+    receivedRevisionPdf: (id, version) => financeRequest(`received-invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
+    invoiceDefaults: () => financeRequest('invoices/defaults/'),
+    internalSources: () => financeRequest('invoices/internal-sources/'),
+    internalPrefill: (assignment_ids) => financeRequest('invoices/internal-prefill/', 'POST', { assignment_ids }),
+    invoice: (id) => financeRequest(`invoices/${id}/`),
+    invoiceRevision: (id, version) => financeRequest(`invoices/${id}/revisions/${version}/`),
+    invoiceRevisionPdf: (id, version) => financeRequest(`invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
+    saveInvoice: (value, id) => financeRequest(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    preview: (value) => financeRequest('invoices/preview/', 'POST', value),
+    duplicate: (id, request_key) => financeRequest(`invoices/${id}/duplicate/`, 'POST', { request_key }),
+    issue: (id, version) => financeRequest(`invoices/${id}/issue/`, 'POST', { version, confirmed: true }),
+    superDocument: (id, version) => financeRequest(`invoices/${id}/super-document/`, 'POST', { version }),
+    send: (id, version) => financeRequest(`invoices/${id}/send/`, 'POST', { version, confirmed: true }),
+    markPaid: (id, version) => financeRequest(`invoices/${id}/mark-paid/`, 'POST', version == null ? {} : { version }),
+    requestRevision: (id, version, note) => financeRequest(`received-invoices/${id}/request-revision/`, 'POST', { version, note }),
+    approveForPayment: (id, version, note = '') => financeRequest(`received-invoices/${id}/approve-payment/`, 'POST', { version, note }),
+    markReceivedPaid: (id, version, note = '') => financeRequest(`received-invoices/${id}/mark-paid/`, 'POST', { version, note }),
+    receivedPdf: (id) => financeRequest(`received-invoices/${id}/pdf/`, 'GET', undefined, true),
+    payment: (id, value) => financeRequest(`invoices/${id}/payments/`, 'POST', value),
+    pdf: (id) => financeRequest(`invoices/${id}/pdf/`, 'GET', undefined, true),
+    expenses: () => financeListAll('expenses/'),
+    saveExpense: (value, id) => financeRequest(`expenses/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    uploadReceipt: (id, file, filename) => {
+        const data = new FormData();
+        data.append('file', file, filename);
+        return financeRequest(`expenses/${id}/receipts/`, 'POST', data);
+    },
+    receipt: (id) => financeRequest(`receipts/${id}/download/`, 'GET', undefined, true),
+    shiftHours: (value) => financeRequest('shift-hours/', 'POST', value),
+    worksheet: (start, end, basis) => financeRequest(`bas-worksheet/?${new URLSearchParams({ start, end, basis })}`),
+};
+
 // ============ AUTH ============
 export function login(credentials) {
     return fetchApi('/users/login/', { method: 'POST', body: JSON.stringify(credentials) });
@@ -1736,7 +1931,7 @@ const mapMembership = (api) => ({
 });
 const mapComment = (api) => ({
     id: api.id,
-    postId: api.post,
+    postId: api.post ?? api.poll,
     body: api.body,
     createdAt: api.created_at,
     updatedAt: api.updated_at,
