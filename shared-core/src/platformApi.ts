@@ -1,6 +1,7 @@
 import type { ApiClient, ApiClientConfig, ApiQuery, ApiRequestOptions } from './transport/client';
 import { createApiClient } from './transport/client';
 import { PLATFORM_ENDPOINTS } from './constants/platformEndpoints';
+import { API_ENDPOINTS } from './constants/endpoints';
 import type {
   ApiPage,
   ContentAssignments,
@@ -63,6 +64,8 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
     account: {
       ...domain(client),
       getCurrentUser: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.account.currentUser),
+      login: <T = unknown>(body: { email: string; password: unknown; remember_me?: boolean }) =>
+        client.post<T>(API_ENDPOINTS.login, body, { auth: false, retryAuth: false }),
     },
 
     publicContent: {
@@ -83,6 +86,17 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       removeArticleCommentReaction: (id: number) => client.delete<ReactionSummary>(PLATFORM_ENDPOINTS.publicHub.commentReaction(id)),
       reportArticleComment: (id: number, body: { reason: string }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.commentReport(id), body),
       getMemberContext: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.me),
+      createCommunityPost: (body: FormData) => client.post<PublicHubPost>(API_ENDPOINTS.hubPosts, body),
+      updateCommunityPost: (id: number, body: { body: string }) => client.patch<PublicHubPost>(API_ENDPOINTS.hubPostDetail(id), body),
+      deleteCommunityPost: (id: number) => client.delete<void>(API_ENDPOINTS.hubPostDetail(id)),
+      voteCommunityPoll: (pollId: number, optionId: number) => client.post(API_ENDPOINTS.hubPollVote(pollId), { option_id: optionId }),
+      reactToCommunityPost: (postId: number, reactionType: string) => client.post(API_ENDPOINTS.hubPostReactions(postId), { reaction_type: reactionType }),
+      removeCommunityPostReaction: (postId: number) => client.delete(API_ENDPOINTS.hubPostReactions(postId)),
+      createCommunityComment: (postId: number, body: { body: string; parent_comment?: number }) => client.post(API_ENDPOINTS.hubPostComments(postId), body),
+      updateCommunityComment: (postId: number, commentId: number, body: { body: string }) => client.patch(API_ENDPOINTS.hubCommentDetail(postId, commentId), body),
+      deleteCommunityComment: (postId: number, commentId: number) => client.delete<void>(API_ENDPOINTS.hubCommentDetail(postId, commentId)),
+      reactToCommunityComment: (postId: number, commentId: number, reactionType: string) => client.post(API_ENDPOINTS.hubCommentReactions(postId, commentId), { reaction_type: reactionType }),
+      removeCommunityCommentReaction: (postId: number, commentId: number) => client.delete(API_ENDPOINTS.hubCommentReactions(postId, commentId)),
     },
 
     marketplace: {
