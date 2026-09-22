@@ -434,43 +434,28 @@ export const workforce = {
 
 // Finance remains a separate domain surface, but its authenticated request
 // machinery is owned by api.ts so Vite/mobile do not maintain a third transport.
-function financeEndpoint(path) {
-    const { baseURL } = getApiConfig();
-    const base = new URL('client-profile/finance/', baseURL.replace(/\/?$/, '/'));
-    const target = new URL(path, base);
-    if (!['http:', 'https:'].includes(target.protocol) ||
-        target.username ||
-        target.password ||
-        target.origin !== base.origin ||
-        !target.pathname.startsWith(base.pathname)) {
-        throw new Error('Finance requests cannot leave the configured finance API.');
-    }
-    return target;
-}
-async function financeRequest(path, method = 'GET', body, binary = false) {
-    const url = financeEndpoint(path);
-    const { getToken, credentials = 'include' } = getApiConfig();
-    const token = await getToken();
-    const headers = new Headers();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
-    if (body !== undefined && !multipart) headers.set('Content-Type', 'application/json');
-    const response = await fetch(url, {
+async function financeRequest(endpoint, { method = 'GET', body, responseType = 'json' } = {}) {
+    const response = await performApiRequest(endpoint, {
         method,
+        body,
         redirect: 'error',
-        credentials,
-        headers,
-        body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
+    }, {
+        sameOrigin: true,
+        allowedPathPrefix: API_ENDPOINTS.finance.root,
+        errorMessage: 'Finance requests cannot leave the configured finance API.',
     });
-    if (!response.ok) throw new Error(await parseApiError(response));
-    if (binary) return response.blob();
-    if (response.status === 204) return undefined;
+    if (responseType === 'blob') {
+        return response.blob();
+    }
+    if (response.status === 204) {
+        return undefined;
+    }
     return response.json();
 }
-async function financeListAll(path) {
+async function financeListAll(endpoint) {
     const results = [];
     const seen = new Set();
-    let next = path;
+    let next = endpoint;
     while (next) {
         if (seen.has(next) || seen.size >= 100) {
             throw new Error('List is too large or pagination repeated. Narrow the server query.');
@@ -484,46 +469,46 @@ async function financeListAll(path) {
     return results;
 }
 export const financeApi = {
-    customers: () => financeListAll('customers/'),
-    saveCustomer: (value, id?: number) => financeRequest(`customers/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-    lookupAbn: (id) => financeRequest(`customers/${id}/lookup_abn/`, 'POST', {}),
-    items: () => financeListAll('items/'),
-    saveItem: (value, id?: number) => financeRequest(`items/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-    seedItems: () => financeRequest('items/seed/', 'POST', {}),
-    invoices: () => financeListAll('invoices/'),
-    receivedInvoices: () => financeListAll('received-invoices/'),
-    receivedInvoice: (id) => financeRequest(`received-invoices/${id}/`),
-    receivedRevision: (id, version) => financeRequest(`received-invoices/${id}/revisions/${version}/`),
-    receivedRevisionPdf: (id, version) => financeRequest(`received-invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
-    invoiceDefaults: () => financeRequest('invoices/defaults/'),
-    internalSources: () => financeRequest('invoices/internal-sources/'),
-    internalPrefill: (assignment_ids) => financeRequest('invoices/internal-prefill/', 'POST', { assignment_ids }),
-    invoice: (id) => financeRequest(`invoices/${id}/`),
-    invoiceRevision: (id, version) => financeRequest(`invoices/${id}/revisions/${version}/`),
-    invoiceRevisionPdf: (id, version) => financeRequest(`invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
-    saveInvoice: (value, id?: number) => financeRequest(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-    preview: (value) => financeRequest('invoices/preview/', 'POST', value),
-    duplicate: (id, request_key) => financeRequest(`invoices/${id}/duplicate/`, 'POST', { request_key }),
-    issue: (id, version) => financeRequest(`invoices/${id}/issue/`, 'POST', { version, confirmed: true }),
-    superDocument: (id, version) => financeRequest(`invoices/${id}/super-document/`, 'POST', { version }),
-    send: (id, version) => financeRequest(`invoices/${id}/send/`, 'POST', { version, confirmed: true }),
-    markPaid: (id, version?: number) => financeRequest(`invoices/${id}/mark-paid/`, 'POST', version == null ? {} : { version }),
-    requestRevision: (id, version, note) => financeRequest(`received-invoices/${id}/request-revision/`, 'POST', { version, note }),
-    approveForPayment: (id, version, note = '') => financeRequest(`received-invoices/${id}/approve-payment/`, 'POST', { version, note }),
-    markReceivedPaid: (id, version, note = '') => financeRequest(`received-invoices/${id}/mark-paid/`, 'POST', { version, note }),
-    receivedPdf: (id) => financeRequest(`received-invoices/${id}/pdf/`, 'GET', undefined, true),
-    payment: (id, value) => financeRequest(`invoices/${id}/payments/`, 'POST', value),
-    pdf: (id) => financeRequest(`invoices/${id}/pdf/`, 'GET', undefined, true),
-    expenses: () => financeListAll('expenses/'),
-    saveExpense: (value, id?: number) => financeRequest(`expenses/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    customers: () => financeListAll(API_ENDPOINTS.finance.customers),
+    saveCustomer: (value, id?: number) => financeRequest(id ? API_ENDPOINTS.finance.customer(id) : API_ENDPOINTS.finance.customers, { method: id ? 'PATCH' : 'POST', body: value }),
+    lookupAbn: (id) => financeRequest(API_ENDPOINTS.finance.customerLookupAbn(id), { method: 'POST', body: {} }),
+    items: () => financeListAll(API_ENDPOINTS.finance.items),
+    saveItem: (value, id?: number) => financeRequest(id ? API_ENDPOINTS.finance.item(id) : API_ENDPOINTS.finance.items, { method: id ? 'PATCH' : 'POST', body: value }),
+    seedItems: () => financeRequest(API_ENDPOINTS.finance.seedItems, { method: 'POST', body: {} }),
+    invoices: () => financeListAll(API_ENDPOINTS.finance.invoices),
+    receivedInvoices: () => financeListAll(API_ENDPOINTS.finance.receivedInvoices),
+    receivedInvoice: (id) => financeRequest(API_ENDPOINTS.finance.receivedInvoice(id)),
+    receivedRevision: (id, version) => financeRequest(API_ENDPOINTS.finance.receivedRevision(id, version)),
+    receivedRevisionPdf: (id, version) => financeRequest(API_ENDPOINTS.finance.receivedRevisionPdf(id, version), { responseType: 'blob' }),
+    invoiceDefaults: () => financeRequest(API_ENDPOINTS.finance.invoiceDefaults),
+    internalSources: () => financeRequest(API_ENDPOINTS.finance.internalSources),
+    internalPrefill: (assignment_ids) => financeRequest(API_ENDPOINTS.finance.internalPrefill, { method: 'POST', body: { assignment_ids } }),
+    invoice: (id) => financeRequest(API_ENDPOINTS.finance.invoice(id)),
+    invoiceRevision: (id, version) => financeRequest(API_ENDPOINTS.finance.invoiceRevision(id, version)),
+    invoiceRevisionPdf: (id, version) => financeRequest(API_ENDPOINTS.finance.invoiceRevisionPdf(id, version), { responseType: 'blob' }),
+    saveInvoice: (value, id?: number) => financeRequest(id ? API_ENDPOINTS.finance.invoice(id) : API_ENDPOINTS.finance.invoices, { method: id ? 'PATCH' : 'POST', body: value }),
+    preview: (value) => financeRequest(API_ENDPOINTS.finance.invoicePreview, { method: 'POST', body: value }),
+    duplicate: (id, request_key) => financeRequest(API_ENDPOINTS.finance.invoiceDuplicate(id), { method: 'POST', body: { request_key } }),
+    issue: (id, version) => financeRequest(API_ENDPOINTS.finance.invoiceIssue(id), { method: 'POST', body: { version, confirmed: true } }),
+    superDocument: (id, version) => financeRequest(API_ENDPOINTS.finance.invoiceSuperDocument(id), { method: 'POST', body: { version } }),
+    send: (id, version) => financeRequest(API_ENDPOINTS.finance.invoiceSend(id), { method: 'POST', body: { version, confirmed: true } }),
+    markPaid: (id, version?: number) => financeRequest(API_ENDPOINTS.finance.invoiceMarkPaid(id), { method: 'POST', body: version == null ? {} : { version } }),
+    requestRevision: (id, version, note) => financeRequest(API_ENDPOINTS.finance.receivedRequestRevision(id), { method: 'POST', body: { version, note } }),
+    approveForPayment: (id, version, note = '') => financeRequest(API_ENDPOINTS.finance.receivedApprovePayment(id), { method: 'POST', body: { version, note } }),
+    markReceivedPaid: (id, version, note = '') => financeRequest(API_ENDPOINTS.finance.receivedMarkPaid(id), { method: 'POST', body: { version, note } }),
+    receivedPdf: (id) => financeRequest(API_ENDPOINTS.finance.receivedPdf(id), { responseType: 'blob' }),
+    payment: (id, value) => financeRequest(API_ENDPOINTS.finance.invoicePayments(id), { method: 'POST', body: value }),
+    pdf: (id) => financeRequest(API_ENDPOINTS.finance.invoicePdf(id), { responseType: 'blob' }),
+    expenses: () => financeListAll(API_ENDPOINTS.finance.expenses),
+    saveExpense: (value, id?: number) => financeRequest(id ? API_ENDPOINTS.finance.expense(id) : API_ENDPOINTS.finance.expenses, { method: id ? 'PATCH' : 'POST', body: value }),
     uploadReceipt: (id, file, filename) => {
         const data = new FormData();
         data.append('file', file, filename);
-        return financeRequest(`expenses/${id}/receipts/`, 'POST', data);
+        return financeRequest(API_ENDPOINTS.finance.expenseReceipts(id), { method: 'POST', body: data });
     },
-    receipt: (id) => financeRequest(`receipts/${id}/download/`, 'GET', undefined, true),
-    shiftHours: (value) => financeRequest('shift-hours/', 'POST', value),
-    worksheet: (start, end, basis) => financeRequest(`bas-worksheet/?${new URLSearchParams({ start, end, basis })}`),
+    receipt: (id) => financeRequest(API_ENDPOINTS.finance.receiptDownload(id), { responseType: 'blob' }),
+    shiftHours: (value) => financeRequest(API_ENDPOINTS.finance.shiftHours, { method: 'POST', body: value }),
+    worksheet: (start, end, basis) => financeRequest(`${API_ENDPOINTS.finance.basWorksheet}${buildQuery({ start, end, basis })}`),
 };
 
 // ============ AUTH ============
