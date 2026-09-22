@@ -6,11 +6,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { ORG_ROLES } from "../constants/roles";
 import { resolveDashboardPath } from "../utils/dashboardPath";
 import { canAccessRoute } from "./routeAccess";
+import type { AdminCapability } from "../constants/adminCapabilities";
 
 type ProtectedRouteProps = {
   children: React.ReactElement;
   requiredRole?: string;
   requireAdmin?: boolean;
+  requiredCapability?: AdminCapability;
 };
 
 const ROLES_REQUIRING_BASIC_ONBOARDING = new Set(["PHARMACIST", "OTHER_STAFF", "EXPLORER"]);
@@ -24,8 +26,9 @@ export default function ProtectedRoute({
   children,
   requiredRole,
   requireAdmin = false,
+  requiredCapability,
 }: ProtectedRouteProps) {
-  const { user, isLoading, isAdminUser } = useAuth();
+  const { user, isLoading, isAdminUser, hasCapability } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -64,6 +67,8 @@ export default function ProtectedRoute({
       requireAdmin,
       isAdminUser,
       hasOrgRole,
+      requiresCapability: Boolean(requiredCapability),
+      hasRequiredCapability: requiredCapability ? hasCapability(requiredCapability) : true,
     })
   ) {
     return children;
