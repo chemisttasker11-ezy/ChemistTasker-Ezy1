@@ -6,6 +6,8 @@ export type FinanceMoney = string;
 export interface FinanceConfig {
   baseURL: string;
   getToken: () => string | null | undefined | Promise<string | null | undefined>;
+  refreshToken?: () => string | null | undefined | Promise<string | null | undefined>;
+  onAuthFailure?: () => void | Promise<void>;
   credentials?: RequestCredentials;
 }
 export interface FinanceCustomer {
