@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const targets = [
   'frontend_web/src',
@@ -15,6 +17,43 @@ const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:
 // Authenticated operational domains are intentionally owned by legacy api.ts.
 // Do not reintroduce them through the request-scoped Next/platform facade.
 const operationalPlatformPattern = /\bchemistTaskerApi\.(?:workforce|attendance|rosterV2)\b/;
+
+const root = path.resolve(import.meta.dirname, '..');
+const ignoredDirs = new Set(['node_modules', 'dist', 'dist-kiosk', '.next', '.expo', 'build', 'coverage']);
+const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+
+function walk(directory, output = []) {
+  if (!fs.existsSync(directory)) return output;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory() && ignoredDirs.has(entry.name)) continue;
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) walk(fullPath, output);
+    else if (extensions.has(path.extname(entry.name))) output.push(fullPath);
+  }
+  return output;
+}
+
+// Operational ownership is not legacy debt: after CP1 there must be zero
+// Vite/mobile clients using the Next/platform facade for these domains.
+const operationalFindings = [];
+for (const target of ['frontend_web/src', 'frontend_mobile']) {
+  for (const file of walk(path.join(root, target))) {
+    const relative = path.relative(root, file).replaceAll('\\', '/');
+    const source = fs.readFileSync(file, 'utf8');
+    source.split(/\r?\n/).forEach((line, index) => {
+      if (operationalPlatformPattern.test(line)) {
+        operationalFindings.push({ file: relative, line: index + 1, text: line.trim() });
+      }
+    });
+  }
+}
+if (operationalFindings.length) {
+  console.error(`Shared-core ownership audit failed: ${operationalFindings.length} operational platform-facade use(s) remain.`);
+  for (const finding of operationalFindings) console.error(`${finding.file}:${finding.line}  ${finding.text}`);
+  console.error('Workforce, Attendance and Roster V2 must use the authenticated api.ts shared-core exports.');
+  process.exit(1);
+}
+
 
 function resolveBase() {
   const configured = (process.env.SHARED_CORE_AUDIT_BASE || '').trim();
