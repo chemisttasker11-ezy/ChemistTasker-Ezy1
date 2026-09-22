@@ -8,8 +8,8 @@ import {
   type WorkforceTimesheetPeriod,
   type WorkforceTimesheetRow,
   type WorkforceTimesheetSummary,
+  workforce,
 } from '@chemisttasker/shared-core';
-import { chemistTaskerApi } from '../config/api';
 
 const hours = (minutes?: number | null) => minutes == null ? '—' : `${(minutes / 60).toFixed(2)} h`;
 
@@ -55,7 +55,7 @@ export default function WorkforceTimesheetsScreen() {
     if (!pharmacyId) {
       setPeriods([]); setPeriodId(null); return;
     }
-    const next = await chemistTaskerApi.workforce.listTimesheetPeriods(pharmacyId);
+    const next = await workforce.listTimesheetPeriods(pharmacyId);
     setPeriods(next);
     setPeriodId(current => current && next.some(row => row.id === current) ? current : (next[0]?.id ?? null));
   }, [pharmacyId]);
@@ -65,8 +65,8 @@ export default function WorkforceTimesheetsScreen() {
       setSummary(null); setRows([]); return;
     }
     const [nextSummary, nextRows] = await Promise.all([
-      chemistTaskerApi.workforce.getTimesheetPeriodSummary(periodId),
-      chemistTaskerApi.workforce.listTimesheets(periodId),
+      workforce.getTimesheetPeriodSummary(periodId),
+      workforce.listTimesheets(periodId),
     ]);
     setSummary(nextSummary);
     setRows(nextRows);
@@ -102,7 +102,7 @@ export default function WorkforceTimesheetsScreen() {
     if (!pharmacyId) return;
     const range = currentFortnight();
     void run(async () => {
-      const opened = await chemistTaskerApi.workforce.openTimesheetPeriod(pharmacyId, range.start, range.end);
+      const opened = await workforce.openTimesheetPeriod(pharmacyId, range.start, range.end);
       setPeriodId(opened.id);
     });
   };
@@ -111,7 +111,7 @@ export default function WorkforceTimesheetsScreen() {
     if (!periodId) return;
     Alert.alert('Lock reviewed period?', 'Locked time becomes immutable and later corrections require the adjustment workflow.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Lock', style: 'destructive', onPress: () => void run(() => chemistTaskerApi.workforce.lockTimesheetPeriod(periodId)) },
+      { text: 'Lock', style: 'destructive', onPress: () => void run(() => workforce.lockTimesheetPeriod(periodId)) },
     ]);
   };
 
@@ -133,7 +133,7 @@ export default function WorkforceTimesheetsScreen() {
 
         <View style={styles.actionRow}>
           <Button mode="outlined" disabled={!pharmacyId || busy} onPress={openCurrent}>Open current fortnight</Button>
-          <Button disabled={!periodId || busy || selectedPeriod?.status === 'LOCKED'} onPress={() => void run(() => chemistTaskerApi.workforce.recalculateTimesheetPeriod(periodId!, true))}>Recalculate</Button>
+          <Button disabled={!periodId || busy || selectedPeriod?.status === 'LOCKED'} onPress={() => void run(() => workforce.recalculateTimesheetPeriod(periodId!, true))}>Recalculate</Button>
           <Button disabled={!periodId || busy || selectedPeriod?.status === 'LOCKED'} textColor="#B42318" onPress={lockPeriod}>Lock</Button>
         </View>
 
@@ -166,8 +166,8 @@ export default function WorkforceTimesheetsScreen() {
             <View><Text variant="labelSmall">Checks</Text><Text>{row.blocking_checks} blocking · {row.warning_checks} warning</Text></View>
           </View>
           <View style={styles.actionRow}>
-            <Button compact disabled={busy || !row.revision_number || row.needs_rebuild || row.status === 'APPROVED'} onPress={() => void run(() => chemistTaskerApi.workforce.approveTimesheet(row.id, row.revision_number!, 'Approved from mobile manager timesheets'))}>Approve</Button>
-            <Button compact disabled={busy || selectedPeriod?.status === 'LOCKED'} onPress={() => void run(() => chemistTaskerApi.workforce.recalculateTimesheet(row.id))}>Recalculate</Button>
+            <Button compact disabled={busy || !row.revision_number || row.needs_rebuild || row.status === 'APPROVED'} onPress={() => void run(() => workforce.approveTimesheet(row.id, row.revision_number!, 'Approved from mobile manager timesheets'))}>Approve</Button>
+            <Button compact disabled={busy || selectedPeriod?.status === 'LOCKED'} onPress={() => void run(() => workforce.recalculateTimesheet(row.id))}>Recalculate</Button>
           </View>
         </Card.Content></Card>)}
       </ScrollView>
