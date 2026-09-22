@@ -40,7 +40,7 @@
     "axios": "^1.8.4",
     "canvas-confetti": "^1.9.3",
     "date-fns": "^4.1.0",
-    "dayjs": "^1.11.13",
+    "dayjs": "^1.11.23",
     "framer-motion": "^12.15.0",
     "jwt-decode": "^4.0.0",
     "minimal-shared": "^1.0.8",
