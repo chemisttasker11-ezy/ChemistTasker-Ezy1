@@ -30,6 +30,6 @@ export const createWorkforceLeave = (payload: { membership_id: number; leave_typ
 export const decideWorkforceLeave = (id: number, decision: 'APPROVED' | 'REJECTED' | 'CANCELLED', managerNote = '') => workforce.decideLeave(id, decision, managerNote);
 
 export const listEmploymentEngagements = (pharmacyId: number, membershipId?: number) => workforce.listEmploymentEngagements(pharmacyId, membershipId);
-export const previewEmploymentEngagementAward = (payload: { membership_id: number; employment_type?: string; award_classification?: string }) => workforce.previewEmploymentEngagementAward(payload);
+export const previewEmploymentEngagementAward = (payload: { membership_id: number; employment_type?: string; award_classification?: string; effective_from?: string }) => workforce.previewEmploymentEngagementAward(payload);
 export const createEmploymentEngagement = (payload: WorkforceEmploymentEngagementWrite) => workforce.createEmploymentEngagement(payload);
 export const updateEmploymentEngagement = (publicId: string, payload: Partial<WorkforceEmploymentEngagementWrite>) => workforce.updateEmploymentEngagement(publicId, payload);

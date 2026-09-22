@@ -19,6 +19,9 @@ export interface OrgMembership {
   organization_name: string;
   role: string;
   region: string;
+  admin_level?: string;
+  pharmacies?: Array<{ id: number; name?: string }>;
+  capabilities?: string[];
 }
 
 export type User = {
@@ -498,12 +501,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!user) return false;
     const role = String(user.role || '').toUpperCase();
     if (role === 'OWNER') return true;
+
+    const requested = String(capability || '').trim().toUpperCase();
     const assignments: any[] = (user as any).admin_assignments || [];
-    return assignments.some((a) => {
-      const caps: string[] = a?.capabilities || [];
-      const pid = a?.pharmacy_id ?? a?.pharmacyId ?? a?.pharmacy;
+    const pharmacyAdminMatch = assignments.some((assignment) => {
+      const caps: string[] = assignment?.capabilities || [];
+      const pid = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy;
       const matchesPharmacy = pharmacyId ? String(pid ?? '') === String(pharmacyId) : true;
-      return matchesPharmacy && caps.includes(capability);
+      return matchesPharmacy && caps.some((value) => String(value).toUpperCase() === requested);
+    });
+    if (pharmacyAdminMatch) return true;
+
+    const orgMemberships = Array.isArray(user.memberships) ? user.memberships : [];
+    return orgMemberships.some((membership) => {
+      const caps = Array.isArray(membership?.capabilities) ? membership.capabilities : [];
+      const hasRequestedCapability = caps.some(
+        (value) => String(value).replaceAll('-', '_').toUpperCase() === requested,
+      );
+      if (!hasRequestedCapability) return false;
+
+      // Organisation admins have VIEW_ALL_PHARMACIES in the backend role model.
+      if (String(membership?.role || '').toUpperCase() === 'ORG_ADMIN') return true;
+      if (!pharmacyId) return true;
+
+      const scopedPharmacies = Array.isArray(membership?.pharmacies) ? membership.pharmacies : [];
+      return scopedPharmacies.some((pharmacy) => String(pharmacy?.id ?? '') === String(pharmacyId));
     });
   };
 

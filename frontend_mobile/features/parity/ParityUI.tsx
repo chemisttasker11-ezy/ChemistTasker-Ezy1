@@ -209,15 +209,17 @@ export function ChoiceChips({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <View style={styles.chips}>
       {options.map((option) => (
-        <Chip key={option.value} selected={value === option.value} onPress={() => onChange(option.value)}>
+        <Chip key={option.value} selected={value === option.value} disabled={disabled} onPress={() => onChange(option.value)}>
           {option.label}
         </Chip>
       ))}

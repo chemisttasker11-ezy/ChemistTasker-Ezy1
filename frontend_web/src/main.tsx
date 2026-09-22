@@ -192,7 +192,7 @@ const router = createBrowserRouter([
       {
         path: 'dashboard/workforce/settings',
         element: (
-          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
+          <ProtectedRoute requiredAnyCapabilities={["MANAGE_STAFF", "MANAGE_ROSTER"]}>
             <WorkforceSettingsPage />
           </ProtectedRoute>
         ),

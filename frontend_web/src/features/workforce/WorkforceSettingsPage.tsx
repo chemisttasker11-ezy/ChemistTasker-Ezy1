@@ -22,6 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import { STAFF_ROLE_OPTIONS, fetchPharmaciesService } from '@chemisttasker/shared-core';
+import { useAuth } from '../../contexts/AuthContext';
 import type { WorkforcePayrollConfiguration, WorkforceWorkSettings } from '@chemisttasker/shared-core';
 import EmploymentEngagementsPanel from './EmploymentEngagementsPanel';
 import {
@@ -37,6 +38,7 @@ import {
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function WorkforceSettingsPage() {
+  const { hasCapability } = useAuth();
   const initialPharmacy = Number(new URLSearchParams(window.location.search).get('pharmacy_id') || '') || null;
   const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(initialPharmacy);
@@ -48,6 +50,15 @@ export default function WorkforceSettingsPage() {
   const [error, setError] = useState('');
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [coverageForm, setCoverageForm] = useState({ weekday: 0, start_time: '08:00', end_time: '18:00', role: 'PHARMACIST', minimum_staff: 1 });
+
+  const canManageRoster = pharmacyId
+    ? hasCapability('MANAGE_ROSTER', pharmacyId)
+    : hasCapability('MANAGE_ROSTER');
+  const canManageStaff = canManageRoster || (
+    pharmacyId
+      ? hasCapability('MANAGE_STAFF', pharmacyId)
+      : hasCapability('MANAGE_STAFF')
+  );
 
   useEffect(() => {
     fetchPharmaciesService({}).then((rows: any[]) => {
@@ -62,9 +73,9 @@ export default function WorkforceSettingsPage() {
     setError('');
     try {
       const [coverageRows, staffRows, payroll] = await Promise.all([
-        listCoverageRequirements(pharmacyId),
-        listWorkSettings(pharmacyId),
-        getPayrollConfiguration(pharmacyId),
+        canManageRoster ? listCoverageRequirements(pharmacyId) : Promise.resolve([]),
+        canManageStaff ? listWorkSettings(pharmacyId) : Promise.resolve([]),
+        canManageStaff ? getPayrollConfiguration(pharmacyId) : Promise.resolve(null),
       ]);
       setCoverage(coverageRows);
       setStaff(staffRows);
@@ -72,8 +83,11 @@ export default function WorkforceSettingsPage() {
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to load workforce settings.');
     }
-  }, [pharmacyId]);
+  }, [canManageRoster, canManageStaff, pharmacyId]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!canManageRoster && tab === 0) setTab(1);
+  }, [canManageRoster, tab]);
 
   const saveHours = async (membershipId: number, raw: string) => {
     const hours = raw.trim() === '' ? null : Number(raw);
@@ -142,10 +156,10 @@ export default function WorkforceSettingsPage() {
           </Paper>
         )}
         <Paper variant="outlined" sx={{ borderRadius: 3 }}>
-          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" /><Tab label="Contracted hours" /><Tab label="Employment & pay" /></Tabs>
+          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" disabled={!canManageRoster} /><Tab label="Contracted hours" disabled={!canManageStaff} /><Tab label="Employment & pay" disabled={!canManageStaff} /></Tabs>
           <Box sx={{ p: 2 }}>
             {tab === 0 && <Stack spacing={1.5}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography fontWeight={900}>Coverage rules</Typography><Button variant="contained" onClick={() => setCoverageOpen(true)}>Add rule</Button></Stack>
+              <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography fontWeight={900}>Coverage rules</Typography><Button variant="contained" disabled={!canManageRoster} onClick={() => setCoverageOpen(true)}>Add rule</Button></Stack>
               {!coverage.length && <Alert severity="info">No coverage rules are configured. This is not evidence that the roster has adequate staffing.</Alert>}
               {coverage.map((row) => <Paper key={row.id} variant="outlined" sx={{ p: 1.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}><Box flex={1}><Typography fontWeight={800}>{DAYS[row.weekday]} · {row.start_time}–{row.end_time}</Typography><Typography variant="body2">{row.role.replaceAll('_', ' ')} · minimum {row.minimum_staff}</Typography></Box><Button color="error" onClick={async () => { await deleteCoverageRequirement(row.id); await load(); }}>Delete</Button></Stack></Paper>)}
             </Stack>}

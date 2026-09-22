@@ -282,6 +282,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
           effective_from: effectiveFrom,
           effective_to: '',
           award_effective_from: current.award_effective_from || '',
+          adult_rate_confirmed: Boolean(current.adult_rate_confirmed),
           rate_early_morning: current.rate_early_morning || '',
           rate_late_night: current.rate_late_night || '',
           ordinary_hours_days:
@@ -336,12 +337,13 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
     setSaving(true);
     setError('');
     try {
-      const historical = Boolean(form.public_id && !form.terms_editable);
       if (historical) {
-        await updateEmploymentEngagement(form.public_id, {
-          effective_to: form.effective_to || null,
-          notes: form.notes,
-        });
+        await updateEmploymentEngagement(
+          form.public_id,
+          completedHistorical
+            ? { notes: form.notes }
+            : { effective_to: form.effective_to || null, notes: form.notes },
+        );
       } else {
         const payload: WorkforceEmploymentEngagementWrite = {
           membership_id: form.membership_id,
@@ -422,6 +424,9 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
   };
 
   const historical = Boolean(form.public_id && !form.terms_editable);
+  const completedHistorical = Boolean(
+    historical && form.effective_to && form.effective_to < isoToday(),
+  );
   const aboveAwardComplete =
     form.pay_basis !== 'ABOVE_AWARD'
     || Boolean(
@@ -539,7 +544,9 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
 
       <Dialog open={open} onClose={() => !saving && setOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {historical
+          {completedHistorical
+            ? 'Update historical engagement notes'
+            : historical
             ? 'Update engagement end date / notes'
             : form.public_id
               ? 'Edit future employment engagement'
@@ -559,7 +566,9 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
 
             {historical && (
               <Alert severity="info">
-                This engagement has started, so its classification and pay terms are locked for payroll history. You may close it or amend notes. Use “New terms” to create a dated successor.
+                {completedHistorical
+                  ? 'This engagement is completed payroll history. Its end date is immutable; only notes may be amended.'
+                  : 'This engagement has started, so its classification and pay terms are locked for payroll history. You may close it or amend notes. Use “New terms” to create a dated successor.'}
               </Alert>
             )}
 
@@ -587,6 +596,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
                 label="Effective to (optional)"
                 InputLabelProps={{ shrink: true }}
                 value={form.effective_to}
+                disabled={completedHistorical}
                 onChange={(event) => setForm((current) => ({ ...current, effective_to: event.target.value }))}
               />
             </Stack>

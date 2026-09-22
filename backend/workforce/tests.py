@@ -1,13 +1,21 @@
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from client_profile.models import Membership, Pharmacy
 
 from .award_rates import classification_options, resolve_award_schedule
 from .employment_terms import correspondence_profile, normalise_part_time_pattern
 from .employment_engagement_service import build_employment_engagement_payload
+from .models import EmploymentEngagement
+from .permissions import can_manage_roster_pharmacy, can_manage_workforce_pharmacy
+from .views import EmploymentEngagementListCreateView
 
 
 class PharmacyAwardResolverTests(SimpleTestCase):
@@ -368,3 +376,118 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
         self.assertEqual(snapshot["effective_ordinary_schedule"]["weekday"]["evening_19_21"], "55.00")
         self.assertEqual(snapshot["effective_ordinary_schedule"]["weekday"]["late_21_24"], "75.00")
         self.assertEqual(snapshot["overtime_floor"]["sunday_all_day"], "83.48")
+
+
+class WorkforceCapabilityPermissionTests(SimpleTestCase):
+    @staticmethod
+    def _user():
+        return SimpleNamespace(id=7, is_active=True, is_superuser=False)
+
+    @staticmethod
+    def _pharmacy():
+        return SimpleNamespace(
+            id=11,
+            organization_id=None,
+            owner=SimpleNamespace(user_id=99),
+        )
+
+    @patch("client_profile.admin_helpers.can_manage_roster", return_value=False)
+    @patch("client_profile.admin_helpers.can_manage_staff", return_value=True)
+    def test_manage_staff_can_manage_employment_without_roster_access(self, _staff, _roster):
+        user = self._user()
+        pharmacy = self._pharmacy()
+        self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
+        self.assertFalse(can_manage_roster_pharmacy(user, pharmacy))
+
+    @patch("client_profile.admin_helpers.can_manage_roster", return_value=True)
+    @patch("client_profile.admin_helpers.can_manage_staff", return_value=False)
+    def test_manage_roster_preserves_existing_workforce_access(self, _staff, _roster):
+        user = self._user()
+        pharmacy = self._pharmacy()
+        self.assertTrue(can_manage_roster_pharmacy(user, pharmacy))
+        self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
+
+    @patch("client_profile.admin_helpers.can_manage_roster", return_value=False)
+    @patch("client_profile.admin_helpers.can_manage_staff", return_value=False)
+    @patch("workforce.permissions._org_has_capability")
+    def test_org_staff_scope_does_not_grant_roster_scope(self, org_capability, _staff, _roster):
+        from users.org_roles import OrgCapability
+
+        org_capability.side_effect = lambda _user, _pharmacy, capability: capability == OrgCapability.MANAGE_STAFF
+        user = self._user()
+        pharmacy = SimpleNamespace(id=11, organization_id=3, owner=SimpleNamespace(user_id=99))
+
+        self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
+        self.assertFalse(can_manage_roster_pharmacy(user, pharmacy))
+
+class EmploymentEngagementSuccessorApiTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.manager = user_model.objects.create_superuser(
+            email="workforce-manager@example.test",
+            password="test-password",
+            role="OWNER",
+        )
+        self.worker = user_model.objects.create_user(
+            email="successor-worker@example.test",
+            password="test-password",
+            role="PHARMACIST",
+        )
+        self.pharmacy = Pharmacy.objects.create(name="Successor Test Pharmacy")
+        self.membership = Membership.objects.create(
+            user=self.worker,
+            pharmacy=self.pharmacy,
+            role="PHARMACIST",
+            employment_type="FULL_TIME",
+            pharmacist_award_level="PHARMACIST",
+        )
+        self.today = timezone.localdate()
+        self.previous = EmploymentEngagement.objects.create(
+            membership=self.membership,
+            effective_from=self.today,
+            role="PHARMACIST",
+            employment_type="FULL_TIME",
+            job_title="Pharmacist",
+            pay_basis=EmploymentEngagement.PayBasis.AWARD,
+            award_classification="PHARMACIST",
+            award_rate_snapshot={},
+            ordinary_hours_pattern={},
+            rate_weekday="41.74",
+            rate_saturday="52.18",
+            rate_sunday="62.61",
+            rate_public_holiday="93.92",
+            created_by=self.manager,
+            updated_by=self.manager,
+        )
+        self.factory = APIRequestFactory()
+
+    def test_successor_closes_previous_engagement_and_creates_new_terms(self):
+        successor_date = self.today + timedelta(days=1)
+        request = self.factory.post(
+            "/workforce/employment-engagements/",
+            {
+                "membership_id": self.membership.pk,
+                "supersedes_public_id": str(self.previous.public_id),
+                "effective_from": str(successor_date),
+                "employment_type": "FULL_TIME",
+                "job_title": "Senior Pharmacist",
+                "pay_basis": "AWARD",
+                "award_classification": "PHARMACIST",
+                "notes": "Successor terms",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=self.manager)
+
+        response = EmploymentEngagementListCreateView.as_view()(request)
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.previous.refresh_from_db()
+        self.assertEqual(self.previous.effective_to, self.today)
+
+        successor = EmploymentEngagement.objects.get(
+            membership=self.membership,
+            effective_from=successor_date,
+        )
+        self.assertEqual(successor.job_title, "Senior Pharmacist")
+        self.assertEqual(successor.notes, "Successor terms")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -48,7 +48,7 @@ from .models import (
     TimesheetPeriod,
     WorkforceLeaveRequest,
 )
-from .permissions import can_manage_pharmacy, can_view_worker_timesheet, require_manage_pharmacy
+from .permissions import can_manage_pharmacy, can_view_worker_timesheet, require_manage_pharmacy, require_manage_workforce_pharmacy
 from .roster import publish_period_command, serialize_workspace, validate_period_command
 from .tasks import rebuild_timesheet_period_task, rebuild_timesheet_task
 from .timesheets import (
@@ -200,7 +200,7 @@ class PharmacyPayrollConfigurationView(APIView):
     def get(self, request):
         try:
             pharmacy = _pharmacy(request.query_params.get("pharmacy_id"))
-            require_manage_pharmacy(request.user, pharmacy)
+            require_manage_workforce_pharmacy(request.user, pharmacy)
             return Response(self._serialize(pharmacy))
         except DjangoPermissionDenied as exc:
             return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
@@ -210,7 +210,7 @@ class PharmacyPayrollConfigurationView(APIView):
     def patch(self, request):
         try:
             pharmacy = _pharmacy(request.data.get("pharmacy_id"))
-            require_manage_pharmacy(request.user, pharmacy)
+            require_manage_workforce_pharmacy(request.user, pharmacy)
             raw = request.data.get("use_chemisttasker_payroll")
             if not isinstance(raw, bool):
                 raise DjangoValidationError({
@@ -231,7 +231,7 @@ class EmploymentEngagementAwardPreviewView(APIView):
     def post(self, request):
         try:
             membership = _engagement_membership(request.data.get("membership_id"))
-            require_manage_pharmacy(request.user, membership.pharmacy)
+            require_manage_workforce_pharmacy(request.user, membership.pharmacy)
             role = str(membership.role or "").upper()
             employment_type = str(request.data.get("employment_type") or membership.employment_type or "").upper()
             classification = str(
@@ -267,7 +267,7 @@ class EmploymentEngagementListCreateView(APIView):
     def get(self, request):
         try:
             pharmacy = _pharmacy(request.query_params.get("pharmacy_id"))
-            require_manage_pharmacy(request.user, pharmacy)
+            require_manage_workforce_pharmacy(request.user, pharmacy)
             qs = EmploymentEngagement.objects.filter(
                 membership__pharmacy=pharmacy
             ).select_related("membership__user", "membership__pharmacy")
@@ -284,7 +284,7 @@ class EmploymentEngagementListCreateView(APIView):
     def post(self, request):
         try:
             membership = _engagement_membership(request.data.get("membership_id"))
-            require_manage_pharmacy(request.user, membership.pharmacy)
+            require_manage_workforce_pharmacy(request.user, membership.pharmacy)
             effective_from = _parse_required_date(request.data.get("effective_from"), "effective_from")
             effective_to_raw = request.data.get("effective_to")
             effective_to = _parse_required_date(effective_to_raw, "effective_to") if effective_to_raw else None
@@ -356,7 +356,7 @@ class EmploymentEngagementDetailView(APIView):
                 row = EmploymentEngagement.objects.select_for_update().select_related(
                     "membership__pharmacy", "membership__user"
                 ).get(public_id=public_id)
-                require_manage_pharmacy(request.user, row.membership.pharmacy)
+                require_manage_workforce_pharmacy(request.user, row.membership.pharmacy)
                 Membership.objects.select_for_update().get(pk=row.membership_id)
 
                 started = row.effective_from <= timezone.localdate()
@@ -495,7 +495,7 @@ class MembershipWorkSettingsView(APIView):
     def get(self, request):
         try:
             pharmacy = _pharmacy(request.query_params.get("pharmacy_id"))
-            require_manage_pharmacy(request.user, pharmacy)
+            require_manage_workforce_pharmacy(request.user, pharmacy)
             memberships = Membership.objects.filter(
                 pharmacy=pharmacy, is_active=True, status=Membership.Status.ACCEPTED
             ).exclude(role="CONTACT").select_related("user").order_by("user__first_name", "user__last_name", "pk")
@@ -524,7 +524,7 @@ class MembershipWorkSettingsView(APIView):
     def post(self, request):
         try:
             membership = Membership.objects.select_related("pharmacy", "user").get(pk=request.data.get("membership_id"))
-            require_manage_pharmacy(request.user, membership.pharmacy)
+            require_manage_workforce_pharmacy(request.user, membership.pharmacy)
             raw_minutes = request.data.get("contracted_weekly_minutes")
             minutes = None if raw_minutes in (None, "") else int(raw_minutes)
             if minutes is not None and (minutes < 0 or minutes > 7 * 24 * 60):
