@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { chemistTaskerApi } from '@/config/api';
+import { attendance } from '@chemisttasker/shared-core';
 
 type Pharmacy = { id: number; name: string; has_pin: boolean };
 export default function AttendancePinScreen() {
