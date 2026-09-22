@@ -32,10 +32,20 @@ export default function OTPVerify() {
     setStatus('');
     setLoading(true);
     try {
+      const csrfSession = await axios.get(`${API_BASE_URL}/users/csrf/`, {
+        withCredentials: true,
+        headers: { "X-Client-Platform": "web" },
+      });
       await axios.post(
         `${API_BASE_URL}${API_ENDPOINTS.verifyOtp}`,
         { email, otp },
-        { withCredentials: true }
+        {
+          withCredentials: true,
+          headers: {
+            "X-CSRFToken": csrfSession.data.csrfToken,
+            "X-Client-Platform": "web",
+          },
+        }
       );
       setStatus('Verification successful! Redirecting...');
       setTimeout(() => navigate('/login', { state: { email } }), 800);
@@ -56,7 +66,7 @@ export default function OTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      await axios.post(`${API_BASE_URL}${API_ENDPOINTS.resendOtp}`, { email }, { withCredentials: true });
+      await axios.post(`${API_BASE_URL}${API_ENDPOINTS.resendOtp}`, { email }, { withCredentials: true, headers: { "X-Client-Platform": "web" } });
       setStatus('A new code has been sent to your email.');
     } catch (err) {
       setError('Could not resend code. Please try again later.');
