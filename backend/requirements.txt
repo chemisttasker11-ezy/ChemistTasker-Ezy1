@@ -73,7 +73,7 @@ psycopg-binary==3.2.9
 psycopg-pool==3.2.6
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
-pycparser==2.22
+pycparser==3.0
 pydyf==0.11.0
 pyee==13.0.0
 PyJWT==2.9.0
