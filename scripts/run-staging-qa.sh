@@ -111,7 +111,7 @@ docker run --rm   -v "$ROOT_DIR:/src:ro"   rust:1-bookworm   bash -lc '
     apt-get install -y --no-install-recommends       build-essential       libayatana-appindicator3-dev       libgtk-3-dev       librsvg2-dev       libssl-dev       libwebkit2gtk-4.1-dev       libxdo-dev       patchelf
     cp -a /src/frontend_web/src-tauri /work
     cd /work
-    CARGO_TARGET_DIR=/tmp/chemisttasker-cargo-target cargo test --locked
+    CARGO_TARGET_DIR=/tmp/chemisttasker-cargo-target /usr/local/cargo/bin/cargo test --locked
   '
 
 echo "QA_SUITE=PASS"
