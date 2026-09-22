@@ -909,6 +909,7 @@ const handleSubmitLeaveRequest = async () => {
         selectedAssignment={selectedAssignment}
         currentUserId={currentUserId}
         setSnackbar={setSnackbar}
+        isEditingLeaveRequest={isEditingLeaveRequest}
         setIsEditingLeaveRequest={setIsEditingLeaveRequest}
         leaveType={leaveType}
         setLeaveType={setLeaveType}
@@ -919,6 +920,7 @@ const handleSubmitLeaveRequest = async () => {
         canModifyLeaveRequest={canModifyLeaveRequest}
         handleCancelLeaveRequest={handleCancelLeaveRequest}
         handleSubmitLeaveRequest={handleSubmitLeaveRequest}
+        isEditingSwapRequest={isEditingSwapRequest}
         setIsEditingSwapRequest={setIsEditingSwapRequest}
         swapNote={swapNote}
         setSwapNote={setSwapNote}

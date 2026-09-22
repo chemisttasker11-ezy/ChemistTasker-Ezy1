@@ -20,7 +20,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import moment from 'moment';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
-import { type DayOperatingHours, type HorizontalCalendarGridProps, formatMinutesToTime, getPharmacyDayHours, getRoleTheme } from './HorizontalCalendarGrid.model';
+import { type CalendarEventItem, type DayOperatingHours, type HorizontalCalendarGridProps, formatMinutesToTime, getPharmacyDayHours, getRoleTheme } from './HorizontalCalendarGrid.model';
 export type { CalendarEventItem, HorizontalCalendarGridProps, DayOperatingHours } from './HorizontalCalendarGrid.model';
 export { parseTimeToMinutes, formatMinutesToTime, getPharmacyDayHours } from './HorizontalCalendarGrid.model';
 

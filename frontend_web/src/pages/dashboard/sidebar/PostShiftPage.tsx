@@ -18,7 +18,6 @@ import {
   AttachMoney as RateIcon,
   Schedule as ScheduleIcon,
 } from '@mui/icons-material';
-import Grid from '@mui/material/Grid';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import dayjs from 'dayjs';
@@ -44,6 +43,7 @@ import {
   type PharmacyOption,
   type ShiftDescriptionTemplate,
   type SlotEntry,
+  type SlotTime,
   type CalendarEvent,
   type CalendarViewOption,
   toRateInputString,
@@ -175,7 +175,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const [calendarDate, setCalendarDate] = useState(todayStart.toDate());
   const minCalendarDate = useMemo(() => todayStart.toDate(), [todayStart]);
   const maxCalendarDate = useMemo(() => todayStart.add(4, 'month').endOf('month').toDate(), [todayStart]);
-  const minDateInputValue = useMemo(() => todayStart.format('YYYY-MM-DD'), [todayStart]);
   const safeCalendarDate = useMemo(
     () => (isValidDate(calendarDate) ? calendarDate : todayStart.toDate()),
     [calendarDate, todayStart]

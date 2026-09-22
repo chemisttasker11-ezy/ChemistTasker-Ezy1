@@ -24,7 +24,6 @@ import {
   RATE_TYPE_DESCRIPTIONS,
   formatSlotTime,
   getSlotDurationHours,
-  type SlotEntry,
 } from './PostShiftPage.helpers';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -76,7 +75,7 @@ type Props = {
   handleSavePharmacyRateDefaults: () => void | Promise<void>;
   savingPharmacyRates: boolean;
   pharmacyId: number | '';
-  expandedSlots: SlotEntry[];
+  expandedSlots: Array<{ date: string; startTime: string; endTime: string }>;
   slotRateRows: SlotRateRow[];
   ownerBonus: string;
   setOwnerBonus: Setter<string>;

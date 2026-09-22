@@ -85,7 +85,7 @@ export default function TimesheetsPage() {
     try {
       const next = await listTimesheetPeriods(pharmacyId);
       setPeriods(next);
-      setPeriodId((current) => current && next.some((row) => row.id === current) ? current : (next[0]?.id ?? null));
+      setPeriodId((current) => current && next.some((row: TimesheetPeriod) => row.id === current) ? current : (next[0]?.id ?? null));
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to load timesheet periods.');
     } finally {

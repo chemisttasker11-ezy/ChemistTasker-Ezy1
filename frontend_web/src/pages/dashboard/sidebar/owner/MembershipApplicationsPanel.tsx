@@ -24,13 +24,6 @@ import utc from "dayjs/plugin/utc";
 
 dayjs.extend(utc);
 
-const getFirstErrorMessage = (value: unknown): string | null => {
-  if (Array.isArray(value)) {
-    return typeof value[0] === "string" ? value[0] : null;
-  }
-  return null;
-};
-
 type MembershipApplicationsPanelProps = {
   pharmacyId: string;
   category: "FULL_PART_TIME" | "LOCUM_CASUAL";
