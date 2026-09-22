@@ -23,7 +23,10 @@ export function canAccessRoute({
   if (userRole === requiredRole) return true;
   if (requiredRole === "ORG_ADMIN") return hasOrgRole;
 
-  // A pharmacy-admin assignment is not ownership. OWNER routes remain
-  // owner-only even when a staff member administers one or more pharmacies.
+  // ChemistTasker pharmacy admins intentionally inherit the owner-side
+  // workspace/persona. Their individual capabilities still determine which
+  // delegated owner responsibilities and actions they can use.
+  if (requiredRole === "OWNER" && isAdminUser) return true;
+
   return false;
 }
