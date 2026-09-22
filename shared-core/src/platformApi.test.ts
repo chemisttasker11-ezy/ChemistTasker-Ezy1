@@ -68,20 +68,61 @@ describe('createChemistTaskerApi public content', () => {
     await api.publicContent.listArticles({ kind: 'news' });
   });
 
-  it('uses authenticated named comment and reporting operations', async () => {
+  it('uses authenticated named discussion operations with Django methods', async () => {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ url: String(input), method: init?.method ?? 'GET', body: init?.body as string ?? null });
+      if ((init?.method ?? 'GET') === 'DELETE' && String(input).includes('/comments/10/')) {
+        return new Response(null, { status: 204 });
+      }
+      if (String(input).includes('/reaction/')) return json({ counts: { like: 1 }, mine: 'like' });
       return json({ detail: 'Report received.' }, 201);
     });
     const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
 
+    await api.publicContent.createArticleComment('hello', { body: 'Comment' });
+    await api.publicContent.deleteArticleComment(10);
+    await api.publicContent.reactToArticle('hello', { kind: 'like' });
+    await api.publicContent.removeArticleReaction('hello');
+    await api.publicContent.reactToArticleComment(11, { kind: 'support' });
+    await api.publicContent.removeArticleCommentReaction(11);
     await api.publicContent.reportPost(7, { reason: 'spam', comment_id: 8 });
     await api.publicContent.reportArticleComment(9, { reason: 'unsafe' });
 
     expect(calls).toEqual([
+      { url: 'https://example.test/api/public-hub/articles/hello/comments/', method: 'POST', body: JSON.stringify({ body: 'Comment' }) },
+      { url: 'https://example.test/api/public-hub/comments/10/', method: 'DELETE', body: null },
+      { url: 'https://example.test/api/public-hub/articles/hello/reaction/', method: 'PUT', body: JSON.stringify({ kind: 'like' }) },
+      { url: 'https://example.test/api/public-hub/articles/hello/reaction/', method: 'DELETE', body: null },
+      { url: 'https://example.test/api/public-hub/comments/11/reaction/', method: 'PUT', body: JSON.stringify({ kind: 'support' }) },
+      { url: 'https://example.test/api/public-hub/comments/11/reaction/', method: 'DELETE', body: null },
       { url: 'https://example.test/api/public-hub/posts/7/report/', method: 'POST', body: JSON.stringify({ reason: 'spam', comment_id: 8 }) },
       { url: 'https://example.test/api/public-hub/comments/9/report/', method: 'POST', body: JSON.stringify({ reason: 'unsafe' }) },
+    ]);
+  });
+});
+
+describe('createChemistTaskerApi named community operations', () => {
+  it('uses canonical login and original Hub endpoint owners without client-local routes', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? 'GET' });
+      return json({ ok: true });
+    });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+
+    await api.account.login({ email: 'user@example.test', password: 'secret' });
+    await api.publicContent.createCommunityComment(4, { body: 'Reply', parent_comment: 2 });
+    await api.publicContent.updateCommunityComment(4, 5, { body: 'Updated' });
+    await api.publicContent.reactToCommunityPost(4, 'LIKE');
+    await api.publicContent.removeCommunityCommentReaction(4, 5);
+
+    expect(calls).toEqual([
+      { url: 'https://example.test/api/users/login/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/5/', method: 'PATCH' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/reactions/', method: 'POST' },
+      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/5/reactions/', method: 'DELETE' },
     ]);
   });
 });
@@ -158,46 +199,18 @@ describe('createChemistTaskerApi Ethical Marketplace', () => {
   });
 });
 
-describe('createChemistTaskerApi roster and attendance', () => {
-  it('uses named manager, PIN and roster action routes', async () => {
-    const urls: string[] = [];
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      urls.push(String(input));
-      return json({ status: 'ok', request_id: 1, message: 'ok' });
-    });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+describe('createChemistTaskerApi ownership boundary', () => {
+  it('keeps authenticated operational domains out of the Next/platform facade', () => {
+    const api = createChemistTaskerApi({
+      baseUrl: 'https://example.test/api',
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+    }) as Record<string, unknown>;
 
-    await api.attendance.updatePin(2, '1234');
-    await api.attendance.approve(3, 'Roster confirmed');
-    await api.rosterV2.copyWeek({ source_period_id: 4, target_week_start: '2026-09-21' });
-    await api.rosterV2.approveReplacement(5, 6);
-
-    expect(urls).toEqual([
-      'https://example.test/api/client-profile/attendance/worker/pin/update/',
-      'https://example.test/api/client-profile/attendance/manager/approve/',
-      'https://example.test/api/client-profile/attendance/roster/copy-week/',
-      'https://example.test/api/client-profile/attendance/roster/manager/approve-replacement/',
-    ]);
-  });
-});
-
-describe('createChemistTaskerApi workforce', () => {
-  it('uses named roster, leave and timesheet routes', async () => {
-    const calls: Array<{ url: string; method: string }> = [];
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), method: init?.method ?? 'GET' });
-      return json([]);
-    });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
-
-    await api.workforce.getRosterWorkspace(2, '2026-09-21');
-    await api.workforce.createLeave({ membership_id: 3, leave_type: 'ANNUAL', start_at: '2026-09-21T09:00:00Z', end_at: '2026-09-21T17:00:00Z' });
-    await api.workforce.submitTimesheet(4, 5);
-
-    expect(calls).toEqual([
-      { url: 'https://example.test/api/client-profile/workforce/roster/workspace/?pharmacy_id=2&week_start=2026-09-21', method: 'GET' },
-      { url: 'https://example.test/api/client-profile/workforce/leave/', method: 'POST' },
-      { url: 'https://example.test/api/client-profile/workforce/timesheets/4/submit/', method: 'POST' },
-    ]);
+    expect('attendance' in api).toBe(false);
+    expect('rosterV2' in api).toBe(false);
+    expect('workforce' in api).toBe(false);
+    expect('finance' in api).toBe(false);
+    expect('marketplace' in api).toBe(true);
+    expect('publicContent' in api).toBe(true);
   });
 });

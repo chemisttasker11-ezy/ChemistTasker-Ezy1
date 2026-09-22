@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { chemistTaskerApi } from '@/config/api';
+import { attendance, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
@@ -18,8 +18,6 @@ type AttendanceScreen =
   | 'review-decision'
   | 'kiosk-status';
 
-const attendance = chemistTaskerApi.attendance;
-const workforce = chemistTaskerApi.workforce;
 
 const titles: Record<AttendanceScreen,string> = {
   home:'Attendance',

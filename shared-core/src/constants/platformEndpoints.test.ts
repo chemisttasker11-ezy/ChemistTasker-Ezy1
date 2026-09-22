@@ -29,28 +29,41 @@ describe('PLATFORM_ENDPOINTS', () => {
     expect(PLATFORM_ENDPOINTS.ethicalMarketplace.transferDocument('transfer-id', 10)).toBe('/ethical/transfers/transfer-id/documents/10/');
   });
 
-  it('matches Django attendance, roster and kiosk routes', () => {
-    expect(PLATFORM_ENDPOINTS.attendance.managerTimeline(11)).toBe('/client-profile/attendance/manager/timeline/11/');
-    expect(PLATFORM_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/client-profile/attendance/roster/acknowledgements/12/');
-    expect(PLATFORM_ENDPOINTS.rosterV2.managerApproveReplacement).toBe('/client-profile/attendance/roster/manager/approve-replacement/');
+  it('keeps only kiosk device routes in the platform catalogue', () => {
     expect(PLATFORM_ENDPOINTS.kiosk.syncBatch).toBe('/client-profile/attendance/kiosk/sync/batch/');
     expect(PLATFORM_ENDPOINTS.kiosk.workerEnrol).toBe('/client-profile/attendance/kiosk/workers/enrol/');
-  });
-
-  it('matches Django workforce and timesheet routes', () => {
-    expect(PLATFORM_ENDPOINTS.workforce.rosterWorkspace).toBe('/client-profile/workforce/roster/workspace/');
-    expect(PLATFORM_ENDPOINTS.workforce.leaveDecision(3)).toBe('/client-profile/workforce/leave/3/decision/');
-    expect(PLATFORM_ENDPOINTS.workforce.timesheetPeriodSummary(4)).toBe('/client-profile/workforce/timesheet-periods/4/summary/');
-    expect(PLATFORM_ENDPOINTS.workforce.timesheetSubmit(5)).toBe('/client-profile/workforce/timesheets/5/submit/');
-    expect(PLATFORM_ENDPOINTS.workforce.timesheetCheckDecision(6)).toBe('/client-profile/workforce/timesheet-checks/6/decision/');
+    expect('attendance' in PLATFORM_ENDPOINTS).toBe(false);
+    expect('rosterV2' in PLATFORM_ENDPOINTS).toBe(false);
+    expect('workforce' in PLATFORM_ENDPOINTS).toBe(false);
   });
 });
 
 describe('legacy API_ENDPOINTS reconciliation', () => {
+  it('owns authenticated Worker Finance routes in API_ENDPOINTS', () => {
+    expect(API_ENDPOINTS.finance.root).toBe('/client-profile/finance/');
+    expect(API_ENDPOINTS.finance.customer(3)).toBe('/client-profile/finance/customers/3/');
+    expect(API_ENDPOINTS.finance.invoiceRevisionPdf(4, 2)).toBe('/client-profile/finance/invoices/4/revisions/2/pdf/');
+    expect(API_ENDPOINTS.finance.receivedApprovePayment(5)).toBe('/client-profile/finance/received-invoices/5/approve-payment/');
+    expect(API_ENDPOINTS.finance.expenseReceipts(6)).toBe('/client-profile/finance/expenses/6/receipts/');
+    expect(API_ENDPOINTS.finance.basWorksheet).toBe('/client-profile/finance/bas-worksheet/');
+  });
+
+  it('owns authenticated attendance, roster and workforce routes', () => {
+    expect(API_ENDPOINTS.attendance.managerTimeline(11)).toBe('/client-profile/attendance/manager/timeline/11/');
+    expect(API_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/client-profile/attendance/roster/acknowledgements/12/');
+    expect(API_ENDPOINTS.rosterV2.managerApproveReplacement).toBe('/client-profile/attendance/roster/manager/approve-replacement/');
+    expect(API_ENDPOINTS.workforce.rosterWorkspace).toBe('/client-profile/workforce/roster/workspace/');
+    expect(API_ENDPOINTS.workforce.leaveDecision(3)).toBe('/client-profile/workforce/leave/3/decision/');
+    expect(API_ENDPOINTS.workforce.timesheetPeriodSummary(4)).toBe('/client-profile/workforce/timesheet-periods/4/summary/');
+    expect(API_ENDPOINTS.workforce.timesheetSubmit(5)).toBe('/client-profile/workforce/timesheets/5/submit/');
+    expect(API_ENDPOINTS.workforce.timesheetCheckDecision(6)).toBe('/client-profile/workforce/timesheet-checks/6/decision/');
+  });
+
   it('uses canonical Django detail routes', () => {
     expect(API_ENDPOINTS.getCommunityShiftDetail(1)).toBe('/client-profile/community-shifts/1/');
     expect(API_ENDPOINTS.getPublicShiftDetail(2)).toBe('/client-profile/public-shifts/2/');
     expect(API_ENDPOINTS.getActiveShiftDetail(3)).toBe('/client-profile/shifts/active/3/');
+    expect(API_ENDPOINTS.hubCommentDetail(4, 5)).toBe('/client-profile/hub/posts/4/comments/5/');
   });
 
   it('exposes the current token-based referee rejection route', () => {

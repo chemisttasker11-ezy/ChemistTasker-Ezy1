@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService } from '@chemisttasker/shared-core';
-import { chemistTaskerApi } from '@/config/api';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, rosterV2, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateLabel, errorMessage, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -22,8 +21,7 @@ type RosterScreen =
   | 'approvals'
   | 'audit';
 
-const roster = chemistTaskerApi.rosterV2;
-const workforce = chemistTaskerApi.workforce;
+const roster = rosterV2;
 
 const titles: Record<RosterScreen, string> = {
   workspace: 'Roster workspace',

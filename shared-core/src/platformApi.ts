@@ -1,6 +1,7 @@
 import type { ApiClient, ApiClientConfig, ApiQuery, ApiRequestOptions } from './transport/client';
 import { createApiClient } from './transport/client';
 import { PLATFORM_ENDPOINTS } from './constants/platformEndpoints';
+import { API_ENDPOINTS } from './constants/endpoints';
 import type {
   ApiPage,
   ContentAssignments,
@@ -12,7 +13,6 @@ import type {
   ContentPayload,
   ContentTeamMember,
   DetailResponse,
-  JsonValue,
   PublicArticle,
   PublicArticleComment,
   PublicArticleDetail,
@@ -20,6 +20,7 @@ import type {
   PublicHubPoll,
   PublicHubPost,
   PublicHubSummary,
+  ReactionSummary,
 } from './contracts/publicContent';
 import type {
   MarketplaceAccess,
@@ -47,33 +48,6 @@ import type {
   EthicalStockLotWrite,
   EthicalTransfer,
 } from './contracts/ethicalMarketplace';
-import type {
-  AttendanceBreakResult,
-  AttendanceClockResult,
-  AttendancePinPharmacy,
-  AttendanceTimeline,
-  AttendanceWorkerStatus,
-  PendingAttendance,
-  RosterActionResult,
-  RosterAudit,
-  RosterPeriod,
-  RosterTemplate,
-} from './contracts/attendanceRoster';
-import type {
-  WorkforceAwardPreview,
-  WorkforceCoverageRequirement,
-  WorkforceEmploymentEngagement,
-  WorkforceEmploymentEngagementWrite,
-  WorkforceLeave,
-  WorkforceMyHoursRow,
-  WorkforcePayrollConfiguration,
-  WorkforceRosterWorkspace,
-  WorkforceTimesheetDetail,
-  WorkforceTimesheetPeriod,
-  WorkforceTimesheetRow,
-  WorkforceTimesheetSummary,
-  WorkforceWorkSettings,
-} from './contracts/workforce';
 
 export interface DomainApi {
   request<T = unknown>(path: string, options?: ApiRequestOptions): Promise<T>;
@@ -90,11 +64,13 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
     account: {
       ...domain(client),
       getCurrentUser: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.account.currentUser),
+      login: <T = unknown>(body: { email: string; password: unknown; remember_me?: boolean }) =>
+        client.post<T>(API_ENDPOINTS.login, body, { auth: false, retryAuth: false }),
     },
 
     publicContent: {
-      ...domain(client),
       listHubs: () => client.get<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community, undefined, { auth: false }),
+      getSitemap: <T = Array<{ loc: string; lastmod?: string }>>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.sitemap, undefined, { auth: false }),
       listCommunityPosts: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query, { auth: false }),
       listCommunityPolls: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query, { auth: false }),
       getPost: (id: number) => client.get<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id), undefined, { auth: false }),
@@ -105,10 +81,23 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       listArticleComments: (slug: string, query?: ApiQuery) => client.get<ApiPage<PublicArticleComment>>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), query, { auth: false }),
       createArticleComment: (slug: string, body: { body: string; parent?: number | null }) => client.post<PublicArticleComment>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), body),
       deleteArticleComment: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.publicHub.comment(id)),
-      reactToArticle: (slug: string, body: { kind: string }) => client.post<PublicArticle>(PLATFORM_ENDPOINTS.publicHub.articleReaction(slug), body),
-      reactToArticleComment: (id: number, body: { kind: string }) => client.post<PublicArticleComment>(PLATFORM_ENDPOINTS.publicHub.commentReaction(id), body),
+      reactToArticle: (slug: string, body: { kind: string }) => client.put<ReactionSummary>(PLATFORM_ENDPOINTS.publicHub.articleReaction(slug), body),
+      removeArticleReaction: (slug: string) => client.delete<ReactionSummary>(PLATFORM_ENDPOINTS.publicHub.articleReaction(slug)),
+      reactToArticleComment: (id: number, body: { kind: string }) => client.put<ReactionSummary>(PLATFORM_ENDPOINTS.publicHub.commentReaction(id), body),
+      removeArticleCommentReaction: (id: number) => client.delete<ReactionSummary>(PLATFORM_ENDPOINTS.publicHub.commentReaction(id)),
       reportArticleComment: (id: number, body: { reason: string }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.commentReport(id), body),
       getMemberContext: <T = unknown>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.me),
+      createCommunityPost: (body: FormData) => client.post<PublicHubPost>(API_ENDPOINTS.hubPosts, body),
+      updateCommunityPost: (id: number, body: { body: string }) => client.patch<PublicHubPost>(API_ENDPOINTS.hubPostDetail(id), body),
+      deleteCommunityPost: (id: number) => client.delete<void>(API_ENDPOINTS.hubPostDetail(id)),
+      voteCommunityPoll: (pollId: number, optionId: number) => client.post(API_ENDPOINTS.hubPollVote(pollId), { option_id: optionId }),
+      reactToCommunityPost: (postId: number, reactionType: string) => client.post(API_ENDPOINTS.hubPostReactions(postId), { reaction_type: reactionType }),
+      removeCommunityPostReaction: (postId: number) => client.delete(API_ENDPOINTS.hubPostReactions(postId)),
+      createCommunityComment: (postId: number, body: { body: string; parent_comment?: number }) => client.post(API_ENDPOINTS.hubPostComments(postId), body),
+      updateCommunityComment: (postId: number, commentId: number, body: { body: string }) => client.patch(API_ENDPOINTS.hubCommentDetail(postId, commentId), body),
+      deleteCommunityComment: (postId: number, commentId: number) => client.delete<void>(API_ENDPOINTS.hubCommentDetail(postId, commentId)),
+      reactToCommunityComment: (postId: number, commentId: number, reactionType: string) => client.post(API_ENDPOINTS.hubCommentReactions(postId, commentId), { reaction_type: reactionType }),
+      removeCommunityCommentReaction: (postId: number, commentId: number) => client.delete(API_ENDPOINTS.hubCommentReactions(postId, commentId)),
     },
 
     marketplace: {
@@ -172,83 +161,6 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       uploadTransferDocument: (id: string, body: FormData) => client.post<{ id: number; document_type: string }>(PLATFORM_ENDPOINTS.ethicalMarketplace.transferDocuments(id), body),
       transferDocumentPath: (id: string, documentId: number) => PLATFORM_ENDPOINTS.ethicalMarketplace.transferDocument(id, documentId),
       actOnTransfer: (id: string, action: 'agree' | 'authorise' | 'dispatch' | 'receive' | 'cancel', body: { expected_version: number; client_request_id: string }) => client.post<{ state: string; version: number }>(PLATFORM_ENDPOINTS.ethicalMarketplace.transferAction(id, action), body),
-    },
-
-    attendance: {
-      ...domain(client),
-      getWorkerStatus: () => client.get<AttendanceWorkerStatus>(PLATFORM_ENDPOINTS.attendance.workerStatus),
-      clockIn: (qrToken: string) => client.post<AttendanceClockResult>(PLATFORM_ENDPOINTS.attendance.workerClockIn, { qr_token: qrToken }),
-      breakStart: () => client.post<AttendanceBreakResult>(PLATFORM_ENDPOINTS.attendance.workerBreakStart, {}),
-      breakEnd: () => client.post<AttendanceBreakResult>(PLATFORM_ENDPOINTS.attendance.workerBreakEnd, {}),
-      clockOut: (qrToken: string) => client.post<AttendanceClockResult>(PLATFORM_ENDPOINTS.attendance.workerClockOut, { qr_token: qrToken }),
-      getPinPharmacies: () => client.get<{ pharmacies: AttendancePinPharmacy[] }>(PLATFORM_ENDPOINTS.attendance.workerPinUpdate),
-      updatePin: (pharmacyId: number, newPin: string) => client.post<{ success: true; message: string; pharmacy_id: number }>(PLATFORM_ENDPOINTS.attendance.workerPinUpdate, { pharmacy_id: pharmacyId, new_pin: newPin }),
-      getManagerPending: (pharmacyId: number) => client.get<PendingAttendance[]>(PLATFORM_ENDPOINTS.attendance.managerPending, { pharmacy_id: pharmacyId }),
-      approve: (provisionalId: number, reason = '') => client.post<{ status: 'APPROVED'; assignment_id: number; slot_id: number; shift_id: number }>(PLATFORM_ENDPOINTS.attendance.managerApprove, { provisional_id: provisionalId, reason }),
-      reject: (provisionalId: number, reason: string) => client.post<{ status: 'REJECTED'; provisional_id: number; reason: string }>(PLATFORM_ENDPOINTS.attendance.managerReject, { provisional_id: provisionalId, reason }),
-      correct: (eventId: number, correctedTimestamp: string, reason: string) => client.post<{ status: 'CORRECTED'; correction_id: number; event_id: number; corrected_timestamp: string; reason: string }>(PLATFORM_ENDPOINTS.attendance.managerCorrect, { event_id: eventId, corrected_timestamp: correctedTimestamp, reason }),
-      getManagerTimeline: (sessionId: number) => client.get<AttendanceTimeline>(PLATFORM_ENDPOINTS.attendance.managerTimeline(sessionId)),
-    },
-
-    rosterV2: {
-      ...domain(client),
-      getPeriod: (pharmacyId: number, weekStart: string) => client.get<RosterPeriod>(PLATFORM_ENDPOINTS.rosterV2.period, { pharmacy_id: pharmacyId, week_start: weekStart }),
-      initializePeriod: (pharmacyId: number, weekStart: string) => client.post<RosterPeriod>(PLATFORM_ENDPOINTS.rosterV2.period, { pharmacy_id: pharmacyId, week_start: weekStart }),
-      validate: <T = unknown>(body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.rosterV2.validate, body),
-      publish: <T = unknown>(body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.rosterV2.publish, body),
-      unpublish: <T = unknown>(body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.rosterV2.unpublish, body),
-      archive: <T = unknown>(body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.rosterV2.archive, body),
-      getWorkerRoster: <T = unknown>(query?: ApiQuery) => client.get<T>(PLATFORM_ENDPOINTS.rosterV2.worker, query),
-      acknowledge: <T = unknown>(body: Record<string, unknown>) => client.post<T>(PLATFORM_ENDPOINTS.rosterV2.acknowledge, body),
-      getAcknowledgements: <T = unknown>(periodId: number) => client.get<T>(PLATFORM_ENDPOINTS.rosterV2.acknowledgements(periodId)),
-      copyWeek: (body: { source_period_id: number; target_week_start: string; include_assignments?: boolean; overwrite?: boolean }) => client.post<{ status: 'DRAFT'; period_id: number; target_week_start: string; copied_from_period_id: number; counts: Record<string, number> }>(PLATFORM_ENDPOINTS.rosterV2.copyWeek, body),
-      getTemplates: (pharmacyId: number) => client.get<RosterTemplate[]>(PLATFORM_ENDPOINTS.rosterV2.templates, { pharmacy_id: pharmacyId }),
-      createTemplate: (body: { name: string; pharmacy_id?: number; from_period_id?: number; template_data?: JsonValue[]; include_users?: boolean }) => client.post<RosterTemplate>(PLATFORM_ENDPOINTS.rosterV2.templates, body),
-      applyTemplate: (body: { template_id: number; target_week_start: string; include_assignments?: boolean; overwrite?: boolean }) => client.post<{ status: 'DRAFT'; period_id: number; target_week_start: string; template_id: number; counts: Record<string, number> }>(PLATFORM_ENDPOINTS.rosterV2.templateApply, body),
-      bulkEdit: (periodId: number, operations: Array<Record<string, unknown>>) => client.post<{ status: 'SUCCESS'; period_id: number; summary: Record<string, JsonValue> }>(PLATFORM_ENDPOINTS.rosterV2.bulkEdit, { period_id: periodId, operations }),
-      requestSwap: (assignmentId: number, targetUserId: number, notes = '') => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.workerSwapRequest, { assignment_id: assignmentId, target_user_id: targetUserId, notes }),
-      requestCover: (assignmentId: number, reason = '') => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.workerCoverRequest, { assignment_id: assignmentId, reason }),
-      approveSwap: (requestId: number, targetUserId?: number) => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.managerApproveSwap, { request_id: requestId, ...(targetUserId ? { target_user_id: targetUserId } : {}) }),
-      approveReplacement: (requestId: number, replacementUserId: number) => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.managerApproveReplacement, { request_id: requestId, replacement_user_id: replacementUserId }),
-      releaseWorker: (requestId: number, escalateToVisibility?: string | null) => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.managerReleaseWorker, { request_id: requestId, escalate_to_visibility: escalateToVisibility ?? null }),
-      rejectRequest: (requestId: number, reason = '') => client.post<RosterActionResult>(PLATFORM_ENDPOINTS.rosterV2.managerRejectRequest, { request_id: requestId, reason }),
-      getAudits: (pharmacyId: number) => client.get<{ audits: RosterAudit[] }>(PLATFORM_ENDPOINTS.rosterV2.audits, { pharmacy_id: pharmacyId }),
-    },
-
-    workforce: {
-      ...domain(client),
-      getRosterWorkspace: (pharmacyId: number, weekStart: string) => client.get<WorkforceRosterWorkspace>(PLATFORM_ENDPOINTS.workforce.rosterWorkspace, { pharmacy_id: pharmacyId, week_start: weekStart }),
-      validateRoster: <T = unknown>(periodId: number, expectedRevision: number) => client.post<T>(PLATFORM_ENDPOINTS.workforce.rosterValidate, { period_id: periodId, expected_revision: expectedRevision }),
-      publishRoster: <T = unknown>(body: { period_id: number; expected_revision: number; acknowledged_warning_keys: string[]; operation_id: string }) => client.post<T>(PLATFORM_ENDPOINTS.workforce.rosterPublish, body),
-      getPayrollConfiguration: (pharmacyId: number) => client.get<WorkforcePayrollConfiguration>(PLATFORM_ENDPOINTS.workforce.payrollConfiguration, { pharmacy_id: pharmacyId }),
-      updatePayrollConfiguration: (body: { pharmacy_id: number; use_chemisttasker_payroll: boolean }) => client.patch<WorkforcePayrollConfiguration>(PLATFORM_ENDPOINTS.workforce.payrollConfiguration, body),
-      listWorkSettings: (pharmacyId: number) => client.get<WorkforceWorkSettings[]>(PLATFORM_ENDPOINTS.workforce.workSettings, { pharmacy_id: pharmacyId }),
-      saveWorkSettings: (body: { membership_id: number; contracted_weekly_minutes: number | null; effective_from?: string | null; work_pattern?: Record<string, unknown> }) => client.post<WorkforceWorkSettings>(PLATFORM_ENDPOINTS.workforce.workSettings, body),
-      listEmploymentEngagements: (pharmacyId: number, membershipId?: number) => client.get<WorkforceEmploymentEngagement[]>(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { pharmacy_id: pharmacyId, ...(membershipId ? { membership_id: membershipId } : {}) }),
-      previewEmploymentEngagementAward: (body: { membership_id: number; employment_type?: string; award_classification?: string }) => client.post<WorkforceAwardPreview>(PLATFORM_ENDPOINTS.workforce.employmentEngagementAwardPreview, body),
-      createEmploymentEngagement: (body: WorkforceEmploymentEngagementWrite) => client.post<WorkforceEmploymentEngagement>(PLATFORM_ENDPOINTS.workforce.employmentEngagements, body),
-      updateEmploymentEngagement: (publicId: string, body: Partial<WorkforceEmploymentEngagementWrite>) => client.patch<WorkforceEmploymentEngagement>(PLATFORM_ENDPOINTS.workforce.employmentEngagement(publicId), body),
-      listCoverageRequirements: (pharmacyId: number) => client.get<WorkforceCoverageRequirement[]>(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { pharmacy_id: pharmacyId }),
-      createCoverageRequirement: (body: { pharmacy_id: number; weekday: number; start_time: string; end_time: string; role: string; minimum_staff: number; active?: boolean }) => client.post<WorkforceCoverageRequirement>(PLATFORM_ENDPOINTS.workforce.coverageRequirements, body),
-      deleteCoverageRequirement: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.workforce.coverageRequirement(id)),
-      listLeave: (query?: ApiQuery) => client.get<WorkforceLeave[]>(PLATFORM_ENDPOINTS.workforce.leave, query),
-      createLeave: (body: { membership_id: number; leave_type: string; start_at: string; end_at: string; note?: string }) => client.post<WorkforceLeave>(PLATFORM_ENDPOINTS.workforce.leave, body),
-      decideLeave: (id: number, decision: 'APPROVED' | 'REJECTED' | 'CANCELLED', managerNote = '') => client.post<WorkforceLeave>(PLATFORM_ENDPOINTS.workforce.leaveDecision(id), { decision, manager_note: managerNote }),
-      listTimesheetPeriods: (pharmacyId: number) => client.get<WorkforceTimesheetPeriod[]>(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { pharmacy_id: pharmacyId }),
-      openTimesheetPeriod: (pharmacyId: number, startDate: string, endDate: string) => client.post<{ id: number; created: boolean; status: string }>(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { pharmacy_id: pharmacyId, start_date: startDate, end_date: endDate }),
-      getTimesheetPeriodSummary: (id: number) => client.get<WorkforceTimesheetSummary>(PLATFORM_ENDPOINTS.workforce.timesheetPeriodSummary(id)),
-      recalculateTimesheetPeriod: <T = unknown>(id: number, sync = false) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetPeriodRecalculate(id), { sync }),
-      lockTimesheetPeriod: <T = unknown>(id: number) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetPeriodLock(id), {}),
-      listTimesheets: (periodId: number, query: { status?: string; search?: string } = {}) => client.get<WorkforceTimesheetRow[]>(PLATFORM_ENDPOINTS.workforce.timesheets, { period_id: periodId, ...query }),
-      getTimesheet: (id: number) => client.get<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheet(id)),
-      recalculateTimesheet: (id: number) => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetRecalculate(id), {}),
-      addMissingPunch: (id: number, body: { session_id: number; event_type: 'CLOCK_IN' | 'CLOCK_OUT'; occurred_at?: string; occurred_at_local?: string; reason: string }) => client.post<{ created_event_id: number; timesheet: WorkforceTimesheetDetail }>(PLATFORM_ENDPOINTS.workforce.timesheetMissingPunch(id), body),
-      submitTimesheet: (id: number, revisionNumber: number) => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetSubmit(id), { revision_number: revisionNumber }),
-      approveTimesheet: (id: number, revisionNumber: number, reason = '') => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetApprove(id), { revision_number: revisionNumber, reason }),
-      reopenTimesheet: (id: number, reason: string) => client.post<WorkforceTimesheetDetail>(PLATFORM_ENDPOINTS.workforce.timesheetReopen(id), { reason }),
-      addTimesheetComment: <T = unknown>(id: number, body: string, workerVisible = true) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetComments(id), { body, worker_visible: workerVisible }),
-      decideTimesheetCheck: <T = unknown>(id: number, decision: 'RESOLVED' | 'WAIVED' | 'REOPENED', reason: string) => client.post<T>(PLATFORM_ENDPOINTS.workforce.timesheetCheckDecision(id), { decision, reason }),
-      getMyHours: (query?: ApiQuery) => client.get<WorkforceMyHoursRow[]>(PLATFORM_ENDPOINTS.workforce.myHours, query),
     },
 
     /**

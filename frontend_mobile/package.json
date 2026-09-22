@@ -10,10 +10,11 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "update:preview": "eas update --channel preview",
-    "update:production": "eas update --channel production"
+    "update:production": "eas update --channel production",
+    "preinstall": "node ../scripts/prepare-shared-core.mjs"
   },
   "dependencies": {
-    "@chemisttasker/shared-core": "file:../shared-core/chemisttasker-shared-core-1.1.1.tgz",
+    "@chemisttasker/shared-core": "file:../shared-core",
     "@expo/vector-icons": "^15.0.3",
     "@react-google-maps/api": "^2.20.7",
     "@react-native-async-storage/async-storage": "2.2.0",

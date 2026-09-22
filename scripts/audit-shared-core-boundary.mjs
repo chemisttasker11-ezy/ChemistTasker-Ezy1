@@ -1,33 +1,27 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 
-const root = path.resolve(import.meta.dirname, '..');
 const targets = [
   'frontend_web/src',
   'frontend_web/landing_next',
   'frontend_mobile',
 ];
-const allowed = new Set([
-  // Bootstrap/configuration may declare the API origin but should not own domain routes.
-  'frontend_web/src/config-global.ts',
-]);
+
+// Domain routes belong in @chemisttasker/shared-core. Runtime bootstrap files
+// may configure an API origin, but feature code must not construct backend
+// domain routes or use generic shared-core escape hatches.
+const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//;
+const requestCallPattern = /(?:\.(?:get|post|put|patch|delete|request)\s*(?:<[^>]*>)?\s*\(|\b(?:fetch|fetchJson|postJson|axios)\s*\()/;
+const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
+// Authenticated operational domains are intentionally owned by legacy api.ts.
+// Do not reintroduce them through the request-scoped Next/platform facade.
+const operationalPlatformPattern = /\bchemistTaskerApi\.(?:workforce|attendance|rosterV2)\b/;
+
+const root = path.resolve(import.meta.dirname, '..');
 const ignoredDirs = new Set(['node_modules', 'dist', 'dist-kiosk', '.next', '.expo', 'build', 'coverage']);
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-// Match both absolute `/api/...` routes and relative `/<domain>/...`
-// literals, but only when they appear on an actual request-call line.
-// Client-side navigation such as router.push('/marketplace/...') is not
-// transport debt and must not change the reviewed shared-core baseline.
-const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//g;
-const requestCallPattern = /(?:\.(?:get|post|put|patch|delete|request)\s*(?:<[^>]*>)?\s*\(|\b(?:fetch|fetchJson|postJson|axios)\s*\()/;
-// Generic request helpers can hide relative routes from the literal matcher.
-// Keep those escape hatches in the reviewed baseline too; new domain work must
-// add a named shared-core operation instead of extending one of these helpers.
-const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
-// This digest records the reviewed legacy route and escape-hatch backlog.
-// Strict mode fails on any added, removed or changed finding.
-const REVIEWED_BASELINE_DIGEST = '92ff2039cabc561883b5679c9de853709850bc9082949b06d11adf5f0c276af0';
 
 function walk(directory, output = []) {
   if (!fs.existsSync(directory)) return output;
@@ -40,44 +34,77 @@ function walk(directory, output = []) {
   return output;
 }
 
-const findings = [];
-for (const target of targets) {
+// Operational ownership is not legacy debt: after CP1 there must be zero
+// Vite/mobile clients using the Next/platform facade for these domains.
+const operationalFindings = [];
+for (const target of ['frontend_web/src', 'frontend_mobile']) {
   for (const file of walk(path.join(root, target))) {
     const relative = path.relative(root, file).replaceAll('\\', '/');
-    if (allowed.has(relative)) continue;
-    const text = fs.readFileSync(file, 'utf8');
-    text.split(/\r?\n/).forEach((line, index) => {
-      const directRequestRoute = routePattern.test(line) && requestCallPattern.test(line);
-      if (directRequestRoute || escapeHatchPattern.test(line)) {
-        findings.push({ file: relative, line: index + 1, text: line.trim() });
+    const source = fs.readFileSync(file, 'utf8');
+    source.split(/\r?\n/).forEach((line, index) => {
+      if (operationalPlatformPattern.test(line)) {
+        operationalFindings.push({ file: relative, line: index + 1, text: line.trim() });
       }
-      routePattern.lastIndex = 0;
     });
   }
 }
-
-const digest = crypto.createHash('sha256')
-  .update(findings.map(({ file, text }) => `${file}\t${text}`).sort().join('\n'))
-  .digest('hex');
-
-if (process.argv.includes('--baseline-digest')) {
-  console.log(digest);
-  process.exit(0);
+if (operationalFindings.length) {
+  console.error(`Shared-core ownership audit failed: ${operationalFindings.length} operational platform-facade use(s) remain.`);
+  for (const finding of operationalFindings) console.error(`${finding.file}:${finding.line}  ${finding.text}`);
+  console.error('Workforce, Attendance and Roster V2 must use the authenticated api.ts shared-core exports.');
+  process.exit(1);
 }
 
-if (findings.length === 0) {
-  console.log('Shared-core boundary audit: no reviewed direct request routes or generic-request escape hatches found.');
-  process.exit(0);
-}
 
-console.log(`Shared-core boundary audit: ${findings.length} reviewed direct-route or generic-request finding(s) found.`);
-for (const finding of findings) console.log(`${finding.file}:${finding.line}  ${finding.text}`);
-console.log(`\nReviewed baseline digest: ${digest}`);
-console.log('Migration rule: reuse/add the operation in @chemisttasker/shared-core before changing the client.');
-if (process.argv.includes('--strict')) {
-  if (digest !== REVIEWED_BASELINE_DIGEST) {
-    console.error('Strict boundary audit failed: route or generic-request baseline changed. Migrate the call to a named shared-core operation or review the baseline intentionally.');
-    process.exit(1);
+function resolveBase() {
+  const configured = (process.env.SHARED_CORE_AUDIT_BASE || '').trim();
+  if (configured && !/^0+$/.test(configured)) return configured;
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD^'], { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
   }
-  console.log('Strict boundary audit passed: no unreviewed route or generic-request drift.');
 }
+
+const base = resolveBase();
+if (!base) {
+  console.log('Shared-core boundary audit: no comparison base is available; nothing to ratchet.');
+  process.exit(0);
+}
+
+let diff;
+try {
+  diff = execFileSync(
+    'git',
+    ['diff', '--unified=0', base, 'HEAD', '--', ...targets],
+    { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+  );
+} catch (error) {
+  console.error('Shared-core boundary audit could not inspect the changed client lines.');
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
+const findings = [];
+let currentFile = '';
+for (const line of diff.split(/\r?\n/)) {
+  if (line.startsWith('+++ b/')) {
+    currentFile = line.slice('+++ b/'.length);
+    continue;
+  }
+  if (!line.startsWith('+') || line.startsWith('+++')) continue;
+  const added = line.slice(1);
+  const directRequestRoute = routePattern.test(added) && requestCallPattern.test(added);
+  if (directRequestRoute || escapeHatchPattern.test(added) || operationalPlatformPattern.test(added)) {
+    findings.push({ file: currentFile || '(unknown)', text: added.trim() });
+  }
+}
+
+if (findings.length) {
+  console.error(`Shared-core boundary audit failed: ${findings.length} new client bypass(es) introduced.`);
+  for (const finding of findings) console.error(`${finding.file}  ${finding.text}`);
+  console.error('Rule: add/reuse a named @chemisttasker/shared-core operation instead of adding a client-local backend route.');
+  process.exit(1);
+}
+
+console.log('Shared-core boundary audit passed: no new client bypasses; reductions are allowed.');

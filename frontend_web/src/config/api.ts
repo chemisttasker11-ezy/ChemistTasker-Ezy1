@@ -35,6 +35,7 @@ export function initSharedCoreApi() {
       const refreshed = await refreshCookieSession();
       return refreshed?.access ?? null;
     },
+    refreshToken: async () => (await refreshCookieSession(true))?.access ?? null,
   });
   configured = true;
 }

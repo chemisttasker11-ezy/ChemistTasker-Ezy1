@@ -27,6 +27,7 @@ configureApi({
   getToken: async () => {
     return await getValidAccessToken(baseURL);
   },
+  refreshToken: () => refreshAccessToken(baseURL),
 });
 
 /** Shared request/contract facade; device storage and lifecycle remain mobile-owned. */

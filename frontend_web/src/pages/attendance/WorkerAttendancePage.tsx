@@ -30,7 +30,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import moment from "moment";
-import apiClient from "../../utils/apiClient";
+import { attendance, rosterV2 } from "@chemisttasker/shared-core";
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from "../../constants/brandTheme";
 
 export interface WorkerRosterShift {
@@ -79,10 +79,11 @@ export default function WorkerAttendancePage() {
     if (!pinModalOpen) return;
     let active = true;
     setPinPharmacies([]); setPinPharmacyId(''); setPinUpdateError(null);
-    apiClient.get('/client-profile/attendance/worker/pin/update/').then(({ data }) => {
+    attendance.getPinPharmacies().then((data: any) => {
       if (!active) return;
-      setPinPharmacies(data.pharmacies);
-      if (data.pharmacies.length === 1) setPinPharmacyId(String(data.pharmacies[0].id));
+      const pharmacies = Array.isArray(data?.pharmacies) ? data.pharmacies : [];
+      setPinPharmacies(pharmacies);
+      if (pharmacies.length === 1) setPinPharmacyId(String(pharmacies[0].id));
     }).catch(() => { if (active) setPinUpdateError('Unable to load your pharmacies. Close this dialog and try again.'); });
     return () => { active = false; };
   }, [pinModalOpen]);
@@ -106,16 +107,13 @@ export default function WorkerAttendancePage() {
     setSubmittingPin(true);
     setPinUpdateError(null);
     try {
-      await apiClient.post("/client-profile/attendance/worker/pin/update/", {
-        new_pin: newPin,
-        pharmacy_id: Number(pinPharmacyId),
-      });
+      await attendance.updatePin(Number(pinPharmacyId), newPin);
       setSuccessMsg("Attendance PIN updated for the selected pharmacy. Connect its terminal to the internet when first using the new PIN.");
       setPinModalOpen(false);
       setNewPin("");
       setConfirmNewPin("");
     } catch (err: any) {
-      setPinUpdateError(err.response?.data?.error || "Failed to update PIN.");
+      setPinUpdateError(err?.message || "Failed to update PIN.");
     } finally {
       setSubmittingPin(false);
     }
@@ -126,8 +124,8 @@ export default function WorkerAttendancePage() {
     try {
       setLoading(true);
       setErrorMsg(null);
-      const res = await apiClient.get("/client-profile/attendance/worker/status/");
-      setStatusInfo(res.data);
+      const data = await attendance.getWorkerStatus();
+      setStatusInfo(data as typeof statusInfo);
     } catch (err: any) {
       setErrorMsg("Failed to retrieve current attendance state.");
     } finally {
@@ -139,8 +137,8 @@ export default function WorkerAttendancePage() {
   const fetchRosterShifts = async () => {
     try {
       setLoadingShifts(true);
-      const res = await apiClient.get("/client-profile/attendance/roster/worker/");
-      setRosterShifts(res.data.shifts || []);
+      const data = await rosterV2.getWorkerRoster();
+      setRosterShifts((data as any)?.shifts || []);
     } catch (err: any) {
       console.error("Failed to load worker published roster", err);
     } finally {
@@ -152,14 +150,14 @@ export default function WorkerAttendancePage() {
   const handleAcknowledgePeriod = async (periodId: number) => {
     try {
       setAcknowledgingPeriodId(periodId);
-      await apiClient.post("/client-profile/attendance/roster/acknowledge/", {
+      await rosterV2.acknowledge({
         period_id: periodId,
         notes: "Acknowledged via Worker Attendance Dashboard",
       });
       setSuccessMsg("Roster shifts acknowledged successfully!");
       await fetchRosterShifts();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || "Failed to acknowledge shifts.");
+      setErrorMsg(err?.message || "Failed to acknowledge shifts.");
     } finally {
       setAcknowledgingPeriodId(null);
     }
@@ -198,11 +196,11 @@ export default function WorkerAttendancePage() {
     try {
       setSubmittingAction(true);
       setErrorMsg(null);
-      await apiClient.post("/client-profile/attendance/worker/break-start/");
+      await attendance.breakStart();
       setSuccessMsg("Break started.");
       await fetchStatus();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || "Failed to start break.");
+      setErrorMsg(err?.message || "Failed to start break.");
     } finally {
       setSubmittingAction(false);
     }
@@ -213,11 +211,11 @@ export default function WorkerAttendancePage() {
     try {
       setSubmittingAction(true);
       setErrorMsg(null);
-      await apiClient.post("/client-profile/attendance/worker/break-end/");
+      await attendance.breakEnd();
       setSuccessMsg("Break ended. Resumed shift.");
       await fetchStatus();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || "Failed to end break.");
+      setErrorMsg(err?.message || "Failed to end break.");
     } finally {
       setSubmittingAction(false);
     }
@@ -243,24 +241,20 @@ export default function WorkerAttendancePage() {
 
     try {
       if (scanAction === "CLOCK_IN") {
-        const res = await apiClient.post("/client-profile/attendance/worker/clock-in/", {
-          qr_token: qrInputToken.trim(),
-        });
+        const data = await attendance.clockIn(qrInputToken.trim()) as any;
         setSuccessMsg(
-          res.data.is_provisional
-            ? `Clocked in provisionally at ${res.data.pharmacy_name}. Pending manager review.`
-            : `Clocked in successfully at ${res.data.pharmacy_name}.`
+          data.is_provisional
+            ? `Clocked in provisionally at ${data.pharmacy_name}. Pending manager review.`
+            : `Clocked in successfully at ${data.pharmacy_name}.`
         );
       } else {
-        const res = await apiClient.post("/client-profile/attendance/worker/clock-out/", {
-          qr_token: qrInputToken.trim(),
-        });
-        setSuccessMsg(`Clocked out successfully from ${res.data.pharmacy_name}.`);
+        const data = await attendance.clockOut(qrInputToken.trim()) as any;
+        setSuccessMsg(`Clocked out successfully from ${data.pharmacy_name}.`);
       }
       setScanModalOpen(false);
       await fetchStatus();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || "QR verification or clock transition failed.");
+      setErrorMsg(err?.message || "QR verification or clock transition failed.");
     } finally {
       setSubmittingAction(false);
     }

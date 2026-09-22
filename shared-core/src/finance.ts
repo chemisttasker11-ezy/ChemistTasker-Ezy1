@@ -6,6 +6,8 @@ export type FinanceMoney = string;
 export interface FinanceConfig {
   baseURL: string;
   getToken: () => string | null | undefined | Promise<string | null | undefined>;
+  refreshToken?: () => string | null | undefined | Promise<string | null | undefined>;
+  onAuthFailure?: () => void | Promise<void>;
   credentials?: RequestCredentials;
 }
 export interface FinanceCustomer {
@@ -74,94 +76,19 @@ export interface FinanceWorksheet {
 export type FinanceCustomerInput = Omit<FinanceCustomer, 'id' | 'abn_result' | 'abn_checked_at'>;
 export type FinanceItemInput = Omit<FinanceItem, 'id'>;
 export type FinanceExpenseInput = Omit<FinanceExpense, 'id' | 'gst_credit' | 'receipts'>;
-interface Page<T> { results: T[]; next: string | null; count: number }
-let configuration: FinanceConfig | undefined;
+import { financeApi } from './api';
 
-/** Called by the package configureApi wrapper, not independently by applications. */
-export function configureFinanceApi(value: FinanceConfig): void { configuration = value; }
-function endpoint(path: string): URL {
-  if (!configuration) throw new Error('API not configured. Call configureApi() first.');
-  const base = new URL('client-profile/finance/', configuration.baseURL.replace(/\/?$/, '/'));
-  const target = new URL(path, base);
-  if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.origin !== base.origin || !target.pathname.startsWith(base.pathname)) {
-    throw new Error('Finance requests cannot leave the configured finance API.');
-  }
-  return target;
+/**
+ * Worker finance belongs to the established authenticated shared-core surface.
+ * Keep the finance domain API and types stable, but delegate all network I/O
+ * to api.ts so Vite/mobile use one authenticated request engine.
+ */
+export const finance = financeApi;
+
+/**
+ * Backwards-compatible no-op. configureApi() now configures the authenticated
+ * core once; finance no longer owns independent transport state.
+ */
+export function configureFinanceApi(_value: FinanceConfig): void {
+  // Intentionally empty.
 }
-function messageFrom(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object') {
-    for (const child of Object.values(value)) { const result = messageFrom(child); if (result) return result; }
-  }
-  return undefined;
-}
-async function request<T>(path: string, method = 'GET', body?: unknown, binary = false): Promise<T> {
-  const url = endpoint(path);
-  const config = configuration!;
-  const token = await config.getToken();
-  const headers = new Headers();
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
-  if (body !== undefined && !multipart) headers.set('Content-Type', 'application/json');
-  const response = await fetch(url, { method, redirect: 'error', credentials: config.credentials ?? 'include', headers,
-    body: body === undefined ? undefined : multipart ? body as FormData : JSON.stringify(body) });
-  if (!response.ok) {
-    const error: unknown = await response.json().catch(() => null);
-    // Safe, specific server messages are useful for uncertain email acceptance too.
-    throw new Error(messageFrom(error) || `Finance request failed (${response.status}).`);
-  }
-  if (binary) return await response.blob() as T;
-  if (response.status === 204) return undefined as T;
-  return await response.json() as T;
-}
-async function listAll<T>(path: string): Promise<T[]> {
-  const results: T[] = [];
-  const seen = new Set<string>();
-  let next: string | null = path;
-  while (next) {
-    if (seen.has(next) || seen.size >= 100) throw new Error('List is too large or pagination repeated. Narrow the server query.');
-    seen.add(next);
-    const page: Page<T> = await request<Page<T>>(next);
-    if (!Array.isArray(page.results)) throw new Error('Unexpected finance list response.');
-    results.push(...page.results); next = page.next;
-  }
-  return results;
-}
-export const finance = {
-  customers: () => listAll<FinanceCustomer>('customers/'),
-  saveCustomer: (value: FinanceCustomerInput, id?: number) => request<FinanceCustomer>(`customers/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-  lookupAbn: (id: number) => request<FinanceCustomer>(`customers/${id}/lookup_abn/`, 'POST', {}),
-  items: () => listAll<FinanceItem>('items/'),
-  saveItem: (value: FinanceItemInput, id?: number) => request<FinanceItem>(`items/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-  seedItems: () => request<{ detail: string }>('items/seed/', 'POST', {}),
-  invoices: () => listAll<FinanceInvoice>('invoices/'),
-  receivedInvoices: () => listAll<FinanceInvoice>('received-invoices/'),
-  receivedInvoice: (id: number) => request<FinanceInvoice>(`received-invoices/${id}/`),
-  receivedRevision: (id: number, version: number) => request<FinanceInvoice>(`received-invoices/${id}/revisions/${version}/`),
-  receivedRevisionPdf: (id: number, version: number) => request<Blob>(`received-invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
-  invoiceDefaults: () => request<FinanceInvoiceDefaults>('invoices/defaults/'),
-  internalSources: () => request<FinanceInternalSource[]>('invoices/internal-sources/'),
-  internalPrefill: (assignment_ids: number[]) => request<FinanceDraft>('invoices/internal-prefill/', 'POST', { assignment_ids }),
-  invoice: (id: number) => request<FinanceInvoice>(`invoices/${id}/`),
-  invoiceRevision: (id: number, version: number) => request<FinanceInvoice>(`invoices/${id}/revisions/${version}/`),
-  invoiceRevisionPdf: (id: number, version: number) => request<Blob>(`invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
-  saveInvoice: (value: FinanceDraft, id?: number) => request<FinanceInvoice>(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-  preview: (value: FinanceDraft) => request<FinanceCalculation>('invoices/preview/', 'POST', value),
-  duplicate: (id: number, request_key: string) => request<FinanceInvoice>(`invoices/${id}/duplicate/`, 'POST', { request_key }),
-  issue: (id: number, version: number) => request<FinanceInvoice>(`invoices/${id}/issue/`, 'POST', { version, confirmed: true }),
-  superDocument: (id: number, version: number) => request<FinanceInvoice>(`invoices/${id}/super-document/`, 'POST', { version }),
-  send: (id: number, version: number) => request<{ detail: string; document: FinanceInvoice }>(`invoices/${id}/send/`, 'POST', { version, confirmed: true }),
-  markPaid: (id: number, version?: number) => request<FinanceInvoice>(`invoices/${id}/mark-paid/`, 'POST', version == null ? {} : { version }),
-  requestRevision: (id: number, version: number, note: string) => request<FinanceInvoice>(`received-invoices/${id}/request-revision/`, 'POST', { version, note }),
-  approveForPayment: (id: number, version: number, note = '') => request<FinanceInvoice>(`received-invoices/${id}/approve-payment/`, 'POST', { version, note }),
-  markReceivedPaid: (id: number, version: number, note = '') => request<FinanceInvoice>(`received-invoices/${id}/mark-paid/`, 'POST', { version, note }),
-  receivedPdf: (id: number) => request<Blob>(`received-invoices/${id}/pdf/`, 'GET', undefined, true),
-  payment: (id: number, value: { request_key: string; date: string; amount: string; reference: string; fund_payment_confirmed: boolean }) => request<FinanceInvoice>(`invoices/${id}/payments/`, 'POST', value),
-  pdf: (id: number) => request<Blob>(`invoices/${id}/pdf/`, 'GET', undefined, true),
-  expenses: () => listAll<FinanceExpense>('expenses/'),
-  saveExpense: (value: FinanceExpenseInput, id?: number) => request<FinanceExpense>(`expenses/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
-  uploadReceipt: (id: number, file: Blob, filename: string) => { const data = new FormData(); data.append('file', file, filename); return request<FinanceExpense>(`expenses/${id}/receipts/`, 'POST', data); },
-  receipt: (id: number) => request<Blob>(`receipts/${id}/download/`, 'GET', undefined, true),
-  shiftHours: (value: { start: string; end: string; break_minutes: number }) => request<{ hours: string }>('shift-hours/', 'POST', value),
-  worksheet: (start: string, end: string, basis: 'cash' | 'accrual') => request<FinanceWorksheet>(`bas-worksheet/?${new URLSearchParams({ start, end, basis })}`),
-};

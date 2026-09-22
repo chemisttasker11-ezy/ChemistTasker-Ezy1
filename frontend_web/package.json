@@ -19,10 +19,11 @@
     "kiosk:build:acceptance": "cross-env KIOSK_BUILD_PROFILE=acceptance npm run kiosk:build",
     "kiosk:build:production": "cross-env KIOSK_BUILD_PROFILE=production npm run kiosk:build",
     "install:all": "npm ci && npm ci --prefix landing_next",
-    "build:all": "npm run build && npm run build --prefix landing_next"
+    "build:all": "npm run build && npm run build --prefix landing_next",
+    "preinstall": "node ../scripts/prepare-shared-core.mjs"
   },
   "dependencies": {
-    "@chemisttasker/shared-core": "file:../shared-core/chemisttasker-shared-core-1.1.1.tgz",
+    "@chemisttasker/shared-core": "file:../shared-core",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
