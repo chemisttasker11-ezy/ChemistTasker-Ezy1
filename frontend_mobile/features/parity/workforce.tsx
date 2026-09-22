@@ -616,7 +616,7 @@ function EngagementEditor({
 
       {worker ? (
         <>
-          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} editable={!historical} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
+          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} disabled={historical} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
           <Field label="Effective to (optional, YYYY-MM-DD)" value={effectiveTo} onChangeText={setEffectiveTo} />
 
           {!historical ? (
