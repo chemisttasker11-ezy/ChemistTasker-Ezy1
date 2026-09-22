@@ -1,6 +1,6 @@
 # ChemistTasker staging preview
 
-The `staging` branch is the review environment. It is deliberately separate from `main`.
+This repository is the **staging repository**. Its `main` branch is the source of truth for the preview environment. Production is deployed from a completely separate repository.
 
 ## Isolation
 
@@ -12,7 +12,7 @@ Email, SMS, Stripe, OCR, ScrapingBee and Azure storage remain intentionally disc
 
 ## Browser integrations
 
-The staging build now requires all browser variables that the consolidated web applications actually use:
+The staging build requires all browser variables that the consolidated web applications actually use:
 
 - Vite uses same-origin `/api`, the Maps/Places browser key, the reCAPTCHA site key and the public-site bridge flag.
 - Next uses the exact preview origin for both site and platform URLs, plus the same Maps/Places browser key and reCAPTCHA site key.
@@ -30,17 +30,17 @@ It stores them as `env/staging.integrations.env`. A dedicated staging key pair c
 
 Because the temporary preview hostname changes, Google-side restrictions must also allow the staging host:
 
-- Google Maps browser key: allow the HTTPS referrer `https://*.trycloudflare.com`. Google supports wildcard subdomains for website restrictions.
-- reCAPTCHA: add `trycloudflare.com` to the allowed Domains list; Google treats its subdomains as allowed too.
-- For local consolidated development, also allow `http://localhost:3000` for the Maps browser key and add `localhost` to reCAPTCHA. Add `http://127.0.0.1:3000` as a Maps referrer if you use that hostname.
+- Google Maps browser key: allow the HTTPS referrer `https://*.trycloudflare.com`.
+- reCAPTCHA: add `trycloudflare.com` to the allowed Domains list.
+- For local consolidated development, also allow `http://localhost:3000` for the Maps browser key and add `localhost` to reCAPTCHA. Add `http://127.0.0.1:3000` as a Maps referrer if that hostname is used.
 
 A permanent `staging.chemisttasker.com.au` origin is preferable later because it lets both Google services use a narrow, stable allowlist instead of the broad temporary tunnel domain.
 
 ## One-time self-hosted runner setup
 
-GitHub-hosted staging jobs did not start, so staging uses a self-hosted GitHub Actions runner on the existing OVH server. This avoids GitHub-hosted runner capacity/minute limits and does not require storing the OVH private SSH key in GitHub.
+Staging uses a self-hosted GitHub Actions runner on the existing OVH server. This avoids GitHub-hosted runner capacity/minute limits and does not require storing the OVH private SSH key in GitHub.
 
-In the repository, open:
+In this repository, open:
 
 `Settings -> Actions -> Runners -> New self-hosted runner -> Linux -> x64`
 
@@ -58,14 +58,17 @@ The workflow deploys the isolated stack to:
 
 Server-generated staging database/Django secrets and browser-integration values live under the ignored `env/` directory in that staging folder and are preserved between deployments.
 
-Once the runner shows **Idle** in GitHub, the queued **Staging Preview** workflow can run. Every later push to `staging` redeploys the preview automatically.
+Once the runner shows **Idle** in GitHub, every push to this repository's `main` branch redeploys the preview automatically.
 
 ## Review workflow
 
-1. Make proposed changes on `staging` only.
-2. Let the Staging Preview workflow deploy them.
-3. Open the preview URL from the workflow summary and review/test.
-4. Iterate on `staging` until approved.
-5. Only after approval, move the approved code to `main`.
+1. Make proposed changes in this staging repository.
+2. Commit them to this repository's `main` branch.
+3. Let the Staging Preview workflow deploy them.
+4. Open the preview URL from the workflow summary and review/test.
+5. Iterate here until approved.
+6. Only after approval, transfer the approved changes to the separate production repository.
+
+Temporary feature branches are still fine for large or risky work, but there is no permanent `staging` branch because the repository itself is staging.
 
 Do not use the staging database as a production-data copy. If realistic test data is needed, restore a sanitised dataset into the staging PostgreSQL volume instead.
