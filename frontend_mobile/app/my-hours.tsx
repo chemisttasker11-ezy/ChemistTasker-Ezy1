@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
-import { chemistTaskerApi } from '../config/api';
+import { workforce } from '@chemisttasker/shared-core';
 
 type Row = {
   id: number;
@@ -33,7 +33,7 @@ export default function MyHoursScreen() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
-      const response = await chemistTaskerApi.workforce.getMyHours();
+      const response = await workforce.getMyHours();
       setRows(Array.isArray(response) ? response : []);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to load your hours.');
@@ -50,7 +50,7 @@ export default function MyHoursScreen() {
     setSubmitting(row.id);
     setError('');
     try {
-      await chemistTaskerApi.workforce.submitTimesheet(row.id, row.revision_number);
+      await workforce.submitTimesheet(row.id, row.revision_number);
       await load();
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to submit the timesheet.');
