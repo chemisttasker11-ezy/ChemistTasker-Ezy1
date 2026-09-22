@@ -54,6 +54,7 @@ describe('legacy API_ENDPOINTS reconciliation', () => {
     expect(API_ENDPOINTS.getCommunityShiftDetail(1)).toBe('/client-profile/community-shifts/1/');
     expect(API_ENDPOINTS.getPublicShiftDetail(2)).toBe('/client-profile/public-shifts/2/');
     expect(API_ENDPOINTS.getActiveShiftDetail(3)).toBe('/client-profile/shifts/active/3/');
+    expect(API_ENDPOINTS.hubCommentDetail(4, 5)).toBe('/client-profile/hub/posts/4/comments/5/');
   });
 
   it('exposes the current token-based referee rejection route', () => {
