@@ -71,7 +71,7 @@
     "@types/react-dom": "^19.1.2",
     "@types/react-google-recaptcha": "^2.1.9",
     "@types/three": "^0.178.1",
-    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-react": "^6.1.1",
     "@vitejs/plugin-vue-jsx": "^5.1.5",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
