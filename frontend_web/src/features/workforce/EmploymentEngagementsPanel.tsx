@@ -282,6 +282,7 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
           effective_from: effectiveFrom,
           effective_to: '',
           award_effective_from: current.award_effective_from || '',
+          adult_rate_confirmed: Boolean(current.adult_rate_confirmed),
           rate_early_morning: current.rate_early_morning || '',
           rate_late_night: current.rate_late_night || '',
           ordinary_hours_days:

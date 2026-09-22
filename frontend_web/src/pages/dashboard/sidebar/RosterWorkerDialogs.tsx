@@ -47,6 +47,7 @@ type Props = {
   currentUserId: number | null | undefined;
   setSnackbar: Setter<SnackbarState>;
 
+  isEditingLeaveRequest: boolean;
   setIsEditingLeaveRequest: Setter<boolean>;
   leaveType: string;
   setLeaveType: Setter<string>;
@@ -58,6 +59,7 @@ type Props = {
   handleCancelLeaveRequest: () => void | Promise<void>;
   handleSubmitLeaveRequest: () => void | Promise<void>;
 
+  isEditingSwapRequest: boolean;
   setIsEditingSwapRequest: Setter<boolean>;
   swapNote: string;
   setSwapNote: Setter<string>;
@@ -86,6 +88,7 @@ export default function RosterWorkerDialogs({
   selectedAssignment,
   currentUserId,
   setSnackbar,
+  isEditingLeaveRequest,
   setIsEditingLeaveRequest,
   leaveType,
   setLeaveType,
@@ -96,6 +99,7 @@ export default function RosterWorkerDialogs({
   canModifyLeaveRequest,
   handleCancelLeaveRequest,
   handleSubmitLeaveRequest,
+  isEditingSwapRequest,
   setIsEditingSwapRequest,
   swapNote,
   setSwapNote,

@@ -137,7 +137,7 @@ export default function WorkerAttendancePage() {
   const fetchRosterShifts = async () => {
     try {
       setLoadingShifts(true);
-      const data = await rosterV2.getWorkerRoster();
+      const data = await rosterV2.getWorkerRoster({});
       setRosterShifts((data as any)?.shifts || []);
     } catch (err: any) {
       console.error("Failed to load worker published roster", err);

@@ -7,7 +7,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  CircularProgress,
   Paper,
   FormControl,
   FormGroup,
@@ -45,7 +44,7 @@ import { API_BASE_URL } from "../../../constants/api";
 import OwnerPharmaciesPage from "./owner/OwnerPharmaciesPage";
 import OwnerPharmacyDetailPage from "./owner/OwnerPharmacyDetailPage";
 import TopBar from "./owner/TopBar";
-import type { PharmacyAdminDTO } from "./owner/types";
+import type { MembershipDTO, PharmacyAdminDTO, PharmacyDTO as OwnerPharmacyDTO } from "./owner/types";
 import PharmacyPageDialogs from "./PharmacyPageDialogs";
 import PharmacyClaimsPanels from "./PharmacyClaimsPanels";
 import { ORG_ROLES } from "../../../constants/roles";
@@ -65,6 +64,8 @@ import {
 import { fetchMembershipsForPharmacy } from "./owner/membershipApi";
 import {
   type Pharmacy,
+  type PharmacyApi,
+  type ClaimStatus,
   type OrganizationClaimItem,
   type OwnerClaimRequest,
   type OwnerClaimDialogState,
@@ -2491,7 +2492,7 @@ export default function PharmacyPage({
         standalone={standalone}
         dialogOpen={dialogOpen}
         closeDialog={closeDialog}
-        editing={editing}
+        editing={Boolean(editing)}
         isSaving={isSaving}
         tabIndex={tabIndex}
         lastTabIndex={lastTabIndex}

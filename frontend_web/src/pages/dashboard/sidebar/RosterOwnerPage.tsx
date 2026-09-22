@@ -16,7 +16,6 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  ListItem,
   ListItemText,
   CircularProgress,
   Checkbox,
@@ -42,11 +41,9 @@ import RosterCoveragePanel from '../../../features/workforce/RosterCoveragePanel
 import HorizontalCalendarGrid from '../../../components/roster/HorizontalCalendarGrid';
 import {
   PharmacySummary,
-  RosterAssignment,
   WorkerShiftRequest,
   OpenShift,
   RosterPharmacyMember,
-  RosterSlotDetail,
   RosterShiftDetail,
   fetchPharmaciesService,
   fetchRosterOwnerAssignments,
@@ -71,7 +68,6 @@ import {
   type ShiftForEdit,
   ROLES,
   ALL_STAFF,
-  LEAVE_TYPES_MAP,
 } from './RosterOwnerPage.model';
 
 const localizer = momentLocalizer(moment);

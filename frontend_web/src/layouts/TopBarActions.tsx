@@ -339,7 +339,7 @@ export default function TopBarActions({
 
     if (pharmacyCount !== null && pharmacyCount <= 1) {
       if (roleKey === "OWNER" || roleKey === "PHARMACY_ADMIN") {
-        baseOptions = ownerOptions.map((opt) => {
+        baseOptions = ROLE_SEARCH_OPTIONS.OWNER.map((opt: SearchOption) => {
           if (opt.path === "/dashboard/owner/manage-pharmacies") {
             return { ...opt, label: "Manage Pharmacy" };
           }
@@ -349,7 +349,7 @@ export default function TopBarActions({
           return opt;
         });
       } else if (roleKey.startsWith("ORG")) {
-        baseOptions = organizationOptions.map((opt) => {
+        baseOptions = (ROLE_SEARCH_OPTIONS[roleKey] ?? ROLE_SEARCH_OPTIONS.ORGANIZATION).map((opt: SearchOption) => {
           if (opt.path === "/dashboard/organization/manage-pharmacies") {
             return { ...opt, label: "Manage Pharmacy" };
           }
