@@ -47,8 +47,24 @@ jobs:
         working-directory: shared-core
       - run: npm run build
         working-directory: shared-core
+      - name: Pack shared core once
+        run: |
+          mkdir -p ../.ci-artifacts
+          npm pack --pack-destination ../.ci-artifacts
+          cd ../.ci-artifacts
+          sha256sum chemisttasker-shared-core-1.1.1.tgz > shared-core.sha256
+        working-directory: shared-core
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-core-package
+          path: |
+            .ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+            .ci-artifacts/shared-core.sha256
+          if-no-files-found: error
+          retention-days: 1
 
   web-vite:
+    needs: shared-core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,15 +77,17 @@ jobs:
           cache-dependency-path: |
             shared-core/package-lock.json
             frontend_web/package-lock.json
-      - name: Build and pack shared core
-        run: |
-          npm ci
-          npm run build
-          mkdir -p ../.ci-artifacts
-          npm pack --pack-destination ../.ci-artifacts
-        working-directory: shared-core
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-core-package
+          path: .ci-artifacts
+      - name: Verify shared-core artifact checksum
+        run: sha256sum -c shared-core.sha256
+        working-directory: .ci-artifacts
       - run: npm ci
         working-directory: frontend_web
+        env:
+          CT_SHARED_CORE_SKIP_PREPARE: "1"
       - name: Use freshly packed shared core
         run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
         working-directory: frontend_web
@@ -86,6 +104,7 @@ jobs:
           VITE_API_BASE_URL: http://127.0.0.1:8000
 
   web-next:
+    needs: shared-core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,15 +117,17 @@ jobs:
           cache-dependency-path: |
             shared-core/package-lock.json
             frontend_web/landing_next/package-lock.json
-      - name: Build and pack shared core
-        run: |
-          npm ci
-          npm run build
-          mkdir -p ../.ci-artifacts
-          npm pack --pack-destination ../.ci-artifacts
-        working-directory: shared-core
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-core-package
+          path: .ci-artifacts
+      - name: Verify shared-core artifact checksum
+        run: sha256sum -c shared-core.sha256
+        working-directory: .ci-artifacts
       - run: npm ci
         working-directory: frontend_web/landing_next
+        env:
+          CT_SHARED_CORE_SKIP_PREPARE: "1"
       - name: Use freshly packed shared core
         run: npm install --no-save --package-lock=false --ignore-scripts ../../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
         working-directory: frontend_web/landing_next
@@ -116,6 +137,7 @@ jobs:
         working-directory: frontend_web/landing_next
 
   mobile:
+    needs: shared-core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,15 +150,17 @@ jobs:
           cache-dependency-path: |
             shared-core/package-lock.json
             frontend_mobile/package-lock.json
-      - name: Build and pack shared core
-        run: |
-          npm ci
-          npm run build
-          mkdir -p ../.ci-artifacts
-          npm pack --pack-destination ../.ci-artifacts
-        working-directory: shared-core
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-core-package
+          path: .ci-artifacts
+      - name: Verify shared-core artifact checksum
+        run: sha256sum -c shared-core.sha256
+        working-directory: .ci-artifacts
       - run: npm ci
         working-directory: frontend_mobile
+        env:
+          CT_SHARED_CORE_SKIP_PREPARE: "1"
       - name: Use freshly packed shared core
         run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
         working-directory: frontend_mobile
@@ -235,6 +259,7 @@ jobs:
         with:
           node-version: "22"
       - run: node scripts/audit-architecture-boundaries.mjs
+      - run: node scripts/audit-shared-core-package.mjs
 
   kiosk:
     runs-on: ubuntu-latest
