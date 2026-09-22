@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@types/google.maps": "3.65.2",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.2",
     "@types/react": "^19.0.0",
     "@types/react-big-calendar": "^1.16.0",
     "@types/react-dom": "^19.0.0",
