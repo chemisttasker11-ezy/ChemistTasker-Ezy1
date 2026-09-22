@@ -158,46 +158,18 @@ describe('createChemistTaskerApi Ethical Marketplace', () => {
   });
 });
 
-describe('createChemistTaskerApi roster and attendance', () => {
-  it('uses named manager, PIN and roster action routes', async () => {
-    const urls: string[] = [];
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      urls.push(String(input));
-      return json({ status: 'ok', request_id: 1, message: 'ok' });
-    });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+describe('createChemistTaskerApi ownership boundary', () => {
+  it('keeps authenticated operational domains out of the Next/platform facade', () => {
+    const api = createChemistTaskerApi({
+      baseUrl: 'https://example.test/api',
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+    }) as Record<string, unknown>;
 
-    await api.attendance.updatePin(2, '1234');
-    await api.attendance.approve(3, 'Roster confirmed');
-    await api.rosterV2.copyWeek({ source_period_id: 4, target_week_start: '2026-09-21' });
-    await api.rosterV2.approveReplacement(5, 6);
-
-    expect(urls).toEqual([
-      'https://example.test/api/client-profile/attendance/worker/pin/update/',
-      'https://example.test/api/client-profile/attendance/manager/approve/',
-      'https://example.test/api/client-profile/attendance/roster/copy-week/',
-      'https://example.test/api/client-profile/attendance/roster/manager/approve-replacement/',
-    ]);
-  });
-});
-
-describe('createChemistTaskerApi workforce', () => {
-  it('uses named roster, leave and timesheet routes', async () => {
-    const calls: Array<{ url: string; method: string }> = [];
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), method: init?.method ?? 'GET' });
-      return json([]);
-    });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
-
-    await api.workforce.getRosterWorkspace(2, '2026-09-21');
-    await api.workforce.createLeave({ membership_id: 3, leave_type: 'ANNUAL', start_at: '2026-09-21T09:00:00Z', end_at: '2026-09-21T17:00:00Z' });
-    await api.workforce.submitTimesheet(4, 5);
-
-    expect(calls).toEqual([
-      { url: 'https://example.test/api/client-profile/workforce/roster/workspace/?pharmacy_id=2&week_start=2026-09-21', method: 'GET' },
-      { url: 'https://example.test/api/client-profile/workforce/leave/', method: 'POST' },
-      { url: 'https://example.test/api/client-profile/workforce/timesheets/4/submit/', method: 'POST' },
-    ]);
+    expect('attendance' in api).toBe(false);
+    expect('rosterV2' in api).toBe(false);
+    expect('workforce' in api).toBe(false);
+    expect('finance' in api).toBe(false);
+    expect('marketplace' in api).toBe(true);
+    expect('publicContent' in api).toBe(true);
   });
 });
