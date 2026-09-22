@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
+import ParityToolsCard from '@/components/ParityToolsCard';
 
 export default function ExplorerOverviewScreen() {
   const { access, user, logout, isLoading: authLoading } = useAuth();
@@ -125,6 +126,8 @@ export default function ExplorerOverviewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
+
+        <ParityToolsCard />
 
         <Surface style={styles.bottomSection}>
           <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/explorer/profile' as any)}>

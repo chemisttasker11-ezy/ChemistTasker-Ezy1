@@ -246,7 +246,8 @@ function AuthGate() {
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
     const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave', 'workforce-timesheets', 'workforce-settings']);
-    const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '');
+    const sharedProductPrefixes = new Set(['workforce', 'manager', 'attendance', 'finance', 'marketplace', 'profile', 'rewards']);
+    const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '') || sharedProductPrefixes.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
     const expectedTopByRole: Record<string, string> = {
       OWNER: 'owner',
@@ -289,6 +290,13 @@ function AuthGate() {
 
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
+          if (top === 'manager') {
+            const normalizedSharedRole = String(user.role || '').toUpperCase();
+            const canManageRoster = normalizedSharedRole === 'OWNER' || hasOrganizationAccess(user) || hasAdminAccess(user);
+            if (!canManageRoster) {
+              router.replace(getRoleHome(user.role) as any);
+            }
+          }
           return;
         }
 

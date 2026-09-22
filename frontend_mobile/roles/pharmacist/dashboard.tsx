@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
+import ParityToolsCard from '@/components/ParityToolsCard';
 import {
   DashboardActivity,
   DashboardErrorState,
@@ -352,6 +353,8 @@ export default function PharmacistOverviewScreen() {
         </LinearGradient>
 
         <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
+
+        <ParityToolsCard />
 
         <DashboardActivity data={data} />
 

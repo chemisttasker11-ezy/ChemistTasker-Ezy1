@@ -8755,6 +8755,65 @@ class RatingViewSet(viewsets.GenericViewSet):
             "pharmacies_to_rate": list(pharmacies_to_rate_ids),
         }).data)
 
+    @action(detail=True, methods=["post"], url_path="report")
+    def report(self, request, pk=None):
+        """
+        Report a rating received by the current worker or a pharmacy they control.
+        One open report per reporter/rating is kept so repeated submissions update
+        the reason instead of generating duplicate moderation work.
+        """
+        from .models import RatingReport
+
+        rating = self.get_object()
+        can_report = rating.ratee_user_id == request.user.id
+        if not can_report and rating.ratee_pharmacy_id:
+            can_report = self._user_controls_pharmacy(request.user, rating.ratee_pharmacy)
+
+        if not can_report:
+            return Response(
+                {"detail": "You can only report ratings received by you or a pharmacy you control."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        reason = str(request.data.get("reason", "")).strip()
+        if len(reason) < 10:
+            return Response(
+                {"detail": "Please provide at least 10 characters explaining the issue."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(reason) > 2000:
+            return Response(
+                {"detail": "Reason must be 2000 characters or fewer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        report = RatingReport.objects.filter(
+            rating=rating,
+            reporter=request.user,
+            status=RatingReport.Status.OPEN,
+        ).first()
+        created = report is None
+        if report is None:
+            report = RatingReport.objects.create(
+                rating=rating,
+                reporter=request.user,
+                reason=reason,
+            )
+        else:
+            report.reason = reason
+            report.save(update_fields=["reason", "updated_at"])
+
+        return Response(
+            {
+                "id": report.id,
+                "reference": f"RAT-{report.id:06d}",
+                "status": report.status,
+                "created": created,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
 # -----------------------------------------------------------------------------
 # Explorer 
 # -----------------------------------------------------------------------------

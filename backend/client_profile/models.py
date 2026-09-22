@@ -2513,6 +2513,41 @@ class Rating(models.Model):
         target = self.ratee_user_id or self.ratee_pharmacy_id
         return f"{self.direction} by {self.rater_user_id} → {target}: {self.stars}★"
 
+class RatingReport(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        REVIEWED = "REVIEWED", "Reviewed"
+        CLOSED = "CLOSED", "Closed"
+
+    rating = models.ForeignKey(
+        "Rating",
+        on_delete=models.CASCADE,
+        related_name="reports",
+    )
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="rating_reports_submitted",
+    )
+    reason = models.TextField(max_length=2000)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["rating", "reporter"],
+                condition=models.Q(status="OPEN"),
+                name="uniq_open_rating_report_per_reporter",
+            ),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Rating report #{self.pk} for rating #{self.rating_id}"
+
+
 ## Invoice model
 class Invoice(models.Model):
     STATUS_CHOICES = [

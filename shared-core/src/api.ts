@@ -1544,6 +1544,9 @@ export async function createRatingService(payload) {
     const data = await createRating(payload);
     return mapShiftRatingComment(data);
 }
+export async function reportRatingService(ratingId, reason) {
+    return fetchApi(`/client-profile/ratings/${ratingId}/report/`, { method: 'POST', body: JSON.stringify({ reason }) });
+}
 // ============ HUB ============
 // ============ DASHBOARDS ============
 export function getOwnerDashboard(params) {

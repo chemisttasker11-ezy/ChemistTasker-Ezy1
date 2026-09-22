@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
 import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
+import ParityToolsCard from '@/components/ParityToolsCard';
 import {
   DashboardActivity,
   DashboardErrorState,
@@ -246,6 +247,8 @@ export default function OwnerDashboard() {
         <DashboardStatsOverview data={dashboardData} />
 
         <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
+
+        <ParityToolsCard />
 
         <DashboardActivity data={dashboardData} />
 
