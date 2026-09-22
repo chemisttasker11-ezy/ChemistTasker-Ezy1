@@ -168,7 +168,7 @@ const router = createBrowserRouter([
       {
         path: 'dashboard/attendance/reviews',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
             <ManagerAttendanceReviewPage />
           </ProtectedRoute>
         ),
@@ -176,7 +176,7 @@ const router = createBrowserRouter([
       {
         path: 'dashboard/workforce/timesheets',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
             <TimesheetsPage />
           </ProtectedRoute>
         ),
@@ -184,7 +184,7 @@ const router = createBrowserRouter([
       {
         path: 'dashboard/workforce/leave',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
             <ManagerLeavePage />
           </ProtectedRoute>
         ),
@@ -192,7 +192,7 @@ const router = createBrowserRouter([
       {
         path: 'dashboard/workforce/settings',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
             <WorkforceSettingsPage />
           </ProtectedRoute>
         ),
