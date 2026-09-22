@@ -292,10 +292,9 @@ function AuthGate() {
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
           const normalizedSharedRole = String(user.role || '').toUpperCase();
-          const orgAccess = hasOrganizationAccess(user);
           const ownerAccess = normalizedSharedRole === 'OWNER';
-          const rosterCapability = ownerAccess || orgAccess || hasCapability('MANAGE_ROSTER', selectedPharmacyId);
-          const workforceCapability = ownerAccess || orgAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', selectedPharmacyId);
+          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
 
           const isManagerRoute = top === 'manager';
           const isWorkforceRoute = top === 'workforce' || top === 'workforce-timesheets' || top === 'workforce-settings';
