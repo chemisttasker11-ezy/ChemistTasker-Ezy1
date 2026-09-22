@@ -1,7 +1,4 @@
-import type { WorkforceEmploymentEngagementWrite } from '@chemisttasker/shared-core';
-import { chemistTaskerApi } from '../../config/api';
-
-const workforce = chemistTaskerApi.workforce;
+import { workforce, type WorkforceEmploymentEngagementWrite } from '@chemisttasker/shared-core';
 
 export const fetchRosterWorkspace = (pharmacyId: number, weekStart: string) => workforce.getRosterWorkspace(pharmacyId, weekStart);
 export const validateRosterRevision = (periodId: number, expectedRevision: number) => workforce.validateRoster(periodId, expectedRevision);
