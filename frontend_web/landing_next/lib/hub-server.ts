@@ -9,7 +9,7 @@ export class HubUnavailable extends Error {}
 export async function publicFetch<T>(path: string): Promise<T | null> {
   try {
     const api = createServerChemistTaskerApi({ baseUrl: backend });
-    return await api.publicContent.request<T>(`/public-hub/${path}`, { auth: false, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    return await api.client.request<T>(`/public-hub/${path}`, { auth: false, cache: 'no-store', signal: AbortSignal.timeout(8000) });
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     if (error instanceof HubUnavailable) throw error;
