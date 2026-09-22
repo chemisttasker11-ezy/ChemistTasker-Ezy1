@@ -67,7 +67,7 @@ function usePharmacy() {
 
 export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; membershipId?: string; supersedes?: string }>();
+  const params = useLocalSearchParams<{ id?: string; membershipId?: string; supersedes?: string; edit?: string }>();
   const { pharmacyId, pharmacyName, missing, missingView } = usePharmacy();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -241,8 +241,22 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
               {ratePairs(target).map(([label, value]) => <DataRow key={label} title={label} right={<Text variant="titleSmall">{money(value)}/hr</Text>} />)}
               {target.notes ? <InfoNote title="Notes">{target.notes}</InfoNote> : null}
             </Section>
+            {target.ordinary_hours_pattern?.days?.length ? (
+              <Section title="Part-time agreed ordinary hours" description="Frozen with these dated terms.">
+                {target.ordinary_hours_pattern.days.map((day: any) => (
+                  <DataRow
+                    key={day.weekday}
+                    title={day.weekday_label || `Day ${day.weekday}`}
+                    subtitle={`${day.start_time}–${day.end_time} · ${day.meal_break_minutes || 0} min meal break${day.meal_break_start ? ` from ${day.meal_break_start}` : ''}`}
+                  />
+                ))}
+              </Section>
+            ) : null}
             <ActionButtons>
               <Button mode="contained" onPress={() => router.push(`/workforce/employment-engagements/new?membershipId=${target.membership_id}&supersedes=${target.public_id}` as any)}>New terms</Button>
+              <Button mode="outlined" onPress={() => router.push(`/workforce/employment-engagements/new?membershipId=${target.membership_id}&edit=${target.public_id}` as any)}>
+                {target.terms_editable ? 'Edit future' : 'End / notes'}
+              </Button>
               <Button mode="outlined" onPress={() => router.push(`/workforce/employment-engagements/${target.public_id}/history` as any)}>History</Button>
             </ActionButtons>
           </>
@@ -307,43 +321,119 @@ function AwardPreview({ staff, loading, error }: { staff: any[]; loading: boolea
   const [membershipId, setMembershipId] = useState<number | null>(null);
   const [classification, setClassification] = useState('');
   const [employmentType, setEmploymentType] = useState('FULL_TIME');
+  const [effectiveFrom, setEffectiveFrom] = useState(isoDate());
   const [preview, setPreview] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState('');
   const selected = staff.find((row) => Number(row.membership_id) === membershipId);
+  const classificationOptions = selected?.award_classification_options || [];
+
   useEffect(() => {
     if (!selected) return;
     setEmploymentType(selected.employment_type || 'FULL_TIME');
     setClassification(selected.default_award_classification || selected.award_classification_options?.[0]?.value || '');
+    setPreview(null);
   }, [selected]);
+
   const run = async () => {
-    if (!membershipId) return;
-    setBusy(true); setLocalError('');
+    if (!membershipId || !classification || !effectiveFrom) return;
+    setBusy(true);
+    setLocalError('');
     try {
-      setPreview(await workforce.previewEmploymentEngagementAward({ membership_id: membershipId, employment_type: employmentType, award_classification: classification }));
-    } catch (e) { setLocalError(errorMessage(e, 'Unable to preview Award rates.')); }
-    finally { setBusy(false); }
+      setPreview(await workforce.previewEmploymentEngagementAward({
+        membership_id: membershipId,
+        employment_type: employmentType,
+        award_classification: classification,
+        effective_from: effectiveFrom,
+      }));
+    } catch (e) {
+      setLocalError(errorMessage(e, 'Unable to preview Award rates.'));
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
     <ParityPage title="Award preview" subtitle={subtitleFor['award-preview']} loading={loading} error={error || localError}>
       <Section title="Eligible staff">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {staff.filter((row) => row.employment_engagement_eligible !== false).map((row) => (
-            <Chip key={row.membership_id} selected={membershipId === Number(row.membership_id)} onPress={() => setMembershipId(Number(row.membership_id))}>{row.worker_name || `#${row.membership_id}`}</Chip>
+            <Chip key={row.membership_id} selected={membershipId === Number(row.membership_id)} onPress={() => setMembershipId(Number(row.membership_id))}>
+              {row.worker_name || `#${row.membership_id}`}
+            </Chip>
           ))}
         </View>
       </Section>
-      {selected ? <>
-        <ChoiceChips value={employmentType} onChange={setEmploymentType} options={[{value:'FULL_TIME',label:'Full time'},{value:'PART_TIME',label:'Part time'},{value:'CASUAL',label:'Casual'}]} />
-        <Field label="Award classification" value={classification} onChangeText={setClassification} />
-        <Button mode="contained" loading={busy} disabled={!classification || busy} onPress={() => void run()}>Preview Award</Button>
-      </> : <EmptyState title="Choose a worker" body="Select an eligible employee membership to resolve its Award options." />}
-      {preview ? <Section title="Preview">
-        <InfoNote title={preview.award_source_label || 'Award source'}>{preview.award_effective_from ? `Effective ${preview.award_effective_from}` : 'Current Award guidance'}</InfoNote>
-        {ratePairs(preview).map(([label,value]) => <DataRow key={label} title={label} right={<Text variant="titleSmall">{money(value)}/hr</Text>} />)}
-      </Section> : null}
+      {selected ? (
+        <>
+          <ChoiceChips
+            value={employmentType}
+            onChange={(value) => { setEmploymentType(value); setPreview(null); }}
+            options={[{ value: 'FULL_TIME', label: 'Full time' }, { value: 'PART_TIME', label: 'Part time' }, { value: 'CASUAL', label: 'Casual' }]}
+          />
+          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
+          {classificationOptions.length ? (
+            <Section title="Award classification" description="Choose from the backend-provided classifications for this worker.">
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {classificationOptions.map((option: any) => (
+                  <Chip key={option.value} selected={classification === option.value} onPress={() => { setClassification(option.value); setPreview(null); }}>
+                    {option.label}
+                  </Chip>
+                ))}
+              </View>
+            </Section>
+          ) : <Field label="Award classification" value={classification} onChangeText={(value) => { setClassification(value); setPreview(null); }} />}
+          <Button mode="contained" loading={busy} disabled={!classification || !effectiveFrom || busy} onPress={() => void run()}>
+            Preview Award
+          </Button>
+        </>
+      ) : <EmptyState title="Choose a worker" body="Select an eligible employee membership to resolve its Award options." />}
+      {preview ? (
+        <Section title="Preview">
+          <InfoNote title={preview.classification_label || preview.award_source_label || 'Award source'}>
+            {preview.award_effective_basis || (preview.award_effective_from ? `Effective ${preview.award_effective_from}` : 'Award guidance for the selected date')}
+          </InfoNote>
+          {preview.rate_scope === 'junior' ? (
+            <InfoNote title="Junior rate">
+              {preview.age_at_effective_date != null ? `Age ${preview.age_at_effective_date}` : 'DOB-based rate'}
+              {preview.junior_percentage ? ` · ${preview.junior_percentage}%` : ''}
+              {preview.next_rate_review_date ? ` · review again from ${preview.next_rate_review_date}` : ''}
+            </InfoNote>
+          ) : null}
+          {ratePairs(preview).map(([label, value]) => <DataRow key={label} title={label} right={<Text variant="titleSmall">{money(value)}/hr</Text>} />)}
+          {preview.ordinary_hours_note ? <InfoNote title="Ordinary hours">{preview.ordinary_hours_note}</InfoNote> : null}
+        </Section>
+      ) : null}
     </ParityPage>
   );
+}
+
+type PartTimeDay = {
+  weekday: number;
+  label: string;
+  enabled: boolean;
+  start_time: string;
+  end_time: string;
+  meal_break_start: string;
+  meal_break_minutes: number;
+};
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function buildPartTimeDays(pattern?: any): PartTimeDay[] {
+  const saved = Array.isArray(pattern?.days) ? pattern.days : [];
+  return WEEKDAYS.map((label, weekday) => {
+    const row = saved.find((day: any) => Number(day.weekday) === weekday);
+    return {
+      weekday,
+      label,
+      enabled: Boolean(row),
+      start_time: String(row?.start_time || '09:00'),
+      end_time: String(row?.end_time || '17:00'),
+      meal_break_start: String(row?.meal_break_start || ''),
+      meal_break_minutes: Number(row?.meal_break_minutes || 0),
+    };
+  });
 }
 
 function EngagementEditor({
@@ -364,108 +454,293 @@ function EngagementEditor({
   onReload: () => Promise<void>;
 }) {
   const router = useRouter();
-  const params = useLocalSearchParams<{ membershipId?: string; supersedes?: string }>();
-  const initialMembership = params.membershipId ? Number(params.membershipId) : null;
+  const params = useLocalSearchParams<{ membershipId?: string; supersedes?: string; edit?: string }>();
+  const editing = params.edit ? engagements.find((row) => String(row.public_id || row.id) === String(params.edit)) : null;
+  const superseded = params.supersedes ? engagements.find((row) => String(row.public_id || row.id) === String(params.supersedes)) : null;
+  const source = editing || superseded;
+  const historical = Boolean(editing && editing.terms_editable === false);
+  const initialMembership = params.membershipId ? Number(params.membershipId) : source?.membership_id ? Number(source.membership_id) : null;
   const [membershipId, setMembershipId] = useState<number | null>(initialMembership);
   const worker = staff.find((row) => Number(row.membership_id) === membershipId);
-  const superseded = params.supersedes ? engagements.find((row) => String(row.public_id) === String(params.supersedes)) : null;
-  const [employmentType, setEmploymentType] = useState(String(superseded?.employment_type || worker?.employment_type || 'FULL_TIME'));
-  const [effectiveFrom, setEffectiveFrom] = useState(isoDate());
-  const [jobTitle, setJobTitle] = useState(String(superseded?.job_title || ''));
-  const [payBasis, setPayBasis] = useState(String(superseded?.pay_basis || 'AWARD'));
-  const [classification, setClassification] = useState(String(superseded?.award_classification || worker?.default_award_classification || ''));
-  const [adultConfirmed, setAdultConfirmed] = useState(Boolean(superseded?.adult_rate_confirmed));
-  const [notes, setNotes] = useState('');
+  const [employmentType, setEmploymentType] = useState(String(source?.employment_type || worker?.employment_type || 'FULL_TIME'));
+  const [effectiveFrom, setEffectiveFrom] = useState(String(editing?.effective_from || isoDate()));
+  const [effectiveTo, setEffectiveTo] = useState(String(editing?.effective_to || ''));
+  const [jobTitle, setJobTitle] = useState(String(source?.job_title || ''));
+  const [payBasis, setPayBasis] = useState(String(source?.pay_basis || 'AWARD'));
+  const [classification, setClassification] = useState(String(source?.award_classification || worker?.default_award_classification || ''));
+  const [adultConfirmed, setAdultConfirmed] = useState(Boolean(source?.adult_rate_confirmed));
+  const [notes, setNotes] = useState(String(editing?.notes || ''));
   const [preview, setPreview] = useState<any>(null);
+  const [partTimeDays, setPartTimeDays] = useState<PartTimeDay[]>(buildPartTimeDays(source?.ordinary_hours_pattern));
   const [rates, setRates] = useState({
-    rate_weekday: String(superseded?.rate_weekday || ''),
-    rate_saturday: String(superseded?.rate_saturday || ''),
-    rate_sunday: String(superseded?.rate_sunday || ''),
-    rate_public_holiday: String(superseded?.rate_public_holiday || ''),
+    rate_weekday: String(source?.rate_weekday || ''),
+    rate_saturday: String(source?.rate_saturday || ''),
+    rate_sunday: String(source?.rate_sunday || ''),
+    rate_public_holiday: String(source?.rate_public_holiday || ''),
+    rate_early_morning: String(source?.rate_early_morning || ''),
+    rate_late_night: String(source?.rate_late_night || ''),
+    early_morning_applicable: Boolean(source?.early_morning_applicable),
+    late_night_applicable: Boolean(source?.late_night_applicable),
   });
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState('');
+  const classificationOptions = worker?.award_classification_options || [];
 
   useEffect(() => {
-    if (!worker) return;
-    setEmploymentType(String(superseded?.employment_type || worker.employment_type || 'FULL_TIME'));
-    setClassification(String(superseded?.award_classification || worker.default_award_classification || worker.award_classification_options?.[0]?.value || ''));
-  }, [worker, superseded]);
+    if (!worker || editing || superseded) return;
+    setEmploymentType(String(worker.employment_type || 'FULL_TIME'));
+    setClassification(String(worker.default_award_classification || worker.award_classification_options?.[0]?.value || ''));
+  }, [worker, editing, superseded]);
+
+  const updatePartTimeDay = (weekday: number, patch: Partial<PartTimeDay>) => {
+    setPartTimeDays((rows) => rows.map((day) => day.weekday === weekday ? { ...day, ...patch } : day));
+  };
 
   const previewAward = async () => {
-    if (!membershipId || !classification) return;
-    setBusy(true); setLocalError('');
+    if (!membershipId || !classification || !effectiveFrom) return;
+    setBusy(true);
+    setLocalError('');
     try {
-      const next = await workforce.previewEmploymentEngagementAward({ membership_id: membershipId, employment_type: employmentType, award_classification: classification });
+      const next = await workforce.previewEmploymentEngagementAward({
+        membership_id: membershipId,
+        employment_type: employmentType,
+        award_classification: classification,
+        effective_from: effectiveFrom,
+      });
       setPreview(next);
       if (payBasis === 'AWARD') {
-        setRates({
+        setRates((current) => ({
+          ...current,
           rate_weekday: String(next.rate_weekday || ''),
           rate_saturday: String(next.rate_saturday || ''),
           rate_sunday: String(next.rate_sunday || ''),
           rate_public_holiday: String(next.rate_public_holiday || ''),
-        });
+          rate_early_morning: String(next.rate_early_morning || ''),
+          rate_late_night: String(next.rate_late_night || ''),
+          early_morning_applicable: Boolean(next.early_morning_applicable),
+          late_night_applicable: Boolean(next.late_night_applicable),
+        }));
       }
-    } catch (e) { setLocalError(errorMessage(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setLocalError(errorMessage(e, 'Unable to preview Award rates.'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const save = async () => {
-    if (!membershipId || !classification || busy) return;
-    setBusy(true); setLocalError('');
+    if (!membershipId || busy) return;
+    if (!historical && (!classification || !effectiveFrom)) return;
+    setBusy(true);
+    setLocalError('');
     try {
-      const payload: any = {
-        membership_id: membershipId,
-        ...(params.supersedes ? { supersedes_public_id: params.supersedes } : {}),
-        effective_from: effectiveFrom,
-        employment_type: employmentType,
-        job_title: jobTitle,
-        pay_basis: payBasis,
-        award_classification: classification,
-        adult_rate_confirmed: adultConfirmed,
-        notes,
-      };
-      if (payBasis === 'ABOVE_AWARD') Object.assign(payload, rates);
-      await workforce.createEmploymentEngagement(payload);
+      if (historical && editing) {
+        await workforce.updateEmploymentEngagement(editing.public_id, {
+          effective_to: effectiveTo || null,
+          notes,
+        });
+      } else {
+        const payload: any = {
+          membership_id: membershipId,
+          ...(params.supersedes ? { supersedes_public_id: params.supersedes } : {}),
+          effective_from: effectiveFrom,
+          effective_to: effectiveTo || null,
+          employment_type: employmentType,
+          job_title: jobTitle,
+          pay_basis: payBasis,
+          award_classification: classification,
+          adult_rate_confirmed: adultConfirmed,
+          notes,
+        };
+        if (employmentType === 'PART_TIME') {
+          payload.ordinary_hours_pattern = {
+            days: partTimeDays.filter((day) => day.enabled).map((day) => ({
+              weekday: day.weekday,
+              start_time: day.start_time,
+              end_time: day.end_time,
+              meal_break_start: day.meal_break_minutes ? day.meal_break_start || null : null,
+              meal_break_minutes: day.meal_break_minutes,
+            })),
+          };
+        }
+        if (payBasis === 'ABOVE_AWARD') {
+          Object.assign(payload, {
+            rate_weekday: rates.rate_weekday,
+            rate_saturday: rates.rate_saturday,
+            rate_sunday: rates.rate_sunday,
+            rate_public_holiday: rates.rate_public_holiday,
+            rate_early_morning: rates.early_morning_applicable ? rates.rate_early_morning : null,
+            rate_late_night: rates.late_night_applicable ? rates.rate_late_night : null,
+            early_morning_applicable: rates.early_morning_applicable,
+            late_night_applicable: rates.late_night_applicable,
+          });
+        }
+        if (editing) await workforce.updateEmploymentEngagement(editing.public_id, payload);
+        else await workforce.createEmploymentEngagement(payload);
+      }
       await onReload();
       router.replace('/workforce/employment-engagements' as any);
-    } catch (e) { setLocalError(errorMessage(e, 'Unable to create employment engagement.')); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setLocalError(errorMessage(e, historical ? 'Unable to update this engagement.' : 'Unable to save employment engagement.'));
+    } finally {
+      setBusy(false);
+    }
   };
 
+  const title = historical ? 'End engagement / notes' : editing ? 'Edit future engagement' : params.supersedes ? 'Create successor terms' : 'Create engagement';
+
   return (
-    <ParityPage title="Create engagement" subtitle={subtitleFor['engagement-new']} loading={loading} error={error || localError}>
+    <ParityPage title={title} subtitle={subtitleFor['engagement-new']} loading={loading} error={error || localError}>
       <InfoNote title={pharmacyName || `Pharmacy #${pharmacyId}`}>
-        Employment engagements are dated records. New terms can supersede an existing engagement without rewriting historical payroll evidence.
+        {historical
+          ? 'Started employment terms are locked for payroll history. Only the end date and notes can be amended.'
+          : params.supersedes
+            ? 'Saving successor terms atomically ends the current engagement on the day before the new effective date.'
+            : 'Employment engagements are dated records. Historical payroll evidence is never rewritten.'}
       </InfoNote>
+
       <Section title="Worker">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {staff.filter((row) => row.employment_engagement_eligible !== false).map((row) => (
-            <Chip key={row.membership_id} selected={membershipId === Number(row.membership_id)} onPress={() => setMembershipId(Number(row.membership_id))}>{row.worker_name || `#${row.membership_id}`}</Chip>
+            <Chip
+              key={row.membership_id}
+              selected={membershipId === Number(row.membership_id)}
+              disabled={Boolean(editing || params.supersedes)}
+              onPress={() => { setMembershipId(Number(row.membership_id)); setPreview(null); }}
+            >
+              {row.worker_name || `#${row.membership_id}`}
+            </Chip>
           ))}
         </View>
       </Section>
-      {worker ? <>
-        <ChoiceChips value={employmentType} onChange={setEmploymentType} options={[{value:'FULL_TIME',label:'Full time'},{value:'PART_TIME',label:'Part time'},{value:'CASUAL',label:'Casual'}]} />
-        <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} onChangeText={setEffectiveFrom} />
-        <Field label="Job title" value={jobTitle} onChangeText={setJobTitle} />
-        <Field label="Award classification" value={classification} onChangeText={setClassification} />
-        <ChoiceChips value={payBasis} onChange={setPayBasis} options={[{value:'AWARD',label:'Award'},{value:'ABOVE_AWARD',label:'Above Award'}]} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Checkbox status={adultConfirmed ? 'checked' : 'unchecked'} onPress={() => setAdultConfirmed(!adultConfirmed)} />
-          <Text style={{ flex: 1 }}>Adult rate confirmed where applicable</Text>
-        </View>
-        <Button mode="outlined" loading={busy} disabled={busy} onPress={() => void previewAward()}>Preview Award rates</Button>
-        {preview ? <InfoNote title={preview.award_source_label || 'Award preview'}>{preview.award_effective_from ? `Effective ${preview.award_effective_from}` : 'Current rates loaded'}</InfoNote> : null}
-        {payBasis === 'ABOVE_AWARD' ? <Section title="Agreed rates">
-          <Field label="Weekday rate" value={rates.rate_weekday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({...current, rate_weekday:value}))} />
-          <Field label="Saturday rate" value={rates.rate_saturday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({...current, rate_saturday:value}))} />
-          <Field label="Sunday rate" value={rates.rate_sunday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({...current, rate_sunday:value}))} />
-          <Field label="Public holiday rate" value={rates.rate_public_holiday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({...current, rate_public_holiday:value}))} />
-        </Section> : null}
-        <Field label="Notes" value={notes} multiline onChangeText={setNotes} />
-        <Button mode="contained" loading={busy} disabled={!membershipId || !classification || busy} onPress={() => void save()}>Create engagement</Button>
-      </> : <EmptyState title="Choose an eligible worker" body="Only employee memberships eligible for employment engagement setup are shown." />}
+
+      {worker ? (
+        <>
+          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} editable={!historical} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
+          <Field label="Effective to (optional, YYYY-MM-DD)" value={effectiveTo} onChangeText={setEffectiveTo} />
+
+          {!historical ? (
+            <>
+              <ChoiceChips
+                value={employmentType}
+                onChange={(value) => { setEmploymentType(value); setPreview(null); }}
+                options={[{ value: 'FULL_TIME', label: 'Full time' }, { value: 'PART_TIME', label: 'Part time' }, { value: 'CASUAL', label: 'Casual' }]}
+              />
+              <Field label="Job title" value={jobTitle} onChangeText={setJobTitle} />
+
+              {employmentType === 'PART_TIME' ? (
+                <Section title="Part-time agreed ordinary hours" description="Record the written day/start/finish/meal-break pattern. The backend validates Award limits and minimum shift rules.">
+                  {partTimeDays.map((day) => (
+                    <Card key={day.weekday} mode="outlined">
+                      <Card.Content style={{ gap: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Checkbox status={day.enabled ? 'checked' : 'unchecked'} onPress={() => updatePartTimeDay(day.weekday, { enabled: !day.enabled })} />
+                          <Text variant="titleSmall" style={{ flex: 1 }}>{day.label}</Text>
+                        </View>
+                        {day.enabled ? (
+                          <>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                              <View style={{ flex: 1 }}><Field label="Start (HH:MM)" value={day.start_time} onChangeText={(value) => updatePartTimeDay(day.weekday, { start_time: value })} /></View>
+                              <View style={{ flex: 1 }}><Field label="Finish (HH:MM)" value={day.end_time} onChangeText={(value) => updatePartTimeDay(day.weekday, { end_time: value })} /></View>
+                            </View>
+                            <ChoiceChips
+                              value={String(day.meal_break_minutes)}
+                              onChange={(value) => updatePartTimeDay(day.weekday, { meal_break_minutes: Number(value), meal_break_start: Number(value) ? day.meal_break_start : '' })}
+                              options={[{ value: '0', label: 'No meal break' }, { value: '30', label: '30 min' }, { value: '45', label: '45 min' }, { value: '60', label: '60 min' }]}
+                            />
+                            {day.meal_break_minutes ? <Field label="Meal break starts (HH:MM)" value={day.meal_break_start} onChangeText={(value) => updatePartTimeDay(day.weekday, { meal_break_start: value })} /> : null}
+                          </>
+                        ) : null}
+                      </Card.Content>
+                    </Card>
+                  ))}
+                  <InfoNote title="Written variation">Later changes should be saved as new dated terms rather than overwriting this frozen part-time agreement.</InfoNote>
+                </Section>
+              ) : null}
+
+              {classificationOptions.length ? (
+                <Section title="Award classification" description="Select the classification from duties, competencies and qualifications; do not infer it from the role name.">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {classificationOptions.map((option: any) => (
+                      <Chip key={option.value} selected={classification === option.value} onPress={() => { setClassification(option.value); setPreview(null); }}>
+                        {option.label}
+                      </Chip>
+                    ))}
+                  </View>
+                </Section>
+              ) : <Field label="Award classification" value={classification} onChangeText={(value) => { setClassification(value); setPreview(null); }} />}
+
+              <ChoiceChips
+                value={payBasis}
+                onChange={(value) => {
+                  setPayBasis(value);
+                  setPreview(null);
+                  if (value === 'ABOVE_AWARD') {
+                    setRates((current) => ({ ...current, rate_weekday: '', rate_saturday: '', rate_sunday: '', rate_public_holiday: '', rate_early_morning: '', rate_late_night: '', early_morning_applicable: false, late_night_applicable: false }));
+                  }
+                }}
+                options={[{ value: 'AWARD', label: 'Award' }, { value: 'ABOVE_AWARD', label: 'Above Award' }]}
+              />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Checkbox status={adultConfirmed ? 'checked' : 'unchecked'} onPress={() => setAdultConfirmed(!adultConfirmed)} />
+                <Text style={{ flex: 1 }}>Adult rate confirmed where applicable</Text>
+              </View>
+
+              <Button mode="outlined" loading={busy} disabled={!classification || !effectiveFrom || busy} onPress={() => void previewAward()}>
+                Preview Award for effective date
+              </Button>
+
+              {preview ? (
+                <Section title={payBasis === 'AWARD' ? 'Award hourly rate summary' : 'Award minimum underpinning'}>
+                  <InfoNote title={preview.classification_label || preview.award_source_label || 'Award preview'}>
+                    {preview.award_effective_basis || (preview.award_effective_from ? `Effective ${preview.award_effective_from}` : 'Award guidance loaded')}
+                  </InfoNote>
+                  {preview.rate_scope === 'junior' ? (
+                    <InfoNote title="DOB-based junior rate">
+                      {preview.age_at_effective_date != null ? `Age ${preview.age_at_effective_date}` : 'Junior rate'}
+                      {preview.junior_percentage ? ` · ${preview.junior_percentage}%` : ''}
+                      {preview.next_rate_review_date ? ` · create successor terms from ${preview.next_rate_review_date}` : ''}
+                    </InfoNote>
+                  ) : null}
+                  {ratePairs(preview).map(([label, value]) => <DataRow key={label} title={label} right={<Text variant="titleSmall">{money(value)}/hr</Text>} />)}
+                  {preview.ordinary_hours_note ? <InfoNote title="Ordinary hours">{preview.ordinary_hours_note}</InfoNote> : null}
+                </Section>
+              ) : null}
+
+              {payBasis === 'ABOVE_AWARD' ? (
+                <Section title="Agreed hourly rates" description="The API enforces the selected Award minimum as the floor.">
+                  <Field label="Weekday 8 am–7 pm" value={rates.rate_weekday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({ ...current, rate_weekday: value }))} />
+                  <Field label="Saturday 8 am–6 pm" value={rates.rate_saturday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({ ...current, rate_saturday: value }))} />
+                  <Field label="Sunday 7 am–9 pm" value={rates.rate_sunday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({ ...current, rate_sunday: value }))} />
+                  <Field label="Public holiday" value={rates.rate_public_holiday} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({ ...current, rate_public_holiday: value }))} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Checkbox status={rates.early_morning_applicable ? 'checked' : 'unchecked'} onPress={() => setRates((current) => ({ ...current, early_morning_applicable: !current.early_morning_applicable }))} />
+                    <Text style={{ flex: 1 }}>Separate weekday 7–8 am agreed rate applies</Text>
+                  </View>
+                  {rates.early_morning_applicable ? <Field label="Weekday 7–8 am rate" value={rates.rate_early_morning} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({ ...current, rate_early_morning: value }))} /> : null}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Checkbox status={rates.late_night_applicable ? 'checked' : 'unchecked'} onPress={() => setRates((current) => ({ ...current, late_night_applicable: !current.late_night_applicable }))} />
+                    <Text style={{ flex: 1 }}>Separate weekday 9 pm–midnight agreed rate applies</Text>
+                  </View>
+                  {rates.late_night_applicable ? <Field label="Weekday 9 pm–midnight rate" value={rates.rate_late_night} keyboardType="decimal-pad" onChangeText={(value) => setRates((current) => ({ ...current, rate_late_night: value }))} /> : null}
+                  <InfoNote title="Penalty floor">When no separate agreed penalty-window rate is recorded, payroll must still use at least the frozen Award floor.</InfoNote>
+                </Section>
+              ) : null}
+            </>
+          ) : null}
+
+          <Field label="Agreement notes" value={notes} multiline onChangeText={setNotes} />
+          <Button
+            mode="contained"
+            loading={busy}
+            disabled={busy || !membershipId || (!historical && (!classification || !effectiveFrom))}
+            onPress={() => void save()}
+          >
+            {historical ? 'Save end date / notes' : editing ? 'Save changes' : 'Save engagement'}
+          </Button>
+        </>
+      ) : <EmptyState title="Choose an eligible worker" body="Only employee memberships eligible for employment engagement setup are shown." />}
     </ParityPage>
   );
 }
