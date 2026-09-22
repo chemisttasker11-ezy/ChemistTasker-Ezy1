@@ -12,7 +12,7 @@ export function TrustRewardsScreen({screen}:{screen:TrustScreen}){
  const router=useRouter();const params=useLocalSearchParams<{id?:string}>();const{user}=useAuth();
  const[summary,setSummary]=useState<any>(null),[ratings,setRatings]=useState<any[]>([]),[balance,setBalance]=useState<any>(null),[history,setHistory]=useState<any[]>([]),[referral,setReferral]=useState<any>(null),[referrals,setReferrals]=useState<any[]>([]),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState('');
  const load=useCallback(async()=>{setError('');try{
-   if(screen.startsWith('ratings')&&user?.id){const[s,p]=await Promise.all([fetchRatingsSummaryService({targetType:'worker',targetId:user.id}),fetchRatingsPageService({targetType:'worker',targetId:user.id,page:1})]);setSummary(s);setRatings(asArray((p as any)?.results??p));}
+   if((screen==='ratings'||screen==='ratings-history'||screen==='rating-report')&&user?.id){const[s,p]=await Promise.all([fetchRatingsSummaryService({targetType:'worker',targetId:user.id}),fetchRatingsPageService({targetType:'worker',targetId:user.id,page:1})]);setSummary(s);setRatings(asArray((p as any)?.results??p));}
    if(screen==='pills'){const[b,h,rc,refs]=await Promise.all([fetchPillBalanceService(),fetchPillHistoryService({page:1}),fetchPillReferralCodeService(),fetchPillReferralsService({page:1})]);setBalance(b);setHistory(asArray((h as any)?.results??h));setReferral(rc);setReferrals(asArray((refs as any)?.results??refs));}
  }catch(e){setError(errorMessage(e,'Unable to load trust and rewards data.'));}finally{setLoading(false);setRefreshing(false);}},[screen,user?.id]);
  useEffect(()=>{void load();},[load]);

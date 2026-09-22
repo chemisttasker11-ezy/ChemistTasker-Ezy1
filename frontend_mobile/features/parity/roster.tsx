@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { fetchWorkerShiftRequestsService } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService } from '@chemisttasker/shared-core';
 import { chemistTaskerApi } from '@/config/api';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
@@ -63,6 +63,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [coverage, setCoverage] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
   const [acknowledgements, setAcknowledgements] = useState<any>(null);
   const [validation, setValidation] = useState<any>(null);
@@ -86,8 +87,12 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       if (screen === 'coverage') setCoverage(asArray(await workforce.listCoverageRequirements(pharmacyId)));
       if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
       if (screen === 'approvals') {
-        const rows = await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any);
-        setRequests(asArray(rows));
+        const [rows, memberRows] = await Promise.all([
+          fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any),
+          fetchRosterOwnerMembersService(pharmacyId),
+        ]);
+        setRequests(asArray(rows).filter((row:any)=>String(row.status||'').toUpperCase()==='PENDING'));
+        setMembers(asArray(memberRows));
       }
       if (screen === 'audit') {
         const result = await roster.getAudits(pharmacyId);
@@ -133,7 +138,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     return <TemplatesScreen pharmacyId={pharmacyId} period={period} rows={templates} loading={loading} error={error} onReload={load} />;
   }
   if (screen === 'approvals') {
-    return <ApprovalsScreen rows={requests} loading={loading} error={error} onReload={load} />;
+    return <ApprovalsScreen rows={requests} members={members} loading={loading} error={error} onReload={load} />;
   }
   if (screen === 'audit') {
     return (
@@ -324,11 +329,45 @@ function TemplatesScreen({pharmacyId,period,rows,loading,error,onReload}:{pharma
   </ParityPage>;
 }
 
-function ApprovalsScreen({rows,loading,error,onReload}:{rows:any[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
+function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];members:any[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const action=async(row:any,kind:'approve'|'release'|'reject')=>{setBusy(true);setLocalError('');try{const id=Number(row.id||row.request_id);if(kind==='approve'){const isSwap=/swap/i.test(String(row.note||row.request_type||''));if(isSwap)await roster.approveSwap(id);else{const replacement=Number(row.replacement_user_id||row.target_user_id||0);if(!replacement)throw new Error('Choose a replacement worker in the roster workflow before approving this cover request.');await roster.approveReplacement(id,replacement);}}else if(kind==='release')await roster.releaseWorker(id,'LOCUM_CASUAL');else await roster.rejectRequest(id,'Rejected from mobile manager review');await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+  const [replacementByRequest,setReplacementByRequest]=useState<Record<string,number>>({});
+  const memberUserId=(member:any)=>Number(member.user??member.userDetails?.id??0);
+  const memberLabel=(member:any)=>{
+    const detail=member.userDetails||{};
+    const full=[detail.firstName,detail.lastName].filter(Boolean).join(' ').trim();
+    return full||detail.displayName||detail.email||member.invitedName||('User #'+memberUserId(member));
+  };
+  const isSwapRequest=(row:any)=>/^Direct swap request/i.test(String(row.note||''));
+  const action=async(row:any,kind:'approve'|'release'|'reject')=>{
+    setBusy(true);setLocalError('');
+    try{
+      const id=Number(row.id);
+      if(kind==='approve'){
+        if(isSwapRequest(row)) await roster.approveSwap(id);
+        else{
+          const replacement=Number(replacementByRequest[String(id)]||0);
+          if(!replacement) throw new Error('Select an eligible replacement worker before approving this cover request.');
+          await roster.approveReplacement(id,replacement);
+        }
+      }else if(kind==='release') await roster.releaseWorker(id);
+      else await roster.rejectRequest(id,'Rejected from mobile manager review');
+      setReplacementByRequest(current=>{const next={...current};delete next[String(id)];return next;});
+      await onReload();
+    }catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}
+  };
   return <ParityPage title="Swap & cover approvals" subtitle="Review pending worker roster-change requests without dropping the current assignment." loading={loading} error={error||localError}>
-    <InfoNote title="Assignment safety">Requests preserve the current worker assignment until an approval or explicit release succeeds.</InfoNote>
-    <Section title="Pending requests">{rows.length?rows.map((row:any)=><Card key={row.id||row.request_id} mode="outlined"><Card.Content style={{gap:10}}><Text variant="titleSmall">{row.worker_name||row.requested_by_name||'Worker request'}</Text><Text variant="bodySmall" style={{color:palette.muted}}>{row.note||replaceUnderscore(row.request_type||'Cover / swap request')}</Text><ActionButtons><Button compact mode="contained" disabled={busy} onPress={()=>void action(row,'approve')}>Approve</Button><Button compact mode="outlined" disabled={busy} onPress={()=>void action(row,'release')}>Release & escalate</Button><Button compact textColor={palette.danger} disabled={busy} onPress={()=>void action(row,'reject')}>Reject</Button></ActionButtons></Card.Content></Card>):<EmptyState title="No pending requests" body="Swap and cover requests will appear here when workers submit them." />}</Section>
+    <InfoNote title="Assignment safety">Requests preserve the current worker assignment until a manager approves a swap/replacement or explicitly releases the worker.</InfoNote>
+    <Section title="Pending requests">{rows.length?rows.map((row:any)=>{
+      const swap=isSwapRequest(row);const requestId=String(row.id);const requesterId=Number(row.requestedBy||row.requestedById||0);
+      const eligible=members.filter(member=>{const userId=memberUserId(member);return userId>0&&userId!==requesterId&&member.isActive!==false;});
+      return <Card key={row.id} mode="outlined"><Card.Content style={{gap:10}}>
+        <Text variant="titleSmall">{row.requesterName||'Worker request'}</Text>
+        <Text variant="bodySmall" style={{color:palette.muted}}>{[row.pharmacyName,row.slotDate,row.startTime&&row.endTime?(row.startTime+'–'+row.endTime):'',replaceUnderscore(row.role||'')].filter(Boolean).join(' · ')}</Text>
+        <Text variant="bodySmall">{row.note||'Roster change request'}</Text>
+        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=memberUserId(member);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{memberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
+        <ActionButtons><Button compact mode="contained" disabled={busy||(!swap&&!replacementByRequest[requestId])} onPress={()=>void action(row,'approve')}>Approve</Button><Button compact mode="outlined" disabled={busy} onPress={()=>void action(row,'release')}>Release worker</Button><Button compact textColor={palette.danger} disabled={busy} onPress={()=>void action(row,'reject')}>Reject</Button></ActionButtons>
+      </Card.Content></Card>;
+    }):<EmptyState title="No pending requests" body="Swap and cover requests will appear here when workers submit them." />}</Section>
   </ParityPage>;
 }
