@@ -1,12 +1,12 @@
 import React,{useCallback,useEffect,useMemo,useState}from'react';
 import{View}from'react-native';
-import{Button,Card,Chip,IconButton,Text}from'react-native-paper';
+import{Button,Chip,IconButton}from'react-native-paper';
 import{useLocalSearchParams,useRouter}from'expo-router';
 import*as DocumentPicker from'expo-document-picker';
 import{chemistTaskerApi}from'@/config/api';
 import{useWorkspace}from'@/context/WorkspaceContext';
 import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,ParityPage,PharmacyRequired,ScreenLink,Section,palette}from'./ParityUI';
-import{asArray,dateLabel,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
+import{asArray,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
 
 type EthicalScreen='access'|'grants'|'pharmacy'|'inventory'|'scan'|'import'|'import-review'|'lot'|'listings'|'listing-new'|'listing-s8'|'requests'|'transfers'|'transfer'|'documents'|'complete';
 const api=chemistTaskerApi.ethicalMarketplace;

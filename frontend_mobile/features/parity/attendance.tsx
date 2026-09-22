@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
+import { Button, Chip } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { chemistTaskerApi } from '@/config/api';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -200,7 +200,7 @@ function CorrectionScreen({manager,rows,params,loading,error}:{manager:boolean;r
         setSuccess('Correction appended to the attendance audit history.');
       }else{
         if(!timesheetId.trim()||!sessionId.trim()) throw new Error('Select a timesheet/session from My Hours before requesting a missing punch.');
-        await workforce.addMissingPunch(toNumber(timesheetId),{sessionId:toNumber(sessionId),eventType:kind,occurredAt:new Date(timestamp).toISOString(),reason:reason.trim()});
+        await workforce.addMissingPunch(toNumber(timesheetId),{session_id:toNumber(sessionId),event_type:kind,occurred_at:new Date(timestamp).toISOString(),reason:reason.trim()});
         setSuccess('Missing-punch request recorded on the timesheet.');
       }
     }catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}
@@ -208,7 +208,8 @@ function CorrectionScreen({manager,rows,params,loading,error}:{manager:boolean;r
   return <ParityPage title="Attendance correction" subtitle={manager?'Append a manager correction without deleting original scan evidence.':'Request a missing punch through the workforce timesheet audit trail.'} loading={loading} error={error||localError}>
     {success?<InfoNote title="Saved" tone="success">{success}</InfoNote>:null}
     {manager?<Field label="Attendance event ID" value={eventId} keyboardType="numeric" onChangeText={setEventId}/>:<>
-      <InfoNote title="Worker workflow">Use the timesheet and session identifiers from My Hours. Missing punches are reviewed through workforce timesheet checks.</InfoNote>
+      <InfoNote title="Worker workflow">Select the relevant timesheet, then provide the attendance session identifier for the missing punch. Requests are reviewed through workforce timesheet checks.</InfoNote>
+      {rows.length?<Section title="Timesheet period">{rows.map((row:any)=><DataRow key={row.id} title={row.pharmacy?.name||'Pharmacy'} subtitle={String(row.start_date||'')+' – '+String(row.end_date||'')+' · '+replaceUnderscore(row.status||'')} status={timesheetId===String(row.id)?'Selected':undefined} onPress={()=>setTimesheetId(String(row.id))}/>)}</Section>:null}
       <Field label="Timesheet ID" value={timesheetId} keyboardType="numeric" onChangeText={setTimesheetId}/>
       <Field label="Session ID" value={sessionId} keyboardType="numeric" onChangeText={setSessionId}/>
       <View style={{flexDirection:'row',gap:8}}><Chip selected={kind==='CLOCK_IN'} onPress={()=>setKind('CLOCK_IN')}>Missing clock in</Chip><Chip selected={kind==='CLOCK_OUT'} onPress={()=>setKind('CLOCK_OUT')}>Missing clock out</Chip></View>

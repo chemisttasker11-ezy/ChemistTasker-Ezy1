@@ -1,14 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
-import { Button, Card, Checkbox, Chip, Divider, IconButton, Switch, Text } from 'react-native-paper';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { Button, Card, Checkbox, Chip, IconButton, Switch, Text } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { chemistTaskerApi } from '@/config/api';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { errorMessage, isoDate, money, replaceUnderscore, startOfWeek, toNumber } from './utils';
+import { errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
 
 type WorkforceScreen =
   | 'engagements'
@@ -70,7 +69,6 @@ function usePharmacy() {
 export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; membershipId?: string; supersedes?: string }>();
-  const { user } = useAuth();
   const { pharmacyId, pharmacyName, missing, missingView } = usePharmacy();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

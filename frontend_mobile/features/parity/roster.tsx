@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
+import { Button, Card, Checkbox, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { fetchWorkerShiftRequestsService } from '@chemisttasker/shared-core';
 import { chemistTaskerApi } from '@/config/api';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { asArray, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
+import { asArray, dateLabel, errorMessage, replaceUnderscore, startOfWeek, toNumber } from './utils';
 
 type RosterScreen =
   | 'workspace'

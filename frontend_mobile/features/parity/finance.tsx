@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
-import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Button, Chip, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
@@ -18,8 +17,8 @@ import {
   type FinanceInvoice,
 } from '@chemisttasker/shared-core';
 import FinanceWorkspace from '@/roles/shared/invoices/FinanceWorkspace';
-import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, Section, palette } from './ParityUI';
-import { asArray, dateLabel, errorMessage, idempotencyKey, money, replaceUnderscore, toNumber } from './utils';
+import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, Section } from './ParityUI';
+import { dateLabel, errorMessage, idempotencyKey, money, replaceUnderscore, toNumber } from './utils';
 
 type FinanceScreen =
   | 'home' | 'customers' | 'customer-new' | 'items' | 'item-new' | 'expenses' | 'expense-new'

@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useState}from'react';
-import{Button,Card,Chip,Text}from'react-native-paper';
+import{Button,Card,Text}from'react-native-paper';
 import{useLocalSearchParams,useRouter}from'expo-router';
 import{fetchRatingsSummaryService,fetchRatingsPageService,reportRatingService,fetchPillBalanceService,fetchPillHistoryService,fetchPillReferralCodeService,fetchPillReferralsService}from'@chemisttasker/shared-core';
 import{useAuth}from'@/context/AuthContext';
