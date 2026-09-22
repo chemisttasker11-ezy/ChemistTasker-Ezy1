@@ -218,26 +218,32 @@ def _login_failure_response(attempt_state):
     )
 
 
-def _login_invalid_credentials_response(user, attempt_state):
+def _login_invalid_credentials_response(user, attempt_state, *, password_matches=False):
     if attempt_state and attempt_state["locked"]:
         return _login_failure_response(attempt_state)
 
-    if user is None:
-        detail = "No account was found for this email address."
-        code = "email_not_found"
-    elif not user.is_active:
-        detail = "This account is disabled. Please contact support."
-        code = "account_disabled"
-    elif not getattr(user, "is_otp_verified", False):
-        detail = "Your email address is not verified. Enter the email OTP we sent before logging in."
-        code = "email_not_verified"
-    else:
-        detail = "The password is incorrect for this email address."
-        code = "incorrect_password"
+    # Do not disclose whether an email exists, an account is disabled, or a
+    # password was wrong. The only actionable exception is an unverified
+    # account whose password was actually correct, so that user can continue
+    # to the OTP verification flow.
+    if (
+        user is not None
+        and user.is_active
+        and password_matches
+        and not getattr(user, "is_otp_verified", False)
+    ):
+        return Response(
+            {
+                "detail": "Your email address is not verified. Enter the email OTP we sent before logging in.",
+                "code": "email_not_verified",
+            },
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
 
-    payload = {"detail": detail, "code": code}
-    status_code = status.HTTP_401_UNAUTHORIZED
-
+    payload = {
+        "detail": "Invalid email or password.",
+        "code": "invalid_credentials",
+    }
     if attempt_state:
         failure_limit = int(attempt_state["failure_limit"])
         failures = int(attempt_state.get("failures") or 0)
@@ -248,23 +254,20 @@ def _login_invalid_credentials_response(user, attempt_state):
                 "attempts_remaining": attempts_remaining,
             }
         )
-        if code == "incorrect_password":
-            payload["detail"] = (
-                f"The password is incorrect for this email address. "
-                f"{attempts_remaining} login attempt{'s' if attempts_remaining != 1 else ''} remaining before temporary lockout."
-            )
+        payload["detail"] = (
+            f"Invalid email or password. {attempts_remaining} login attempt"
+            f"{'s' if attempts_remaining != 1 else ''} remaining before temporary lockout."
+        )
+    return Response(payload, status=status.HTTP_401_UNAUTHORIZED)
 
-    return Response(payload, status=status_code)
-    return Response(
-        {
-            "detail": detail,
-            "code": "invalid_credentials",
-            "failure_limit": attempt_state["failure_limit"],
-            "attempts_remaining": attempts_remaining,
-        },
-        status=status.HTTP_401_UNAUTHORIZED,
-    )
 
+def _is_web_client(request):
+    platform = (
+        request.headers.get("X-Client-Platform")
+        or request.headers.get("x-client-platform")
+        or ""
+    ).strip().lower()
+    return platform in {"web", "browser"}
 
 def _cookie_kwargs():
     kwargs = {
@@ -1059,19 +1062,31 @@ class CustomLoginView(TokenObtainPairView):
             return _login_failure_response(attempt_state)
 
         user = User.objects.filter(email__iexact=email).first() if email else None
+        supplied_password = request.data.get("password") or ""
+        password_matches = bool(user and user.check_password(supplied_password))
         try:
             response = super().post(request, *args, **kwargs)
         except AuthenticationFailed:
             attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_invalid_credentials_response(user, attempt_state)
+            return _login_invalid_credentials_response(
+                user,
+                attempt_state,
+                password_matches=password_matches,
+            )
 
         if response.status_code >= 400:
             attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_invalid_credentials_response(user, attempt_state)
+            return _login_invalid_credentials_response(
+                user,
+                attempt_state,
+                password_matches=password_matches,
+            )
         access = response.data.get("access")
         refresh = response.data.get("refresh")
         if access and refresh:
             _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=remember_me)
+        if _is_web_client(request):
+            response.data.pop("refresh", None)
         return response
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -1109,6 +1124,8 @@ class CustomTokenRefreshView(TokenRefreshView):
         refresh = serializer.validated_data.get("refresh")
         if access and refresh:
             _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=serializer.validated_data.get('remember_me'))
+        if _is_web_client(request):
+            response.data.pop("refresh", None)
         return response
 
 

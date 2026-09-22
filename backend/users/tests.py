@@ -176,3 +176,134 @@ class PublicAndPrivateRoutePreservationTests(TestCase):
         self.assertEqual(client.get(path).status_code, 200)
         pharmacy.refresh_from_db()
         self.assertEqual(pharmacy.name, 'Private pharmacy')
+
+
+class BrowserTokenExposureTests(TestCase):
+    @override_settings(AXES_ENABLED=False, JWT_COOKIE_SECURE=True)
+    def test_web_login_keeps_refresh_token_out_of_javascript_response(self):
+        get_user_model().objects.create_user(
+            email="web-cookie-only@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+        csrf = self.client.get("/api/users/csrf/").json()["csrfToken"]
+        response = self.client.post(
+            "/api/users/login/",
+            {
+                "email": "web-cookie-only@example.com",
+                "password": "CorrectPassword123!",
+                "remember_me": True,
+            },
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf,
+            HTTP_X_CLIENT_PLATFORM="web",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.json())
+        self.assertNotIn("refresh", response.json())
+        self.assertIn("ct_refresh", response.cookies)
+        self.assertTrue(response.cookies["ct_refresh"]["httponly"])
+        self.assertTrue(response.cookies["ct_refresh"]["secure"])
+
+    @override_settings(AXES_ENABLED=False)
+    def test_web_refresh_rotates_cookie_without_exposing_refresh_token(self):
+        get_user_model().objects.create_user(
+            email="web-refresh@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+        csrf = self.client.get("/api/users/csrf/").json()["csrfToken"]
+        login = self.client.post(
+            "/api/users/login/",
+            {"email": "web-refresh@example.com", "password": "CorrectPassword123!"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf,
+            HTTP_X_CLIENT_PLATFORM="web",
+        )
+        self.assertEqual(login.status_code, 200)
+        csrf = self.client.get("/api/users/csrf/").json()["csrfToken"]
+        response = self.client.post(
+            "/api/users/token/refresh/",
+            {},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf,
+            HTTP_X_CLIENT_PLATFORM="web",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.json())
+        self.assertNotIn("refresh", response.json())
+        self.assertIn("ct_refresh", response.cookies)
+
+    @override_settings(AXES_ENABLED=False)
+    def test_non_web_client_keeps_token_response_for_mobile_compatibility(self):
+        get_user_model().objects.create_user(
+            email="mobile-token@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+        response = self.client.post(
+            "/api/users/login/",
+            {"email": "mobile-token@example.com", "password": "CorrectPassword123!"},
+            content_type="application/json",
+            HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.json())
+        self.assertIn("refresh", response.json())
+
+
+class LoginEnumerationSafetyTests(TestCase):
+    @override_settings(AXES_ENABLED=False)
+    def test_unknown_email_and_wrong_password_have_same_generic_error(self):
+        get_user_model().objects.create_user(
+            email="known@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+        unknown = self.client.post(
+            "/api/users/login/",
+            {"email": "missing@example.com", "password": "WrongPassword123!"},
+            content_type="application/json",
+        )
+        wrong = self.client.post(
+            "/api/users/login/",
+            {"email": "known@example.com", "password": "WrongPassword123!"},
+            content_type="application/json",
+        )
+        self.assertEqual(unknown.status_code, 401)
+        self.assertEqual(wrong.status_code, 401)
+        self.assertEqual(unknown.json()["code"], "invalid_credentials")
+        self.assertEqual(wrong.json()["code"], "invalid_credentials")
+        self.assertEqual(unknown.json()["detail"], wrong.json()["detail"])
+
+    @override_settings(AXES_ENABLED=False)
+    def test_unverified_account_is_only_disclosed_after_correct_password(self):
+        get_user_model().objects.create_user(
+            email="unverified@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=False,
+            is_mobile_verified=False,
+        )
+        wrong = self.client.post(
+            "/api/users/login/",
+            {"email": "unverified@example.com", "password": "WrongPassword123!"},
+            content_type="application/json",
+        )
+        correct = self.client.post(
+            "/api/users/login/",
+            {"email": "unverified@example.com", "password": "CorrectPassword123!"},
+            content_type="application/json",
+        )
+        self.assertEqual(wrong.status_code, 401)
+        self.assertEqual(wrong.json()["code"], "invalid_credentials")
+        self.assertEqual(correct.status_code, 401)
+        self.assertEqual(correct.json()["code"], "email_not_verified")
