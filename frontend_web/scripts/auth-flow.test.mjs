@@ -38,11 +38,12 @@ test('failed logout does not announce success and can be retried',async()=>{
  finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
 });
 
-test('frontend role gate does not treat a pharmacy admin as an owner',()=>{
- assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'OWNER',isAdminUser:true}),false);
+test('pharmacy admins inherit the owner-side workspace while capabilities remain separately enforceable',()=>{
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'OWNER',isAdminUser:true}),true);
  assert.equal(canAccessRoute({userRole:'OWNER',requiredRole:'OWNER',isAdminUser:false}),true);
  assert.equal(canAccessRoute({userRole:'PHARMACIST',requireAdmin:true,isAdminUser:true}),true);
  assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'ORG_ADMIN',hasOrgRole:true}),true);
+ assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'OWNER',isAdminUser:true,requiresCapability:true,hasRequiredCapability:false}),false);
 });
 
 
