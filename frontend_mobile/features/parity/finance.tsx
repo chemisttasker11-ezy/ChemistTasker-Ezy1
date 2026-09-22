@@ -53,6 +53,7 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
   const [received,setReceived]=useState<FinanceInvoice[]>([]);
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
+  const [actionBusy,setActionBusy]=useState(false);
   const [error,setError]=useState('');
 
   const load=useCallback(async()=>{
@@ -80,13 +81,23 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
   if(screen==='invoice-payment') return <InvoicePayment invoice={invoices.find(x=>Number(x.id)===id)} loading={loading} error={error} onReload={load}/>;
 
   const common={loading,error,onRetry:load,onRefresh:()=>{setRefreshing(true);void load();},refreshing};
+  const seedRecommendedItems=async()=>{
+    if(actionBusy)return;
+    setActionBusy(true);setError('');
+    try{await finance.seedItems();await load();}
+    catch(e){setError(errorMessage(e,'Unable to add recommended reusable items.'));}
+    finally{setActionBusy(false);}
+  };
 
   if(screen==='customers') return <ParityPage title={titles[screen]} subtitle="Reusable billing contacts for invoices." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/customers/new' as any)}/>}>
     <Section title="Saved customers">{customers.length?customers.map(c=><DataRow key={c.id} title={c.name||c.legal_name} subtitle={`${c.email||'No invoice email'} · ${c.payment_terms_days}-day terms · ABN ${c.abn||'not supplied'}`} status={c.active?'Active':'Inactive'} onPress={()=>router.push(`/finance/customers/new?id=${c.id}` as any)}/>):<EmptyState title="No customers" body="Create a customer before issuing invoices." actionLabel="Create customer" onAction={()=>router.push('/finance/customers/new' as any)}/>}</Section>
   </ParityPage>;
 
   if(screen==='items') return <ParityPage title={titles[screen]} subtitle="Reusable invoice line items and tax treatment." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/items/new' as any)}/>}>
-    <Section title="Saved items">{items.length?items.map(i=><DataRow key={i.id} title={i.name} subtitle={`${i.code||'No code'} · ${money(i.unit_price)} / ${i.unit} · ${replaceUnderscore(i.tax_code)}`} status={i.active?'Active':'Inactive'}/>):<EmptyState title="No reusable items" body="Add common professional-service or expense items for faster invoicing."/>}</Section>
+    <Section title="Saved items">
+      {items.length?items.map(i=><DataRow key={i.id} title={i.name} subtitle={`${i.code||'No code'} · ${money(i.unit_price)} / ${i.unit} · ${replaceUnderscore(i.tax_code)}`} status={i.active?'Active':'Inactive'} onPress={()=>router.push(`/finance/items/new?id=${i.id}` as any)}/>):<EmptyState title="No reusable items" body="Add common professional-service or expense items for faster invoicing."/>}
+      <ActionButtons><Button mode="outlined" loading={actionBusy} disabled={actionBusy} onPress={()=>void seedRecommendedItems()}>Add recommended defaults</Button></ActionButtons>
+    </Section>
   </ParityPage>;
 
   if(screen==='expenses') return <ParityPage title={titles[screen]} subtitle="Business expenses, evidence and GST treatment." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/expenses/new' as any)}/>}>
@@ -147,15 +158,17 @@ function ItemEditor({item,loading,error,onSaved}:{item?:FinanceItem;loading:bool
   const [form,setForm]=useState<FinanceItemInput>(()=>item?{code:item.code,name:item.name,category:item.category,unit:item.unit,unit_price:item.unit_price,tax_code:item.tax_code,super_eligible:item.super_eligible,active:item.active}:{code:'',name:'',category:'ProfessionalServices',unit:'Hours',unit_price:'0.00',tax_code:'OUT_OF_SCOPE',super_eligible:false,active:true});
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
   useEffect(()=>{if(item)setForm({code:item.code,name:item.name,category:item.category,unit:item.unit,unit_price:item.unit_price,tax_code:item.tax_code,super_eligible:item.super_eligible,active:item.active});},[item]);
+  const isSuperannuation=form.category==='Superannuation';
   const save=async()=>{setBusy(true);setLocalError('');try{await finance.saveItem(form,item?.id);await onSaved();router.replace('/finance/items' as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
   return <ParityPage title={item?'Edit reusable item':'New reusable item'} subtitle="Maintain an invoice line template and its tax/super treatment." loading={loading} error={error||localError}>
     <Field label="Code" value={form.code} onChangeText={v=>setForm(x=>({...x,code:v}))}/>
     <Field label="Name" value={form.name} onChangeText={v=>setForm(x=>({...x,name:v}))}/>
-    <ChoiceChips value={form.category} onChange={v=>setForm(x=>({...x,category:v as any}))} options={[{value:'ProfessionalServices',label:'Professional services'},{value:'Superannuation',label:'Super'},{value:'Transportation',label:'Transport'},{value:'Accommodation',label:'Accommodation'},{value:'Miscellaneous',label:'Misc'}]}/>
-    <Field label="Unit" value={form.unit} onChangeText={v=>setForm(x=>({...x,unit:v}))}/>
+    <ChoiceChips value={form.category} onChange={v=>setForm(x=>({...x,category:v as any,...(v==='Superannuation'?{tax_code:'OUT_OF_SCOPE',super_eligible:false,unit:'Lump Sum'}:{})}))} options={[{value:'ProfessionalServices',label:'Professional services'},{value:'Superannuation',label:'Super'},{value:'Transportation',label:'Transport'},{value:'Accommodation',label:'Accommodation'},{value:'Miscellaneous',label:'Misc'}]}/>
+    {isSuperannuation?<InfoNote title="Superannuation item">Super requests are always out of scope for GST, use a lump-sum unit, and cannot themselves attract super.</InfoNote>:null}
+    <Field label="Unit" value={form.unit} disabled={isSuperannuation} onChangeText={v=>setForm(x=>({...x,unit:v}))}/>
     <Field label="Unit price (AUD)" value={String(form.unit_price)} keyboardType="decimal-pad" onChangeText={v=>setForm(x=>({...x,unit_price:v}))}/>
-    <ChoiceChips value={form.tax_code} onChange={v=>setForm(x=>({...x,tax_code:v as any}))} options={[{value:'GST',label:'GST'},{value:'GST_FREE',label:'GST free'},{value:'INPUT_TAXED',label:'Input taxed'},{value:'OUT_OF_SCOPE',label:'Out of scope'}]}/>
-    <ChoiceChips value={form.super_eligible?'YES':'NO'} onChange={v=>setForm(x=>({...x,super_eligible:v==='YES'}))} options={[{value:'YES',label:'Super eligible'},{value:'NO',label:'Not super eligible'}]}/>
+    <ChoiceChips disabled={isSuperannuation} value={form.tax_code} onChange={v=>setForm(x=>({...x,tax_code:v as any}))} options={[{value:'GST',label:'GST'},{value:'GST_FREE',label:'GST free'},{value:'INPUT_TAXED',label:'Input taxed'},{value:'OUT_OF_SCOPE',label:'Out of scope'}]}/>
+    <ChoiceChips disabled={isSuperannuation} value={form.super_eligible?'YES':'NO'} onChange={v=>setForm(x=>({...x,super_eligible:v==='YES'}))} options={[{value:'YES',label:'Super eligible'},{value:'NO',label:'Not super eligible'}]}/>
     <ChoiceChips value={form.active?'ACTIVE':'INACTIVE'} onChange={v=>setForm(x=>({...x,active:v==='ACTIVE'}))} options={[{value:'ACTIVE',label:'Active'},{value:'INACTIVE',label:'Inactive'}]}/>
     <Button mode="contained" loading={busy} disabled={!form.name.trim()||busy} onPress={()=>void save()}>{item?'Save changes':'Save item'}</Button>
   </ParityPage>;
