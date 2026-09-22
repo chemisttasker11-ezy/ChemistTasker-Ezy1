@@ -1,7 +1,7 @@
 'use client';
 import { FormEvent, useState } from 'react';
-import { platform } from '../../../../lib/hub';
-import { api } from '../../components/hub-client';
+import { chemistTaskerApi } from '@/lib/chemisttasker-api';
+import { announceSession } from '@/shared/browser-session';
 export default function SignInForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -9,7 +9,11 @@ export default function SignInForm() {
     event.preventDefault(); setBusy(true); setError('');
     const form = new FormData(event.currentTarget);
     try {
-      await api('session/', 'POST', { email: String(form.get('email')).trim().toLowerCase(), password: form.get('password') });
+      await chemistTaskerApi.account.login({
+        email: String(form.get('email')).trim().toLowerCase(),
+        password: form.get('password'),
+      });
+      announceSession('login');
       const next = new URLSearchParams(window.location.search).get('next') || '/news';
       window.location.assign(/^\/(blog|news|hubs|content)(\/[a-zA-Z0-9_-]+)*(#[a-zA-Z0-9_-]+)?$/.test(next) ? next : '/news');
     } catch (e) { setError((e as Error).message); setBusy(false); }
