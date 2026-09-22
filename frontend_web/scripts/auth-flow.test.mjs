@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
 import {canAccessRoute} from '../src/components/routeAccess.ts';
+import {safeHubAttachmentUrl} from '../landing_next/lib/safe-hub-attachment.ts';
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
@@ -42,4 +43,13 @@ test('frontend role gate does not treat a pharmacy admin as an owner',()=>{
  assert.equal(canAccessRoute({userRole:'OWNER',requiredRole:'OWNER',isAdminUser:false}),true);
  assert.equal(canAccessRoute({userRole:'PHARMACIST',requireAdmin:true,isAdminUser:true}),true);
  assert.equal(canAccessRoute({userRole:'PHARMACIST',requiredRole:'ORG_ADMIN',hasOrgRole:true}),true);
+});
+
+
+test('public hub attachment URLs stay on the protected same-site endpoint',()=>{
+ assert.equal(safeHubAttachmentUrl('/api/hub/attachments/42/',42),'/api/hub/attachments/42/');
+ assert.equal(safeHubAttachmentUrl('/api/public-hub/attachments/42/',42),'/api/hub/attachments/42/');
+ for(const value of ['javascript:alert(1)','https://evil.example/file.pdf','//evil.example/file.pdf','/api/hub/attachments/43/','/media/private.pdf','data:text/html,x']){
+  assert.equal(safeHubAttachmentUrl(value,42),undefined);
+ }
 });
