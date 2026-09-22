@@ -19,7 +19,7 @@ export default function AttendancePinScreen() {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const data = await chemistTaskerApi.attendance.getPinPharmacies();
+      const data = await attendance.getPinPharmacies();
       setPharmacies(data.pharmacies);
       setSelected(data.pharmacies.length === 1 ? String(data.pharmacies[0].id) : '');
     } catch { setError('Unable to load your active pharmacy memberships.'); }
@@ -31,7 +31,7 @@ export default function AttendancePinScreen() {
     if (!valid) return;
     setSaving(true); setError(''); setSuccess('');
     try {
-      await chemistTaskerApi.attendance.updatePin(Number(selected), pin);
+      await attendance.updatePin(Number(selected), pin);
       setSuccess(`Attendance PIN saved for ${pharmacies.find(p => String(p.id) === selected)?.name}. Connect the terminal to the internet the next time you use this PIN.`);
       setPin(''); setConfirm('');
     } catch (e: any) { setError(e?.payload?.error || e?.message || 'PIN was not saved. Try again.'); }
