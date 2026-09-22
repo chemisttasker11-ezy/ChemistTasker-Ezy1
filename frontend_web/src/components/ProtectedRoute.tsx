@@ -13,6 +13,7 @@ type ProtectedRouteProps = {
   requiredRole?: string;
   requireAdmin?: boolean;
   requiredCapability?: AdminCapability;
+  requiredAnyCapabilities?: AdminCapability[];
 };
 
 const ROLES_REQUIRING_BASIC_ONBOARDING = new Set(["PHARMACIST", "OTHER_STAFF", "EXPLORER"]);
@@ -27,6 +28,7 @@ export default function ProtectedRoute({
   requiredRole,
   requireAdmin = false,
   requiredCapability,
+  requiredAnyCapabilities,
 }: ProtectedRouteProps) {
   const { user, isLoading, isAdminUser, hasCapability } = useAuth();
   const location = useLocation();
@@ -60,6 +62,13 @@ export default function ProtectedRoute({
     );
   }
 
+  const capabilityRequirementPresent = Boolean(requiredCapability || requiredAnyCapabilities?.length);
+  const capabilityRequirementSatisfied = requiredCapability
+    ? hasCapability(requiredCapability)
+    : requiredAnyCapabilities?.length
+      ? requiredAnyCapabilities.some((capability) => hasCapability(capability))
+      : true;
+
   if (
     canAccessRoute({
       userRole: user.role,
@@ -67,8 +76,8 @@ export default function ProtectedRoute({
       requireAdmin,
       isAdminUser,
       hasOrgRole,
-      requiresCapability: Boolean(requiredCapability),
-      hasRequiredCapability: requiredCapability ? hasCapability(requiredCapability) : true,
+      requiresCapability: capabilityRequirementPresent,
+      hasRequiredCapability: capabilityRequirementSatisfied,
     })
   ) {
     return children;
