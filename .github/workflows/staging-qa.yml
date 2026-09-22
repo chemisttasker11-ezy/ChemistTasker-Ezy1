@@ -1,0 +1,39 @@
+name: Staging QA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chemisttasker-staging-qa
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    runs-on: [self-hosted, linux, x64, chemisttasker-staging]
+    timeout-minutes: 90
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run isolated regression suite
+        shell: bash
+        run: bash scripts/run-staging-qa.sh
+
+      - name: QA summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ChemistTasker staging QA"
+            echo ""
+            echo "Commit: $GITHUB_SHA"
+            echo ""
+            echo "The suite covers shared-core, Vite, Next.js, mobile lint/typecheck, Django checks/tests, PostgreSQL migration/concurrency, architecture boundaries, and Tauri/Rust tests."
+          } >> "$GITHUB_STEP_SUMMARY"
