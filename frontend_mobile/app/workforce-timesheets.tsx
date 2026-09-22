@@ -55,7 +55,7 @@ export default function WorkforceTimesheetsScreen() {
     if (!pharmacyId) {
       setPeriods([]); setPeriodId(null); return;
     }
-    const next = await workforce.listTimesheetPeriods(pharmacyId);
+    const next = await workforce.listTimesheetPeriods(pharmacyId) as WorkforceTimesheetPeriod[];
     setPeriods(next);
     setPeriodId(current => current && next.some(row => row.id === current) ? current : (next[0]?.id ?? null));
   }, [pharmacyId]);
@@ -67,7 +67,7 @@ export default function WorkforceTimesheetsScreen() {
     const [nextSummary, nextRows] = await Promise.all([
       workforce.getTimesheetPeriodSummary(periodId),
       workforce.listTimesheets(periodId),
-    ]);
+    ]) as [WorkforceTimesheetSummary, WorkforceTimesheetRow[]];
     setSummary(nextSummary);
     setRows(nextRows);
   }, [periodId]);
