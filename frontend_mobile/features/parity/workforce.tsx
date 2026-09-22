@@ -4,7 +4,7 @@ import { Button, Card, Checkbox, Chip, IconButton, Switch, Text } from 'react-na
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { chemistTaskerApi } from '@/config/api';
+import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
@@ -20,7 +20,6 @@ type WorkforceScreen =
   | 'work-settings'
   | 'payroll-export';
 
-const workforce = chemistTaskerApi.workforce;
 
 const titleFor: Record<WorkforceScreen, string> = {
   engagements: 'Employment engagements',
