@@ -386,9 +386,9 @@ export const rosterV2 = {
     bulkEdit: (periodId, operations) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.bulkEdit, { method: 'POST', body: { period_id: periodId, operations } }),
     requestSwap: (assignmentId, targetUserId, notes = '') => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.workerSwapRequest, { method: 'POST', body: { assignment_id: assignmentId, target_user_id: targetUserId, notes } }),
     requestCover: (assignmentId, reason = '') => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.workerCoverRequest, { method: 'POST', body: { assignment_id: assignmentId, reason } }),
-    approveSwap: (requestId, targetUserId = undefined) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerApproveSwap, { method: 'POST', body: { request_id: requestId, ...(targetUserId ? { target_user_id: targetUserId } : {}) } }),
+    approveSwap: (requestId, targetUserId?: number) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerApproveSwap, { method: 'POST', body: { request_id: requestId, ...(targetUserId ? { target_user_id: targetUserId } : {}) } }),
     approveReplacement: (requestId, replacementUserId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerApproveReplacement, { method: 'POST', body: { request_id: requestId, replacement_user_id: replacementUserId } }),
-    releaseWorker: (requestId, escalateToVisibility = undefined) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerReleaseWorker, { method: 'POST', body: { request_id: requestId, escalate_to_visibility: escalateToVisibility ?? null } }),
+    releaseWorker: (requestId, escalateToVisibility?: string | null) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerReleaseWorker, { method: 'POST', body: { request_id: requestId, escalate_to_visibility: escalateToVisibility ?? null } }),
     rejectRequest: (requestId, reason = '') => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.managerRejectRequest, { method: 'POST', body: { request_id: requestId, reason } }),
     getAudits: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.rosterV2.audits, { query: { pharmacy_id: pharmacyId } }),
 };
@@ -401,14 +401,14 @@ export const workforce = {
     updatePayrollConfiguration: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.payrollConfiguration, { method: 'PATCH', body }),
     listWorkSettings: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.workSettings, { query: { pharmacy_id: pharmacyId } }),
     saveWorkSettings: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.workSettings, { method: 'POST', body }),
-    listEmploymentEngagements: (pharmacyId, membershipId = undefined) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { query: { pharmacy_id: pharmacyId, ...(membershipId ? { membership_id: membershipId } : {}) } }),
+    listEmploymentEngagements: (pharmacyId, membershipId?: number) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { query: { pharmacy_id: pharmacyId, ...(membershipId ? { membership_id: membershipId } : {}) } }),
     previewEmploymentEngagementAward: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagementAwardPreview, { method: 'POST', body }),
     createEmploymentEngagement: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagements, { method: 'POST', body }),
     updateEmploymentEngagement: (publicId, body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.employmentEngagement(publicId), { method: 'PATCH', body }),
     listCoverageRequirements: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { query: { pharmacy_id: pharmacyId } }),
     createCoverageRequirement: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.coverageRequirements, { method: 'POST', body }),
     deleteCoverageRequirement: (id) => operationalRequest(PLATFORM_ENDPOINTS.workforce.coverageRequirement(id), { method: 'DELETE' }),
-    listLeave: (query = undefined) => operationalRequest(PLATFORM_ENDPOINTS.workforce.leave, { query }),
+    listLeave: (query?: Record<string, unknown>) => operationalRequest(PLATFORM_ENDPOINTS.workforce.leave, { query }),
     createLeave: (body) => operationalRequest(PLATFORM_ENDPOINTS.workforce.leave, { method: 'POST', body }),
     decideLeave: (id, decision, managerNote = '') => operationalRequest(PLATFORM_ENDPOINTS.workforce.leaveDecision(id), { method: 'POST', body: { decision, manager_note: managerNote } }),
     listTimesheetPeriods: (pharmacyId) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetPeriods, { query: { pharmacy_id: pharmacyId } }),
@@ -425,7 +425,7 @@ export const workforce = {
     reopenTimesheet: (id, reason) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetReopen(id), { method: 'POST', body: { reason } }),
     addTimesheetComment: (id, body, workerVisible = true) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetComments(id), { method: 'POST', body: { body, worker_visible: workerVisible } }),
     decideTimesheetCheck: (id, decision, reason) => operationalRequest(PLATFORM_ENDPOINTS.workforce.timesheetCheckDecision(id), { method: 'POST', body: { decision, reason } }),
-    getMyHours: (query = undefined) => operationalRequest(PLATFORM_ENDPOINTS.workforce.myHours, { query }),
+    getMyHours: (query?: Record<string, unknown>) => operationalRequest(PLATFORM_ENDPOINTS.workforce.myHours, { query }),
 };
 
 // Finance remains a separate domain surface, but its authenticated request
@@ -481,10 +481,10 @@ async function financeListAll(path) {
 }
 export const financeApi = {
     customers: () => financeListAll('customers/'),
-    saveCustomer: (value, id = undefined) => financeRequest(`customers/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    saveCustomer: (value, id?: number) => financeRequest(`customers/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
     lookupAbn: (id) => financeRequest(`customers/${id}/lookup_abn/`, 'POST', {}),
     items: () => financeListAll('items/'),
-    saveItem: (value, id = undefined) => financeRequest(`items/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    saveItem: (value, id?: number) => financeRequest(`items/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
     seedItems: () => financeRequest('items/seed/', 'POST', {}),
     invoices: () => financeListAll('invoices/'),
     receivedInvoices: () => financeListAll('received-invoices/'),
@@ -497,13 +497,13 @@ export const financeApi = {
     invoice: (id) => financeRequest(`invoices/${id}/`),
     invoiceRevision: (id, version) => financeRequest(`invoices/${id}/revisions/${version}/`),
     invoiceRevisionPdf: (id, version) => financeRequest(`invoices/${id}/revisions/${version}/pdf/`, 'GET', undefined, true),
-    saveInvoice: (value, id = undefined) => financeRequest(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    saveInvoice: (value, id?: number) => financeRequest(`invoices/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
     preview: (value) => financeRequest('invoices/preview/', 'POST', value),
     duplicate: (id, request_key) => financeRequest(`invoices/${id}/duplicate/`, 'POST', { request_key }),
     issue: (id, version) => financeRequest(`invoices/${id}/issue/`, 'POST', { version, confirmed: true }),
     superDocument: (id, version) => financeRequest(`invoices/${id}/super-document/`, 'POST', { version }),
     send: (id, version) => financeRequest(`invoices/${id}/send/`, 'POST', { version, confirmed: true }),
-    markPaid: (id, version = undefined) => financeRequest(`invoices/${id}/mark-paid/`, 'POST', version == null ? {} : { version }),
+    markPaid: (id, version?: number) => financeRequest(`invoices/${id}/mark-paid/`, 'POST', version == null ? {} : { version }),
     requestRevision: (id, version, note) => financeRequest(`received-invoices/${id}/request-revision/`, 'POST', { version, note }),
     approveForPayment: (id, version, note = '') => financeRequest(`received-invoices/${id}/approve-payment/`, 'POST', { version, note }),
     markReceivedPaid: (id, version, note = '') => financeRequest(`received-invoices/${id}/mark-paid/`, 'POST', { version, note }),
@@ -511,7 +511,7 @@ export const financeApi = {
     payment: (id, value) => financeRequest(`invoices/${id}/payments/`, 'POST', value),
     pdf: (id) => financeRequest(`invoices/${id}/pdf/`, 'GET', undefined, true),
     expenses: () => financeListAll('expenses/'),
-    saveExpense: (value, id = undefined) => financeRequest(`expenses/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
+    saveExpense: (value, id?: number) => financeRequest(`expenses/${id ? `${id}/` : ''}`, id ? 'PATCH' : 'POST', value),
     uploadReceipt: (id, file, filename) => {
         const data = new FormData();
         data.append('file', file, filename);
