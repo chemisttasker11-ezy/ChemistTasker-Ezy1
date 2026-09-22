@@ -69,36 +69,56 @@ async function parseApiError(response) {
     }
     return `Request failed with status ${response.status}`;
 }
-async function fetchApi(endpoint, options = {}) {
-    const { baseURL, getToken, credentials = 'include' } = getApiConfig();
-    const includeAuth = !options.skipAuth;
-    // Remove the marker so it isn't sent as a header
-    if ('skipAuth' in options) {
-        delete options.skipAuth;
+function assertRequestPolicy(baseURL, targetUrl, policy = {}) {
+    if (policy.sameOrigin && !isSameOriginRequest(baseURL, targetUrl)) {
+        throw new Error(policy.errorMessage || 'Cross-origin authenticated requests are not allowed.');
     }
-    const body = options.body;
+    if (policy.allowedPathPrefix) {
+        const allowedRoot = buildRequestUrl(baseURL, policy.allowedPathPrefix);
+        const allowedPath = allowedRoot.pathname.endsWith('/') ? allowedRoot.pathname : `${allowedRoot.pathname}/`;
+        if (!['http:', 'https:'].includes(targetUrl.protocol) ||
+            targetUrl.username ||
+            targetUrl.password ||
+            targetUrl.origin !== allowedRoot.origin ||
+            !(targetUrl.pathname === allowedPath.slice(0, -1) || targetUrl.pathname.startsWith(allowedPath))) {
+            throw new Error(policy.errorMessage || 'Request is outside the allowed API boundary.');
+        }
+    }
+}
+async function performApiRequest(endpoint, options = {}, policy = {}) {
+    const { baseURL, getToken, credentials = 'include' } = getApiConfig();
+    const { skipAuth = false, ...requestOptions } = options;
+    const includeAuth = !skipAuth;
+    const targetUrl = buildRequestUrl(baseURL, endpoint);
+    assertRequestPolicy(baseURL, targetUrl, policy);
+    let body = requestOptions.body;
     if (body && !(body instanceof FormData) && typeof body !== 'string') {
-        options.body = JSON.stringify(body);
+        body = JSON.stringify(body);
     }
     const token = includeAuth ? await getToken() : null;
-    const headers = {};
-    if (options.headers) {
-        const existingHeaders = options.headers;
-        Object.assign(headers, existingHeaders);
-    }
+    const headers = new Headers(requestOptions.headers || {});
     if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        headers.set('Authorization', `Bearer ${token}`);
     }
-    if (!(options.body instanceof FormData)) {
-        headers['Content-Type'] = 'application/json';
+    const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
+    if (!multipart && (body !== undefined || policy.jsonContentTypeWithoutBody)) {
+        if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     }
-    const response = await fetch(buildRequestUrl(baseURL, endpoint), {
-        ...options,
+    const response = await fetch(targetUrl, {
+        ...requestOptions,
+        body,
         headers,
         credentials,
     });
     if (!response.ok) {
         throw new Error(await parseApiError(response));
+    }
+    return response;
+}
+async function fetchApi(endpoint, options = {}) {
+    const response = await performApiRequest(endpoint, options, { jsonContentTypeWithoutBody: true });
+    if (response.status === 204) {
+        return {};
     }
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
@@ -125,26 +145,11 @@ function buildQuery(params) {
     return query ? `?${query}` : '';
 }
 async function fetchWithAuth(url, options = {}) {
-    const { baseURL, getToken, credentials = 'include' } = getApiConfig();
-    const targetUrl = buildRequestUrl(baseURL, url);
-    if (!isSameOriginRequest(baseURL, targetUrl)) {
-        throw new Error('Cross-origin authenticated requests are not allowed.');
-    }
-    const token = await getToken();
-    const headers = {};
-    if (options.headers) {
-        Object.assign(headers, options.headers);
-    }
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    if (!(options.body instanceof FormData)) {
-        headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
-    }
-    const response = await fetch(targetUrl, { ...options, headers, credentials });
-    if (!response.ok) {
-        throw new Error(await parseApiError(response));
-    }
+    const response = await performApiRequest(url, options, {
+        sameOrigin: true,
+        jsonContentTypeWithoutBody: true,
+        errorMessage: 'Cross-origin authenticated requests are not allowed.',
+    });
     if (response.status === 204) {
         return {};
     }
