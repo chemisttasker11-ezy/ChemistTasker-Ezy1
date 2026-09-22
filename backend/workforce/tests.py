@@ -8,6 +8,7 @@ from django.test import SimpleTestCase
 from .award_rates import classification_options, resolve_award_schedule
 from .employment_terms import correspondence_profile, normalise_part_time_pattern
 from .employment_engagement_service import build_employment_engagement_payload
+from .permissions import can_manage_roster_pharmacy, can_manage_workforce_pharmacy
 
 
 class PharmacyAwardResolverTests(SimpleTestCase):
@@ -368,3 +369,46 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
         self.assertEqual(snapshot["effective_ordinary_schedule"]["weekday"]["evening_19_21"], "55.00")
         self.assertEqual(snapshot["effective_ordinary_schedule"]["weekday"]["late_21_24"], "75.00")
         self.assertEqual(snapshot["overtime_floor"]["sunday_all_day"], "83.48")
+
+
+class WorkforceCapabilityPermissionTests(SimpleTestCase):
+    @staticmethod
+    def _user():
+        return SimpleNamespace(id=7, is_active=True, is_superuser=False)
+
+    @staticmethod
+    def _pharmacy():
+        return SimpleNamespace(
+            id=11,
+            organization_id=None,
+            owner=SimpleNamespace(user_id=99),
+        )
+
+    @patch("client_profile.admin_helpers.can_manage_roster", return_value=False)
+    @patch("client_profile.admin_helpers.can_manage_staff", return_value=True)
+    def test_manage_staff_can_manage_employment_without_roster_access(self, _staff, _roster):
+        user = self._user()
+        pharmacy = self._pharmacy()
+        self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
+        self.assertFalse(can_manage_roster_pharmacy(user, pharmacy))
+
+    @patch("client_profile.admin_helpers.can_manage_roster", return_value=True)
+    @patch("client_profile.admin_helpers.can_manage_staff", return_value=False)
+    def test_manage_roster_preserves_existing_workforce_access(self, _staff, _roster):
+        user = self._user()
+        pharmacy = self._pharmacy()
+        self.assertTrue(can_manage_roster_pharmacy(user, pharmacy))
+        self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
+
+    @patch("client_profile.admin_helpers.can_manage_roster", return_value=False)
+    @patch("client_profile.admin_helpers.can_manage_staff", return_value=False)
+    @patch("workforce.permissions._org_has_capability")
+    def test_org_staff_scope_does_not_grant_roster_scope(self, org_capability, _staff, _roster):
+        from users.org_roles import OrgCapability
+
+        org_capability.side_effect = lambda _user, _pharmacy, capability: capability == OrgCapability.MANAGE_STAFF
+        user = self._user()
+        pharmacy = SimpleNamespace(id=11, organization_id=3, owner=SimpleNamespace(user_id=99))
+
+        self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
+        self.assertFalse(can_manage_roster_pharmacy(user, pharmacy))
