@@ -4,6 +4,9 @@ export type InvoiceSummaryItem = {
   status?: string | null;
   total?: number | string | null;
   total_amount?: number | string | null;
+  balance?: number | string | null;
+  paid?: number | string | null;
+  overdue?: boolean;
   invoice_date?: string | null;
   created_at?: string | null;
 };
@@ -35,6 +38,11 @@ export const isPendingInvoiceStatus = (status?: string | null) => {
 export const getInvoiceAmount = (invoice: InvoiceSummaryItem) => {
   const raw = invoice.total ?? invoice.total_amount ?? 0;
   const amount = Number(raw);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const getMoney = (value?: number | string | null) => {
+  const amount = Number(value ?? 0);
   return Number.isFinite(amount) ? amount : 0;
 };
 
@@ -87,6 +95,13 @@ export const buildInvoiceStats = (invoices: InvoiceSummaryItem[]) => {
   const issueCount = invoices
     .filter((invoice) => ['issue', 'issue_reported', 'disputed'].includes(normalizeStatus(invoice.status)))
     .length;
+  const awaitingPayment = invoices
+    .filter((invoice) => isPendingInvoiceStatus(invoice.status) && !invoice.overdue)
+    .reduce((sum, invoice) => sum + getMoney(invoice.balance ?? invoice.total ?? invoice.total_amount), 0);
+  const paymentsReceived = invoices.reduce((sum, invoice) => sum + getMoney(invoice.paid), 0);
+  const overdueTotal = invoices
+    .filter((invoice) => invoice.overdue)
+    .reduce((sum, invoice) => sum + getMoney(invoice.balance ?? invoice.total ?? invoice.total_amount), 0);
 
   return {
     draftTotal,
@@ -95,5 +110,8 @@ export const buildInvoiceStats = (invoices: InvoiceSummaryItem[]) => {
     paidTotal,
     unpaidTotal,
     issueCount,
+    awaitingPayment,
+    paymentsReceived,
+    overdueTotal,
   };
 };

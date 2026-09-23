@@ -7,6 +7,8 @@ import { finance, financeStatus, type FinanceCustomer, type FinanceItem, type Fi
 import { CustomerEditor, ItemEditor, ExpenseEditor, PaymentEditor } from './Editors';
 import InvoiceComposer from './InvoiceComposer';
 import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
+import InvoiceStatsCards from '../dashboard/sidebar/Invoices/InvoiceStatsCards';
+import type { InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStats';
 
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
   | { kind: 'invoice'; value?: FinanceInvoice } | { kind: 'expense'; value?: FinanceExpense }
@@ -31,6 +33,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
   const running = useRef(false);
   const [invoiceStatus, setInvoiceStatus] = useState('all');
+  const [snapshotTimeframe, setSnapshotTimeframe] = useState<InvoiceTimeframe>('this_year');
   const [customerFilter, setCustomerFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -89,7 +92,14 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   });
   const matches = (...values: (string | undefined)[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
   const serviceInvoices = invoices.filter(invoice => invoice.kind === 'invoice' && !invoice.voided);
-  const totalCents = (key: 'balance' | 'paid') => serviceInvoices.reduce((sum, invoice) => sum + Math.round(Number(invoice[key]) * 100), 0) / 100;
+  const snapshotInvoices = serviceInvoices.map(invoice => ({
+    status: invoice.status,
+    total: invoice.calculation.payable,
+    balance: invoice.balance,
+    paid: invoice.paid,
+    overdue: financeStatus(invoice) === 'Overdue',
+    invoice_date: invoice.payload.invoice_date,
+  }));
   const viewInvoice = (invoice: FinanceInvoice) => setEditor({ kind: 'invoice', value: invoice });
   const visibleInvoices = invoices.filter(invoice => {
     const displayStatus = financeStatus(invoice).toLowerCase();
@@ -130,9 +140,9 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
         </Tabs>
         <Box role="tabpanel" id={`finance-panel-${tool}`} aria-labelledby={`finance-tab-${tool}`} sx={{ p: { xs: 2, md: 3 } }}>
           {tool === 'invoices' && <>
-            <Stack direction="row" spacing={3} useFlexGap flexWrap="wrap" sx={{ mb: 3, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-              {[['Balance due', dollars(totalCents('balance'))], ['Payments received', dollars(totalCents('paid'))], ['Overdue', dollars(serviceInvoices.filter(i => financeStatus(i) === 'Overdue').reduce((sum, i) => sum + Number(i.balance), 0))]].map(([label, amount]) => <Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h6" sx={{ fontVariantNumeric: 'tabular-nums', color: label === 'Overdue' ? 'error.main' : 'text.primary' }}>{amount}</Typography></Box>)}
-            </Stack>
+            <Box sx={{ mb: 3, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <InvoiceStatsCards invoices={snapshotInvoices} timeframe={snapshotTimeframe} onTimeframeChange={setSnapshotTimeframe} mode="workspace" compact />
+            </Box>
             <Tabs value={invoiceStatus} onChange={(_, next) => setInvoiceStatus(next)} variant="scrollable" scrollButtons="auto" aria-label="Invoice status" sx={{ mb: 3, minHeight: 40 }}>
               {[['all', 'All invoices'], ['saved', 'Saved'], ['sent', 'Sent / approved'], ['revision', 'Revision requested'], ['overdue', 'Overdue'], ['paid', 'Paid']].map(([key, label]) => <Tab key={key} value={key} label={label} />)}
             </Tabs>
