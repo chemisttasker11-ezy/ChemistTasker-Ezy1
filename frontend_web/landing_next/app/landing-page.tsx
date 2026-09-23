@@ -102,6 +102,90 @@ const roles = [
     icon: GraduationCap,
   },
 ];
+const staffPersonas = [
+  {
+    label: 'Pharmacy Owner',
+    image: '/assets/personas/pharmacy-owner.webp',
+    accent: '#06214A',
+    short: 'People, rosters and escalation.',
+    heading: 'Run staffing from one operational view.',
+    detail: 'See pharmacy context, roster gaps, internal-team coverage and wider shift escalation without separating the work into disconnected tools.',
+    tools: ['Roster', 'Team', 'Escalation'],
+  },
+  {
+    label: 'Pharmacy Manager',
+    image: '/assets/personas/retail-manager.webp',
+    accent: '#008DDB',
+    short: 'Day-to-day team coordination.',
+    heading: 'Keep the working day visible.',
+    detail: 'Coordinate rosters, availability and team communication with the pharmacy context managers need for day-to-day staffing decisions.',
+    tools: ['Roster', 'Availability', 'Team updates'],
+  },
+  {
+    label: 'Pharmacist',
+    image: '/assets/personas/pharmacist.webp',
+    accent: '#5222B8',
+    short: 'Shifts, availability and invoices.',
+    heading: 'Keep flexible work connected.',
+    detail: 'Discover opportunities, publish availability and keep confirmed work, communication and invoicing together in one professional workspace.',
+    tools: ['Find shifts', 'Availability', 'Invoices'],
+  },
+  {
+    label: 'Locum Pharmacist',
+    image: '/assets/personas/locum-pharmacist.webp',
+    accent: '#5222B8',
+    short: 'Flexible work with less admin.',
+    heading: 'Move from opportunity to completed shift.',
+    detail: 'Browse flexible pharmacy work, keep your professional details close at hand and carry confirmed shift information through to invoicing.',
+    tools: ['Shift board', 'Profile', 'Invoice'],
+  },
+  {
+    label: 'Pharmacy Assistant',
+    image: '/assets/personas/pharmacy-assistant.webp',
+    accent: '#D600C8',
+    short: 'Roster and team context.',
+    heading: 'See the tools relevant to your day.',
+    detail: 'Keep rostered work, availability and pharmacy-team updates close without owner-only administration getting in the way.',
+    tools: ['Roster', 'Availability', 'Pharmacy Hub'],
+  },
+  {
+    label: 'Dispensary Technician',
+    image: '/assets/personas/dispensary-technician.webp',
+    accent: '#D600C8',
+    short: 'Role-relevant work in view.',
+    heading: 'Stay connected to the pharmacy team.',
+    detail: 'See rostered work, publish availability and keep the conversations and updates connected to your pharmacy role.',
+    tools: ['Roster', 'Availability', 'Team spaces'],
+  },
+  {
+    label: 'Intern Pharmacist',
+    image: '/assets/personas/intern.webp',
+    accent: '#00BDD2',
+    short: 'Experience, learning and shifts.',
+    heading: 'Build experience with the team around you.',
+    detail: 'Keep work opportunities, pharmacy context, learning and your developing professional profile connected as your experience grows.',
+    tools: ['Opportunities', 'Learning', 'Profile'],
+  },
+  {
+    label: 'Pharmacy Student',
+    image: '/assets/personas/pharmacy-student.webp',
+    accent: '#00BDD2',
+    short: 'Explore, learn and connect.',
+    heading: 'See a clearer path into pharmacy work.',
+    detail: 'Discover pharmacy opportunities, community and learning while building a profile that can grow with your pharmacy career.',
+    tools: ['Explore', 'Community', 'Learning'],
+  },
+  {
+    label: 'Junior Pharmacy Staff',
+    image: '/assets/personas/pharmacy-student.webp',
+    accent: '#00BDD2',
+    short: 'Start clear. Grow with the team.',
+    heading: 'Begin with the everyday essentials in view.',
+    detail: 'Stay connected to rostered work, availability, team updates and the next opportunities to build confidence and experience.',
+    tools: ['Roster', 'Updates', 'Growth'],
+  },
+];
+
 const faqs = [
   ['Who is ChemistTasker for?', 'ChemistTasker brings together pharmacy owners, pharmacists, pharmacy assistants, technicians, other staff and organisations. Each role has a workspace suited to its needs.'],
   ['Can I manage more than one pharmacy?', 'The owner workspace includes multi-pharmacy management, so you can organise pharmacy locations and their teams from one account.'],
@@ -121,6 +205,8 @@ export default function LandingPage() {
   const [roleInteracting, setRoleInteracting] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const active = roles[role];
+  const [staffRole, setStaffRole] = useState(0);
+  const activeStaff = staffPersonas[staffRole];
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -150,6 +236,42 @@ export default function LandingPage() {
           <p className="eyebrow">ONE PLATFORM. A DIFFERENT VIEW FOR EVERY ROLE.</p>
           <h2>See what ChemistTasker adds to your working day.</h2>
           <p>Four persona colours from the ChemistTasker bottle. One connected platform. The board moves with the person using it.</p>
+        </div>
+        <div className="staff-persona-showcase" aria-label="What each pharmacy role gets from ChemistTasker">
+          <div className="staff-persona-rail" role="list">
+            {staffPersonas.map((persona, i) => (
+              <button
+                key={persona.label}
+                type="button"
+                className="staff-persona"
+                style={{ '--staff-accent': persona.accent } as React.CSSProperties}
+                aria-pressed={staffRole === i}
+                aria-label={`${persona.label}: ${persona.short}`}
+                onClick={() => setStaffRole(i)}
+                role="listitem"
+              >
+                <span className="staff-persona-figure">
+                  <img
+                    className="staff-persona-image"
+                    src={persona.image}
+                    alt=""
+                    aria-hidden="true"
+                    loading={i < 4 ? 'eager' : 'lazy'}
+                  />
+                </span>
+                <span className="staff-persona-role">{persona.label}</span>
+                <span className="staff-persona-summary">{persona.short}</span>
+              </button>
+            ))}
+          </div>
+          <div className="staff-persona-detail" aria-live="polite" style={{ '--staff-accent': activeStaff.accent } as React.CSSProperties}>
+            <span className="staff-persona-detail-role">{activeStaff.label}</span>
+            <strong>{activeStaff.heading}</strong>
+            <p>{activeStaff.detail}</p>
+            <div className="staff-persona-tools" aria-label={`${activeStaff.label} ChemistTasker tools`}>
+              {activeStaff.tools.map(tool => <span key={tool}>{tool}</span>)}
+            </div>
+          </div>
         </div>
         <div className="persona-switcher">
           <div className="role-tabs" role="tablist" aria-label="Explore ChemistTasker by role">

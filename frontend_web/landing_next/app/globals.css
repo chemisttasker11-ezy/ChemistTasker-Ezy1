@@ -104,3 +104,47 @@
 .persona-switcher .role-tabs button[data-accent="pharmacist"][aria-selected=true]{color:#5222B8;border:1px solid #5222B824;background:#f7f3ff}
 .persona-switcher .role-tabs button[data-accent="other-staff"][aria-selected=true]{color:#B000A5;border:1px solid #D600C824;background:#fff3fd}
 .persona-switcher .role-tabs button[data-accent="explorer"][aria-selected=true]{color:#008FA0;border:1px solid #00BDD230;background:#effcfd}
+
+
+/* Role portrait showcase: no card chrome, large people-first imagery above the four-workspace switcher. */
+.staff-persona-showcase{margin:2px auto 46px;max-width:1180px}
+.staff-persona-rail{display:flex;align-items:flex-end;justify-content:center;gap:4px;min-height:320px;padding:0 4px}
+.staff-persona{--staff-accent:var(--purple);appearance:none;border:0;background:transparent;color:var(--body);display:flex;flex:0 1 108px;min-width:0;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 4px 8px;text-align:center;transition:flex-basis .32s ease,transform .28s ease,opacity .2s ease;color .2s ease}
+.staff-persona:hover,.staff-persona:focus-visible{transform:translateY(-5px);color:var(--navy)}
+.staff-persona[aria-pressed=true]{flex-basis:232px;color:var(--navy)}
+.staff-persona-figure{display:flex;width:100%;height:174px;align-items:flex-end;justify-content:center;overflow:visible}
+.staff-persona-image{width:100%;max-width:126px;height:174px;object-fit:contain;object-position:center bottom;mix-blend-mode:multiply;transform-origin:center bottom;transition:max-width .32s ease,height .32s ease,transform .28s ease,opacity .2s ease;opacity:.74}
+.staff-persona[aria-pressed=true] .staff-persona-figure{height:286px}
+.staff-persona[aria-pressed=true] .staff-persona-image{max-width:228px;height:286px;opacity:1;transform:translateY(2px)}
+.staff-persona-role{display:block;margin-top:9px;color:inherit;font-size:10px;font-weight:700;line-height:1.25}
+.staff-persona[aria-pressed=true] .staff-persona-role{font-size:13px;color:var(--staff-accent)}
+.staff-persona-summary{display:block;max-width:132px;margin-top:4px;color:#8190a3;font-size:8px;line-height:1.35}
+.staff-persona[aria-pressed=true] .staff-persona-summary{max-width:210px;color:#65738a;font-size:9px}
+.staff-persona-detail{--staff-accent:var(--purple);max-width:720px;margin:16px auto 0;text-align:center}
+.staff-persona-detail-role{display:block;color:var(--staff-accent);font-size:9px;font-weight:800;letter-spacing:1.35px;text-transform:uppercase}
+.staff-persona-detail>strong{display:block;margin-top:7px;color:var(--navy);font:500 24px/1.2 Outfit,sans-serif;letter-spacing:-.025em}
+.staff-persona-detail>p{max-width:630px;margin:10px auto 0;font-size:11px;line-height:1.75}
+.staff-persona-tools{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;margin-top:13px}
+.staff-persona-tools span{border-bottom:2px solid color-mix(in srgb,var(--staff-accent) 38%,transparent);padding:3px 4px 4px;color:#66748a;font-size:8px;font-weight:700;letter-spacing:.45px;text-transform:uppercase}
+@media(max-width:980px){
+  .staff-persona-rail{justify-content:flex-start;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;margin-left:-32px;margin-right:-32px;padding:0 32px 12px;min-height:292px;scrollbar-width:thin}
+  .staff-persona{flex:0 0 112px;scroll-snap-align:center}
+  .staff-persona[aria-pressed=true]{flex-basis:205px}
+  .staff-persona[aria-pressed=true] .staff-persona-figure{height:252px}
+  .staff-persona[aria-pressed=true] .staff-persona-image{max-width:198px;height:252px}
+}
+@media(max-width:780px){
+  .staff-persona-showcase{margin-bottom:34px}
+  .staff-persona-rail{margin-left:-22px;margin-right:-22px;padding-left:22px;padding-right:22px;min-height:268px}
+  .staff-persona{flex-basis:102px}
+  .staff-persona[aria-pressed=true]{flex-basis:178px}
+  .staff-persona-figure{height:154px}
+  .staff-persona-image{height:154px;max-width:112px}
+  .staff-persona[aria-pressed=true] .staff-persona-figure{height:225px}
+  .staff-persona[aria-pressed=true] .staff-persona-image{max-width:174px;height:225px}
+  .staff-persona-detail>strong{font-size:21px}
+  .staff-persona-summary{font-size:7.5px}
+}
+@media(prefers-reduced-motion:reduce){
+  .staff-persona,.staff-persona-image{transition:none}
+}
