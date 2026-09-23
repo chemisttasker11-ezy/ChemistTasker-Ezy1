@@ -26,6 +26,12 @@ from users.jwt_ws import JWTAuthMiddleware
 
 
 class SecurityBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        caches["security"].clear()
+
+    def tearDown(self):
+        caches["security"].clear()
+
     def test_cookie_websocket_requires_allowed_origin(self):
         middleware = JWTAuthMiddleware(lambda *_: None)
         cookie = (b"cookie", b"ct_access=secret")
