@@ -6539,8 +6539,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         ]
 
     def get_finance_record_id(self, obj):
-        record = getattr(obj, "finance_record", None)
-        return getattr(record, "id", None)
+        return obj.pk if obj.request_key is not None else None
 
     def create(self, validated_data):
         items = validated_data.pop('line_items', [])

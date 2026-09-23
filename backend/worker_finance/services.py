@@ -16,7 +16,6 @@ from .calculations import calculate_invoice, CalculationError, allocate_payment,
 from .models import (
     Customer,
     CatalogueItem,
-    InvoiceRecord,
     InvoiceRevision,
     InvoiceReviewRequest,
     Payment,
@@ -389,14 +388,14 @@ def internal_invoice_prefill(owner, assignment_ids):
 
 def _record_revision(record):
     InvoiceRevision.objects.update_or_create(
-        record=record,
+        invoice=record,
         version=record.version,
         defaults={
             "payload": json_safe(record.payload),
             "calculation": json_safe(record.calculation),
-            "invoice_status": record.invoice.status,
+            "invoice_status": record.status,
             "review_status": record.review_status,
-            "source_snapshot": json_safe(record.invoice.source_snapshot or {}),
+            "source_snapshot": json_safe(record.source_snapshot or {}),
         },
     )
 
@@ -407,7 +406,7 @@ def record_revision_state(record):
 
 def write_canonical(record):
     """Write the current editable invoice while preserving source identity."""
-    invoice, data, calc = record.invoice, record.payload, record.calculation
+    invoice, data, calc = record, record.payload, record.calculation
     for field in (
         "invoice_date", "due_date", "issuer_abn", "gst_registered", "bank_account_name",
         "bsb", "account_number", "super_fund_name", "super_usi", "super_member_number",
@@ -415,7 +414,7 @@ def write_canonical(record):
         setattr(invoice, field, data.get(field, ""))
     invoice.issuer_first_name = data["issuer_name"]
     invoice.issuer_last_name = ""
-    invoice.issuer_email = record.owner.email
+    invoice.issuer_email = record.user.email
     invoice.external = record.source == "external"
     invoice.custom_bill_to_name = data["customer"]["name"]
     invoice.custom_bill_to_address = data["customer"]["address"]
@@ -503,7 +502,7 @@ def adopt_internal_invoice(owner, invoice):
     # The pharmacy link is nullable for external invoices. Keep the lock query
     # on the invoice row so PostgreSQL does not reject a nullable outer join.
     invoice = Invoice.objects.select_related(None).select_for_update().get(pk=invoice.pk)
-    existing = InvoiceRecord.objects.filter(invoice=invoice).first()
+    existing = Invoice.objects.filter(pk=invoice.pk, request_key__isnull=False).first()
     if existing:
         return existing
     source_snapshot = invoice.source_snapshot or {}
@@ -564,16 +563,16 @@ def adopt_internal_invoice(owner, invoice):
         super_mode=payload["super_mode"],
         super_rate=payload["super_rate"],
     )
-    record = InvoiceRecord.objects.create(
-        owner=owner,
-        invoice=invoice,
-        customer=customer,
-        kind="invoice",
-        source="internal",
-        request_key=payload["request_key"],
-        payload=json_safe(payload),
-        calculation=json_safe(calc),
-    )
+    invoice.customer = customer
+    invoice.kind = "invoice"
+    invoice.source = "internal"
+    invoice.request_key = payload["request_key"]
+    invoice.payload = json_safe(payload)
+    invoice.calculation = json_safe(calc)
+    invoice.save(update_fields=[
+        "customer", "kind", "source", "request_key", "payload", "calculation", "updated_at",
+    ])
+    record = Invoice.objects.get(pk=invoice.pk)
     _record_revision(record)
     return record
 
@@ -582,14 +581,14 @@ def adopt_internal_invoice(owner, invoice):
 def save_draft(owner, data, record_id=None, source="external"):
     """Save a new invoice or the next editable revision.
 
-    Before Save there is no InvoiceRecord. Once saved, every later Save creates a
+    Before Save there is no Invoice. Once saved, every later Save creates a
     new immutable InvoiceRevision, even when the live invoice had been sent/paid.
     """
     owner.__class__.objects.select_for_update().get(pk=owner.pk)
     data = dict(data)
     submitted_customer = json_safe(data.pop("customer", {}) or {})
     source_assignment_ids = [int(v) for v in data.pop("source_assignment_ids", [])]
-    existing = InvoiceRecord.objects.filter(owner=owner, request_key=data["request_key"]).first()
+    existing = Invoice.objects.filter(user=owner, request_key=data["request_key"]).first()
     if record_id is None and existing:
         return existing
 
@@ -597,9 +596,9 @@ def save_draft(owner, data, record_id=None, source="external"):
     source_snapshot = {}
     if record_id is not None:
         record = get_object_or_404(
-            InvoiceRecord.objects.select_for_update().select_related("invoice", "customer"),
+            Invoice.objects.select_for_update(),
             pk=record_id,
-            owner=owner,
+            user=owner,
         )
         check_version(record, data.get("version"))
         # Capture the outgoing live state before creating the next revision.
@@ -610,7 +609,7 @@ def save_draft(owner, data, record_id=None, source="external"):
             raise ValidationError("The invoice request key cannot change.")
         source = record.source
         if source == "internal":
-            required_ids = [int(v) for v in (record.invoice.source_snapshot or {}).get("assignment_ids", [])]
+            required_ids = [int(v) for v in (record.source_snapshot or {}).get("assignment_ids", [])]
             submitted_ids = [int(line.get("source_assignment_id")) for line in data.get("lines", []) if line.get("source_assignment_id")]
             if set(submitted_ids) != set(required_ids) or len(submitted_ids) != len(required_ids):
                 raise ValidationError(
@@ -651,7 +650,7 @@ def save_draft(owner, data, record_id=None, source="external"):
         payload["source_assignment_ids"] = (
             source_assignment_ids
             if source_assignment_ids
-            else list((record.invoice.source_snapshot or {}).get("assignment_ids") or [])
+            else list((record.source_snapshot or {}).get("assignment_ids") or [])
         )
     payload["lines"] = lines
     customer_snapshot = {
@@ -666,31 +665,27 @@ def save_draft(owner, data, record_id=None, source="external"):
     payload["customer"] = customer_snapshot
 
     if record_id is None:
-        invoice = Invoice.objects.create(
+        record = Invoice.objects.create(
             user=owner,
             external=source == "external",
             pharmacy=assignments[0].shift.pharmacy if assignments else None,
             source_snapshot=source_snapshot,
-        )
-        if assignments:
-            pharmacy = assignments[0].shift.pharmacy
-            invoice.pharmacy_name_snapshot = pharmacy.name
-            invoice.pharmacy_address_snapshot = _pharmacy_address(pharmacy)
-            invoice.pharmacy_abn_snapshot = getattr(pharmacy, "abn", "") or ""
-            invoice.save(update_fields=[
-                "pharmacy_name_snapshot",
-                "pharmacy_address_snapshot",
-                "pharmacy_abn_snapshot",
-            ])
-        record = InvoiceRecord.objects.create(
-            owner=owner,
-            invoice=invoice,
             customer=customer,
             source=source,
             request_key=data["request_key"],
             payload=payload,
             calculation=calc,
         )
+        if assignments:
+            pharmacy = assignments[0].shift.pharmacy
+            record.pharmacy_name_snapshot = pharmacy.name
+            record.pharmacy_address_snapshot = _pharmacy_address(pharmacy)
+            record.pharmacy_abn_snapshot = getattr(pharmacy, "abn", "") or ""
+            record.save(update_fields=[
+                "pharmacy_name_snapshot",
+                "pharmacy_address_snapshot",
+                "pharmacy_abn_snapshot",
+            ])
     else:
         record.customer = customer
         record.payload = payload
@@ -704,9 +699,9 @@ def save_draft(owner, data, record_id=None, source="external"):
             "customer", "payload", "calculation", "version", "review_status",
             "last_review_note", "last_reviewed_at", "locked_at", "updated_at",
         ])
-        record.invoice.status = "draft"
-        record.invoice.save(update_fields=["status"])
-        InvoiceReviewRequest.objects.filter(record=record, resolved_at__isnull=True).update(
+        record.status = "draft"
+        record.save(update_fields=["status"])
+        InvoiceReviewRequest.objects.filter(invoice=record, resolved_at__isnull=True).update(
             resolved_at=timezone.now(),
             resolved_by_version=record.version,
         )
@@ -748,8 +743,9 @@ def serialize_owner_revision(record, revision):
         .values_list("version", flat=True)
     )
     if (
-        record.invoice.status in {"sent", "paid"}
+        record.status in {"sent", "paid"}
         or record.review_status != "NONE"
+        or record.legacy_snapshot
     ):
         visible_versions.add(record.version)
     document["revisions"] = [
@@ -773,8 +769,9 @@ def owner_visible_document(record):
     ).first()
     current_is_visible = (
         current_delivery is not None
-        or record.invoice.status in {"sent", "paid"}
+        or record.status in {"sent", "paid"}
         or record.review_status != "NONE"
+        or record.legacy_snapshot
     )
     visible_versions = set(
         record.deliveries
@@ -811,7 +808,7 @@ def owner_visible_document(record):
 def serialize_record(record):
     payments = list(record.payments.all())
     paid = sum((payment.amount for payment in payments), ZERO)
-    invoice = record.invoice
+    invoice = record
     delivery = next((item for item in record.deliveries.all() if item.version == record.version), None)
     companion = getattr(record, "super_document", None)
     revisions = list(record.revisions.all()[:20])
@@ -869,7 +866,7 @@ def serialize_record(record):
 
 @transaction.atomic
 def duplicate(owner, record_id, request_key):
-    source_record = get_object_or_404(InvoiceRecord, pk=record_id, owner=owner, kind="invoice")
+    source_record = get_object_or_404(Invoice, pk=record_id, user=owner, kind="invoice")
     data = dict(source_record.payload)
     data["request_key"] = request_key
     data.pop("version", None)
@@ -891,10 +888,10 @@ def duplicate(owner, record_id, request_key):
 @transaction.atomic
 def make_super_document(owner, record_id, version):
     record = get_object_or_404(
-        InvoiceRecord.objects.select_for_update(), pk=record_id, owner=owner, kind="invoice"
+        Invoice.objects.select_for_update(), pk=record_id, user=owner, kind="invoice"
     )
     check_version(record, version)
-    existing = InvoiceRecord.objects.filter(parent=record, voided_at__isnull=True).first()
+    existing = Invoice.objects.filter(parent=record, voided_at__isnull=True).first()
     if existing:
         return existing
     if record.voided_at or Decimal(record.calculation["super"]) <= 0 or record.payload["super_mode"] != "separate":
@@ -905,7 +902,7 @@ def make_super_document(owner, record_id, version):
     amount = record.calculation["super"]
     line = {
         "item_id": item.pk,
-        "description": f"Super contribution for INV-{record.invoice_id:06d}",
+        "description": f"Super contribution for INV-{record.pk:06d}",
         "category_code": "Superannuation",
         "unit": "Lump Sum",
         "quantity": "1.00",
@@ -931,12 +928,11 @@ def make_super_document(owner, record_id, version):
         **record.payload,
         "lines": [line],
         "request_key": str(request_key),
-        "notes": f"Separate contribution request linked to INV-{record.invoice_id:06d}. Pay the fund, not the worker.",
+        "notes": f"Separate contribution request linked to INV-{record.pk:06d}. Pay the fund, not the worker.",
     }
-    invoice = Invoice.objects.create(user=owner, external=record.invoice.external)
-    companion = InvoiceRecord.objects.create(
-        owner=owner,
-        invoice=invoice,
+    companion = Invoice.objects.create(
+        user=owner,
+        external=record.external,
         customer=record.customer,
         parent=record,
         kind="super_request",
@@ -952,7 +948,7 @@ def make_super_document(owner, record_id, version):
 
 @transaction.atomic
 def record_payment(owner, record_id, data):
-    record = get_object_or_404(InvoiceRecord.objects.select_for_update(), pk=record_id, owner=owner)
+    record = get_object_or_404(Invoice.objects.select_for_update(), pk=record_id, user=owner)
     if record.voided_at:
         raise ValidationError("Payments cannot be recorded against a void document.")
     if record.kind == "super_request" and not data.get("fund_payment_confirmed"):
@@ -984,7 +980,7 @@ def record_payment(owner, record_id, data):
     except CalculationError as exc:
         raise ValidationError(str(exc)) from exc
     Payment.objects.create(
-        record=record,
+        invoice=record,
         request_key=data["request_key"],
         date=data["date"],
         amount=amount,
@@ -993,6 +989,6 @@ def record_payment(owner, record_id, data):
         reference=data.get("reference", ""),
     )
     if paid + amount == Decimal(record.calculation["payable"]):
-        record.invoice.status = "paid"
-        record.invoice.save(update_fields=["status"])
+        record.status = "paid"
+        record.save(update_fields=["status"])
     return record

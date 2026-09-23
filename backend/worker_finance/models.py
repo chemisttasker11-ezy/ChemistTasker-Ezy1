@@ -47,39 +47,8 @@ class CatalogueItem(OwnedRecord):
         indexes = [models.Index(fields=['owner', 'active'], name='finance_item_owner_active')]
 
 
-class InvoiceRecord(OwnedRecord):
-    invoice = models.OneToOneField('client_profile.Invoice', on_delete=models.RESTRICT,
-                                  related_name='finance_record')
-    customer = models.ForeignKey(Customer, on_delete=models.RESTRICT)
-    parent = models.OneToOneField('self', null=True, blank=True, on_delete=models.RESTRICT,
-                                 related_name='super_document')
-    kind = models.CharField(max_length=16, default='invoice')
-    source = models.CharField(max_length=16, default='external')
-    version = models.PositiveIntegerField(default=1)
-    request_key = models.UUIDField(default=uuid.uuid4)
-    payload = models.JSONField(default=dict)
-    calculation = models.JSONField(default=dict)
-    locked_at = models.DateTimeField(null=True, blank=True)
-    voided_at = models.DateTimeField(null=True, blank=True)
-    review_status = models.CharField(
-        max_length=32,
-        default='NONE',
-        choices=[
-            ('NONE', 'No owner review decision'),
-            ('APPROVED_FOR_PAYMENT', 'Approved for payment'),
-            ('REVISION_REQUESTED', 'Revision requested'),
-        ],
-    )
-    last_review_note = models.TextField(blank=True, default='')
-    last_reviewed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ['-created_at', '-id']
-        constraints = [models.UniqueConstraint(fields=['owner', 'request_key'], name='finance_invoice_request')]
-
-
 class InvoiceRevision(models.Model):
-    record = models.ForeignKey(InvoiceRecord, on_delete=models.CASCADE, related_name='revisions')
+    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='revisions')
     version = models.PositiveIntegerField()
     payload = models.JSONField(default=dict)
     calculation = models.JSONField(default=dict)
@@ -91,12 +60,12 @@ class InvoiceRevision(models.Model):
     class Meta:
         ordering = ['-version']
         constraints = [
-            models.UniqueConstraint(fields=['record', 'version'], name='finance_inv_revision_ver')
+            models.UniqueConstraint(fields=['invoice', 'version'], name='finance_inv_revision_ver')
         ]
 
 
 class InvoiceReviewRequest(models.Model):
-    record = models.ForeignKey(InvoiceRecord, on_delete=models.CASCADE, related_name='review_requests')
+    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='review_requests')
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='invoice_revision_requests')
     requested_version = models.PositiveIntegerField()
     note = models.TextField()
@@ -109,7 +78,7 @@ class InvoiceReviewRequest(models.Model):
 
 
 class Payment(models.Model):
-    record = models.ForeignKey(InvoiceRecord, on_delete=models.CASCADE, related_name='payments')
+    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='payments')
     request_key = models.UUIDField()
     date = models.DateField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -119,12 +88,12 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['record', 'request_key'], name='finance_payment_request')]
+        constraints = [models.UniqueConstraint(fields=['invoice', 'request_key'], name='finance_payment_request')]
         ordering = ['date', 'id']
 
 
 class Delivery(models.Model):
-    record = models.ForeignKey(InvoiceRecord, on_delete=models.CASCADE, related_name='deliveries')
+    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='deliveries')
     version = models.PositiveIntegerField()
     status = models.CharField(max_length=16, default='preparing')
     recipient = models.EmailField()
@@ -132,7 +101,7 @@ class Delivery(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['record', 'version'], name='finance_delivery_version')]
+        constraints = [models.UniqueConstraint(fields=['invoice', 'version'], name='finance_delivery_version')]
         ordering = ['-created_at']
 
 

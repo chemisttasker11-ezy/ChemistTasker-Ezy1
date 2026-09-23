@@ -133,9 +133,9 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(invoice.super_amount, Decimal("0.00"))
         self.assertEqual(invoice.total, Decimal("616.00"))
         self.assertFalse(invoice.line_items.filter(category_code="Superannuation").exists())
-        record = invoice.finance_record
+        record = invoice
         self.assertEqual(record.source, "internal")
-        self.assertEqual(record.invoice_id, invoice.id)
+        self.assertEqual(record.id, invoice.id)
         source_line = next(line for line in record.payload["lines"] if line.get("source_assignment_id"))
         self.assertEqual(source_line["source_assignment_id"], self.assignment.id)
         self.assertEqual(serialize_record(record)["source_snapshot"], invoice.source_snapshot)
@@ -161,8 +161,8 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(record.source, "internal")
         self.assertEqual(record.version, 1)
-        self.assertEqual(record.invoice.pharmacy_id, self.pharmacy.id)
-        self.assertEqual(InvoiceRevision.objects.filter(record=record).count(), 1)
+        self.assertEqual(record.pharmacy_id, self.pharmacy.id)
+        self.assertEqual(InvoiceRevision.objects.filter(invoice=record).count(), 1)
 
     def test_internal_invoice_recipient_override_is_invoice_only_and_keeps_pharmacy_provenance(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
@@ -176,31 +176,31 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         }
 
         record = save_draft(self.worker, draft)
-        record.invoice.refresh_from_db()
+        record.refresh_from_db()
         record.customer.refresh_from_db()
 
         self.assertEqual(record.payload["customer"]["email"], "invoice-only@example.invalid")
         self.assertEqual(record.payload["customer"]["address"], "Accounts PO Box 99")
-        self.assertEqual(record.invoice.bill_to_email, "invoice-only@example.invalid")
-        self.assertEqual(record.invoice.custom_bill_to_address, "Accounts PO Box 99")
+        self.assertEqual(record.bill_to_email, "invoice-only@example.invalid")
+        self.assertEqual(record.custom_bill_to_address, "Accounts PO Box 99")
         self.assertEqual(record.customer.email, original_email)
         self.assertEqual(record.customer.address, original_address)
-        self.assertEqual(record.invoice.source_snapshot["version"], 3)
-        self.assertEqual(record.invoice.source_snapshot["pharmacy"]["id"], self.pharmacy.id)
-        self.assertEqual(record.invoice.source_snapshot["pharmacy"]["abn"], self.pharmacy.abn)
+        self.assertEqual(record.source_snapshot["version"], 3)
+        self.assertEqual(record.source_snapshot["pharmacy"]["id"], self.pharmacy.id)
+        self.assertEqual(record.source_snapshot["pharmacy"]["abn"], self.pharmacy.abn)
 
     def test_owner_payment_approval_is_snapshotted_on_exact_sent_revision(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)
         Delivery.objects.create(
-            record=record,
+            invoice=record,
             version=record.version,
             recipient=self.owner.email,
             status="sent",
             sent_at=timezone.now(),
         )
-        record.invoice.status = "sent"
-        record.invoice.save(update_fields=["status"])
+        record.status = "sent"
+        record.save(update_fields=["status"])
 
         factory = APIRequestFactory()
         request = factory.post(
@@ -212,17 +212,31 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         response = ReceivedInvoiceViewSet.as_view({"post": "approve_payment"})(request, pk=record.id)
 
         self.assertEqual(response.status_code, 200, response.data)
-        revision = InvoiceRevision.objects.get(record=record, version=1)
+        revision = InvoiceRevision.objects.get(invoice=record, version=1)
         self.assertEqual(revision.review_status, "APPROVED_FOR_PAYMENT")
         self.assertEqual(response.data["last_review_note"], "Approved after checking the shift.")
+
+    def test_owner_can_read_migrated_snapshot_without_new_delivery_row(self):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        record.legacy_snapshot = True
+        record.save(update_fields=["legacy_snapshot"])
+
+        request = APIRequestFactory().get("/client-profile/finance/received-invoices/")
+        force_authenticate(request, user=self.owner)
+        response = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["id"], record.id)
+        self.assertEqual(response.data["results"][0]["version"], record.version)
 
     def test_finance_revision_visibility_requires_current_successful_delivery(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)
-        self.assertEqual(InvoiceSerializer(record.invoice).data["finance_record_id"], record.id)
+        self.assertEqual(InvoiceSerializer(record).data["finance_record_id"], record.id)
 
         delivery = Delivery.objects.create(
-            record=record,
+            invoice=record,
             version=record.version,
             recipient=self.owner.email,
             status="failed",
@@ -235,9 +249,9 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(received.status_code, 200)
         self.assertEqual(received.data["count"], 0)
 
-        legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        legacy_request = factory.get(f"/client-profile/invoices/{record.pk}/")
         force_authenticate(legacy_request, user=self.owner)
-        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
+        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.pk)
         self.assertEqual(legacy.status_code, 404)
 
         delivery.status = "sent"
@@ -249,9 +263,9 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
         self.assertEqual(received.data["count"], 1)
 
-        legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        legacy_request = factory.get(f"/client-profile/invoices/{record.pk}/")
         force_authenticate(legacy_request, user=self.owner)
-        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
+        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.pk)
         self.assertEqual(legacy.status_code, 200)
 
         payload = dict(record.payload)
@@ -259,7 +273,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         payload["notes"] = "Saved correction not sent yet"
         revised = save_draft(self.worker, payload, record.id)
         self.assertEqual(revised.version, 2)
-        self.assertEqual(revised.invoice.status, "draft")
+        self.assertEqual(revised.status, "draft")
 
         received_request = factory.get("/client-profile/finance/received-invoices/")
         force_authenticate(received_request, user=self.owner)
@@ -298,21 +312,21 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         )
         self.assertEqual(hidden_revision.status_code, 404)
 
-        legacy_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        legacy_request = factory.get(f"/client-profile/invoices/{record.pk}/")
         force_authenticate(legacy_request, user=self.owner)
-        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.invoice_id)
+        legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.pk)
         self.assertEqual(legacy.status_code, 404)
 
-        worker_request = factory.get(f"/client-profile/invoices/{record.invoice_id}/")
+        worker_request = factory.get(f"/client-profile/invoices/{record.pk}/")
         force_authenticate(worker_request, user=self.worker)
-        worker_view = InvoiceDetailView.as_view()(worker_request, pk=record.invoice_id)
+        worker_view = InvoiceDetailView.as_view()(worker_request, pk=record.pk)
         self.assertEqual(worker_view.status_code, 200)
 
     def test_owner_can_request_revision_and_worker_save_resolves_request(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)
-        record.invoice.status = "sent"
-        record.invoice.save(update_fields=["status"])
+        record.status = "sent"
+        record.save(update_fields=["status"])
 
         factory = APIRequestFactory()
         request = factory.post(
@@ -345,20 +359,20 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertIsNotNone(request_row.resolved_at)
         self.assertEqual(request_row.resolved_by_version, revised.version)
         self.assertEqual(revised.review_status, "NONE")
-        self.assertEqual(revised.invoice.status, "draft")
+        self.assertEqual(revised.status, "draft")
 
     def test_owner_review_action_rejects_stale_invoice_version(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)
         Delivery.objects.create(
-            record=record,
+            invoice=record,
             version=record.version,
             recipient=self.owner.email,
             status="sent",
             sent_at=timezone.now(),
         )
-        record.invoice.status = "sent"
-        record.invoice.save(update_fields=["status"])
+        record.status = "sent"
+        record.save(update_fields=["status"])
 
         payload = dict(record.payload)
         payload["version"] = record.version
@@ -393,7 +407,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(unsent_response.status_code, 400)
         revised.refresh_from_db()
         self.assertEqual(revised.review_status, "NONE")
-        self.assertEqual(revised.invoice.status, "draft")
+        self.assertEqual(revised.status, "draft")
 
     def test_partial_hour_invoice_uses_same_precision_for_quantity_and_total(self):
         self.slot.end_time = time(16, 37)
@@ -408,7 +422,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(invoice.subtotal, Decimal("533.40"))
         self.assertEqual(invoice.gst_amount, Decimal("53.34"))
         self.assertEqual(invoice.total, Decimal("586.74"))
-        self.assertEqual(invoice.finance_record.calculation["payable"], "586.74")
+        self.assertEqual(invoice.calculation["payable"], "586.74")
 
     def test_same_accepted_assignment_cannot_be_invoiced_twice(self):
         first = self._generate()
@@ -502,7 +516,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         invoice = self._generate()
         invoice.bill_to_email = self.owner.email
         invoice.save(update_fields=["bill_to_email"])
-        record = invoice.finance_record
+        record = invoice
         factory = APIRequestFactory()
 
         def request():
@@ -524,8 +538,8 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         record.refresh_from_db()
         self.assertEqual(invoice.status, "sent")
         self.assertIsNone(record.locked_at)
-        self.assertEqual(InvoiceRevision.objects.get(record=record, version=record.version).invoice_status, "sent")
-        delivery = Delivery.objects.get(record=record, version=record.version)
+        self.assertEqual(InvoiceRevision.objects.get(invoice=record, version=record.version).invoice_status, "sent")
+        delivery = Delivery.objects.get(invoice=record, version=record.version)
         self.assertEqual(delivery.recipient, self.owner.email)
         self.assertEqual(delivery.status, "legacy_queued")
 
@@ -547,7 +561,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
     def test_legacy_status_patch_cannot_bypass_finance_send_or_review_actions(self):
         invoice = self._generate()
-        record = invoice.finance_record
+        record = invoice
         factory = APIRequestFactory()
 
         worker_request = factory.patch(
@@ -563,7 +577,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertFalse(record.deliveries.exists())
 
         Delivery.objects.create(
-            record=record,
+            invoice=record,
             version=record.version,
             recipient=self.owner.email,
             status="sent",
@@ -585,7 +599,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
     def test_new_finance_workspace_can_correct_shift_values_but_preserves_source_identity(self):
         invoice = self._generate()
-        record = invoice.finance_record
+        record = invoice
         original_snapshot = dict(invoice.source_snapshot)
         travel = CatalogueItem.objects.create(
             owner=self.worker,
@@ -631,5 +645,5 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(source_line.total, Decimal("562.50"))
         self.assertEqual(invoice.source_snapshot, original_snapshot)
         self.assertEqual(updated.version, 2)
-        self.assertEqual(updated.invoice.status, "draft")
-        self.assertEqual(InvoiceRevision.objects.filter(record=updated).count(), 2)
+        self.assertEqual(updated.status, "draft")
+        self.assertEqual(InvoiceRevision.objects.filter(invoice=updated).count(), 2)

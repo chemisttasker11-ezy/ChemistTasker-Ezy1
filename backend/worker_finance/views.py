@@ -26,7 +26,7 @@ from django.apps import apps
 Invoice = apps.get_model('client_profile', 'Invoice')
 Notification = apps.get_model('client_profile', 'Notification')
 from .calculations import CalculationError, expense_gst_credit, shift_hours, ZERO
-from .models import Customer, CatalogueItem, InvoiceRecord, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
+from .models import Customer, CatalogueItem, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
 from .serializers import CustomerSerializer, ItemSerializer, InvoiceInput, ExpenseSerializer, MoneyField
 from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
@@ -150,7 +150,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def owned(self, request, pk, lock=False):
-        qs = InvoiceRecord.objects.select_related('invoice', 'customer', 'owner').filter(owner=request.user)
+        qs = Invoice.objects.select_related('customer', 'user').filter(user=request.user)
         if lock:
             qs = qs.select_for_update(of=('self',))
         return get_object_or_404(qs, pk=pk)
@@ -158,8 +158,8 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def list(self, request):
         from rest_framework.pagination import PageNumberPagination
         pager = PageNumberPagination()
-        records = (InvoiceRecord.objects.filter(owner=request.user)
-                   .select_related('invoice', 'owner', 'customer')
+        records = (Invoice.objects.filter(user=request.user, request_key__isnull=False)
+                   .select_related('user', 'customer')
                    .prefetch_related('payments', 'deliveries', 'super_document', 'revisions', 'review_requests__requested_by'))
         page = pager.paginate_queryset(records, request)
         return pager.get_paginated_response([serialize_record(record) for record in page])
@@ -248,9 +248,9 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                 check_version(record, version)
             if record.voided_at:
                 raise ValidationError('A void invoice cannot be marked paid.')
-            record.invoice.status = 'paid'
-            record.invoice.save(update_fields=['status'])
-            record.invoice.refresh_from_db()
+            record.status = 'paid'
+            record.save(update_fields=['status'])
+            record.refresh_from_db()
             record_revision_state(record)
         return Response(serialize_record(record))
 
@@ -276,7 +276,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                 raise ValidationError('Confirm sending this saved invoice.')
             recipient = record.payload['customer']['email']
             serializers.EmailField().run_validation(recipient)
-            delivery, created = Delivery.objects.get_or_create(record=record, version=record.version,
+            delivery, created = Delivery.objects.get_or_create(invoice=record, version=record.version,
                                                                defaults={'recipient': recipient})
             if not created:
                 if delivery.status == 'failed':
@@ -313,8 +313,8 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             return Response({'detail': 'Email acceptance is uncertain. Do not resend until checked with your mail provider.'}, status=503)
         with transaction.atomic():
             Delivery.objects.filter(pk=delivery.pk).update(status='sent', sent_at=timezone.now())
-            Invoice.objects.filter(pk=record.invoice_id).update(status='sent')
-        record.invoice.refresh_from_db()
+            Invoice.objects.filter(pk=record.pk).update(status='sent')
+        record.refresh_from_db()
         record_revision_state(record)
         return Response({'detail': 'Accepted by the email provider; inbox delivery is not guaranteed.',
                          'document': serialize_record(record)})
@@ -334,13 +334,14 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def queryset(self, request):
         managed = self._managed_pharmacies(request.user)
         return (
-            InvoiceRecord.objects.filter(source='internal', invoice__pharmacy__in=managed)
+            Invoice.objects.filter(source='internal', pharmacy__in=managed, request_key__isnull=False)
             .filter(
                 models.Q(deliveries__status__in=['sent', 'legacy_queued'])
-                | models.Q(invoice__status__in=['sent', 'paid'])
+                | models.Q(status__in=['sent', 'paid'])
                 | ~models.Q(review_status='NONE')
+                | models.Q(legacy_snapshot=True)
             )
-            .select_related('invoice', 'customer', 'owner')
+            .select_related('customer', 'user')
             .prefetch_related('payments', 'deliveries', 'revisions', 'review_requests__requested_by')
             .distinct()
         )
@@ -349,7 +350,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         allowed = self.queryset(request).filter(pk=pk).values_list('pk', flat=True).first()
         if allowed is None:
             raise Http404
-        qs = InvoiceRecord.objects.select_related('invoice', 'customer', 'owner')
+        qs = Invoice.objects.select_related('customer', 'user')
         if lock:
             qs = qs.select_for_update(of=('self',))
         return get_object_or_404(qs, pk=allowed)
@@ -362,8 +363,9 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         ).exists()
         current_visible = (
             delivered
-            or record.invoice.status in {'sent', 'paid'}
+            or record.status in {'sent', 'paid'}
             or record.review_status != 'NONE'
+            or record.legacy_snapshot
         )
         if not current_visible:
             raise ValidationError({
@@ -417,7 +419,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             version=revision.version,
             status__in=['sent', 'legacy_queued'],
         ).exists()
-        if not delivered:
+        if not delivered and not (record.legacy_snapshot and revision.version == record.version):
             raise Http404
         return pdf_response(record, serialize_owner_revision(record, revision))
 
@@ -433,7 +435,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
             InvoiceReviewRequest.objects.create(
-                record=record,
+                invoice=record,
                 requested_by=request.user,
                 requested_version=record.version,
                 note=note,
@@ -444,15 +446,15 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
             record_revision_state(record)
             Notification.objects.create(
-                user=record.owner,
+                user=record.user,
                 type='alert',
-                title=f'Revision requested for INV-{record.invoice_id:06d}',
+                title=f'Revision requested for INV-{record.pk:06d}',
                 body=note,
                 action_url='/dashboard/invoices',
                 payload={
                     'kind': 'invoice_revision_requested',
                     'finance_invoice_id': record.id,
-                    'invoice_id': record.invoice_id,
+                    'invoice_id': record.pk,
                     'requested_version': record.version,
                 },
             )
@@ -471,21 +473,21 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record.last_review_note = note
             record.last_reviewed_at = timezone.now()
             record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
-            InvoiceReviewRequest.objects.filter(record=record, resolved_at__isnull=True).update(
+            InvoiceReviewRequest.objects.filter(invoice=record, resolved_at__isnull=True).update(
                 resolved_at=timezone.now(),
                 resolved_by_version=record.version,
             )
             record_revision_state(record)
             Notification.objects.create(
-                user=record.owner,
+                user=record.user,
                 type='alert',
-                title=f'Invoice INV-{record.invoice_id:06d} approved for payment',
+                title=f'Invoice INV-{record.pk:06d} approved for payment',
                 body=note or 'The pharmacy approved this invoice for payment.',
                 action_url='/dashboard/invoices',
                 payload={
                     'kind': 'invoice_approved_for_payment',
                     'finance_invoice_id': record.id,
-                    'invoice_id': record.invoice_id,
+                    'invoice_id': record.pk,
                     'version': record.version,
                 },
             )
@@ -500,28 +502,28 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record = self._get(request, pk, lock=True)
             self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
-            record.invoice.status = 'paid'
-            record.invoice.save(update_fields=['status'])
-            record.invoice.refresh_from_db()
+            record.status = 'paid'
+            record.save(update_fields=['status'])
+            record.refresh_from_db()
             record.review_status = 'APPROVED_FOR_PAYMENT'
             record.last_review_note = note
             record.last_reviewed_at = timezone.now()
             record.save(update_fields=['review_status', 'last_review_note', 'last_reviewed_at', 'updated_at'])
-            InvoiceReviewRequest.objects.filter(record=record, resolved_at__isnull=True).update(
+            InvoiceReviewRequest.objects.filter(invoice=record, resolved_at__isnull=True).update(
                 resolved_at=timezone.now(),
                 resolved_by_version=record.version,
             )
             record_revision_state(record)
             Notification.objects.create(
-                user=record.owner,
+                user=record.user,
                 type='alert',
-                title=f'Invoice INV-{record.invoice_id:06d} marked paid',
+                title=f'Invoice INV-{record.pk:06d} marked paid',
                 body=note or 'The pharmacy marked this invoice as paid.',
                 action_url='/dashboard/invoices',
                 payload={
                     'kind': 'invoice_paid',
                     'finance_invoice_id': record.id,
-                    'invoice_id': record.invoice_id,
+                    'invoice_id': record.pk,
                     'version': record.version,
                 },
             )
@@ -620,18 +622,18 @@ def bas_worksheet(request):
     basis = request.query_params.get('basis', 'cash')
     if end < start or (end - start).days > 366 or basis not in ('cash', 'accrual'):
         raise ValidationError('Choose cash/accrual and a period of at most 366 days.')
-    records = InvoiceRecord.objects.filter(
-        owner=request.user,
+    records = Invoice.objects.filter(
+        user=request.user,
         kind='invoice',
         voided_at__isnull=True,
-        invoice__status__in=['sent', 'paid'],
+        status__in=['sent', 'paid'],
     )
     sales = gst = credit = ZERO
     if basis == 'cash':
-        totals = Payment.objects.filter(record__in=records, date__range=(start, end)).aggregate(sales=Sum('sales'), gst=Sum('gst'))
+        totals = Payment.objects.filter(invoice__in=records, date__range=(start, end)).aggregate(sales=Sum('sales'), gst=Sum('gst'))
         sales, gst = totals['sales'] or ZERO, totals['gst'] or ZERO
     else:
-        for record in records.filter(invoice__invoice_date__range=(start, end)):
+        for record in records.filter(invoice_date__range=(start, end)):
             sales += Decimal(record.calculation['sales_gross'])
             gst += Decimal(record.calculation['gst'])
     expenses = Expense.objects.filter(owner=request.user, archived_at__isnull=True)
@@ -643,7 +645,7 @@ def bas_worksheet(request):
                                      evidence_confirmed=expense.evidence_confirmed, gst_registered=expense.gst_registered)
         if expense.tax_code == 'GST' and expense.amount > Decimal('82.50') and not expense.evidence_confirmed:
             review.append(expense.pk)
-    legacy = Invoice.objects.filter(user=request.user, finance_record__isnull=True).count()
+    legacy = Invoice.objects.filter(user=request.user, request_key__isnull=True).count()
     return Response({'start': start, 'end': end, 'basis': basis, 'G1': str(sales), '1A': str(gst), '1B': str(credit),
                      'estimated_gst_net': str(gst - credit), 'expenses_needing_evidence': review,
                      'excluded_legacy_invoice_count': legacy, 'lodgement_ready': False,

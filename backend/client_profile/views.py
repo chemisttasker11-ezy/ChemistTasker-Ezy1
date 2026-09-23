@@ -9249,18 +9249,18 @@ def _invoice_queryset_for_user(user):
         | Q(pharmacy_id__in=org_pharmacy_ids)
     )
     manager_visible_state = (
-        Q(finance_record__isnull=True)
+        Q(request_key__isnull=True)
         | Q(
-            finance_record__deliveries__version=F("finance_record__version"),
-            finance_record__deliveries__status__in=["sent", "legacy_queued"],
+            deliveries__version=F("version"),
+            deliveries__status__in=["sent", "legacy_queued"],
         )
         | Q(status__in=["sent", "paid"])
-        | ~Q(finance_record__review_status="NONE")
+        | ~Q(review_status="NONE")
     )
 
     return Invoice.objects.filter(
         Q(user=user) | (managed_pharmacy_invoice & manager_visible_state)
-    ).select_related("finance_record").distinct()
+    ).distinct()
 
 
 class InvoiceListView(generics.ListCreateAPIView):
@@ -9288,8 +9288,7 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
         requested_fields = set(self.request.data.keys())
 
         if invoice.user_id == user.id:
-            finance_record = getattr(invoice, "finance_record", None)
-            if finance_record is not None:
+            if invoice.request_key is not None:
                 raise PermissionDenied(
                     "This invoice is managed by the new Invoices & finances workspace. "
                     "Use its Save, Send/Resend and Mark paid actions so revision and delivery history are preserved."
@@ -9297,8 +9296,7 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
             serializer.save()
             return
 
-        finance_record = getattr(invoice, "finance_record", None)
-        if finance_record is not None:
+        if invoice.request_key is not None:
             raise PermissionDenied(
                 "This invoice is managed by the Received invoices workspace. "
                 "Use Approve, Request revision or Mark paid there so the decision is bound to the correct revision."
@@ -9316,8 +9314,7 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         if instance.user_id != self.request.user.id:
             raise PermissionDenied("Only the invoice issuer can delete this invoice.")
-        finance_record = getattr(instance, "finance_record", None)
-        if finance_record is not None:
+        if instance.request_key is not None:
             raise PermissionDenied("Finance-workspace invoices keep their revision history and cannot be deleted through the legacy editor.")
         instance.delete()
 
@@ -9475,14 +9472,11 @@ def send_invoice_email(request, invoice_id):
 
         # If this invoice belongs to the new finance workspace, record the
         # legacy send against the current revision without locking future edits.
-        from worker_finance.models import Delivery, InvoiceRecord
-        try:
-            record = InvoiceRecord.objects.select_for_update().get(invoice=invoice)
-        except InvoiceRecord.DoesNotExist:
-            record = None
-        if record is not None:
+        from worker_finance.models import Delivery
+        record = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if record.request_key is not None:
             Delivery.objects.get_or_create(
-                record=record,
+                invoice=record,
                 version=record.version,
                 defaults={
                     'recipient': to_email,
@@ -9490,7 +9484,7 @@ def send_invoice_email(request, invoice_id):
                 },
             )
             from worker_finance.services import record_revision_state
-            record.invoice.refresh_from_db()
+            record.refresh_from_db()
             record_revision_state(record)
 
     return Response({"status": "sent"})
@@ -9502,7 +9496,7 @@ def report_invoice_issue(request, invoice_id):
     invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
     if invoice.user_id == request.user.id:
         return Response({"detail": "You cannot report an issue on your own invoice."}, status=400)
-    if getattr(invoice, "finance_record", None) is not None:
+    if invoice.request_key is not None:
         raise PermissionDenied(
             "This invoice is managed by the Received invoices workspace. "
             "Use Request revision with a note so the request is attached to the exact invoice revision."

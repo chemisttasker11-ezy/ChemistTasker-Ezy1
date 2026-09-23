@@ -16,3 +16,4 @@ TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates', 'APP
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 FINANCE_CONTRACT_TESTS = True
+MIGRATION_MODULES = {'client_profile': None, 'worker_finance': None}

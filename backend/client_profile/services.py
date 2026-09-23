@@ -831,7 +831,7 @@ def generate_invoice_from_shifts(
                 from rest_framework.exceptions import ValidationError as DRFValidationError
                 from worker_finance.services import adopt_internal_invoice
                 try:
-                    adopt_internal_invoice(user, invoice)
+                    invoice = adopt_internal_invoice(user, invoice)
                 except DRFValidationError as exc:
                     raise ValidationError({"finance_workspace": str(exc.detail)}) from exc
             return invoice

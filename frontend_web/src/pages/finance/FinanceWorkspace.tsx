@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent,
   DialogTitle, Menu, MenuItem, Paper, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography } from '@mui/material';
@@ -11,14 +11,14 @@ import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
   | { kind: 'invoice'; value?: FinanceInvoice } | { kind: 'expense'; value?: FinanceExpense }
   | { kind: 'payment'; value: FinanceInvoice };
-const workerTools = ['invoices', 'customers', 'items', 'expenses', 'bas', 'existing'] as const;
-const ownerTools = ['received', 'existing'] as const;
-const labels: Record<string, string> = { invoices: 'Invoices', received: 'Received invoices', customers: 'Customers & stores', items: 'Saved items', expenses: 'Expenses & receipts', bas: 'GST / BAS workspace', existing: 'Existing tools' };
+const workerTools = ['invoices', 'customers', 'items', 'expenses', 'bas'] as const;
+const ownerTools = ['received'] as const;
+const labels: Record<string, string> = { invoices: 'Invoices', received: 'Received invoices', customers: 'Customers & stores', items: 'Saved items', expenses: 'Expenses & receipts', bas: 'GST / BAS workspace' };
 function Empty({ title, detail }: { title: string; detail: string }) {
   return <Box sx={{ py: 6, textAlign: 'center' }}><Typography variant="h6">{title}</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>{detail}</Typography></Box>;
 }
 
-export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: ReactNode; receivedMode?: boolean }) {
+export default function FinanceWorkspace({ receivedMode = false }: { receivedMode?: boolean }) {
   const [params, setParams] = useSearchParams();
   const availableTools = receivedMode ? ownerTools : workerTools;
   const requested = params.get('tool');
@@ -137,7 +137,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
               {[['all', 'All invoices'], ['saved', 'Saved'], ['sent', 'Sent / approved'], ['revision', 'Revision requested'], ['overdue', 'Overdue'], ['paid', 'Paid']].map(([key, label]) => <Tab key={key} value={key} label={label} />)}
             </Tabs>
           </>}
-          {loading && tool !== 'existing' ? <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress aria-label="Loading finance records" /></Box> : <>
+          {loading ? <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress aria-label="Loading finance records" /></Box> : <>
             {['invoices', 'customers', 'items', 'expenses'].includes(tool) && <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField size="small" label="Search" placeholder={tool === 'invoices' ? 'Invoice number, customer or reference' : 'Search records'} value={search} onChange={event => setSearch(event.target.value)} sx={{ flexGrow: 1, width: 'auto', minWidth: 180 }} />
               {tool === 'customers' && <Button variant="outlined" onClick={() => setEditor({ kind: 'customer' })}>Add customer</Button>}
@@ -206,7 +206,6 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
                 {worksheet.warnings.map(warning => <Typography key={warning} variant="body2" color="text.secondary">{warning}</Typography>)}
                 <Button onClick={() => downloadCsv('gst-worksheet-DRAFT.csv', [['DRAFT ONLY', 'Not a complete BAS'], ['Start', worksheet.start], ['End', worksheet.end], ['Basis', worksheet.basis], ['G1', worksheet.G1], ['1A', worksheet['1A']], ['1B', worksheet['1B']], ['Estimated GST net', worksheet.estimated_gst_net], ['Excluded legacy invoices', worksheet.excluded_legacy_invoice_count]])}>Export draft worksheet</Button></>}
             </Stack>}
-            {tool === 'existing' && existingTools}
           </>}
         </Box>
       </Paper>

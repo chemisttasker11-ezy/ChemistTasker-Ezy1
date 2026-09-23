@@ -9,13 +9,15 @@ from uuid import uuid4
 from unittest import skipUnless
 from unittest.mock import patch
 from django.conf import settings
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
-from worker_finance.models import Customer, CatalogueItem, InvoiceRecord, InvoiceRevision, Payment
+from worker_finance.models import Customer, CatalogueItem, InvoiceRevision, Payment
+Invoice = apps.get_model('client_profile', 'Invoice')
 
 BASE = '/api/client-profile/finance/'
 
@@ -85,16 +87,16 @@ class FinanceApiTests(TestCase):
         self.item.owner = self.other
         self.item.save()
         self.assertEqual(self.post('invoices/', self.data).status_code, 400)
-        self.assertEqual(InvoiceRecord.objects.count(), 0)
+        self.assertEqual(Invoice.objects.count(), 0)
 
     def test_canonical_totals_and_create_idempotency(self):
         self.data.update({'subtotal': '999', 'owner': self.other.pk})
         first, second = self.create(), self.create()
         self.assertEqual(first['id'], second['id'])
-        record = InvoiceRecord.objects.get(pk=first['id'])
-        self.assertEqual(str(record.invoice.total), '880.00')
+        record = Invoice.objects.get(pk=first['id'])
+        self.assertEqual(str(record.total), '880.00')
         self.assertEqual(record.calculation['super'], '96.00')
-        self.assertEqual(record.owner_id, self.user.pk)
+        self.assertEqual(record.user_id, self.user.pk)
 
     def test_stale_version_rejected_but_saved_invoice_remains_revisable(self):
         record = self.create()
@@ -108,7 +110,7 @@ class FinanceApiTests(TestCase):
         self.assertEqual(edited.data['version'], 2)
         self.assertEqual(edited.data['status'], 'draft')
         self.assertEqual(
-            list(InvoiceRevision.objects.filter(record_id=record['id']).values_list('version', flat=True)),
+            list(InvoiceRevision.objects.filter(invoice_id=record['id']).values_list('version', flat=True)),
             [2, 1],
         )
 
@@ -119,7 +121,7 @@ class FinanceApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.data['finance_record_id'], record['id'])
-        self.assertEqual(InvoiceRecord.objects.get(pk=record['id']).invoice.total, Decimal('880.00'))
+        self.assertEqual(Invoice.objects.get(pk=record['id']).total, Decimal('880.00'))
 
     def test_duplicate_has_new_identity_and_no_work_dates(self):
         record = self.create()
@@ -140,7 +142,7 @@ class FinanceApiTests(TestCase):
         self.assertEqual(one.data['calculation']['payable'], '96.00')
         self.assertEqual(one.data['calculation']['gst'], '0.00')
         self.assertEqual(one.data['calculation']['sales_gross'], '0.00')
-        self.assertEqual(InvoiceRecord.objects.get(pk=record['id']).calculation['payable'], '880.00')
+        self.assertEqual(Invoice.objects.get(pk=record['id']).calculation['payable'], '880.00')
 
     def test_partial_payments_and_cash_worksheet(self):
         record = self.issue(self.create())
@@ -165,7 +167,7 @@ class FinanceApiTests(TestCase):
             self.assertEqual(result.status_code, 200, result.data)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['accounts@example.invalid'])
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=1).invoice_status, 'sent')
 
     @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
     def test_sent_invoice_can_be_revised_and_new_revision_sent_again(self, _render):
@@ -178,13 +180,13 @@ class FinanceApiTests(TestCase):
         self.assertEqual(edited.status_code, 200, edited.data)
         self.assertEqual(edited.data['version'], 2)
         self.assertEqual(edited.data['status'], 'draft')
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=1).invoice_status, 'sent')
         self.assertIsNone(edited.data['delivery_status'])
 
         second_send = self.post(f'invoices/{record["id"]}/send/', {'version': 2, 'confirmed': True})
         self.assertEqual(second_send.status_code, 200, second_send.data)
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=2).invoice_status, 'sent')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=2).invoice_status, 'sent')
 
     def test_paid_invoice_can_be_corrected_and_returns_to_saved_state(self):
         record = self.create()
@@ -197,7 +199,7 @@ class FinanceApiTests(TestCase):
         self.assertEqual(edited.status_code, 200, edited.data)
         self.assertEqual(edited.data['version'], 2)
         self.assertEqual(edited.data['status'], 'draft')
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'paid')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=1).invoice_status, 'paid')
 
     @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
     def test_sent_invoice_can_be_edited_saved_and_resent_as_new_revision(self, _render):
@@ -214,8 +216,8 @@ class FinanceApiTests(TestCase):
         resent = self.post(f'invoices/{record["id"]}/send/', {'version': 2, 'confirmed': True})
         self.assertEqual(resent.status_code, 200, resent.data)
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'sent')
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=2).invoice_status, 'sent')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=1).invoice_status, 'sent')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=2).invoice_status, 'sent')
 
     @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
     def test_paid_invoice_can_be_corrected_saved_and_resent(self, _render):
@@ -229,7 +231,7 @@ class FinanceApiTests(TestCase):
         self.assertEqual(edited.status_code, 200, edited.data)
         self.assertEqual(edited.data['version'], 2)
         self.assertEqual(edited.data['status'], 'draft')
-        self.assertEqual(InvoiceRevision.objects.get(record_id=record['id'], version=1).invoice_status, 'paid')
+        self.assertEqual(InvoiceRevision.objects.get(invoice_id=record['id'], version=1).invoice_status, 'paid')
 
         resent = self.post(f'invoices/{record["id"]}/send/', {'version': 2, 'confirmed': True})
         self.assertEqual(resent.status_code, 200, resent.data)
@@ -265,7 +267,7 @@ class FinanceApiTests(TestCase):
                 data = {**self.data, 'lines': [{**self.data['lines'][0], key: 1.5}]}
                 self.assertEqual(self.post('invoices/', data).status_code, 400)
         self.assertEqual(self.post('invoices/', {**self.data, 'super_rate': 12.0}).status_code, 400)
-        self.assertEqual(InvoiceRecord.objects.count(), 0)
+        self.assertEqual(Invoice.objects.count(), 0)
 
     def test_issue_review_action_does_not_lock_or_prevent_later_edit(self):
         self.data.update(issuer_abn='', gst_registered=False, super_mode='none')
@@ -273,7 +275,7 @@ class FinanceApiTests(TestCase):
         record = self.create()
         response = self.post(f'invoices/{record["id"]}/issue/', {'version': 1, 'confirmed': True})
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertFalse(InvoiceRecord.objects.get(pk=record['id']).locked_at)
+        self.assertFalse(Invoice.objects.get(pk=record['id']).locked_at)
         payload = {**self.data, 'version': 1, 'notes': 'Still editable'}
         changed = self.client.patch(BASE + f'invoices/{record["id"]}/', payload, format='json')
         self.assertEqual(changed.status_code, 200, changed.data)

@@ -2614,13 +2614,53 @@ class Invoice(models.Model):
     total      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     source_snapshot = models.JSONField(default=dict, blank=True)
 
+    # Finance workspace state lives on the canonical invoice. Older invoices
+    # legitimately leave request_key/customer unset and remain fully readable.
+    customer = models.ForeignKey(
+        'worker_finance.Customer', on_delete=models.RESTRICT,
+        related_name='invoices', null=True, blank=True,
+    )
+    parent = models.OneToOneField(
+        'self', on_delete=models.RESTRICT, related_name='super_document',
+        null=True, blank=True,
+    )
+    kind = models.CharField(max_length=16, default='invoice')
+    source = models.CharField(max_length=16, default='external')
+    version = models.PositiveIntegerField(default=1)
+    request_key = models.UUIDField(null=True, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    calculation = models.JSONField(default=dict, blank=True)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    review_status = models.CharField(
+        max_length=32,
+        default='NONE',
+        choices=[
+            ('NONE', 'No owner review decision'),
+            ('APPROVED_FOR_PAYMENT', 'Approved for payment'),
+            ('REVISION_REQUESTED', 'Revision requested'),
+        ],
+    )
+    last_review_note = models.TextField(blank=True, default='')
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
+    legacy_snapshot = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
     status     = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
+        ordering = ['-created_at', '-id']
         indexes = [
             models.Index(fields=['user']),
             models.Index(fields=['pharmacy']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'request_key'],
+                condition=models.Q(request_key__isnull=False),
+                name='invoice_user_request_key',
+            ),
         ]
 
     def __str__(self):

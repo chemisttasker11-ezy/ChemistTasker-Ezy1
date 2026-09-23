@@ -105,7 +105,7 @@ export function InvoiceEditor({ initial, previous, customers, items, onClose, on
   const recalculate = async () => { setPreviewing(true); setPreviewError(''); try { const submitted = JSON.stringify(value); const result = await finance.preview(value); if (submitted === JSON.stringify(latestDraft.current)) setPreview(result); } catch (error) { setPreviewError(errorMessage(error)); } finally { setPreviewing(false); } };
   return <><FormDialog title={initial ? `Edit ${initial.number}` : 'New external-shift invoice'} label="Save draft" onClose={onClose}
     onSave={async () => { await finance.saveInvoice(value, initial?.id); await onSaved(); }}>
-    <Alert severity="info">Saving creates a draft only. An issuer ABN is required before issuing. Review the document before sending; internal shifts remain under Existing tools.</Alert>
+    <Alert severity="info">Saving creates a draft only. An issuer ABN is required before issuing. Review the document before sending; accepted internal shifts and historical snapshots are available in Invoices.</Alert>
     <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Customer and dates</Typography><Button onClick={() => setInlineEditor('customer')}>Create new customer</Button></Stack>
     <Box sx={grid}>
       <TextField select required label="Customer / store" value={value.customer_id || ''} onChange={event => { const id = Number(event.target.value); const customer = customerOptions.find(entry => entry.id === id); setValue({ ...value, customer_id: id, due_date: dueDate(value.invoice_date, customer?.payment_terms_days ?? 14) }); setPreview(null); }}>

@@ -1,7 +1,6 @@
 import { CircularProgress, Container } from '@mui/material';
 import { useAuth } from '../../../../contexts/AuthContext';
 import FinanceWorkspace from '../../../finance/FinanceWorkspace';
-import LegacyInvoiceManagePage from './LegacyInvoiceManagePage';
 import FinanceTheme from '../../../finance/FinanceTheme';
 
 export default function InvoiceManagePage() {
@@ -11,7 +10,6 @@ export default function InvoiceManagePage() {
     <FinanceTheme>
       <FinanceWorkspace
         receivedMode={auth.user.role === 'OWNER'}
-        existingTools={<LegacyInvoiceManagePage />}
       />
     </FinanceTheme>
   );

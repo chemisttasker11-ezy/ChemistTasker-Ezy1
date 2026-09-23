@@ -58,6 +58,24 @@ class Invoice(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=10, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    customer = models.ForeignKey('worker_finance.Customer', null=True, on_delete=models.RESTRICT, related_name='invoices')
+    parent = models.OneToOneField('self', null=True, on_delete=models.RESTRICT, related_name='super_document')
+    kind = models.CharField(max_length=16, default='invoice')
+    source = models.CharField(max_length=16, default='external')
+    version = models.PositiveIntegerField(default=1)
+    request_key = models.UUIDField(null=True)
+    payload = models.JSONField(default=dict)
+    calculation = models.JSONField(default=dict)
+    locked_at = models.DateTimeField(null=True)
+    voided_at = models.DateTimeField(null=True)
+    review_status = models.CharField(max_length=32, default='NONE')
+    last_review_note = models.TextField(blank=True, default='')
+    last_reviewed_at = models.DateTimeField(null=True)
+    legacy_snapshot = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
 
 
 class InvoiceLineItem(models.Model):
