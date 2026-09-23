@@ -5,6 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Box,
   Button,
   Typography,
 } from "@mui/material";
@@ -109,6 +110,39 @@ export default function PublicTalentBoardPage() {
     <>
       <PublicLogoTopBar />
       <AuthLayout title="Find Talent" maxWidth={false} noCard showTitle={false}>
+        <Box sx={{ px: { xs: 2, lg: 3 }, pt: 3 }}>
+          <Box
+            component="section"
+            aria-labelledby="public-talent-board-title"
+            sx={{
+              maxWidth: 1440,
+              mx: 'auto',
+              mb: { xs: 2.5, md: 3.5 },
+              p: { xs: 2.5, sm: 3.5, md: 4.5 },
+              borderRadius: { xs: 3, md: 4 },
+              color: '#fff',
+              background: 'linear-gradient(135deg, #04142E 0%, #06214A 58%, #0D3F78 100%)',
+              boxShadow: '0 18px 46px rgba(6,33,74,0.16)',
+            }}
+          >
+            <Typography sx={{ fontSize: 11, fontWeight: 900, letterSpacing: '.14em', opacity: .78 }}>
+              OWNER · DEEP NAVY
+            </Typography>
+            <Typography id="public-talent-board-title" component="h1" sx={{ mt: 1, fontSize: { xs: 30, md: 44 }, lineHeight: 1.08, fontWeight: 900 }}>
+              Find pharmacy people, not another pile of CVs.
+            </Typography>
+            <Typography sx={{ mt: 1.5, maxWidth: 780, fontSize: { xs: 15, md: 17 }, lineHeight: 1.55, color: 'rgba(255,255,255,.9)' }}>
+              Browse pharmacy talent by professional role, location and availability, then move into the ChemistTasker workflow when there is a fit.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2.5 }}>
+              {['Profession', 'Location', 'Availability', 'Work preferences'].map((label) => (
+                <Box key={label} component="span" sx={{ px: 1.25, py: .7, borderRadius: 999, bgcolor: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', fontSize: 12, fontWeight: 800 }}>
+                  {label}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
         <TalentBoard
           publicMode
           externalPosts={posts}

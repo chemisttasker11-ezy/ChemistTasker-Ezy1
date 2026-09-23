@@ -277,8 +277,8 @@ export default function OwnerOverviewHome({
             label={selectedPharmacy ? "Internal workspace" : "Public platform"}
             size="small"
             sx={{
-              bgcolor: "#EAF2FF",
-              color: "#063BDA",
+              bgcolor: "var(--ct-dashboard-soft)",
+              color: "var(--ct-dashboard-accent)",
               fontWeight: 950,
               textTransform: "uppercase",
               letterSpacing: ".05em",
@@ -305,7 +305,7 @@ export default function OwnerOverviewHome({
           p: { xs: 2, sm: 3, md: 4 },
           minHeight: { xs: "auto", md: 290 },
           borderRadius: { xs: "18px", md: "22px" },
-          backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
+          backgroundImage: "var(--ct-dashboard-gradient)",
           color: "#fff",
           overflow: "hidden",
           position: "relative",
@@ -345,7 +345,7 @@ export default function OwnerOverviewHome({
                 color="inherit"
                 startIcon={<CalendarMonthIcon />}
                 onClick={onPostShift}
-                sx={{ color: "#063BDA", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}
+                sx={{ color: "var(--ct-dashboard-accent)", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}
               >
                 Post a shift
               </Button>
@@ -438,7 +438,8 @@ export default function OwnerOverviewHome({
               return (
                 <Paper
                   key={action.title}
-                  role="button"
+                  component="button"
+                  type="button"
                   onClick={action.onClick}
                   sx={{
                     minHeight: { xs: 132, md: 196 },
@@ -449,6 +450,9 @@ export default function OwnerOverviewHome({
                     boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
                     transition: "all 0.2s ease",
                     cursor: "pointer",
+                    width: "100%",
+                    textAlign: "left",
+                    font: "inherit",
                     p: { xs: 2, md: 3 },
                     display: "flex",
                     flexDirection: "column",
@@ -494,7 +498,7 @@ export default function OwnerOverviewHome({
         <Stack spacing={{ xs: 2.5, md: 3 }}>
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
+              <CalendarMonthIcon sx={{ color: "var(--ct-dashboard-accent)", fontSize: 30 }} />
               <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Upcoming Shifts</Typography>
             </Stack>
             <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
@@ -505,18 +509,18 @@ export default function OwnerOverviewHome({
               ].map(([label, value]) => (
                 <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
                   <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
-                  <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
+                  <Typography sx={{ color: "var(--ct-dashboard-accent)", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
                 </Stack>
               ))}
             </Stack>
-            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "var(--ct-dashboard-accent)", fontWeight: 950 }}>
               View all shifts
             </Button>
           </Paper>
 
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
-              <FavoriteBorderIcon sx={{ color: "#5B18E8", fontSize: 30 }} />
+              <FavoriteBorderIcon sx={{ color: "var(--ct-dashboard-accent)", fontSize: 30 }} />
               <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Recent Activity</Typography>
             </Stack>
             <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
@@ -537,7 +541,7 @@ export default function OwnerOverviewHome({
                     textAlign: "left",
                     borderRadius: 1,
                     cursor: actionUrl ? "pointer" : "default",
-                    "&:hover": actionUrl ? { bgcolor: alpha("#5B18E8", 0.05) } : undefined,
+                    "&:hover": actionUrl ? { bgcolor: "var(--ct-dashboard-soft)" } : undefined,
                   }}
                 >
                 <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ py: 1.8, px: 0.75 }}>
@@ -551,7 +555,7 @@ export default function OwnerOverviewHome({
                 </ButtonBase>
               )})}
             </Stack>
-            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "var(--ct-dashboard-accent)", fontWeight: 950 }}>
               View all activity
             </Button>
           </Paper>
@@ -588,7 +592,7 @@ export default function OwnerOverviewHome({
                 borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" },
                 cursor: isInvoiceStat ? "pointer" : "default",
                 transition: "background-color 0.18s ease",
-                "&:hover": isInvoiceStat ? { bgcolor: alpha("#6D28D9", 0.04) } : undefined,
+                "&:hover": isInvoiceStat ? { bgcolor: "var(--ct-dashboard-soft)" } : undefined,
               }}
             >
               <Box

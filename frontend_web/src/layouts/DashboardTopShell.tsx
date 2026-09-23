@@ -47,26 +47,53 @@ const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(["FULL_TIME", "PART_TIME", "CASU
 const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(["LOCUM", "SHIFT_HERO"]);
 const INTERNAL_PHARMACY_ROLES = new Set(["OWNER", "PHARMACY_OWNER", "MANAGER", "PHARMACY_ADMIN", "ADMIN", "ROSTER_MANAGER", "COMMUNICATION_MANAGER"]);
 
-const dashboardAccents = [
-  {
-    gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
-    soft: "#EFE7FF",
-    text: "#4A16B8",
+const personaAccents = {
+  owner: {
+    key: "owner",
+    accent: "#06214A",
+    gradient: "linear-gradient(135deg, #04142E 0%, #06214A 56%, #0D3F78 100%)",
+    soft: "#EAF0F7",
+    tint: "rgba(6,33,74,0.08)",
   },
-  {
-    gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
-    soft: "#EFE7FF",
-    text: "#4A16B8",
+  pharmacist: {
+    key: "pharmacist",
+    accent: "#5222B8",
+    gradient: "linear-gradient(135deg, #281457 0%, #5222B8 58%, #7654D4 100%)",
+    soft: "#F0EAFF",
+    tint: "rgba(82,34,184,0.09)",
   },
-  {
-    gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
-    soft: "#EFE7FF",
-    text: "#4A16B8",
+  otherStaff: {
+    key: "other-staff",
+    accent: "#D600C8",
+    gradient: "linear-gradient(135deg, #5E1558 0%, #A11A98 54%, #D600C8 100%)",
+    soft: "#FDEAFB",
+    tint: "rgba(214,0,200,0.08)",
   },
-];
+  explorer: {
+    key: "explorer",
+    accent: "#00A8BC",
+    gradient: "linear-gradient(135deg, #075066 0%, #008DA5 56%, #00BDD2 100%)",
+    soft: "#E4FAFC",
+    tint: "rgba(0,189,210,0.09)",
+  },
+  organization: {
+    key: "organization",
+    accent: "#008DDB",
+    gradient: "linear-gradient(135deg, #075A91 0%, #008DDB 58%, #25B6E8 100%)",
+    soft: "#E8F6FD",
+    tint: "rgba(0,141,219,0.08)",
+  },
+};
 
-function accentForScope(_scopeId: number | null, _workspace: string) {
-  return dashboardAccents[0];
+function accentForPersona(role: unknown, forceAdminScope: boolean) {
+  if (forceAdminScope) return personaAccents.owner;
+  const normalized = String(role || "").toUpperCase();
+  if (normalized === "OWNER") return personaAccents.owner;
+  if (normalized === "PHARMACIST") return personaAccents.pharmacist;
+  if (normalized === "OTHER_STAFF") return personaAccents.otherStaff;
+  if (normalized === "EXPLORER") return personaAccents.explorer;
+  if (normalized.includes("ORG") || normalized === "ORGANIZATION") return personaAccents.organization;
+  return personaAccents.pharmacist;
 }
 
 function workerOverviewPath(role?: string | null) {
@@ -289,7 +316,7 @@ function MegaMenu({
                       lineHeight: 1.2,
                       color: active ? "var(--ct-dashboard-accent)" : item.child ? "var(--ct-text-secondary)" : "var(--ct-text-primary)",
                       bgcolor: active ? "var(--ct-dashboard-soft)" : item.child ? "var(--ct-hover-bg)" : "var(--ct-surface-bg)",
-                      border: `1px solid ${active ? "#C4B5FD" : "transparent"}`,
+                      border: `1px solid ${active ? "var(--ct-dashboard-accent)" : "transparent"}`,
                       boxShadow: item.child ? "none" : "0 4px 14px rgba(6,18,58,0.05)",
                       "&:hover": {
                         bgcolor: active ? "var(--ct-dashboard-soft)" : "var(--ct-surface-bg)",
@@ -364,7 +391,7 @@ export default function DashboardTopShell({
   const showPharmacySelector = !hidePharmacyScope && (isOwner || isOrgUser || isWorker) && (pharmacies.length > 0 || canUsePlatformWorkspace);
   const selectedPharmacy = pharmacies.find((item) => item.id === selectedPharmacyId) ?? null;
   const title = titleOverride ?? dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType);
-  const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
+  const accent = accentForPersona(user?.role, forceAdminScope);
 
   useEffect(() => {
     const initialVerified = isOverallVerified(user);
@@ -502,7 +529,9 @@ export default function DashboardTopShell({
         sx={{
           "--ct-dashboard-gradient": accent.gradient,
           "--ct-dashboard-soft": accent.soft,
-          "--ct-dashboard-accent": accent.text,
+          "--ct-dashboard-accent": accent.accent,
+          "--ct-dashboard-tint": accent.tint,
+          "--ct-dashboard-persona": `"${accent.key}"`,
           "--ct-dashboard-card-bg": "#FFFFFF",
           "--ct-dashboard-card-border": "#E5ECF7",
           "--ct-dashboard-card-shadow": "0 8px 24px rgba(6, 18, 58, 0.04)",
@@ -522,7 +551,7 @@ export default function DashboardTopShell({
             inset: 0,
             pointerEvents: "none",
             background:
-              "radial-gradient(circle at 0% 0%, rgba(20,62,234,0.08) 0, transparent 28%), radial-gradient(circle at 100% 0%, rgba(234,10,142,0.08) 0, transparent 28%), radial-gradient(circle at 50% 100%, rgba(8,190,234,0.06) 0, transparent 24%)",
+              "radial-gradient(circle at 0% 0%, var(--ct-dashboard-tint) 0, transparent 28%), radial-gradient(circle at 100% 0%, rgba(0,141,219,0.05) 0, transparent 26%), radial-gradient(circle at 50% 100%, rgba(0,189,210,0.04) 0, transparent 22%)",
             zIndex: -2,
           },
           "&::after": {
@@ -546,9 +575,9 @@ export default function DashboardTopShell({
           justifyContent: "center",
           alignItems: "stretch",
           minHeight: { xs: 86, md: 104 },
-          background: "linear-gradient(90deg, rgba(6,59,218,0.12) 0%, rgba(109,40,217,0.11) 42%, rgba(234,10,142,0.10) 72%, rgba(8,190,234,0.10) 100%)",
+          background: "linear-gradient(90deg, var(--ct-dashboard-tint) 0%, rgba(255,255,255,0.76) 46%, rgba(0,141,219,0.05) 100%)",
           backdropFilter: "blur(18px)",
-          borderBottom: "1px solid rgba(109,40,217,0.16)",
+          borderBottom: "1px solid var(--ct-border-color)",
           boxShadow: "0 12px 34px rgba(6,18,58,0.07)",
           overflow: "hidden",
           "&::before": {
@@ -595,12 +624,12 @@ export default function DashboardTopShell({
             minHeight: { xs: 86, md: 104 },
             flexShrink: 0,
             borderRadius: "0 0 30px 0",
-            background: "linear-gradient(135deg, rgba(6,59,218,0.13) 0%, rgba(109,40,217,0.11) 52%, rgba(234,10,142,0.09) 100%)",
+            background: "linear-gradient(135deg, var(--ct-dashboard-tint) 0%, rgba(255,255,255,0.48) 100%)",
             borderRight: "1px solid rgba(109,40,217,0.16)",
             boxShadow: "0 18px 46px rgba(6, 26, 61, 0.12)",
             p: { xs: 0.75, sm: 1.25, md: 2 },
             "&:hover": {
-              background: "linear-gradient(135deg, rgba(6,59,218,0.18) 0%, rgba(109,40,217,0.15) 52%, rgba(234,10,142,0.12) 100%)",
+              background: "linear-gradient(135deg, var(--ct-dashboard-tint) 0%, rgba(255,255,255,0.68) 100%)",
               filter: "brightness(1.02)",
             },
             "&:after": {
@@ -610,7 +639,7 @@ export default function DashboardTopShell({
               right: 0,
               bottom: 0,
               height: 4,
-              background: `linear-gradient(90deg, ${DNA.violet}, ${DNA.magenta}, ${DNA.cyan})`,
+              background: "var(--ct-dashboard-accent)",
             },
           }}
         >
@@ -726,7 +755,7 @@ export default function DashboardTopShell({
                   textTransform: "none",
                   fontSize: { xs: 11, md: 12 },
                   fontWeight: 900,
-                  color: activePersona === "admin" ? "var(--ct-text-secondary)" : DNA.violet,
+                  color: activePersona === "admin" ? "var(--ct-text-secondary)" : "var(--ct-dashboard-accent)",
                   bgcolor: activePersona === "admin" ? "transparent" : "var(--ct-soft-primary)",
                 }}
               >
@@ -741,7 +770,7 @@ export default function DashboardTopShell({
                   textTransform: "none",
                   fontSize: { xs: 11, md: 12 },
                   fontWeight: 900,
-                  color: activePersona === "admin" ? DNA.violet : "var(--ct-text-secondary)",
+                  color: activePersona === "admin" ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)",
                   bgcolor: activePersona === "admin" ? "var(--ct-soft-primary)" : "transparent",
                 }}
               >
@@ -780,7 +809,7 @@ export default function DashboardTopShell({
               maxWidth: "100%",
             }}
           >
-            <Typography noWrap sx={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: DNA.violet }}>
+            <Typography noWrap sx={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ct-dashboard-accent)" }}>
               {forceAdminScope ? "Internal Workspace" : workspace === "platform" ? "Public Platform" : "Internal Workspace"}
             </Typography>
             <Typography noWrap sx={{ fontSize: 18, fontWeight: 950, color: "var(--ct-text-primary)" }}>
@@ -810,7 +839,7 @@ export default function DashboardTopShell({
                 bgcolor: "var(--ct-surface-bg)",
                 color: "var(--ct-text-secondary)",
                 boxShadow: "0 3px 12px rgba(6,18,58,0.05)",
-                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: DNA.violet },
+                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-dashboard-accent)" },
               }}
             />
           </Stack>

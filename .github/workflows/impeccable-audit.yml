@@ -1,0 +1,25 @@
+name: Impeccable UI Audit
+
+on:
+  pull_request:
+    paths:
+      - 'frontend_web/**'
+      - '.github/workflows/impeccable-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  impeccable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Impeccable detector
+        run: npx -y impeccable detect frontend_web/landing_next/app frontend_web/landing_next/features/home frontend_web/landing_next/public

@@ -64,6 +64,15 @@ export function createSleekTheme(mode: Mode): Theme {
         styleOverrides: {
           ":root": {
             colorScheme: mode,
+            "--ct-brand-navy": "#06214A",
+            "--ct-brand-violet": "#5222B8",
+            "--ct-brand-magenta": "#D600C8",
+            "--ct-brand-cyan": "#00BDD2",
+            "--ct-brand-blue": "#008DDB",
+            "--ct-persona-owner": "#06214A",
+            "--ct-persona-pharmacist": "#5222B8",
+            "--ct-persona-other-staff": "#D600C8",
+            "--ct-persona-explorer": "#00BDD2",
             "--ct-page-bg": pageBg,
             "--ct-surface-bg": surfaceBg,
             "--ct-elevated-bg": elevatedBg,
