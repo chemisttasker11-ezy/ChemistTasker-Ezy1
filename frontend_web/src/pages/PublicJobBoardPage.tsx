@@ -369,6 +369,37 @@ export default function PublicJobBoardPage() {
       <PublicLogoTopBar />
       <AuthLayout title="Public Job Board" maxWidth={false} noCard showTitle={false}>
         <Box sx={{ px: { xs: 2, lg: 3 }, py: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
+          <Box
+            component="section"
+            aria-labelledby="public-shift-board-title"
+            sx={{
+              maxWidth: 1440,
+              mx: 'auto',
+              mb: { xs: 2.5, md: 3.5 },
+              p: { xs: 2.5, sm: 3.5, md: 4.5 },
+              borderRadius: { xs: 3, md: 4 },
+              color: '#fff',
+              background: 'linear-gradient(135deg, #281457 0%, #5222B8 58%, #7654D4 100%)',
+              boxShadow: '0 18px 46px rgba(82,34,184,0.16)',
+            }}
+          >
+            <Typography sx={{ fontSize: 11, fontWeight: 900, letterSpacing: '.14em', opacity: .78 }}>
+              PHARMACIST · VIOLET
+            </Typography>
+            <Typography id="public-shift-board-title" component="h1" sx={{ mt: 1, fontSize: { xs: 30, md: 44 }, lineHeight: 1.08, fontWeight: 900 }}>
+              Pharmacy shifts, clear at a glance.
+            </Typography>
+            <Typography sx={{ mt: 1.5, maxWidth: 760, fontSize: { xs: 15, md: 17 }, lineHeight: 1.55, color: 'rgba(255,255,255,.9)' }}>
+              Search by role, location, timing and practical shift details before deciding what is worth opening.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2.5 }}>
+              {['Location', 'Date', 'Role', 'Rate', 'Travel & accommodation'].map((label) => (
+                <Box key={label} component="span" sx={{ px: 1.25, py: .7, borderRadius: 999, bgcolor: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', fontSize: 12, fontWeight: 800 }}>
+                  {label}
+                </Box>
+              ))}
+            </Box>
+          </Box>
           {error && (
             <Typography color="error" sx={{ mb: 1 }}>
               {error}
