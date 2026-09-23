@@ -113,7 +113,7 @@
 .staff-persona:hover,.staff-persona:focus-visible{transform:translateY(-5px);color:var(--navy)}
 .staff-persona[aria-pressed=true]{flex-basis:232px;color:var(--navy)}
 .staff-persona-figure{display:flex;width:100%;height:174px;align-items:flex-end;justify-content:center;overflow:visible}
-.staff-persona-image{width:100%;max-width:126px;height:174px;object-fit:contain;object-position:center bottom;mix-blend-mode:multiply;transform-origin:center bottom;transition:max-width .32s ease,height .32s ease,transform .28s ease,opacity .2s ease;opacity:.74}
+.staff-persona-image{width:100%;max-width:126px;height:174px;object-fit:contain;object-position:center bottom;mix-blend-mode:multiply;transform-origin:center bottom;transition:transform .28s ease,opacity .2s ease;opacity:.74}
 .staff-persona[aria-pressed=true] .staff-persona-figure{height:286px}
 .staff-persona[aria-pressed=true] .staff-persona-image{max-width:228px;height:286px;opacity:1;transform:translateY(2px)}
 .staff-persona-role{display:block;margin-top:9px;color:inherit;font-size:10px;font-weight:700;line-height:1.25}
