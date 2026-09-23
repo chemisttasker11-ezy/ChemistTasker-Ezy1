@@ -20,7 +20,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.utils import timezone
@@ -28,6 +28,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 User = get_user_model()
+security_cache = caches["security"]
 
 from users.models import DeviceToken
 from client_profile.models import (
@@ -103,6 +104,7 @@ class WorkerPinSetupTests(unittest.TestCase):
 
     def setUp(self):
         cache.clear()
+        security_cache.clear()
         self.client = APIClient()
 
         ts = int(timezone.now().timestamp() * 1000)
@@ -175,6 +177,7 @@ class WorkerPinSetupTests(unittest.TestCase):
 
     def tearDown(self):
         cache.clear()
+        security_cache.clear()
         with connection.cursor() as cursor:
             for table in (
                 "client_profile_notification",
@@ -223,7 +226,7 @@ class WorkerPinSetupTests(unittest.TestCase):
         self.assertIn("s***", res.data["masked_email"])
 
         # Check OTP in cache
-        cached = cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}")
+        cached = security_cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}")
         self.assertIsNotNone(cached)
         self.assertEqual(len(cached["otp"]), 6)
 
@@ -250,7 +253,7 @@ class WorkerPinSetupTests(unittest.TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data["status"], "READY_FOR_PIN")
         self.assertTrue(res.data["has_pin"])
-        self.assertIsNone(cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_with_pin.id}"))
+        self.assertIsNone(security_cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_with_pin.id}"))
 
     def test_worker_status_unknown_identifier(self):
         """Unknown email/ID returns 404."""
@@ -266,7 +269,7 @@ class WorkerPinSetupTests(unittest.TestCase):
         """First-time worker submits valid OTP + new PIN, gets clocked in, and OTP consumed."""
         # 1. Trigger OTP
         send_worker_pin_setup_code(self.device, self.worker_no_pin.email)
-        otp = cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}")["otp"]
+        otp = security_cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}")["otp"]
 
         # 2. Setup PIN via kiosk
         res = self.client.post(
@@ -288,7 +291,7 @@ class WorkerPinSetupTests(unittest.TestCase):
         self.assertTrue(wpin.check_pin("5678"))
 
         # Verify OTP consumed
-        self.assertIsNone(cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}"))
+        self.assertIsNone(security_cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}"))
 
         # Verify new PIN authenticates for subsequent clockings
         valid, mem, err = verify_kiosk_worker_pin(self.device, self.worker_no_pin.email, "5678")
@@ -313,19 +316,19 @@ class WorkerPinSetupTests(unittest.TestCase):
     def test_worker_setup_code_locks_after_five_wrong_guesses(self):
         send_worker_pin_setup_code(self.device, self.worker_no_pin.email)
         cache_key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}"
-        correct_code = cache.get(cache_key)["otp"]
+        correct_code = security_cache.get(cache_key)["otp"]
         wrong_code = "000000" if correct_code != "000000" else "111111"
         for _ in range(5):
             with self.assertRaises(ValidationError):
                 setup_worker_kiosk_pin(self.device, self.worker_no_pin.email, wrong_code, "5678")
-        self.assertIsNone(cache.get(cache_key))
+        self.assertIsNone(security_cache.get(cache_key))
         with self.assertRaises(ValidationError):
             setup_worker_kiosk_pin(self.device, self.worker_no_pin.email, correct_code, "5678")
 
     def test_worker_setup_pin_invalid_format(self):
         """Non-numeric or too short PIN is rejected."""
         send_worker_pin_setup_code(self.device, self.worker_no_pin.email)
-        otp = cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}")["otp"]
+        otp = security_cache.get(f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}")["otp"]
         res = self.client.post(
             "/attendance/kiosk/worker-pin/setup/",
             {
