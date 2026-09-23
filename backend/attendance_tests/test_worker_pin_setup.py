@@ -310,6 +310,18 @@ class WorkerPinSetupTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_worker_setup_code_locks_after_five_wrong_guesses(self):
+        send_worker_pin_setup_code(self.device, self.worker_no_pin.email)
+        cache_key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{self.worker_no_pin.id}"
+        correct_code = cache.get(cache_key)["otp"]
+        wrong_code = "000000" if correct_code != "000000" else "111111"
+        for _ in range(5):
+            with self.assertRaises(ValidationError):
+                setup_worker_kiosk_pin(self.device, self.worker_no_pin.email, wrong_code, "5678")
+        self.assertIsNone(cache.get(cache_key))
+        with self.assertRaises(ValidationError):
+            setup_worker_kiosk_pin(self.device, self.worker_no_pin.email, correct_code, "5678")
+
     def test_worker_setup_pin_invalid_format(self):
         """Non-numeric or too short PIN is rejected."""
         send_worker_pin_setup_code(self.device, self.worker_no_pin.email)

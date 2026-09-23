@@ -26,7 +26,7 @@ from typing import Optional, Tuple
 
 from django.conf import settings
 from django.core import signing
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
@@ -49,6 +49,18 @@ from client_profile.models import (
 
 QR_SALT = "chemisttasker_attendance_kiosk_qr"
 DEVICE_TOKEN_PREFIX = "ctk_kiosk_"
+security_cache = caches["security"]
+
+
+def _count_security_attempt(key: str, *, limit: int, window: int) -> None:
+    """Atomic, shared fixed-window limit; cache failure rejects a code attempt."""
+    try:
+        security_cache.add(key, 0, timeout=window)
+        attempts = security_cache.incr(key)
+    except Exception as exc:
+        raise ValidationError("Verification is temporarily unavailable. Please retry shortly.") from exc
+    if attempts > limit:
+        raise ValidationError("Too many verification attempts. Please retry later.")
 
 
 def _validate_kiosk_public_key(public_signing_key: str, *, required: bool = False) -> str:
@@ -314,6 +326,10 @@ def redeem_kiosk_pairing_code(
     code = _normalize_pairing_code(pairing_code)
     if len(code) != 6 or not code.isdigit():
         raise ValidationError("Pairing code must be a 6-digit number.")
+    # Unknown codes have no subject to lock. This shared budget limits the
+    # entire six-digit search space across IPs and web workers.
+    _count_security_attempt("kiosk-pair:redeem:minute", limit=300, window=60)
+    _count_security_attempt("kiosk-pair:redeem:day", limit=3000, window=86400)
 
     native = str(platform or "").lower() in {"windows", "macos", "linux"}
     public_signing_key = _validate_kiosk_public_key(public_signing_key, required=native)
@@ -725,7 +741,10 @@ def send_worker_pin_setup_code(
         raise ValidationError("Worker has no valid email address registered.")
 
     cache_key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{worker.id}"
-    cached_data = cache.get(cache_key)
+    lock_key = f"{cache_key}:locked"
+    if security_cache.get(lock_key):
+        raise ValidationError("Too many verification attempts. Please retry later.")
+    cached_data = security_cache.get(cache_key)
 
     # If code was already sent in last 10 mins and caller did not explicitly request a fresh code
     if not force_new and cached_data and isinstance(cached_data, dict) and cached_data.get("otp"):
@@ -740,7 +759,8 @@ def send_worker_pin_setup_code(
     # Generate 6-digit OTP
     otp_code = f"{secrets.randbelow(900000) + 100000}"
 
-    cache.set(cache_key, {
+    _count_security_attempt(f"{cache_key}:send", limit=5, window=WORKER_PIN_OTP_TTL)
+    security_cache.set(cache_key, {
         "otp": otp_code,
         "worker_id": worker.id,
         "membership_id": membership.id,
@@ -772,7 +792,7 @@ def send_worker_pin_setup_code(
         if not delivery_result:
             raise RuntimeError("mail backend did not accept the verification email")
     except Exception as exc:
-        cache.delete(cache_key)
+        security_cache.delete(cache_key)
         raise ValidationError(
             "Verification email could not be sent. Please retry; no active setup code was created."
         ) from exc
@@ -816,13 +836,30 @@ def setup_worker_kiosk_pin(
 
     worker = membership.user
     cache_key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{worker.id}"
-    cached_data = cache.get(cache_key)
+    lock_key = f"{cache_key}:locked"
+    if security_cache.get(lock_key):
+        raise ValidationError("Too many verification attempts. Please retry later.")
+    cached_data = security_cache.get(cache_key)
 
     if not cached_data or not isinstance(cached_data, dict):
         raise ValidationError("Verification code expired or not requested. Please request a new code.")
+    if (
+        cached_data.get("membership_id") != membership.id
+        or cached_data.get("pharmacy_id") != kiosk_device.pharmacy_id
+    ):
+        raise ValidationError("Verification code was requested for another pharmacy. Please request a new code.")
 
     cleaned_code = str(verification_code).strip().replace(" ", "").replace("-", "")
     if cleaned_code != str(cached_data.get("otp")):
+        try:
+            security_cache.add(f"{cache_key}:fail", 0, timeout=WORKER_PIN_OTP_TTL)
+            failures = security_cache.incr(f"{cache_key}:fail")
+        except Exception as exc:
+            raise ValidationError("Verification is temporarily unavailable. Please retry shortly.") from exc
+        if failures >= 5:
+            security_cache.set(lock_key, True, timeout=WORKER_PIN_OTP_TTL)
+            security_cache.delete(cache_key)
+            raise ValidationError("Too many verification attempts. Please retry later.")
         raise ValidationError("Invalid verification code. Please check your email and try again.")
 
     cleaned_pin = str(new_pin).strip()
@@ -830,7 +867,8 @@ def setup_worker_kiosk_pin(
         raise ValidationError("PIN must be 4 to 6 numeric digits.")
 
     # Code is valid, consume it immediately
-    cache.delete(cache_key)
+    security_cache.delete(cache_key)
+    security_cache.delete(f"{cache_key}:fail")
 
     # Save or update WorkerPIN
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)

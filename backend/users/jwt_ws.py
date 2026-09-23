@@ -1,7 +1,10 @@
 from urllib.parse import parse_qs
+from datetime import timedelta
 from django.contrib.auth.models import AnonymousUser
 from django.db import close_old_connections
+from django.db import transaction
 from django.conf import settings
+from django.utils import timezone
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 
@@ -53,11 +56,16 @@ class JWTAuthMiddleware:
     def _get_user_from_ticket(self, ticket_str):
         close_old_connections()
         try:
-            ticket_obj = WebSocketTicket.objects.select_related('user').get(ticket=ticket_str)
-            user = ticket_obj.user
-            # Delete the ticket instantly so it can only be used once
-            ticket_obj.delete()
-            return user
+            with transaction.atomic():
+                ticket_obj = WebSocketTicket.objects.select_for_update().select_related('user').get(ticket=ticket_str)
+                user = ticket_obj.user
+                valid = (
+                    ticket_obj.created_at >= timezone.now() - timedelta(minutes=5)
+                    and user.is_active
+                    and getattr(user, 'deleted_at', None) is None
+                )
+                ticket_obj.delete()
+                return user if valid else None
         except WebSocketTicket.DoesNotExist:
             return None
 
@@ -66,7 +74,12 @@ class JWTAuthMiddleware:
         auth = headers.get(b"authorization", b"").decode()
         if auth.lower().startswith("bearer "):
             return auth.split(" ", 1)[1].strip()
-        # Deprecated: Reading from cookies
+        # Browsers send an Origin on WebSocket handshakes. Never authenticate a
+        # cross-site (or origin-less) handshake using ambient cookies.
+        origin = headers.get(b"origin", b"").decode("ascii", errors="ignore").rstrip("/")
+        allowed = {value.rstrip("/") for value in getattr(settings, "CORS_ALLOWED_ORIGINS", [])}
+        if origin not in allowed:
+            return None
         raw_cookies = headers.get(b"cookie", b"").decode()
         cookie_name = getattr(settings, "JWT_AUTH_COOKIE", "ct_access")
         for part in raw_cookies.split(";"):

@@ -205,10 +205,6 @@ def verify_filefield_task(
                 ocr_path, converted_path = ocr_input_path_for_file(local_path)
                 logger.info(f"[verify_filefield_task] Sending OCR input path to Azure: {ocr_path}")
                 ocr_data = azure_ocr(ocr_path)
-                output_json = save_output_file("ocr", object_pk, "json")
-                with open(output_json, "w", encoding="utf-8") as f:
-                    json.dump(ocr_data, f, indent=2, ensure_ascii=False)
-
                 lines = ocr_data.get("lines", [])
                 text = " ".join(lines)
                 is_name_match = simple_name_match(text, first_name, last_name)

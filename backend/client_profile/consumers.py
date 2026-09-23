@@ -68,7 +68,6 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
-        print(f"[WS] RECEIVE {content}", flush=True)
         if content.get("type") == "typing":
             if not getattr(self, "membership", None):
                 return

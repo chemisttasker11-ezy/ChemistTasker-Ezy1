@@ -6,7 +6,10 @@ ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 CORS_ALLOWED_ORIGINS = ["http://tauri.localhost", "tauri://localhost", "http://localhost:5173"]
 CORS_ALLOW_HEADERS = [*CORS_ALLOW_HEADERS, "x-device-token"]  # noqa: F405
 CSRF_TRUSTED_ORIGINS = ["http://tauri.localhost", "http://localhost:5173"]
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "security": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "kiosk-runtime-tests"},
+}
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_TIMEOUT = 20
 CELERY_TASK_ALWAYS_EAGER = True

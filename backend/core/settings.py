@@ -168,6 +168,20 @@ INSTALLED_APPS = [
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
 CHANNEL_REDIS_URL = env("CHANNEL_REDIS_URL", default=REDIS_URL)
 
+# Security attempt counters must be shared by every web worker. Keep the
+# application's existing default cache unchanged to avoid altering other flows.
+_security_cache_url = env("DJANGO_CACHE_URL", default="")
+if os.environ.get("APP_ENV", "local").lower() not in {"local", "dev", "development", "test"} and not _security_cache_url:
+    raise RuntimeError("DJANGO_CACHE_URL is required for shared security attempt limits")
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "security": (
+        {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": _security_cache_url}
+        if _security_cache_url
+        else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "security-local"}
+    ),
+}
+
 # Celery handles all asynchronous task execution.
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)

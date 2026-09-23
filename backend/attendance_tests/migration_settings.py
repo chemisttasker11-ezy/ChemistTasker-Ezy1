@@ -14,5 +14,8 @@ DATABASES = {"default": {
     "PASSWORD": os.environ.get("LOCAL_DB_PASSWORD", ""),
 }}
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "security": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "kiosk-migration-tests"},
+}
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}

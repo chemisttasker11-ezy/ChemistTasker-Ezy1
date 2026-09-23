@@ -20,7 +20,8 @@ DEBUG = False
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
-ROOT_URLCONF = "client_profile.urls"
+ROOT_URLCONF = "attendance_tests.urls"
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -34,6 +35,11 @@ DATABASES = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": ":memory:",
     }
+}
+
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "attendance-tests"},
+    "security": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "attendance-tests"},
 }
 
 # This module is opt-in and never invokes migrate. Disabling the unavailable

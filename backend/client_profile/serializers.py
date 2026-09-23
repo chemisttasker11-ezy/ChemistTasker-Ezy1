@@ -6730,6 +6730,18 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         return ExplorerPostReaction.objects.filter(post=obj, user=req.user).exists()
 
 
+class PublicExplorerPostReadSerializer(ExplorerPostReadSerializer):
+    """Public cards keep their content but not an anonymous author's identity."""
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.is_anonymous:
+            for field in ("explorer_profile", "author_user_id", "explorer_user_id"):
+                data[field] = None
+            data["explorer_name"] = "Anonymous candidate"
+        return data
+
+
 class ExplorerPostWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExplorerPost
@@ -7002,6 +7014,15 @@ class MessageSerializer(serializers.ModelSerializer):
             "original_body", "reactions",  "is_pinned",
         ]
         read_only_fields = fields
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.is_deleted:
+            data["body"] = ""
+            data["original_body"] = None
+            data["attachment"] = None
+            data["attachment_url"] = None
+            data["attachment_filename"] = None
+        return data
     def get_attachment_url(self, obj):
         try:
             return obj.attachment.url if obj.attachment else None

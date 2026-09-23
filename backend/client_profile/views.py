@@ -8936,7 +8936,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         """
         qs = self._visible_posts(self.filter_queryset(self.get_queryset()))
         page = self.paginate_queryset(qs)
-        ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
+        ser = PublicExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:
             return self.get_paginated_response(ser.data)
         return Response(ser.data)
@@ -10428,11 +10428,19 @@ class MessageViewSet(viewsets.ModelViewSet):
         if not my_participant or message.sender != my_participant.membership:
             raise PermissionDenied("You can only delete your own messages.")
 
-        message.is_deleted = True
-        message.body = ""
-        message.attachment = None
-        message.attachment_filename = None
-        message.save()
+        attachment_name = message.attachment.name if message.attachment else None
+        attachment_storage = message.attachment.storage if attachment_name else None
+        with transaction.atomic():
+            message.is_deleted = True
+            message.body = ""
+            message.original_body = None
+            message.attachment = None
+            message.attachment_filename = None
+            message.save()
+            if attachment_name:
+                transaction.on_commit(
+                    lambda: attachment_storage.delete(attachment_name), robust=True
+                )
         
         layer = get_channel_layer()
         # --- FIX: Changed "chat_" back to "room." to match your consumers.py ---

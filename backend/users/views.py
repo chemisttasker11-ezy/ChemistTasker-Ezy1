@@ -1720,6 +1720,7 @@ class DeleteAccountView(APIView):
         with transaction.atomic():
             _anonymize_user(user)
             user.device_tokens.all().delete()
+            user.ws_tickets.all().delete()
             _revoke_user_sessions(user)
             _revoke_user_tokens(user)
             _delete_verification_docs_for_user(user)
