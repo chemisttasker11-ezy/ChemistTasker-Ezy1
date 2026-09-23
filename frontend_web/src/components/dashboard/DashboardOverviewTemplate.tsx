@@ -186,8 +186,8 @@ export default function DashboardOverviewTemplate({
             label={badge}
             size="small"
             sx={{
-              bgcolor: "#EAF2FF",
-              color: DNA.blue,
+              bgcolor: "var(--ct-dashboard-soft)",
+              color: "var(--ct-dashboard-accent)",
               fontWeight: 950,
               textTransform: "uppercase",
               letterSpacing: ".05em",
@@ -214,7 +214,7 @@ export default function DashboardOverviewTemplate({
               p: { xs: 2, sm: 3, md: 4 },
               minHeight: { xs: "auto", md: 290 },
               borderRadius: { xs: "18px", md: "22px" },
-              backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
+              backgroundImage: "var(--ct-dashboard-gradient)",
               color: "#fff",
               overflow: "hidden",
               position: "relative",
@@ -243,7 +243,7 @@ export default function DashboardOverviewTemplate({
                   {heroSubtitle}
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: { xs: 2, md: 3 }, "& > *": { width: { xs: "100%", sm: "auto" } } }}>
-                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: DNA.blue, borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
+                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: "var(--ct-dashboard-accent)", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
                     {primaryAction.label}
                   </Button>
                   {secondaryAction && (
@@ -276,7 +276,12 @@ export default function DashboardOverviewTemplate({
             {actions.map((action) => {
               const tone = toneStyles[action.tone];
               return (
-                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ minHeight: { xs: 132, md: 196 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
+                <Paper
+                  key={action.title}
+                  component="button"
+                  type="button"
+                  onClick={action.onClick}
+                  sx={{ minHeight: { xs: 132, md: 196 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", textAlign: "left", font: "inherit", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
                   <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
                     <Box sx={{ width: { xs: 52, md: 64 }, height: { xs: 52, md: 64 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 28, md: 34 } } }}>
                       {action.icon}
@@ -295,25 +300,25 @@ export default function DashboardOverviewTemplate({
         <Stack spacing={{ xs: 2.5, md: 3 }}>
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
+              <CalendarMonthIcon sx={{ color: "var(--ct-dashboard-accent)", fontSize: 30 }} />
               <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>{upcomingTitle}</Typography>
             </Stack>
             <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
               {[["Today", upcoming.today], ["This Week", upcoming.week], ["This Month", upcoming.month]].map(([label, value]) => (
                 <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
                   <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
-                  <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
+                  <Typography sx={{ color: "var(--ct-dashboard-accent)", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
                 </Stack>
               ))}
             </Stack>
-            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "var(--ct-dashboard-accent)", fontWeight: 950 }}>
               View all shifts
             </Button>
           </Paper>
 
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
-              <FavoriteBorderIcon sx={{ color: "#5B18E8", fontSize: 30 }} />
+              <FavoriteBorderIcon sx={{ color: "var(--ct-dashboard-accent)", fontSize: 30 }} />
               <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Recent Activity</Typography>
             </Stack>
             <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
@@ -334,7 +339,7 @@ export default function DashboardOverviewTemplate({
                     textAlign: "left",
                     borderRadius: 1,
                     cursor: actionUrl ? "pointer" : "default",
-                    "&:hover": actionUrl ? { bgcolor: alpha("#5B18E8", 0.05) } : undefined,
+                    "&:hover": actionUrl ? { bgcolor: "var(--ct-dashboard-soft)" } : undefined,
                   }}
                 >
                 <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ py: 1.8, px: 0.75 }}>
