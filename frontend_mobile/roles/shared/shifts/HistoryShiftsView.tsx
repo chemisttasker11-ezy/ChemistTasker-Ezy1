@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Linking, View, StyleSheet } from 'react-native';
 import {
     ActivityIndicator,
     Button,
@@ -160,7 +160,7 @@ export default function HistoryShiftsView() {
                                 <Text><Text style={styles.bold}>Email:</Text> {profile.email}</Text>
                                 {profile.phoneNumber ? <Text><Text style={styles.bold}>Phone:</Text> {profile.phoneNumber}</Text> : null}
                                 {profile.shortBio ? <Text><Text style={styles.bold}>Bio:</Text> {profile.shortBio}</Text> : null}
-                                {profile.resume ? <Button mode="text" onPress={() => { }}>Download CV</Button> : null}
+                                {profile.resume ? <Button mode="text" onPress={() => void Linking.openURL(String(profile.resume)).catch(() => setSnackbar('Unable to open CV.'))}>Download CV</Button> : null}
                                 {profile.ratePreference ? (
                                     <View style={{ marginTop: 8, gap: 2 }}>
                                         <Text style={styles.bold}>Rate Preference</Text>
