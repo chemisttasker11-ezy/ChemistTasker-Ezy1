@@ -88,6 +88,10 @@ async function installApiFixture(page, user) {
     const path = url.pathname;
     const method = request.method();
 
+    // Only mock ChemistTasker's API. Third-party URLs such as Google Maps
+    // also contain "/api/" and must be allowed to load as JavaScript.
+    if (!path.startsWith('/api/')) return route.continue();
+
     if (path.endsWith('/users/me/')) return json(route, user);
     if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'breadth-csrf' });
     if (isRefreshPath(path)) return json(route, { access: 'breadth-access', refresh: '' });
@@ -101,6 +105,16 @@ async function installApiFixture(page, user) {
     }
     if (path.endsWith('/client-profile/attendance/roster/worker/')) return json(route, { shifts: [] });
     if (path.endsWith('/client-profile/attendance/manager/pending/')) return json(route, []);
+    if (path.endsWith('/client-profile/workforce/roster/workspace/')) {
+      return json(route, {
+        period_id: 501,
+        draft_revision: 1,
+        published_revision: 0,
+        validation: { errors: [], warnings: [] },
+        summary: { coverage_shortfalls: 0 },
+        coverage_view: [],
+      });
+    }
     if (path.endsWith('/client-profile/workforce/leave/')) return json(route, []);
     if (path.endsWith('/client-profile/workforce/timesheet-periods/')) return json(route, []);
     if (path.endsWith('/client-profile/workforce/timesheets/')) return json(route, []);
@@ -449,7 +463,7 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
   await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
   await page.getByRole('button', { name: 'Acknowledge Shifts' }).click();
 
-  await expect(page.getByText('ACKNOWLEDGED')).toBeVisible();
+  await expect(page.getByText('ACKNOWLEDGED', { exact: true })).toBeVisible();
   expect(acknowledgePosts).toBe(1);
   expect(observedAcknowledge).toEqual({
     method: 'POST',
