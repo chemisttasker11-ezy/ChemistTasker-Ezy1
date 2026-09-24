@@ -7,6 +7,7 @@ import {
   Checkbox,
   Chip,
   HelperText,
+  Icon,
   IconButton,
   Menu,
   Modal,
@@ -26,6 +27,9 @@ import {
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { surfaceTokens } from '@/roles/shared/pharmacies/types';
+import { brandColors, personaPalettes } from '@/constants/theme';
+
+const orgPalette = personaPalettes.organization;
 
 type RoleDefinition = {
   key: string;
@@ -425,7 +429,7 @@ export default function OrganizationInviteScreen() {
           <View style={styles.headerStack}>
             <View style={styles.header}>
               <View style={styles.headerIcon}>
-                <IconButton icon="account-plus" size={28} iconColor="#FFFFFF" />
+                <Icon source="account-plus" size={28} color={brandColors.white} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="headlineSmall" style={styles.title}>Invite Staff</Text>
@@ -692,7 +696,7 @@ export default function OrganizationInviteScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   content: { padding: 16, paddingBottom: 40 },
   headerStack: { gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
@@ -700,41 +704,41 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#6366F1',
+    backgroundColor: orgPalette.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { color: '#111827', fontWeight: '800' },
-  subtitle: { color: '#6B7280', marginTop: 3, lineHeight: 19 },
+  title: { color: brandColors.navy, fontWeight: '900' },
+  subtitle: { color: brandColors.body, marginTop: 3, lineHeight: 20 },
   warningCard: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', borderWidth: 1 },
   warningText: { color: '#92400E' },
-  card: { borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  card: { borderRadius: 16, backgroundColor: brandColors.white, overflow: 'hidden', borderWidth: 1, borderColor: brandColors.border },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16 },
-  cardTitle: { color: '#111827', fontWeight: '700' },
+  cardTitle: { color: brandColors.navy, fontWeight: '800' },
   formContent: { gap: 10, paddingTop: 0 },
-  input: { backgroundColor: '#FFFFFF' },
-  selectorButton: { alignSelf: 'stretch', borderColor: '#D1D5DB' },
-  helpText: { color: '#6B7280', fontSize: 12, lineHeight: 18 },
-  sectionLabel: { color: '#374151', fontWeight: '700', marginBottom: 8, marginTop: 4 },
+  input: { backgroundColor: brandColors.white },
+  selectorButton: { alignSelf: 'stretch', borderColor: brandColors.border },
+  helpText: { color: brandColors.body, fontSize: 12, lineHeight: 18 },
+  sectionLabel: { color: brandColors.navy, fontWeight: '800', marginBottom: 8, marginTop: 4 },
   pharmacyPicker: { gap: 4 },
-  checkboxItem: { paddingHorizontal: 0, backgroundColor: '#FFFFFF' },
-  primaryButton: { marginTop: 6, backgroundColor: '#6366F1' },
+  checkboxItem: { paddingHorizontal: 0, backgroundColor: brandColors.white },
+  primaryButton: { marginTop: 6, borderRadius: 12 },
   memberListHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  memberCard: { marginTop: 12, borderRadius: 14, backgroundColor: '#FFFFFF' },
+  memberCard: { marginTop: 12, borderRadius: 14, backgroundColor: brandColors.white, borderWidth: 1, borderColor: brandColors.border },
   memberHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  memberName: { color: '#111827', fontWeight: '700' },
-  memberEmail: { color: '#6B7280', marginTop: 2, fontSize: 12 },
+  memberName: { color: brandColors.navy, fontWeight: '800' },
+  memberEmail: { color: brandColors.body, marginTop: 2, fontSize: 12 },
   memberActions: { flexDirection: 'row', alignItems: 'center' },
   chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 10 },
-  roleChip: { backgroundColor: '#EEF2FF' },
-  memberMeta: { color: '#6B7280', marginTop: 8 },
+  roleChip: { backgroundColor: orgPalette.soft },
+  memberMeta: { color: brandColors.body, marginTop: 8 },
   pharmacyChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  pharmacyChip: { backgroundColor: '#F9FAFB' },
+  pharmacyChip: { backgroundColor: brandColors.mist },
   emptyState: { padding: 24, alignItems: 'center' },
-  emptyText: { color: '#6B7280', textAlign: 'center' },
-  modal: { backgroundColor: '#FFFFFF', margin: 20, padding: 20, borderRadius: 14, maxHeight: '86%' },
-  modalTitle: { color: '#111827', fontWeight: '800', marginBottom: 16 },
+  emptyText: { color: brandColors.body, textAlign: 'center' },
+  modal: { backgroundColor: brandColors.white, margin: 20, padding: 20, borderRadius: 16, maxHeight: '86%' },
+  modalTitle: { color: brandColors.navy, fontWeight: '900', marginBottom: 16 },
   optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  selectedChip: { backgroundColor: '#EEF2FF' },
+  selectedChip: { backgroundColor: orgPalette.soft },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
 });
