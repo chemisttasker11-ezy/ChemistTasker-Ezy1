@@ -1,14 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
+import { AdminWorkspaceProvider, useAdminWorkspace } from '@/context/AdminWorkspaceContext';
+import { brandColors } from '@/constants/theme';
+import {
+  getAssignmentId,
+  getAssignmentPharmacyName,
+  getRoleHome,
+  selectRolePersona,
+  type MobileAdminAssignment,
+} from '@/utils/mobilePersona';
 
 function profileRouteForRole(role?: string | null) {
   const normalized = String(role || '').toUpperCase();
   if (normalized === 'PHARMACIST') return '/pharmacist/profile';
   if (normalized === 'OTHER_STAFF') return '/otherstaff/profile';
   if (normalized === 'OWNER') return '/owner/profile';
+  if (normalized === 'EXPLORER') return '/explorer/profile';
   if (normalized.includes('ORG') || normalized === 'ORGANIZATION') return '/organization/profile';
   return '/admin';
 }
@@ -17,12 +27,20 @@ function AdminSidebar({
   visible,
   onDismiss,
   onNavigate,
-  pharmacyName,
+  assignments,
+  activeAssignmentId,
+  onSelectAssignment,
+  onReturnToRole,
+  roleLabel,
 }: {
   visible: boolean;
   onDismiss: () => void;
   onNavigate: (route: string) => void;
-  pharmacyName: string;
+  assignments: MobileAdminAssignment[];
+  activeAssignmentId: number | null;
+  onSelectAssignment: (assignmentId: number) => void;
+  onReturnToRole: () => void;
+  roleLabel: string;
 }) {
   const { logout } = useAuth();
   const router = useRouter();
@@ -48,43 +66,76 @@ function AdminSidebar({
   return (
     <Portal>
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.sidebar}>
-        <Text variant="labelMedium" style={styles.sidebarEyebrow}>Admin workspace</Text>
-        <Text variant="titleMedium" style={styles.sidebarTitle} numberOfLines={2}>
-          {pharmacyName}
-        </Text>
-        <Divider style={styles.sidebarDivider} />
-        {items.map((item) => (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text variant="labelMedium" style={styles.sidebarEyebrow}>Admin workspace</Text>
+          <Text variant="titleMedium" style={styles.sidebarTitle}>
+            Manage your pharmacy responsibilities
+          </Text>
+
+          {assignments.length > 0 ? (
+            <View style={styles.scopeBlock}>
+              <Text variant="labelSmall" style={styles.scopeLabel}>ACTIVE PHARMACY</Text>
+              {assignments.map((assignment) => {
+                const id = getAssignmentId(assignment);
+                if (id == null) return null;
+                const selected = id === activeAssignmentId;
+                return (
+                  <List.Item
+                    key={id}
+                    title={getAssignmentPharmacyName(assignment)}
+                    description={selected ? 'Current admin scope' : 'Switch admin scope'}
+                    left={(props) => <List.Icon {...props} icon={selected ? 'check-circle' : 'store-outline'} color={selected ? brandColors.navy : undefined} />}
+                    style={[styles.scopeItem, selected && styles.scopeItemSelected]}
+                    onPress={() => onSelectAssignment(id)}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
+
+          <Divider style={styles.sidebarDivider} />
+          {items.map((item) => (
+            <List.Item
+              key={`${item.route}-${item.label}`}
+              title={item.label}
+              left={(props) => <List.Icon {...props} icon={item.icon} />}
+              onPress={() => {
+                onDismiss();
+                onNavigate(item.route);
+              }}
+            />
+          ))}
+          <Divider style={styles.sidebarDivider} />
           <List.Item
-            key={`${item.route}-${item.label}`}
-            title={item.label}
-            left={(props) => <List.Icon {...props} icon={item.icon} />}
-            onPress={() => {
-              onDismiss();
-              onNavigate(item.route);
-            }}
+            title={`Return to ${roleLabel} workspace`}
+            description="Switch back to your personal role"
+            left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
+            onPress={onReturnToRole}
           />
-        ))}
-        <Divider style={styles.sidebarDivider} />
-        <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
-          Logout
-        </Button>
+          <Button icon="logout" textColor={brandColors.danger} onPress={handleLogout}>
+            Logout
+          </Button>
+        </ScrollView>
       </Modal>
     </Portal>
   );
 }
 
-export default function AdminLayout() {
+function AdminLayoutInner() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const {
+    assignments,
+    activeAssignment,
+    activePharmacyId: pharmacyId,
+    activePharmacyName: pharmacyName,
+    selectAssignment,
+  } = useAdminWorkspace();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // Do not update the photo based on an intermediate or loading user object.
-    // This prevents the avatar from flickering during navigation.
-    if (isLoading) {
-      return;
-    }
+    if (isLoading) return;
     if (!user) {
       setPhotoUrl(null);
       return;
@@ -97,15 +148,9 @@ export default function AdminLayout() {
     setPhotoUrl(newPhoto);
   }, [user, isLoading]);
 
-  const assignment = useMemo(() => {
-    const assignments = Array.isArray((user as any)?.admin_assignments)
-      ? (user as any).admin_assignments
-      : [];
-    return assignments.find((item: any) => item?.pharmacy_id || item?.pharmacyId) || assignments[0] || null;
-  }, [user]);
-  const pharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy ?? null;
-  const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
   const profileRoute = profileRouteForRole(user?.role);
+  const roleLabel = String(user?.role || 'staff').toLowerCase().replace('_', ' ');
+
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
     if (route === '/admin/pills' && pharmacyId) return `/admin/${pharmacyId}/pills`;
@@ -116,35 +161,52 @@ export default function AdminLayout() {
     router.push(adminPath(route) as any);
   };
 
+  const returnToRole = async () => {
+    setSidebarVisible(false);
+    const route = await selectRolePersona(user);
+    router.replace(route as any);
+  };
+
+  const changeAssignment = async (assignmentId: number) => {
+    await selectAssignment(assignmentId);
+    setSidebarVisible(false);
+    router.replace('/admin' as any);
+  };
+
   return (
     <>
       <AdminSidebar
         visible={sidebarVisible}
         onDismiss={() => setSidebarVisible(false)}
         onNavigate={navigateAdmin}
-        pharmacyName={pharmacyName}
+        assignments={assignments}
+        activeAssignmentId={getAssignmentId(activeAssignment)}
+        onSelectAssignment={(assignmentId) => void changeAssignment(assignmentId)}
+        onReturnToRole={() => void returnToRole()}
+        roleLabel={roleLabel}
       />
       <Stack
         screenOptions={{
           headerShown: true,
-          headerTitle: 'Admin',
-          headerStyle: { backgroundColor: '#FFFFFF' },
-          headerShadowVisible: true,
+          headerTitle: pharmacyName,
+          headerStyle: { backgroundColor: brandColors.white },
+          headerShadowVisible: false,
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+            <IconButton icon="menu" accessibilityLabel="Open admin menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => (
             <View style={styles.headerRight}>
               <IconButton
                 icon="bell-outline"
+                accessibilityLabel="Notifications"
                 onPress={() => router.push('/admin/notifications' as any)}
               />
-              <TouchableOpacity onPress={() => router.push(profileRoute as any)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push(profileRoute as any)}>
                 {photoUrl ? (
-                  <Avatar.Image size={32} source={{ uri: photoUrl }} />
+                  <Avatar.Image size={36} source={{ uri: photoUrl }} />
                 ) : (
                   <Avatar.Text
-                    size={32}
+                    size={36}
                     label={(user?.username || user?.email || 'A').charAt(0).toUpperCase()}
                     style={styles.avatar}
                     labelStyle={styles.avatarLabel}
@@ -155,7 +217,7 @@ export default function AdminLayout() {
           ),
         }}
       >
-        <Stack.Screen name="index" options={{ headerTitle: 'Admin Dashboard' }} />
+        <Stack.Screen name="index" options={{ headerTitle: pharmacyName }} />
         <Stack.Screen name="messages/[id]" options={{ headerTitle: 'Messages' }} />
         <Stack.Screen name="pharmacies/index" options={{ headerTitle: 'Pharmacies' }} />
         <Stack.Screen name="pharmacies/[id]" options={{ headerTitle: 'Pharmacy' }} />
@@ -178,37 +240,66 @@ export default function AdminLayout() {
   );
 }
 
+export default function AdminLayout() {
+  return (
+    <AdminWorkspaceProvider>
+      <AdminLayoutInner />
+    </AdminWorkspaceProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 2,
   },
   avatar: {
-    backgroundColor: '#06214A',
+    backgroundColor: brandColors.navy,
   },
   avatarLabel: {
-    color: '#FFFFFF',
+    color: brandColors.white,
     fontWeight: 'bold',
   },
   sidebar: {
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+    maxHeight: '88%',
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
+    backgroundColor: brandColors.white,
+    paddingVertical: 16,
     overflow: 'hidden',
   },
   sidebarEyebrow: {
-    color: '#06214A',
-    textTransform: 'uppercase',
+    color: brandColors.navy,
     letterSpacing: 1,
     paddingHorizontal: 18,
+    fontWeight: '800',
   },
   sidebarTitle: {
-    color: '#06214A',
+    color: brandColors.navy,
     fontWeight: '900',
     paddingHorizontal: 18,
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  scopeBlock: {
+    marginHorizontal: 12,
+    padding: 8,
+    borderRadius: 14,
+    backgroundColor: brandColors.mist,
+  },
+  scopeLabel: {
+    color: brandColors.body,
+    letterSpacing: 0.8,
+    marginHorizontal: 8,
+    marginBottom: 2,
+    fontWeight: '800',
+  },
+  scopeItem: {
+    borderRadius: 12,
+  },
+  scopeItemSelected: {
+    backgroundColor: brandColors.white,
   },
   sidebarDivider: {
     marginVertical: 8,
