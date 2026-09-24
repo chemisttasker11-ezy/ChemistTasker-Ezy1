@@ -4,7 +4,7 @@ import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { brandColors, getPersonaPalette } from '@/constants/theme';
 import {
@@ -29,8 +29,22 @@ type Notification = {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
-  const persona = getPersonaPalette(user?.role);
+  const routePersonaRole = pathname?.startsWith('/admin')
+    ? 'ADMIN'
+    : pathname?.startsWith('/owner')
+      ? 'OWNER'
+      : pathname?.startsWith('/organization')
+        ? 'ORGANIZATION'
+        : pathname?.startsWith('/pharmacist')
+          ? 'PHARMACIST'
+          : pathname?.startsWith('/otherstaff')
+            ? 'OTHER_STAFF'
+            : pathname?.startsWith('/explorer')
+              ? 'EXPLORER'
+              : user?.role;
+  const persona = getPersonaPalette(routePersonaRole);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,13 +136,13 @@ export default function NotificationsScreen() {
       payload: item.payload,
     });
     if (roomId) {
-      router.push(getMessageDetailRoute(user?.role, roomId) as any);
+      router.push(getMessageDetailRoute(routePersonaRole, roomId) as any);
       return;
     }
     const route = resolveShiftNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
-      userRole: user?.role ?? null,
+      userRole: routePersonaRole ?? null,
     });
     if (route) {
       router.push(route as any);
@@ -137,7 +151,7 @@ export default function NotificationsScreen() {
     const calendarRoute = resolveCalendarNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
-      userRole: user?.role ?? null,
+      userRole: routePersonaRole ?? null,
     });
     if (calendarRoute) {
       router.push(calendarRoute as any);
@@ -146,7 +160,7 @@ export default function NotificationsScreen() {
     const hubRoute = resolveHubNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
-      userRole: user?.role ?? null,
+      userRole: routePersonaRole ?? null,
     });
     if (hubRoute) {
       router.push(hubRoute as any);
@@ -155,7 +169,7 @@ export default function NotificationsScreen() {
     const membershipRoute = resolveMembershipNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
-      userRole: user?.role ?? null,
+      userRole: routePersonaRole ?? null,
     });
     if (membershipRoute) {
       router.push(membershipRoute as any);
