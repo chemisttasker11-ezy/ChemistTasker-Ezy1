@@ -1,0 +1,198 @@
+import { test, expect } from '@playwright/test';
+
+const baseCapabilities = ['MANAGE_STAFF', 'MANAGE_ROSTER', 'MANAGE_ADMINS', 'MANAGE_COMMUNICATIONS'];
+
+const roleUsers = {
+  owner: {
+    id: 1,
+    username: 'owner-smoke',
+    email: 'owner@example.test',
+    role: 'OWNER',
+    is_mobile_verified: true,
+    memberships: [{ pharmacy_id: 101, pharmacy_name: 'Smoke Pharmacy', role: 'OWNER' }],
+    pharmacies: [{ id: 101, name: 'Smoke Pharmacy' }],
+    admin_assignments: [],
+  },
+  admin: {
+    id: 2,
+    username: 'admin-smoke',
+    email: 'admin@example.test',
+    role: 'PHARMACIST',
+    is_mobile_verified: true,
+    memberships: [{ pharmacy_id: 101, pharmacy_name: 'Smoke Pharmacy', role: 'PHARMACIST', employment_type: 'FULL_TIME' }],
+    admin_assignments: [{ id: 201, pharmacy_id: 101, pharmacy_name: 'Smoke Pharmacy', admin_level: 'FULL_ADMIN', capabilities: baseCapabilities }],
+  },
+  organization: {
+    id: 3,
+    username: 'org-smoke',
+    email: 'org@example.test',
+    role: 'ORG_ADMIN',
+    is_mobile_verified: true,
+    memberships: [{ organization_id: 301, organization_name: 'Smoke Org', role: 'ORG_ADMIN', capabilities: baseCapabilities, pharmacies: [{ id: 101, name: 'Smoke Pharmacy' }] }],
+    admin_assignments: [],
+  },
+  pharmacist: {
+    id: 4,
+    username: 'pharmacist-smoke',
+    email: 'pharmacist@example.test',
+    role: 'PHARMACIST',
+    is_mobile_verified: true,
+    memberships: [{ pharmacy_id: 101, pharmacy_name: 'Smoke Pharmacy', role: 'PHARMACIST', employment_type: 'FULL_TIME' }],
+    admin_assignments: [],
+  },
+  otherstaff: {
+    id: 5,
+    username: 'staff-smoke',
+    email: 'staff@example.test',
+    role: 'OTHER_STAFF',
+    is_mobile_verified: true,
+    memberships: [{ pharmacy_id: 101, pharmacy_name: 'Smoke Pharmacy', role: 'OTHER_STAFF', employment_type: 'PART_TIME' }],
+    admin_assignments: [],
+  },
+  explorer: {
+    id: 6,
+    username: 'explorer-smoke',
+    email: 'explorer@example.test',
+    role: 'EXPLORER',
+    is_mobile_verified: true,
+    memberships: [],
+    admin_assignments: [],
+  },
+};
+
+function json(route, value, status = 200) {
+  return route.fulfill({
+    status,
+    contentType: 'application/json',
+    body: JSON.stringify(value),
+  });
+}
+
+async function installApiFixture(page, user) {
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    const method = request.method();
+
+    if (path.endsWith('/users/me/')) return json(route, user);
+    if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+    if (path.includes('/chat/rooms')) return json(route, { results: [], count: 0 });
+    if (path.includes('/notifications')) return json(route, { results: [], unread_count: 0, count: 0 });
+    if (path.includes('/pharmacies')) return json(route, []);
+    if (path.includes('/onboarding/')) {
+      return json(route, {
+        progress_percent: 100,
+        verified: true,
+        submitted_for_verification: true,
+        first_name: 'Smoke',
+        last_name: 'User',
+        username: user.username,
+        phone_number: '0400000000',
+        role: user.role,
+        number_of_pharmacies: 1,
+      });
+    }
+
+    if (method === 'GET') return json(route, { results: [], count: 0, next: null, previous: null });
+    return json(route, { ok: true, id: 999 });
+  });
+}
+
+async function openAuthenticatedRoute(page, user, path) {
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await installApiFixture(page, user);
+  await page.goto(path);
+  await page.waitForLoadState('networkidle');
+
+  await expect(page.locator('body')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('Page not found');
+  await expect(page.locator('body')).not.toContainText('Not Found');
+  expect(pageErrors, `page errors while opening ${path}`).toEqual([]);
+}
+
+test.describe('public/auth wiring', () => {
+  test('login requires email and password before any auth request', async ({ page }) => {
+    let authPostCount = 0;
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST' && request.url().includes('/users/')) authPostCount += 1;
+      return json(route, request.url().endsWith('/users/me/') ? {} : { results: [] }, request.url().endsWith('/users/me/') ? 401 : 200);
+    });
+
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(page.getByRole('alert')).toContainText('Please enter both email and password');
+    expect(authPostCount).toBe(0);
+  });
+
+  test('invalid login uses POST with normalized email and existing payload keys', async ({ page }) => {
+    let observed = null;
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      if (path.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
+      if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+      if (request.method() === 'POST' && path.includes('/users/')) {
+        observed = {
+          method: request.method(),
+          path,
+          body: request.postDataJSON(),
+          csrf: request.headers()['x-csrftoken'],
+          platform: request.headers()['x-client-platform'],
+        };
+        return json(route, { detail: 'Invalid credentials' }, 401);
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('SMOKE@EXAMPLE.TEST');
+    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByRole('button', { name: 'Login' }).click();
+
+    await expect(page.getByRole('alert')).toContainText('Invalid credentials');
+    expect(observed).not.toBeNull();
+    expect(observed.method).toBe('POST');
+    expect(observed.body).toMatchObject({
+      email: 'smoke@example.test',
+      password: 'wrong-password',
+      remember_me: false,
+    });
+    expect(observed.csrf).toBe('smoke-csrf');
+    expect(observed.platform).toBe('web');
+  });
+});
+
+test.describe('authenticated route skeleton', () => {
+  const cases = [
+    ['Owner overview', roleUsers.owner, '/dashboard/owner/overview'],
+    ['Delegated Admin overview', roleUsers.admin, '/dashboard/admin/101/overview'],
+    ['Organisation overview', roleUsers.organization, '/dashboard/organization/overview'],
+    ['Pharmacist overview', roleUsers.pharmacist, '/dashboard/pharmacist/overview'],
+    ['Other Staff overview', roleUsers.otherstaff, '/dashboard/otherstaff/overview'],
+    ['Explorer overview', roleUsers.explorer, '/dashboard/explorer/overview'],
+    ['Worker My Hours', roleUsers.pharmacist, '/dashboard/my-hours'],
+    ['Worker My Leave', roleUsers.otherstaff, '/dashboard/my-leave'],
+    ['Workforce settings', roleUsers.admin, '/dashboard/workforce/settings'],
+    ['Timesheets', roleUsers.admin, '/dashboard/workforce/timesheets'],
+    ['Attendance approvals', roleUsers.admin, '/dashboard/attendance/reviews'],
+    ['Shared Pharmacy Hub', roleUsers.owner, '/dashboard/pharmacy-hub'],
+  ];
+
+  for (const [name, user, path] of cases) {
+    test(name, async ({ page }) => {
+      await openAuthenticatedRoute(page, user, path);
+    });
+  }
+});
+
+test('delegated admin direct route preserves requested pharmacy scope', async ({ page }) => {
+  await installApiFixture(page, roleUsers.admin);
+  await page.addInitScript(() => localStorage.setItem('ct-active-persona:2', 'ADMIN:201'));
+  await page.goto('/dashboard/admin/101/overview');
+  await page.waitForLoadState('networkidle');
+  await expect(page).toHaveURL(/\/dashboard\/admin\/101\/overview$/);
+});
