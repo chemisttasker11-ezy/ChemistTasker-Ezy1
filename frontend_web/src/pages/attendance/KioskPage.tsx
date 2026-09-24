@@ -2047,15 +2047,20 @@ export default function KioskPage() {
           {settingsError && <Alert severity="error" sx={{ mb: 2 }}>{settingsError}</Alert>}
           {settingsMessage && <Alert severity="success" sx={{ mb: 2 }}>{settingsMessage}</Alert>}
           {desktopRuntime && (
-            <Alert severity={pendingDisconnectCount > 0 ? "warning" : "info"} sx={{ mb: 2 }}>
-              {pendingDisconnectCount > 0
-                ? `${pendingDisconnectCount} attendance event${pendingDisconnectCount === 1 ? "" : "s"} waiting to sync.`
-                : "No attendance events are waiting to sync."}
-            </Alert>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="overline" fontWeight={900} color="text.secondary">Attendance sync</Typography>
+              <Alert severity={pendingDisconnectCount > 0 ? "warning" : "success"}>
+                {pendingDisconnectCount > 0
+                  ? `${pendingDisconnectCount} attendance event${pendingDisconnectCount === 1 ? "" : "s"} waiting to sync. Use Sync Now before disconnecting this terminal.`
+                  : "Attendance evidence is fully uploaded."}
+              </Alert>
+            </Box>
           )}
+          <Typography variant="overline" fontWeight={900} color="text.secondary">Device connection</Typography>
           <Typography variant="body2" color="text.secondary">
-            Disconnect this terminal from <strong>{pharmacyName}</strong>. The device will be revoked
-            on ChemistTasker and must be paired again before it can record attendance.
+            Disconnect this terminal from <strong>{pharmacyName}</strong>. ChemistTasker will revoke
+            the device before any local credentials are removed, and the terminal must be paired again
+            before it can record new attendance.
           </Typography>
           {desktopRuntime && pendingDisconnectCount > 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>
