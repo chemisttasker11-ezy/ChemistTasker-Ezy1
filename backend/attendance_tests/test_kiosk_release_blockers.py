@@ -1,6 +1,12 @@
 import base64
+import os
 import uuid
 from unittest.mock import patch
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
+
+import django
+django.setup()
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
