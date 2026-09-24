@@ -78,10 +78,19 @@ function isPath(path, expected) {
 async function installLoggedOutBootstrap(route) {
   const request = route.request();
   const path = new URL(request.url()).pathname;
-  if (path.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
-  if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
-  if (isPath(path, REFRESH_PATH)) return json(route, { detail: 'Unauthenticated' }, 401);
-  return null;
+  if (path.endsWith('/users/me/')) {
+    await json(route, { detail: 'Unauthenticated' }, 401);
+    return true;
+  }
+  if (path.endsWith('/users/csrf/')) {
+    await json(route, { csrfToken: 'smoke-csrf' });
+    return true;
+  }
+  if (isPath(path, REFRESH_PATH)) {
+    await json(route, { detail: 'Unauthenticated' }, 401);
+    return true;
+  }
+  return false;
 }
 
 async function installApiFixture(page, user) {
