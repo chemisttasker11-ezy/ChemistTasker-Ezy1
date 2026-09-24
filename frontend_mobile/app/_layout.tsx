@@ -12,6 +12,7 @@ import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
+import { hasOrganizationAccess as hasOrgPersonaAccess, resolveInitialWorkspace } from '../utils/mobilePersona';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
@@ -20,12 +21,7 @@ import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '.
 const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
 
 function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
+  return hasOrgPersonaAccess(user);
 }
 
 function hasAdminAccess(user: any) {
@@ -285,7 +281,8 @@ function AuthGate() {
           return;
         }
 
-        router.replace(getRoleHome(user.role) as any);
+        const workspaceRoute = await resolveInitialWorkspace(user);
+        if (active) router.replace(workspaceRoute as any);
         return;
       }
 
