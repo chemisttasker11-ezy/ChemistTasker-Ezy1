@@ -386,9 +386,11 @@ test('timesheets Sync now uses existing kiosk status and period recalculation co
   await expect(syncButton).toBeEnabled();
   await syncButton.click();
 
-  await expect(page.getByRole('alert')).toContainText(
-    'Timesheets refreshed from all attendance currently received by ChemistTasker',
-  );
+  await expect(
+    page.getByRole('alert').filter({
+      hasText: 'Timesheets refreshed from all attendance currently received by ChemistTasker',
+    }),
+  ).toBeVisible();
 
   expect(observed.kiosk).toEqual({
     method: 'GET',
