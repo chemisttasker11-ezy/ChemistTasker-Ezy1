@@ -7824,6 +7824,8 @@ class LeaveRequestViewSet(viewsets.ViewSet):
 
         qs = WorkforceLeaveRequest.objects.filter(
             slot_assignment__isnull=False,
+        ).exclude(
+            status=WorkforceLeaveRequest.Status.CANCELLED,
         ).select_related(
             "pharmacy",
             "user",
