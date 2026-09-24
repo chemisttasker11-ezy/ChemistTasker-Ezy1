@@ -38,6 +38,7 @@ import { API_BASE_URL } from "../../constants/api";
 import { clearTokens } from "../../utils/tokenService";
 import {
   getDesktopKioskStatus,
+  getDesktopOnlineQr,
   isDesktopKiosk,
   pairDesktopKiosk,
   captureDesktopPinAttendance,
@@ -175,33 +176,45 @@ export default function KioskPage() {
   // Fetch rotating QR from server (30s TTL)
   const fetchQR = useCallback(async () => {
     if (!deviceToken || isFetchingRef.current) return;
-    if (desktopRuntime) {
-      setQrLoading(false);
-      return;
-    }
     try {
       isFetchingRef.current = true;
       setQrLoading(true);
       setQrError(null);
-      const res = await kioskClient.post(
-        "/client-profile/attendance/kiosk/qr/",
-        {},
-        { headers: { "X-Device-Token": deviceToken } }
-      );
-      setQrToken(res.data.qr_token);
-      setExpiresAt(res.data.expires_at);
-      if (res.data.pharmacy_name) {
-        setPharmacyName(res.data.pharmacy_name);
-        localStorage.setItem(KIOSK_PHARMACY_NAME_KEY, res.data.pharmacy_name);
+
+      const data = desktopRuntime
+        ? await getDesktopOnlineQr()
+        : (await kioskClient.post(
+            "/client-profile/attendance/kiosk/qr/",
+            {},
+            { headers: { "X-Device-Token": deviceToken } }
+          )).data;
+
+      setQrToken(data.qr_token);
+      setExpiresAt(data.expires_at);
+      if (data.pharmacy_name) {
+        setPharmacyName(data.pharmacy_name);
+        if (!desktopRuntime) {
+          localStorage.setItem(KIOSK_PHARMACY_NAME_KEY, data.pharmacy_name);
+        }
       }
-      const expiry = new Date(res.data.expires_at).getTime();
-      const remaining = Math.max(0, Math.min(30, Math.round((expiry - Date.now()) / 1000)));
-      setCountdownSeconds(remaining || 30);
+      const expiry = new Date(data.expires_at).getTime();
+      const refreshWindow = Math.max(1, Number(data.refresh_interval_seconds) || 30);
+      const remaining = Math.max(0, Math.min(refreshWindow, Math.round((expiry - Date.now()) / 1000)));
+      setCountdownSeconds(remaining || refreshWindow);
     } catch (err: any) {
-      const msg = err.response?.data?.error || "Device inactive or network error.";
-      setQrError(msg);
-      if (err.response?.status === 401) {
-        // Device revoked
+      setQrToken(null);
+      setExpiresAt(null);
+      setCountdownSeconds(0);
+      const msg = desktopRuntime
+        ? String(err).replace(/^KIOSK_REVOKED:\s*/, "")
+        : err.response?.data?.error || "Device inactive or network error.";
+      setQrError(
+        desktopRuntime
+          ? `${msg} Use your attendance PIN while QR is unavailable.`
+          : msg
+      );
+      if (!desktopRuntime && err.response?.status === 401) {
+        // Browser kiosk device revoked.
         setDeviceToken(null);
         localStorage.removeItem(KIOSK_TOKEN_KEY);
       }
@@ -1019,8 +1032,7 @@ export default function KioskPage() {
           </Grid>
           )}
 
-          {/* Legacy web QR remains available; desktop QR stays hidden until its return path is complete. */}
-          {!desktopRuntime && (
+          {/* Online QR and offline-capable PIN share the same kiosk. QR is server-issued for both web and native. */}
           <Grid size={{ xs: 12, md: 6 }}>
             <Paper
               elevation={8}
@@ -1119,16 +1131,15 @@ export default function KioskPage() {
               </Box>
 
               {qrError && (
-                <Alert severity="error" sx={{ mt: 2, width: "100%", borderRadius: 2 }}>
+                <Alert severity={desktopRuntime ? "warning" : "error"} sx={{ mt: 2, width: "100%", borderRadius: 2 }}>
                   {qrError}
                 </Alert>
               )}
             </Paper>
           </Grid>
-          )}
 
           {/* Right: Personal PIN Pad */}
-          <Grid size={{ xs: 12, md: desktopRuntime ? 12 : 6 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Paper
               elevation={8}
               sx={{
