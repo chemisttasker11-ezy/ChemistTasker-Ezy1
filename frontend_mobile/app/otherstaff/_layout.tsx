@@ -226,13 +226,13 @@ export default function OtherStaffTabs() {
     if (user.role !== 'OTHER_STAFF') {
       switch (user.role) {
         case 'OWNER':
-          router.replace('/owner' as any);
+          router.replace('/owner/dashboard' as any);
           break;
         case 'PHARMACIST':
           router.replace('/pharmacist' as any);
           break;
         case 'EXPLORER':
-          router.replace('/explorer' as any);
+          router.replace('/explorer/dashboard' as any);
           break;
         case 'ORGANIZATION':
           router.replace('/organization/dashboard' as any);
