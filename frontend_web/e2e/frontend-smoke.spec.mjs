@@ -535,7 +535,7 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
   });
 
   await page.goto('/dashboard/pharmacist/memberships');
-  await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Smoke Pharmacy' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Accept' }).click();
 
@@ -644,5 +644,9 @@ test('delegated admin direct route preserves requested pharmacy scope', async ({
 
   await page.goto('/dashboard/admin/101/overview');
   await page.waitForLoadState('networkidle');
-  await expect(page).toHaveURL(/\/dashboard\/admin\/101\/overview$/);
+
+  const adminUrl = new URL(page.url());
+  expect(adminUrl.pathname).toBe('/dashboard/admin/101/overview');
+  expect(adminUrl.searchParams.get('pharmacy_id')).toBe('101');
+  expect(adminUrl.searchParams.get('workspace')).toBe('internal');
 });
