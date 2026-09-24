@@ -115,7 +115,11 @@ def is_authorized_kiosk_manager(user, pharmacy: Pharmacy) -> bool:
             membership = OrganizationMembership.objects.filter(
                 user=user,
                 organization_id=pharmacy.organization_id,
-                role="ORG_ADMIN",
+                role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"],
+                admin_level__in=[
+                    PharmacyAdmin.AdminLevel.OWNER,
+                    PharmacyAdmin.AdminLevel.MANAGER,
+                ],
             ).first()
             if membership:
                 scope = membership.pharmacies.all()
