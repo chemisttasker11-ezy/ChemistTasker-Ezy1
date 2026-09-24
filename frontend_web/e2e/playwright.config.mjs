@@ -1,4 +1,8 @@
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from '@playwright/test';
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export default defineConfig({
   testDir: '.',
@@ -15,6 +19,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
+    cwd: projectRoot,
     command: 'npx vite --host 127.0.0.1 --port 5173',
     url: 'http://127.0.0.1:5173/login',
     timeout: 120_000,
