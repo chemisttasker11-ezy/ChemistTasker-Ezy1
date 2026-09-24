@@ -9,10 +9,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
 
-export default function PharmacistProfileScreen() {
 import { brandColors, personaPalettes } from '@/constants/theme';
 
 const profilePalette = personaPalettes.pharmacist;
+
+export default function PharmacistProfileScreen() {
   const { user, logout, refreshUser, updateUserProfilePhoto } = useAuth();
   const router = useRouter();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
