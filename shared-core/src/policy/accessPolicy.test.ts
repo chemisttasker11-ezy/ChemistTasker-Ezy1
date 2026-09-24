@@ -95,6 +95,32 @@ describe('shared access policy', () => {
     expect(resolvePersonaSelection(user, 'ADMIN:999')).toEqual({ mode: 'admin', assignmentId: 8 });
   });
 
+  it('keeps multi-role staff, pharmacy admin and organisation authority distinct', () => {
+    const user = {
+      id: 7,
+      role: 'PHARMACIST',
+      admin_assignments: [{
+        id: 70,
+        pharmacy_id: 70,
+        admin_level: 'ROSTER_MANAGER',
+        capabilities: ['MANAGE_ROSTER'],
+      }],
+      memberships: [{
+        organization_id: 9,
+        role: 'REGION_ADMIN',
+        capabilities: ['MANAGE_STAFF'],
+        pharmacies: [{ id: 71 }],
+      }],
+    };
+
+    expect(hasOrganizationAccess(user)).toBe(true);
+    expect(hasAdminCapability(user, 'MANAGE_ROSTER', { pharmacyId: 70 })).toBe(true);
+    expect(hasAdminCapability(user, 'MANAGE_STAFF', { pharmacyId: 70 })).toBe(false);
+    expect(hasAdminCapability(user, 'MANAGE_STAFF', { pharmacyId: 71 })).toBe(true);
+    expect(resolvePersonaSelection(user, 'ROLE:PHARMACIST')).toEqual({ mode: 'staff', assignmentId: null });
+    expect(resolvePersonaSelection(user, 'ADMIN:70')).toEqual({ mode: 'admin', assignmentId: 70 });
+  });
+
   it('keeps a stored matching staff persona', () => {
     const user = {
       id: 6,
