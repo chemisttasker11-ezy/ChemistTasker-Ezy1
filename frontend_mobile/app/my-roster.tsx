@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip, Dialog, Portal, Text } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import {
   claimShiftService,
   createLeaveRequestService,
@@ -13,6 +14,10 @@ import {
   fetchWorkerShiftRequestsService,
   updateLeaveRequestService,
   updateWorkerShiftRequestService,
+  WORKFORCE_LEAVE_TYPE_OPTIONS,
+  type LeaveRequest,
+  type WorkforceLeaveType,
+  type WorkerShiftRequest,
 } from '@chemisttasker/shared-core';
 import {
   ActionButtons,
@@ -25,24 +30,13 @@ import {
   ParityPage,
   Section,
 } from '@/features/parity/ParityUI';
-import { asArray, errorMessage, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
-
-const LEAVE_TYPES = [
-  { value: 'ANNUAL', label: 'Annual' },
-  { value: 'SICK', label: 'Sick' },
-  { value: 'PERSONAL', label: 'Personal' },
-  { value: 'UNPAID', label: 'Unpaid' },
-  { value: 'OTHER', label: 'Other' },
-];
+import { asArray, dateFromIso, errorMessage, isoDate, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
 
 const addDays = (value: string, days: number) => {
-  const date = new Date(`${value}T00:00:00`);
+  const date = dateFromIso(value);
+  if (!date) return value;
   date.setDate(date.getDate() + days);
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
+  return isoDate(date);
 };
 
 const assignmentDate = (row: any) =>
@@ -66,8 +60,8 @@ const pharmacyNameOf = (row: any) => row?.name ?? row?.pharmacyName ?? row?.phar
 const openShiftSlots = (shift: any) => asArray<any>(shift?.slots);
 
 type EditState =
-  | { type: 'leave'; assignment: any; existing?: any | null }
-  | { type: 'cover'; assignment: any; existing?: any | null }
+  | { type: 'leave'; assignment: any; existing?: LeaveRequest | null }
+  | { type: 'cover'; assignment: any; existing?: WorkerShiftRequest | null }
   | { type: 'claim'; shift: any; slot: any }
   | null;
 
@@ -77,13 +71,13 @@ export default function MyRosterScreen() {
   const [weekStart, setWeekStart] = useState(startOfWeek());
   const [assignments, setAssignments] = useState<any[]>([]);
   const [openShifts, setOpenShifts] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<WorkerShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [edit, setEdit] = useState<EditState>(null);
-  const [leaveType, setLeaveType] = useState('ANNUAL');
+  const [leaveType, setLeaveType] = useState<WorkforceLeaveType>('ANNUAL');
   const [note, setNote] = useState('');
 
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
@@ -115,7 +109,7 @@ export default function MyRosterScreen() {
       ]);
       setAssignments(asArray<any>(assignmentRows));
       setOpenShifts(asArray<any>((openRows as any)?.results ?? openRows));
-      setRequests(asArray<any>(requestRows));
+      setRequests(asArray<WorkerShiftRequest>(requestRows));
     } catch (e) {
       setError(errorMessage(e, 'Unable to load your roster.'));
     } finally {
@@ -141,13 +135,13 @@ export default function MyRosterScreen() {
   };
 
   const openLeave = (assignment: any) => {
-    const existing = assignmentLeave(assignment);
-    setLeaveType(existing?.leaveType ?? existing?.leave_type ?? 'ANNUAL');
+    const existing = assignmentLeave(assignment) as LeaveRequest | null;
+    setLeaveType((existing?.leaveType ?? 'ANNUAL') as WorkforceLeaveType);
     setNote(existing?.note ?? '');
     setEdit({ type: 'leave', assignment, existing });
   };
 
-  const openCover = (assignment: any, existing?: any | null) => {
+  const openCover = (assignment: any, existing?: WorkerShiftRequest | null) => {
     setNote(existing?.note ?? '');
     setEdit({ type: 'cover', assignment, existing: existing ?? null });
   };
@@ -273,7 +267,13 @@ export default function MyRosterScreen() {
       ) : null}
 
       <Section title="Week" description="The same weekly roster window used by the web workspace.">
-        <Field label="Week starting (YYYY-MM-DD)" value={weekStart} onChangeText={setWeekStart} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Week starting"
+          value={dateFromIso(weekStart)}
+          onChange={(date) => date && setWeekStart(startOfWeek(date))}
+          inputMode="start"
+        />
       </Section>
 
       <MetricGrid items={[
@@ -324,15 +324,15 @@ export default function MyRosterScreen() {
         {pendingRequests.length ? pendingRequests.map((request) => {
           const syntheticAssignment = {
             role: request.role,
-            slotDate: request.slotDate ?? request.slot_date,
-            startTime: request.startTime ?? request.start_time,
-            endTime: request.endTime ?? request.end_time,
+            slotDate: request.slotDate,
+            startTime: request.startTime,
+            endTime: request.endTime,
           };
           return (
             <DataRow
               key={request.id}
               title={replaceUnderscore(request.role || 'Cover request')}
-              subtitle={`${request.slotDate ?? request.slot_date ?? ''} · ${request.startTime ?? request.start_time ?? ''}–${request.endTime ?? request.end_time ?? ''}`}
+              subtitle={`${request.slotDate ?? ''} · ${request.startTime ?? ''}–${request.endTime ?? ''}`}
               status={replaceUnderscore(request.status || 'PENDING')}
               onPress={() => openCover(syntheticAssignment, request)}
             />
@@ -345,7 +345,7 @@ export default function MyRosterScreen() {
           <Dialog.Title>{edit && edit.type === 'leave' && edit.existing ? 'Manage leave request' : 'Request leave'}</Dialog.Title>
           <Dialog.ScrollArea>
             <View style={{ padding: 18, gap: 14 }}>
-              <ChoiceChips value={leaveType} options={LEAVE_TYPES} onChange={setLeaveType} disabled={busy} />
+              <ChoiceChips value={leaveType} options={WORKFORCE_LEAVE_TYPE_OPTIONS} onChange={(value) => setLeaveType(value as WorkforceLeaveType)} disabled={busy} />
               <Field label="Note" value={note} onChangeText={setNote} multiline disabled={busy} />
               {edit?.type === 'leave' && edit.existing && String(edit.existing?.status || '').toUpperCase() !== 'PENDING'
                 ? <InfoNote title="Request locked">Only pending leave requests can be changed or cancelled.</InfoNote>
@@ -360,7 +360,7 @@ export default function MyRosterScreen() {
             <Button
               mode="contained"
               loading={busy}
-              disabled={busy || (edit?.type === 'leave' && edit.existing && String(edit.existing?.status || '').toUpperCase() !== 'PENDING')}
+              disabled={busy || Boolean(edit?.type === 'leave' && edit.existing && String(edit.existing.status || '').toUpperCase() !== 'PENDING')}
               onPress={() => void saveLeave()}
             >
               Save

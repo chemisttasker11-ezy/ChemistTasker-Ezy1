@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { ActivityIndicator, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
+import { Icon, Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminAssignments, getAssignmentId, getSelectedAdminAssignment, selectAdminPersona } from '@/utils/mobilePersona';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
@@ -10,6 +10,7 @@ import * as Notifications from 'expo-notifications';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { triggerShiftSlotActivity } from '@/utils/pushNotifications';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
@@ -322,9 +323,9 @@ export default function PharmacistTabs() {
                     }
                   }}
                 />
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -343,9 +344,9 @@ export default function PharmacistTabs() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => router.push('/pharmacist/notifications' as any)} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={() => router.push('/pharmacist/notifications' as any)} style={{ marginHorizontal: 4 }}>
                   <View>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -373,7 +374,7 @@ export default function PharmacistTabs() {
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="home" iconColor={color} size={size} />
+              <Icon source="home" color={color} size={size} />
             ),
           }}
         />
@@ -383,7 +384,7 @@ export default function PharmacistTabs() {
             title: 'Shifts',
             tabBarAccessibilityLabel: 'Shifts tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="calendar" iconColor={color} size={size} />
+              <Icon source="calendar" color={color} size={size} />
             ),
           }}
         />
@@ -393,7 +394,7 @@ export default function PharmacistTabs() {
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="message" iconColor={color} size={size} />
+              <Icon source="message" color={color} size={size} />
             ),
           }}
         />
@@ -403,7 +404,7 @@ export default function PharmacistTabs() {
             title: 'Hub',
             tabBarAccessibilityLabel: 'Hub tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="view-grid" iconColor={color} size={size} />
+              <Icon source="view-grid" color={color} size={size} />
             ),
           }}
         />
@@ -413,7 +414,7 @@ export default function PharmacistTabs() {
             title: 'Invoices',
             tabBarAccessibilityLabel: 'Invoices tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="file-document-multiple" iconColor={color} size={size} />
+              <Icon source="file-document-multiple" color={color} size={size} />
             ),
           }}
         />
@@ -423,7 +424,7 @@ export default function PharmacistTabs() {
             title: 'Publish',
             tabBarAccessibilityLabel: 'Publish availability tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="calendar-plus" iconColor={color} size={size} />
+              <Icon source="calendar-plus" color={color} size={size} />
             ),
           }}
         />

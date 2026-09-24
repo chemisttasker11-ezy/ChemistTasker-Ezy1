@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, rosterV2, workforce } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce, type RosterPharmacyMember, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { asArray, dateLabel, errorMessage, replaceUnderscore, startOfWeek, toNumber } from './utils';
+import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
 
 type RosterScreen =
   | 'workspace'
@@ -62,8 +63,8 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [period, setPeriod] = useState<any>(null);
   const [coverage, setCoverage] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
+  const [requests, setRequests] = useState<WorkerShiftRequest[]>([]);
+  const [membersByRole, setMembersByRole] = useState<Record<string, RosterPharmacyMember[]>>({});
   const [audits, setAudits] = useState<any[]>([]);
   const [acknowledgements, setAcknowledgements] = useState<any>(null);
   const [validation, setValidation] = useState<any>(null);
@@ -86,13 +87,20 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       const p = await loadPeriod();
       if (screen === 'coverage') setCoverage(asArray(await workforce.listCoverageRequirements(pharmacyId)));
       if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
-      if (screen === 'approvals' || screen === 'shift-editor') {
-        const memberRows = await fetchRosterOwnerMembersService(pharmacyId);
-        setMembers(asArray(memberRows));
-        if (screen === 'approvals') {
-          const rows = await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any);
-          setRequests(asArray(rows).filter((row:any)=>String(row.status||'').toUpperCase()==='PENDING'));
-        }
+      if (screen === 'approvals') {
+        const rows = asArray<WorkerShiftRequest>(
+          await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any),
+        ).filter((row) => String(row.status || '').toUpperCase() === 'PENDING');
+        setRequests(rows);
+
+        const roles = [...new Set(rows.map((row) => String(row.role || '').toUpperCase()).filter(Boolean))];
+        const entries = await Promise.all(
+          roles.map(async (role) => [
+            role,
+            asArray<RosterPharmacyMember>(await fetchRosterOwnerMembersService(pharmacyId, role)),
+          ] as const),
+        );
+        setMembersByRole(Object.fromEntries(entries));
       }
       if (screen === 'audit') {
         const result = await roster.getAudits(pharmacyId);
@@ -126,7 +134,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   };
 
   if (screen === 'shift-editor') {
-    return <ShiftEditor pharmacyId={pharmacyId} pharmacyName={pharmacyName} weekStart={weekStart} period={period} members={members} ensurePeriod={ensurePeriod} onSaved={load} />;
+    return <ShiftEditor pharmacyId={pharmacyId} pharmacyName={pharmacyName} weekStart={weekStart} period={period} ensurePeriod={ensurePeriod} onSaved={load} />;
   }
   if (screen === 'coverage') {
     return <CoverageScreen pharmacyId={pharmacyId} rows={coverage} loading={loading} error={error} onReload={load} />;
@@ -138,7 +146,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     return <TemplatesScreen pharmacyId={pharmacyId} period={period} rows={templates} loading={loading} error={error} onReload={load} />;
   }
   if (screen === 'approvals') {
-    return <ApprovalsScreen rows={requests} members={members} loading={loading} error={error} onReload={load} />;
+    return <ApprovalsScreen rows={requests} membersByRole={membersByRole} loading={loading} error={error} onReload={load} />;
   }
   if (screen === 'audit') {
     return (
@@ -233,7 +241,13 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   return (
     <ParityPage title={titles[screen]} subtitle={screen === 'workspace' ? 'Plan, validate and publish weekly pharmacy coverage.' : screen === 'calendar' ? 'Week-at-a-glance shift coverage.' : 'Staff-centred roster allocation.'} loading={loading} error={error} onRetry={load} onRefresh={() => {setRefreshing(true);void load();}} refreshing={refreshing} right={<IconButton icon="plus" onPress={() => router.push('/manager/roster/shift-editor' as any)} />}>
       <View style={{ flexDirection:'row', gap:8, alignItems:'center' }}>
-        <Field label="Week starting (YYYY-MM-DD)" value={weekStart} onChangeText={setWeekStart} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Week starting"
+          value={dateFromIso(weekStart)}
+          onChange={(date) => date && setWeekStart(startOfWeek(date))}
+          inputMode="start"
+        />
       </View>
       <MetricGrid items={[
         { label:'Status',value:period?.status || 'DRAFT' },
@@ -262,29 +276,36 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   );
 }
 
-function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; members:any[]; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
+function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
   const router=useRouter();
   const [date,setDate]=useState(weekStart);
   const [start,setStart]=useState('09:00');
   const [end,setEnd]=useState('17:00');
   const [role,setRole]=useState('PHARMACIST');
   const [userId,setUserId]=useState<number|null>(null);
+  const [eligibleMembers,setEligibleMembers]=useState<RosterPharmacyMember[]>([]);
+  const [membersLoading,setMembersLoading]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
 
-  const memberUserId=(member:any)=>Number(member?.userId ?? member?.user_id ?? member?.user?.id ?? member?.user ?? 0);
-  const memberRole=(member:any)=>String(member?.role ?? member?.userRole ?? member?.user_role ?? '').toUpperCase();
-  const memberLabel=(member:any)=>{
-    const detail=member?.userDetail ?? member?.user_detail ?? member?.user ?? {};
-    const full=[detail?.firstName ?? detail?.first_name,detail?.lastName ?? detail?.last_name].filter(Boolean).join(' ').trim();
-    return full || member?.name || detail?.email || member?.email || `Worker #${memberUserId(member)}`;
-  };
-  const eligible=members.filter((member:any)=>{
-    const user=memberUserId(member);
-    if(!user || member?.isActive===false || member?.is_active===false) return false;
-    const memberRoleValue=memberRole(member);
-    return !memberRoleValue || memberRoleValue===role || (role==='ASSISTANT' && memberRoleValue==='OTHER_STAFF');
-  });
+  useEffect(() => {
+    let active = true;
+    setMembersLoading(true);
+    fetchRosterOwnerMembersService(pharmacyId, role)
+      .then((rows) => {
+        if (active) setEligibleMembers(asArray<RosterPharmacyMember>(rows));
+      })
+      .catch((e) => {
+        if (active) {
+          setEligibleMembers([]);
+          setError(errorMessage(e, 'Unable to load eligible pharmacy members.'));
+        }
+      })
+      .finally(() => {
+        if (active) setMembersLoading(false);
+      });
+    return () => { active = false; };
+  }, [pharmacyId, role]);
 
   const save=async()=>{
     setBusy(true);setError('');
@@ -297,7 +318,13 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
   return <ParityPage title="Add roster shift" subtitle="Create a draft roster slot and optionally assign an eligible pharmacy team member." error={error}>
     <InfoNote title={pharmacyName || `Pharmacy #${pharmacyId}`}>Roster changes are transactional and server validated before publication.</InfoNote>
     <Section title="Shift details">
-      <Field label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
+      <DatePickerInput
+        locale="en-AU"
+        label="Shift date"
+        value={dateFromIso(date)}
+        onChange={(next) => next && setDate(isoDate(next))}
+        inputMode="start"
+      />
       <View style={{flexDirection:'row',gap:10}}>
         <View style={{flex:1}}><Field label="Start (HH:MM)" value={start} onChangeText={setStart} /></View>
         <View style={{flex:1}}><Field label="End (HH:MM)" value={end} onChangeText={setEnd} /></View>
@@ -307,12 +334,13 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
     <Section title="Assignment" description="Leave unassigned to create a vacant roster slot, or choose an eligible worker.">
       <Chip selected={userId===null} onPress={()=>setUserId(null)}>Leave vacant</Chip>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        {eligible.map((member:any)=>{
-          const id=memberUserId(member);
-          return <Chip key={id} selected={userId===id} onPress={()=>setUserId(id)}>{memberLabel(member)}</Chip>;
+        {eligibleMembers.map((member)=>{
+          const id=Number(member.user || 0);
+          return <Chip key={member.id || id} selected={userId===id} onPress={()=>setUserId(id)}>{rosterMemberLabel(member)}</Chip>;
         })}
       </View>
-      {!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible active members were returned for this role.</Text>:null}
+      {membersLoading?<Text variant="bodySmall" style={{color:palette.muted}}>Loading eligible members…</Text>:null}
+      {!membersLoading&&!eligibleMembers.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible active members were returned for this role.</Text>:null}
     </Section>
     <Button mode="contained" loading={busy} disabled={busy||!date||!start||!end} onPress={()=>void save()}>Create draft shift</Button>
   </ParityPage>;
@@ -339,7 +367,13 @@ function CopyWeek({period,weekStart,setWeekStart,loading,error,onReload}:{period
   const copy=async()=>{const id=Number(period?.period_id||period?.id||0);if(!id)return;setBusy(true);setLocalError('');try{await roster.copyWeek({source_period_id:id,target_week_start:target,include_assignments:include,overwrite});setWeekStart(target);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
   return <ParityPage title="Copy week" subtitle="Copy shifts into a new draft week with explicit overwrite controls." loading={loading} error={error||localError}>
     <InfoNote title="Source week">{weekStart} · {period?.status||'DRAFT'}</InfoNote>
-    <Field label="Target week start (YYYY-MM-DD)" value={target} onChangeText={setTarget} />
+    <DatePickerInput
+      locale="en-AU"
+      label="Target week start"
+      value={dateFromIso(target)}
+      onChange={(date) => date && setTarget(startOfWeek(date))}
+      inputMode="start"
+    />
     <View style={{flexDirection:'row',alignItems:'center'}}><Checkbox status={include?'checked':'unchecked'} onPress={()=>setInclude(!include)} /><Text>Include assignments</Text></View>
     <View style={{flexDirection:'row',alignItems:'center'}}><Checkbox status={overwrite?'checked':'unchecked'} onPress={()=>setOverwrite(!overwrite)} /><Text>Overwrite existing target draft</Text></View>
     <Button mode="contained" loading={busy} disabled={!target||busy||!period?.period_id} onPress={()=>void copy()}>Copy roster week</Button>
@@ -353,21 +387,24 @@ function TemplatesScreen({pharmacyId,period,rows,loading,error,onReload}:{pharma
   return <ParityPage title="Roster templates" subtitle="Save reusable weekly patterns and apply them into draft periods." loading={loading} error={error||localError}>
     <Section title="Templates">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={`${row.total_slots||0} slots · updated ${dateLabel(row.updated_at||row.created_at)}`} right={<Button compact disabled={!target||busy} onPress={()=>void apply(Number(row.id))}>Apply</Button>} />):<EmptyState title="No templates" body="Save the current roster as a reusable template." />}</Section>
     <Section title="Save current week"><Field label="Template name" value={name} onChangeText={setName} /><Button mode="outlined" loading={busy} disabled={!name.trim()||busy||!period?.period_id} onPress={()=>void save()}>Save template</Button></Section>
-    <Section title="Apply target"><Field label="Target week start (YYYY-MM-DD)" value={target} onChangeText={setTarget} /></Section>
+    <Section title="Apply target">
+      <DatePickerInput
+        locale="en-AU"
+        label="Target week start"
+        value={dateFromIso(target)}
+        onChange={(date) => date && setTarget(startOfWeek(date))}
+        inputMode="start"
+      />
+    </Section>
   </ParityPage>;
 }
 
-function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];members:any[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
+function ApprovalsScreen({rows,membersByRole,loading,error,onReload}:{rows:WorkerShiftRequest[];membersByRole:Record<string,RosterPharmacyMember[]>;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
   const [replacementByRequest,setReplacementByRequest]=useState<Record<string,number>>({});
-  const memberUserId=(member:any)=>Number(member.user??member.userDetails?.id??0);
-  const memberLabel=(member:any)=>{
-    const detail=member.userDetails||{};
-    const full=[detail.firstName,detail.lastName].filter(Boolean).join(' ').trim();
-    return full||detail.displayName||detail.email||member.invitedName||('User #'+memberUserId(member));
-  };
-  const isSwapRequest=(row:any)=>/^Direct swap request/i.test(String(row.note||''));
-  const action=async(row:any,kind:'approve'|'release'|'reject')=>{
+
+  const isSwapRequest=(row:WorkerShiftRequest)=>/^Direct swap request/i.test(String(row.note||''));
+  const action=async(row:WorkerShiftRequest,kind:'approve'|'release'|'reject')=>{
     setBusy(true);setLocalError('');
     try{
       const id=Number(row.id);
@@ -386,14 +423,14 @@ function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];membe
   };
   return <ParityPage title="Swap & cover approvals" subtitle="Review pending worker roster-change requests without dropping the current assignment." loading={loading} error={error||localError}>
     <InfoNote title="Assignment safety">Requests preserve the current worker assignment until a manager approves a swap/replacement or explicitly releases the worker.</InfoNote>
-    <Section title="Pending requests">{rows.length?rows.map((row:any)=>{
-      const swap=isSwapRequest(row);const requestId=String(row.id);const requesterId=Number(row.requestedBy||row.requestedById||0);
-      const eligible=members.filter(member=>{const userId=memberUserId(member);return userId>0&&userId!==requesterId&&member.isActive!==false;});
+    <Section title="Pending requests">{rows.length?rows.map((row)=>{
+      const swap=isSwapRequest(row);const requestId=String(row.id);const requesterId=Number(row.requestedBy||0);const requiredRole=String(row.role||'').toUpperCase();
+      const eligible=(membersByRole[requiredRole]||[]).filter((member)=>Number(member.user||0)!==requesterId);
       return <Card key={row.id} mode="outlined"><Card.Content style={{gap:10}}>
         <Text variant="titleSmall">{row.requesterName||'Worker request'}</Text>
         <Text variant="bodySmall" style={{color:palette.muted}}>{[row.pharmacyName,row.slotDate,row.startTime&&row.endTime?(row.startTime+'–'+row.endTime):'',replaceUnderscore(row.role||'')].filter(Boolean).join(' · ')}</Text>
         <Text variant="bodySmall">{row.note||'Roster change request'}</Text>
-        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=memberUserId(member);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{memberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
+        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=Number(member.user||0);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{rosterMemberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
         <ActionButtons><Button compact mode="contained" disabled={busy||(!swap&&!replacementByRequest[requestId])} onPress={()=>void action(row,'approve')}>Approve</Button><Button compact mode="outlined" disabled={busy} onPress={()=>void action(row,'release')}>Release worker</Button><Button compact textColor={palette.danger} disabled={busy} onPress={()=>void action(row,'reject')}>Reject</Button></ActionButtons>
       </Card.Content></Card>;
     }):<EmptyState title="No pending requests" body="Swap and cover requests will appear here when workers submit them." />}</Section>

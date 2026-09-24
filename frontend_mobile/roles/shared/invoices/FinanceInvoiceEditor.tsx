@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
 import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
+import { dateFromIso, isoDate } from '@/features/parity/utils';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 
@@ -32,8 +34,9 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [query, setQuery] = useState('');
   const [internalSources, setInternalSources] = useState<FinanceInternalSource[]>([]);
   const [sourceOpen, setSourceOpen] = useState(false);
-  const [hoursStart, setHoursStart] = useState('');
-  const [hoursEnd, setHoursEnd] = useState('');
+  const [hoursStart, setHoursStart] = useState<Date | undefined>(undefined);
+  const [hoursEnd, setHoursEnd] = useState<Date | undefined>(undefined);
+  const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
   const [breakMinutes, setBreakMinutes] = useState('0');
   const [computedHours, setComputedHours] = useState('');
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
@@ -118,9 +121,13 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     if (!hoursStart || !hoursEnd) { setError('Enter a start and end date/time first.'); return; }
     setBusy(true); setError('');
     try {
+      if (hoursEnd <= hoursStart) {
+        setError('End date/time must be after the start date/time.');
+        return;
+      }
       const result = await finance.shiftHours({
-        start: new Date(hoursStart).toISOString(),
-        end: new Date(hoursEnd).toISOString(),
+        start: hoursStart.toISOString(),
+        end: hoursEnd.toISOString(),
         break_minutes: Number(breakMinutes) || 0,
       });
       setComputedHours(String(result.hours));
@@ -238,7 +245,24 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
           </View>
         </List.Accordion> : null}
         {field('reference', 'Customer PO / reference')}
-        {field('invoice_date', 'Issue date (YYYY-MM-DD)')}{field('due_date', 'Due date (YYYY-MM-DD)')}
+        <View style={{ gap: 12 }}>
+          <DatePickerInput
+            locale="en-AU"
+            label="Issue date"
+            value={dateFromIso(value.invoice_date)}
+            onChange={(date) => date && change('invoice_date', isoDate(date))}
+            inputMode="start"
+            disabled={busy}
+          />
+          <DatePickerInput
+            locale="en-AU"
+            label="Due date"
+            value={dateFromIso(value.due_date)}
+            onChange={(date) => date && change('due_date', isoDate(date))}
+            inputMode="start"
+            disabled={busy}
+          />
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.price_mode === 'exclusive'} onPress={() => change('price_mode', 'exclusive')}>GST exclusive</Chip><Chip selected={value.price_mode === 'inclusive'} onPress={() => change('price_mode', 'inclusive')}>GST inclusive</Chip></View>
       </Surface>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Text variant="titleMedium" style={{ flex: 1 }}>Items & services</Text><Button compact icon="plus" onPress={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Ad-hoc row</Button><Button compact icon="playlist-plus" onPress={() => { setItemOpen(!itemOpen); setNewItemOpen(false); setCustomerOpen(false); setQuery(''); }}>Saved item</Button><Button compact icon="plus-box-outline" onPress={() => { setNewItemOpen(!newItemOpen); setItemOpen(false); setCustomerOpen(false); }}>Add new saved item</Button></View>
@@ -260,7 +284,14 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         <TextInput mode="outlined" dense label="Description" value={line.description || ''} onChangeText={description => changeLine(index, { description })} />
         <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Qty" value={line.quantity} onChangeText={text => changeLine(index, { quantity: text })} /><TextInput mode="outlined" dense style={{ flex: 1 }} label="Unit" value={line.unit || ''} onChangeText={unit => changeLine(index, { unit })} /><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Rate" value={line.unit_price} onChangeText={text => changeLine(index, { unit_price: text })} /></View>
         <TextInput mode="outlined" dense label="Discount %" keyboardType="decimal-pad" value={line.discount} onChangeText={discount => changeLine(index, { discount })} />
-        <TextInput mode="outlined" dense label="Work date (YYYY-MM-DD)" value={line.worked_on || ''} onChangeText={worked_on => changeLine(index, { worked_on })} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Work date"
+          value={dateFromIso(line.worked_on || undefined)}
+          onChange={(date) => changeLine(index, { worked_on: date ? isoDate(date) : null })}
+          inputMode="start"
+          disabled={busy}
+        />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>{(['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'] as const).map((tax, i) => <Chip key={tax} selected={line.tax_code === tax} onPress={() => changeLine(index, { tax_code: tax })}>{['GST 10%', 'GST-free', 'Input taxed', 'N-T / not taxable'][i]}</Chip>)}</View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           {(['ProfessionalServices', 'Transportation', 'Accommodation', 'Miscellaneous', 'Superannuation'] as FinanceCategory[]).map(category => (
@@ -274,9 +305,57 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       </Surface>)}
       <Surface elevation={0} style={{ padding: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant, gap: 10 }}>
         <Text variant="titleMedium">Calculate shift hours</Text>
-        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Use local date/time values for an ad-hoc labour item. Confirm the timezone for interstate work.</Text>
-        <TextInput mode="outlined" dense label="Start date/time" placeholder="2026-09-24T09:00:00+10:00" value={hoursStart} onChangeText={setHoursStart} />
-        <TextInput mode="outlined" dense label="End date/time" placeholder="2026-09-24T17:00:00+10:00" value={hoursEnd} onChangeText={setHoursEnd} />
+        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Choose the local date and time for the work performed. Confirm the pharmacy timezone for interstate work.</Text>
+        <DatePickerInput
+          locale="en-AU"
+          label="Start date"
+          value={hoursStart}
+          onChange={(date) => {
+            if (!date) return setHoursStart(undefined);
+            const next = new Date(date);
+            next.setHours(hoursStart?.getHours() ?? 9, hoursStart?.getMinutes() ?? 0, 0, 0);
+            setHoursStart(next);
+          }}
+          inputMode="start"
+          disabled={busy}
+        />
+        <Button mode="outlined" icon="clock-outline" disabled={busy || !hoursStart} onPress={() => setTimeTarget('start')}>
+          {hoursStart ? `Start time · ${hoursStart.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}` : 'Choose start date first'}
+        </Button>
+        <DatePickerInput
+          locale="en-AU"
+          label="End date"
+          value={hoursEnd}
+          onChange={(date) => {
+            if (!date) return setHoursEnd(undefined);
+            const next = new Date(date);
+            next.setHours(hoursEnd?.getHours() ?? 17, hoursEnd?.getMinutes() ?? 0, 0, 0);
+            setHoursEnd(next);
+          }}
+          inputMode="start"
+          disabled={busy}
+        />
+        <Button mode="outlined" icon="clock-outline" disabled={busy || !hoursEnd} onPress={() => setTimeTarget('end')}>
+          {hoursEnd ? `End time · ${hoursEnd.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}` : 'Choose end date first'}
+        </Button>
+        <TimePickerModal
+          visible={timeTarget !== null}
+          onDismiss={() => setTimeTarget(null)}
+          onConfirm={({ hours, minutes }) => {
+            const current = timeTarget === 'start' ? hoursStart : hoursEnd;
+            if (current) {
+              const next = new Date(current);
+              next.setHours(hours, minutes, 0, 0);
+              if (timeTarget === 'start') setHoursStart(next);
+              else setHoursEnd(next);
+            }
+            setTimeTarget(null);
+          }}
+          hours={(timeTarget === 'start' ? hoursStart : hoursEnd)?.getHours() ?? 9}
+          minutes={(timeTarget === 'start' ? hoursStart : hoursEnd)?.getMinutes() ?? 0}
+          label="Select time"
+          locale="en"
+        />
         <TextInput mode="outlined" dense keyboardType="numeric" label="Unpaid break (minutes)" value={breakMinutes} onChangeText={setBreakMinutes} />
         <Button mode="outlined" disabled={busy || !hoursStart || !hoursEnd} onPress={() => void calculateHours()}>Calculate hours</Button>
         {computedHours ? <Text variant="bodyMedium"><Text style={{ fontWeight: '800' }}>{computedHours} billable hours.</Text> Enter this quantity on the relevant professional-services item.</Text> : null}

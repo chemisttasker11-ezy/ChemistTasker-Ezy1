@@ -1,37 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  hasOrganizationAccess as sharedHasOrganizationAccess,
+  normalizeAdminAssignments,
+  resolvePersonaSelection,
+  type AuthorityUser,
+  type NormalizedAdminAssignment,
+} from '@chemisttasker/shared-core';
 
-export type MobileAdminAssignment = {
-  id?: number | null;
-  pharmacy_id?: number | null;
-  pharmacyId?: number | null;
-  pharmacy?: number | null;
-  pharmacy_name?: string | null;
-  pharmacyName?: string | null;
-  capabilities?: string[];
-};
+export type MobileAdminAssignment = NormalizedAdminAssignment;
 
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
 const PERSONA_KEY_PREFIX = 'ct-active-persona';
 
-function storageKey(user: any) {
+function storageKey(user: AuthorityUser | null | undefined) {
   const id = user?.id ?? user?.email ?? user?.username;
   return id ? `${PERSONA_KEY_PREFIX}:${id}` : PERSONA_KEY_PREFIX;
 }
 
-export function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) =>
-    ORG_ROLES.has(String(membership?.role || '').toUpperCase())
-  );
+export function hasOrganizationAccess(user: AuthorityUser | null | undefined) {
+  return sharedHasOrganizationAccess(user);
 }
 
-export function getAdminAssignments(user: any): MobileAdminAssignment[] {
-  return Array.isArray(user?.admin_assignments)
-    ? user.admin_assignments.filter((assignment: any) =>
-        Number.isFinite(Number(assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy))
-      )
-    : [];
+export function getAdminAssignments(user: AuthorityUser | null | undefined): MobileAdminAssignment[] {
+  return normalizeAdminAssignments(user);
 }
 
 export function getAssignmentId(assignment?: MobileAdminAssignment | null) {
@@ -40,14 +30,13 @@ export function getAssignmentId(assignment?: MobileAdminAssignment | null) {
 }
 
 export function getAssignmentPharmacyId(assignment?: MobileAdminAssignment | null) {
-  const raw = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy;
-  const value = Number(raw);
+  const value = Number(assignment?.pharmacy_id);
   return Number.isFinite(value) ? value : null;
 }
 
 export function getAssignmentPharmacyName(assignment?: MobileAdminAssignment | null) {
   const pharmacyId = getAssignmentPharmacyId(assignment);
-  return assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
+  return assignment?.pharmacy_name ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
 }
 
 export function getRoleHome(role?: string | null) {
@@ -72,7 +61,7 @@ export function getRoleHome(role?: string | null) {
   }
 }
 
-export async function readPersonaSelection(user: any) {
+export async function readPersonaSelection(user: AuthorityUser | null | undefined) {
   try {
     return await AsyncStorage.getItem(storageKey(user));
   } catch {
@@ -80,7 +69,7 @@ export async function readPersonaSelection(user: any) {
   }
 }
 
-export async function selectRolePersona(user: any) {
+export async function selectRolePersona(user: AuthorityUser | null | undefined) {
   const role = String(user?.role || '').toUpperCase();
   try {
     await AsyncStorage.setItem(storageKey(user), `ROLE:${role}`);
@@ -90,7 +79,7 @@ export async function selectRolePersona(user: any) {
   return getRoleHome(role);
 }
 
-export async function selectAdminPersona(user: any, assignmentId?: number | null) {
+export async function selectAdminPersona(user: AuthorityUser | null | undefined, assignmentId?: number | null) {
   const assignments = getAdminAssignments(user);
   const selected = assignmentId != null
     ? assignments.find((assignment) => getAssignmentId(assignment) === Number(assignmentId))
@@ -105,45 +94,34 @@ export async function selectAdminPersona(user: any, assignmentId?: number | null
   return selected;
 }
 
-export async function getSelectedAdminAssignment(user: any) {
+export async function getSelectedAdminAssignment(user: AuthorityUser | null | undefined) {
   const assignments = getAdminAssignments(user);
   if (!assignments.length) return null;
 
   const stored = await readPersonaSelection(user);
-  if (stored?.startsWith('ADMIN:')) {
-    const id = Number(stored.split(':')[1]);
-    const match = assignments.find((assignment) => getAssignmentId(assignment) === id);
-    if (match) return match;
+  const selection = resolvePersonaSelection(user, stored);
+  if (selection.mode === 'admin' && selection.assignmentId != null) {
+    return assignments.find((assignment) => getAssignmentId(assignment) === selection.assignmentId) ?? assignments[0] ?? null;
   }
-  return assignments[0] ?? null;
+  return null;
 }
 
-export async function resolveInitialWorkspace(user: any) {
+export async function resolveInitialWorkspace(user: AuthorityUser | null | undefined) {
   if (!user) return '/login';
   if (hasOrganizationAccess(user)) return '/organization/dashboard';
 
   const role = String(user?.role || '').toUpperCase();
   if (role === 'OWNER') return '/owner/dashboard';
 
-  const assignments = getAdminAssignments(user);
   const stored = await readPersonaSelection(user);
-
-  if (stored?.startsWith('ADMIN:') && assignments.length) {
-    const id = Number(stored.split(':')[1]);
-    if (assignments.some((assignment) => getAssignmentId(assignment) === id)) {
-      return '/admin';
-    }
-  }
-
-  if (stored?.startsWith('ROLE:')) {
-    const storedRole = stored.split(':')[1];
-    if (storedRole === role) return getRoleHome(role);
-  }
-
-  if (assignments.length) {
-    await selectAdminPersona(user, getAssignmentId(assignments[0]));
+  const selection = resolvePersonaSelection(user, stored);
+  if (selection.mode === 'admin' && selection.assignmentId != null) {
+    await selectAdminPersona(user, selection.assignmentId);
     return '/admin';
   }
 
+  if (selection.mode === 'staff') {
+    await selectRolePersona(user);
+  }
   return getRoleHome(role);
 }

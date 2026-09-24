@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { Icon, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
+import { getNotifications, hasOrganizationAccess as sharedHasOrganizationAccess, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../context/AuthContext';
+import { brandColors } from '@/constants/theme';
 import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
@@ -13,17 +14,6 @@ import {
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
-}
 
 const tabTitles: Record<string, string> = {
   index: 'Organization',
@@ -207,7 +197,7 @@ export default function OrganizationLayout() {
       router.replace('/login' as any);
       return;
     }
-    if (!hasOrganizationAccess(user)) {
+    if (!sharedHasOrganizationAccess(user)) {
       const role = String(user.role || '').toUpperCase();
       switch (role) {
         case 'OWNER':
@@ -331,9 +321,9 @@ export default function OrganizationLayout() {
                     }}
                   />
                 ) : null}
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -366,7 +356,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="home" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="home" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -380,7 +370,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Shifts',
             tabBarAccessibilityLabel: 'Shifts tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="calendar" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="calendar" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -395,12 +385,9 @@ export default function OrganizationLayout() {
             title: 'Post',
             tabBarAccessibilityLabel: 'Post shift tab',
             tabBarIcon: () => (
-              <IconButton
-                icon="plus-circle"
-                iconColor="#FFFFFF"
-                size={32}
-                style={styles.postTabIcon}
-              />
+              <View style={styles.postTabIcon}>
+                <Icon source="plus-circle" color="#FFFFFF" size={32} />
+              </View>
             ),
           }}
         />
@@ -415,7 +402,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Hub',
             tabBarAccessibilityLabel: 'Hub tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-group" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="account-group" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -429,7 +416,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="message" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="message" color={color} size={size} />,
           }}
         />
 

@@ -12,20 +12,18 @@ import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
-import { getAssignmentPharmacyId, getSelectedAdminAssignment, hasOrganizationAccess as hasOrgPersonaAccess, readPersonaSelection, resolveInitialWorkspace } from '../utils/mobilePersona';
+import { getAdminAssignments, getAssignmentPharmacyId, getRoleHome, getSelectedAdminAssignment, hasOrganizationAccess as hasOrgPersonaAccess, readPersonaSelection, resolveInitialWorkspace } from '../utils/mobilePersona';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
 
 function hasOrganizationAccess(user: any) {
   return hasOrgPersonaAccess(user);
 }
 
 function hasAdminAccess(user: any) {
-  return Array.isArray(user?.admin_assignments) && user.admin_assignments.length > 0;
+  return getAdminAssignments(user).length > 0;
 }
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -214,25 +212,6 @@ function AuthGate() {
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
 
-  const getRoleHome = (role?: string | null) => {
-    const normalized = String(role || '').toUpperCase();
-    if (ORG_ROLES.has(normalized)) {
-      return '/organization/dashboard';
-    }
-    switch (normalized) {
-      case 'OWNER':
-        return '/owner/dashboard';
-      case 'PHARMACIST':
-        return '/pharmacist/dashboard';
-      case 'OTHER_STAFF':
-        return '/otherstaff/dashboard';
-      case 'EXPLORER':
-        return '/explorer/dashboard';
-      default:
-        return '/login';
-    }
-  };
-
   useEffect(() => {
     if (isLoading) return;
     const top = segments[0];
@@ -300,11 +279,12 @@ function AuthGate() {
           const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', capabilityPharmacyId);
 
           const isManagerRoute = top === 'manager';
+          const isManagerLeaveRoute = top === 'workforce' && second === 'leave-requests';
           const isRosterWorkforceRoute = top === 'workforce-timesheets' || (top === 'workforce' && second === 'payroll-export');
-          const isStaffWorkforceRoute = top === 'workforce-settings' || (top === 'workforce' && second !== 'payroll-export');
+          const isStaffWorkforceRoute = top === 'workforce-settings' || (top === 'workforce' && second !== 'payroll-export' && second !== 'leave-requests');
           const isAttendanceReviewRoute = top === 'attendance' && second === 'reviews';
 
-          if ((isManagerRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
+          if ((isManagerRoute || isManagerLeaveRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
             router.replace(getRoleHome(user.role) as any);
             return;
           }

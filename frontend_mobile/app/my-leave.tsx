@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { Button, Chip, Dialog, Menu, Portal } from 'react-native-paper';
+import { Button, Dialog, Menu, Portal } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
-import { workforce } from '@chemisttasker/shared-core';
+import { workforce, WORKFORCE_LEAVE_TYPE_OPTIONS, type WorkforceLeaveType } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import {
   ChoiceChips,
@@ -14,9 +14,6 @@ import {
   ParityPage,
   Section,
 } from '@/features/parity/ParityUI';
-
-const TYPES = ['ANNUAL', 'SICK', 'CARER', 'COMPASSIONATE', 'STUDY', 'UNPAID', 'OTHER'];
-const typeOptions = TYPES.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
 const parseTime = (value: string) => {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
@@ -51,7 +48,7 @@ export default function MyLeaveScreen() {
   const [rows, setRows] = useState<any[]>([]);
   const [visible, setVisible] = useState(false);
   const [membershipId, setMembershipId] = useState<number | null>(memberships[0]?.id ?? null);
-  const [type, setType] = useState('ANNUAL');
+  const [type, setType] = useState<WorkforceLeaveType>('ANNUAL');
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState('09:00');
@@ -187,7 +184,7 @@ export default function MyLeaveScreen() {
                 ))}
               </Menu>
 
-              <ChoiceChips value={type} options={typeOptions} onChange={setType} disabled={busy} />
+              <ChoiceChips value={type} options={WORKFORCE_LEAVE_TYPE_OPTIONS} onChange={(value) => setType(value as WorkforceLeaveType)} disabled={busy} />
               <DatePickerInput locale="en-AU" label="Start date" value={startDate} onChange={setStartDate} inputMode="start" />
               <Field label="Start time (HH:MM)" value={startTime} onChangeText={setStartTime} disabled={busy} />
               <DatePickerInput locale="en-AU" label="End date" value={endDate} onChange={setEndDate} inputMode="start" />

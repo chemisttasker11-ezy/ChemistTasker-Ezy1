@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { Icon, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../context/AuthContext';
 import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
@@ -256,9 +257,9 @@ export default function ExplorerTabs() {
                     }
                   }}
                 />
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -277,9 +278,9 @@ export default function ExplorerTabs() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -305,7 +306,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="home" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="home" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -313,7 +314,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="message" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="message" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -321,7 +322,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Profile',
             tabBarAccessibilityLabel: 'Profile tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-circle" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="account-circle" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -329,7 +330,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Talent Board',
             tabBarAccessibilityLabel: 'Talent Board tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-search" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="account-search" color={color} size={size} />,
           }}
         />
 

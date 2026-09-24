@@ -1,27 +1,27 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { getOnboardingDetail } from '@chemisttasker/shared-core';
+import { getAdminAssignments, readPersonaSelection } from '@/utils/mobilePersona';
 
 type WorkspaceType = 'internal' | 'platform';
 
 interface WorkspaceContextType {
   workspace: WorkspaceType;
-  setWorkspace: (workspace: WorkspaceType) => void;
+  setWorkspace: (workspace: WorkspaceType) => Promise<void>;
+  reloadWorkspace: () => Promise<void>;
   isLoading: boolean;
   canUseInternal: boolean;
   canUsePlatform: boolean;
   selectedPharmacyId: number | null;
-  setSelectedPharmacyId: (pharmacyId: number | null) => void;
+  setSelectedPharmacyId: (pharmacyId: number | null) => Promise<void>;
   selectedPharmacyName: string | null;
-  setSelectedPharmacyName: (pharmacyName: string | null) => void;
+  setSelectedPharmacyName: (pharmacyName: string | null) => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
-const WORKSPACE_STORAGE_KEY = '@chemisttasker_workspace';
-const PHARMACY_ID_STORAGE_KEY = '@chemisttasker_selected_pharmacy_id';
-const PHARMACY_NAME_STORAGE_KEY = '@chemisttasker_selected_pharmacy_name';
+const WORKSPACE_STORAGE_PREFIX = '@chemisttasker_workspace_v2';
 const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
 const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(['LOCUM', 'SHIFT_HERO']);
 const INTERNAL_PHARMACY_ROLES = new Set(['OWNER', 'PHARMACY_OWNER', 'MANAGER', 'PHARMACY_ADMIN', 'ADMIN', 'ROSTER_MANAGER', 'COMMUNICATION_MANAGER']);
@@ -52,6 +52,24 @@ function hasFavoriteStaffMembership(user: any): boolean {
   });
 }
 
+function userIdentity(user: any): string | null {
+  const value = user?.id ?? user?.email ?? user?.username;
+  return value == null ? null : String(value);
+}
+
+async function storageKeys(user: any) {
+  const identity = userIdentity(user);
+  if (!identity) return null;
+  const storedPersona = await readPersonaSelection(user);
+  const persona = storedPersona || `ROLE:${String(user?.role || 'UNKNOWN').toUpperCase()}`;
+  const scope = `${identity}:${persona}`;
+  return {
+    workspace: `${WORKSPACE_STORAGE_PREFIX}:${scope}:workspace`,
+    pharmacyId: `${WORKSPACE_STORAGE_PREFIX}:${scope}:pharmacy-id`,
+    pharmacyName: `${WORKSPACE_STORAGE_PREFIX}:${scope}:pharmacy-name`,
+  };
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const [workspace, setWorkspaceState] = useState<WorkspaceType>('internal');
@@ -61,10 +79,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [canUseInternal, setCanUseInternal] = useState(false);
   const [workerVerified, setWorkerVerified] = useState(false);
   const canUsePlatform = isWorkerRole(user?.role) && (workerVerified || hasFavoriteStaffMembership(user));
-
-  useEffect(() => {
-    loadWorkspace();
-  }, []);
 
   useEffect(() => {
     const memberships = Array.isArray((user as any)?.memberships) ? (user as any).memberships : [];
@@ -78,11 +92,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType)
       );
     });
-    const adminAssignments = Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [];
-    const hasAdminAssignment = adminAssignments.some((assignment: any) => {
-      const rawPharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy;
-      return Number.isFinite(Number(rawPharmacyId));
-    });
+    const hasAdminAssignment = getAdminAssignments(user).length > 0;
     const ownerPharmacies = [(user as any)?.pharmacies, (user as any)?.owner_pharmacies, (user as any)?.owned_pharmacies].find(Array.isArray) ?? [];
     const hasOwnerPharmacy = ownerPharmacies.some((pharmacy: any) => Number.isFinite(Number(pharmacy?.id)));
     setCanUseInternal(hasPharmacyMembership || hasAdminAssignment || hasOwnerPharmacy);
@@ -115,97 +125,101 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!canUsePlatform && workspace === 'platform') {
-      setWorkspaceState('internal');
-      AsyncStorage.setItem(WORKSPACE_STORAGE_KEY, 'internal').catch(() => null);
-      return;
-    }
-    if (!canUseInternal) {
-      if (canUsePlatform && workspace !== 'platform') {
-        setWorkspaceState('platform');
+  const reloadWorkspace = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const keys = await storageKeys(user);
+      if (!keys) {
+        setWorkspaceState('internal');
         setSelectedPharmacyIdState(null);
         setSelectedPharmacyNameState(null);
-        AsyncStorage.setItem(WORKSPACE_STORAGE_KEY, 'platform').catch(() => null);
-        AsyncStorage.multiRemove([PHARMACY_ID_STORAGE_KEY, PHARMACY_NAME_STORAGE_KEY]).catch(() => null);
+        return;
       }
-    }
-  }, [authLoading, canUseInternal, canUsePlatform, workspace]);
+      const [storedWorkspace, rawStoredPharmacyId, storedPharmacyName] = await AsyncStorage.multiGet([
+        keys.workspace,
+        keys.pharmacyId,
+        keys.pharmacyName,
+      ]);
+      const workspaceValue = storedWorkspace[1];
+      setWorkspaceState(workspaceValue === 'platform' ? 'platform' : 'internal');
 
-  const loadWorkspace = async () => {
-    try {
-      const stored = await AsyncStorage.getItem(WORKSPACE_STORAGE_KEY);
-      if (stored === 'internal' || stored === 'platform') {
-        setWorkspaceState(stored);
-      }
-      const rawStoredPharmacyId = await AsyncStorage.getItem(PHARMACY_ID_STORAGE_KEY);
-      const storedPharmacyId = Number(rawStoredPharmacyId);
-      if (rawStoredPharmacyId != null && Number.isFinite(storedPharmacyId)) {
-        setSelectedPharmacyIdState(storedPharmacyId);
-      }
-      const storedPharmacyName = await AsyncStorage.getItem(PHARMACY_NAME_STORAGE_KEY);
-      if (storedPharmacyName) {
-        setSelectedPharmacyNameState(storedPharmacyName);
-      }
+      const rawId = rawStoredPharmacyId[1];
+      const parsedId = Number(rawId);
+      setSelectedPharmacyIdState(rawId != null && Number.isFinite(parsedId) ? parsedId : null);
+      setSelectedPharmacyNameState(storedPharmacyName[1] || null);
     } catch (error) {
       console.error('Failed to load workspace:', error);
+      setWorkspaceState('internal');
+      setSelectedPharmacyIdState(null);
+      setSelectedPharmacyNameState(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
-  const setWorkspace = async (newWorkspace: WorkspaceType) => {
+  useEffect(() => {
+    if (authLoading) return;
+    void reloadWorkspace();
+  }, [authLoading, reloadWorkspace]);
+
+  const setWorkspace = useCallback(async (newWorkspace: WorkspaceType) => {
     const targetWorkspace: WorkspaceType = newWorkspace === 'platform' && canUsePlatform ? 'platform' : 'internal';
+    setWorkspaceState(targetWorkspace);
+    const keys = await storageKeys(user);
+    if (!keys) return;
     try {
-      await AsyncStorage.setItem(WORKSPACE_STORAGE_KEY, targetWorkspace);
-      setWorkspaceState(targetWorkspace);
+      await AsyncStorage.setItem(keys.workspace, targetWorkspace);
       if (targetWorkspace === 'platform') {
         setSelectedPharmacyIdState(null);
         setSelectedPharmacyNameState(null);
-        await AsyncStorage.multiRemove([PHARMACY_ID_STORAGE_KEY, PHARMACY_NAME_STORAGE_KEY]);
+        await AsyncStorage.multiRemove([keys.pharmacyId, keys.pharmacyName]);
       }
     } catch (error) {
       console.error('Failed to save workspace:', error);
-      setWorkspaceState(targetWorkspace);
-      if (targetWorkspace === 'platform') {
-        setSelectedPharmacyIdState(null);
-        setSelectedPharmacyNameState(null);
-      }
     }
-  };
+  }, [canUsePlatform, user]);
 
-  const setSelectedPharmacyId = async (pharmacyId: number | null) => {
+  const setSelectedPharmacyId = useCallback(async (pharmacyId: number | null) => {
     setSelectedPharmacyIdState(pharmacyId);
+    const keys = await storageKeys(user);
+    if (!keys) return;
     try {
-      if (pharmacyId == null) {
-        await AsyncStorage.removeItem(PHARMACY_ID_STORAGE_KEY);
-      } else {
-        await AsyncStorage.setItem(PHARMACY_ID_STORAGE_KEY, String(pharmacyId));
-      }
+      if (pharmacyId == null) await AsyncStorage.removeItem(keys.pharmacyId);
+      else await AsyncStorage.setItem(keys.pharmacyId, String(pharmacyId));
     } catch (error) {
       console.error('Failed to save selected pharmacy:', error);
     }
-  };
+  }, [user]);
 
-  const setSelectedPharmacyName = async (pharmacyName: string | null) => {
+  const setSelectedPharmacyName = useCallback(async (pharmacyName: string | null) => {
     setSelectedPharmacyNameState(pharmacyName);
+    const keys = await storageKeys(user);
+    if (!keys) return;
     try {
-      if (!pharmacyName) {
-        await AsyncStorage.removeItem(PHARMACY_NAME_STORAGE_KEY);
-      } else {
-        await AsyncStorage.setItem(PHARMACY_NAME_STORAGE_KEY, pharmacyName);
-      }
+      if (!pharmacyName) await AsyncStorage.removeItem(keys.pharmacyName);
+      else await AsyncStorage.setItem(keys.pharmacyName, pharmacyName);
     } catch (error) {
       console.error('Failed to save selected pharmacy name:', error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!canUsePlatform && workspace === 'platform') {
+      void setWorkspace('internal');
+      return;
+    }
+    if (!canUseInternal && canUsePlatform && workspace !== 'platform') {
+      void setWorkspace('platform');
+    }
+  }, [authLoading, canUseInternal, canUsePlatform, setWorkspace, workspace]);
 
   return (
     <WorkspaceContext.Provider
       value={{
         workspace,
         setWorkspace,
+        reloadWorkspace,
         isLoading,
         canUseInternal,
         canUsePlatform,

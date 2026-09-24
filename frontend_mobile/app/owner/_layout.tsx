@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, IconButton, Portal, Modal, List, Divider, Button, Text } from 'react-native-paper';
+import { Icon, Avatar, IconButton, Portal, Modal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
@@ -334,9 +335,9 @@ export default function OwnerLayout() {
                     }}
                   />
                 ) : null}
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -369,7 +370,7 @@ export default function OwnerLayout() {
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="home" iconColor={color} size={size} />
+              <Icon source="home" color={color} size={size} />
             ),
           }}
         />
@@ -385,7 +386,7 @@ export default function OwnerLayout() {
             title: 'Shifts',
             tabBarAccessibilityLabel: 'Shifts tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="calendar" iconColor={color} size={size} />
+              <Icon source="calendar" color={color} size={size} />
             ),
           }}
         />
@@ -401,16 +402,9 @@ export default function OwnerLayout() {
             title: 'Post',
             tabBarAccessibilityLabel: 'Post shift tab',
             tabBarIcon: ({ color }) => (
-              <IconButton
-                icon="plus-circle"
-                iconColor="#FFFFFF"
-                size={32}
-                style={{
-                  backgroundColor: '#06214A',
-                  borderRadius: 24,
-                  marginTop: -20,
-                }}
-              />
+              <View style={{ backgroundColor: '#06214A', borderRadius: 24, marginTop: -20, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon source="plus-circle" color="#FFFFFF" size={32} />
+              </View>
             ),
           }}
         />
@@ -426,7 +420,7 @@ export default function OwnerLayout() {
             title: 'Hub',
             tabBarAccessibilityLabel: 'Hub tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="account-group" iconColor={color} size={size} />
+              <Icon source="account-group" color={color} size={size} />
             ),
           }}
         />
@@ -442,7 +436,7 @@ export default function OwnerLayout() {
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="message" iconColor={color} size={size} />
+              <Icon source="message" color={color} size={size} />
             ),
           }}
         />

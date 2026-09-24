@@ -1329,13 +1329,18 @@ export type LeaveRequest = CamelCasedPropertiesDeep<LeaveRequestApi>;
 export interface WorkerShiftRequestApi {
     id: number;
     pharmacy: number | null;
+    pharmacy_name?: string | null;
+    requested_by?: number | null;
     requester_name?: string | null;
+    shift?: number | null;
     role: string;
     slot_date: string;
     start_time: string;
     end_time: string;
     note?: string | null;
     status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'AUTO_PUBLISHED';
+    created_at?: string | null;
+    updated_at?: string | null;
 }
 
 export type WorkerShiftRequest = CamelCasedPropertiesDeep<WorkerShiftRequestApi>;
