@@ -7807,256 +7807,122 @@ class RosterWorkerViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response(data)
 
-class LeaveRequestViewSet(viewsets.ModelViewSet):
-    queryset = LeaveRequest.objects.all()
-    serializer_class = LeaveRequestSerializer
+class LeaveRequestViewSet(viewsets.ViewSet):
+    """Compatibility API for the original Sada roster-leave routes.
+
+    The legacy URL remains available for deployed clients, but all active
+    reads/writes now use workforce.WorkforceLeaveRequest as the canonical
+    leave record. client_profile.LeaveRequest is retained only as migrated
+    historical data.
+    """
+
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        qs = super().get_queryset()
+    def _queryset(self):
+        from workforce.models import WorkforceLeaveRequest
+
+        qs = WorkforceLeaveRequest.objects.filter(
+            slot_assignment__isnull=False,
+        ).select_related(
+            "pharmacy",
+            "user",
+            "membership",
+            "slot_assignment__slot",
+            "slot_assignment__shift__pharmacy",
+        )
         user = self.request.user
 
-        # ORG_ADMIN → all pharmacies in their org(s)
         org_ids = OrganizationMembership.objects.filter(
-            user=user, role='ORG_ADMIN'
-        ).values_list('organization_id', flat=True)
+            user=user, role="ORG_ADMIN"
+        ).values_list("organization_id", flat=True)
         if org_ids:
-            return qs.filter(
-                slot_assignment__shift__pharmacy__organization_id__in=org_ids
-            ).distinct()
+            return qs.filter(pharmacy__organization_id__in=org_ids).distinct()
 
-        # OWNER → only their pharmacies
-        if hasattr(user, 'owneronboarding'):
-            return qs.filter(
-                slot_assignment__shift__pharmacy__owner=user.owneronboarding
-            ).distinct()
+        if hasattr(user, "owneronboarding"):
+            return qs.filter(pharmacy__owner=user.owneronboarding).distinct()
 
-        # PHARMACY_ADMIN → only pharmacies they admin
         admin_pharmacy_ids = PharmacyAdmin.objects.filter(
             user=user, is_active=True
-        ).values_list('pharmacy_id', flat=True)
+        ).values_list("pharmacy_id", flat=True)
         if admin_pharmacy_ids:
-            return qs.filter(
-                slot_assignment__shift__pharmacy_id__in=admin_pharmacy_ids
-            ).distinct()
+            return qs.filter(pharmacy_id__in=admin_pharmacy_ids).distinct()
 
-        # Worker → only their own leaves
         return qs.filter(user=user)
 
-    def perform_create(self, serializer):
-        slot_assignment_id = self.request.data.get('slot_assignment')
-        slot_assignment = ShiftSlotAssignment.objects.get(id=slot_assignment_id)
-        if slot_assignment.user != self.request.user:
-            raise PermissionDenied("You can only request leave for your own assigned slots.")
-        if LeaveRequest.objects.filter(slot_assignment=slot_assignment, user=self.request.user, status='PENDING').exists():
-            raise ValidationError("A pending leave request already exists for this slot.")
-        leave = serializer.save(user=self.request.user)
+    def _get_object(self, pk):
+        return get_object_or_404(self._queryset(), pk=pk)
 
-        shift = slot_assignment.shift
-        pharmacy = shift.pharmacy
+    def list(self, request):
+        from workforce.leave_service import serialize_legacy_leave
+        return Response([
+            serialize_legacy_leave(row)
+            for row in self._queryset().order_by("-created_at", "-id")[:500]
+        ])
 
-        # Email recipients
-        notification_emails = []
-        notification_users = []
-        owner_user = getattr(pharmacy.owner, "user", None) if hasattr(pharmacy, "owner") and pharmacy.owner else None
-        org_admins = []
-        if pharmacy.organization_id:
-            org_admins = OrganizationMembership.objects.filter(
-                role='ORG_ADMIN',
-                organization_id=pharmacy.organization_id
-            ).select_related('user')
+    def retrieve(self, request, pk=None):
+        from workforce.leave_service import serialize_legacy_leave
+        return Response(serialize_legacy_leave(self._get_object(pk)))
 
+    def create(self, request):
+        from workforce.leave_service import create_leave, serialize_legacy_leave
+        try:
+            row = create_leave(request.user, request.data)
+            return Response(serialize_legacy_leave(row), status=status.HTTP_201_CREATED)
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
 
-        # + Pharmacy Admins for this pharmacy
-        pharmacy_admins = PharmacyAdmin.objects.filter(
-            pharmacy=pharmacy,
-            is_active=True
-        ).select_related('user')
+    def update(self, request, pk=None):
+        from workforce.leave_service import serialize_legacy_leave, update_pending_leave
+        try:
+            row = update_pending_leave(request.user, pk, request.data)
+            return Response(serialize_legacy_leave(row))
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
 
-        for admin_mem in pharmacy_admins:
-            if admin_mem.user and admin_mem.user.email:
-                if admin_mem.user.email not in notification_emails:
-                    notification_emails.append(admin_mem.user.email)
-                notification_users.append(admin_mem.user)
+    def partial_update(self, request, pk=None):
+        return self.update(request, pk=pk)
 
-        for admin in org_admins:
-            if admin.user and admin.user.email:
-                if admin.user.email not in notification_emails:
-                    notification_emails.append(admin.user.email)
-                notification_users.append(admin.user)
-        if owner_user and owner_user.email:
-            if owner_user.email not in notification_emails:
-                notification_emails.append(owner_user.email)
-            notification_users.append(owner_user)
+    def destroy(self, request, pk=None):
+        from workforce.leave_service import decide_leave
+        try:
+            decide_leave(request.user, pk, "CANCELLED")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
 
-        # Who should the roster link be for?
-        # Prefer the owner, then org admin, then pharmacy admin to avoid misrouting owners to admin paths.
-        if owner_user:
-            roster_link_user = owner_user
-        elif org_admins:
-            roster_link_user = org_admins[0].user
-        elif pharmacy_admins:
-            roster_link_user = pharmacy_admins[0].user
-        else:
-            roster_link_user = None
-
-        notification_user_ids = sorted({u.id for u in notification_users if getattr(u, "id", None)})
-
-        ctx = {
-            "worker_name": self.request.user.get_full_name() or self.request.user.email,
-            "worker_email": self.request.user.email,
-            "leave_type": leave.get_leave_type_display(),
-            "note": leave.note,
-            "shift_date": slot_assignment.slot_date,
-            "shift_time": f"{slot_assignment.slot.start_time}–{slot_assignment.slot.end_time}",
-            "pharmacy_name": pharmacy.name,
-            "shift_link": build_roster_email_link(roster_link_user, pharmacy)
-        }
-        if notification_emails:
-            notification_payload = {
-                "title": f"Leave request: {pharmacy.name}",
-                "body": f"{ctx['worker_name']} requested leave on {ctx['shift_date']}.",
-                "action_url": ctx["shift_link"],
-                "payload": {
-                    "leave_request_id": leave.id,
-                    "pharmacy_id": pharmacy.id,
-                },
-            }
-            if notification_user_ids:
-                notification_payload["user_ids"] = notification_user_ids
-
-            async_task(
-                'users.tasks.send_async_email',
-                subject=f"Leave request from {ctx['worker_name']} for {pharmacy.name}",
-                recipient_list=notification_emails,
-                template_name="emails/leave_request.html",
-                context=ctx,
-                text_template="emails/leave_request.txt",
-                notification=notification_payload
-            )
-
-    def _assert_worker_can_modify(self, leave):
-        if leave.user != self.request.user:
-            raise PermissionDenied("You can only manage your own leave requests.")
-        if leave.status != 'PENDING':
-            raise ValidationError("Only pending leave requests can be updated or cancelled.")
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        self._assert_worker_can_modify(instance)
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
-    def partial_update(self, request, *args, **kwargs):
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self._assert_worker_can_modify(instance)
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def is_owner_or_claimed_admin(self, user):
-        from .models import Pharmacy  # To avoid circular imports
-
-        is_owner = Pharmacy.objects.filter(owner__user=user).exists()
-
-        is_claimed_admin = OrganizationMembership.objects.filter(
-            user=user,
-            role='ORG_ADMIN',
-            organization__pharmacies__isnull=False
-        ).exists()
-
-        is_pharmacy_admin = PharmacyAdmin.objects.filter(
-            user=user,
-            is_active=True
-        ).exists()
-
-        return is_owner or is_claimed_admin or is_pharmacy_admin
-
-
-    def _assert_owner_or_claimed_admin(self, leave):
-        shift = leave.slot_assignment.shift
-        pharmacy = shift.pharmacy
-        user = self.request.user
-        is_owner = hasattr(pharmacy, "owner") and pharmacy.owner and getattr(pharmacy.owner, "user", None) == user
-        is_claimed_admin = (
-            pharmacy.organization_id
-            and OrganizationMembership.objects.filter(
-                user=user,
-                role='ORG_ADMIN',
-                organization_id=pharmacy.organization_id
-            ).exists()
-        )
-        can_manage_roster = has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER)
-
-        if not (is_owner or is_claimed_admin or can_manage_roster):
-            raise PermissionDenied("Not authorized to approve/reject this leave request.")
-
-
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
-        leave = self.get_object()
-        self._assert_owner_or_claimed_admin(leave)
-        leave.status = 'APPROVED'
-        leave.date_resolved = timezone.now()
-        leave.save()
-        ctx = {
-            "leave_type": leave.get_leave_type_display(),
-            "shift_date": leave.slot_assignment.slot_date,
-            "pharmacy_name": leave.slot_assignment.shift.pharmacy.name,
-            "shift_link": build_roster_email_link(leave.user, leave.slot_assignment.shift.pharmacy),
-        }
-        async_task(
-            'users.tasks.send_async_email',
-            subject=f"Your leave request for {ctx['pharmacy_name']} was approved",
-            recipient_list=[leave.user.email],
-            template_name="emails/leave_approved.html",
-            context=ctx,
-            text_template="emails/leave_approved.txt",
-            notification={
-                "title": f"Leave approved: {ctx['pharmacy_name']}",
-                "body": f"Your leave request for {ctx['shift_date']} was approved.",
-                "action_url": ctx["shift_link"],
-                "payload": {"leave_request_id": leave.id, "pharmacy_id": leave.slot_assignment.shift.pharmacy.id},
-                "user_ids": [getattr(leave.user, "id", None)],
-            }
-        )
-        return Response({'status': 'approved'})
+        from workforce.leave_service import decide_leave
+        try:
+            row = decide_leave(request.user, pk, "APPROVED", request.data.get("manager_note") or "")
+            return Response({"status": row.status})
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
-        leave = self.get_object()
-        self._assert_owner_or_claimed_admin(leave)
-        leave.status = 'REJECTED'
-        leave.date_resolved = timezone.now()
-        leave.save()
-        ctx = {
-            "leave_type": leave.get_leave_type_display(),
-            "shift_date": leave.slot_assignment.slot_date,
-            "pharmacy_name": leave.slot_assignment.shift.pharmacy.name,
-            "shift_link": build_roster_email_link(leave.user, leave.slot_assignment.shift.pharmacy),
-        }
-        async_task(
-            'users.tasks.send_async_email',
-            subject=f"Your leave request for {ctx['pharmacy_name']} was rejected",
-            recipient_list=[leave.user.email],
-            template_name="emails/leave_rejected.html",
-            context=ctx,
-            text_template="emails/leave_rejected.txt",
-            notification={
-                "title": f"Leave rejected: {ctx['pharmacy_name']}",
-                "body": f"Your leave request for {ctx['shift_date']} was rejected.",
-                "action_url": ctx["shift_link"],
-                "payload": {"leave_request_id": leave.id, "pharmacy_id": leave.slot_assignment.shift.pharmacy.id},
-                "user_ids": [getattr(leave.user, "id", None)],
-            }
-        )
-        return Response({'status': 'rejected'})
+        from workforce.leave_service import decide_leave
+        try:
+            row = decide_leave(request.user, pk, "REJECTED", request.data.get("manager_note") or "")
+            return Response({"status": row.status})
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+
 
 class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
     """
