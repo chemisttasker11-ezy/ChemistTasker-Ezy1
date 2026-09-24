@@ -322,6 +322,28 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertFalse(self.device.is_active)
         self.assertIsNotNone(self.device.revoked_at)
 
+    def test_signed_self_revoke_is_idempotent_after_remote_revocation(self):
+        revoke_kiosk_device(self.owner, self.device)
+        issued_at = timezone.now().isoformat()
+        message = (
+            f"chemisttasker:kiosk-disconnect:v1|{self.device.installation_id}|{issued_at}"
+        ).encode("utf-8")
+        proof_signature = base64.b64encode(
+            self.private_key.sign(message)
+        ).decode("ascii")
+
+        response = APIClient().post(
+            "/attendance/kiosk/revoke-self/",
+            {"issued_at": issued_at, "proof_signature": proof_signature},
+            format="json",
+            HTTP_X_DEVICE_TOKEN=self.raw_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "REVOKED")
+        self.device.refresh_from_db()
+        self.assertFalse(self.device.is_active)
+
     def test_manager_can_list_and_revoke_kiosk_device(self):
         manager_client = APIClient()
         manager_client.force_authenticate(user=self.owner)
