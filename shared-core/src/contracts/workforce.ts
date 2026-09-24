@@ -1,3 +1,20 @@
+export const WORKFORCE_LEAVE_TYPES = [
+  'SICK',
+  'ANNUAL',
+  'COMPASSIONATE',
+  'STUDY',
+  'CARER',
+  'UNPAID',
+  'OTHER',
+] as const;
+
+export type WorkforceLeaveType = (typeof WORKFORCE_LEAVE_TYPES)[number];
+
+export const WORKFORCE_LEAVE_TYPE_OPTIONS = WORKFORCE_LEAVE_TYPES.map((value) => ({
+  value,
+  label: value.replaceAll('_', ' '),
+}));
+
 export type WorkforceCheckSeverity = 'BLOCKER' | 'WARNING' | 'INFO';
 export type WorkforceTimesheetStatus = 'OPEN' | 'NEEDS_REVIEW' | 'READY' | 'SUBMITTED' | 'APPROVED' | 'REOPENED';
 
@@ -167,7 +184,7 @@ export interface WorkforceWorkSettings {
 export interface WorkforceLeave {
   id: number;
   pharmacy_name?: string;
-  leave_type: string;
+  leave_type: WorkforceLeaveType;
   start_at: string;
   end_at: string;
   status: string;
