@@ -113,8 +113,8 @@ export default function ManagerLeaveScreen() {
         <ChoiceChips value={status} options={statusOptions} onChange={setStatus} />
       </Section>
 
-      <InfoNote title="Two leave paths">
-        General workforce leave is reviewed here. Leave tied to a specific roster assignment remains visible in the roster workflow as well.
+      <InfoNote title="One leave record">
+        Leave can be requested from My Leave or directly from an assigned roster shift. Both paths use the same workforce leave record and approval workflow.
       </InfoNote>
 
       <Section title="Requests">
