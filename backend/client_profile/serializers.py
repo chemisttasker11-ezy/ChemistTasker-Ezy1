@@ -6172,15 +6172,6 @@ class SharedShiftSerializer(serializers.ModelSerializer):
 
         return data
 
-class LeaveRequestSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LeaveRequest
-        fields = [
-            'id', 'slot_assignment', 'user', 'leave_type', 'note',
-            'status', 'date_applied', 'date_resolved'
-        ]
-        read_only_fields = ['id', 'user', 'status', 'date_applied', 'date_resolved']
-
 class WorkerShiftRequestSerializer(serializers.ModelSerializer):
     requested_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     pharmacy_name = serializers.CharField(source="pharmacy.name", read_only=True)
