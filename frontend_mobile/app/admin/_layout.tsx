@@ -54,7 +54,7 @@ function AdminSidebar({
     { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: true },
     { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: true },
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies', visible: canManageStaff },
-    { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings', visible: canManageStaff },
+    { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings', visible: canManageStaff || canManageRoster },
     { label: 'Shift Centre', icon: 'calendar-month-outline', route: '/admin/shifts', visible: canManageRoster },
     { label: 'Weekly Roster', icon: 'calendar-account-outline', route: '/manager/roster', visible: canManageRoster },
     { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews', visible: canManageRoster },
