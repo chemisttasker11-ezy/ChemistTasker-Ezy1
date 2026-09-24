@@ -214,12 +214,16 @@ export default function KioskPage() {
       setQrToken(null);
       setExpiresAt(null);
       setCountdownSeconds(0);
+      const rawDesktopError = desktopRuntime ? String(err) : "";
+      const revoked = rawDesktopError.includes("KIOSK_REVOKED");
       const msg = desktopRuntime
-        ? String(err).replace(/^KIOSK_REVOKED:\s*/, "")
+        ? rawDesktopError.replace(/^KIOSK_REVOKED:\s*/, "")
         : err.response?.data?.error || "Device inactive or network error.";
       setQrError(
         desktopRuntime
-          ? `${msg} Use your attendance PIN while QR is unavailable.`
+          ? revoked
+            ? `${msg} Manager re-pairing is required before this terminal can record attendance.`
+            : `${msg} Use your attendance PIN while QR is unavailable.`
           : msg
       );
       if (!desktopRuntime && err.response?.status === 401) {
