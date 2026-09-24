@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, IconButton, Text } from 'react-native-paper';
+import { Card, Icon, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -69,13 +69,13 @@ export default function ParityToolsCard() {
           <Card key={tool.route} mode="outlined" style={styles.card} onPress={() => router.push(tool.route as any)}>
             <Card.Content style={styles.content}>
               <View style={[styles.icon, { backgroundColor: persona.soft }]}>
-                <IconButton icon={tool.icon} size={22} iconColor={persona.accent} />
+                <Icon source={tool.icon} size={22} color={persona.accent} />
               </View>
               <View style={styles.copy}>
                 <Text variant="titleSmall" style={styles.title}>{tool.title}</Text>
                 <Text variant="bodySmall" style={styles.subtitle}>{tool.subtitle}</Text>
               </View>
-              <IconButton icon="chevron-right" size={18} iconColor="#8A97AA" />
+              <Icon source="chevron-right" size={20} color="#8A97AA" />
             </Card.Content>
           </Card>
         ))}
