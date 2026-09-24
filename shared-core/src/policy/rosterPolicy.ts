@@ -1,11 +1,21 @@
+export type RosterMemberIdentity = {
+  id?: number | string | null;
+  firstName?: string;
+  first_name?: string;
+  lastName?: string;
+  last_name?: string;
+  displayName?: string;
+  email?: string | null;
+};
+
 export type RosterMemberLike = {
   id?: number | string | null;
-  user?: number | string | { id?: number | string | null; firstName?: string; first_name?: string; lastName?: string; last_name?: string; email?: string | null } | null;
+  user?: number | string | RosterMemberIdentity | null;
   userId?: number | string | null;
   user_id?: number | string | null;
-  userDetails?: { id?: number | string | null; firstName?: string; lastName?: string; displayName?: string; email?: string | null } | null;
-  userDetail?: { id?: number | string | null; firstName?: string; lastName?: string; email?: string | null } | null;
-  user_detail?: { id?: number | string | null; first_name?: string; last_name?: string; email?: string | null } | null;
+  userDetails?: RosterMemberIdentity | null;
+  userDetail?: RosterMemberIdentity | null;
+  user_detail?: RosterMemberIdentity | null;
   role?: string | null;
   userRole?: string | null;
   user_role?: string | null;
@@ -50,11 +60,11 @@ export function rosterMemberLabel(member: RosterMemberLike): string {
     member?.user_detail ??
     (typeof member?.user === 'object' ? member.user : null) ??
     {};
-  const first = (detail as any)?.firstName ?? (detail as any)?.first_name ?? '';
-  const last = (detail as any)?.lastName ?? (detail as any)?.last_name ?? '';
+  const first = detail.firstName ?? detail.first_name ?? '';
+  const last = detail.lastName ?? detail.last_name ?? '';
   const full = [first, last].filter(Boolean).join(' ').trim();
-  const email = (detail as any)?.email ?? member?.email ?? null;
-  return full || (detail as any)?.displayName || member?.name || email || member?.invitedName || member?.invited_name || `Worker #${rosterMemberUserId(member)}`;
+  const email = detail.email ?? member?.email ?? null;
+  return full || detail.displayName || member?.name || email || member?.invitedName || member?.invited_name || `Worker #${rosterMemberUserId(member)}`;
 }
 
 export function isRosterMemberEligibleForRole(
