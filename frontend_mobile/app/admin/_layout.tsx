@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { ActivityIndicator, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import { AdminWorkspaceProvider, useAdminWorkspace } from '@/context/AdminWorkspaceContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -139,6 +139,7 @@ function AdminLayoutInner() {
     activePharmacyId: pharmacyId,
     activePharmacyName: pharmacyName,
     selectAssignment,
+    isLoading: adminWorkspaceLoading,
   } = useAdminWorkspace();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -156,6 +157,14 @@ function AdminLayoutInner() {
       null;
     setPhotoUrl(newPhoto);
   }, [user, isLoading]);
+
+  if (isLoading || adminWorkspaceLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brandColors.white }}>
+        <ActivityIndicator size="large" color={brandColors.navy} />
+      </View>
+    );
+  }
 
   const profileRoute = profileRouteForRole(user?.role);
   const roleLabel = String(user?.role || 'staff').toLowerCase().replace('_', ' ');
