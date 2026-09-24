@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { useWorkspace } from './WorkspaceContext';
 import {
   getAdminAssignments,
   getAssignmentId,
@@ -23,6 +24,7 @@ const AdminWorkspaceContext = createContext<AdminWorkspaceContextValue | null>(n
 
 export function AdminWorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { setSelectedPharmacyId, setSelectedPharmacyName } = useWorkspace();
   const assignments = useMemo(() => getAdminAssignments(user), [user]);
   const [activeAssignmentId, setActiveAssignmentId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +36,10 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
       .then((assignment) => {
         if (!active) return;
         setActiveAssignmentId(getAssignmentId(assignment));
+        const pharmacyId = getAssignmentPharmacyId(assignment);
+        const pharmacyName = assignment ? getAssignmentPharmacyName(assignment) : null;
+        void setSelectedPharmacyId(pharmacyId);
+        void setSelectedPharmacyName(pharmacyName);
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -51,7 +57,9 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
   const selectAssignment = useCallback(async (assignmentId: number) => {
     const selected = await selectAdminPersona(user, assignmentId);
     setActiveAssignmentId(getAssignmentId(selected));
-  }, [user]);
+    await setSelectedPharmacyId(getAssignmentPharmacyId(selected));
+    await setSelectedPharmacyName(selected ? getAssignmentPharmacyName(selected) : null);
+  }, [setSelectedPharmacyId, setSelectedPharmacyName, user]);
 
   const value = useMemo<AdminWorkspaceContextValue>(() => ({
     assignments,
