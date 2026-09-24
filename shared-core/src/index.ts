@@ -23,7 +23,6 @@ export * from './contracts/marketplace';
 export * from './contracts/ethicalMarketplace';
 export * from './contracts/attendanceRoster';
 export * from './contracts/workforce';
-export * from './contracts/roster';
 
 // Re-export all types
 export * from './types';
@@ -53,7 +52,6 @@ export * from './constants/personas';
 // Shared cross-client authorization/persona policy.
 export * from './policy/accessPolicy';
 export * from './policy/marketplacePolicy';
-export * from './policy/rosterPolicy';
 
 // Re-export pricing utils
 export * from './utils/pricing';
