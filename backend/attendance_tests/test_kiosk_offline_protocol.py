@@ -20,9 +20,11 @@ from rest_framework.test import APIClient, APIRequestFactory
 from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
 from client_profile.attendance_credentials import (
     activate_kiosk_device,
+    generate_signed_pharmacy_qr,
     revoke_kiosk_device,
     set_worker_personal_code,
 )
+from client_profile.attendance_transitions import clock_in
 from client_profile.attendance_protocol import (
     calculate_event_hash,
     canonical_event_payload,
@@ -134,6 +136,24 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertEqual(second["results"][0]["result"], "already_received")
         self.assertEqual(KioskAttendanceEvent.objects.count(), 1)
         self.assertEqual(AttendanceSession.objects.count(), 1)
+
+    def test_qr_and_offline_pin_clock_in_converge_on_one_session(self):
+        qr = generate_signed_pharmacy_qr(self.device)
+        session, qr_event = clock_in(
+            self.worker,
+            self.pharmacy,
+            signed_qr_token=qr["signed_token"],
+        )
+
+        offline_event = self.signed_event(sequence=1, event_type="CLOCK_IN")
+        result = sync_offline_batch(self.device, [offline_event], app_version="0.1.1")
+
+        self.assertEqual(result["results"][0]["result"], "accepted")
+        self.assertEqual(AttendanceSession.objects.count(), 1)
+        self.assertEqual(AttendanceSession.objects.get().id, session.id)
+        self.assertEqual(AttendanceEvent.objects.filter(session=session).count(), 1)
+        self.assertEqual(qr_event.source, AttendanceEvent.Source.MOBILE_QR)
+        self.assertEqual(KioskAttendanceEvent.objects.count(), 1)
 
     def test_web_device_with_signing_key_is_denied_offline_sync(self):
         self.device.client_kind = "WEB_ONLINE"
