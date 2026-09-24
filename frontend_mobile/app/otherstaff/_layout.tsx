@@ -423,6 +423,7 @@ export default function OtherStaffTabs() {
         <Tabs.Screen name="profile-referees" options={{ href: null }} />
         <Tabs.Screen name="profile-bio" options={{ href: null }} />
         <Tabs.Screen name="interests" options={{ href: null }} />
+        <Tabs.Screen name="memberships" options={{ href: null }} />
         <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
