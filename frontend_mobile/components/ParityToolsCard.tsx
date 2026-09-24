@@ -10,6 +10,7 @@ type Tool = { title: string; subtitle: string; icon: string; route: string };
 
 const managerTools: Tool[] = [
   { title: 'Workforce', subtitle: 'Employment terms, rates and payroll prep', icon: 'account-hard-hat-outline', route: '/workforce/employment-engagements' },
+  { title: 'Leave requests', subtitle: 'Review dated workforce leave requests', icon: 'calendar-remove-outline', route: '/workforce/leave-requests' },
   { title: 'Roster', subtitle: 'Plan, validate and publish weekly coverage', icon: 'calendar-month-outline', route: '/manager/roster' },
   { title: 'Attendance', subtitle: 'Clocking, exceptions and manager review', icon: 'clock-check-outline', route: '/attendance' },
   { title: 'Finance', subtitle: 'Customers, expenses, BAS and invoices', icon: 'cash-multiple', route: '/finance' },
