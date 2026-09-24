@@ -1,0 +1,32 @@
+appId: com.chemisttasker.app
+env:
+  MAESTRO_EXPLORER_EMAIL: ${MAESTRO_EXPLORER_EMAIL}
+  MAESTRO_EXPLORER_PASSWORD: ${MAESTRO_EXPLORER_PASSWORD}
+---
+- launchApp:
+    clearState: true
+- tapOn: "Work email"
+- inputText: ${MAESTRO_EXPLORER_EMAIL}
+- tapOn: "Password"
+- inputText: ${MAESTRO_EXPLORER_PASSWORD}
+- tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Use biometrics for this account?"
+    commands:
+      - tapOn: "Not now"
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Chat tab"
+- assertVisible: "Chat"
+- tapOn: "Profile tab"
+- assertVisible: "Profile"
+- tapOn: "Talent Board tab"
+- assertVisible: "Talent"
+- tapOn: "Open explorer menu"
+- assertVisible: "Explorer menu"
+- assertVisible: "Learning"
+- assertVisible: "Calendar"
+- tapOn: "Logout"
+- assertVisible: "Welcome back"
