@@ -87,6 +87,15 @@ struct ConfigResponse {
 }
 
 #[derive(Deserialize, Serialize)]
+struct KioskQrResponse {
+    qr_token: String,
+    expires_at: String,
+    pharmacy_id: i64,
+    pharmacy_name: String,
+    refresh_interval_seconds: i64,
+}
+
+#[derive(Deserialize, Serialize)]
 struct SyncResponse {
     device_id: String,
     acknowledged_through: i64,
@@ -557,6 +566,44 @@ fn device_identity_from(connection: &Connection) -> Result<DeviceIdentity, Strin
 fn kiosk_status(app: AppHandle) -> Result<DeviceIdentity, String> {
     let connection = open_database(&app)?;
     device_identity_from(&connection)
+}
+
+#[tauri::command]
+async fn fetch_online_qr(app: AppHandle) -> Result<KioskQrResponse, String> {
+    let connection = open_database(&app)?;
+    let (api_base_url, expected_pharmacy_id): (String, i64) = connection
+        .query_row(
+            "SELECT api_base_url, pharmacy_id FROM device_config WHERE singleton = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| "This kiosk has not been paired".to_string())?;
+    let token = keyring_entry("device-token")?
+        .get_password()
+        .map_err(|error| format!("Device credential is unavailable: {error}"))?;
+    let response = restricted_http_client()?
+        .post(format!(
+            "{}/client-profile/attendance/kiosk/qr/",
+            api_base_url.trim_end_matches('/')
+        ))
+        .header("X-Device-Token", token)
+        .send()
+        .await
+        .map_err(|error| format!("QR is temporarily unavailable: {error}"))?;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        return Err("KIOSK_REVOKED: This kiosk is inactive or revoked.".to_string());
+    }
+    if !response.status().is_success() {
+        return Err(response
+            .text()
+            .await
+            .unwrap_or_else(|_| "QR is temporarily unavailable.".to_string()));
+    }
+    let qr: KioskQrResponse = response.json().await.map_err(|error| error.to_string())?;
+    if qr.pharmacy_id != expected_pharmacy_id {
+        return Err("QR response belongs to a different pharmacy".to_string());
+    }
+    Ok(qr)
 }
 
 #[tauri::command]
@@ -1613,6 +1660,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             kiosk_status,
+            fetch_online_qr,
             pair_device,
             prepare_capture_request,
             capture_pin_attendance,
