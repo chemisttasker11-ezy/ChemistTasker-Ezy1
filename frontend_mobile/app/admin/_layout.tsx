@@ -53,7 +53,7 @@ function AdminSidebar({
 
   const items = [
     { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin', visible: true },
-    { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat', visible: canManageCommunications },
+    { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat', visible: true },
     { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: canManageCommunications },
     { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: canManageCommunications },
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies', visible: canManageStaff },
