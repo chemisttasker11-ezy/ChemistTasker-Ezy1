@@ -35,10 +35,7 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
     void getSelectedAdminAssignment(user)
       .then(async (storedAssignment) => {
         if (!active) return;
-        const fallbackId = getAssignmentId(assignments[0]);
-        const assignment = storedAssignment ?? (
-          fallbackId != null ? await selectAdminPersona(user, fallbackId) : null
-        );
+        const assignment = await selectAdminPersona(user, getAssignmentId(storedAssignment));
         if (!active) return;
         setActiveAssignmentId(getAssignmentId(assignment));
         await reloadWorkspace();
