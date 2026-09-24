@@ -51,6 +51,7 @@ def backfill_legacy_leave(apps, schema_editor):
                 status=legacy.status,
                 start_at=start_at,
                 end_at=end_at,
+                legacy_leave_id__isnull=True,
             ).order_by("id").first()
 
         if row is None:
