@@ -315,6 +315,14 @@ def decide_leave(actor, leave_id, decision, manager_note=""):
             raise ValidationError("decision must be APPROVED, REJECTED, or worker-owned CANCELLED.")
         if row.status != WorkforceLeaveRequest.Status.PENDING:
             raise ValidationError("Only pending leave requests can be approved or rejected.")
+        if (
+            decision == WorkforceLeaveRequest.Status.APPROVED
+            and row.slot_assignment_id
+            and row.slot_assignment.user_id != row.user_id
+        ):
+            raise ValidationError(
+                "This roster assignment has changed since leave was requested. Reject the stale leave request instead."
+            )
         if decision == WorkforceLeaveRequest.Status.APPROVED and WorkforceLeaveRequest.objects.filter(
             user_id=row.user_id,
             pharmacy_id=row.pharmacy_id,
