@@ -34,6 +34,7 @@ function AdminSidebar({
   roleLabel,
   canManageStaff,
   canManageRoster,
+  canManageCommunications,
 }: {
   visible: boolean;
   onDismiss: () => void;
@@ -45,15 +46,16 @@ function AdminSidebar({
   roleLabel: string;
   canManageStaff: boolean;
   canManageRoster: boolean;
+  canManageCommunications: boolean;
 }) {
   const { logout } = useAuth();
   const router = useRouter();
 
   const items = [
     { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin', visible: true },
-    { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat', visible: true },
-    { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: true },
-    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: true },
+    { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat', visible: canManageCommunications },
+    { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: canManageCommunications },
+    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: canManageCommunications },
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies', visible: canManageStaff },
     { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings', visible: canManageStaff || canManageRoster },
     { label: 'Shift Centre', icon: 'calendar-month-outline', route: '/admin/shifts', visible: canManageRoster },
@@ -170,6 +172,13 @@ function AdminLayoutInner() {
   const roleLabel = String(user?.role || 'staff').toLowerCase().replace('_', ' ');
   const canManageStaff = Boolean(pharmacyId && hasCapability('MANAGE_STAFF', pharmacyId));
   const canManageRoster = Boolean(pharmacyId && hasCapability('MANAGE_ROSTER', pharmacyId));
+  const canManageCommunications = Boolean(
+    pharmacyId && (
+      hasCapability('MANAGE_COMMUNICATIONS', pharmacyId) ||
+      canManageStaff ||
+      canManageRoster
+    ),
+  );
 
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
@@ -210,6 +219,7 @@ function AdminLayoutInner() {
         roleLabel={roleLabel}
         canManageStaff={canManageStaff}
         canManageRoster={canManageRoster}
+        canManageCommunications={canManageCommunications}
       />
       <Stack
         screenOptions={{
