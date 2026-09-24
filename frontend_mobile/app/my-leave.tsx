@@ -137,7 +137,7 @@ export default function MyLeaveScreen() {
       ]} />
 
       <InfoNote title="Roster relationship">
-        General leave can be requested here before a shift exists. For leave tied to a specific assigned shift, use My Roster so the request remains connected to that roster assignment.
+        All leave uses the same workforce leave record. Use My Roster when the request is for an existing assigned shift so that record is also linked to the roster assignment.
       </InfoNote>
 
       <Section title="Leave requests">
