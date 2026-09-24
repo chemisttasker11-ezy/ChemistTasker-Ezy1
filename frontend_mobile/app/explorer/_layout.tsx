@@ -343,6 +343,7 @@ export default function ExplorerTabs() {
         <Tabs.Screen name="availability" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="messages/[id]" options={{ href: null }} />
+        <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
       </Tabs>
