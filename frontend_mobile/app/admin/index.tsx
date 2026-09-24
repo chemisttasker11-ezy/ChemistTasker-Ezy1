@@ -73,7 +73,7 @@ export default function AdminHomeScreen() {
           onPress={() => router.push(adminPath('pills') as any)}
           activeOpacity={0.84}
         >
-          <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.pillHeroGradient}>
+          <LinearGradient colors={['#04142E', '#06214A', '#0D3F78']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.pillHeroGradient}>
             <View pointerEvents="none" style={styles.heroAngleOne} />
             <View pointerEvents="none" style={styles.heroAngleTwo} />
             <View style={styles.pillHeroCopy}>
@@ -117,17 +117,17 @@ export default function AdminHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F5F8FC' },
   scrollView: { flex: 1 },
   content: { padding: 20, gap: 16 },
   hero: { borderRadius: 22, padding: 20, backgroundColor: '#FFFFFF' },
-  eyebrow: { color: '#6366F1', textTransform: 'uppercase', letterSpacing: 1 },
-  title: { color: '#111827', fontWeight: '900', marginTop: 6 },
-  subtitle: { color: '#6B7280', marginTop: 8, lineHeight: 20 },
+  eyebrow: { color: '#06214A', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: '#06214A', fontWeight: '900', marginTop: 6 },
+  subtitle: { color: '#59677E', marginTop: 8, lineHeight: 20 },
   grid: { gap: 12 },
   card: { borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' },
-  cardTitle: { color: '#111827', fontWeight: '800' },
-  cardText: { color: '#6B7280', marginTop: 4, marginBottom: 12 },
+  cardTitle: { color: '#06214A', fontWeight: '800' },
+  cardText: { color: '#59677E', marginTop: 4, marginBottom: 12 },
   cardButton: { alignSelf: 'flex-start' },
   pillHero: { borderRadius: 22, overflow: 'hidden' },
   pillHeroGradient: {
