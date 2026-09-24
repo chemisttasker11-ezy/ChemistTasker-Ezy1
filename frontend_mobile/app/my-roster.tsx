@@ -13,6 +13,8 @@ import {
   fetchWorkerShiftRequestsService,
   updateLeaveRequestService,
   updateWorkerShiftRequestService,
+  WORKFORCE_LEAVE_TYPE_OPTIONS,
+  type WorkforceLeaveType,
 } from '@chemisttasker/shared-core';
 import {
   ActionButtons,
@@ -26,14 +28,6 @@ import {
   Section,
 } from '@/features/parity/ParityUI';
 import { asArray, errorMessage, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
-
-const LEAVE_TYPES = [
-  { value: 'ANNUAL', label: 'Annual' },
-  { value: 'SICK', label: 'Sick' },
-  { value: 'PERSONAL', label: 'Personal' },
-  { value: 'UNPAID', label: 'Unpaid' },
-  { value: 'OTHER', label: 'Other' },
-];
 
 const addDays = (value: string, days: number) => {
   const date = new Date(`${value}T00:00:00`);
@@ -83,7 +77,7 @@ export default function MyRosterScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [edit, setEdit] = useState<EditState>(null);
-  const [leaveType, setLeaveType] = useState('ANNUAL');
+  const [leaveType, setLeaveType] = useState<WorkforceLeaveType>('ANNUAL');
   const [note, setNote] = useState('');
 
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
@@ -142,7 +136,7 @@ export default function MyRosterScreen() {
 
   const openLeave = (assignment: any) => {
     const existing = assignmentLeave(assignment);
-    setLeaveType(existing?.leaveType ?? existing?.leave_type ?? 'ANNUAL');
+    setLeaveType((existing?.leaveType ?? existing?.leave_type ?? 'ANNUAL') as WorkforceLeaveType);
     setNote(existing?.note ?? '');
     setEdit({ type: 'leave', assignment, existing });
   };
@@ -345,7 +339,7 @@ export default function MyRosterScreen() {
           <Dialog.Title>{edit && edit.type === 'leave' && edit.existing ? 'Manage leave request' : 'Request leave'}</Dialog.Title>
           <Dialog.ScrollArea>
             <View style={{ padding: 18, gap: 14 }}>
-              <ChoiceChips value={leaveType} options={LEAVE_TYPES} onChange={setLeaveType} disabled={busy} />
+              <ChoiceChips value={leaveType} options={WORKFORCE_LEAVE_TYPE_OPTIONS} onChange={(value) => setLeaveType(value as WorkforceLeaveType)} disabled={busy} />
               <Field label="Note" value={note} onChangeText={setNote} multiline disabled={busy} />
               {edit?.type === 'leave' && edit.existing && String(edit.existing?.status || '').toUpperCase() !== 'PENDING'
                 ? <InfoNote title="Request locked">Only pending leave requests can be changed or cancelled.</InfoNote>
