@@ -32,6 +32,7 @@ const tabTitles: Record<string, string> = {
 const sidebarItems = [
   { label: 'Home', icon: 'home', route: '/otherstaff/dashboard' },
   { label: 'Shifts', icon: 'calendar-range', route: '/otherstaff/shifts' },
+  { label: 'My Roster', icon: 'calendar-account', route: '/my-roster' },
   { label: 'Publish Availability', icon: 'calendar-plus', route: '/otherstaff/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/otherstaff/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/otherstaff/calendar' },
