@@ -4,6 +4,7 @@ import { Card, IconButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { brandColors, getPersonaPalette } from '@/constants/theme';
 
 type Tool = { title: string; subtitle: string; icon: string; route: string };
 
@@ -39,7 +40,9 @@ export default function ParityToolsCard() {
   const { user, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
   const role = String(user?.role || '').toUpperCase();
-  const tools = useMemo(() => {
+  const persona = getPersonaPalette(role);
+
+  const availableTools = useMemo(() => {
     if (role === 'EXPLORER') return explorerTools;
     if (role === 'OWNER') return managerTools;
 
@@ -54,8 +57,6 @@ export default function ParityToolsCard() {
       delegated.push(managerTools[2]);
     }
 
-    // Preserve the existing non-management tools for organization personas, but
-    // never expose staff/roster controls solely because the user has an org role.
     delegated.push(...(isOrganizationRole ? managerTools.slice(3) : workerTools));
     return delegated.filter((tool, index, rows) => rows.findIndex((candidate) => candidate.route === tool.route) === index);
   }, [hasCapability, role, selectedPharmacyId]);
@@ -64,15 +65,17 @@ export default function ParityToolsCard() {
     <View style={styles.section}>
       <Text variant="titleMedium" style={styles.heading}>Work & platform tools</Text>
       <View style={styles.grid}>
-        {tools.map((tool) => (
+        {availableTools.map((tool) => (
           <Card key={tool.route} mode="outlined" style={styles.card} onPress={() => router.push(tool.route as any)}>
             <Card.Content style={styles.content}>
-              <View style={styles.icon}><IconButton icon={tool.icon} size={22} iconColor="#6366F1" /></View>
+              <View style={[styles.icon, { backgroundColor: persona.soft }]}>
+                <IconButton icon={tool.icon} size={22} iconColor={persona.accent} />
+              </View>
               <View style={styles.copy}>
                 <Text variant="titleSmall" style={styles.title}>{tool.title}</Text>
                 <Text variant="bodySmall" style={styles.subtitle}>{tool.subtitle}</Text>
               </View>
-              <IconButton icon="chevron-right" size={18} iconColor="#9CA3AF" />
+              <IconButton icon="chevron-right" size={18} iconColor="#8A97AA" />
             </Card.Content>
           </Card>
         ))}
@@ -83,12 +86,12 @@ export default function ParityToolsCard() {
 
 const styles = StyleSheet.create({
   section: { marginHorizontal: 20, marginBottom: 24, gap: 12 },
-  heading: { color: '#111827', fontWeight: '700' },
+  heading: { color: brandColors.navy, fontWeight: '800' },
   grid: { gap: 10 },
-  card: { borderRadius: 14, backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' },
-  content: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  icon: { width: 46, height: 46, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: 14, backgroundColor: brandColors.white, borderColor: brandColors.border },
+  content: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 66 },
+  icon: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1 },
-  title: { color: '#111827', fontWeight: '700' },
-  subtitle: { color: '#6B7280', marginTop: 2 },
+  title: { color: brandColors.navy, fontWeight: '800' },
+  subtitle: { color: brandColors.body, marginTop: 2, lineHeight: 17 },
 });
