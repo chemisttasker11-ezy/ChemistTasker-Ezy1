@@ -13,6 +13,7 @@ import {
 import type { HubPost, HubPostPayload } from './types';
 import { SubmissionNotice, useSubmissionGuard } from './submissionGuard';
 import { useAuth } from '@/context/AuthContext';
+import { brandColors } from '@/constants/theme';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message.trim()) {
@@ -295,7 +296,7 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
           ) : memberError ? (
             <HelperText type="error">{memberError}</HelperText>
           ) : members.length ? (
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 8, maxHeight: 180 }}>
+            <View style={{ borderWidth: 1, borderColor: brandColors.border, borderRadius: 8, padding: 8, maxHeight: 180 }}>
               {members.map((m) => {
                 const id = m.membershipId || m.membership_id || m.id;
                 const name = getMemberDisplayName(m);
@@ -372,7 +373,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  muted: { color: '#6B7280' },
+  muted: { color: brandColors.body },
   attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   errorBanner: {
     backgroundColor: '#FEE2E2',
