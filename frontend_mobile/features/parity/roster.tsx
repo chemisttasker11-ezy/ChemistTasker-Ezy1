@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, rosterV2, workforce } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateLabel, errorMessage, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -272,19 +272,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
 
-  const memberUserId=(member:any)=>Number(member?.userId ?? member?.user_id ?? member?.user?.id ?? member?.user ?? 0);
-  const memberRole=(member:any)=>String(member?.role ?? member?.userRole ?? member?.user_role ?? '').toUpperCase();
-  const memberLabel=(member:any)=>{
-    const detail=member?.userDetail ?? member?.user_detail ?? member?.user ?? {};
-    const full=[detail?.firstName ?? detail?.first_name,detail?.lastName ?? detail?.last_name].filter(Boolean).join(' ').trim();
-    return full || member?.name || detail?.email || member?.email || `Worker #${memberUserId(member)}`;
-  };
-  const eligible=members.filter((member:any)=>{
-    const user=memberUserId(member);
-    if(!user || member?.isActive===false || member?.is_active===false) return false;
-    const memberRoleValue=memberRole(member);
-    return !memberRoleValue || memberRoleValue===role || (role==='ASSISTANT' && memberRoleValue==='OTHER_STAFF');
-  });
+  const eligible=members.filter((member:any)=>isRosterMemberEligibleForRole(member,role));
 
   const save=async()=>{
     setBusy(true);setError('');
@@ -308,8 +296,8 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
       <Chip selected={userId===null} onPress={()=>setUserId(null)}>Leave vacant</Chip>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
         {eligible.map((member:any)=>{
-          const id=memberUserId(member);
-          return <Chip key={id} selected={userId===id} onPress={()=>setUserId(id)}>{memberLabel(member)}</Chip>;
+          const id=rosterMemberUserId(member);
+          return <Chip key={id} selected={userId===id} onPress={()=>setUserId(id)}>{rosterMemberLabel(member)}</Chip>;
         })}
       </View>
       {!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible active members were returned for this role.</Text>:null}
@@ -360,12 +348,7 @@ function TemplatesScreen({pharmacyId,period,rows,loading,error,onReload}:{pharma
 function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];members:any[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
   const [replacementByRequest,setReplacementByRequest]=useState<Record<string,number>>({});
-  const memberUserId=(member:any)=>Number(member.user??member.userDetails?.id??0);
-  const memberLabel=(member:any)=>{
-    const detail=member.userDetails||{};
-    const full=[detail.firstName,detail.lastName].filter(Boolean).join(' ').trim();
-    return full||detail.displayName||detail.email||member.invitedName||('User #'+memberUserId(member));
-  };
+
   const isSwapRequest=(row:any)=>/^Direct swap request/i.test(String(row.note||''));
   const action=async(row:any,kind:'approve'|'release'|'reject')=>{
     setBusy(true);setLocalError('');
@@ -387,13 +370,13 @@ function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];membe
   return <ParityPage title="Swap & cover approvals" subtitle="Review pending worker roster-change requests without dropping the current assignment." loading={loading} error={error||localError}>
     <InfoNote title="Assignment safety">Requests preserve the current worker assignment until a manager approves a swap/replacement or explicitly releases the worker.</InfoNote>
     <Section title="Pending requests">{rows.length?rows.map((row:any)=>{
-      const swap=isSwapRequest(row);const requestId=String(row.id);const requesterId=Number(row.requestedBy||row.requestedById||0);
-      const eligible=members.filter(member=>{const userId=memberUserId(member);return userId>0&&userId!==requesterId&&member.isActive!==false;});
+      const swap=isSwapRequest(row);const requestId=String(row.id);const requesterId=Number(row.requestedBy||row.requestedById||0);const requiredRole=String(row.role||'');
+      const eligible=members.filter(member=>isRosterMemberEligibleForRole(member,requiredRole,{excludeUserId:requesterId}));
       return <Card key={row.id} mode="outlined"><Card.Content style={{gap:10}}>
         <Text variant="titleSmall">{row.requesterName||'Worker request'}</Text>
         <Text variant="bodySmall" style={{color:palette.muted}}>{[row.pharmacyName,row.slotDate,row.startTime&&row.endTime?(row.startTime+'–'+row.endTime):'',replaceUnderscore(row.role||'')].filter(Boolean).join(' · ')}</Text>
         <Text variant="bodySmall">{row.note||'Roster change request'}</Text>
-        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=memberUserId(member);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{memberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
+        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=rosterMemberUserId(member);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{rosterMemberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
         <ActionButtons><Button compact mode="contained" disabled={busy||(!swap&&!replacementByRequest[requestId])} onPress={()=>void action(row,'approve')}>Approve</Button><Button compact mode="outlined" disabled={busy} onPress={()=>void action(row,'release')}>Release worker</Button><Button compact textColor={palette.danger} disabled={busy} onPress={()=>void action(row,'reject')}>Reject</Button></ActionButtons>
       </Card.Content></Card>;
     }):<EmptyState title="No pending requests" body="Swap and cover requests will appear here when workers submit them." />}</Section>
