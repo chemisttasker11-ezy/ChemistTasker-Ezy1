@@ -37,11 +37,14 @@ const sidebarItems = [
   { label: 'Publish Availability', icon: 'calendar-plus', route: '/pharmacist/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/pharmacist/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/pharmacist/calendar' },
+  { label: 'My Attendance', icon: 'clock-in', route: '/attendance' },
   { label: 'My Hours', icon: 'clock-check-outline', route: '/my-hours' },
+  { label: 'Memberships', icon: 'store-check-outline', route: '/pharmacist/memberships' },
   { label: 'Chat', icon: 'message', route: '/pharmacist/chat' },
   { label: 'Hub', icon: 'view-grid', route: '/pharmacist/hub' },
   { label: 'Invoices', icon: 'file-document-multiple', route: '/pharmacist/invoice' },
   { label: 'Talent Board', icon: 'account-search', route: '/pharmacist/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/pharmacist/learning' },
   { label: 'Profile', icon: 'account-circle', route: '/pharmacist/profile' },
 ];
 
