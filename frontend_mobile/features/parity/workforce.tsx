@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Switch, Text } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -8,7 +9,7 @@ import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
+import { dateFromIso, errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
 
 type WorkforceScreen =
   | 'engagements'
@@ -417,7 +418,17 @@ function AwardPreview({ staff, loading, error }: { staff: any[]; loading: boolea
             onChange={(value) => { setEmploymentType(value); setPreview(null); }}
             options={[{ value: 'FULL_TIME', label: 'Full time' }, { value: 'PART_TIME', label: 'Part time' }, { value: 'CASUAL', label: 'Casual' }]}
           />
-          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
+          <DatePickerInput
+            locale="en-AU"
+            label="Effective from"
+            value={dateFromIso(effectiveFrom)}
+            onChange={(date) => {
+              setEffectiveFrom(date ? isoDate(date) : '');
+              setPreview(null);
+            }}
+            inputMode="start"
+            disabled={busy}
+          />
           {classificationOptions.length ? (
             <Section title="Award classification" description="Choose from the backend-provided classifications for this worker.">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -697,8 +708,25 @@ function EngagementEditor({
 
       {worker ? (
         <>
-          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} disabled={historical} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
-          <Field label="Effective to (optional, YYYY-MM-DD)" value={effectiveTo} disabled={completedHistorical} onChangeText={setEffectiveTo} />
+          <DatePickerInput
+            locale="en-AU"
+            label="Effective from"
+            value={dateFromIso(effectiveFrom)}
+            onChange={(date) => {
+              setEffectiveFrom(date ? isoDate(date) : '');
+              setPreview(null);
+            }}
+            inputMode="start"
+            disabled={historical || busy}
+          />
+          <DatePickerInput
+            locale="en-AU"
+            label="Effective to (optional)"
+            value={dateFromIso(effectiveTo)}
+            onChange={(date) => setEffectiveTo(date ? isoDate(date) : '')}
+            inputMode="start"
+            disabled={completedHistorical || busy}
+          />
 
           {!historical ? (
             <>
