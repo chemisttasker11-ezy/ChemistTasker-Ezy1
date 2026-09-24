@@ -546,6 +546,9 @@ export default function TalentBoard({
     form.append('open_to_travel', pitchForm.openToTravel ? 'true' : 'false');
     form.append('travel_states', JSON.stringify(pitchForm.travelStates || []));
     form.append('coverage_radius_km', String(pitchForm.coverageRadiusKm || 0));
+    if (pitchForm.latitude != null) form.append('latitude', String(pitchForm.latitude));
+    if (pitchForm.longitude != null) form.append('longitude', String(pitchForm.longitude));
+    if (pitchForm.googlePlaceId) form.append('google_place_id', pitchForm.googlePlaceId);
     await updateOnboardingForm(safeRole, form);
   }, [isOtherStaff, isPharmacist, pitchForm]);
 
@@ -553,8 +556,18 @@ export default function TalentBoard({
     setPitchSaving(true);
     setPitchError(null);
     try {
-      await updateOnboardingLocationPrefs();
+      if (pitchForm.openToTravel && (pitchForm.travelStates || []).length === 0) {
+        setPitchError('Select at least one travel state.');
+        setPitchSaving(false);
+        return;
+      }
       const isFullTimeApplication = pitchForm.postKind === 'FULL_TIME_APPLICATION';
+      if (isExplorer && isFullTimeApplication && !pitchForm.headline.trim() && !pitchForm.body.trim()) {
+        setPitchError('Please add a headline or some text.');
+        setPitchSaving(false);
+        return;
+      }
+      await updateOnboardingLocationPrefs();
       const normalizedWorkTypes = isFullTimeApplication
         ? Array.from(new Set([...(pitchForm.workTypes || []), 'FULL_TIME']))
         : pitchForm.workTypes;
