@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, rosterV2, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
@@ -53,9 +53,11 @@ function slotSummary(row: any) {
 
 export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const router = useRouter();
+  const params = useLocalSearchParams<{ pharmacyId?: string }>();
   const workspace = useWorkspace();
-  const pharmacyId = workspace.selectedPharmacyId;
-  const pharmacyName = workspace.selectedPharmacyName;
+  const scopedPharmacyId = Number(params.pharmacyId || 0);
+  const pharmacyId = Number.isFinite(scopedPharmacyId) && scopedPharmacyId > 0 ? scopedPharmacyId : workspace.selectedPharmacyId;
+  const pharmacyName = pharmacyId === workspace.selectedPharmacyId ? workspace.selectedPharmacyName : null;
   const [weekStart, setWeekStart] = useState(startOfWeek());
   const [period, setPeriod] = useState<any>(null);
   const [coverage, setCoverage] = useState<any[]>([]);
