@@ -47,6 +47,7 @@ const sidebarItems = [
   { label: 'Pharmacies', icon: 'store', route: '/organization/pharmacies' },
   { label: 'Shifts', icon: 'calendar-month', route: '/organization/shifts' },
   { label: 'Weekly Roster', icon: 'calendar-account', route: '/manager/roster' },
+  { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews' },
   { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
   { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
   { label: 'Post Shift', icon: 'plus-circle', route: '/organization/post-shift' },
