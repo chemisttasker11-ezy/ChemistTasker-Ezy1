@@ -312,7 +312,7 @@ export default function OwnerLayout() {
           headerTitle: tabTitles[route.name] || 'Owner',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+            <IconButton icon="menu" accessibilityLabel="Open owner menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
