@@ -4,8 +4,7 @@
  * Complete API functions for ChemistTasker
  */
 import { API_ENDPOINTS } from './constants/endpoints';
-import type { ShiftOfferAcceptancePayload } from './types';
-import type { RosterPharmacyMember, WorkerShiftRequestRecord } from './contracts/roster';
+import type { ShiftOfferAcceptancePayload, RosterPharmacyMember, WorkerShiftRequest } from './types';
 let config = null;
 export function configureApi(apiConfig) {
     config = apiConfig;
@@ -308,7 +307,7 @@ const mapShift = (api) => {
     };
 };
 const mapRosterAssignment = (api) => camelCaseKeysDeep(api);
-const mapWorkerShiftRequest = (api): WorkerShiftRequestRecord => camelCaseKeysDeep(api);
+const mapWorkerShiftRequest = (api): WorkerShiftRequest => camelCaseKeysDeep(api);
 const mapOpenShift = (api) => camelCaseKeysDeep(api);
 const mapRosterPharmacyMember = (api): RosterPharmacyMember => camelCaseKeysDeep(api);
 const mapShiftApplication = (api) => camelCaseKeysDeep(api);
@@ -1351,8 +1350,9 @@ export function createOpenShift(data) {
 export function deleteRosterAssignment(id) {
     return fetchApi(`/client-profile/roster-owner/${id}/`, { method: 'DELETE' });
 }
-export function getRosterOwnerMembers(pharmacyId) {
-    return fetchApi(`/client-profile/roster-owner/members-for-roster/?pharmacy_id=${pharmacyId}`);
+export function getRosterOwnerMembers(pharmacyId, role = null) {
+    const query = buildQuery({ pharmacy_id: pharmacyId, ...(role ? { role } : {}) });
+    return fetchApi(`/client-profile/roster-owner/members-for-roster/${query}`);
 }
 export function getRosterWorkerPharmacies() {
     return fetchApi('/client-profile/roster-worker/pharmacies/');
@@ -1365,7 +1365,7 @@ export async function fetchRosterWorkerAssignments(params) {
     const data = await getRosterWorker(toRosterQueryParams(params));
     return asList(data).map(mapRosterAssignment);
 }
-export async function fetchWorkerShiftRequestsService(params): Promise<WorkerShiftRequestRecord[]> {
+export async function fetchWorkerShiftRequestsService(params): Promise<WorkerShiftRequest[]> {
     const data = await getWorkerShiftRequests(toRosterQueryParams(params));
     return asList(data).map(mapWorkerShiftRequest);
 }
@@ -1373,8 +1373,8 @@ export async function fetchOwnerOpenShifts(params) {
     const data = await getOwnerOpenShifts(toShiftListParams(params));
     return asList(data).map(mapOpenShift);
 }
-export async function fetchRosterOwnerMembersService(pharmacyId): Promise<RosterPharmacyMember[]> {
-    const data = await getRosterOwnerMembers(pharmacyId);
+export async function fetchRosterOwnerMembersService(pharmacyId, role = null): Promise<RosterPharmacyMember[]> {
+    const data = await getRosterOwnerMembers(pharmacyId, role);
     return asList(data).map(mapRosterPharmacyMember);
 }
 export async function fetchRosterWorkerPharmaciesService() {
