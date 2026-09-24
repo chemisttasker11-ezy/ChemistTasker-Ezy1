@@ -84,13 +84,13 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       const p = await loadPeriod();
       if (screen === 'coverage') setCoverage(asArray(await workforce.listCoverageRequirements(pharmacyId)));
       if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
-      if (screen === 'approvals') {
-        const [rows, memberRows] = await Promise.all([
-          fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any),
-          fetchRosterOwnerMembersService(pharmacyId),
-        ]);
-        setRequests(asArray(rows).filter((row:any)=>String(row.status||'').toUpperCase()==='PENDING'));
+      if (screen === 'approvals' || screen === 'shift-editor') {
+        const memberRows = await fetchRosterOwnerMembersService(pharmacyId);
         setMembers(asArray(memberRows));
+        if (screen === 'approvals') {
+          const rows = await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any);
+          setRequests(asArray(rows).filter((row:any)=>String(row.status||'').toUpperCase()==='PENDING'));
+        }
       }
       if (screen === 'audit') {
         const result = await roster.getAudits(pharmacyId);
@@ -124,7 +124,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   };
 
   if (screen === 'shift-editor') {
-    return <ShiftEditor pharmacyId={pharmacyId} weekStart={weekStart} period={period} ensurePeriod={ensurePeriod} onSaved={load} />;
+    return <ShiftEditor pharmacyId={pharmacyId} pharmacyName={pharmacyName} weekStart={weekStart} period={period} members={members} ensurePeriod={ensurePeriod} onSaved={load} />;
   }
   if (screen === 'coverage') {
     return <CoverageScreen pharmacyId={pharmacyId} rows={coverage} loading={loading} error={error} onReload={load} />;
@@ -260,30 +260,58 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   );
 }
 
-function ShiftEditor({ pharmacyId, weekStart, period, ensurePeriod, onSaved }: { pharmacyId:number; weekStart:string; period:any; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
+function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; members:any[]; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
   const router=useRouter();
   const [date,setDate]=useState(weekStart);
   const [start,setStart]=useState('09:00');
   const [end,setEnd]=useState('17:00');
   const [role,setRole]=useState('PHARMACIST');
-  const [userId,setUserId]=useState('');
+  const [userId,setUserId]=useState<number|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+
+  const memberUserId=(member:any)=>Number(member?.userId ?? member?.user_id ?? member?.user?.id ?? member?.user ?? 0);
+  const memberRole=(member:any)=>String(member?.role ?? member?.userRole ?? member?.user_role ?? '').toUpperCase();
+  const memberLabel=(member:any)=>{
+    const detail=member?.userDetail ?? member?.user_detail ?? member?.user ?? {};
+    const full=[detail?.firstName ?? detail?.first_name,detail?.lastName ?? detail?.last_name].filter(Boolean).join(' ').trim();
+    return full || member?.name || detail?.email || member?.email || `Worker #${memberUserId(member)}`;
+  };
+  const eligible=members.filter((member:any)=>{
+    const user=memberUserId(member);
+    if(!user || member?.isActive===false || member?.is_active===false) return false;
+    const memberRoleValue=memberRole(member);
+    return !memberRoleValue || memberRoleValue===role || (role==='ASSISTANT' && memberRoleValue==='OTHER_STAFF');
+  });
+
   const save=async()=>{
     setBusy(true);setError('');
     try{
       const p=period?.period_id ? period : await ensurePeriod();
-      await roster.bulkEdit(Number(p.period_id || p.id), [{action:'create_shift',date,start_time:start,end_time:end,role,...(userId.trim()?{user_id:toNumber(userId)}:{})}]);
+      await roster.bulkEdit(Number(p.period_id || p.id), [{action:'create_shift',date,start_time:start,end_time:end,role,...(userId?{user_id:userId}:{})}]);
       await onSaved();router.replace('/manager/roster' as any);
     }catch(e){setError(errorMessage(e,'Unable to create roster shift.'));}finally{setBusy(false);}
   };
-  return <ParityPage title="Add / edit roster shift" subtitle="Create a draft roster slot and optionally assign a worker." error={error}>
-    <InfoNote title={`Pharmacy #${pharmacyId}`}>Roster changes are transactional and validated by the server.</InfoNote>
-    <Field label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
-    <Field label="Start time (HH:MM)" value={start} onChangeText={setStart} />
-    <Field label="End time (HH:MM)" value={end} onChangeText={setEnd} />
-    <ChoiceChips value={role} onChange={setRole} options={[{value:'PHARMACIST',label:'Pharmacist'},{value:'INTERN',label:'Intern'},{value:'TECHNICIAN',label:'Technician'},{value:'ASSISTANT',label:'Assistant'},{value:'STUDENT',label:'Student'}]} />
-    <Field label="Assign worker user ID (optional)" value={userId} keyboardType="numeric" onChangeText={setUserId} />
+  return <ParityPage title="Add roster shift" subtitle="Create a draft roster slot and optionally assign an eligible pharmacy team member." error={error}>
+    <InfoNote title={pharmacyName || `Pharmacy #${pharmacyId}`}>Roster changes are transactional and server validated before publication.</InfoNote>
+    <Section title="Shift details">
+      <Field label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
+      <View style={{flexDirection:'row',gap:10}}>
+        <View style={{flex:1}}><Field label="Start (HH:MM)" value={start} onChangeText={setStart} /></View>
+        <View style={{flex:1}}><Field label="End (HH:MM)" value={end} onChangeText={setEnd} /></View>
+      </View>
+      <ChoiceChips value={role} onChange={(value)=>{setRole(value);setUserId(null);}} options={[{value:'PHARMACIST',label:'Pharmacist'},{value:'INTERN',label:'Intern'},{value:'TECHNICIAN',label:'Technician'},{value:'ASSISTANT',label:'Assistant'},{value:'STUDENT',label:'Student'}]} />
+    </Section>
+    <Section title="Assignment" description="Leave unassigned to create a vacant roster slot, or choose an eligible worker.">
+      <Chip selected={userId===null} onPress={()=>setUserId(null)}>Leave vacant</Chip>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+        {eligible.map((member:any)=>{
+          const id=memberUserId(member);
+          return <Chip key={id} selected={userId===id} onPress={()=>setUserId(id)}>{memberLabel(member)}</Chip>;
+        })}
+      </View>
+      {!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible active members were returned for this role.</Text>:null}
+    </Section>
     <Button mode="contained" loading={busy} disabled={busy||!date||!start||!end} onPress={()=>void save()}>Create draft shift</Button>
   </ParityPage>;
 }
