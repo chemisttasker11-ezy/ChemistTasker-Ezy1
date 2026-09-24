@@ -39,6 +39,8 @@ from .attendance_credentials import (
     is_authorized_kiosk_manager,
     generate_signed_pharmacy_qr,
     redeem_kiosk_pairing_code,
+    revoke_kiosk_device,
+    revoke_kiosk_device_by_credential,
     send_worker_pin_setup_code,
     setup_worker_kiosk_pin,
     verify_kiosk_worker_pin,
@@ -103,7 +105,7 @@ from .roster_services import (
 )
 
 
-def _get_kiosk_device_from_request(request):
+def _get_kiosk_device_from_request(request, *, allow_revoked=False):
     """
     Extracts and authenticates a KioskDevice from request headers, META, or body.
     Supports:
@@ -125,7 +127,7 @@ def _get_kiosk_device_from_request(request):
     if not token:
         raise PermissionDenied("Kiosk device token required.")
 
-    device = authenticate_kiosk_device(token)
+    device = authenticate_kiosk_device(token, include_revoked=allow_revoked)
     if not device:
         raise PermissionDenied("Invalid or revoked kiosk device.")
     return device
@@ -273,6 +275,8 @@ class KioskPairWithCodeView(APIView):
                 "pharmacy_name": device.pharmacy.name,
                 "activated_at": device.activated_at.isoformat(),
                 "installation_id": str(device.installation_id),
+                "server_time": timezone.now().isoformat(),
+                "max_offline_hours": int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24)),
             }, status=status.HTTP_201_CREATED)
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
@@ -289,7 +293,7 @@ class KioskOfflineSyncView(APIView):
 
     def post(self, request):
         try:
-            device = _get_kiosk_device_from_request(request)
+            device = _get_kiosk_device_from_request(request, allow_revoked=True)
             if device.client_kind != "NATIVE_OFFLINE":
                 raise PermissionDenied("This device is not authorized for offline attendance sync.")
             result = sync_offline_batch(
@@ -297,6 +301,9 @@ class KioskOfflineSyncView(APIView):
                 request.data.get("events"),
                 app_version=request.data.get("app_version", ""),
             )
+            result["device_revoked"] = bool(device.revoked_at or not device.is_active)
+            if not result["device_revoked"]:
+                result["max_offline_hours"] = int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24))
             return Response(result, status=status.HTTP_200_OK)
         except (DjangoPermissionDenied, PermissionDenied) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
@@ -325,6 +332,73 @@ class KioskConfigView(APIView):
             })
         except (DjangoPermissionDenied, PermissionDenied) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class KioskSelfRevokeView(APIView):
+    """Revoke the authenticated kiosk itself before local credentials are cleared."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            device = _get_kiosk_device_from_request(request, allow_revoked=True)
+            revoke_kiosk_device_by_credential(
+                device,
+                issued_at=request.data.get("issued_at", ""),
+                proof_signature=request.data.get("proof_signature", ""),
+            )
+            return Response({"status": "REVOKED", "installation_id": str(device.installation_id)})
+        except (DjangoPermissionDenied, PermissionDenied) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+        except DjangoValidationError as exc:
+            message = "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ManagerKioskDevicesView(APIView):
+    """List or revoke kiosk devices for a pharmacy under manager authority."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        pharmacy_id = request.query_params.get("pharmacy_id")
+        if not pharmacy_id:
+            return Response({"error": "pharmacy_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
+        if not is_authorized_kiosk_manager(request.user, pharmacy):
+            raise PermissionDenied("You are not authorized to manage kiosks for this pharmacy.")
+        devices = KioskDevice.objects.filter(pharmacy=pharmacy).order_by("-activated_at", "-pk")
+        return Response({"devices": [{
+            "id": device.pk,
+            "installation_id": str(device.installation_id),
+            "device_name": device.device_name,
+            "platform": device.platform,
+            "client_kind": device.client_kind,
+            "app_version": device.app_version,
+            "is_active": device.is_active,
+            "activated_at": device.activated_at.isoformat(),
+            "last_seen_at": device.last_seen_at.isoformat() if device.last_seen_at else None,
+            "last_sync_at": device.last_sync_at.isoformat() if device.last_sync_at else None,
+            "revoked_at": device.revoked_at.isoformat() if device.revoked_at else None,
+            "last_contiguous_sequence": device.last_contiguous_sequence,
+        } for device in devices]})
+
+    def post(self, request):
+        device_id = request.data.get("device_id")
+        if not device_id:
+            return Response({"error": "device_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        device = get_object_or_404(KioskDevice.objects.select_related("pharmacy"), pk=device_id)
+        try:
+            revoke_kiosk_device(request.user, device)
+            return Response({
+                "status": "REVOKED",
+                "device_id": device.pk,
+                "installation_id": str(device.installation_id),
+                "revoked_at": device.revoked_at.isoformat() if device.revoked_at else None,
+            })
+        except (DjangoPermissionDenied, PermissionDenied) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
 
 class KioskWorkerEnrolView(APIView):

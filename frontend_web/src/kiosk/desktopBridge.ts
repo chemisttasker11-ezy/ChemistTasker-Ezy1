@@ -52,6 +52,12 @@ export const pairDesktopKiosk = (input: {
 
 export const getDesktopPendingCount = () => invoke<number>('pending_count');
 
+export const verifyDesktopDashboardPin = (pin: string) =>
+  invoke<boolean>('verify_dashboard_pin', { pin });
+
+export const disconnectDesktopKiosk = (dashboardPin: string) =>
+  invoke<DesktopKioskStatus>('disconnect_device', { dashboardPin });
+
 export const syncDesktopNow = () => invoke('sync_now');
 
 export type OfflinePinResult = {

@@ -28,7 +28,9 @@ from .attendance_views import (
     KioskConfigView,
     KioskQRView,
     KioskRequestPairingCodeView,
+    KioskSelfRevokeView,
     KioskStaffBreakActionView,
+    ManagerKioskDevicesView,
     KioskWorkerPinStatusView,
     KioskWorkerEnrolView,
     KioskWorkerSetupPinView,
@@ -248,6 +250,7 @@ urlpatterns = [
     path('attendance/kiosk/pin-clock/', KioskPinClockView.as_view(), name='attendance-kiosk-pin-clock'),
     path('attendance/kiosk/sync/batch/', KioskOfflineSyncView.as_view(), name='attendance-kiosk-sync-batch'),
     path('attendance/kiosk/config/', KioskConfigView.as_view(), name='attendance-kiosk-config'),
+    path('attendance/kiosk/revoke-self/', KioskSelfRevokeView.as_view(), name='attendance-kiosk-revoke-self'),
     path('attendance/kiosk/workers/enrol/', KioskWorkerEnrolView.as_view(), name='attendance-kiosk-worker-enrol'),
     path('attendance/kiosk/worker-pin/status/', KioskWorkerPinStatusView.as_view(), name='attendance-kiosk-worker-pin-status'),
     path('attendance/kiosk/worker-pin/setup/', KioskWorkerSetupPinView.as_view(), name='attendance-kiosk-worker-pin-setup'),
@@ -268,6 +271,7 @@ urlpatterns = [
     path('attendance/manager/reject/', ManagerRejectAttendanceView.as_view(), name='attendance-manager-reject'),
     path('attendance/manager/correct/', ManagerCreateCorrectionView.as_view(), name='attendance-manager-correct'),
     path('attendance/manager/timeline/<int:session_id>/', ManagerSessionTimelineView.as_view(), name='attendance-manager-timeline'),
+    path('attendance/manager/kiosk-devices/', ManagerKioskDevicesView.as_view(), name='attendance-manager-kiosk-devices'),
 
     # Roster V2 Endpoints
     path('attendance/roster/period/', RosterPeriodDetailView.as_view(), name='roster-period-detail'),

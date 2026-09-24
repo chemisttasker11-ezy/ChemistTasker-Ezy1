@@ -33,12 +33,17 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import CoffeeIcon from "@mui/icons-material/Coffee";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import KioskSetup from "../../kiosk/KioskSetup";
 import { API_BASE_URL } from "../../constants/api";
 import { clearTokens } from "../../utils/tokenService";
 import {
   getDesktopKioskStatus,
   getDesktopOnlineQr,
+  getDesktopPendingCount,
+  verifyDesktopDashboardPin,
+  disconnectDesktopKiosk,
+  syncDesktopNow,
   isDesktopKiosk,
   pairDesktopKiosk,
   captureDesktopPinAttendance,
@@ -72,6 +77,12 @@ export default function KioskPage() {
   const [activationError, setActivationError] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [showSettingsUnlock, setShowSettingsUnlock] = useState(false);
+  const [settingsPin, setSettingsPin] = useState("");
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [pendingDisconnectCount, setPendingDisconnectCount] = useState(0);
 
   // 6-digit Mobile Pairing Code state
   const [pairingCode, setPairingCode] = useState("");
@@ -205,12 +216,16 @@ export default function KioskPage() {
       setQrToken(null);
       setExpiresAt(null);
       setCountdownSeconds(0);
+      const rawDesktopError = desktopRuntime ? String(err) : "";
+      const revoked = rawDesktopError.includes("KIOSK_REVOKED");
       const msg = desktopRuntime
-        ? String(err).replace(/^KIOSK_REVOKED:\s*/, "")
+        ? rawDesktopError.replace(/^KIOSK_REVOKED:\s*/, "")
         : err.response?.data?.error || "Device inactive or network error.";
       setQrError(
         desktopRuntime
-          ? `${msg} Use your attendance PIN while QR is unavailable.`
+          ? revoked
+            ? `${msg} Manager re-pairing is required before this terminal can record attendance.`
+            : `${msg} Use your attendance PIN while QR is unavailable.`
           : msg
       );
       if (!desktopRuntime && err.response?.status === 401) {
@@ -365,13 +380,92 @@ export default function KioskPage() {
     }
   };
 
-  const handleDeactivate = () => {
+  const clearBrowserKiosk = () => {
     localStorage.removeItem(KIOSK_TOKEN_KEY);
     localStorage.removeItem(KIOSK_PHARMACY_NAME_KEY);
     localStorage.removeItem(KIOSK_PHARMACY_ID_KEY);
     setDeviceToken(null);
     setQrToken(null);
+    setExpiresAt(null);
     setShowDeactivateDialog(false);
+  };
+
+  const openKioskSettings = async () => {
+    setSettingsError(null);
+    setSettingsMessage(null);
+    if (!desktopRuntime) {
+      setShowDeactivateDialog(true);
+      return;
+    }
+    setSettingsPin("");
+    setShowSettingsUnlock(true);
+  };
+
+  const unlockKioskSettings = async () => {
+    if (!/^\d{6}$/.test(settingsPin)) {
+      setSettingsError("Enter the six-digit dashboard PIN.");
+      return;
+    }
+    setSettingsBusy(true);
+    setSettingsError(null);
+    try {
+      const valid = await verifyDesktopDashboardPin(settingsPin);
+      if (!valid) {
+        setSettingsError("Dashboard PIN is incorrect.");
+        return;
+      }
+      setPendingDisconnectCount(await getDesktopPendingCount());
+      setShowSettingsUnlock(false);
+      setShowDeactivateDialog(true);
+    } catch (error) {
+      setSettingsError(String(error));
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    if (!desktopRuntime) return;
+    setSettingsBusy(true);
+    setSettingsError(null);
+    setSettingsMessage(null);
+    try {
+      await syncDesktopNow();
+      const remaining = await getDesktopPendingCount();
+      setPendingDisconnectCount(remaining);
+      setSettingsMessage(
+        remaining === 0
+          ? "Sync complete. Attendance on this kiosk is up to date with ChemistTasker."
+          : `Sync finished with ${remaining} event${remaining === 1 ? "" : "s"} still waiting to upload.`
+      );
+    } catch (error) {
+      setSettingsError(String(error));
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!desktopRuntime) {
+      clearBrowserKiosk();
+      return;
+    }
+    setSettingsBusy(true);
+    setSettingsError(null);
+    try {
+      const status = await disconnectDesktopKiosk(settingsPin);
+      setDeviceToken(null);
+      setQrToken(null);
+      setExpiresAt(null);
+      setPharmacyName(status.pharmacy_name || "Pharmacy Counter");
+      setShowDeactivateDialog(false);
+      setSettingsPin("");
+      setPendingDisconnectCount(0);
+    } catch (error) {
+      setSettingsError(String(error));
+    } finally {
+      setSettingsBusy(false);
+    }
   };
 
   // PIN Pad helpers
@@ -841,7 +935,7 @@ export default function KioskPage() {
             </Typography>
           </Box>
           <IconButton
-            onClick={() => setShowDeactivateDialog(true)}
+            onClick={() => void openKioskSettings()}
             sx={{
               color: "#94a3b8",
               bgcolor: "rgba(255, 255, 255, 0.05)",
@@ -1904,19 +1998,105 @@ export default function KioskPage() {
         handleConfirmBreakAction={handleConfirmBreakAction}
       />
 
-      {/* Deactivate Dialog */}
-      <Dialog open={showDeactivateDialog} onClose={() => setShowDeactivateDialog(false)}>
-        <DialogTitle>Kiosk Terminal Settings</DialogTitle>
+      <Dialog open={showSettingsUnlock} onClose={() => !settingsBusy && setShowSettingsUnlock(false)}>
+        <DialogTitle>Manager Access</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            Are you sure you want to disconnect this terminal from <strong>{pharmacyName}</strong>?
-            You will need manager credentials to re-activate it.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter the six-digit dashboard PIN to open kiosk settings.
           </Typography>
+          {settingsError && <Alert severity="error" sx={{ mb: 2 }}>{settingsError}</Alert>}
+          <TextField
+            autoFocus
+            fullWidth
+            label="Dashboard PIN"
+            type="password"
+            value={settingsPin}
+            onChange={(event) => setSettingsPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputProps={{ inputMode: "numeric", maxLength: 6 }}
+            disabled={settingsBusy}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && /^\d{6}$/.test(settingsPin)) void unlockKioskSettings();
+            }}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowDeactivateDialog(false)}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={handleDeactivate}>
-            Disconnect Device
+          <Button disabled={settingsBusy} onClick={() => setShowSettingsUnlock(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={settingsBusy || !/^\d{6}$/.test(settingsPin)}
+            onClick={() => void unlockKioskSettings()}
+          >
+            {settingsBusy ? <CircularProgress size={20} color="inherit" /> : "Unlock Settings"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Protected kiosk settings / disconnect */}
+      <Dialog
+        open={showDeactivateDialog}
+        onClose={() => {
+          if (!settingsBusy) {
+            setShowDeactivateDialog(false);
+            setSettingsError(null);
+            if (desktopRuntime) setSettingsPin("");
+          }
+        }}
+      >
+        <DialogTitle>Kiosk Terminal Settings</DialogTitle>
+        <DialogContent>
+          {settingsError && <Alert severity="error" sx={{ mb: 2 }}>{settingsError}</Alert>}
+          {settingsMessage && <Alert severity="success" sx={{ mb: 2 }}>{settingsMessage}</Alert>}
+          {desktopRuntime && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="overline" fontWeight={900} color="text.secondary">Attendance sync</Typography>
+              <Alert severity={pendingDisconnectCount > 0 ? "warning" : "success"}>
+                {pendingDisconnectCount > 0
+                  ? `${pendingDisconnectCount} attendance event${pendingDisconnectCount === 1 ? "" : "s"} waiting to sync. Use Sync Now before disconnecting this terminal.`
+                  : "Attendance evidence is fully uploaded."}
+              </Alert>
+            </Box>
+          )}
+          <Typography variant="overline" fontWeight={900} color="text.secondary">Device connection</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Disconnect this terminal from <strong>{pharmacyName}</strong>. ChemistTasker will revoke
+            the device before any local credentials are removed, and the terminal must be paired again
+            before it can record new attendance.
+          </Typography>
+          {desktopRuntime && pendingDisconnectCount > 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              {pendingDisconnectCount} attendance event{pendingDisconnectCount === 1 ? "" : "s"} still
+              {pendingDisconnectCount === 1 ? " is" : " are"} waiting to sync. This terminal cannot be
+              disconnected until that evidence reaches ChemistTasker.
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            disabled={settingsBusy}
+            onClick={() => {
+              setShowDeactivateDialog(false);
+              setSettingsError(null);
+              if (desktopRuntime) setSettingsPin("");
+            }}
+          >
+            Cancel
+          </Button>
+          {desktopRuntime && (
+            <Button
+              startIcon={<RefreshIcon />}
+              disabled={settingsBusy}
+              onClick={() => void handleSyncNow()}
+            >
+              Sync Now
+            </Button>
+          )}
+          <Button
+            color="error"
+            variant="contained"
+            disabled={settingsBusy || (desktopRuntime && pendingDisconnectCount > 0)}
+            onClick={() => void handleDeactivate()}
+          >
+            {settingsBusy ? <CircularProgress size={20} color="inherit" /> : "Disconnect Device"}
           </Button>
         </DialogActions>
       </Dialog>

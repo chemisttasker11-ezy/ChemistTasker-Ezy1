@@ -48,6 +48,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const [status,setStatus]=useState<any>(null);
   const [pending,setPending]=useState<any[]>([]);
   const [pinPharmacies,setPinPharmacies]=useState<any[]>([]);
+  const [kioskDevices,setKioskDevices]=useState<any[]>([]);
   const [timeline,setTimeline]=useState<any>(null);
   const [hours,setHours]=useState<any[]>([]);
   const [loading,setLoading]=useState(true);
@@ -67,6 +68,12 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       if(screen==='kiosk-status') {
         const result=await attendance.getPinPharmacies();
         setPinPharmacies(asArray((result as any)?.pharmacies??result));
+        if(manager&&pharmacyId){
+          const devices=await attendance.getManagerKioskDevices(pharmacyId);
+          setKioskDevices(asArray((devices as any)?.devices??devices));
+        }else{
+          setKioskDevices([]);
+        }
       }
       if(screen==='correction'&&!manager) setHours(asArray(await workforce.getMyHours()));
     }catch(e){setError(errorMessage(e,'Unable to load attendance data.'));}
@@ -88,7 +95,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
 
   if(screen==='clock') return <ClockScreen status={status} loading={loading} error={error} onReload={load}/>;
   if(screen==='correction') return <CorrectionScreen manager={manager} rows={hours} params={params} loading={loading} error={error} />;
-  if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} loading={loading} error={error} />;
+  if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} devices={kioskDevices} manager={manager} pharmacyId={pharmacyId} loading={loading} error={error} onReload={load} />;
 
   if(screen==='reviews'){
     return <ParityPage title={titles[screen]} subtitle="Review provisional and cross-site attendance before it becomes rostered history." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing}>
@@ -283,10 +290,56 @@ function CorrectionScreen({manager,rows,params,loading,error}:{manager:boolean;r
   </ParityPage>;
 }
 
-function KioskStatus({rows,loading,error}:{rows:any[];loading:boolean;error:string}) {
+function KioskStatus({rows,devices,manager,pharmacyId,loading,error,onReload}:{rows:any[];devices:any[];manager:boolean;pharmacyId:number|null;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const router=useRouter();
-  return <ParityPage title="Kiosk & PIN status" subtitle="Worker PIN setup across pharmacies available to your account." loading={loading} error={error}>
-    <Section title="Pharmacies">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>
-    <InfoNote title="Kiosk access">Kiosk pairing remains an explicit deep-link/device workflow. This screen exposes only the authenticated worker PIN status and setup entry point.</InfoNote>
+  const [confirmDeviceId,setConfirmDeviceId]=useState<number|null>(null);
+  const [busyDeviceId,setBusyDeviceId]=useState<number|null>(null);
+  const [localError,setLocalError]=useState('');
+
+  const revokeDevice=async(id:number)=>{
+    setBusyDeviceId(id);setLocalError('');
+    try{
+      await attendance.revokeManagerKioskDevice(id);
+      setConfirmDeviceId(null);
+      await onReload();
+    }catch(e){
+      setLocalError(errorMessage(e,'Unable to revoke this kiosk device.'));
+    }finally{
+      setBusyDeviceId(null);
+    }
+  };
+
+  return <ParityPage title="Kiosk devices & PINs" subtitle="Manage registered attendance terminals and your worker PIN setup." loading={loading} error={error||localError}>
+    {manager?<Section title="Registered kiosk devices" description="Remote revocation blocks online access immediately. Native offline attendance is also bounded by its server-issued authorization window.">
+      {!pharmacyId?<PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/>:devices.length?devices.map((device:any)=><Section
+        key={device.id}
+        title={device.device_name||'Kiosk terminal'}
+        description={[
+          replaceUnderscore(device.client_kind||''),
+          device.platform||'Unknown platform',
+          device.app_version?`v${device.app_version}`:null,
+        ].filter(Boolean).join(' · ')}
+        action={<Chip compact>{device.is_active?'Active':'Revoked'}</Chip>}
+      >
+        <MetricGrid items={[
+          {label:'Activated',value:device.activated_at?dateLabel(device.activated_at):'—'},
+          {label:'Last seen',value:device.last_seen_at?dateLabel(device.last_seen_at):'Never',tone:device.last_seen_at?'success':'warning'},
+          {label:'Last sync',value:device.last_sync_at?dateLabel(device.last_sync_at):'Never',tone:device.last_sync_at?'success':'warning'},
+          {label:'Received sequence',value:Number(device.last_contiguous_sequence||0)},
+        ]}/>
+        {!device.is_active&&device.revoked_at?<InfoNote title="Revoked">Revoked {dateLabel(device.revoked_at)}. This terminal must be paired again before it can record new attendance.</InfoNote>:null}
+        {device.is_active?confirmDeviceId===Number(device.id)?<>
+          <InfoNote title="Confirm revocation" tone="warning">Revocation blocks new attendance authority immediately. Already-signed offline evidence can still drain into review so it is not lost.</InfoNote>
+          <ActionButtons>
+            <Button mode="contained" buttonColor={palette.danger} loading={busyDeviceId===Number(device.id)} disabled={busyDeviceId!==null} onPress={()=>void revokeDevice(Number(device.id))}>Confirm revoke</Button>
+            <Button mode="outlined" disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(null)}>Cancel</Button>
+          </ActionButtons>
+        </>:<Button mode="outlined" textColor={palette.danger} disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(Number(device.id))}>Revoke kiosk</Button>:null}
+      </Section>):<EmptyState title="No registered kiosks" body="No attendance terminal is registered for the selected pharmacy."/>}
+    </Section>:null}
+
+    <Section title="Worker attendance PINs">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>
+    <InfoNote title="Device lifecycle">Disconnecting a native kiosk requires its dashboard PIN and a safe server revocation. A terminal with unsynced attendance cannot erase its local evidence.</InfoNote>
   </ParityPage>;
 }
+

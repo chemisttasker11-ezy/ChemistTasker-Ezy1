@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "users.apps.UsersConfig",
+    "worker_finance.apps.WorkerFinanceConfig",
     "attendance_tests.settings.AttendanceClientProfileConfig",
 ]
 
@@ -48,6 +49,7 @@ CACHES = {
 MIGRATION_MODULES = {
     "users": None,
     "client_profile": None,
+    "worker_finance": None,
     "billing": None,
 }
 
