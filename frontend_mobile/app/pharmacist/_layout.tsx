@@ -439,6 +439,7 @@ export default function PharmacistTabs() {
         <Tabs.Screen name="profile-rate" options={{ href: null }} />
         <Tabs.Screen name="profile-bio" options={{ href: null }} />
         <Tabs.Screen name="interests" options={{ href: null }} />
+        <Tabs.Screen name="memberships" options={{ href: null }} />
         <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
