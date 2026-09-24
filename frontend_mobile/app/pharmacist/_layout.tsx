@@ -3,6 +3,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import { ActivityIndicator, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
+import { getAdminAssignments, getAssignmentId, getSelectedAdminAssignment, selectAdminPersona } from '@/utils/mobilePersona';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
@@ -51,7 +52,7 @@ function PharmacistSidebar({
   onDismiss: () => void;
 }) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleNav = (route: string) => {
     onDismiss();
@@ -78,6 +79,24 @@ function PharmacistSidebar({
           />
         ))}
         <Divider />
+        {getAdminAssignments(user).length > 0 ? (
+          <List.Item
+            title="Admin workspace"
+            description="Switch to your delegated pharmacy responsibilities"
+            left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
+            onPress={() => {
+              void (async () => {
+                const selected = await getSelectedAdminAssignment(user);
+                const assignmentId = getAssignmentId(selected);
+                if (assignmentId != null) {
+                  await selectAdminPersona(user, assignmentId);
+                  onDismiss();
+                  router.replace('/admin' as any);
+                }
+              })();
+            }}
+          />
+        ) : null}
         <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
           Logout
         </Button>
