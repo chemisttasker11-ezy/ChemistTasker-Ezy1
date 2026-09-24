@@ -1,10 +1,10 @@
 export type RosterMemberIdentity = {
   id?: number | string | null;
-  firstName?: string;
-  first_name?: string;
-  lastName?: string;
-  last_name?: string;
-  displayName?: string;
+  firstName?: string | null;
+  first_name?: string | null;
+  lastName?: string | null;
+  last_name?: string | null;
+  displayName?: string | null;
   email?: string | null;
 };
 
