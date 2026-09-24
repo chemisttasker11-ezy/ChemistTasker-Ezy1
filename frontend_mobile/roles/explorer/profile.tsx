@@ -12,6 +12,7 @@ import {
   Surface,
   Text,
   TextInput,
+  Icon,
   IconButton,
 } from 'react-native-paper';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ExplorerProfileScreen() {
+import { brandColors, personaPalettes } from '@/constants/theme';
+
+const profilePalette = personaPalettes.explorer;
   const router = useRouter();
   const { user, logout, refreshUser, updateUserProfilePhoto } = useAuth();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -156,7 +160,7 @@ export default function ExplorerProfileScreen() {
 
         <Card style={styles.profileCard}>
           <LinearGradient
-            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            colors={[profilePalette.soft, '#FFFFFF', brandColors.mist]}
             locations={[0, 0.58, 1]}
             start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
@@ -200,13 +204,13 @@ export default function ExplorerProfileScreen() {
             <Card key={index} style={styles.menuCard} onPress={() => router.push(item.route as any)}>
               <Card.Content style={styles.menuContent}>
                 <View style={styles.menuIcon}>
-                  <IconButton icon={item.icon} size={24} iconColor="#6366F1" />
+                  <Icon source={item.icon} size={24} color={profilePalette.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="titleMedium" style={styles.menuTitle}>{item.title}</Text>
                   <Text variant="bodySmall" style={styles.menuDesc}>{item.description}</Text>
                 </View>
-                <IconButton icon="chevron-right" size={24} iconColor="#9CA3AF" />
+                <Icon source="chevron-right" size={22} color="#718096" />
               </Card.Content>
             </Card>
           ))}
@@ -307,7 +311,7 @@ export default function ExplorerProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   header: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -315,7 +319,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontWeight: 'bold',
-    color: '#111827',
+    color: brandColors.navy,
   },
   profileCard: {
     marginHorizontal: 20,
@@ -364,13 +368,13 @@ const styles = StyleSheet.create({
   },
   section: { paddingHorizontal: 16, marginTop: 16 },
   menuContainer: { paddingHorizontal: 16, gap: 10, marginTop: 8 },
-  menuCard: { backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 0, borderWidth: 1, borderColor: '#E5E7EB' },
+  menuCard: { backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 0, borderWidth: 1, borderColor: brandColors.border },
   menuContent: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8, gap: 8 },
-  menuIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
-  menuTitle: { fontWeight: '600', color: '#111827' },
-  menuDesc: { color: '#6B7280', marginTop: 2 },
+  menuIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: profilePalette.soft, justifyContent: 'center', alignItems: 'center' },
+  menuTitle: { fontWeight: '600', color: brandColors.navy },
+  menuDesc: { color: brandColors.body, marginTop: 2 },
   sectionTitle: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginBottom: 8,
     marginLeft: 4,
     fontWeight: '600',
