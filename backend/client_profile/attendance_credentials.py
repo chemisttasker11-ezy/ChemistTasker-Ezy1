@@ -226,27 +226,35 @@ def revoke_kiosk_device_by_credential(
     return _mark_kiosk_device_revoked(kiosk_device)
 
 
-def authenticate_kiosk_device(device_token: str) -> Optional[KioskDevice]:
-    """Resolve an active kiosk device from its scoped device token."""
+def authenticate_kiosk_device(
+    device_token: str,
+    *,
+    include_revoked: bool = False,
+) -> Optional[KioskDevice]:
+    """Resolve a kiosk from its scoped device token.
+
+    Normal device operations require an active device. The offline sync endpoint
+    may opt into resolving a revoked native device solely to drain already
+    signed local evidence; it does not restore QR, enrollment, or capture rights.
+    """
     if not device_token or not isinstance(device_token, str):
         return None
 
     cleaned_token = device_token.strip()
     token_hash = hash_kiosk_token(cleaned_token)
+    filters = {} if include_revoked else {"is_active": True}
 
-    # 1. Primary lookup by hashed token
     device = (
         KioskDevice.objects.select_related("pharmacy")
-        .filter(device_token=token_hash, is_active=True)
+        .filter(device_token=token_hash, **filters)
         .first()
     )
     if device is not None:
         return device
 
-    # 2. Backward-compatible fallback for legacy unhashed tokens
     return (
         KioskDevice.objects.select_related("pharmacy")
-        .filter(device_token=cleaned_token, is_active=True)
+        .filter(device_token=cleaned_token, **filters)
         .first()
     )
 
