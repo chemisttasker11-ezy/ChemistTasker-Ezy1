@@ -1,23 +1,22 @@
-// ActiveShiftsPage Theme
-// Custom theme colors and styles
+import { brandColors } from '@/constants/theme';
 
 export const customTheme = {
     colors: {
-        primary: '#7C3AED',
-        primaryLight: '#F3E8FF',
-        success: '#10B981',
-        successLight: '#D1FAE5',
-        warning: '#F59E0B',
-        warningLight: '#FEF3C7',
-        error: '#EF4444',
-        errorLight: '#FEE2E2',
-        info: '#3B82F6',
-        infoLight: '#DBEAFE',
-        grey: '#6B7280',
-        greyLight: '#F3F4F6',
-        border: '#E5E7EB',
-        text: '#111827',
-        textMuted: '#9CA3AF',
+        primary: brandColors.purple,
+        primaryLight: '#F0EAFF',
+        success: brandColors.success,
+        successLight: brandColors.successSoft,
+        warning: brandColors.warning,
+        warningLight: brandColors.warningSoft,
+        error: brandColors.danger,
+        errorLight: brandColors.dangerSoft,
+        info: brandColors.blue,
+        infoLight: '#E8F5FB',
+        grey: brandColors.body,
+        greyLight: brandColors.surfaceMuted,
+        border: brandColors.border,
+        text: brandColors.navy,
+        textMuted: '#718096',
     },
     spacing: {
         xs: 4,
