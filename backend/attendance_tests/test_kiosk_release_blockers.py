@@ -1,6 +1,7 @@
 import base64
 import os
 import uuid
+import unittest
 from unittest.mock import patch
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
