@@ -164,6 +164,72 @@ test.describe('public/auth wiring', () => {
     expect(observed.csrf).toBe('smoke-csrf');
     expect(observed.platform).toBe('web');
   });
+  for (const status of [400, 401, 403, 404, 409, 422, 500]) {
+    test(`login handles HTTP ${status} without crashing or spinning forever`, async ({ page }) => {
+      await page.route('**/api/**', async (route) => {
+        const request = route.request();
+        const apiPath = new URL(request.url()).pathname;
+        if (apiPath.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
+        if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+        if (request.method() === 'POST' && apiPath.includes('/users/')) {
+          return json(route, { detail: `Smoke HTTP ${status}` }, status);
+        }
+        return json(route, {});
+      });
+
+      await page.goto('/login');
+      await page.getByLabel('Email').fill('smoke@example.test');
+      await page.getByLabel('Password').fill('wrong-password');
+      await page.getByRole('button', { name: 'Login' }).click();
+      await expect(page.getByRole('alert')).toContainText(`Smoke HTTP ${status}`);
+      await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+    });
+  }
+
+  test('login handles network failure safely', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      if (apiPath.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
+      if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+      if (request.method() === 'POST' && apiPath.includes('/users/')) return route.abort('failed');
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('smoke@example.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(page.getByRole('alert')).toContainText('unexpected error');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+  });
+
+  test('login prevents duplicate submission while request is pending', async ({ page }) => {
+    let loginPosts = 0;
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      if (apiPath.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
+      if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+      if (request.method() === 'POST' && apiPath.includes('/users/')) {
+        loginPosts += 1;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return json(route, { detail: 'Invalid credentials' }, 401);
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('smoke@example.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    const button = page.getByRole('button', { name: 'Login' });
+    await button.click();
+    await expect(button).toBeDisabled();
+    await page.waitForTimeout(450);
+    expect(loginPosts).toBe(1);
+    await expect(page.getByRole('alert')).toContainText('Invalid credentials');
+  });
+
 });
 
 test.describe('authenticated route skeleton', () => {
