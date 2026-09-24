@@ -78,6 +78,8 @@
         "expo-camera",
         {
           "cameraPermission": "Allow ChemistTasker to use the camera to scan pharmacy attendance QR codes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
       ],
