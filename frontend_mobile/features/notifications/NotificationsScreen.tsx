@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
-import { Text, Surface, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
+import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { brandColors, getPersonaPalette } from '@/constants/theme';
 import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
@@ -29,6 +30,7 @@ type Notification = {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const persona = getPersonaPalette(user?.role);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -169,13 +171,7 @@ export default function NotificationsScreen() {
       >
       <View style={styles.iconContainer}>
         <Surface style={styles.iconSurface} elevation={0}>
-          <IconButton
-            icon={getIconForType(item.type)}
-            size={24}
-            iconColor="#6366F1"
-            accessibilityLabel={`Notification type ${item.type}`}
-            accessibilityRole="button"
-          />
+          <Icon source={getIconForType(item.type)} size={24} color={persona.accent} />
         </Surface>
         {!item.readAt && <Badge size={8} style={styles.unreadDot} />}
       </View>
@@ -199,7 +195,7 @@ export default function NotificationsScreen() {
           icon="check"
           size={20}
           onPress={() => markAsRead(item.id)}
-          iconColor="#6B7280"
+          iconColor="#59677E"
           accessibilityLabel="Mark notification as read"
           accessibilityRole="button"
         />
@@ -212,7 +208,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
+          <ActivityIndicator size="large" color={persona.accent} />
         </View>
       ) : (
         <FlatList
@@ -240,7 +236,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F8FC',
   },
   centerContainer: {
     flex: 1,
@@ -259,17 +255,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unreadItem: {
-    backgroundColor: '#F5F7FF',
-    borderLeftWidth: 4,
-    borderLeftColor: '#6366F1',
+    backgroundColor: '#F4F7FB',
   },
   iconContainer: {
     position: 'relative',
     marginRight: 12,
   },
   iconSurface: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 20,
+    backgroundColor: '#F0EAFF',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   unreadDot: {
     position: 'absolute',
@@ -287,15 +285,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: '600',
-    color: '#111827',
+    color: '#06214A',
     flex: 1,
     marginRight: 8,
   },
   time: {
-    color: '#9CA3AF',
+    color: '#718096',
   },
   message: {
-    color: '#6B7280',
+    color: '#59677E',
   },
   emptyState: {
     alignItems: 'center',
@@ -304,9 +302,9 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontWeight: '600',
     marginBottom: 8,
-    color: '#111827',
+    color: '#06214A',
   },
   emptyText: {
-    color: '#6B7280',
+    color: '#59677E',
   },
 });
