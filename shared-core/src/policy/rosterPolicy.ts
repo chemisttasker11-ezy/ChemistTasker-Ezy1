@@ -1,27 +1,10 @@
-export type RosterMemberLike = {
-  id?: number | string | null;
-  user?: number | string | { id?: number | string | null; firstName?: string; first_name?: string; lastName?: string; last_name?: string; email?: string | null } | null;
-  userId?: number | string | null;
-  user_id?: number | string | null;
-  userDetails?: { id?: number | string | null; firstName?: string; lastName?: string; displayName?: string; email?: string | null } | null;
-  userDetail?: { id?: number | string | null; firstName?: string; lastName?: string; email?: string | null } | null;
-  user_detail?: { id?: number | string | null; first_name?: string; last_name?: string; email?: string | null } | null;
-  role?: string | null;
-  userRole?: string | null;
-  user_role?: string | null;
-  isActive?: boolean | null;
-  is_active?: boolean | null;
-  invitedName?: string | null;
-  invited_name?: string | null;
-  name?: string | null;
-  email?: string | null;
-};
+import type { RosterPharmacyMember } from '../contracts/roster';
 
 function normalizeRole(value: unknown): string {
   return String(value ?? '').trim().replace(/-/g, '_').toUpperCase();
 }
 
-export function rosterMemberUserId(member: RosterMemberLike): number {
+export function rosterMemberUserId(member: RosterPharmacyMember): number {
   const nestedUser = typeof member?.user === 'object' && member.user ? member.user.id : member?.user;
   const raw =
     member?.userId ??
@@ -35,15 +18,15 @@ export function rosterMemberUserId(member: RosterMemberLike): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-export function rosterMemberRole(member: RosterMemberLike): string {
+export function rosterMemberRole(member: RosterPharmacyMember): string {
   return normalizeRole(member?.role ?? member?.userRole ?? member?.user_role ?? '');
 }
 
-export function rosterMemberIsActive(member: RosterMemberLike): boolean {
+export function rosterMemberIsActive(member: RosterPharmacyMember): boolean {
   return member?.isActive !== false && member?.is_active !== false;
 }
 
-export function rosterMemberLabel(member: RosterMemberLike): string {
+export function rosterMemberLabel(member: RosterPharmacyMember): string {
   const detail =
     member?.userDetails ??
     member?.userDetail ??
@@ -79,7 +62,7 @@ export function rosterMemberLabel(member: RosterMemberLike): string {
 }
 
 export function isRosterMemberEligibleForRole(
-  member: RosterMemberLike,
+  member: RosterPharmacyMember,
   requiredRole?: string | null,
   options: { excludeUserId?: number | null } = {},
 ): boolean {
