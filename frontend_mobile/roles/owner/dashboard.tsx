@@ -166,7 +166,7 @@ export default function OwnerDashboard() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor="#06214A" />}
         showsVerticalScrollIndicator={false}
       >
         <DashboardScopeSwitcher
@@ -213,7 +213,7 @@ export default function OwnerDashboard() {
           onPress={() => router.push('/owner/pills' as any)}
           activeOpacity={0.82}
         >
-          <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.pillHeroGradient}>
+          <LinearGradient colors={['#04142E', '#06214A', '#0D3F78']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.pillHeroGradient}>
             <View pointerEvents="none" style={styles.heroAngleOne} />
             <View pointerEvents="none" style={styles.heroAngleTwo} />
             <View style={styles.pillHeroCopy}>
@@ -267,7 +267,7 @@ export default function OwnerDashboard() {
                 <Card.Content style={styles.shiftPreviewContent}>
                   <View style={styles.shiftPreviewLeft}>
                     <View style={styles.shiftIconContainer}>
-                      <IconButton icon="calendar-clock" size={20} iconColor="#6366F1" />
+                      <IconButton icon="calendar-clock" size={20} iconColor="#06214A" />
                     </View>
                     <View style={styles.shiftTextColumn}>
                       <Text variant="labelMedium" style={styles.shiftPharmacyName} numberOfLines={1} ellipsizeMode="tail">
@@ -302,7 +302,7 @@ export default function OwnerDashboard() {
         <Surface style={styles.bottomSection}>
           <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/owner/profile' as any)}>
             <View style={styles.bottomMenuIcon}>
-              <IconButton icon="account-cog" size={24} iconColor="#6366F1" />
+              <IconButton icon="account-cog" size={24} iconColor="#06214A" />
             </View>
             <View style={styles.bottomMenuContent}>
               <Text variant="labelLarge" style={styles.bottomMenuTitle}>
@@ -361,18 +361,18 @@ export default function OwnerDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F5F8FC' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greetingText: { color: '#6B7280', marginBottom: 4, fontSize: 14 },
-  nameText: { fontWeight: 'bold', color: '#111827', fontSize: 28 },
+  greetingText: { color: '#59677E', marginBottom: 4, fontSize: 14 },
+  nameText: { fontWeight: 'bold', color: '#06214A', fontSize: 28 },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconButton: { position: 'relative' },
   notificationBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#EF4444' },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#06214A' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold' },
   pillHero: {
     marginHorizontal: 20,
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     elevation: 8,
-    shadowColor: '#6366F1',
+    shadowColor: '#06214A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -458,8 +458,8 @@ const styles = StyleSheet.create({
   heroButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 16, marginLeft: -8 },
   statsContainer: { paddingHorizontal: 20, marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontWeight: '700', color: '#111827', fontSize: 18 },
-  seeAllText: { color: '#6366F1', fontWeight: '600', fontSize: 14 },
+  sectionTitle: { fontWeight: '700', color: '#06214A', fontSize: 18 },
+  seeAllText: { color: '#06214A', fontWeight: '600', fontSize: 14 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },
   statCard: {
     width: 180,
@@ -474,10 +474,10 @@ const styles = StyleSheet.create({
   statCardContent: { paddingVertical: 20, paddingHorizontal: 18, gap: 10, alignItems: 'center' },
   statCardHeader: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   statIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  statValue: { fontWeight: 'bold', color: '#111827', fontSize: 30 },
-  statLabel: { color: '#6B7280', fontSize: 13 },
+  statValue: { fontWeight: 'bold', color: '#06214A', fontSize: 30 },
+  statLabel: { color: '#59677E', fontSize: 13 },
   section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionHeaderText: { fontWeight: '700', color: '#111827', marginBottom: 16, fontSize: 18 },
+  sectionHeaderText: { fontWeight: '700', color: '#06214A', marginBottom: 16, fontSize: 18 },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
   },
-  quickActionTitle: { fontWeight: '600', color: '#111827', textAlign: 'center', fontSize: 12 },
+  quickActionTitle: { fontWeight: '600', color: '#06214A', textAlign: 'center', fontSize: 12 },
   activityCard: {
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
@@ -511,8 +511,8 @@ const styles = StyleSheet.create({
   activityItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
   activityIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   activityContent: { flex: 1, gap: 2 },
-  activityTitle: { color: '#111827', fontWeight: '600' },
-  activityDesc: { color: '#6B7280', fontSize: 12 },
+  activityTitle: { color: '#06214A', fontWeight: '600' },
+  activityDesc: { color: '#59677E', fontSize: 12 },
   activityTime: { color: '#9CA3AF', fontSize: 11 },
   activityDivider: { marginHorizontal: 16 },
   shiftPreviewCard: {
@@ -527,10 +527,10 @@ const styles = StyleSheet.create({
   },
   shiftPreviewContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   shiftPreviewLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  shiftIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
+  shiftIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   shiftTextColumn: { flex: 1, minWidth: 0 },
-  shiftPharmacyName: { color: '#111827', fontWeight: '600' },
-  shiftRole: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  shiftPharmacyName: { color: '#06214A', fontWeight: '600' },
+  shiftRole: { color: '#59677E', fontSize: 12, marginTop: 2 },
   shiftStatusChip: {
     height: 26,
     alignSelf: 'center',
@@ -551,8 +551,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   bottomMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-  bottomMenuIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
+  bottomMenuIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   bottomMenuContent: { flex: 1, marginLeft: 12 },
-  bottomMenuTitle: { color: '#111827', fontWeight: '600' },
-  bottomMenuDesc: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  bottomMenuTitle: { color: '#06214A', fontWeight: '600' },
+  bottomMenuDesc: { color: '#59677E', fontSize: 12, marginTop: 2 },
 });
