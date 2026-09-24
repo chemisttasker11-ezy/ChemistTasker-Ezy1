@@ -223,7 +223,7 @@ export default function OtherStaffOverviewScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#D600C8" />}
         showsVerticalScrollIndicator={false}
       >
         <DashboardPersonaSwitcher role="OTHER_STAFF" />
@@ -237,7 +237,7 @@ export default function OtherStaffOverviewScreen() {
           onSelectPharmacy={scope.selectPharmacy}
         />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={loadDashboard} /> : null}
-        <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.shiftHero}>
+        <LinearGradient colors={['#401454', '#8E2CC3', '#D600C8']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.shiftHero}>
           <View pointerEvents="none" style={styles.heroAngleOne} />
           <View pointerEvents="none" style={styles.heroAngleTwo} />
           <Text variant="headlineSmall" style={styles.shiftHeroTitle}>Welcome {displayName},</Text>
@@ -257,7 +257,7 @@ export default function OtherStaffOverviewScreen() {
                 <Card.Content style={styles.shiftPreviewContent}>
                   <View style={styles.shiftPreviewLeft}>
                     <View style={styles.shiftIconContainer}>
-                      <IconButton icon="calendar-clock" size={20} iconColor="#6366F1" />
+                      <IconButton icon="calendar-clock" size={20} iconColor="#D600C8" />
                     </View>
                     <View>
                       <Text variant="labelMedium" style={styles.shiftPharmacyName}>
@@ -286,7 +286,7 @@ export default function OtherStaffOverviewScreen() {
 
         <DashboardStatsOverview data={data} />
 
-        <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.billingHero}>
+        <LinearGradient colors={['#401454', '#8E2CC3', '#D600C8']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.billingHero}>
           <View pointerEvents="none" style={styles.heroAngleOne} />
           <View pointerEvents="none" style={styles.heroAngleTwo} />
           <Text variant="labelMedium" style={styles.billingEyebrow}>Invoices</Text>
@@ -320,7 +320,7 @@ export default function OtherStaffOverviewScreen() {
         <Surface style={styles.bottomSection}>
           <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/otherstaff/profile')}>
             <View style={styles.bottomMenuIcon}>
-              <IconButton icon="account-cog" size={24} iconColor="#6366F1" />
+              <IconButton icon="account-cog" size={24} iconColor="#D600C8" />
             </View>
             <View style={styles.bottomMenuContent}>
               <Text variant="labelLarge" style={styles.bottomMenuTitle}>
@@ -382,7 +382,7 @@ export default function OtherStaffOverviewScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F8FC',
   },
   loadingContainer: {
     flex: 1,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
-    color: '#6B7280',
+    color: '#59677E',
     fontSize: 16,
   },
   scrollView: {
@@ -411,13 +411,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greetingText: {
-    color: '#6B7280',
+    color: '#59677E',
     marginBottom: 4,
     fontSize: 14,
   },
   nameText: {
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#06214A',
     fontSize: 28,
   },
   heroCard: {
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     elevation: 8,
-    shadowColor: '#6366F1',
+    shadowColor: '#D600C8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -490,11 +490,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontWeight: '700',
-    color: '#111827',
+    color: '#06214A',
     fontSize: 18,
   },
   seeAllText: {
-    color: '#6366F1',
+    color: '#D600C8',
     fontWeight: '600',
     fontSize: 14,
   },
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   },
   sectionHeaderText: {
     fontWeight: '700',
-    color: '#111827',
+    color: '#06214A',
     marginBottom: 16,
     fontSize: 18,
   },
@@ -654,12 +654,12 @@ const styles = StyleSheet.create({
   },
   quickActionTitle: {
     fontWeight: '600',
-    color: '#111827',
+    color: '#06214A',
     textAlign: 'center',
     fontSize: 12,
   },
   quickActionDesc: {
-    color: '#6B7280',
+    color: '#59677E',
     textAlign: 'center',
     fontSize: 10,
   },
@@ -689,16 +689,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#FDE9FA',
     justifyContent: 'center',
     alignItems: 'center',
   },
   shiftPharmacyName: {
-    color: '#111827',
+    color: '#06214A',
     fontWeight: '600',
   },
   shiftRole: {
-    color: '#6B7280',
+    color: '#59677E',
     fontSize: 12,
     marginTop: 2,
   },
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#FDE9FA',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -733,19 +733,19 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   bottomMenuTitle: {
-    color: '#111827',
+    color: '#06214A',
     fontWeight: '600',
   },
   bottomMenuDesc: {
-    color: '#6B7280',
+    color: '#59677E',
     fontSize: 12,
     marginTop: 2,
   },
   emptyCard: {
     borderRadius: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F8FC',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E6EAF2',
   },
 });
 
