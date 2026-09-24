@@ -177,7 +177,7 @@ export default function ExplorerTabs() {
     if (user.role !== 'EXPLORER') {
       switch (user.role) {
         case 'OWNER':
-          router.replace('/owner' as any);
+          router.replace('/owner/dashboard' as any);
           break;
         case 'PHARMACIST':
           router.replace('/pharmacist' as any);
