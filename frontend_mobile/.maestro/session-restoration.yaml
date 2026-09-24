@@ -1,0 +1,29 @@
+appId: com.chemisttasker.app
+env:
+  MAESTRO_OWNER_EMAIL: ${MAESTRO_OWNER_EMAIL}
+  MAESTRO_OWNER_PASSWORD: ${MAESTRO_OWNER_PASSWORD}
+---
+- launchApp:
+    clearState: true
+- tapOn: "Work email"
+- inputText: ${MAESTRO_OWNER_EMAIL}
+- tapOn: "Password"
+- inputText: ${MAESTRO_OWNER_PASSWORD}
+- tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Use biometrics for this account?"
+    commands:
+      - tapOn: "Not now"
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Open owner menu"
+- tapOn: "Logout"
+- assertVisible: "Welcome back"
