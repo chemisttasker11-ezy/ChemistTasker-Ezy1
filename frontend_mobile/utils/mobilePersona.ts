@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   hasOrganizationAccess as sharedHasOrganizationAccess,
   normalizeAdminAssignments,
+  resolveAdminPersonaAssignmentId,
   resolvePersonaSelection,
   type AuthorityUser,
   type NormalizedAdminAssignment,
@@ -81,9 +82,12 @@ export async function selectRolePersona(user: AuthorityUser | null | undefined) 
 
 export async function selectAdminPersona(user: AuthorityUser | null | undefined, assignmentId?: number | null) {
   const assignments = getAdminAssignments(user);
-  const selected = assignmentId != null
-    ? assignments.find((assignment) => getAssignmentId(assignment) === Number(assignmentId))
-    : assignments[0];
+  const resolvedId = assignmentId != null
+    ? Number(assignmentId)
+    : resolveAdminPersonaAssignmentId(user);
+  const selected = resolvedId != null
+    ? assignments.find((assignment) => getAssignmentId(assignment) === resolvedId)
+    : null;
   const id = getAssignmentId(selected);
   if (!selected || id == null) return null;
   try {
