@@ -12,10 +12,12 @@ import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } fr
 
 export default function AdminHomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, hasCapability } = useAuth();
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
   const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
   const { activePharmacyId: pharmacyId, activePharmacyName: pharmacyName } = useAdminWorkspace();
+  const canManageStaff = Boolean(pharmacyId && hasCapability('MANAGE_STAFF', pharmacyId));
+  const canManageRoster = Boolean(pharmacyId && hasCapability('MANAGE_ROSTER', pharmacyId));
 
   useEffect(() => {
     let mounted = true;
@@ -58,7 +60,7 @@ export default function AdminHomeScreen() {
           <Text variant="labelLarge" style={styles.eyebrow}>Admin workspace</Text>
           <Text variant="headlineSmall" style={styles.title}>{pharmacyName}</Text>
           <Text style={styles.subtitle}>
-            Manage shifts, referrals, and pill rewards for the pharmacy you administer.
+            Manage the responsibilities delegated to you for this pharmacy.
           </Text>
         </Surface>
 
@@ -94,12 +96,21 @@ export default function AdminHomeScreen() {
 
         <HomeNavigationGrid
           items={[
-            { title: 'Shift Centre', description: 'Active shifts', icon: 'calendar-month-outline', route: '/admin/shifts' },
-            { title: 'Post Shift', description: 'Create coverage', icon: 'plus-circle-outline', route: adminPath('post-shift') },
-            { title: 'Pharmacies', description: 'Store details', icon: 'store-outline', route: '/admin/pharmacies' },
-            { title: 'Chat', description: 'Open messages', icon: 'message-text-outline', route: '/admin/chat' },
-            { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/admin/shifts' },
-            { title: 'Notifications', description: 'Alerts', icon: 'bell-outline', route: '/admin/notifications' },
+            { title: 'Chat', description: 'Open pharmacy messages', icon: 'message-text-outline', route: '/admin/chat' },
+            { title: 'Pharmacy Hub', description: 'Updates, posts and pharmacy groups', icon: 'account-group-outline', route: '/admin/hub' },
+            { title: 'Calendar', description: 'Events and pharmacy notes', icon: 'calendar-outline', route: '/admin/calendar' },
+            ...(canManageStaff ? [
+              { title: 'Pharmacies', description: 'Store and team details', icon: 'store-outline', route: '/admin/pharmacies' },
+              { title: 'Workforce & Payroll', description: 'Employment terms and payroll setup', icon: 'account-cash-outline', route: '/workforce-settings' },
+            ] : []),
+            ...(canManageRoster ? [
+              { title: 'Shift Centre', description: 'Active, confirmed and historical shifts', icon: 'calendar-month-outline', route: '/admin/shifts' },
+              { title: 'Weekly Roster', description: 'Plan and publish internal coverage', icon: 'calendar-account-outline', route: pharmacyId ? `/manager/roster?pharmacyId=${pharmacyId}` : '/manager/roster' },
+              { title: 'Attendance Approvals', description: 'Review attendance and exceptions', icon: 'check-decagram-outline', route: '/attendance/reviews' },
+              { title: 'Timesheets', description: 'Review payroll-ready periods', icon: 'clock-check-outline', route: '/workforce-timesheets' },
+              { title: 'Post Shift', description: 'Create external coverage', icon: 'plus-circle-outline', route: adminPath('post-shift') },
+            ] : []),
+            { title: 'Notifications', description: 'Alerts and activity', icon: 'bell-outline', route: '/admin/notifications' },
           ]}
           onNavigate={(route) => router.push(route as any)}
         />
