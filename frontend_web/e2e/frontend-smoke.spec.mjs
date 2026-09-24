@@ -102,6 +102,7 @@ async function installApiFixture(page, user) {
 
     if (path.endsWith('/users/me/')) return json(route, user);
     if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+    if (isPath(path, REFRESH_PATH)) return json(route, { access: 'smoke-access', refresh: '' });
     if (path.includes('/chat/rooms')) return json(route, { results: [], count: 0 });
     if (path.includes('/notifications')) return json(route, { results: [], unread_count: 0, count: 0 });
     if (path.includes('/pharmacies')) return json(route, []);
@@ -132,6 +133,8 @@ async function openAuthenticatedRoute(page, user, path) {
   await page.goto(path);
   await page.waitForLoadState('networkidle');
 
+  await expect(page).not.toHaveURL(/\\/login(?:\\?|$)/);
+  expect(new URL(page.url()).pathname).toBe(path.split('?')[0]);
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Page not found');
   await expect(page.locator('body')).not.toContainText('Not Found');
@@ -250,7 +253,8 @@ test.describe('public/auth wiring', () => {
     await page.goto('/login');
     await page.getByLabel('Email').fill('smoke@example.test');
     await page.getByLabel('Password').fill('wrong-password');
-    const button = page.getByRole('button', { name: 'Login' });
+    const button = page.locator('form button[type="submit"]');
+    await expect(button).toHaveText('Login');
     await button.click();
     await expect(button).toBeDisabled();
     await page.waitForTimeout(450);
