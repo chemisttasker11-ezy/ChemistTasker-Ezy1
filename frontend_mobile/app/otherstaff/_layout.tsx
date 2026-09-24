@@ -9,6 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
