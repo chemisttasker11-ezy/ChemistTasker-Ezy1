@@ -211,7 +211,7 @@ export default function ExplorerTabs() {
   if (isLoading || !user || user.role !== 'EXPLORER') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color="#00A8BB" />
       </View>
     );
   }
@@ -221,12 +221,12 @@ export default function ExplorerTabs() {
       <ExplorerSidebar visible={sidebarVisible} onDismiss={() => setSidebarVisible(false)} />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#00A8BB',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -371,6 +371,6 @@ const styles = StyleSheet.create({
   bellWrapper: {
     position: 'relative',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#00A8BB' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
 });
