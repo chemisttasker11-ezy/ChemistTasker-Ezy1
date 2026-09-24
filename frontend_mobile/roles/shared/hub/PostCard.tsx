@@ -12,8 +12,8 @@ import {
 import { Card, Text, Button, IconButton, Chip, Divider, Avatar, Menu } from 'react-native-paper';
 import { deleteHubPost, reactToHubPost, removeHubReaction } from './api';
 import type { HubPost, HubAttachment, HubReactionType } from './types';
-import {
 import { brandColors } from '@/constants/theme';
+import {
   formatHubDate,
   formatMemberLabel,
   getHubAuthorName,
