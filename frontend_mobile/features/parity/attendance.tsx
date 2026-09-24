@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip } from 'react-native-paper';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -47,6 +48,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const [status,setStatus]=useState<any>(null);
   const [pending,setPending]=useState<any[]>([]);
   const [pinPharmacies,setPinPharmacies]=useState<any[]>([]);
+  const [kioskDevices,setKioskDevices]=useState<any[]>([]);
   const [timeline,setTimeline]=useState<any>(null);
   const [hours,setHours]=useState<any[]>([]);
   const [loading,setLoading]=useState(true);
@@ -66,6 +68,12 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       if(screen==='kiosk-status') {
         const result=await attendance.getPinPharmacies();
         setPinPharmacies(asArray((result as any)?.pharmacies??result));
+        if(manager&&pharmacyId){
+          const devices=await attendance.getManagerKioskDevices(pharmacyId);
+          setKioskDevices(asArray((devices as any)?.devices??devices));
+        }else{
+          setKioskDevices([]);
+        }
       }
       if(screen==='correction'&&!manager) setHours(asArray(await workforce.getMyHours()));
     }catch(e){setError(errorMessage(e,'Unable to load attendance data.'));}
@@ -87,7 +95,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
 
   if(screen==='clock') return <ClockScreen status={status} loading={loading} error={error} onReload={load}/>;
   if(screen==='correction') return <CorrectionScreen manager={manager} rows={hours} params={params} loading={loading} error={error} />;
-  if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} loading={loading} error={error} />;
+  if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} devices={kioskDevices} manager={manager} pharmacyId={pharmacyId} loading={loading} error={error} onReload={load} />;
 
   if(screen==='reviews'){
     return <ParityPage title={titles[screen]} subtitle="Review provisional and cross-site attendance before it becomes rostered history." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing}>
@@ -124,27 +132,91 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   const [qrToken,setQrToken]=useState('');
   const [busy,setBusy]=useState(false);
   const [localError,setLocalError]=useState('');
+  const [scannerOpen,setScannerOpen]=useState(false);
+  const [scanLocked,setScanLocked]=useState(false);
+  const [permission,requestPermission]=useCameraPermissions();
   const active=Boolean(status?.has_active_session);
-  const run=async(kind:'in'|'out'|'break-start'|'break-end')=>{
+
+  const run=async(kind:'in'|'out'|'break-start'|'break-end', scannedToken?:string)=>{
+    const token=(scannedToken??qrToken).trim();
     setBusy(true);setLocalError('');
     try{
-      if(kind==='in') await attendance.clockIn(qrToken.trim());
-      if(kind==='out') await attendance.clockOut(qrToken.trim());
+      if(kind==='in') await attendance.clockIn(token);
+      if(kind==='out') await attendance.clockOut(token);
       if(kind==='break-start') await attendance.breakStart();
       if(kind==='break-end') await attendance.breakEnd();
+      setQrToken('');
+      setScannerOpen(false);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Attendance action failed.'));}finally{setBusy(false);}
+    }catch(e){
+      setLocalError(errorMessage(e,'Attendance action failed.'));
+    }finally{
+      setBusy(false);
+      setScanLocked(false);
+    }
   };
-  return <ParityPage title="Clock & breaks" subtitle="Use the pharmacy kiosk QR token for clock in/out. Break actions use the active session." loading={loading} error={error||localError}>
+
+  const openScanner=async()=>{
+    setLocalError('');
+    if(!permission?.granted){
+      const next=await requestPermission();
+      if(!next.granted){
+        setLocalError('Camera permission is required to scan the pharmacy attendance QR code.');
+        return;
+      }
+    }
+    setScanLocked(false);
+    setScannerOpen(true);
+  };
+
+  const handleBarcodeScanned=({data}:BarcodeScanningResult)=>{
+    if(scanLocked||busy||!data?.trim()) return;
+    setScanLocked(true);
+    const token=data.trim();
+    setQrToken(token);
+    void run(active?'out':'in',token);
+  };
+
+  return <ParityPage title="Clock & breaks" subtitle="Scan the rotating pharmacy kiosk QR to clock in or out. Break actions use your active attendance session." loading={loading} error={error||localError}>
     <MetricGrid items={[{label:'Status',value:active?'Clocked in':'Not clocked in',tone:active?'success':'primary'},{label:'Pharmacy',value:status?.pharmacy_name||'—'},{label:'Started',value:status?.started_at?dateLabel(status.started_at):'—'}]}/>
-    {!active||!status?.is_on_break?<Field label="Kiosk QR token" value={qrToken} onChangeText={setQrToken} placeholder="Paste or enter token from the pharmacy kiosk"/>:null}
-    <ActionButtons>
-      {!active?<Button mode="contained" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('in')}>Clock in</Button>:null}
-      {active&&!status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-start')}>Start break</Button>:null}
-      {active&&status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-end')}>End break</Button>:null}
-      {active?<Button mode="outlined" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('out')}>Clock out</Button>:null}
-    </ActionButtons>
-    <InfoNote title="Audit trail">Clock, break and correction events are retained as attendance history. Manager corrections append audit records rather than rewriting raw scan events.</InfoNote>
+
+    <Section title={active?'Clock out with kiosk QR':'Clock in with kiosk QR'} description="The QR is short-lived and tied to the pharmacy kiosk.">
+      {scannerOpen ? (
+        <View style={{gap:12}}>
+          <View style={{overflow:'hidden',borderRadius:18,minHeight:360}}>
+            <CameraView
+              style={{height:360,width:'100%'}}
+              facing="back"
+              barcodeScannerSettings={{barcodeTypes:['qr']}}
+              onBarcodeScanned={scanLocked||busy?undefined:handleBarcodeScanned}
+            />
+          </View>
+          <InfoNote title="Scanning">{busy?'Checking attendance…':'Point the camera at the QR displayed on the pharmacy kiosk.'}</InfoNote>
+          <Button mode="outlined" disabled={busy} onPress={()=>setScannerOpen(false)}>Cancel scanner</Button>
+        </View>
+      ) : (
+        <Button mode="contained" loading={busy} disabled={busy} icon="qrcode-scan" onPress={()=>void openScanner()}>
+          {active?'Scan QR to clock out':'Scan QR to clock in'}
+        </Button>
+      )}
+    </Section>
+
+    <Section title="Manual fallback" description="Use this only if the camera cannot scan the displayed code.">
+      <Field label="Kiosk QR token" value={qrToken} onChangeText={setQrToken} placeholder="Paste or enter the QR token"/>
+      {!active?<Button mode="outlined" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('in')}>Clock in with token</Button>:null}
+      {active?<Button mode="outlined" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('out')}>Clock out with token</Button>:null}
+    </Section>
+
+    {active ? (
+      <Section title="Breaks" description="Break events use your existing active attendance session and do not require another QR scan.">
+        <ActionButtons>
+          {!status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-start')}>Start break</Button>:null}
+          {status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-end')}>End break</Button>:null}
+        </ActionButtons>
+      </Section>
+    ) : null}
+
+    <InfoNote title="Audit trail">QR clocking, kiosk PIN clocking, breaks and corrections all feed the same attendance history and timesheet workflow.</InfoNote>
   </ParityPage>;
 }
 
@@ -218,10 +290,46 @@ function CorrectionScreen({manager,rows,params,loading,error}:{manager:boolean;r
   </ParityPage>;
 }
 
-function KioskStatus({rows,loading,error}:{rows:any[];loading:boolean;error:string}) {
+function KioskStatus({rows,devices,manager,pharmacyId,loading,error,onReload}:{rows:any[];devices:any[];manager:boolean;pharmacyId:number|null;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const router=useRouter();
-  return <ParityPage title="Kiosk & PIN status" subtitle="Worker PIN setup across pharmacies available to your account." loading={loading} error={error}>
-    <Section title="Pharmacies">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>
-    <InfoNote title="Kiosk access">Kiosk pairing remains an explicit deep-link/device workflow. This screen exposes only the authenticated worker PIN status and setup entry point.</InfoNote>
+  const [confirmDeviceId,setConfirmDeviceId]=useState<number|null>(null);
+  const [busyDeviceId,setBusyDeviceId]=useState<number|null>(null);
+  const [localError,setLocalError]=useState('');
+
+  const revokeDevice=async(id:number)=>{
+    setBusyDeviceId(id);setLocalError('');
+    try{
+      await attendance.revokeManagerKioskDevice(id);
+      setConfirmDeviceId(null);
+      await onReload();
+    }catch(e){
+      setLocalError(errorMessage(e,'Unable to revoke this kiosk device.'));
+    }finally{
+      setBusyDeviceId(null);
+    }
+  };
+
+  return <ParityPage title="Kiosk devices & PINs" subtitle="Manage registered attendance terminals and your worker PIN setup." loading={loading} error={error||localError}>
+    {manager?<Section title="Registered kiosk devices" description="Remote revocation blocks online access immediately. Native offline attendance is also bounded by its server-issued authorization window.">
+      {!pharmacyId?<PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/>:devices.length?devices.map((device:any)=><View key={device.id} style={{gap:8}}>
+        <DataRow
+          title={device.device_name||'Kiosk terminal'}
+          subtitle={[
+            replaceUnderscore(device.client_kind||''),
+            device.platform||'Unknown platform',
+            device.last_seen_at?'Last seen '+dateLabel(device.last_seen_at):'Not seen yet',
+          ].filter(Boolean).join(' · ')}
+          status={device.is_active?'Active':'Revoked'}
+        />
+        {device.is_active?confirmDeviceId===Number(device.id)?<ActionButtons>
+          <Button mode="contained" buttonColor={palette.danger} loading={busyDeviceId===Number(device.id)} disabled={busyDeviceId!==null} onPress={()=>void revokeDevice(Number(device.id))}>Confirm revoke</Button>
+          <Button mode="outlined" disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(null)}>Cancel</Button>
+        </ActionButtons>:<Button mode="outlined" textColor={palette.danger} disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(Number(device.id))}>Revoke kiosk</Button>:null}
+      </View>):<EmptyState title="No registered kiosks" body="No attendance terminal is registered for the selected pharmacy."/>}
+    </Section>:null}
+
+    <Section title="Worker attendance PINs">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>
+    <InfoNote title="Device lifecycle">Disconnecting a native kiosk requires its dashboard PIN and a safe server revocation. A terminal with unsynced attendance cannot erase its local evidence.</InfoNote>
   </ParityPage>;
 }
+

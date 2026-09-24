@@ -26,6 +26,16 @@ function invoke<T>(command: string, args?: Record<string, unknown>) {
 
 export const getDesktopKioskStatus = () => invoke<DesktopKioskStatus>('kiosk_status');
 
+export type DesktopKioskQr = {
+  qr_token: string;
+  expires_at: string;
+  pharmacy_id: number;
+  pharmacy_name: string;
+  refresh_interval_seconds: number;
+};
+
+export const getDesktopOnlineQr = () => invoke<DesktopKioskQr>('fetch_online_qr');
+
 export const pairDesktopKiosk = (input: {
   pairingCode: string;
   deviceName: string;
@@ -41,6 +51,12 @@ export const pairDesktopKiosk = (input: {
 });
 
 export const getDesktopPendingCount = () => invoke<number>('pending_count');
+
+export const verifyDesktopDashboardPin = (pin: string) =>
+  invoke<boolean>('verify_dashboard_pin', { pin });
+
+export const disconnectDesktopKiosk = (dashboardPin: string) =>
+  invoke<DesktopKioskStatus>('disconnect_device', { dashboardPin });
 
 export const syncDesktopNow = () => invoke('sync_now');
 
