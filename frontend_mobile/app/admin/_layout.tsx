@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import { AdminWorkspaceProvider, useAdminWorkspace } from '@/context/AdminWorkspaceContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
 import { brandColors } from '@/constants/theme';
 import {
   getAssignmentId,
@@ -131,6 +132,7 @@ function AdminSidebar({
 function AdminLayoutInner() {
   const router = useRouter();
   const { user, isLoading, hasCapability } = useAuth();
+  const { reloadWorkspace } = useWorkspace();
   const {
     assignments,
     activeAssignment,
@@ -176,6 +178,7 @@ function AdminLayoutInner() {
   const returnToRole = async () => {
     setSidebarVisible(false);
     const route = await selectRolePersona(user);
+    await reloadWorkspace();
     router.replace(route as any);
   };
 
