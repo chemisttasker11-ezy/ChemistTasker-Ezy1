@@ -31,6 +31,8 @@ function AdminSidebar({
   onSelectAssignment,
   onReturnToRole,
   roleLabel,
+  canManageStaff,
+  canManageRoster,
 }: {
   visible: boolean;
   onDismiss: () => void;
@@ -40,23 +42,27 @@ function AdminSidebar({
   onSelectAssignment: (assignmentId: number) => void;
   onReturnToRole: () => void;
   roleLabel: string;
+  canManageStaff: boolean;
+  canManageRoster: boolean;
 }) {
   const { logout } = useAuth();
   const router = useRouter();
 
   const items = [
-    { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin' },
-    { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies' },
-    { label: 'Shift Centre', icon: 'calendar-month-outline', route: '/admin/shifts' },
-    { label: 'Weekly Roster', icon: 'calendar-account-outline', route: '/manager/roster' },
-    { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews' },
-    { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
-    { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
-    { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift' },
-    { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat' },
-    { label: 'Pills', icon: 'pill', route: '/admin/pills' },
-    { label: 'Notifications', icon: 'bell-outline', route: '/admin/notifications' },
-  ];
+    { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin', visible: true },
+    { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat', visible: true },
+    { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: true },
+    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: true },
+    { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies', visible: canManageStaff },
+    { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings', visible: canManageStaff },
+    { label: 'Shift Centre', icon: 'calendar-month-outline', route: '/admin/shifts', visible: canManageRoster },
+    { label: 'Weekly Roster', icon: 'calendar-account-outline', route: '/manager/roster', visible: canManageRoster },
+    { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews', visible: canManageRoster },
+    { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets', visible: canManageRoster },
+    { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift', visible: canManageRoster },
+    { label: 'Pills', icon: 'pill', route: '/admin/pills', visible: true },
+    { label: 'Notifications', icon: 'bell-outline', route: '/admin/notifications', visible: true },
+  ].filter((item) => item.visible);
 
   const handleLogout = async () => {
     onDismiss();
@@ -124,7 +130,7 @@ function AdminSidebar({
 
 function AdminLayoutInner() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasCapability } = useAuth();
   const {
     assignments,
     activeAssignment,
@@ -151,6 +157,8 @@ function AdminLayoutInner() {
 
   const profileRoute = profileRouteForRole(user?.role);
   const roleLabel = String(user?.role || 'staff').toLowerCase().replace('_', ' ');
+  const canManageStaff = Boolean(pharmacyId && hasCapability('MANAGE_STAFF', pharmacyId));
+  const canManageRoster = Boolean(pharmacyId && hasCapability('MANAGE_ROSTER', pharmacyId));
 
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
@@ -188,6 +196,8 @@ function AdminLayoutInner() {
         onSelectAssignment={(assignmentId) => void changeAssignment(assignmentId)}
         onReturnToRole={() => void returnToRole()}
         roleLabel={roleLabel}
+        canManageStaff={canManageStaff}
+        canManageRoster={canManageRoster}
       />
       <Stack
         screenOptions={{
@@ -238,6 +248,8 @@ function AdminLayoutInner() {
         <Stack.Screen name="pills" options={{ headerTitle: 'Pills' }} />
         <Stack.Screen name="[pharmacyId]/pills" options={{ headerTitle: 'Pills' }} />
         <Stack.Screen name="chat" options={{ headerTitle: 'Chat' }} />
+        <Stack.Screen name="hub" options={{ headerTitle: 'Pharmacy Hub' }} />
+        <Stack.Screen name="calendar" options={{ headerTitle: 'Calendar' }} />
         <Stack.Screen name="notifications" options={{ headerTitle: 'Notifications' }} />
       </Stack>
     </>
