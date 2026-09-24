@@ -350,6 +350,7 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
         )) : <EmptyState title="No employment engagements" body="Add dated employment terms for eligible employee memberships." actionLabel="New engagement" onAction={() => router.push('/workforce/employment-engagements/new' as any)} />}
       </Section>
       <Section title="Workforce tools">
+        <ScreenLink title="Leave requests" subtitle="Review dated and partial-day workforce leave." onPress={() => router.push('/workforce/leave-requests' as any)} />
         <ScreenLink title="Award preview" subtitle="Preview classifications and rates." onPress={() => router.push('/workforce/award-preview' as any)} />
         <ScreenLink title="Payroll configuration" subtitle="Control payroll preparation for this pharmacy." onPress={() => router.push('/workforce/payroll-configuration' as any)} />
         <ScreenLink title="Work settings" subtitle="Contracted hours and worker settings." onPress={() => router.push('/workforce/work-settings' as any)} />
