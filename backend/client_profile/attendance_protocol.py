@@ -231,8 +231,14 @@ def ingest_offline_event(device, raw_event):
         monotonic_ms,
         str(payload["boot_session_id"] or ""),
     )
+    if device.revoked_at or not device.is_active:
+        flags.append("DEVICE_REVOKED_DRAIN")
     attendance_event = None
-    rejection_reason = ""
+    rejection_reason = (
+        "Device was revoked; signed attendance evidence was retained for manager review."
+        if "DEVICE_REVOKED_DRAIN" in flags
+        else ""
+    )
     processing_status = (
         KioskAttendanceEvent.ProcessingStatus.NEEDS_REVIEW
         if flags
@@ -246,7 +252,12 @@ def ingest_offline_event(device, raw_event):
         processing_status = KioskAttendanceEvent.ProcessingStatus.REJECTED
         rejection_reason = "Employee is inactive."
 
-    blocking_flags = {"SEQUENCE_GAP", "HASH_CHAIN_MISMATCH", "UNEXPECTED_INITIAL_HASH"}
+    blocking_flags = {
+        "SEQUENCE_GAP",
+        "HASH_CHAIN_MISMATCH",
+        "UNEXPECTED_INITIAL_HASH",
+        "DEVICE_REVOKED_DRAIN",
+    }
     if employee is not None and employee.is_active and not blocking_flags.intersection(flags):
         try:
             with transaction.atomic():
@@ -299,8 +310,6 @@ def sync_offline_batch(device, events, *, app_version=""):
         raise ValidationError("A sync batch may contain at most 100 events.")
 
     device = KioskDevice.objects.select_for_update().select_related("pharmacy").get(pk=device.pk)
-    if not device.is_active or device.revoked_at:
-        raise ValidationError("Kiosk device is revoked.")
     if device.client_kind != "NATIVE_OFFLINE":
         raise ValidationError("This device is not authorized for offline attendance sync.")
 
