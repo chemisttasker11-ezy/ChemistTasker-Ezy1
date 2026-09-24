@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, rosterV2, workforce, type RosterPharmacyMember, type WorkerShiftRequest } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce, type RosterPharmacyMember, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -38,12 +38,6 @@ const titles: Record<RosterScreen, string> = {
   approvals: 'Swap & cover approvals',
   audit: 'Roster audit',
 };
-
-function memberLabel(member: RosterPharmacyMember) {
-  const detail = member.userDetails;
-  const full = [detail?.firstName, detail?.lastName].filter(Boolean).join(' ').trim();
-  return full || detail?.email || member.invitedName || `Worker #${Number(member.user || 0)}`;
-}
 
 function flattenAssignments(period: any) {
   const direct = asArray<any>(period?.assignments);
@@ -342,7 +336,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
         {eligibleMembers.map((member)=>{
           const id=Number(member.user || 0);
-          return <Chip key={member.id || id} selected={userId===id} onPress={()=>setUserId(id)}>{memberLabel(member)}</Chip>;
+          return <Chip key={member.id || id} selected={userId===id} onPress={()=>setUserId(id)}>{rosterMemberLabel(member)}</Chip>;
         })}
       </View>
       {membersLoading?<Text variant="bodySmall" style={{color:palette.muted}}>Loading eligible members…</Text>:null}
@@ -436,7 +430,7 @@ function ApprovalsScreen({rows,membersByRole,loading,error,onReload}:{rows:Worke
         <Text variant="titleSmall">{row.requesterName||'Worker request'}</Text>
         <Text variant="bodySmall" style={{color:palette.muted}}>{[row.pharmacyName,row.slotDate,row.startTime&&row.endTime?(row.startTime+'–'+row.endTime):'',replaceUnderscore(row.role||'')].filter(Boolean).join(' · ')}</Text>
         <Text variant="bodySmall">{row.note||'Roster change request'}</Text>
-        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=Number(member.user||0);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{memberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
+        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=Number(member.user||0);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{rosterMemberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
         <ActionButtons><Button compact mode="contained" disabled={busy||(!swap&&!replacementByRequest[requestId])} onPress={()=>void action(row,'approve')}>Approve</Button><Button compact mode="outlined" disabled={busy} onPress={()=>void action(row,'release')}>Release worker</Button><Button compact textColor={palette.danger} disabled={busy} onPress={()=>void action(row,'reject')}>Reject</Button></ActionButtons>
       </Card.Content></Card>;
     }):<EmptyState title="No pending requests" body="Swap and cover requests will appear here when workers submit them." />}</Section>
