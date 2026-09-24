@@ -33,7 +33,12 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
     let active = true;
     setIsLoading(true);
     void getSelectedAdminAssignment(user)
-      .then(async (assignment) => {
+      .then(async (storedAssignment) => {
+        if (!active) return;
+        const fallbackId = getAssignmentId(assignments[0]);
+        const assignment = storedAssignment ?? (
+          fallbackId != null ? await selectAdminPersona(user, fallbackId) : null
+        );
         if (!active) return;
         setActiveAssignmentId(getAssignmentId(assignment));
         await reloadWorkspace();
@@ -49,7 +54,7 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
     return () => {
       active = false;
     };
-  }, [reloadWorkspace, setSelectedPharmacyId, setSelectedPharmacyName, user]);
+  }, [assignments, reloadWorkspace, setSelectedPharmacyId, setSelectedPharmacyName, user]);
 
   const activeAssignment = useMemo(
     () => activeAssignmentId == null
