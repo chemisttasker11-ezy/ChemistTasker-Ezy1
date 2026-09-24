@@ -342,7 +342,7 @@ class KioskSelfRevokeView(APIView):
 
     def post(self, request):
         try:
-            device = _get_kiosk_device_from_request(request)
+            device = _get_kiosk_device_from_request(request, allow_revoked=True)
             revoke_kiosk_device_by_credential(
                 device,
                 issued_at=request.data.get("issued_at", ""),
