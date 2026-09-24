@@ -5,6 +5,7 @@
  */
 import { API_ENDPOINTS } from './constants/endpoints';
 import type { ShiftOfferAcceptancePayload } from './types';
+import type { RosterPharmacyMember, WorkerShiftRequestRecord } from './contracts/roster';
 let config = null;
 export function configureApi(apiConfig) {
     config = apiConfig;
@@ -307,9 +308,9 @@ const mapShift = (api) => {
     };
 };
 const mapRosterAssignment = (api) => camelCaseKeysDeep(api);
-const mapWorkerShiftRequest = (api) => camelCaseKeysDeep(api);
+const mapWorkerShiftRequest = (api): WorkerShiftRequestRecord => camelCaseKeysDeep(api);
 const mapOpenShift = (api) => camelCaseKeysDeep(api);
-const mapRosterPharmacyMember = (api) => camelCaseKeysDeep(api);
+const mapRosterPharmacyMember = (api): RosterPharmacyMember => camelCaseKeysDeep(api);
 const mapShiftApplication = (api) => camelCaseKeysDeep(api);
 const mapOwnerShiftSummary = (api) => camelCaseKeysDeep(api);
 const mapPharmacySummaryRecord = (api) => camelCaseKeysDeep(api);
@@ -1364,7 +1365,7 @@ export async function fetchRosterWorkerAssignments(params) {
     const data = await getRosterWorker(toRosterQueryParams(params));
     return asList(data).map(mapRosterAssignment);
 }
-export async function fetchWorkerShiftRequestsService(params) {
+export async function fetchWorkerShiftRequestsService(params): Promise<WorkerShiftRequestRecord[]> {
     const data = await getWorkerShiftRequests(toRosterQueryParams(params));
     return asList(data).map(mapWorkerShiftRequest);
 }
@@ -1372,7 +1373,7 @@ export async function fetchOwnerOpenShifts(params) {
     const data = await getOwnerOpenShifts(toShiftListParams(params));
     return asList(data).map(mapOpenShift);
 }
-export async function fetchRosterOwnerMembersService(pharmacyId) {
+export async function fetchRosterOwnerMembersService(pharmacyId): Promise<RosterPharmacyMember[]> {
     const data = await getRosterOwnerMembers(pharmacyId);
     return asList(data).map(mapRosterPharmacyMember);
 }
