@@ -12,7 +12,7 @@ import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
-import { hasOrganizationAccess as hasOrgPersonaAccess, resolveInitialWorkspace } from '../utils/mobilePersona';
+import { getAssignmentPharmacyId, getSelectedAdminAssignment, hasOrganizationAccess as hasOrgPersonaAccess, readPersonaSelection, resolveInitialWorkspace } from '../utils/mobilePersona';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
@@ -290,8 +290,13 @@ function AuthGate() {
         if (isSharedAuthenticatedRoute) {
           const normalizedSharedRole = String(user.role || '').toUpperCase();
           const ownerAccess = normalizedSharedRole === 'OWNER';
-          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', selectedPharmacyId);
-          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+          const storedPersona = await readPersonaSelection(user);
+          const activeAdminAssignment = storedPersona?.startsWith('ADMIN:')
+            ? await getSelectedAdminAssignment(user)
+            : null;
+          const capabilityPharmacyId = getAssignmentPharmacyId(activeAdminAssignment) ?? selectedPharmacyId;
+          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', capabilityPharmacyId);
+          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', capabilityPharmacyId);
 
           const isManagerRoute = top === 'manager';
           const isRosterWorkforceRoute = top === 'workforce-timesheets' || (top === 'workforce' && second === 'payroll-export');
