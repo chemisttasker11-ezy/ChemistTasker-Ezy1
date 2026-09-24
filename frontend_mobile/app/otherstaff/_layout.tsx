@@ -287,7 +287,7 @@ export default function OtherStaffTabs() {
           headerTitle: tabTitles[route.name] || 'Other Staff',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+            <IconButton icon="menu" accessibilityLabel="Open other staff menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
