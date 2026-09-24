@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Text, Avatar, Badge, Menu, IconButton, Divider } from 'react-native-paper';
 import { formatDistanceToNow } from 'date-fns';
 import type { ChatRoom } from './types';
+import { brandColors } from '@/constants/theme';
 
 type Props = {
   room: ChatRoom;
@@ -72,7 +73,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     marginRight: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F0EAFF',
   },
   content: {
     flex: 1,
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   badge: {
-    backgroundColor: '#6366F1',
+    backgroundColor: brandColors.purple,
   },
   pinBadge: {
     backgroundColor: '#F59E0B',
