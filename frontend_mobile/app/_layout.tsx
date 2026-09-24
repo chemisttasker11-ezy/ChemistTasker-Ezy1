@@ -238,6 +238,7 @@ function AuthGate() {
     const top = segments[0];
     const segmentList = segments as readonly string[];
     const second = segmentList[1];
+    const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
@@ -319,6 +320,24 @@ function AuthGate() {
         const normalizedRole = String(user.role || '').toUpperCase();
 
         if (top === 'admin' && hasAdminAccess(user)) {
+          const activeAssignment = await getSelectedAdminAssignment(user);
+          const adminPharmacyId = getAssignmentPharmacyId(activeAssignment);
+          const canManageStaff = hasCapability('MANAGE_STAFF', adminPharmacyId);
+          const canManageRoster = hasCapability('MANAGE_ROSTER', adminPharmacyId);
+          const isAdminPharmacyManagement = second === 'pharmacies';
+          const isAdminRosterManagement =
+            second === 'shifts' ||
+            second === 'post-shift' ||
+            (second != null && /^\d+$/.test(second) && third === 'post-shift');
+
+          if (isAdminPharmacyManagement && !canManageStaff) {
+            router.replace('/admin' as any);
+            return;
+          }
+          if (isAdminRosterManagement && !canManageRoster) {
+            router.replace('/admin' as any);
+            return;
+          }
           return;
         }
 
