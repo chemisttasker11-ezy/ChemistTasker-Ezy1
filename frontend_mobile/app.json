@@ -19,7 +19,7 @@
       "bundleIdentifier": "com.chemisttasker.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow camera access to add profile photos.",
+        "NSCameraUsageDescription": "Allow camera access to scan pharmacy attendance QR codes and add profile photos.",
         "NSLocationWhenInUseUsageDescription": "Allow location access while using the app to improve map-based address selection and travel radius preview.",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to upload profile photos and attachments.",
         "NSPhotoLibraryAddUsageDescription": "Allow saving images to your photo library.",
@@ -30,7 +30,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ],
         "NSPrivacyCollectedDataTypes": [
@@ -72,6 +74,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow ChemistTasker to use the camera to scan pharmacy attendance QR codes.",
+          "barcodeScannerEnabled": true
+        }
+      ],
       "./plugins/withAndroidManifestFixes",
       [
         "expo-splash-screen",
