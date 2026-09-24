@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated, SAFE_METHODS, AllowAny
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.exceptions import NotFound, APIException, PermissionDenied, ValidationError, NotAuthenticated
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action, api_view, permission_classes
 from .models import *
@@ -7868,7 +7869,7 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         try:
             row = create_leave(request.user, request.data)
             return Response(serialize_legacy_leave(row), status=status.HTTP_201_CREATED)
-        except PermissionDenied as exc:
+        except (PermissionDenied, DjangoPermissionDenied) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
@@ -7879,7 +7880,7 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         try:
             row = update_pending_leave(request.user, pk, request.data)
             return Response(serialize_legacy_leave(row))
-        except PermissionDenied as exc:
+        except (PermissionDenied, DjangoPermissionDenied) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
@@ -7893,7 +7894,7 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         try:
             decide_leave(request.user, pk, "CANCELLED")
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except PermissionDenied as exc:
+        except (PermissionDenied, DjangoPermissionDenied) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
@@ -7905,7 +7906,7 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         try:
             row = decide_leave(request.user, pk, "APPROVED", request.data.get("manager_note") or "")
             return Response({"status": row.status})
-        except PermissionDenied as exc:
+        except (PermissionDenied, DjangoPermissionDenied) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
@@ -7917,7 +7918,7 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         try:
             row = decide_leave(request.user, pk, "REJECTED", request.data.get("manager_note") or "")
             return Response({"status": row.status})
-        except PermissionDenied as exc:
+        except (PermissionDenied, DjangoPermissionDenied) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": getattr(exc, "messages", [str(exc)])}
