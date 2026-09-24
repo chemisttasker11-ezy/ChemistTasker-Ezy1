@@ -6377,6 +6377,7 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
 
         leave = WorkforceLeaveRequest.objects.filter(
             slot_assignment=obj,
+            user_id=obj.user_id,
             status__in=[
                 WorkforceLeaveRequest.Status.PENDING,
                 WorkforceLeaveRequest.Status.APPROVED,
