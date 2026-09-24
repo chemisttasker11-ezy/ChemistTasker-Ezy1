@@ -66,6 +66,8 @@ struct PairResponse {
     device_token: String,
     pharmacy_id: i64,
     pharmacy_name: String,
+    server_time: String,
+    max_offline_hours: i64,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +86,7 @@ struct EnrollmentResponse {
 struct ConfigResponse {
     device_id: String,
     server_time: String,
+    max_offline_hours: i64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -101,6 +104,8 @@ struct SyncResponse {
     acknowledged_through: i64,
     server_time: String,
     results: Vec<Value>,
+    #[serde(default)]
+    max_offline_hours: Option<i64>,
 }
 
 fn keyring_entry(account: &str) -> Result<Entry, String> {
@@ -494,6 +499,69 @@ fn set_config_value(connection: &Connection, key: &str, value: &str) -> Result<(
     Ok(())
 }
 
+fn mark_device_revoked(connection: &Connection) -> Result<(), String> {
+    set_config_value(connection, "device_revoked", "1")
+}
+
+fn refresh_device_authorization(
+    connection: &Connection,
+    server_time: &str,
+    max_offline_hours: i64,
+) -> Result<(), String> {
+    if max_offline_hours <= 0 {
+        return Err("Kiosk offline authorization policy is invalid".to_string());
+    }
+    let verified = DateTime::parse_from_rfc3339(server_time)
+        .map_err(|_| "Server authorization timestamp is invalid".to_string())?
+        .with_timezone(&Utc);
+    let valid_until = verified + ChronoDuration::hours(max_offline_hours);
+    set_config_value(connection, "device_authorized_until", &valid_until.to_rfc3339())?;
+    set_config_value(connection, "device_revoked", "0")
+}
+
+fn refresh_device_authorization_until(
+    connection: &Connection,
+    valid_until: &str,
+) -> Result<(), String> {
+    let parsed = DateTime::parse_from_rfc3339(valid_until)
+        .map_err(|_| "Device authorization expiry is invalid".to_string())?
+        .with_timezone(&Utc);
+    set_config_value(connection, "device_authorized_until", &parsed.to_rfc3339())?;
+    set_config_value(connection, "device_revoked", "0")
+}
+
+fn ensure_device_offline_authorized(connection: &Connection) -> Result<(), String> {
+    if config_value(connection, "device_revoked")?.as_deref() == Some("1") {
+        return Err("KIOSK_REVOKED: This kiosk registration has been revoked.".to_string());
+    }
+    let valid_until = config_value(connection, "device_authorized_until")?
+        .ok_or_else(|| "Kiosk authorization expired; reconnect before recording offline attendance.".to_string())?;
+    let parsed = DateTime::parse_from_rfc3339(&valid_until)
+        .map_err(|_| "Stored kiosk authorization is invalid".to_string())?
+        .with_timezone(&Utc);
+    if parsed <= Utc::now() {
+        return Err("Kiosk authorization expired; reconnect before recording offline attendance.".to_string());
+    }
+    Ok(())
+}
+
+fn pending_event_count(connection: &Connection) -> Result<i64, String> {
+    connection
+        .query_row(
+            "SELECT COUNT(*) FROM attendance_event WHERE sync_status = 'PENDING'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+fn delete_keyring_credential(account: &str) -> Result<(), String> {
+    match keyring_entry(account)?.delete_credential() {
+        Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
+        Err(error) => Err(format!("Could not clear secure {account}: {error}")),
+    }
+}
+
 fn sorted_json(value: Value) -> Value {
     match value {
         Value::Object(map) => {
@@ -591,6 +659,7 @@ async fn fetch_online_qr(app: AppHandle) -> Result<KioskQrResponse, String> {
         .await
         .map_err(|error| format!("QR is temporarily unavailable: {error}"))?;
     if response.status() == StatusCode::UNAUTHORIZED {
+        mark_device_revoked(&connection)?;
         return Err("KIOSK_REVOKED: This kiosk is inactive or revoked.".to_string());
     }
     if !response.status().is_success() {
@@ -717,6 +786,11 @@ async fn pair_device(
             [],
         )
         .map_err(|error| error.to_string())?;
+    refresh_device_authorization(
+        &connection,
+        &paired.server_time,
+        paired.max_offline_hours,
+    )?;
     device_identity_from(&connection)
 }
 
@@ -1071,6 +1145,10 @@ async fn enrol_worker_from_server(
         .send()
         .await
         .map_err(|error| format!("Online enrollment is unavailable: {error}"))?;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        mark_device_revoked(&connection)?;
+        return Err("KIOSK_REVOKED: This kiosk registration has been revoked.".to_string());
+    }
     if !response.status().is_success() {
         return Err(response
             .text()
@@ -1082,6 +1160,7 @@ async fn enrol_worker_from_server(
     if enrollment.pharmacy_id != expected_pharmacy_id {
         return Err("Worker enrollment response belongs to a different pharmacy".to_string());
     }
+    refresh_device_authorization_until(&connection, &enrollment.offline_valid_until)?;
     Ok(enrollment)
 }
 
@@ -1097,6 +1176,7 @@ fn record_offline_pin_attendance(
         return Err("Choose an attendance action before confirming".to_string());
     }
     let connection = open_database(app)?;
+    ensure_device_offline_authorized(&connection)?;
     let credential: (i64, String, String, i64, Option<String>, Option<String>) = connection
         .query_row(
             "SELECT employee_id, display_name, pin_hash, failed_attempts, locked_until, offline_valid_until
@@ -1318,6 +1398,7 @@ async fn capture_pin_attendance(
             if error.contains("not enrolled for offline use")
                 || error == "Invalid worker PIN"
                 || error.contains("Offline worker authorization expired")
+                || error.contains("Kiosk authorization expired")
                 || error.contains("requires online reconciliation") =>
         {
             let enrollment = enrol_worker_from_server(&app, &identifier, &pin).await?;
@@ -1347,9 +1428,7 @@ async fn capture_pin_attendance(
     }
 }
 
-#[tauri::command]
-fn verify_dashboard_pin(app: AppHandle, pin: String) -> Result<bool, String> {
-    let connection = open_database(&app)?;
+fn verify_dashboard_pin_from(connection: &Connection, pin: &str) -> Result<bool, String> {
     let guard: (String, i64, Option<String>) = connection
         .query_row(
             "SELECT pin_hash, failed_attempts, locked_until FROM dashboard_guard WHERE singleton = 1",
@@ -1392,6 +1471,12 @@ fn verify_dashboard_pin(app: AppHandle, pin: String) -> Result<bool, String> {
         )
         .map_err(|error| error.to_string())?;
     Ok(false)
+}
+
+#[tauri::command]
+fn verify_dashboard_pin(app: AppHandle, pin: String) -> Result<bool, String> {
+    let connection = open_database(&app)?;
+    verify_dashboard_pin_from(&connection, &pin)
 }
 
 fn pending_events(connection: &Connection) -> Result<Vec<Value>, String> {
@@ -1442,6 +1527,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
                 server_time: trusted_time_estimate(&connection, runtime)?
                     .unwrap_or_else(|| Utc::now().to_rfc3339()),
                 results: vec![],
+                max_offline_hours: None,
             });
         }
         let token = keyring_entry("device-token")?
@@ -1456,6 +1542,10 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
             .send()
             .await
             .map_err(|error| error.to_string())?;
+        if response.status() == StatusCode::UNAUTHORIZED {
+            mark_device_revoked(&connection)?;
+            return Err("KIOSK_REVOKED: This kiosk registration has been revoked.".to_string());
+        }
         if !response.status().is_success() {
             return Err(response
                 .text()
@@ -1466,6 +1556,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
         if refreshed.device_id.to_lowercase() != config.2.to_lowercase() {
             return Err("Configuration response belongs to a different kiosk".to_string());
         }
+        refresh_device_authorization(&connection, &refreshed.server_time, refreshed.max_offline_hours)?;
         connection
             .execute(
                 "INSERT OR REPLACE INTO clock_anchor(singleton, server_utc, boot_session_id, monotonic_elapsed_ms)
@@ -1485,6 +1576,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
                 .unwrap_or(0),
             server_time: refreshed.server_time,
             results: vec![],
+            max_offline_hours: Some(refreshed.max_offline_hours),
         });
     }
     let token = keyring_entry("device-token")?
@@ -1500,6 +1592,10 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
         .send()
         .await
         .map_err(|error| error.to_string())?;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        mark_device_revoked(&connection)?;
+        return Err("KIOSK_REVOKED: This kiosk registration has been revoked.".to_string());
+    }
     if !response.status().is_success() {
         return Err(response
             .text()
@@ -1519,6 +1615,9 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
         .map_err(|error| error.to_string())?;
     if receipt.acknowledged_through > highest_local_sequence {
         return Err("Sync receipt acknowledges unknown local evidence".to_string());
+    }
+    if let Some(max_offline_hours) = receipt.max_offline_hours {
+        refresh_device_authorization(&connection, &receipt.server_time, max_offline_hours)?;
     }
 
     let transaction = connection
@@ -1624,13 +1723,105 @@ async fn sync_now(
 
 #[tauri::command]
 fn pending_count(app: AppHandle) -> Result<i64, String> {
-    open_database(&app)?
+    pending_event_count(&open_database(&app)?)
+}
+
+#[tauri::command]
+async fn disconnect_device(
+    app: AppHandle,
+    runtime: State<'_, RuntimeState>,
+    dashboard_pin: String,
+) -> Result<DeviceIdentity, String> {
+    let mut connection = open_database(&app)?;
+    if !verify_dashboard_pin_from(&connection, &dashboard_pin)? {
+        return Err("Dashboard PIN is incorrect".to_string());
+    }
+
+    if pending_event_count(&connection)? > 0 {
+        drop(connection);
+        perform_sync(&app, &runtime).await.map_err(|error| {
+            format!("Cannot disconnect while attendance is waiting to sync: {error}")
+        })?;
+        connection = open_database(&app)?;
+    }
+    let remaining = pending_event_count(&connection)?;
+    if remaining > 0 {
+        return Err(format!(
+            "Cannot disconnect: {remaining} attendance event(s) are still waiting to sync."
+        ));
+    }
+
+    let (api_base_url, installation_id): (String, String) = connection
         .query_row(
-            "SELECT COUNT(*) FROM attendance_event WHERE sync_status = 'PENDING'",
+            "SELECT api_base_url, installation_id FROM device_config WHERE singleton = 1",
             [],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(|error| error.to_string())
+        .map_err(|_| "This kiosk has not been paired".to_string())?;
+    let token = keyring_entry("device-token")?
+        .get_password()
+        .map_err(|error| format!("Device credential is unavailable: {error}"))?;
+    let issued_at = Utc::now().to_rfc3339();
+    let message = format!(
+        "chemisttasker:kiosk-disconnect:v1|{}|{}",
+        installation_id, issued_at
+    );
+    let proof_signature = BASE64.encode(
+        signing_key(&connection)?
+            .sign(message.as_bytes())
+            .to_bytes(),
+    );
+
+    let response = restricted_http_client()?
+        .post(format!(
+            "{}/client-profile/attendance/kiosk/revoke-self/",
+            api_base_url.trim_end_matches('/')
+        ))
+        .header("X-Device-Token", token)
+        .json(&json!({
+            "issued_at": issued_at,
+            "proof_signature": proof_signature,
+        }))
+        .send()
+        .await
+        .map_err(|error| format!(
+            "Could not contact ChemistTasker to revoke this kiosk. Nothing was removed locally: {error}"
+        ))?;
+
+    if response.status() != StatusCode::UNAUTHORIZED && !response.status().is_success() {
+        return Err(response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Kiosk revocation failed; local data was preserved.".to_string()));
+    }
+
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    transaction
+        .execute_batch(
+            "DELETE FROM attendance_event;
+             DELETE FROM sync_receipt;
+             DELETE FROM clock_anchor;
+             DELETE FROM worker_credential;
+             DELETE FROM worker_local_state;
+             DELETE FROM capture_request;
+             DELETE FROM dashboard_guard;
+             DELETE FROM device_config;
+             DELETE FROM local_state;",
+        )
+        .map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())?;
+
+    for account in [
+        "device-token",
+        "device-signing-key",
+        "worker-pin-pepper",
+        "dashboard-pin-pepper",
+    ] {
+        delete_keyring_credential(account)?;
+    }
+    device_identity_from(&connection)
 }
 
 pub fn run() {
@@ -1666,6 +1857,7 @@ pub fn run() {
             capture_pin_attendance,
             confirm_capture_receipt,
             verify_dashboard_pin,
+            disconnect_device,
             sync_now,
             pending_count,
         ])
