@@ -392,6 +392,82 @@ test('timesheets Sync now uses existing kiosk status and period recalculation co
   });
 });
 
+
+test('attendance approval uses existing pharmacy-scoped pending and approve contracts', async ({ page }) => {
+  await installApiFixture(page, roleUsers.admin);
+
+  const observed = {
+    pendingPharmacyId: null,
+    approve: null,
+  };
+
+  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+      return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
+    }
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/attendance/manager/pending/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET') {
+      observed.pendingPharmacyId = url.searchParams.get('pharmacy_id');
+      return json(route, [{
+        provisional_id: 77,
+        session_id: 88,
+        worker_id: 4,
+        worker_name: 'Smoke Pharmacist',
+        worker_email: 'pharmacist@example.test',
+        started_at: '2026-09-24T08:00:00+10:00',
+        ended_at: '2026-09-24T16:00:00+10:00',
+        cover_type: 'UNROSTERED_LOCAL',
+        source_pharmacy_name: null,
+        status: 'PENDING',
+        decision_reason: null,
+        created_at: '2026-09-24T16:01:00+10:00',
+      }]);
+    }
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/attendance/manager/approve/**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      observed.approve = {
+        method: request.method(),
+        path: new URL(request.url()).pathname,
+        body: request.postDataJSON(),
+      };
+      return json(route, { status: 'APPROVED' });
+    }
+    return route.fallback();
+  });
+
+  await page.goto('/dashboard/attendance/reviews');
+  await expect(page.getByText('Smoke Pharmacist')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.getByText('Approve Provisional Shift')).toBeVisible();
+  await page.getByRole('button', { name: 'Approve & Backfill' }).click();
+
+  await expect(page.getByRole('alert')).toContainText(
+    'Successfully approved shift for Smoke Pharmacist',
+  );
+
+  expect(observed.pendingPharmacyId).toBe('101');
+  expect(observed.approve).toEqual({
+    method: 'POST',
+    path: '/api/client-profile/attendance/manager/approve/',
+    body: {
+      provisional_id: 77,
+      reason: 'Approved cover shift by pharmacy manager.',
+    },
+  });
+});
+
 test('delegated admin direct route preserves requested pharmacy scope', async ({ page }) => {
   await installApiFixture(page, roleUsers.admin);
 
