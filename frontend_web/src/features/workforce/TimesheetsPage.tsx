@@ -24,7 +24,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import dayjs from 'dayjs';
-import { fetchPharmaciesService } from '@chemisttasker/shared-core';
+import { attendance, fetchPharmaciesService } from '@chemisttasker/shared-core';
 import {
   fetchTimesheetSummary,
   listTimesheetPeriods,
@@ -157,6 +157,34 @@ export default function TimesheetsPage() {
     }
   };
 
+  const syncAndRefreshTimesheets = async () => {
+    if (!periodId || !pharmacyId) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const kioskStatus = await attendance.getManagerKioskDevices(pharmacyId) as any;
+      const devices = Array.isArray(kioskStatus?.devices) ? kioskStatus.devices : [];
+      const activeDevices = devices.filter((device: any) => device.is_active);
+      const onlineRecently = activeDevices.some((device: any) => {
+        if (!device.last_seen_at) return false;
+        return dayjs().diff(dayjs(device.last_seen_at), 'minute') <= 2;
+      });
+      await recalculateTimesheetPeriod(periodId, true);
+      await loadPeriod();
+      setFeedback(
+        activeDevices.length === 0
+          ? 'Timesheets refreshed from all attendance currently received by ChemistTasker. No active kiosk is registered for this pharmacy.'
+          : onlineRecently
+            ? 'Attendance received from the kiosk has been applied and the selected timesheet period was recalculated.'
+            : 'Timesheets refreshed from all attendance currently received by ChemistTasker. The kiosk has not checked in recently, so an offline terminal may still have unsynced attendance.'
+      );
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || 'Unable to sync and refresh timesheets.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const lock = async () => {
     if (!periodId) return;
     if (!window.confirm('Lock this reviewed period? Locked time is immutable; later corrections must use a later adjustment workflow.')) return;
@@ -201,6 +229,7 @@ export default function TimesheetsPage() {
             </FormControl>
             <Button variant="outlined" onClick={createCurrentFortnight} disabled={!pharmacyId || actionLoading}>Open current fortnight</Button>
             <Box flex={1} />
+            <Button variant="contained" startIcon={<RefreshIcon />} onClick={syncAndRefreshTimesheets} disabled={!periodId || !pharmacyId || actionLoading || selectedPeriod?.status === 'LOCKED'}>Sync now</Button>
             <Button startIcon={<RefreshIcon />} onClick={recalculate} disabled={!periodId || actionLoading || selectedPeriod?.status === 'LOCKED'}>Recalculate</Button>
             <Button color="warning" startIcon={<LockOutlinedIcon />} variant="outlined" onClick={lock} disabled={!periodId || actionLoading || selectedPeriod?.status === 'LOCKED'}>Lock reviewed period</Button>
           </Stack>
