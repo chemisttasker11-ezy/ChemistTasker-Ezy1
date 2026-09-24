@@ -283,6 +283,115 @@ test.describe('authenticated route skeleton', () => {
   }
 });
 
+
+test('timesheets Sync now uses existing kiosk status and period recalculation contracts', async ({ page }) => {
+  await installApiFixture(page, roleUsers.admin);
+
+  const observed = {
+    kiosk: null,
+    recalculate: null,
+  };
+
+  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+      return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
+    }
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/workforce/timesheet-periods/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+
+    if (request.method() === 'GET' && path.endsWith('/client-profile/workforce/timesheet-periods/')) {
+      expect(url.searchParams.get('pharmacy_id')).toBe('101');
+      return json(route, [{
+        id: 501,
+        pharmacy_id: 101,
+        start_date: '2026-09-14',
+        end_date: '2026-09-27',
+        status: 'OPEN',
+        timezone: 'Australia/Brisbane',
+        locked_at: null,
+      }]);
+    }
+
+    if (request.method() === 'GET' && path.endsWith('/501/summary/')) {
+      return json(route, {
+        period_id: 501,
+        pharmacy_id: 101,
+        start_date: '2026-09-14',
+        end_date: '2026-09-27',
+        status: 'OPEN',
+        total_timesheets: 0,
+        blocking_timesheets: 0,
+        warning_checks: 0,
+        pending_leave_requests: 0,
+        open_sessions: 0,
+        ready_timesheets: 0,
+      });
+    }
+
+    if (request.method() === 'POST' && path.endsWith('/501/recalculate/')) {
+      observed.recalculate = {
+        method: request.method(),
+        path,
+        body: request.postDataJSON(),
+      };
+      return json(route, { rebuilt: 0 });
+    }
+
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/workforce/timesheets/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET') {
+      expect(url.searchParams.get('period_id')).toBe('501');
+      return json(route, []);
+    }
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/attendance/manager/kiosk-devices/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET') {
+      observed.kiosk = {
+        method: request.method(),
+        path: url.pathname,
+        pharmacyId: url.searchParams.get('pharmacy_id'),
+      };
+      return json(route, { devices: [] });
+    }
+    return route.fallback();
+  });
+
+  await page.goto('/dashboard/workforce/timesheets?pharmacy_id=101');
+  const syncButton = page.getByRole('button', { name: 'Sync now' });
+  await expect(syncButton).toBeEnabled();
+  await syncButton.click();
+
+  await expect(page.getByRole('alert')).toContainText(
+    'Timesheets refreshed from all attendance currently received by ChemistTasker',
+  );
+
+  expect(observed.kiosk).toEqual({
+    method: 'GET',
+    path: '/api/client-profile/attendance/manager/kiosk-devices/',
+    pharmacyId: '101',
+  });
+  expect(observed.recalculate).toEqual({
+    method: 'POST',
+    path: '/api/client-profile/workforce/timesheet-periods/501/recalculate/',
+    body: { sync: true },
+  });
+});
+
 test('delegated admin direct route preserves requested pharmacy scope', async ({ page }) => {
   await installApiFixture(page, roleUsers.admin);
 
