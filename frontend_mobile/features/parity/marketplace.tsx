@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useState}from'react';
 import{Image,View}from'react-native';
 import{Button,Card,Chip,IconButton,Searchbar,Text}from'react-native-paper';
+import{DatePickerInput,TimePickerModal}from'react-native-paper-dates';
 import{useLocalSearchParams,useRouter}from'expo-router';
 import*as ImagePicker from'expo-image-picker';
 import{chemistTaskerApi}from'@/config/api';
@@ -128,14 +129,15 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
  </ParityPage>;
 }
 function MyListingDetail({row,loading,error,onReload}:{row:any;loading:boolean;error:string;onReload:()=>Promise<void>}){
- const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[scheduleAt,setScheduleAt]=useState('');
+ const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[scheduleAt,setScheduleAt]=useState<Date|undefined>(undefined),[timeOpen,setTimeOpen]=useState(false);
  const labels:Record<string,string>={OWNED_CHAIN:'Owned pharmacies',ORGANISATION:'Organisation',PLATFORM:'Platform owners'};
  const act=async(action:'submit'|'withdraw')=>{if(!row)return;setBusy(true);setLocalError('');try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
  const next=nextMarketplaceAudience(row?.current_circle,row?.maximum_circle);
  const widen=async(schedule=false)=>{if(!row||!next)return;setBusy(true);setLocalError('');try{
-   const due=scheduleAt.trim();if(schedule&&!due){setLocalError('Enter a future ISO date/time before scheduling audience widening.');return;}
-   await api.updateAudience(row.id,{expected_version:row.version,current_circle:schedule?row.current_circle:next,maximum_circle:row.maximum_circle||'PLATFORM',...(schedule?{schedule:[{target_circle:next,due_at:new Date(due).toISOString()}]}:{})});
-   setScheduleAt('');await onReload();
+   if(schedule&&!scheduleAt){setLocalError('Choose a future date and time before scheduling audience widening.');return;}
+   if(schedule&&scheduleAt&&scheduleAt.getTime()<=Date.now()){setLocalError('Scheduled widening must be in the future.');return;}
+   await api.updateAudience(row.id,{expected_version:row.version,current_circle:schedule?row.current_circle:next,maximum_circle:row.maximum_circle||'PLATFORM',...(schedule&&scheduleAt?{schedule:[{target_circle:next,due_at:scheduleAt.toISOString()}]}:{})});
+   setScheduleAt(undefined);await onReload();
  }catch(e){setLocalError(errorMessage(e,'Unable to update listing audience.'));}finally{setBusy(false);}};
  return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error||localError}>
   {!row?<EmptyState title="Listing not found" body="The listing is unavailable."/>:<>
@@ -148,8 +150,27 @@ function MyListingDetail({row,loading,error,onReload}:{row:any;loading:boolean;e
    {String(row.seller_context||'').toUpperCase()==='PHARMACY'&&String(row.publication_status||'').toUpperCase()==='PUBLISHED'&&next?<Section title="Audience widening" description={`Current: ${labels[row.current_circle]||replaceUnderscore(row.current_circle)} · Maximum: ${labels[row.maximum_circle||'PLATFORM']}`}>
     <InfoNote title="Next permitted circle">{labels[next]}</InfoNote>
     <Button mode="contained-tonal" disabled={busy} onPress={()=>void widen(false)}>Widen now to {labels[next]}</Button>
-    <Field label="Schedule date/time (ISO)" value={scheduleAt} onChangeText={setScheduleAt}/>
-    <Button mode="outlined" disabled={busy||!scheduleAt.trim()} onPress={()=>void widen(true)}>Schedule widening</Button>
+    <DatePickerInput
+      locale="en-AU"
+      label="Schedule widening date"
+      value={scheduleAt}
+      onChange={(date)=>{if(!date)return setScheduleAt(undefined);const nextDate=new Date(date);nextDate.setHours(scheduleAt?.getHours()??9,scheduleAt?.getMinutes()??0,0,0);setScheduleAt(nextDate);}}
+      inputMode="start"
+      disabled={busy}
+    />
+    <Button mode="outlined" icon="clock-outline" disabled={busy||!scheduleAt} onPress={()=>setTimeOpen(true)}>
+      {scheduleAt?`Widen at ${scheduleAt.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})}`:'Choose date first'}
+    </Button>
+    <TimePickerModal
+      visible={timeOpen}
+      onDismiss={()=>setTimeOpen(false)}
+      onConfirm={({hours,minutes})=>{if(scheduleAt){const nextDate=new Date(scheduleAt);nextDate.setHours(hours,minutes,0,0);setScheduleAt(nextDate);}setTimeOpen(false);}}
+      hours={scheduleAt?.getHours()??9}
+      minutes={scheduleAt?.getMinutes()??0}
+      label="Select widening time"
+      locale="en"
+    />
+    <Button mode="outlined" disabled={busy||!scheduleAt} onPress={()=>void widen(true)}>Schedule widening</Button>
    </Section>:null}
   </>}
  </ParityPage>;
