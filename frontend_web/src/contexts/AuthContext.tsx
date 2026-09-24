@@ -14,12 +14,11 @@ import {
 } from "react";
 import {
   getRooms,
-  getOwnedPharmacyIds,
   hasAdminCapability,
   normalizeAdminAssignments,
 } from "@chemisttasker/shared-core";
 import { type PersonaMode, type AdminLevel } from "@chemisttasker/shared-core";
-import { AdminCapability, ALL_ADMIN_CAPABILITIES } from "../constants/adminCapabilities";
+import { AdminCapability } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
 import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
@@ -155,11 +154,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if(!resp.ok)throw new Error('Your account is temporarily unavailable.');
     return await resp.json() as User;
   }, []);
-
-  const ownedPharmacyIds = useMemo<Set<number>>(
-    () => new Set(getOwnedPharmacyIds(user)),
-    [user],
-  );
 
   const adminAssignments = useMemo<AdminAssignment[]>(
     () => normalizeAdminAssignments(user) as AdminAssignment[],
