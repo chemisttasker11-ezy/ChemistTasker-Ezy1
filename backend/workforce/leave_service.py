@@ -7,8 +7,11 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from client_profile.models import Membership, ShiftSlotAssignment
+from client_profile.models import Membership, PharmacyAdmin, ShiftSlotAssignment
 from client_profile.timezone_utils import get_pharmacy_timezone
+from client_profile.utils import build_roster_email_link
+from core.task_queue import async_task
+from users.models import OrganizationMembership
 
 from .models import WorkforceLeaveRequest
 from .permissions import can_manage_pharmacy
@@ -45,6 +48,112 @@ def assignment_interval(assignment):
     end_date = work_date + timedelta(days=1) if assignment.slot.end_time <= assignment.slot.start_time else work_date
     end = datetime.combine(end_date, assignment.slot.end_time, tzinfo=tz)
     return start, end
+
+
+
+def _slot_leave_recipients(row):
+    pharmacy = row.pharmacy
+    users = []
+    owner_user = getattr(getattr(pharmacy, "owner", None), "user", None)
+    if owner_user:
+        users.append(owner_user)
+    if pharmacy.organization_id:
+        users.extend(
+            membership.user
+            for membership in OrganizationMembership.objects.filter(
+                organization_id=pharmacy.organization_id,
+                role="ORG_ADMIN",
+            ).select_related("user")
+            if membership.user
+        )
+    users.extend(
+        admin.user
+        for admin in PharmacyAdmin.objects.filter(pharmacy=pharmacy, is_active=True).select_related("user")
+        if admin.user
+    )
+    unique = {}
+    for user in users:
+        if getattr(user, "id", None):
+            unique[user.id] = user
+    return list(unique.values())
+
+
+def _notify_slot_leave_created(row):
+    if not row.slot_assignment_id:
+        return
+    assignment = row.slot_assignment
+    recipients = _slot_leave_recipients(row)
+    emails = [user.email for user in recipients if getattr(user, "email", None)]
+    if not emails:
+        return
+    link_user = recipients[0] if recipients else None
+    action_url = build_roster_email_link(link_user, row.pharmacy)
+    worker_name = row.user.get_full_name() or row.user.email
+    work_date = assignment.slot_date or assignment.slot.date
+    context = {
+        "worker_name": worker_name,
+        "worker_email": row.user.email,
+        "leave_type": row.get_leave_type_display(),
+        "note": row.note,
+        "shift_date": work_date,
+        "shift_time": f"{assignment.slot.start_time}–{assignment.slot.end_time}",
+        "pharmacy_name": row.pharmacy.name,
+        "shift_link": action_url,
+    }
+    notification = {
+        "title": f"Leave request: {row.pharmacy.name}",
+        "body": f"{worker_name} requested leave on {work_date}.",
+        "action_url": action_url,
+        "payload": {"leave_request_id": row.pk, "pharmacy_id": row.pharmacy_id},
+        "user_ids": [user.id for user in recipients],
+    }
+    transaction.on_commit(
+        lambda: async_task(
+            "users.tasks.send_async_email",
+            subject=f"Leave request from {worker_name} for {row.pharmacy.name}",
+            recipient_list=emails,
+            template_name="emails/leave_request.html",
+            context=context,
+            text_template="emails/leave_request.txt",
+            notification=notification,
+        ),
+        robust=True,
+    )
+
+
+def _notify_slot_leave_decision(row):
+    if not row.slot_assignment_id or not row.user.email:
+        return
+    assignment = row.slot_assignment
+    work_date = assignment.slot_date or assignment.slot.date
+    action_url = build_roster_email_link(row.user, row.pharmacy)
+    approved = row.status == WorkforceLeaveRequest.Status.APPROVED
+    context = {
+        "leave_type": row.get_leave_type_display(),
+        "shift_date": work_date,
+        "pharmacy_name": row.pharmacy.name,
+        "shift_link": action_url,
+    }
+    decision_word = "approved" if approved else "rejected"
+    template = "leave_approved" if approved else "leave_rejected"
+    transaction.on_commit(
+        lambda: async_task(
+            "users.tasks.send_async_email",
+            subject=f"Your leave request for {row.pharmacy.name} was {decision_word}",
+            recipient_list=[row.user.email],
+            template_name=f"emails/{template}.html",
+            context=context,
+            text_template=f"emails/{template}.txt",
+            notification={
+                "title": f"Leave {decision_word}: {row.pharmacy.name}",
+                "body": f"Your leave request for {work_date} was {decision_word}.",
+                "action_url": action_url,
+                "payload": {"leave_request_id": row.pk, "pharmacy_id": row.pharmacy_id},
+                "user_ids": [row.user_id],
+            },
+        ),
+        robust=True,
+    )
 
 
 def serialize_leave(row, *, include_manager_note=False):
@@ -148,6 +257,7 @@ def create_leave(user, payload):
 
     row.full_clean()
     row.save()
+    _notify_slot_leave_created(row)
     return row
 
 
@@ -219,4 +329,6 @@ def decide_leave(actor, leave_id, decision, manager_note=""):
     row.decided_by = actor
     row.decided_at = timezone.now()
     row.save(update_fields=["status", "manager_note", "decided_by", "decided_at", "updated_at"])
+    if decision in {WorkforceLeaveRequest.Status.APPROVED, WorkforceLeaveRequest.Status.REJECTED}:
+        _notify_slot_leave_decision(row)
     return row
