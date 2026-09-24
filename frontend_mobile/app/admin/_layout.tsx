@@ -47,7 +47,8 @@ function AdminSidebar({
   const items = [
     { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin' },
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies' },
-    { label: 'Roster', icon: 'calendar-month-outline', route: '/admin/shifts' },
+    { label: 'Shift Centre', icon: 'calendar-month-outline', route: '/admin/shifts' },
+    { label: 'Weekly Roster', icon: 'calendar-account-outline', route: '/manager/roster' },
     { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
     { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
     { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift' },
@@ -153,6 +154,9 @@ function AdminLayoutInner() {
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
     if (route === '/admin/pills' && pharmacyId) return `/admin/${pharmacyId}/pills`;
+    if (route === '/manager/roster' && pharmacyId) return `/manager/roster?pharmacyId=${pharmacyId}`;
+    if (route === '/workforce-timesheets' && pharmacyId) return `/workforce-timesheets?pharmacyId=${pharmacyId}`;
+    if (route === '/workforce-settings' && pharmacyId) return `/workforce-settings?pharmacyId=${pharmacyId}`;
     return route;
   };
 
