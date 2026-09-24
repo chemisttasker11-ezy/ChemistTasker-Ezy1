@@ -68,6 +68,22 @@ function json(route, value, status = 200) {
   });
 }
 
+const LOGIN_PATH = '/api/users/login/';
+const REFRESH_PATH = '/api/users/token/refresh/';
+
+function isPath(path, expected) {
+  return path === expected || path.endsWith(expected.replace(/^\/api/, ''));
+}
+
+async function installLoggedOutBootstrap(route) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  if (path.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
+  if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+  if (isPath(path, REFRESH_PATH)) return json(route, { detail: 'Unauthenticated' }, 401);
+  return null;
+}
+
 async function installApiFixture(page, user) {
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -118,8 +134,11 @@ test.describe('public/auth wiring', () => {
     let authPostCount = 0;
     await page.route('**/api/**', async (route) => {
       const request = route.request();
-      if (request.method() === 'POST' && request.url().includes('/users/')) authPostCount += 1;
-      return json(route, request.url().endsWith('/users/me/') ? {} : { results: [] }, request.url().endsWith('/users/me/') ? 401 : 200);
+      const path = new URL(request.url()).pathname;
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(path, LOGIN_PATH)) authPostCount += 1;
+      return json(route, { results: [] });
     });
 
     await page.goto('/login');
@@ -133,9 +152,9 @@ test.describe('public/auth wiring', () => {
     await page.route('**/api/**', async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
-      if (path.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
-      if (path.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
-      if (request.method() === 'POST' && path.includes('/users/')) {
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(path, LOGIN_PATH)) {
         observed = {
           method: request.method(),
           path,
@@ -169,9 +188,9 @@ test.describe('public/auth wiring', () => {
       await page.route('**/api/**', async (route) => {
         const request = route.request();
         const apiPath = new URL(request.url()).pathname;
-        if (apiPath.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
-        if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
-        if (request.method() === 'POST' && apiPath.includes('/users/')) {
+        const bootstrap = await installLoggedOutBootstrap(route);
+        if (bootstrap) return bootstrap;
+        if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
           return json(route, { detail: `Smoke HTTP ${status}` }, status);
         }
         return json(route, {});
@@ -190,9 +209,9 @@ test.describe('public/auth wiring', () => {
     await page.route('**/api/**', async (route) => {
       const request = route.request();
       const apiPath = new URL(request.url()).pathname;
-      if (apiPath.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
-      if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
-      if (request.method() === 'POST' && apiPath.includes('/users/')) return route.abort('failed');
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) return route.abort('failed');
       return json(route, {});
     });
 
@@ -209,9 +228,9 @@ test.describe('public/auth wiring', () => {
     await page.route('**/api/**', async (route) => {
       const request = route.request();
       const apiPath = new URL(request.url()).pathname;
-      if (apiPath.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
-      if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
-      if (request.method() === 'POST' && apiPath.includes('/users/')) {
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
         loginPosts += 1;
         await new Promise((resolve) => setTimeout(resolve, 300));
         return json(route, { detail: 'Invalid credentials' }, 401);
@@ -257,7 +276,12 @@ test.describe('authenticated route skeleton', () => {
 
 test('delegated admin direct route preserves requested pharmacy scope', async ({ page }) => {
   await installApiFixture(page, roleUsers.admin);
-  await page.addInitScript(() => localStorage.setItem('ct-active-persona:2', 'ADMIN:201'));
+
+  // Establish storage on the actual Vite origin instead of relying on about:blank
+  // initialization semantics.
+  await page.goto('/login');
+  await page.evaluate(() => localStorage.setItem('ct-active-persona:2', 'ADMIN:201'));
+
   await page.goto('/dashboard/admin/101/overview');
   await page.waitForLoadState('networkidle');
   await expect(page).toHaveURL(/\/dashboard\/admin\/101\/overview$/);
