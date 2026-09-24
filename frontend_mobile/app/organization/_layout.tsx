@@ -55,6 +55,7 @@ const sidebarItems = [
   { label: 'Messages', icon: 'message', route: '/organization/chat' },
   { label: 'Pharmacy Hub', icon: 'account-group', route: '/organization/hub' },
   { label: 'Talent Hub', icon: 'account-search', route: '/organization/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/organization/learning' },
   { label: 'Profile', icon: 'account-circle', route: '/organization/profile' },
 ];
 
@@ -444,6 +445,7 @@ export default function OrganizationLayout() {
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="talent-board" options={{ href: null }} />
+        <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="messages/[id]" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
         <Tabs.Screen name="invoice" options={{ href: null }} />
