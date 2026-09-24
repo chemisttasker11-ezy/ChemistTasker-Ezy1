@@ -293,7 +293,13 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod
     setMembersLoading(true);
     fetchRosterOwnerMembersService(pharmacyId, role)
       .then((rows) => {
-        if (active) setEligibleMembers(asArray<RosterPharmacyMember>(rows));
+        if (active) {
+          setEligibleMembers(
+            asArray<RosterPharmacyMember>(rows).filter((member) =>
+              isRosterMemberEligibleForRole(member, role),
+            ),
+          );
+        }
       })
       .catch((e) => {
         if (active) {
@@ -335,7 +341,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod
       <Chip selected={userId===null} onPress={()=>setUserId(null)}>Leave vacant</Chip>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
         {eligibleMembers.map((member)=>{
-          const id=Number(member.user || 0);
+          const id=rosterMemberUserId(member);
           return <Chip key={member.id || id} selected={userId===id} onPress={()=>setUserId(id)}>{rosterMemberLabel(member)}</Chip>;
         })}
       </View>
@@ -425,12 +431,14 @@ function ApprovalsScreen({rows,membersByRole,loading,error,onReload}:{rows:Worke
     <InfoNote title="Assignment safety">Requests preserve the current worker assignment until a manager approves a swap/replacement or explicitly releases the worker.</InfoNote>
     <Section title="Pending requests">{rows.length?rows.map((row)=>{
       const swap=isSwapRequest(row);const requestId=String(row.id);const requesterId=Number(row.requestedBy||0);const requiredRole=String(row.role||'').toUpperCase();
-      const eligible=(membersByRole[requiredRole]||[]).filter((member)=>Number(member.user||0)!==requesterId);
+      const eligible=(membersByRole[requiredRole]||[]).filter((member)=>
+        isRosterMemberEligibleForRole(member,requiredRole,{excludeUserId:requesterId})
+      );
       return <Card key={row.id} mode="outlined"><Card.Content style={{gap:10}}>
         <Text variant="titleSmall">{row.requesterName||'Worker request'}</Text>
         <Text variant="bodySmall" style={{color:palette.muted}}>{[row.pharmacyName,row.slotDate,row.startTime&&row.endTime?(row.startTime+'–'+row.endTime):'',replaceUnderscore(row.role||'')].filter(Boolean).join(' · ')}</Text>
         <Text variant="bodySmall">{row.note||'Roster change request'}</Text>
-        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=Number(member.user||0);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{rosterMemberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
+        {!swap?<View style={{gap:8}}><Text variant="labelMedium">Replacement worker</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{eligible.map(member=>{const userId=rosterMemberUserId(member);return <Chip key={member.id||userId} selected={replacementByRequest[requestId]===userId} onPress={()=>setReplacementByRequest(current=>({...current,[requestId]:userId}))}>{rosterMemberLabel(member)}</Chip>;})}</View>{!eligible.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible pharmacy members were returned for this roster.</Text>:null}</View>:<InfoNote title="Direct swap">The requested swap target is resolved from the server-side roster audit and revalidated at approval time.</InfoNote>}
         <ActionButtons><Button compact mode="contained" disabled={busy||(!swap&&!replacementByRequest[requestId])} onPress={()=>void action(row,'approve')}>Approve</Button><Button compact mode="outlined" disabled={busy} onPress={()=>void action(row,'release')}>Release worker</Button><Button compact textColor={palette.danger} disabled={busy} onPress={()=>void action(row,'reject')}>Reject</Button></ActionButtons>
       </Card.Content></Card>;
     }):<EmptyState title="No pending requests" body="Swap and cover requests will appear here when workers submit them." />}</Section>
