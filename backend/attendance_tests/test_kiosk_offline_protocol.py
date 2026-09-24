@@ -274,15 +274,22 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertEqual(stored.employee_id, self.worker.id)
         self.assertIsNone(stored.attendance_event)
 
-    def test_revoked_device_cannot_use_batch_endpoint(self):
+    def test_revoked_native_device_can_drain_signed_evidence_without_applying_attendance(self):
+        event = self.signed_event()
         revoke_kiosk_device(self.owner, self.device)
         response = APIClient().post(
             "/attendance/kiosk/sync/batch/",
-            {"events": [self.signed_event()]},
+            {"events": [event]},
             format="json",
             HTTP_X_DEVICE_TOKEN=self.raw_token,
         )
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["device_revoked"])
+        self.assertEqual(response.data["results"][0]["result"], "needs_review")
+        self.assertIn("DEVICE_REVOKED_DRAIN", response.data["results"][0]["integrity_flags"])
+        self.assertEqual(KioskAttendanceEvent.objects.count(), 1)
+        self.assertEqual(AttendanceSession.objects.count(), 0)
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
 
     def test_native_self_revoke_requires_device_signature_and_revokes_device(self):
         client = APIClient()
