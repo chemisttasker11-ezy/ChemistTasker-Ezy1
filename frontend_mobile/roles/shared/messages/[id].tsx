@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar } from 'react-native-paper';
+import { Linking, View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { Text, TextInput, Icon, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -638,7 +638,21 @@ const pinnedMessage = useMemo(() => {
                             </Text>
                         </View>
                     {item.attachment_url ? (
-                        <Text style={styles.attachment}>{item.attachment_filename || 'Attachment'}</Text>
+                        <TouchableOpacity
+                            accessibilityRole="link"
+                            accessibilityLabel={`Open attachment ${item.attachment_filename || ''}`.trim()}
+                            onPress={() => {
+                                const raw = String(item.attachment_url || '');
+                                const root = String(process.env.EXPO_PUBLIC_API_URL || '').replace(/\/api\/?$/, '');
+                                const url = /^https?:\/\//i.test(raw) ? raw : `${root}${raw.startsWith('/') ? '' : '/'}${raw}`;
+                                void Linking.openURL(url).catch(() => setSnackbar('Unable to open this attachment.'));
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Icon source="paperclip" size={16} />
+                                <Text style={styles.attachment}>{item.attachment_filename || 'Open attachment'}</Text>
+                            </View>
+                        </TouchableOpacity>
                     ) : null}
                     {renderReactions(item)}
                         <Text style={[

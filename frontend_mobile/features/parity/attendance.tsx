@@ -311,21 +311,31 @@ function KioskStatus({rows,devices,manager,pharmacyId,loading,error,onReload}:{r
 
   return <ParityPage title="Kiosk devices & PINs" subtitle="Manage registered attendance terminals and your worker PIN setup." loading={loading} error={error||localError}>
     {manager?<Section title="Registered kiosk devices" description="Remote revocation blocks online access immediately. Native offline attendance is also bounded by its server-issued authorization window.">
-      {!pharmacyId?<PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/>:devices.length?devices.map((device:any)=><View key={device.id} style={{gap:8}}>
-        <DataRow
-          title={device.device_name||'Kiosk terminal'}
-          subtitle={[
-            replaceUnderscore(device.client_kind||''),
-            device.platform||'Unknown platform',
-            device.last_seen_at?'Last seen '+dateLabel(device.last_seen_at):'Not seen yet',
-          ].filter(Boolean).join(' · ')}
-          status={device.is_active?'Active':'Revoked'}
-        />
-        {device.is_active?confirmDeviceId===Number(device.id)?<ActionButtons>
-          <Button mode="contained" buttonColor={palette.danger} loading={busyDeviceId===Number(device.id)} disabled={busyDeviceId!==null} onPress={()=>void revokeDevice(Number(device.id))}>Confirm revoke</Button>
-          <Button mode="outlined" disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(null)}>Cancel</Button>
-        </ActionButtons>:<Button mode="outlined" textColor={palette.danger} disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(Number(device.id))}>Revoke kiosk</Button>:null}
-      </View>):<EmptyState title="No registered kiosks" body="No attendance terminal is registered for the selected pharmacy."/>}
+      {!pharmacyId?<PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/>:devices.length?devices.map((device:any)=><Section
+        key={device.id}
+        title={device.device_name||'Kiosk terminal'}
+        description={[
+          replaceUnderscore(device.client_kind||''),
+          device.platform||'Unknown platform',
+          device.app_version?`v${device.app_version}`:null,
+        ].filter(Boolean).join(' · ')}
+        action={<Chip compact>{device.is_active?'Active':'Revoked'}</Chip>}
+      >
+        <MetricGrid items={[
+          {label:'Activated',value:device.activated_at?dateLabel(device.activated_at):'—'},
+          {label:'Last seen',value:device.last_seen_at?dateLabel(device.last_seen_at):'Never',tone:device.last_seen_at?'success':'warning'},
+          {label:'Last sync',value:device.last_sync_at?dateLabel(device.last_sync_at):'Never',tone:device.last_sync_at?'success':'warning'},
+          {label:'Received sequence',value:Number(device.last_contiguous_sequence||0)},
+        ]}/>
+        {!device.is_active&&device.revoked_at?<InfoNote title="Revoked">Revoked {dateLabel(device.revoked_at)}. This terminal must be paired again before it can record new attendance.</InfoNote>:null}
+        {device.is_active?confirmDeviceId===Number(device.id)?<>
+          <InfoNote title="Confirm revocation" tone="warning">Revocation blocks new attendance authority immediately. Already-signed offline evidence can still drain into review so it is not lost.</InfoNote>
+          <ActionButtons>
+            <Button mode="contained" buttonColor={palette.danger} loading={busyDeviceId===Number(device.id)} disabled={busyDeviceId!==null} onPress={()=>void revokeDevice(Number(device.id))}>Confirm revoke</Button>
+            <Button mode="outlined" disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(null)}>Cancel</Button>
+          </ActionButtons>
+        </>:<Button mode="outlined" textColor={palette.danger} disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(Number(device.id))}>Revoke kiosk</Button>:null}
+      </Section>):<EmptyState title="No registered kiosks" body="No attendance terminal is registered for the selected pharmacy."/>}
     </Section>:null}
 
     <Section title="Worker attendance PINs">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>

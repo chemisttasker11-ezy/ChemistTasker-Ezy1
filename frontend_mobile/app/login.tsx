@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
+import { hasOrganizationAccess, resolveInitialWorkspace } from '../utils/mobilePersona';
 import {
   authenticateWithBiometrics,
   disableBiometricLogin,
@@ -13,17 +14,6 @@ import {
   getSavedBiometricUser,
   type BiometricUser,
 } from '../utils/biometricAuth';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
-}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -62,21 +52,19 @@ export default function LoginScreen() {
       return;
     }
 
-    // Organization access must win before owner setup because org accounts can still carry OWNER as their base role.
     if (hasOrganizationAccess(userData)) {
       router.replace('/organization/dashboard' as never);
-    } else if (userData.role === 'OWNER') {
+      return;
+    }
+
+    if (String(userData.role || '').toUpperCase() === 'OWNER') {
       const setupStatus = await getOwnerSetupStatus(userData);
       router.replace((setupStatus.nextPath || '/owner/dashboard') as never);
-    } else if (userData.role === 'PHARMACIST') {
-      router.replace('/pharmacist/dashboard' as never);
-    } else if (userData.role === 'OTHER_STAFF') {
-      router.replace('/otherstaff/dashboard' as never);
-    } else if (userData.role === 'EXPLORER') {
-      router.replace('/explorer' as never);
-    } else {
-      router.replace('/login' as never);
+      return;
     }
+
+    const workspaceRoute = await resolveInitialWorkspace(userData);
+    router.replace(workspaceRoute as never);
   };
 
   const promptForBiometricEnable = async (userData: any) => {
@@ -272,20 +260,20 @@ const styles = StyleSheet.create({
   formTitle: {
     marginTop: 8,
     fontWeight: '700',
-    color: '#111827',
+    color: '#06214A',
   },
   formSubtitle: {
-    color: '#4b5563',
+    color: '#59677E',
     marginBottom: 12,
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
+    backgroundColor: '#FDEEEF',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
   },
   errorText: {
-    color: '#c62828',
+    color: '#C53B47',
   },
   form: {
     gap: 16,
@@ -317,6 +305,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   signupText: {
-    color: '#4b5563',
+    color: '#59677E',
   },
 });

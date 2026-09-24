@@ -5,6 +5,7 @@ import { Button, Chip, HelperText, Menu, Text, TextInput } from 'react-native-pa
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { REL_CHOICES, roleKey } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { brandColors } from '@/constants/theme';
 
 type ApiData = {
   referee1_name?: string | null;
@@ -116,12 +117,13 @@ export default function PharmacistRefereesScreen() {
             <Text style={styles.cardTitle}>Referee 1</Text>
             <RefStatus confirmed={data.referee1_confirmed} rejected={data.referee1_rejected} />
           </View>
-          <TextInput mode="outlined" label="Full Name" value={data.referee1_name || ''} onChangeText={(v) => setField('referee1_name', v)} />
-          <Menu visible={menu1} onDismiss={() => setMenu1(false)} anchor={<Button mode="outlined" onPress={() => setMenu1(true)}>{REL_CHOICES.find((r) => r.value === data.referee1_relation)?.label || 'Relationship'}</Button>}>
+          {data.referee1_last_sent ? <Text variant="bodySmall" style={styles.muted}>Last request sent {new Date(data.referee1_last_sent).toLocaleString()}</Text> : null}
+          <TextInput mode="outlined" label="Full Name" value={data.referee1_name || ''} onChangeText={(v) => setField('referee1_name', v)} editable={!data.referee1_confirmed} />
+          <Menu visible={menu1} onDismiss={() => setMenu1(false)} anchor={<Button mode="outlined" disabled={Boolean(data.referee1_confirmed)} onPress={() => setMenu1(true)}>{REL_CHOICES.find((r) => r.value === data.referee1_relation)?.label || 'Relationship'}</Button>}>
             {REL_CHOICES.map((r) => <Menu.Item key={r.value} title={r.label} onPress={() => { setField('referee1_relation', r.value); setMenu1(false); }} />)}
           </Menu>
-          <TextInput mode="outlined" label="Workplace" value={data.referee1_workplace || ''} onChangeText={(v) => setField('referee1_workplace', v)} />
-          <TextInput mode="outlined" label="Email" value={data.referee1_email || ''} onChangeText={(v) => setField('referee1_email', v)} />
+          <TextInput mode="outlined" label="Workplace" value={data.referee1_workplace || ''} onChangeText={(v) => setField('referee1_workplace', v)} editable={!data.referee1_confirmed} />
+          <TextInput mode="outlined" label="Email" value={data.referee1_email || ''} onChangeText={(v) => setField('referee1_email', v)} editable={!data.referee1_confirmed} keyboardType="email-address" autoCapitalize="none" />
         </View>
 
         <View style={styles.card}>
@@ -129,12 +131,13 @@ export default function PharmacistRefereesScreen() {
             <Text style={styles.cardTitle}>Referee 2</Text>
             <RefStatus confirmed={data.referee2_confirmed} rejected={data.referee2_rejected} />
           </View>
-          <TextInput mode="outlined" label="Full Name" value={data.referee2_name || ''} onChangeText={(v) => setField('referee2_name', v)} />
-          <Menu visible={menu2} onDismiss={() => setMenu2(false)} anchor={<Button mode="outlined" onPress={() => setMenu2(true)}>{REL_CHOICES.find((r) => r.value === data.referee2_relation)?.label || 'Relationship'}</Button>}>
+          {data.referee2_last_sent ? <Text variant="bodySmall" style={styles.muted}>Last request sent {new Date(data.referee2_last_sent).toLocaleString()}</Text> : null}
+          <TextInput mode="outlined" label="Full Name" value={data.referee2_name || ''} onChangeText={(v) => setField('referee2_name', v)} editable={!data.referee2_confirmed} />
+          <Menu visible={menu2} onDismiss={() => setMenu2(false)} anchor={<Button mode="outlined" disabled={Boolean(data.referee2_confirmed)} onPress={() => setMenu2(true)}>{REL_CHOICES.find((r) => r.value === data.referee2_relation)?.label || 'Relationship'}</Button>}>
             {REL_CHOICES.map((r) => <Menu.Item key={r.value} title={r.label} onPress={() => { setField('referee2_relation', r.value); setMenu2(false); }} />)}
           </Menu>
-          <TextInput mode="outlined" label="Workplace" value={data.referee2_workplace || ''} onChangeText={(v) => setField('referee2_workplace', v)} />
-          <TextInput mode="outlined" label="Email" value={data.referee2_email || ''} onChangeText={(v) => setField('referee2_email', v)} />
+          <TextInput mode="outlined" label="Workplace" value={data.referee2_workplace || ''} onChangeText={(v) => setField('referee2_workplace', v)} editable={!data.referee2_confirmed} />
+          <TextInput mode="outlined" label="Email" value={data.referee2_email || ''} onChangeText={(v) => setField('referee2_email', v)} editable={!data.referee2_confirmed} keyboardType="email-address" autoCapitalize="none" />
         </View>
 
         {error ? <HelperText type="error">{error}</HelperText> : null}
@@ -148,12 +151,13 @@ export default function PharmacistRefereesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
-  title: { fontWeight: '700', color: '#111827' },
-  card: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, gap: 10, backgroundColor: '#FFFFFF' },
+  title: { fontWeight: '800', color: brandColors.navy },
+  card: { borderWidth: 1, borderColor: brandColors.border, borderRadius: 16, padding: 14, gap: 10, backgroundColor: brandColors.white },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontWeight: '700', color: '#111827' },
-  actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  cardTitle: { fontWeight: '800', color: brandColors.navy },
+  muted: { color: brandColors.body },
+  actions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 4 },
 });

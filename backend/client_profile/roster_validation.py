@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from django.db.models import Q
 
-from .models import LeaveRequest, Membership, ShiftSlotAssignment, UserAvailability
+from .models import Membership, ShiftSlotAssignment, UserAvailability
 from .timezone_utils import get_pharmacy_timezone
 
 
@@ -53,17 +53,6 @@ def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclu
             error("SHIFT_OVERLAP", f"Worker {name} has an overlapping shift at {other.shift.pharmacy.name}.",
                   conflicting_assignment_id=other.pk)
 
-    leaves = LeaveRequest.objects.filter(user=worker, status="APPROVED").select_related("slot_assignment__slot", "slot_assignment__shift__pharmacy")
-    for leave in leaves:
-        assignment = leave.slot_assignment
-        leave_date = assignment.slot_date or assignment.slot.date
-        # Preserve the established full-day leave rule, including overnight work.
-        day_start, day_end = work_interval(assignment.shift.pharmacy, leave_date,
-                                          datetime.min.time(), datetime.min.time())
-        if start < day_end and day_start < end:
-            error("APPROVED_LEAVE_CONFLICT", f"Worker {name} has approved leave on {leave_date}.", leave_id=leave.pk)
-
-    # Workforce V2 dated/partial leave (additive to the legacy assignment-linked LeaveRequest).
     from workforce.models import WorkforceLeaveRequest
     if WorkforceLeaveRequest.objects.filter(
         user=worker,

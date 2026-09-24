@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { Icon, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
+import { getNotifications, hasOrganizationAccess as sharedHasOrganizationAccess, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../context/AuthContext';
+import { brandColors } from '@/constants/theme';
 import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
@@ -13,17 +14,6 @@ import {
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
-}
 
 const tabTitles: Record<string, string> = {
   index: 'Organization',
@@ -46,6 +36,8 @@ const sidebarItems = [
   { label: 'Invite Staff', icon: 'account-plus', route: '/organization/invite' },
   { label: 'Pharmacies', icon: 'store', route: '/organization/pharmacies' },
   { label: 'Shifts', icon: 'calendar-month', route: '/organization/shifts' },
+  { label: 'Weekly Roster', icon: 'calendar-account', route: '/manager/roster' },
+  { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews' },
   { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
   { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
   { label: 'Post Shift', icon: 'plus-circle', route: '/organization/post-shift' },
@@ -53,6 +45,7 @@ const sidebarItems = [
   { label: 'Messages', icon: 'message', route: '/organization/chat' },
   { label: 'Pharmacy Hub', icon: 'account-group', route: '/organization/hub' },
   { label: 'Talent Hub', icon: 'account-search', route: '/organization/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/organization/learning' },
   { label: 'Profile', icon: 'account-circle', route: '/organization/profile' },
 ];
 
@@ -204,7 +197,7 @@ export default function OrganizationLayout() {
       router.replace('/login' as any);
       return;
     }
-    if (!hasOrganizationAccess(user)) {
+    if (!sharedHasOrganizationAccess(user)) {
       const role = String(user.role || '').toUpperCase();
       switch (role) {
         case 'OWNER':
@@ -294,12 +287,12 @@ export default function OrganizationLayout() {
       />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#008DDB',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -308,7 +301,7 @@ export default function OrganizationLayout() {
           headerShown: true,
           headerTitle: tabTitles[route.name] || 'Organization',
           headerRightContainerStyle: { paddingRight: 10 },
-          headerLeft: () => <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />,
+          headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open organization menu" onPress={() => setSidebarVisible(true)} />,
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
@@ -328,9 +321,9 @@ export default function OrganizationLayout() {
                     }}
                   />
                 ) : null}
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -363,7 +356,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="home" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="home" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -377,7 +370,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Shifts',
             tabBarAccessibilityLabel: 'Shifts tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="calendar" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="calendar" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -392,12 +385,9 @@ export default function OrganizationLayout() {
             title: 'Post',
             tabBarAccessibilityLabel: 'Post shift tab',
             tabBarIcon: () => (
-              <IconButton
-                icon="plus-circle"
-                iconColor="#FFFFFF"
-                size={32}
-                style={styles.postTabIcon}
-              />
+              <View style={styles.postTabIcon}>
+                <Icon source="plus-circle" color="#FFFFFF" size={32} />
+              </View>
             ),
           }}
         />
@@ -412,7 +402,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Hub',
             tabBarAccessibilityLabel: 'Hub tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-group" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="account-group" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -426,7 +416,7 @@ export default function OrganizationLayout() {
           options={{
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="message" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="message" color={color} size={size} />,
           }}
         />
 
@@ -442,6 +432,7 @@ export default function OrganizationLayout() {
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="talent-board" options={{ href: null }} />
+        <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="messages/[id]" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
         <Tabs.Screen name="invoice" options={{ href: null }} />
@@ -467,7 +458,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#008DDB' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   badgeDot: {
     position: 'absolute',
@@ -482,7 +473,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   postTabIcon: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#008DDB',
     borderRadius: 24,
     marginTop: -20,
   },

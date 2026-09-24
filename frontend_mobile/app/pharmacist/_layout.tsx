@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { ActivityIndicator, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
+import { Icon, Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
+import { getAdminAssignments, selectAdminPersona } from '@/utils/mobilePersona';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { triggerShiftSlotActivity } from '@/utils/pushNotifications';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
@@ -32,14 +34,18 @@ const tabTitles: Record<string, string> = {
 const sidebarItems = [
   { label: 'Home', icon: 'home', route: '/pharmacist/dashboard' },
   { label: 'Shifts', icon: 'calendar-range', route: '/pharmacist/shifts' },
+  { label: 'My Roster', icon: 'calendar-account', route: '/my-roster' },
   { label: 'Publish Availability', icon: 'calendar-plus', route: '/pharmacist/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/pharmacist/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/pharmacist/calendar' },
+  { label: 'My Attendance', icon: 'clock-in', route: '/attendance' },
   { label: 'My Hours', icon: 'clock-check-outline', route: '/my-hours' },
+  { label: 'Memberships', icon: 'store-check-outline', route: '/pharmacist/memberships' },
   { label: 'Chat', icon: 'message', route: '/pharmacist/chat' },
   { label: 'Hub', icon: 'view-grid', route: '/pharmacist/hub' },
   { label: 'Invoices', icon: 'file-document-multiple', route: '/pharmacist/invoice' },
   { label: 'Talent Board', icon: 'account-search', route: '/pharmacist/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/pharmacist/learning' },
   { label: 'Profile', icon: 'account-circle', route: '/pharmacist/profile' },
 ];
 
@@ -51,7 +57,7 @@ function PharmacistSidebar({
   onDismiss: () => void;
 }) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleNav = (route: string) => {
     onDismiss();
@@ -78,6 +84,22 @@ function PharmacistSidebar({
           />
         ))}
         <Divider />
+        {getAdminAssignments(user).length > 0 ? (
+          <List.Item
+            title="Admin workspace"
+            description="Switch to your delegated pharmacy responsibilities"
+            left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
+            onPress={() => {
+              void (async () => {
+                const selected = await selectAdminPersona(user);
+                if (selected) {
+                  onDismiss();
+                  router.replace('/admin' as any);
+                }
+              })();
+            }}
+          />
+        ) : null}
         <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
           Logout
         </Button>
@@ -216,13 +238,13 @@ export default function PharmacistTabs() {
     if (user.role !== 'PHARMACIST') {
       switch (user.role) {
         case 'OWNER':
-          router.replace('/owner' as any);
+          router.replace('/owner/dashboard' as any);
           break;
         case 'OTHER_STAFF':
           router.replace('/otherstaff' as any);
           break;
         case 'EXPLORER':
-          router.replace('/explorer' as any);
+          router.replace('/explorer/dashboard' as any);
           break;
         case 'ORGANIZATION':
           router.replace('/organization/dashboard' as any);
@@ -252,7 +274,7 @@ export default function PharmacistTabs() {
   if (isLoading || !user || user.role !== 'PHARMACIST') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color="#5222B8" />
       </View>
     );
   }
@@ -262,12 +284,12 @@ export default function PharmacistTabs() {
       <PharmacistSidebar visible={sidebarVisible} onDismiss={() => setSidebarVisible(false)} />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#5222B8',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -277,7 +299,7 @@ export default function PharmacistTabs() {
           headerTitle: tabTitles[route.name] || 'Pharmacist',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+            <IconButton icon="menu" accessibilityLabel="Open pharmacist menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
@@ -299,9 +321,9 @@ export default function PharmacistTabs() {
                     }
                   }}
                 />
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -320,9 +342,9 @@ export default function PharmacistTabs() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => router.push('/pharmacist/notifications' as any)} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={() => router.push('/pharmacist/notifications' as any)} style={{ marginHorizontal: 4 }}>
                   <View>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -350,7 +372,7 @@ export default function PharmacistTabs() {
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="home" iconColor={color} size={size} />
+              <Icon source="home" color={color} size={size} />
             ),
           }}
         />
@@ -360,7 +382,7 @@ export default function PharmacistTabs() {
             title: 'Shifts',
             tabBarAccessibilityLabel: 'Shifts tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="calendar" iconColor={color} size={size} />
+              <Icon source="calendar" color={color} size={size} />
             ),
           }}
         />
@@ -370,7 +392,7 @@ export default function PharmacistTabs() {
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="message" iconColor={color} size={size} />
+              <Icon source="message" color={color} size={size} />
             ),
           }}
         />
@@ -380,7 +402,7 @@ export default function PharmacistTabs() {
             title: 'Hub',
             tabBarAccessibilityLabel: 'Hub tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="view-grid" iconColor={color} size={size} />
+              <Icon source="view-grid" color={color} size={size} />
             ),
           }}
         />
@@ -390,7 +412,7 @@ export default function PharmacistTabs() {
             title: 'Invoices',
             tabBarAccessibilityLabel: 'Invoices tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="file-document-multiple" iconColor={color} size={size} />
+              <Icon source="file-document-multiple" color={color} size={size} />
             ),
           }}
         />
@@ -400,7 +422,7 @@ export default function PharmacistTabs() {
             title: 'Publish',
             tabBarAccessibilityLabel: 'Publish availability tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="calendar-plus" iconColor={color} size={size} />
+              <Icon source="calendar-plus" color={color} size={size} />
             ),
           }}
         />
@@ -417,6 +439,7 @@ export default function PharmacistTabs() {
         <Tabs.Screen name="profile-rate" options={{ href: null }} />
         <Tabs.Screen name="profile-bio" options={{ href: null }} />
         <Tabs.Screen name="interests" options={{ href: null }} />
+        <Tabs.Screen name="memberships" options={{ href: null }} />
         <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
@@ -455,6 +478,6 @@ const styles = StyleSheet.create({
   bellWrapper: {
     position: 'relative',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#5222B8' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
 });

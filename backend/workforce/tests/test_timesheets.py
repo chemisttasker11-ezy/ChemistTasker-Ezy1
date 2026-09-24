@@ -8,6 +8,7 @@ from django.test import TestCase
 from client_profile.models import (
     AttendanceEvent,
     AttendanceSession,
+    LeaveRequest,
     Membership,
     Organization,
     OwnerOnboarding,
@@ -18,6 +19,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from workforce.attendance_edits import append_missing_punch
+from workforce.leave_service import create_leave, decide_leave
 from workforce.models import (
     ManagerAttendanceEventAudit, Timesheet, TimesheetCheckDecision, TimesheetPeriod, WorkforceLeaveRequest
 )
@@ -80,6 +82,90 @@ class TimesheetProjectionTests(TestCase):
             timezone="Australia/Brisbane", created_by=self.owner,
         )
         self.timesheet = Timesheet.objects.create(period=self.period, user=self.worker, membership=self.membership)
+
+    def test_shift_linked_leave_writes_only_canonical_workforce_record(self):
+        row = create_leave(
+            self.worker,
+            {
+                "slot_assignment": self.assignment.pk,
+                "leave_type": "ANNUAL",
+                "note": "Roster leave",
+            },
+        )
+        self.assertEqual(row.slot_assignment_id, self.assignment.pk)
+        self.assertEqual(row.membership_id, self.membership.pk)
+        self.assertEqual(row.pharmacy_id, self.pharmacy.pk)
+        self.assertEqual(row.user_id, self.worker.pk)
+        self.assertEqual(row.start_at.astimezone(ZoneInfo("Australia/Brisbane")).time(), time(8, 0))
+        self.assertEqual(row.end_at.astimezone(ZoneInfo("Australia/Brisbane")).time(), time(16, 0))
+        self.assertEqual(LeaveRequest.objects.count(), 0)
+
+    def test_shift_leave_cannot_be_approved_after_assignment_transfer(self):
+        leave = create_leave(
+            self.worker,
+            {
+                "slot_assignment": self.assignment.pk,
+                "leave_type": "ANNUAL",
+                "note": "Pending leave",
+            },
+        )
+        self.roster_period.status = RosterPeriod.Status.DRAFT
+        self.roster_period.save(update_fields=["status"])
+        replacement = get_user_model().objects.create(
+            username="wf_replacement",
+            email="wf-replacement@example.invalid",
+            role="PHARMACIST",
+        )
+        self.assignment.user = replacement
+        self.assignment.save(update_fields=["user"])
+
+        with self.assertRaises(ValidationError):
+            decide_leave(self.owner, leave.pk, "APPROVED")
+
+    def test_shift_linked_leave_does_not_require_fake_membership(self):
+        self.roster_period.status = RosterPeriod.Status.DRAFT
+        self.roster_period.save(update_fields=["status"])
+        User = get_user_model()
+        public_worker = User.objects.create(
+            username="wf_public_leave",
+            email="wf-public-leave@example.invalid",
+            role="PHARMACIST",
+        )
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.owner,
+            dedicated_user=public_worker,
+            role_needed="PHARMACIST",
+            employment_type="LOCUM",
+            min_hourly_rate=50,
+            max_hourly_rate=50,
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=self.work_date,
+            start_time=time(17, 0),
+            end_time=time(22, 0),
+            roster_period=self.roster_period,
+        )
+        assignment = ShiftSlotAssignment.objects.create(
+            shift=shift,
+            slot=slot,
+            slot_date=self.work_date,
+            user=public_worker,
+            is_rostered=True,
+        )
+
+        row = create_leave(
+            public_worker,
+            {
+                "slot_assignment": assignment.pk,
+                "leave_type": "SICK",
+                "note": "Unable to work",
+            },
+        )
+        self.assertIsNone(row.membership_id)
+        self.assertEqual(row.slot_assignment_id, assignment.pk)
+        self.assertEqual(row.pharmacy_id, self.pharmacy.pk)
 
     def test_projection_keeps_roster_actual_and_checks_separate(self):
         revision = build_timesheet(self.timesheet.pk, actor=self.owner)

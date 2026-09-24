@@ -1,8 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
+import { Button, Chip, Text } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 import { workforce } from '@chemisttasker/shared-core';
+import {
+  DataRow,
+  EmptyState,
+  InfoNote,
+  MetricGrid,
+  ParityPage,
+  Section,
+  palette,
+} from '@/features/parity/ParityUI';
 
 type Row = {
   id: number;
@@ -23,6 +31,7 @@ type Row = {
 const hours = (value?: number | null) => value == null ? '—' : `${(value / 60).toFixed(2)} h`;
 
 export default function MyHoursScreen() {
+  const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,59 +68,73 @@ export default function MyHoursScreen() {
     }
   };
 
+  const latest = rows[0] ?? null;
+  const totalBlocking = rows.reduce((sum, row) => sum + Number(row.blocking_checks || 0), 0);
+  const totalWarnings = rows.reduce((sum, row) => sum + Number(row.warning_checks || 0), 0);
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}>
-        <Text variant="headlineMedium" style={styles.title}>My Hours</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>Compare rostered and captured hours. Your manager must correct source attendance before approved time changes.</Text>
-        {!!error && <Card style={styles.errorCard}><Card.Content><Text style={styles.errorText}>{error}</Text></Card.Content></Card>}
-        {loading && <ActivityIndicator style={styles.loading} />}
-        {!loading && rows.length === 0 && <Card><Card.Content><Text>No timesheet periods are available yet.</Text></Card.Content></Card>}
-        {rows.map((row) => (
-          <Card key={row.id} style={styles.card}>
-            <Card.Content>
-              <View style={styles.headerRow}>
-                <View style={styles.flex}>
-                  <Text variant="titleMedium" style={styles.pharmacy}>{row.pharmacy.name}</Text>
-                  <Text variant="bodySmall">{row.start_date} – {row.end_date}</Text>
-                </View>
-                <Chip compact>{row.status.replaceAll('_', ' ')}</Chip>
-              </View>
-              <View style={styles.metricRow}>
-                <View><Text variant="labelSmall">Rostered</Text><Text variant="titleMedium">{hours(row.rostered_minutes)}</Text></View>
-                <View><Text variant="labelSmall">Worked</Text><Text variant="titleMedium">{hours(row.worked_minutes)}</Text></View>
-                <View><Text variant="labelSmall">Leave</Text><Text variant="titleMedium">{hours(row.approved_leave_minutes)}</Text></View>
-                <View><Text variant="labelSmall">Reviewed</Text><Text variant="titleMedium">{hours(row.reviewed_minutes)}</Text></View>
-              </View>
-              <View style={styles.checkRow}>
-                {row.blocking_checks > 0 && <Chip compact style={styles.blocker}>{row.blocking_checks} blocking</Chip>}
-                {row.warning_checks > 0 && <Chip compact>{row.warning_checks} warnings</Chip>}
-                {row.needs_rebuild && <Chip compact>Recalculation pending</Chip>}
-              </View>
-              <Button mode="contained" loading={submitting === row.id} disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || submitting != null} onPress={() => submit(row)}>
-                Submit reviewed hours
-              </Button>
-            </Card.Content>
-          </Card>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+    <ParityPage
+      title="My hours"
+      subtitle="Compare rostered, captured and reviewed time before submission."
+      loading={loading}
+      error={error}
+      onRetry={() => load()}
+      onRefresh={() => load(true)}
+      refreshing={refreshing}
+    >
+      <MetricGrid items={[
+        { label: 'Periods', value: rows.length },
+        { label: 'Blocking checks', value: totalBlocking, tone: totalBlocking ? 'danger' : 'success' },
+        { label: 'Warnings', value: totalWarnings, tone: totalWarnings ? 'warning' : 'success' },
+      ]} />
+
+      <InfoNote title="How corrections work">
+        Attendance remains the source of truth. If a clock event is missing, request the correction from the relevant period rather than editing reviewed hours directly.
+      </InfoNote>
+
+      <Section title="Timesheet periods">
+        {rows.length ? rows.map((row) => (
+          <Section
+            key={row.id}
+            title={row.pharmacy?.name || 'Pharmacy'}
+            description={`${row.start_date} – ${row.end_date}`}
+            action={<Chip compact>{String(row.status || '').replaceAll('_', ' ')}</Chip>}
+          >
+            <MetricGrid items={[
+              { label: 'Rostered', value: hours(row.rostered_minutes) },
+              { label: 'Worked', value: hours(row.worked_minutes) },
+              { label: 'Leave', value: hours(row.approved_leave_minutes) },
+              { label: 'Reviewed', value: hours(row.reviewed_minutes) },
+            ]} />
+            {row.blocking_checks || row.warning_checks || row.needs_rebuild ? (
+              <>
+                {row.blocking_checks > 0 ? <Text style={{ color: palette.danger }}>{row.blocking_checks} blocking check{row.blocking_checks === 1 ? '' : 's'} must be resolved.</Text> : null}
+                {row.warning_checks > 0 ? <Text style={{ color: palette.warning }}>{row.warning_checks} warning{row.warning_checks === 1 ? '' : 's'} require review.</Text> : null}
+                {row.needs_rebuild ? <InfoNote title="Recalculation pending" tone="warning">This period needs to be rebuilt before it can be submitted.</InfoNote> : null}
+              </>
+            ) : <InfoNote title="Ready for review" tone="success">No blocking checks are reported for this period.</InfoNote>}
+            <DataRow
+              title="Attendance correction"
+              subtitle="Request a missing clock-in or clock-out against this timesheet."
+              onPress={() => router.push(`/attendance/corrections/new?timesheetId=${row.id}` as any)}
+            />
+            <Button
+              mode="contained"
+              loading={submitting === row.id}
+              disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || submitting != null}
+              onPress={() => void submit(row)}
+            >
+              {row.status === 'SUBMITTED' ? 'Submitted' : row.status === 'APPROVED' ? 'Approved' : 'Submit reviewed hours'}
+            </Button>
+          </Section>
+        )) : <EmptyState title="No timesheet periods" body="Periods will appear after attendance and roster data create your first timesheet." />}
+      </Section>
+
+      {latest ? (
+        <Text variant="bodySmall" style={{ color: palette.muted }}>
+          Most recent period: {latest.start_date} – {latest.end_date}
+        </Text>
+      ) : null}
+    </ParityPage>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7FAFF' },
-  content: { padding: 18, gap: 14, paddingBottom: 40 },
-  title: { fontWeight: '800', color: '#06214A' },
-  subtitle: { color: '#52617A', marginBottom: 6 },
-  loading: { marginVertical: 32 },
-  card: { backgroundColor: '#FFFFFF' },
-  errorCard: { backgroundColor: '#FFF1F0' },
-  errorText: { color: '#B42318' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  flex: { flex: 1 },
-  pharmacy: { fontWeight: '800' },
-  metricRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginVertical: 16 },
-  checkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  blocker: { backgroundColor: '#FEE4E2' },
-});

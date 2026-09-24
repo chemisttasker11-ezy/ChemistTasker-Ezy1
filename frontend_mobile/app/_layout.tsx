@@ -12,24 +12,18 @@ import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
+import { getAdminAssignments, getAssignmentPharmacyId, getRoleHome, getSelectedAdminAssignment, hasOrganizationAccess as hasOrgPersonaAccess, readPersonaSelection, resolveInitialWorkspace } from '../utils/mobilePersona';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
 
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
 function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
+  return hasOrgPersonaAccess(user);
 }
 
 function hasAdminAccess(user: any) {
-  return Array.isArray(user?.admin_assignments) && user.admin_assignments.length > 0;
+  return getAdminAssignments(user).length > 0;
 }
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -218,35 +212,17 @@ function AuthGate() {
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
 
-  const getRoleHome = (role?: string | null) => {
-    const normalized = String(role || '').toUpperCase();
-    if (ORG_ROLES.has(normalized)) {
-      return '/organization/dashboard';
-    }
-    switch (normalized) {
-      case 'OWNER':
-        return '/owner/dashboard';
-      case 'PHARMACIST':
-        return '/pharmacist/dashboard';
-      case 'OTHER_STAFF':
-        return '/otherstaff/dashboard';
-      case 'EXPLORER':
-        return '/explorer/dashboard';
-      default:
-        return '/login';
-    }
-  };
-
   useEffect(() => {
     if (isLoading) return;
     const top = segments[0];
     const segmentList = segments as readonly string[];
     const second = segmentList[1];
+    const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
-    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave', 'workforce-timesheets', 'workforce-settings']);
+    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave', 'workforce-timesheets', 'workforce-settings', 'notifications']);
     const sharedProductPrefixes = new Set(['workforce', 'manager', 'attendance', 'finance', 'marketplace', 'profile', 'rewards']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '') || sharedProductPrefixes.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
@@ -285,7 +261,8 @@ function AuthGate() {
           return;
         }
 
-        router.replace(getRoleHome(user.role) as any);
+        const workspaceRoute = await resolveInitialWorkspace(user);
+        if (active) router.replace(workspaceRoute as any);
         return;
       }
 
@@ -293,15 +270,21 @@ function AuthGate() {
         if (isSharedAuthenticatedRoute) {
           const normalizedSharedRole = String(user.role || '').toUpperCase();
           const ownerAccess = normalizedSharedRole === 'OWNER';
-          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', selectedPharmacyId);
-          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+          const storedPersona = await readPersonaSelection(user);
+          const activeAdminAssignment = storedPersona?.startsWith('ADMIN:')
+            ? await getSelectedAdminAssignment(user)
+            : null;
+          const capabilityPharmacyId = getAssignmentPharmacyId(activeAdminAssignment) ?? selectedPharmacyId;
+          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', capabilityPharmacyId);
+          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', capabilityPharmacyId);
 
           const isManagerRoute = top === 'manager';
+          const isManagerLeaveRoute = top === 'workforce' && second === 'leave-requests';
           const isRosterWorkforceRoute = top === 'workforce-timesheets' || (top === 'workforce' && second === 'payroll-export');
-          const isStaffWorkforceRoute = top === 'workforce-settings' || (top === 'workforce' && second !== 'payroll-export');
+          const isStaffWorkforceRoute = top === 'workforce-settings' || (top === 'workforce' && second !== 'payroll-export' && second !== 'leave-requests');
           const isAttendanceReviewRoute = top === 'attendance' && second === 'reviews';
 
-          if ((isManagerRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
+          if ((isManagerRoute || isManagerLeaveRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
             router.replace(getRoleHome(user.role) as any);
             return;
           }
@@ -317,6 +300,35 @@ function AuthGate() {
         const normalizedRole = String(user.role || '').toUpperCase();
 
         if (top === 'admin' && hasAdminAccess(user)) {
+          const activeAssignment = await getSelectedAdminAssignment(user);
+          const adminPharmacyId = getAssignmentPharmacyId(activeAssignment);
+          const canManageStaff = hasCapability('MANAGE_STAFF', adminPharmacyId);
+          const canManageRoster = hasCapability('MANAGE_ROSTER', adminPharmacyId);
+          const canManageCommunications =
+            hasCapability('MANAGE_COMMUNICATIONS', adminPharmacyId) ||
+            canManageStaff ||
+            canManageRoster;
+          const isAdminPharmacyManagement = second === 'pharmacies';
+          const isAdminCommunications =
+            second === 'hub' ||
+            second === 'calendar';
+          const isAdminRosterManagement =
+            second === 'shifts' ||
+            second === 'post-shift' ||
+            (second != null && /^\d+$/.test(second) && third === 'post-shift');
+
+          if (isAdminPharmacyManagement && !canManageStaff) {
+            router.replace('/admin' as any);
+            return;
+          }
+          if (isAdminRosterManagement && !canManageRoster) {
+            router.replace('/admin' as any);
+            return;
+          }
+          if (isAdminCommunications && !canManageCommunications) {
+            router.replace('/admin' as any);
+            return;
+          }
           return;
         }
 

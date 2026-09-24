@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { Icon, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../context/AuthContext';
 import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
@@ -27,6 +28,7 @@ const sidebarItems = [
   { label: 'Chat', icon: 'message', route: '/explorer/chat' },
   { label: 'Profile', icon: 'account-circle', route: '/explorer/profile' },
   { label: 'Talent Board', icon: 'account-search', route: '/explorer/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/explorer/learning' },
   { label: 'Calendar', icon: 'calendar', route: '/explorer/calendar' },
 ];
 
@@ -175,7 +177,7 @@ export default function ExplorerTabs() {
     if (user.role !== 'EXPLORER') {
       switch (user.role) {
         case 'OWNER':
-          router.replace('/owner' as any);
+          router.replace('/owner/dashboard' as any);
           break;
         case 'PHARMACIST':
           router.replace('/pharmacist' as any);
@@ -211,7 +213,7 @@ export default function ExplorerTabs() {
   if (isLoading || !user || user.role !== 'EXPLORER') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color="#00A8BB" />
       </View>
     );
   }
@@ -221,12 +223,12 @@ export default function ExplorerTabs() {
       <ExplorerSidebar visible={sidebarVisible} onDismiss={() => setSidebarVisible(false)} />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#00A8BB',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -235,7 +237,7 @@ export default function ExplorerTabs() {
           headerShown: true,
           headerTitle: tabTitles[route.name] || 'Explorer',
           headerRightContainerStyle: { paddingRight: 10 },
-          headerLeft: () => <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />,
+          headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open explorer menu" onPress={() => setSidebarVisible(true)} />,
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
@@ -255,9 +257,9 @@ export default function ExplorerTabs() {
                     }
                   }}
                 />
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -276,9 +278,9 @@ export default function ExplorerTabs() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -304,7 +306,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="home" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="home" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -312,7 +314,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="message" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="message" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -320,7 +322,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Profile',
             tabBarAccessibilityLabel: 'Profile tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-circle" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="account-circle" color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -328,7 +330,7 @@ export default function ExplorerTabs() {
           options={{
             title: 'Talent Board',
             tabBarAccessibilityLabel: 'Talent Board tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-search" iconColor={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Icon source="account-search" color={color} size={size} />,
           }}
         />
 
@@ -341,6 +343,7 @@ export default function ExplorerTabs() {
         <Tabs.Screen name="availability" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="messages/[id]" options={{ href: null }} />
+        <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
       </Tabs>
@@ -371,6 +374,6 @@ const styles = StyleSheet.create({
   bellWrapper: {
     position: 'relative',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#00A8BB' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
 });

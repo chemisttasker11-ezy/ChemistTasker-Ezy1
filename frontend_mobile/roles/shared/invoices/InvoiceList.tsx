@@ -47,9 +47,10 @@ type Props = { basePath?: string };
 
 export default function InvoiceList({ basePath }: Props) {
   const segments = useSegments();
+  const managerWorkspace = ['owner', 'organization', 'admin'].includes(String(segments[0] || '').toLowerCase());
   return (
     <FinanceWorkspace
-      receivedMode={segments[0] === 'owner'}
+      receivedMode={managerWorkspace}
       existingTools={<LegacyInvoiceList basePath={basePath} />}
     />
   );
@@ -60,7 +61,7 @@ function LegacyInvoiceList({ basePath }: Props) {
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
-  const isReceivedMode = role === 'owner';
+  const isReceivedMode = ['owner', 'organization', 'admin'].includes(String(role).toLowerCase());
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);

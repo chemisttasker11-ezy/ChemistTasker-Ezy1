@@ -1,0 +1,37 @@
+appId: com.chemisttasker.app
+env:
+  MAESTRO_PHARMACIST_EMAIL: ${MAESTRO_PHARMACIST_EMAIL}
+  MAESTRO_PHARMACIST_PASSWORD: ${MAESTRO_PHARMACIST_PASSWORD}
+---
+- launchApp:
+    clearState: true
+- tapOn: "Work email"
+- inputText: ${MAESTRO_PHARMACIST_EMAIL}
+- tapOn: "Password"
+- inputText: ${MAESTRO_PHARMACIST_PASSWORD}
+- tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Use biometrics for this account?"
+    commands:
+      - tapOn: "Not now"
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Shifts tab"
+- assertVisible: "Shifts"
+- tapOn: "Chat tab"
+- assertVisible: "Chat"
+- tapOn: "Hub tab"
+- assertVisible: "Hub"
+- tapOn: "Invoices tab"
+- assertVisible: "Invoices"
+- tapOn: "Publish availability tab"
+- assertVisible: "Publish"
+- tapOn: "Open pharmacist menu"
+- assertVisible: "Pharmacist menu"
+- assertVisible: "Memberships"
+- assertVisible: "Learning"
+- assertVisible: "My Roster"
+- tapOn: "Logout"
+- assertVisible: "Welcome back"

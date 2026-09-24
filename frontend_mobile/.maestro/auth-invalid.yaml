@@ -1,0 +1,7 @@
+appId: com.chemisttasker.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Welcome back"
+- tapOn: "Sign in"
+- assertVisible: "Please enter email and password"

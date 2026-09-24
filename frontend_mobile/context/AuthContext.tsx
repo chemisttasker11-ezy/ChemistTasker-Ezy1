@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import axios from 'axios';
-import { login as sharedLogin, getOnboarding } from '@chemisttasker/shared-core';
+import { login as sharedLogin, getOnboarding, hasAdminCapability, type AuthorityAdminAssignment, type AuthorityMembership } from '@chemisttasker/shared-core';
 import apiClient from '../utils/apiClient';
 import { registerForPushNotificationsAsync, registerDeviceTokenWithBackend } from '../utils/pushNotifications';
 import * as Device from 'expo-device';
@@ -14,15 +14,7 @@ import {
 import { authenticateWithBiometrics, disableBiometricLogin, getBiometricAvailability, getSavedBiometricUser } from '../utils/biometricAuth';
 
 // --- Types ---
-export interface OrgMembership {
-  organization_id: number;
-  organization_name: string;
-  role: string;
-  region: string;
-  admin_level?: string;
-  pharmacies?: Array<{ id: number; name?: string }>;
-  capabilities?: string[];
-}
+export type OrgMembership = AuthorityMembership;
 
 export type User = {
   id?: number;
@@ -35,7 +27,8 @@ export type User = {
   last_name?: string;
   profile_photo?: string;
   profile_photo_url?: string;
-  memberships?: OrgMembership[];
+  memberships?: AuthorityMembership[];
+  admin_assignments?: AuthorityAdminAssignment[];
   billing_active?: boolean;
   in_free_trial?: boolean;
 };
@@ -498,35 +491,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const hasCapability = (capability: string, pharmacyId?: number | string | null) => {
-    if (!user) return false;
-    const role = String(user.role || '').toUpperCase();
-    if (role === 'OWNER') return true;
-
-    const requested = String(capability || '').trim().toUpperCase();
-    const assignments: any[] = (user as any).admin_assignments || [];
-    const pharmacyAdminMatch = assignments.some((assignment) => {
-      const caps: string[] = assignment?.capabilities || [];
-      const pid = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy;
-      const matchesPharmacy = pharmacyId ? String(pid ?? '') === String(pharmacyId) : true;
-      return matchesPharmacy && caps.some((value) => String(value).toUpperCase() === requested);
-    });
-    if (pharmacyAdminMatch) return true;
-
-    const orgMemberships = Array.isArray(user.memberships) ? user.memberships : [];
-    return orgMemberships.some((membership) => {
-      const caps = Array.isArray(membership?.capabilities) ? membership.capabilities : [];
-      const hasRequestedCapability = caps.some(
-        (value) => String(value).replaceAll('-', '_').toUpperCase() === requested,
-      );
-      if (!hasRequestedCapability) return false;
-
-      // Organisation admins have VIEW_ALL_PHARMACIES in the backend role model.
-      if (String(membership?.role || '').toUpperCase() === 'ORG_ADMIN') return true;
-      if (!pharmacyId) return true;
-
-      const scopedPharmacies = Array.isArray(membership?.pharmacies) ? membership.pharmacies : [];
-      return scopedPharmacies.some((pharmacy) => String(pharmacy?.id ?? '') === String(pharmacyId));
-    });
+    return hasAdminCapability(
+      user,
+      String(capability || '').trim().replaceAll('-', '_').toUpperCase() as any,
+      { pharmacyId },
+    );
   };
 
   return (

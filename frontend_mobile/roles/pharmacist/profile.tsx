@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Linking } from 'react-native';
-import { Card, Text, Button, Divider, Avatar, IconButton, List, Surface, Switch, Portal, Dialog, TextInput } from 'react-native-paper';
+import { Card, Text, Button, Divider, Avatar, Icon, IconButton, List, Surface, Switch, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,10 @@ import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
+
+import { brandColors, personaPalettes } from '@/constants/theme';
+
+const profilePalette = personaPalettes.pharmacist;
 
 export default function PharmacistProfileScreen() {
   const { user, logout, refreshUser, updateUserProfilePhoto } = useAuth();
@@ -224,7 +228,7 @@ export default function PharmacistProfileScreen() {
 
         <Card style={styles.profileCard}>
           <LinearGradient
-            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            colors={[profilePalette.soft, '#FFFFFF', brandColors.mist]}
             locations={[0, 0.58, 1]}
             start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
@@ -263,13 +267,13 @@ export default function PharmacistProfileScreen() {
             <Card key={index} style={styles.menuCard} onPress={() => router.push(item.route as any)}>
               <Card.Content style={styles.menuContent}>
                 <View style={styles.menuIcon}>
-                  <IconButton icon={item.icon} size={24} iconColor="#6366F1" />
+                  <Icon source={item.icon} size={24} color={profilePalette.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="titleMedium" style={styles.menuTitle}>{item.title}</Text>
                   <Text variant="bodySmall" style={styles.menuDesc}>{item.description}</Text>
                 </View>
-                <IconButton icon="chevron-right" size={24} iconColor="#9CA3AF" />
+                <Icon source="chevron-right" size={22} color="#718096" />
               </Card.Content>
             </Card>
           ))}
@@ -372,7 +376,7 @@ export default function PharmacistProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: brandColors.mist,
   },
   header: {
     paddingHorizontal: 20,
@@ -381,7 +385,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontWeight: 'bold',
-    color: '#111827',
+    color: brandColors.navy,
   },
   profileCard: {
     marginHorizontal: 20,
@@ -444,7 +448,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     elevation: 0,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
   },
   menuContent: {
     flexDirection: 'row',
@@ -457,16 +461,16 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: profilePalette.soft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   menuTitle: {
     fontWeight: '600',
-    color: '#111827',
+    color: brandColors.navy,
   },
   menuDesc: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginTop: 2,
   },
   sectionBlock: {
@@ -474,7 +478,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   sectionTitle: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginBottom: 8,
     fontWeight: '600',
   },

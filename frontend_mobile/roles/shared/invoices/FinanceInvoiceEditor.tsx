@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextInput, useTheme } from 'react-native-paper';
-import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
+import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
+import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
+import { dateFromIso, isoDate } from '@/features/parity/utils';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 
@@ -14,6 +16,13 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [busy, setBusy] = useState(false); const running = useRef(false);
   const [error, setError] = useState(''); const [preview, setPreview] = useState<FinanceCalculation | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false); const [itemOpen, setItemOpen] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState<FinanceCustomer[]>(customers);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  const [newCustomerAbn, setNewCustomerAbn] = useState('');
+  const [newCustomerAddress, setNewCustomerAddress] = useState('');
+  const [newCustomerTerms, setNewCustomerTerms] = useState('14');
   const [itemOptions, setItemOptions] = useState<FinanceItem[]>(items);
   const [newItemOpen, setNewItemOpen] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -25,6 +34,11 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [query, setQuery] = useState('');
   const [internalSources, setInternalSources] = useState<FinanceInternalSource[]>([]);
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [hoursStart, setHoursStart] = useState<Date | undefined>(undefined);
+  const [hoursEnd, setHoursEnd] = useState<Date | undefined>(undefined);
+  const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
+  const [breakMinutes, setBreakMinutes] = useState('0');
+  const [computedHours, setComputedHours] = useState('');
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
   const snapshotCustomer = (item: FinanceCustomer) => ({
     name: item.name, legal_name: item.legal_name, address: item.address, abn: item.abn,
@@ -62,7 +76,67 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     }).catch((e: any) => setError(e.message || 'Unable to load invoice defaults.'));
     return () => { active = false; };
   }, [initial]);
+  useEffect(() => { setCustomerOptions(customers); }, [customers]);
   useEffect(() => { setItemOptions(items); }, [items]);
+  const saveNewCustomer = async () => {
+    const name = newCustomerName.trim();
+    if (!name) { setError('Enter a customer or store name.'); return; }
+    setBusy(true); setError('');
+    try {
+      const input: FinanceCustomerInput = {
+        name,
+        legal_name: '',
+        abn: newCustomerAbn.trim(),
+        contact_name: '',
+        email: newCustomerEmail.trim(),
+        phone: '',
+        address: newCustomerAddress.trim(),
+        payment_terms_days: Math.max(0, Number(newCustomerTerms) || 14),
+        notes: '',
+        active: true,
+      };
+      const saved = await finance.saveCustomer(input);
+      setCustomerOptions(current => [...current, saved]);
+      setValue(current => ({
+        ...current,
+        customer_id: saved.id,
+        customer: snapshotCustomer(saved),
+        due_date: financeDueDate(current.invoice_date, saved.payment_terms_days),
+      }));
+      setNewCustomerName('');
+      setNewCustomerEmail('');
+      setNewCustomerAbn('');
+      setNewCustomerAddress('');
+      setNewCustomerTerms('14');
+      setNewCustomerOpen(false);
+      setCustomerOpen(false);
+      await onSaved();
+    } catch (e: any) {
+      setError(e.message || 'Unable to create the customer.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const calculateHours = async () => {
+    if (!hoursStart || !hoursEnd) { setError('Enter a start and end date/time first.'); return; }
+    setBusy(true); setError('');
+    try {
+      if (hoursEnd <= hoursStart) {
+        setError('End date/time must be after the start date/time.');
+        return;
+      }
+      const result = await finance.shiftHours({
+        start: hoursStart.toISOString(),
+        end: hoursEnd.toISOString(),
+        break_minutes: Number(breakMinutes) || 0,
+      });
+      setComputedHours(String(result.hours));
+    } catch (e: any) {
+      setError(e.message || 'Unable to calculate shift hours.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const saveNewItem = async () => {
     const name = newItemName.trim();
     const unit = newItemUnit.trim() || 'Item';
@@ -118,7 +192,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     try { await finance.saveInvoice(value, initial?.id); await onSaved(); onClose(); } catch (e: any) { setError(e.message || 'Unable to save invoice.'); } finally { running.current = false; setBusy(false); }
   };
   const field = (key: keyof FinanceDraft, label: string, decimal = false) => <TextInput key={key} mode="outlined" dense label={label} value={String(value[key] ?? '')} disabled={busy} keyboardType={decimal ? 'decimal-pad' : 'default'} onChangeText={text => change(key, text as never)} style={{ marginBottom: 12 }} />;
-  const customer = customers.find(c => c.id === value.customer_id) || (value.customer ? {
+  const customer = customerOptions.find(c => c.id === value.customer_id) || (value.customer ? {
     id: value.customer_id, payment_terms_days: 14, phone: '', notes: '', active: true, ...value.customer,
   } as FinanceCustomer : undefined);
   const internalSource = initial?.source === 'internal' || Boolean(value.source_assignment_ids?.length);
@@ -142,8 +216,23 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       ) : null}
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
         <Chip style={{ alignSelf: 'flex-start', marginBottom: 16 }}>{initial ? financeStatus(initial) : 'Unsaved'}</Chip>
-        <Button mode="outlined" icon="account-outline" disabled={internalSource} onPress={() => { setCustomerOpen(!customerOpen); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
-        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customers.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customers.length && <Text style={{ padding: 12 }}>Add a customer from Customers before creating an invoice.</Text>}</View>}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Button mode="outlined" icon="account-outline" disabled={internalSource} onPress={() => { setCustomerOpen(!customerOpen); setNewCustomerOpen(false); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
+          {!internalSource ? <Button mode="text" icon="account-plus-outline" onPress={() => { setNewCustomerOpen(!newCustomerOpen); setCustomerOpen(false); setItemOpen(false); }}>Create customer</Button> : null}
+        </View>
+        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customerOptions.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} description={c.email || c.abn || undefined} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customerOptions.length && <Text style={{ padding: 12 }}>No saved customers yet. Create one here without losing this invoice.</Text>}</View>}
+        {newCustomerOpen ? <Surface elevation={0} style={{ marginTop: 12, borderRadius: 10, padding: 12, gap: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
+          <Text variant="titleSmall">Create customer / store</Text>
+          <TextInput mode="outlined" dense label="Store / trading name *" value={newCustomerName} onChangeText={setNewCustomerName} />
+          <TextInput mode="outlined" dense keyboardType="email-address" autoCapitalize="none" label="Invoice email" value={newCustomerEmail} onChangeText={setNewCustomerEmail} />
+          <TextInput mode="outlined" dense label="Customer ABN" value={newCustomerAbn} onChangeText={setNewCustomerAbn} />
+          <TextInput mode="outlined" dense multiline label="Billing address" value={newCustomerAddress} onChangeText={setNewCustomerAddress} />
+          <TextInput mode="outlined" dense keyboardType="numeric" label="Payment terms (days)" value={newCustomerTerms} onChangeText={setNewCustomerTerms} />
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+            <Button disabled={busy} onPress={() => setNewCustomerOpen(false)}>Cancel</Button>
+            <Button mode="contained" loading={busy} disabled={busy || !newCustomerName.trim()} onPress={() => void saveNewCustomer()}>Save & use</Button>
+          </View>
+        </Surface> : null}
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 16 }}>{value.customer?.address || customer?.address || 'Customer billing address'}</Text>
         {value.customer ? <List.Accordion title="Invoice recipient details" description="Optional overrides for this invoice only">
           <View style={{ padding: 12 }}>
@@ -156,7 +245,24 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
           </View>
         </List.Accordion> : null}
         {field('reference', 'Customer PO / reference')}
-        {field('invoice_date', 'Issue date (YYYY-MM-DD)')}{field('due_date', 'Due date (YYYY-MM-DD)')}
+        <View style={{ gap: 12 }}>
+          <DatePickerInput
+            locale="en-AU"
+            label="Issue date"
+            value={dateFromIso(value.invoice_date)}
+            onChange={(date) => date && change('invoice_date', isoDate(date))}
+            inputMode="start"
+            disabled={busy}
+          />
+          <DatePickerInput
+            locale="en-AU"
+            label="Due date"
+            value={dateFromIso(value.due_date)}
+            onChange={(date) => date && change('due_date', isoDate(date))}
+            inputMode="start"
+            disabled={busy}
+          />
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.price_mode === 'exclusive'} onPress={() => change('price_mode', 'exclusive')}>GST exclusive</Chip><Chip selected={value.price_mode === 'inclusive'} onPress={() => change('price_mode', 'inclusive')}>GST inclusive</Chip></View>
       </Surface>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Text variant="titleMedium" style={{ flex: 1 }}>Items & services</Text><Button compact icon="plus" onPress={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Ad-hoc row</Button><Button compact icon="playlist-plus" onPress={() => { setItemOpen(!itemOpen); setNewItemOpen(false); setCustomerOpen(false); setQuery(''); }}>Saved item</Button><Button compact icon="plus-box-outline" onPress={() => { setNewItemOpen(!newItemOpen); setItemOpen(false); setCustomerOpen(false); }}>Add new saved item</Button></View>
@@ -178,7 +284,14 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         <TextInput mode="outlined" dense label="Description" value={line.description || ''} onChangeText={description => changeLine(index, { description })} />
         <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Qty" value={line.quantity} onChangeText={text => changeLine(index, { quantity: text })} /><TextInput mode="outlined" dense style={{ flex: 1 }} label="Unit" value={line.unit || ''} onChangeText={unit => changeLine(index, { unit })} /><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Rate" value={line.unit_price} onChangeText={text => changeLine(index, { unit_price: text })} /></View>
         <TextInput mode="outlined" dense label="Discount %" keyboardType="decimal-pad" value={line.discount} onChangeText={discount => changeLine(index, { discount })} />
-        <TextInput mode="outlined" dense label="Work date (YYYY-MM-DD)" value={line.worked_on || ''} onChangeText={worked_on => changeLine(index, { worked_on })} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Work date"
+          value={dateFromIso(line.worked_on || undefined)}
+          onChange={(date) => changeLine(index, { worked_on: date ? isoDate(date) : null })}
+          inputMode="start"
+          disabled={busy}
+        />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>{(['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'] as const).map((tax, i) => <Chip key={tax} selected={line.tax_code === tax} onPress={() => changeLine(index, { tax_code: tax })}>{['GST 10%', 'GST-free', 'Input taxed', 'N-T / not taxable'][i]}</Chip>)}</View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           {(['ProfessionalServices', 'Transportation', 'Accommodation', 'Miscellaneous', 'Superannuation'] as FinanceCategory[]).map(category => (
@@ -190,6 +303,63 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         <Checkbox.Item label="Include in reviewed super base" status={line.super_eligible ? 'checked' : 'unchecked'} onPress={() => changeLine(index, { super_eligible: !line.super_eligible })} />
         <Text style={{ textAlign: 'right', fontWeight: '700' }}>{preview?.lines[index] ? money(preview.lines[index].gross) : 'Pending'}</Text>
       </Surface>)}
+      <Surface elevation={0} style={{ padding: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant, gap: 10 }}>
+        <Text variant="titleMedium">Calculate shift hours</Text>
+        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Choose the local date and time for the work performed. Confirm the pharmacy timezone for interstate work.</Text>
+        <DatePickerInput
+          locale="en-AU"
+          label="Start date"
+          value={hoursStart}
+          onChange={(date) => {
+            if (!date) return setHoursStart(undefined);
+            const next = new Date(date);
+            next.setHours(hoursStart?.getHours() ?? 9, hoursStart?.getMinutes() ?? 0, 0, 0);
+            setHoursStart(next);
+          }}
+          inputMode="start"
+          disabled={busy}
+        />
+        <Button mode="outlined" icon="clock-outline" disabled={busy || !hoursStart} onPress={() => setTimeTarget('start')}>
+          {hoursStart ? `Start time · ${hoursStart.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}` : 'Choose start date first'}
+        </Button>
+        <DatePickerInput
+          locale="en-AU"
+          label="End date"
+          value={hoursEnd}
+          onChange={(date) => {
+            if (!date) return setHoursEnd(undefined);
+            const next = new Date(date);
+            next.setHours(hoursEnd?.getHours() ?? 17, hoursEnd?.getMinutes() ?? 0, 0, 0);
+            setHoursEnd(next);
+          }}
+          inputMode="start"
+          disabled={busy}
+        />
+        <Button mode="outlined" icon="clock-outline" disabled={busy || !hoursEnd} onPress={() => setTimeTarget('end')}>
+          {hoursEnd ? `End time · ${hoursEnd.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}` : 'Choose end date first'}
+        </Button>
+        <TimePickerModal
+          visible={timeTarget !== null}
+          onDismiss={() => setTimeTarget(null)}
+          onConfirm={({ hours, minutes }) => {
+            const current = timeTarget === 'start' ? hoursStart : hoursEnd;
+            if (current) {
+              const next = new Date(current);
+              next.setHours(hours, minutes, 0, 0);
+              if (timeTarget === 'start') setHoursStart(next);
+              else setHoursEnd(next);
+            }
+            setTimeTarget(null);
+          }}
+          hours={(timeTarget === 'start' ? hoursStart : hoursEnd)?.getHours() ?? 9}
+          minutes={(timeTarget === 'start' ? hoursStart : hoursEnd)?.getMinutes() ?? 0}
+          label="Select time"
+          locale="en"
+        />
+        <TextInput mode="outlined" dense keyboardType="numeric" label="Unpaid break (minutes)" value={breakMinutes} onChangeText={setBreakMinutes} />
+        <Button mode="outlined" disabled={busy || !hoursStart || !hoursEnd} onPress={() => void calculateHours()}>Calculate hours</Button>
+        {computedHours ? <Text variant="bodyMedium"><Text style={{ fontWeight: '800' }}>{computedHours} billable hours.</Text> Enter this quantity on the relevant professional-services item.</Text> : null}
+      </Surface>
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8 }}>
         {field('notes', 'Notes to customer')}
         {[['Subtotal', preview?.subtotal], ['GST', preview?.gst], ['Invoice total', preview?.payable], ['Super contribution', preview?.super]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}><Text style={{ fontWeight: label === 'Invoice total' ? '700' : '400' }}>{label}</Text><Text style={{ fontVariant: ['tabular-nums'] }}>{amount !== undefined ? money(amount) : value.lines.length ? 'Pending' : '$0.00'}</Text></View>)}

@@ -43,6 +43,7 @@ import type {
 } from './types';
 import HubPlaceholder from './HubPlaceholder';
 import { HubFeed } from './HubFeed';
+import { brandColors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import {
   type Scope,
@@ -1255,22 +1256,22 @@ export default function HubScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   scroll: { padding: 16, gap: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  muted: { color: '#6B7280' },
+  muted: { color: brandColors.body },
   errorText: { color: '#DC2626', textAlign: 'center' },
   header: { gap: 4, marginBottom: 8 },
   sectionHeader: { marginTop: 8, marginBottom: 6 },
-  sectionTitle: { fontWeight: '700', color: '#111827' },
+  sectionTitle: { fontWeight: '700', color: brandColors.navy },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 16,
   },
-  pillActive: { backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#6366F1' },
-  pillInactive: { backgroundColor: '#E5E7EB' },
+  pillActive: { backgroundColor: '#F0EAFF', borderWidth: 1, borderColor: brandColors.purple },
+  pillInactive: { backgroundColor: brandColors.border },
   pillActiveText: { color: '#4338CA', fontWeight: '700' },
   pillInactiveText: { color: '#374151', fontWeight: '600' },
   card: { marginTop: 8, borderRadius: 12 },
@@ -1278,25 +1279,25 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginTop: 8 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sidebarCard: { borderRadius: 16, marginBottom: 12, backgroundColor: '#FFFFFF', elevation: 2 },
-  sidebarLabel: { color: '#6B7280', marginBottom: 8, fontWeight: '600' },
+  sidebarLabel: { color: brandColors.body, marginBottom: 8, fontWeight: '600' },
   sidebarItem: { paddingVertical: 10 },
-  sidebarItemText: { fontWeight: '700', color: '#111827' },
+  sidebarItemText: { fontWeight: '700', color: brandColors.navy },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  sectionLabel: { color: '#6B7280', fontWeight: '700', letterSpacing: 0.5 },
+  sectionLabel: { color: brandColors.body, fontWeight: '700', letterSpacing: 0.5 },
   groupItem: {
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
     marginBottom: 6,
   },
-  groupItemActive: { borderColor: '#6366F1', backgroundColor: '#EEF2FF' },
-  groupName: { fontWeight: '600', color: '#111827' },
+  groupItemActive: { borderColor: brandColors.purple, backgroundColor: '#F0EAFF' },
+  groupName: { fontWeight: '600', color: brandColors.navy },
   tile: {
     padding: 12,
     borderRadius: 12,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
     borderWidth: 1,
     marginBottom: 10,
     backgroundColor: '#FFFFFF',
@@ -1306,11 +1307,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  tileActive: { borderColor: '#6366F1', backgroundColor: '#EEF2FF' },
-  tileTitle: { fontWeight: '700', color: '#111827', fontSize: 15 },
+  tileActive: { borderColor: brandColors.purple, backgroundColor: '#F0EAFF' },
+  tileTitle: { fontWeight: '700', color: brandColors.navy, fontSize: 15 },
   orgTile: { backgroundColor: '#F8FAFF', borderColor: '#DDE3FF' },
   spaceCard: { borderRadius: 12 },
-  collapsingHeader: { width: '100%', backgroundColor: '#111827', overflow: 'hidden' },
+  collapsingHeader: { width: '100%', backgroundColor: brandColors.navy, overflow: 'hidden' },
   coverImage: { width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 },
   coverMenu: {
     position: 'absolute',
@@ -1371,7 +1372,7 @@ const styles = StyleSheet.create({
   },
   memberList: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
     borderRadius: 8,
     maxHeight: 260,
     paddingHorizontal: 8,
@@ -1389,7 +1390,7 @@ const styles = StyleSheet.create({
   memberDivider: { marginVertical: 6 },
   selectedChips: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 4,

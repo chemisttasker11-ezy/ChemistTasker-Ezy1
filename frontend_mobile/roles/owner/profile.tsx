@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Linking, Share } from 'react-native';
-import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
+import { Text, Avatar, List, Button, Surface, Divider, Switch, Icon, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
@@ -9,6 +9,9 @@ import { getOnboarding, deleteAccount, updateOnboardingForm } from '@chemisttask
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../utils/apiClient';
+import { brandColors, personaPalettes } from '@/constants/theme';
+
+const profilePalette = personaPalettes.owner;
 
 interface UserProfile {
   id: number;
@@ -188,7 +191,7 @@ export default function OwnerProfileScreen() {
         {/* Header Profile Section */}
         <Card style={styles.heroCard} mode="contained">
           <LinearGradient
-            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            colors={[profilePalette.soft, '#FFFFFF', brandColors.mist]}
             locations={[0, 0.58, 1]}
             start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
@@ -235,13 +238,13 @@ export default function OwnerProfileScreen() {
             <Card key={index} style={styles.menuCard} onPress={() => router.push(item.route as any)}>
               <Card.Content style={styles.menuContent}>
                 <View style={styles.menuIcon}>
-                  <IconButton icon={item.icon} size={24} iconColor="#6366F1" />
+                  <Icon source={item.icon} size={24} color={profilePalette.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="titleMedium" style={styles.menuTitle}>{item.title}</Text>
                   <Text variant="bodySmall" style={styles.menuDesc}>{item.description}</Text>
                 </View>
-                <IconButton icon="chevron-right" size={24} iconColor="#9CA3AF" />
+                <Icon source="chevron-right" size={22} color="#718096" />
               </Card.Content>
             </Card>
           ))}
@@ -257,7 +260,7 @@ export default function OwnerProfileScreen() {
                 <Switch
                   value={notificationsEnabled}
                   onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
+                  color={profilePalette.accent}
                 />
               )}
             />
@@ -305,7 +308,7 @@ export default function OwnerProfileScreen() {
           <Card style={styles.menuCard} onPress={shareFriendReferral}>
             <Card.Content style={styles.menuContent}>
               <View style={styles.menuIcon}>
-                <IconButton icon="account-plus-outline" size={24} iconColor="#6366F1" />
+                <Icon source="account-plus-outline" size={24} color={profilePalette.accent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="titleMedium" style={styles.menuTitle}>Refer a colleague </Text>
@@ -313,7 +316,7 @@ export default function OwnerProfileScreen() {
                   Share a referral link and earn pills when they register.
                 </Text>
               </View>
-              <IconButton icon={referralLoading ? 'progress-clock' : 'share-variant'} size={24} iconColor="#9CA3AF" />
+              <IconButton icon={referralLoading ? 'progress-clock' : 'share-variant'} size={24} iconColor="#718096" />
             </Card.Content>
           </Card>
         </View>
@@ -323,7 +326,7 @@ export default function OwnerProfileScreen() {
           <Card style={styles.menuCard} onPress={() => router.push('/owner/subscription-seats' as any)}>
             <Card.Content style={styles.menuContent}>
               <View style={styles.menuIcon}>
-                <IconButton icon="credit-card-outline" size={24} iconColor="#6366F1" />
+                <Icon source="credit-card-outline" size={24} color={profilePalette.accent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="titleMedium" style={styles.menuTitle}>Subscription and seats</Text>
@@ -333,7 +336,7 @@ export default function OwnerProfileScreen() {
                     : 'Open subscription first, then manage extra seats here.'}
                 </Text>
               </View>
-              <IconButton icon="chevron-right" size={24} iconColor="#9CA3AF" />
+              <Icon source="chevron-right" size={22} color="#718096" />
             </Card.Content>
           </Card>
         </View>
@@ -421,7 +424,7 @@ export default function OwnerProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: brandColors.mist,
   },
   centerContent: {
     flex: 1,
@@ -495,7 +498,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginBottom: 8,
     marginLeft: 4,
     fontWeight: '600',
@@ -510,7 +513,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     elevation: 0,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
   },
   menuContent: {
     flexDirection: 'row',
@@ -523,16 +526,16 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: profilePalette.soft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   menuTitle: {
     fontWeight: '600',
-    color: '#111827',
+    color: brandColors.navy,
   },
   menuDesc: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginTop: 2,
   },
   listSurface: {

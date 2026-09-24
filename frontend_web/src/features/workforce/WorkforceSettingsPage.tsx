@@ -188,18 +188,42 @@ export default function WorkforceSettingsPage() {
                 </Alert>
                 {!kioskDevices.length && <Alert severity="info">No kiosk terminals are registered for this pharmacy.</Alert>}
                 {kioskDevices.map((device) => (
-                  <Paper key={device.id} variant="outlined" sx={{ p: 1.5 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
-                      <Box flex={1}>
-                        <Typography fontWeight={800}>{device.device_name || 'Kiosk terminal'}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {[device.platform || 'Unknown platform', String(device.client_kind || '').replaceAll('_', ' '), device.last_seen_at ? `Last seen ${new Date(device.last_seen_at).toLocaleString()}` : 'Not seen yet'].join(' · ')}
+                  <Paper key={device.id} variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
+                        <Box flex={1}>
+                          <Typography fontWeight={900} color="#06214A">{device.device_name || 'Kiosk terminal'}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {[
+                              device.platform || 'Unknown platform',
+                              String(device.client_kind || '').replaceAll('_', ' '),
+                              device.app_version ? `v${device.app_version}` : null,
+                            ].filter(Boolean).join(' · ')}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" fontWeight={900} color={device.is_active ? 'success.main' : 'text.secondary'}>
+                          {device.is_active ? 'Active' : 'Revoked'}
                         </Typography>
-                      </Box>
-                      <Typography variant="body2" fontWeight={800} color={device.is_active ? 'success.main' : 'text.secondary'}>
-                        {device.is_active ? 'Active' : 'Revoked'}
-                      </Typography>
-                      {device.is_active && <Button color="error" variant="outlined" onClick={() => setRevokeDevice(device)}>Revoke</Button>}
+                        {device.is_active && <Button color="error" variant="outlined" onClick={() => setRevokeDevice(device)}>Revoke</Button>}
+                      </Stack>
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                        {[
+                          ['Activated', device.activated_at ? new Date(device.activated_at).toLocaleString() : '—'],
+                          ['Last seen', device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : 'Never'],
+                          ['Last sync', device.last_sync_at ? new Date(device.last_sync_at).toLocaleString() : 'Never'],
+                          ['Received sequence', String(device.last_contiguous_sequence || 0)],
+                        ].map(([label, value]) => (
+                          <Box key={label} sx={{ flex: 1, p: 1.25, borderRadius: 2, bgcolor: '#F5F8FC' }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={800}>{label}</Typography>
+                            <Typography variant="body2" fontWeight={800} color="#06214A">{value}</Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                      {!device.is_active && device.revoked_at && (
+                        <Alert severity="warning">
+                          Revoked {new Date(device.revoked_at).toLocaleString()}. This terminal must be paired again before it can record new attendance.
+                        </Alert>
+                      )}
                     </Stack>
                   </Paper>
                 ))}

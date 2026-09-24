@@ -1,1 +1,6 @@
-export { default } from '@/roles/pharmacist/interests';
+import React from 'react';
+import { Redirect } from 'expo-router';
+
+export default function CompatibilityRedirect() {
+  return <Redirect href="/otherstaff/talent-board" />;
+}

@@ -1,0 +1,29 @@
+appId: com.chemisttasker.app
+env:
+  MAESTRO_ORG_EMAIL: ${MAESTRO_ORG_EMAIL}
+  MAESTRO_ORG_PASSWORD: ${MAESTRO_ORG_PASSWORD}
+---
+- launchApp:
+    clearState: true
+- tapOn: "Work email"
+- inputText: ${MAESTRO_ORG_EMAIL}
+- tapOn: "Password"
+- inputText: ${MAESTRO_ORG_PASSWORD}
+- tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Use biometrics for this account?"
+    commands:
+      - tapOn: "Not now"
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Open organization menu"
+- assertVisible: "Organization menu"
+- assertVisible: "Weekly Roster"
+- assertVisible: "Attendance Approvals"
+- assertVisible: "Timesheets"
+- assertVisible: "Workforce & Payroll"
+- assertVisible: "Learning"
+- tapOn: "Logout"
+- assertVisible: "Welcome back"

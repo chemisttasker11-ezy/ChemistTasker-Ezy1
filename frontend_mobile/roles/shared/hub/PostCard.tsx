@@ -12,6 +12,7 @@ import {
 import { Card, Text, Button, IconButton, Chip, Divider, Avatar, Menu } from 'react-native-paper';
 import { deleteHubPost, reactToHubPost, removeHubReaction } from './api';
 import type { HubPost, HubAttachment, HubReactionType } from './types';
+import { brandColors } from '@/constants/theme';
 import {
   formatHubDate,
   formatMemberLabel,
@@ -191,7 +192,7 @@ export function PostCard({ post, onEdit, onComment, onRefresh, highlighted = fal
                 width: 8,
                 height: 8,
                 borderRadius: 4,
-                backgroundColor: idx === activeAttachment ? '#4F46E5' : '#E5E7EB',
+                backgroundColor: idx === activeAttachment ? brandColors.purple : brandColors.border,
               }}
             />
           ))}
@@ -234,7 +235,7 @@ export function PostCard({ post, onEdit, onComment, onRefresh, highlighted = fal
       style={[
         styles.card,
         highlighted
-          ? { borderWidth: 2, borderColor: '#4F46E5', backgroundColor: '#EEF2FF' }
+          ? { borderWidth: 2, borderColor: brandColors.purple, backgroundColor: '#F0EAFF' }
           : null,
       ]}
       mode="elevated"
@@ -355,7 +356,7 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
@@ -363,14 +364,14 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  muted: { color: '#6B7280' },
-  body: { fontSize: 15, color: '#111827' },
+  muted: { color: brandColors.body },
+  body: { fontSize: 15, color: brandColors.navy },
   actions: { flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' },
-  pinChip: { backgroundColor: '#EEF2FF' },
+  pinChip: { backgroundColor: '#F0EAFF' },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   tagChip: { backgroundColor: '#F3F4F6' },
   reactionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  reactionChip: { backgroundColor: '#EEF2FF' },
+  reactionChip: { backgroundColor: '#F0EAFF' },
   scopeChip: { backgroundColor: '#E0F2FE' },
   reactionMenuRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
 });

@@ -38,13 +38,6 @@ export default function WelcomeScreen() {
                         Register
                     </Button>
 
-                    <Button
-                        mode="text"
-                        onPress={() => { }}
-                        style={styles.guestButton}
-                    >
-                        Continue as Guest
-                    </Button>
                 </View>
 
                 <View style={styles.footer}>

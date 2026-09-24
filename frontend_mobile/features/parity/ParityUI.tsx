@@ -1,25 +1,27 @@
 import React, { type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Chip, Divider, IconButton, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Chip, Divider, IconButton, Surface, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { brandColors, getPersonaPalette } from '@/constants/theme';
 
 export const palette = {
-  primary: '#6366F1',
-  primarySoft: '#EEF2FF',
-  background: '#F9FAFB',
-  surface: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#111827',
-  muted: '#6B7280',
-  success: '#10B981',
-  successSoft: '#ECFDF5',
-  warning: '#F59E0B',
-  warningSoft: '#FFF7ED',
-  danger: '#EF4444',
-  dangerSoft: '#FEF2F2',
-  info: '#0369A1',
-  infoSoft: '#EFF6FF',
+  primary: brandColors.purple,
+  primarySoft: '#F0EAFF',
+  background: brandColors.mist,
+  surface: brandColors.white,
+  border: brandColors.border,
+  text: brandColors.navy,
+  muted: brandColors.body,
+  success: brandColors.success,
+  successSoft: brandColors.successSoft,
+  warning: brandColors.warning,
+  warningSoft: brandColors.warningSoft,
+  danger: brandColors.danger,
+  dangerSoft: brandColors.dangerSoft,
+  info: brandColors.blue,
+  infoSoft: '#E8F5FB',
 };
 
 export function ParityPage({
@@ -44,34 +46,48 @@ export function ParityPage({
   right?: ReactNode;
 }) {
   const router = useRouter();
-  const theme = useTheme();
+  const { user } = useAuth();
+  const persona = getPersonaPalette(user?.role);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <Surface elevation={0} style={styles.header}>
-        <IconButton icon="chevron-left" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} />
+        <IconButton
+          icon="chevron-left"
+          accessibilityLabel="Go back"
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}
+        />
         <View style={styles.headerCopy}>
-          <Text variant="titleMedium" numberOfLines={1} style={styles.headerTitle}>{title}</Text>
-          {subtitle ? <Text variant="bodySmall" numberOfLines={2} style={styles.headerSubtitle}>{subtitle}</Text> : null}
+          <Text variant="titleLarge" numberOfLines={2} style={styles.headerTitle}>{title}</Text>
+          {subtitle ? <Text variant="bodySmall" numberOfLines={3} style={styles.headerSubtitle}>{subtitle}</Text> : null}
         </View>
         {right ?? <View style={styles.headerRightSpacer} />}
       </Surface>
+      <View style={[styles.headerAccent, { backgroundColor: persona.accent }]} />
       <Divider />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} /> : undefined}
+        refreshControl={onRefresh ? (
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={persona.accent} colors={[persona.accent]} />
+        ) : undefined}
       >
         {error ? (
-          <Card mode="outlined" style={styles.errorCard}>
+          <Card mode="contained" style={styles.errorCard}>
             <Card.Content style={styles.gap8}>
-              <Text variant="titleSmall" style={{ color: palette.danger }}>Unable to load</Text>
-              <Text variant="bodyMedium">{error}</Text>
+              <Text variant="titleSmall" style={{ color: palette.danger, fontWeight: '800' }}>Unable to load</Text>
+              <Text variant="bodyMedium" style={{ color: brandColors.navy }}>{error}</Text>
               {onRetry ? <Button mode="contained-tonal" onPress={onRetry}>Try again</Button> : null}
             </Card.Content>
           </Card>
         ) : null}
-        {loading ? <View style={styles.loading}><ActivityIndicator size="large" /><Text>Loading…</Text></View> : children}
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator size="small" color={persona.accent} />
+            <Text style={styles.muted}>Loading…</Text>
+          </View>
+        ) : children}
       </ScrollView>
     </SafeAreaView>
   );
@@ -107,13 +123,13 @@ export function MetricGrid({ items }: { items: Array<{ label: string; value: str
     <View style={styles.metricGrid}>
       {items.map((item) => {
         const tone = item.tone ?? 'primary';
-        const backgroundColor = tone === 'success' ? palette.successSoft : tone === 'warning' ? palette.warningSoft : tone === 'danger' ? palette.dangerSoft : palette.primarySoft;
-        const color = tone === 'success' ? '#047857' : tone === 'warning' ? '#B45309' : tone === 'danger' ? '#B91C1C' : palette.primary;
+        const backgroundColor = tone === 'success' ? palette.successSoft : tone === 'warning' ? palette.warningSoft : tone === 'danger' ? palette.dangerSoft : '#F3F6FA';
+        const color = tone === 'success' ? '#08765D' : tone === 'warning' ? '#8C5B17' : tone === 'danger' ? '#A42E39' : brandColors.navy;
         return (
           <Card key={item.label} mode="contained" style={[styles.metric, { backgroundColor }]}>
             <Card.Content style={styles.metricContent}>
               <Text variant="labelSmall" style={styles.muted}>{item.label}</Text>
-              <Text variant="titleLarge" style={{ color, fontWeight: '800' }}>{item.value}</Text>
+              <Text variant="titleMedium" style={{ color, fontWeight: '900' }} numberOfLines={2}>{item.value}</Text>
             </Card.Content>
           </Card>
         );
@@ -152,10 +168,10 @@ export function DataRow({
 
 export function InfoNote({ title, children, tone = 'info' }: { title: string; children: ReactNode; tone?: 'info' | 'warning' | 'success' }) {
   const backgroundColor = tone === 'warning' ? palette.warningSoft : tone === 'success' ? palette.successSoft : palette.infoSoft;
-  const color = tone === 'warning' ? '#9A3412' : tone === 'success' ? '#047857' : palette.info;
+  const color = tone === 'warning' ? '#8C5B17' : tone === 'success' ? '#08765D' : '#086792';
   return (
     <View style={[styles.note, { backgroundColor }]}>
-      <Text variant="labelLarge" style={{ color, fontWeight: '700' }}>{title}</Text>
+      <Text variant="labelLarge" style={{ color, fontWeight: '800' }}>{title}</Text>
       <Text variant="bodySmall" style={{ color }}>{children}</Text>
     </View>
   );
@@ -163,9 +179,9 @@ export function InfoNote({ title, children, tone = 'info' }: { title: string; ch
 
 export function EmptyState({ title, body, actionLabel, onAction }: { title: string; body: string; actionLabel?: string; onAction?: () => void }) {
   return (
-    <Card mode="outlined" style={styles.empty}>
+    <Card mode="contained" style={styles.empty}>
       <Card.Content style={styles.gap8}>
-        <Text variant="titleMedium">{title}</Text>
+        <Text variant="titleMedium" style={styles.rowTitle}>{title}</Text>
         <Text variant="bodyMedium" style={styles.muted}>{body}</Text>
         {actionLabel && onAction ? <Button mode="contained" onPress={onAction}>{actionLabel}</Button> : null}
       </Card.Content>
@@ -240,7 +256,7 @@ export function ScreenLink({ title, subtitle, onPress, icon = 'chevron-right' }:
     <Card mode="outlined" style={styles.linkCard} onPress={onPress}>
       <Card.Content style={styles.row}>
         <View style={{ flex: 1 }}>
-          <Text variant="titleSmall">{title}</Text>
+          <Text variant="titleSmall" style={styles.rowTitle}>{title}</Text>
           {subtitle ? <Text variant="bodySmall" style={styles.muted}>{subtitle}</Text> : null}
         </View>
         <IconButton icon={icon} />
@@ -252,30 +268,31 @@ export function ScreenLink({ title, subtitle, onPress, icon = 'chevron-right' }:
 export const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: palette.background },
   scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 36, gap: 16 },
-  header: { minHeight: 78, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, backgroundColor: palette.surface },
+  content: { padding: 16, paddingBottom: 36, gap: 20 },
+  header: { minHeight: 82, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, backgroundColor: palette.surface },
+  headerAccent: { height: 2 },
   headerCopy: { flex: 1, paddingVertical: 10 },
-  headerTitle: { fontWeight: '700', color: palette.text },
-  headerSubtitle: { color: palette.muted, marginTop: 2 },
+  headerTitle: { fontWeight: '900', color: palette.text, letterSpacing: -0.2 },
+  headerSubtitle: { color: palette.muted, marginTop: 3, lineHeight: 17 },
   headerRightSpacer: { width: 48 },
   section: { gap: 10 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { fontWeight: '700', color: palette.text },
+  sectionTitle: { fontWeight: '800', color: palette.text },
   sectionBody: { gap: 10 },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  metric: { flexGrow: 1, flexBasis: 100, minWidth: 100, borderRadius: 12 },
-  metricContent: { minHeight: 82, justifyContent: 'space-between' },
-  rowCard: { borderRadius: 12, backgroundColor: palette.surface },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowTitle: { fontWeight: '600', color: palette.text },
+  metric: { flexGrow: 1, flexBasis: 112, minWidth: 112, borderRadius: 14 },
+  metricContent: { minHeight: 78, justifyContent: 'space-between' },
+  rowCard: { borderRadius: 14, backgroundColor: palette.surface, borderColor: palette.border },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
+  rowTitle: { fontWeight: '800', color: palette.text },
   muted: { color: palette.muted },
-  note: { borderRadius: 12, padding: 14, gap: 5 },
-  empty: { borderRadius: 12, backgroundColor: palette.surface },
+  note: { borderRadius: 14, padding: 14, gap: 5 },
+  empty: { borderRadius: 14, backgroundColor: '#F7F9FC' },
   field: { backgroundColor: palette.surface },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  linkCard: { borderRadius: 12, backgroundColor: palette.surface },
+  linkCard: { borderRadius: 14, backgroundColor: palette.surface, borderColor: palette.border },
   gap8: { gap: 8 },
-  loading: { paddingVertical: 56, alignItems: 'center', gap: 12 },
-  errorCard: { borderColor: '#FCA5A5', backgroundColor: palette.dangerSoft },
+  loading: { paddingVertical: 44, alignItems: 'center', gap: 10 },
+  errorCard: { backgroundColor: palette.dangerSoft },
 });

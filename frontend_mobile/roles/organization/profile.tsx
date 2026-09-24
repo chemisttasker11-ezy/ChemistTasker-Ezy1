@@ -6,6 +6,7 @@ import {
   Card,
   Dialog,
   Divider,
+  Icon,
   IconButton,
   List,
   Portal,
@@ -21,6 +22,9 @@ import { useRouter } from 'expo-router';
 import { deleteAccount } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import apiClient from '@/utils/apiClient';
+import { brandColors, personaPalettes } from '@/constants/theme';
+
+const profilePalette = personaPalettes.organization;
 
 const webBaseUrl = 'https://www.chemisttasker.com.au';
 
@@ -123,7 +127,7 @@ export default function OrganizationProfileScreen() {
       <ScrollView style={styles.scrollView}>
         <Card style={styles.heroCard} mode="contained">
           <LinearGradient
-            colors={['#D7E8FF', '#E9D5FF', '#F9C2DE']}
+            colors={[profilePalette.soft, '#FFFFFF', brandColors.mist]}
             locations={[0, 0.58, 1]}
             start={{ x: 0, y: 0.1 }}
             end={{ x: 1, y: 1 }}
@@ -157,13 +161,13 @@ export default function OrganizationProfileScreen() {
             <Card key={item.route} style={styles.menuCard} onPress={() => router.push(item.route as any)}>
               <Card.Content style={styles.menuContent}>
                 <View style={styles.menuIcon}>
-                  <IconButton icon={item.icon} size={24} iconColor="#6366F1" />
+                  <Icon source={item.icon} size={24} color={profilePalette.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="titleMedium" style={styles.menuTitle}>{item.title}</Text>
                   <Text variant="bodySmall" style={styles.menuDesc}>{item.description}</Text>
                 </View>
-                <IconButton icon="chevron-right" size={24} iconColor="#9CA3AF" />
+                <Icon source="chevron-right" size={22} color="#718096" />
               </Card.Content>
             </Card>
           ))}
@@ -179,7 +183,7 @@ export default function OrganizationProfileScreen() {
                 <Switch
                   value={notificationsEnabled}
                   onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
+                  color={profilePalette.accent}
                 />
               )}
             />
@@ -223,7 +227,7 @@ export default function OrganizationProfileScreen() {
           <Card style={styles.menuCard} onPress={shareFriendReferral}>
             <Card.Content style={styles.menuContent}>
               <View style={styles.menuIcon}>
-                <IconButton icon="account-plus-outline" size={24} iconColor="#6366F1" />
+                <Icon source="account-plus-outline" size={24} color={profilePalette.accent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="titleMedium" style={styles.menuTitle}>Refer a colleague </Text>
@@ -231,7 +235,7 @@ export default function OrganizationProfileScreen() {
                   Share a referral link and earn pills when they register.
                 </Text>
               </View>
-              <IconButton icon={referralLoading ? 'progress-clock' : 'share-variant'} size={24} iconColor="#9CA3AF" />
+              <IconButton icon={referralLoading ? 'progress-clock' : 'share-variant'} size={24} iconColor="#718096" />
             </Card.Content>
           </Card>
         </View>
@@ -241,7 +245,7 @@ export default function OrganizationProfileScreen() {
           <Card style={styles.menuCard} onPress={() => router.push('/organization/pills' as any)}>
             <Card.Content style={styles.menuContent}>
               <View style={styles.menuIcon}>
-                <IconButton icon="credit-card-outline" size={24} iconColor="#6366F1" />
+                <Icon source="credit-card-outline" size={24} color={profilePalette.accent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="titleMedium" style={styles.menuTitle}>Organization pills</Text>
@@ -249,7 +253,7 @@ export default function OrganizationProfileScreen() {
                   {pillSummary.shift_post_cost} pills per shift post.
                 </Text>
               </View>
-              <IconButton icon="chevron-right" size={24} iconColor="#9CA3AF" />
+              <Icon source="chevron-right" size={22} color="#718096" />
             </Card.Content>
           </Card>
         </View>
@@ -336,7 +340,7 @@ export default function OrganizationProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   scrollView: { flex: 1 },
   heroCard: {
     marginHorizontal: 16,
@@ -366,7 +370,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontWeight: 'bold',
-    color: '#111827',
+    color: brandColors.navy,
     marginBottom: 4,
     marginTop: 2,
     textAlign: 'center',
@@ -400,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginBottom: 8,
     marginLeft: 4,
     fontWeight: '600',
@@ -410,7 +414,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     elevation: 0,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: brandColors.border,
   },
   menuContent: {
     flexDirection: 'row',
@@ -423,16 +427,16 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: profilePalette.soft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   menuTitle: {
     fontWeight: '600',
-    color: '#111827',
+    color: brandColors.navy,
   },
   menuDesc: {
-    color: '#6B7280',
+    color: brandColors.body,
     marginTop: 2,
   },
   listSurface: {

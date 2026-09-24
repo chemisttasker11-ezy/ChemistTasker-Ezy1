@@ -5,6 +5,7 @@ import type { ChatRoom } from './types';
 import ChatListItem from './ChatListItem';
 import { deleteRoomService } from '@chemisttasker/shared-core';
 import { displayNameFromUser } from './displayName';
+import { brandColors } from '@/constants/theme';
 
 type Props = {
   rooms: ChatRoom[];
@@ -245,7 +246,7 @@ export default function ChatSidebar({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: brandColors.mist,
     padding: 12,
     gap: 8,
   },
@@ -270,5 +271,5 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   section: { paddingVertical: 6 },
-  sectionTitle: { fontWeight: '700', color: '#6B7280' },
+  sectionTitle: { fontWeight: '700', color: brandColors.body },
 });

@@ -1,3 +1,5 @@
+import { brandColors } from '@/constants/theme';
+
 // Mobile types for pharmacy management
 // Re-exports from shared-core with mobile-specific additions
 
@@ -29,18 +31,18 @@ export {
 
 // Mobile-specific surface tokens for consistent styling
 export const surfaceTokens = {
-    bg: '#FFFFFF',
-    bgDark: '#F9FAFB',
-    subtle: 'rgba(0, 0, 0, 0.04)',
-    hover: 'rgba(99, 102, 241, 0.08)',
-    border: '#E5E7EB',
-    text: '#1F2937',
-    textMuted: 'rgba(0, 0, 0, 0.6)',
-    textSecondary: 'rgba(0, 0, 0, 0.6)',
-    primary: '#6366F1',
-    primaryLight: '#A78BFA',
-    error: '#EF4444',
-    success: '#10B981',
-    warning: '#F59E0B',
-    info: '#3B82F6',
+    bg: brandColors.white,
+    bgDark: brandColors.mist,
+    subtle: '#F7F9FC',
+    hover: '#F0EAFF',
+    border: brandColors.border,
+    text: brandColors.navy,
+    textMuted: brandColors.body,
+    textSecondary: brandColors.body,
+    primary: brandColors.purple,
+    primaryLight: '#F0EAFF',
+    error: brandColors.danger,
+    success: brandColors.success,
+    warning: brandColors.warning,
+    info: brandColors.blue,
 };

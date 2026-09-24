@@ -18,7 +18,7 @@ type Props = {
 };
 
 const CARD_COPY = [
-  { key: 'draftTotal', title: 'Total Draft Amount', accent: '#4F46E5' },
+  { key: 'draftTotal', title: 'Total Draft Amount', accent: '#5222B8' },
   { key: 'pendingTotal', title: 'Total Pending Amount', accent: '#D97706' },
   { key: 'revenueTotal', title: 'Revenue T.Y.', accent: '#059669' },
 ] as const;
@@ -93,10 +93,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: '700',
-    color: '#111827',
+    color: '#06214A',
   },
   subtitle: {
-    color: '#6B7280',
+    color: '#59677E',
     marginTop: 2,
   },
   filters: {
@@ -107,17 +107,17 @@ const styles = StyleSheet.create({
     minWidth: 64,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#E6EAF2',
     paddingHorizontal: 14,
     paddingVertical: 8,
     backgroundColor: '#FFFFFF',
   },
   filterChipActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: '#5222B8',
+    borderColor: '#5222B8',
   },
   filterText: {
-    color: '#374151',
+    color: '#33445C',
     fontWeight: '600',
   },
   filterTextActive: {
@@ -134,10 +134,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E6EAF2',
   },
   cardLabel: {
-    color: '#6B7280',
+    color: '#59677E',
     marginBottom: 8,
   },
   cardValue: {

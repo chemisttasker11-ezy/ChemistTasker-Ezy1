@@ -1,0 +1,110 @@
+name: Build Kiosk Production Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-production-windows:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend_web/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable pinned 2026-09-22
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: frontend_web/src-tauri -> target
+          cache-on-failure: true
+
+      - name: Install frontend dependencies
+        working-directory: frontend_web
+        shell: pwsh
+        run: npm ci
+
+      - name: Typecheck kiosk
+        working-directory: frontend_web
+        shell: pwsh
+        run: npm run typecheck:kiosk
+
+      - name: Run native kiosk tests
+        working-directory: frontend_web/src-tauri
+        shell: pwsh
+        run: cargo test
+
+      - name: Validate production kiosk environment
+        working-directory: frontend_web
+        shell: pwsh
+        env:
+          KIOSK_BUILD_PROFILE: production
+          VITE_API_URL: https://chemisttasker.com.au
+        run: node scripts/validate-kiosk-build.mjs
+
+      - name: Build production kiosk EXE and MSI
+        working-directory: frontend_web
+        shell: pwsh
+        env:
+          KIOSK_BUILD_PROFILE: production
+          VITE_API_URL: https://chemisttasker.com.au
+          CARGO_BUILD_JOBS: '2'
+          CARGO_INCREMENTAL: '0'
+        run: node scripts/run-tauri.mjs build --bundles msi
+
+      - name: Stage production artifacts and checksums
+        shell: pwsh
+        run: |
+          $exe = 'frontend_web/src-tauri/target/release/chemisttasker-kiosk.exe'
+          if (-not (Test-Path $exe)) { throw "Compiled production EXE not found at $exe" }
+
+          $msi = Get-ChildItem 'frontend_web/src-tauri/target/release/bundle/msi' -Filter '*.msi' -File | Select-Object -First 1
+          if (-not $msi) { throw "Compiled production MSI not found" }
+
+          New-Item -ItemType Directory -Force -Path build-output | Out-Null
+          Copy-Item $exe 'build-output/ChemistTasker-Kiosk.exe' -Force
+          Copy-Item $msi.FullName 'build-output/ChemistTasker-Kiosk-Setup.msi' -Force
+
+          $exeHash = (Get-FileHash 'build-output/ChemistTasker-Kiosk.exe' -Algorithm SHA256).Hash.ToLower()
+          $msiHash = (Get-FileHash 'build-output/ChemistTasker-Kiosk-Setup.msi' -Algorithm SHA256).Hash.ToLower()
+          $exeSize = (Get-Item 'build-output/ChemistTasker-Kiosk.exe').Length
+          $msiSize = (Get-Item 'build-output/ChemistTasker-Kiosk-Setup.msi').Length
+
+          @"
+          PROFILE=production
+          API_URL=https://chemisttasker.com.au
+          SOURCE_SHA=${{ github.sha }}
+          EXE_SHA256=$exeHash
+          EXE_SIZE_BYTES=$exeSize
+          MSI_SHA256=$msiHash
+          MSI_SIZE_BYTES=$msiSize
+          SIGNING=unsigned
+          "@ | Set-Content 'build-output/BUILD-INFO.txt'
+
+          Get-Content 'build-output/BUILD-INFO.txt'
+
+      - name: Upload production Windows artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chemisttasker-kiosk-production-windows
+          path: |
+            build-output/ChemistTasker-Kiosk.exe
+            build-output/ChemistTasker-Kiosk-Setup.msi
+            build-output/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 30

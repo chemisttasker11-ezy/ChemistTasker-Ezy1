@@ -2321,6 +2321,11 @@ class ShiftSaved(models.Model):
         return f"SavedShift#{self.pk} user={self.user_id} shift={self.shift_id}"
 
 class LeaveRequest(models.Model):
+    """Historical Sada leave rows retained for migration/audit compatibility.
+
+    Active leave reads and writes are owned by workforce.WorkforceLeaveRequest.
+    """
+
     LEAVE_TYPE_CHOICES = [
         ('SICK', 'Sick Leave'),
         ('ANNUAL', 'Annual Leave'),

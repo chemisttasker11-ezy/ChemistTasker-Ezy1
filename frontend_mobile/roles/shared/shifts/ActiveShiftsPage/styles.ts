@@ -4,7 +4,7 @@ import { customTheme } from './theme';
 export const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F5F8FC',
     },
     content: {
         padding: customTheme.spacing.lg,
@@ -17,11 +17,11 @@ export const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: '900',
-        color: '#111827',
+        color: '#06214A',
         letterSpacing: -0.4,
     },
     subtitle: {
-        color: '#64748B',
+        color: '#59677E',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -36,11 +36,11 @@ export const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 17,
         fontWeight: '900',
-        color: '#111827',
+        color: '#06214A',
     },
     cardSubtitle: {
         fontSize: 12,
-        color: '#64748B',
+        color: '#59677E',
         marginTop: 5,
         fontWeight: '600',
     },
@@ -67,15 +67,15 @@ export const styles = StyleSheet.create({
         position: 'relative',
         overflow: 'hidden',
         marginBottom: customTheme.spacing.md,
-        borderRadius: 24,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#D9E2F2',
+        borderColor: '#E6EAF2',
         backgroundColor: '#FFFFFF',
         elevation: 5,
-        shadowColor: '#6366F1',
+        shadowColor: '#06214A',
         shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.12,
-        shadowRadius: 28,
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
     },
     cardAccent: {
         position: 'absolute',
@@ -100,7 +100,7 @@ export const styles = StyleSheet.create({
         borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#7C3AED',
+        shadowColor: '#5222B8',
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.24,
         shadowRadius: 24,
@@ -146,7 +146,7 @@ export const styles = StyleSheet.create({
     location: {
         flex: 1,
         fontSize: 13,
-        color: '#64748B',
+        color: '#59677E',
         fontWeight: '600',
     },
     headerActions: {
@@ -154,7 +154,7 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         flexWrap: 'nowrap',
         justifyContent: 'flex-end',
-        width: 96,
+        width: 116,
     },
     directBadgeRow: {
         flexDirection: 'row',
@@ -179,9 +179,9 @@ export const styles = StyleSheet.create({
     },
     actionButton: {
         margin: 0,
-        width: 30,
-        height: 30,
-        backgroundColor: '#F8FAFC',
+        width: 48,
+        height: 48,
+        backgroundColor: '#F5F8FC',
     },
     statsRow: {
         flexDirection: 'row',
@@ -205,9 +205,9 @@ export const styles = StyleSheet.create({
         paddingVertical: 8,
         marginHorizontal: 4,
         borderWidth: 1,
-        borderColor: '#D9E2F2',
+        borderColor: '#E6EAF2',
         borderRadius: 18,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F5F8FC',
         shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.06,
@@ -221,15 +221,15 @@ export const styles = StyleSheet.create({
         margin: 0,
         width: 32,
         height: 32,
-        backgroundColor: '#F3E8FF',
+        backgroundColor: '#F0EAFF',
     },
     statValue: {
-        color: '#111827',
+        color: '#06214A',
         fontSize: 15,
         fontWeight: '900',
     },
     statLabel: {
-        color: '#64748B',
+        color: '#59677E',
         fontSize: 10,
         fontWeight: '700',
     },

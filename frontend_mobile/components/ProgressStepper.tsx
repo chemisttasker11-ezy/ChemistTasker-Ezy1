@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ProgressBar, Text, Surface } from 'react-native-paper';
+import { brandColors } from '@/constants/theme';
 
 interface ProgressStepperProps {
     currentStep: number;
@@ -63,7 +64,7 @@ export default function ProgressStepper({ currentStep, totalSteps, steps }: Prog
 const styles = StyleSheet.create({
     container: {
         padding: 16,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: brandColors.surfaceMuted,
         borderRadius: 8,
         marginBottom: 16,
     },
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     stepLabel: {
-        color: '#666',
+        color: brandColors.body,
     },
     progressBar: {
         height: 8,
@@ -96,22 +97,22 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#e0e0e0',
+        backgroundColor: '#E6EAF2',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#E6EAF2',
     },
     stepCircleActive: {
-        backgroundColor: '#1976d2',
-        borderColor: '#1976d2',
+        backgroundColor: brandColors.purple,
+        borderColor: brandColors.purple,
     },
     stepCircleComplete: {
-        backgroundColor: '#4caf50',
-        borderColor: '#4caf50',
+        backgroundColor: brandColors.success,
+        borderColor: brandColors.success,
     },
     stepNumber: {
-        color: '#999',
+        color: '#718096',
         fontWeight: 'bold',
     },
     stepNumberActive: {
@@ -119,11 +120,11 @@ const styles = StyleSheet.create({
     },
     stepText: {
         textAlign: 'center',
-        color: '#999',
+        color: '#718096',
         fontSize: 11,
     },
     stepTextActive: {
-        color: '#1976d2',
+        color: brandColors.purple,
         fontWeight: '600',
     },
 });

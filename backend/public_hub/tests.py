@@ -1,4 +1,5 @@
 from datetime import timedelta
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
@@ -7,6 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from .admin import ArticleAdmin
 from .models import Article, Comment, Reaction, Report
 
 
@@ -29,6 +31,12 @@ class HubTests(TestCase):
     def login(self, user=None):
         token = RefreshToken.for_user(user or self.user)
         self.api.credentials(HTTP_AUTHORIZATION=f'Bearer {token.access_token}')
+
+    def test_article_admin_cannot_bypass_editorial_workflow(self):
+        article_admin = ArticleAdmin(Article, admin.site)
+        self.assertFalse(article_admin.has_add_permission(None))
+        self.assertFalse(article_admin.has_change_permission(None, self.article))
+        self.assertFalse(article_admin.has_delete_permission(None, self.article))
 
     def test_drafts_scheduled_and_archived_are_not_public(self):
         for status, date in [('draft', None), ('published', timezone.now() + timedelta(days=1)), ('archived', timezone.now())]:

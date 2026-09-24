@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, IconButton, Portal, Modal, List, Divider, Button, Text } from 'react-native-paper';
+import { Icon, Avatar, IconButton, Portal, Modal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
@@ -29,12 +30,15 @@ const sidebarItems = [
   { label: 'Staff', icon: 'account-group', route: '/owner/staff' },
   { label: 'Locums', icon: 'account-heart', route: '/owner/locums' },
   { label: 'Shifts', icon: 'calendar-month', route: '/owner/shifts' },
+  { label: 'Weekly Roster', icon: 'calendar-account', route: '/manager/roster' },
+  { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews' },
   { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
   { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
   { label: 'Invoices', icon: 'receipt', route: '/owner/invoice' },
   { label: 'Calendar', icon: 'calendar', route: '/owner/calendar' },
   { label: 'Messages', icon: 'message', route: '/owner/chat' },
   { label: 'Talent Board', icon: 'account-search', route: '/owner/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/owner/learning' },
   { label: 'Profile', icon: 'account-circle', route: '/owner/profile' },
 ];
 
@@ -293,12 +297,12 @@ export default function OwnerLayout() {
       />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#06214A',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -308,7 +312,7 @@ export default function OwnerLayout() {
           headerTitle: tabTitles[route.name] || 'Owner',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+            <IconButton icon="menu" accessibilityLabel="Open owner menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
@@ -331,9 +335,9 @@ export default function OwnerLayout() {
                     }}
                   />
                 ) : null}
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} color={brandColors.navy} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -366,7 +370,7 @@ export default function OwnerLayout() {
             title: 'Home',
             tabBarAccessibilityLabel: 'Home tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="home" iconColor={color} size={size} />
+              <Icon source="home" color={color} size={size} />
             ),
           }}
         />
@@ -382,7 +386,7 @@ export default function OwnerLayout() {
             title: 'Shifts',
             tabBarAccessibilityLabel: 'Shifts tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="calendar" iconColor={color} size={size} />
+              <Icon source="calendar" color={color} size={size} />
             ),
           }}
         />
@@ -398,16 +402,9 @@ export default function OwnerLayout() {
             title: 'Post',
             tabBarAccessibilityLabel: 'Post shift tab',
             tabBarIcon: ({ color }) => (
-              <IconButton
-                icon="plus-circle"
-                iconColor="#FFFFFF"
-                size={32}
-                style={{
-                  backgroundColor: '#6366F1',
-                  borderRadius: 24,
-                  marginTop: -20,
-                }}
-              />
+              <View style={{ backgroundColor: '#06214A', borderRadius: 24, marginTop: -20, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon source="plus-circle" color="#FFFFFF" size={32} />
+              </View>
             ),
           }}
         />
@@ -423,7 +420,7 @@ export default function OwnerLayout() {
             title: 'Hub',
             tabBarAccessibilityLabel: 'Hub tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="account-group" iconColor={color} size={size} />
+              <Icon source="account-group" color={color} size={size} />
             ),
           }}
         />
@@ -439,7 +436,7 @@ export default function OwnerLayout() {
             title: 'Chat',
             tabBarAccessibilityLabel: 'Chat tab',
             tabBarIcon: ({ color, size }) => (
-              <IconButton icon="message" iconColor={color} size={size} />
+              <Icon source="message" color={color} size={size} />
             ),
           }}
         />
@@ -478,6 +475,7 @@ export default function OwnerLayout() {
         />
         <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="talent-board" options={{ href: null }} />
+        <Tabs.Screen name="learning" options={{ href: null }} />
         <Tabs.Screen name="pills" options={{ href: null }} />
         <Tabs.Screen name="onboarding" options={{ href: null }} />
         <Tabs.Screen name="profile-detail" options={{ href: null }} />
@@ -503,7 +501,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#06214A' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   badgeDot: {
     position: 'absolute',
