@@ -106,6 +106,8 @@ struct SyncResponse {
     results: Vec<Value>,
     #[serde(default)]
     max_offline_hours: Option<i64>,
+    #[serde(default)]
+    device_revoked: bool,
 }
 
 fn keyring_entry(account: &str) -> Result<Entry, String> {
@@ -1528,6 +1530,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
                     .unwrap_or_else(|| Utc::now().to_rfc3339()),
                 results: vec![],
                 max_offline_hours: None,
+                device_revoked: false,
             });
         }
         let token = keyring_entry("device-token")?
@@ -1577,6 +1580,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
             server_time: refreshed.server_time,
             results: vec![],
             max_offline_hours: Some(refreshed.max_offline_hours),
+            device_revoked: false,
         });
     }
     let token = keyring_entry("device-token")?
@@ -1616,7 +1620,9 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
     if receipt.acknowledged_through > highest_local_sequence {
         return Err("Sync receipt acknowledges unknown local evidence".to_string());
     }
-    if let Some(max_offline_hours) = receipt.max_offline_hours {
+    if receipt.device_revoked {
+        mark_device_revoked(&connection)?;
+    } else if let Some(max_offline_hours) = receipt.max_offline_hours {
         refresh_device_authorization(&connection, &receipt.server_time, max_offline_hours)?;
     }
 
