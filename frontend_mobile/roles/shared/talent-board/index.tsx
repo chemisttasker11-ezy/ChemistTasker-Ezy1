@@ -159,11 +159,12 @@ export default function TalentBoard({
   const feed = useTalentFeed({ enabled: !publicMode });
   const posts = externalPosts ?? feed.posts;
   const loading = externalLoading ?? feed.loading;
-  const error = externalError ?? feed.error;
   const reload = feed.reload;
   const { user } = useAuth();
   const router = useRouter();
 
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = externalError ?? actionError ?? feed.error;
   const [refreshing, setRefreshing] = useState(false);
   const [filters, setFilters] = useState<TalentFilterState>({
     search: '',
@@ -388,11 +389,14 @@ export default function TalentBoard({
 
   const handleToggleLike = useCallback(async (candidate: Candidate) => {
     if (publicMode) return onRequireLogin?.('like');
+    setActionError(null);
     try {
       if (candidate.isLikedByMe) await unlikeExplorerPost(candidate.id);
       else await likeExplorerPost(candidate.id);
       await reload();
-    } catch {}
+    } catch (err: any) {
+      setActionError(err?.message || 'Unable to update this like. Please try again.');
+    }
   }, [onRequireLogin, publicMode, reload]);
 
   const clearAllFilters = () => {
