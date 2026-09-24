@@ -27,6 +27,7 @@ const sidebarItems = [
   { label: 'Chat', icon: 'message', route: '/explorer/chat' },
   { label: 'Profile', icon: 'account-circle', route: '/explorer/profile' },
   { label: 'Talent Board', icon: 'account-search', route: '/explorer/talent-board' },
+  { label: 'Learning', icon: 'school-outline', route: '/explorer/learning' },
   { label: 'Calendar', icon: 'calendar', route: '/explorer/calendar' },
 ];
 
