@@ -12,7 +12,7 @@ export type WorkforceLeaveType = (typeof WORKFORCE_LEAVE_TYPES)[number];
 
 export const WORKFORCE_LEAVE_TYPE_OPTIONS = WORKFORCE_LEAVE_TYPES.map((value) => ({
   value,
-  label: value.replaceAll('_', ' '),
+  label: value.replace(/_/g, ' '),
 }));
 
 export type WorkforceCheckSeverity = 'BLOCKER' | 'WARNING' | 'INFO';
