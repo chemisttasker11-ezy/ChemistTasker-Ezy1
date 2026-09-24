@@ -16,7 +16,7 @@ import {
   updateWorkerShiftRequestService,
   WORKFORCE_LEAVE_TYPE_OPTIONS,
   type WorkforceLeaveType,
-  type WorkerShiftRequestRecord,
+  type WorkerShiftRequest,
 } from '@chemisttasker/shared-core';
 import {
   ActionButtons,
@@ -59,8 +59,8 @@ const pharmacyNameOf = (row: any) => row?.name ?? row?.pharmacyName ?? row?.phar
 const openShiftSlots = (shift: any) => asArray<any>(shift?.slots);
 
 type EditState =
-  | { type: 'leave'; assignment: any; existing?: WorkerShiftRequestRecord | null }
-  | { type: 'cover'; assignment: any; existing?: WorkerShiftRequestRecord | null }
+  | { type: 'leave'; assignment: any; existing?: WorkerShiftRequest | null }
+  | { type: 'cover'; assignment: any; existing?: WorkerShiftRequest | null }
   | { type: 'claim'; shift: any; slot: any }
   | null;
 
@@ -70,7 +70,7 @@ export default function MyRosterScreen() {
   const [weekStart, setWeekStart] = useState(startOfWeek());
   const [assignments, setAssignments] = useState<any[]>([]);
   const [openShifts, setOpenShifts] = useState<any[]>([]);
-  const [requests, setRequests] = useState<WorkerShiftRequestRecord[]>([]);
+  const [requests, setRequests] = useState<WorkerShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -108,7 +108,7 @@ export default function MyRosterScreen() {
       ]);
       setAssignments(asArray<any>(assignmentRows));
       setOpenShifts(asArray<any>((openRows as any)?.results ?? openRows));
-      setRequests(asArray<WorkerShiftRequestRecord>(requestRows));
+      setRequests(asArray<WorkerShiftRequest>(requestRows));
     } catch (e) {
       setError(errorMessage(e, 'Unable to load your roster.'));
     } finally {
