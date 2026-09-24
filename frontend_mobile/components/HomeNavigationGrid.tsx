@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { IconButton, Text } from 'react-native-paper';
+import { Icon, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import { brandColors, getPersonaPalette } from '@/constants/theme';
 
@@ -40,12 +40,7 @@ export default function HomeNavigationGrid({ items, onNavigate }: HomeNavigation
             onPress={() => onNavigate(item.route)}
           >
             <View style={[styles.iconWrap, { backgroundColor: persona.soft }]}>
-              <IconButton
-                icon={item.icon}
-                size={24}
-                iconColor={item.color || persona.accent}
-                style={styles.icon}
-              />
+              <Icon source={item.icon} size={24} color={item.color || persona.accent} />
             </View>
             <View style={styles.copy}>
               <Text variant="titleSmall" style={styles.title} numberOfLines={2}>
@@ -57,7 +52,7 @@ export default function HomeNavigationGrid({ items, onNavigate }: HomeNavigation
                 </Text>
               ) : null}
             </View>
-            <IconButton icon="chevron-right" size={18} iconColor="#8A97AA" style={styles.chevron} />
+            <Icon source="chevron-right" size={20} color="#8A97AA" />
           </Pressable>
         ))}
       </View>
@@ -101,9 +96,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  icon: {
-    margin: 0,
-  },
   copy: {
     flex: 1,
     minWidth: 0,
@@ -117,8 +109,5 @@ const styles = StyleSheet.create({
     color: brandColors.body,
     marginTop: 3,
     lineHeight: 17,
-  },
-  chevron: {
-    margin: 0,
   },
 });
