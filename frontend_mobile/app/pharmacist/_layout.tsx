@@ -3,7 +3,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import { ActivityIndicator, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon, Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
-import { getAdminAssignments, getAssignmentId, getSelectedAdminAssignment, selectAdminPersona } from '@/utils/mobilePersona';
+import { getAdminAssignments, selectAdminPersona } from '@/utils/mobilePersona';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
@@ -91,10 +91,8 @@ function PharmacistSidebar({
             left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
             onPress={() => {
               void (async () => {
-                const selected = await getSelectedAdminAssignment(user);
-                const assignmentId = getAssignmentId(selected);
-                if (assignmentId != null) {
-                  await selectAdminPersona(user, assignmentId);
+                const selected = await selectAdminPersona(user);
+                if (selected) {
                   onDismiss();
                   router.replace('/admin' as any);
                 }
