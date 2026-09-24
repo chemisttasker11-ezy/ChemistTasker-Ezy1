@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
+import { dateFromIso, isoDate } from '@/features/parity/utils';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 
@@ -238,7 +240,24 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
           </View>
         </List.Accordion> : null}
         {field('reference', 'Customer PO / reference')}
-        {field('invoice_date', 'Issue date (YYYY-MM-DD)')}{field('due_date', 'Due date (YYYY-MM-DD)')}
+        <View style={{ gap: 12 }}>
+          <DatePickerInput
+            locale="en-AU"
+            label="Issue date"
+            value={dateFromIso(value.invoice_date)}
+            onChange={(date) => date && change('invoice_date', isoDate(date))}
+            inputMode="start"
+            disabled={busy}
+          />
+          <DatePickerInput
+            locale="en-AU"
+            label="Due date"
+            value={dateFromIso(value.due_date)}
+            onChange={(date) => date && change('due_date', isoDate(date))}
+            inputMode="start"
+            disabled={busy}
+          />
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.price_mode === 'exclusive'} onPress={() => change('price_mode', 'exclusive')}>GST exclusive</Chip><Chip selected={value.price_mode === 'inclusive'} onPress={() => change('price_mode', 'inclusive')}>GST inclusive</Chip></View>
       </Surface>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Text variant="titleMedium" style={{ flex: 1 }}>Items & services</Text><Button compact icon="plus" onPress={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Ad-hoc row</Button><Button compact icon="playlist-plus" onPress={() => { setItemOpen(!itemOpen); setNewItemOpen(false); setCustomerOpen(false); setQuery(''); }}>Saved item</Button><Button compact icon="plus-box-outline" onPress={() => { setNewItemOpen(!newItemOpen); setItemOpen(false); setCustomerOpen(false); }}>Add new saved item</Button></View>
@@ -260,7 +279,14 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         <TextInput mode="outlined" dense label="Description" value={line.description || ''} onChangeText={description => changeLine(index, { description })} />
         <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Qty" value={line.quantity} onChangeText={text => changeLine(index, { quantity: text })} /><TextInput mode="outlined" dense style={{ flex: 1 }} label="Unit" value={line.unit || ''} onChangeText={unit => changeLine(index, { unit })} /><TextInput mode="outlined" dense style={{ flex: 1 }} keyboardType="decimal-pad" label="Rate" value={line.unit_price} onChangeText={text => changeLine(index, { unit_price: text })} /></View>
         <TextInput mode="outlined" dense label="Discount %" keyboardType="decimal-pad" value={line.discount} onChangeText={discount => changeLine(index, { discount })} />
-        <TextInput mode="outlined" dense label="Work date (YYYY-MM-DD)" value={line.worked_on || ''} onChangeText={worked_on => changeLine(index, { worked_on })} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Work date"
+          value={dateFromIso(line.worked_on || undefined)}
+          onChange={(date) => changeLine(index, { worked_on: date ? isoDate(date) : null })}
+          inputMode="start"
+          disabled={busy}
+        />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>{(['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'] as const).map((tax, i) => <Chip key={tax} selected={line.tax_code === tax} onPress={() => changeLine(index, { tax_code: tax })}>{['GST 10%', 'GST-free', 'Input taxed', 'N-T / not taxable'][i]}</Chip>)}</View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           {(['ProfessionalServices', 'Transportation', 'Accommodation', 'Miscellaneous', 'Superannuation'] as FinanceCategory[]).map(category => (
