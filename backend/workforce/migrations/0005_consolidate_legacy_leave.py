@@ -44,6 +44,16 @@ def backfill_legacy_leave(apps, schema_editor):
 
         row = WorkforceLeave.objects.filter(legacy_leave_id=legacy.pk).first()
         if row is None:
+            row = WorkforceLeave.objects.filter(
+                user_id=legacy.user_id,
+                pharmacy_id=pharmacy.pk,
+                leave_type=legacy.leave_type,
+                status=legacy.status,
+                start_at=start_at,
+                end_at=end_at,
+            ).order_by("id").first()
+
+        if row is None:
             row = WorkforceLeave.objects.create(
                 pharmacy_id=pharmacy.pk,
                 membership_id=membership.pk if membership else None,
@@ -68,6 +78,7 @@ def backfill_legacy_leave(apps, schema_editor):
             row.status = legacy.status
             row.note = legacy.note or ""
             row.decided_at = legacy.date_resolved
+            row.legacy_leave_id = legacy.pk
             row.save()
 
         if legacy.date_applied:
