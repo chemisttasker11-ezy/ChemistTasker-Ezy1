@@ -19,6 +19,7 @@ const managerTools: Tool[] = [
 ];
 
 const workerTools: Tool[] = [
+  { title: 'My roster', subtitle: 'Assigned shifts, open slots, leave and cover', icon: 'calendar-account-outline', route: '/my-roster' },
   { title: 'Attendance', subtitle: 'Clock, breaks and attendance corrections', icon: 'clock-check-outline', route: '/attendance' },
   { title: 'Finance', subtitle: 'Invoices, expenses and finance records', icon: 'cash-multiple', route: '/finance' },
   { title: 'Marketplace', subtitle: 'Browse and exchange pharmacy goods', icon: 'storefront-outline', route: '/marketplace' },
