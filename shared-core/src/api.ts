@@ -1350,7 +1350,7 @@ export function createOpenShift(data) {
 export function deleteRosterAssignment(id) {
     return fetchApi(`/client-profile/roster-owner/${id}/`, { method: 'DELETE' });
 }
-export function getRosterOwnerMembers(pharmacyId, role = null) {
+export function getRosterOwnerMembers(pharmacyId, role: string | null = null) {
     const query = buildQuery({ pharmacy_id: pharmacyId, ...(role ? { role } : {}) });
     return fetchApi(`/client-profile/roster-owner/members-for-roster/${query}`);
 }
@@ -1373,7 +1373,7 @@ export async function fetchOwnerOpenShifts(params) {
     const data = await getOwnerOpenShifts(toShiftListParams(params));
     return asList(data).map(mapOpenShift);
 }
-export async function fetchRosterOwnerMembersService(pharmacyId, role = null): Promise<RosterPharmacyMember[]> {
+export async function fetchRosterOwnerMembersService(pharmacyId, role: string | null = null): Promise<RosterPharmacyMember[]> {
     const data = await getRosterOwnerMembers(pharmacyId, role);
     return asList(data).map(mapRosterPharmacyMember);
 }
