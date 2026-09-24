@@ -133,7 +133,6 @@ async function openAuthenticatedRoute(page, user, path) {
   await page.goto(path);
   await page.waitForLoadState('networkidle');
 
-  await expect(page).not.toHaveURL(/\\/login(?:\\?|$)/);
   expect(new URL(page.url()).pathname).toBe(path.split('?')[0]);
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Page not found');
