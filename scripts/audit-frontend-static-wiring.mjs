@@ -58,10 +58,11 @@ const mobileFiles = [
 
 for (const file of mobileFiles) {
   const source = fs.readFileSync(file, 'utf8');
+  const executableSource = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   metrics.mobileFiles += 1;
   metrics.mobileControls += (source.match(/\b(onPress|onSubmit|onValueChange|onChangeText|onChange)\s*=/g) || []).length;
   metrics.mobileDirectTransportCalls += (source.match(/\b(?:fetch\s*\(|axios\.(?:get|post|put|patch|delete)\s*\(|apiClient\.(?:get|post|put|patch|delete)\s*\()/g) || []).length;
-  if (/on(?:Press|Submit)\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/.test(source)) failures.push(path.relative(repoRoot, file) + ' contains an empty interactive handler');
+  if (/on(?:Press|Submit)\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/.test(executableSource)) failures.push(path.relative(repoRoot, file) + ' contains an empty interactive handler');
   const targetRegex = /(?:router\.(?:push|replace)\s*\(\s*|\broute\s*:\s*)['"]((?:\/)[^'"]*)['"]/g;
   for (const match of source.matchAll(targetRegex)) {
     const target = match[1];
@@ -73,10 +74,11 @@ for (const file of mobileFiles) {
 const webFiles = walk(webRoot).filter((file) => /\.(tsx|ts)$/.test(file));
 for (const file of webFiles) {
   const source = fs.readFileSync(file, 'utf8');
+  const executableSource = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   metrics.webFiles += 1;
   metrics.webControls += (source.match(/\b(onClick|onSubmit|onChange|onInput|onBlur)\s*=/g) || []).length;
   metrics.webDirectTransportCalls += (source.match(/\b(?:fetch\s*\(|axios\.(?:get|post|put|patch|delete)\s*\(|apiClient\.(?:get|post|put|patch|delete)\s*\()/g) || []).length;
-  if (/on(?:Click|Submit)\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/.test(source)) failures.push(path.relative(repoRoot, file) + ' contains an empty interactive handler');
+  if (/on(?:Click|Submit)\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/.test(executableSource)) failures.push(path.relative(repoRoot, file) + ' contains an empty interactive handler');
 }
 
 console.log(JSON.stringify({ metrics, routePatterns: routePatterns.length, failures }, null, 2));
