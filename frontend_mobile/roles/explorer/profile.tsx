@@ -22,10 +22,11 @@ import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core'
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export default function ExplorerProfileScreen() {
 import { brandColors, personaPalettes } from '@/constants/theme';
 
 const profilePalette = personaPalettes.explorer;
+
+export default function ExplorerProfileScreen() {
   const router = useRouter();
   const { user, logout, refreshUser, updateUserProfilePhoto } = useAuth();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
