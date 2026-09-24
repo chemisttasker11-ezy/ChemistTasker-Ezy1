@@ -26,7 +26,7 @@ export function MarketplaceParityScreen({screen}:{screen:MarketplaceScreen}){
 
  if(screen==='seller')return <SellerStep draft={draft} options={options} loading={loading} error={error}/>;
  if(screen==='category')return <CategoryStep draft={draft} categories={categories} loading={loading} error={error}/>;
- if(screen==='details')return <DetailsStep draft={draft} loading={loading} error={error}/>;
+ if(screen==='details')return <DetailsStep draft={draft} categories={categories} loading={loading} error={error}/>;
  if(screen==='photos')return <PhotosStep draft={draft} loading={loading} error={error}/>;
  if(screen==='audience')return <AudienceStep draft={draft} loading={loading} error={error}/>;
  if(screen==='review')return <ReviewStep draft={draft} loading={loading} error={error}/>;
@@ -47,7 +47,40 @@ function ListingDetail({listing,loading,error}:{listing:any;loading:boolean;erro
 function useDraftStep(initial:MarketplaceMobileDraft){const[value,setValue]=useState(initial);useEffect(()=>setValue(initial),[initial]);const patch=async(p:Partial<MarketplaceMobileDraft>)=>{const next={...value,...p};setValue(next);await patchMarketplaceDraft(p);return next;};return{value,patch};}
 function SellerStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:any;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const pharmacies=asArray<any>(options?.eligible_pharmacies);return <ParityPage title="Who is selling?" subtitle="Choose personal or pharmacy seller context." loading={loading} error={error}><ChoiceChips value={value.seller_context} onChange={v=>void patch({seller_context:v as any,pharmacy:v==='PERSONAL'?null:value.pharmacy})} options={[{value:'PERSONAL',label:'Personal'},{value:'PHARMACY',label:'Pharmacy'}]}/>{value.seller_context==='PHARMACY'?<Section title="Eligible pharmacies"><View style={{gap:8}}>{pharmacies.map(p=><Chip key={p.id} selected={value.pharmacy===p.id} onPress={()=>void patch({pharmacy:p.id})}>{p.label}</Chip>)}</View></Section>:null}<Button mode="contained" disabled={value.seller_context==='PHARMACY'&&!value.pharmacy} onPress={()=>router.push('/marketplace/new/category' as any)}>Continue</Button></ParityPage>;}
 function CategoryStep({draft,categories,loading,error}:{draft:MarketplaceMobileDraft;categories:any[];loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);return <ParityPage title="Choose category" subtitle="Categories and policy rules come from the live catalogue." loading={loading} error={error}><Section title="Categories">{categories.map(c=><DataRow key={c.id} title={c.name} subtitle={c.description} status={value.category===c.id?'Selected':undefined} onPress={()=>void patch({category:c.id,category_name:c.name})}/>)}</Section><Button mode="contained" disabled={!value.category} onPress={()=>router.push('/marketplace/new/details' as any)}>Continue</Button></ParityPage>;}
-function DetailsStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);return <ParityPage title="Item details" subtitle="Describe the item accurately." loading={loading} error={error}><ChoiceChips value={value.mode} onChange={v=>void patch({mode:v as any})} options={[{value:'SELL',label:'Sell'},{value:'FREE',label:'Free'},{value:'SWAP',label:'Swap'}]}/><Field label="Title" value={value.title} onChangeText={v=>void patch({title:v})}/><Field label="Description" value={value.description} multiline onChangeText={v=>void patch({description:v})}/><Field label="Condition" value={value.condition} onChangeText={v=>void patch({condition:v})}/><Field label="Quantity" value={String(value.quantity)} keyboardType="numeric" onChangeText={v=>void patch({quantity:Math.max(1,toNumber(v,1))})}/><Field label="Unit" value={value.unit} onChangeText={v=>void patch({unit:v})}/>{value.mode==='SELL'?<Field label="Amount (AUD)" value={value.amount} keyboardType="decimal-pad" onChangeText={v=>void patch({amount:v})}/>:null}{value.mode==='SWAP'?<Field label="Desired swap" value={value.desired_swap} onChangeText={v=>void patch({desired_swap:v})}/>:null}<Field label="Suburb" value={value.suburb} onChangeText={v=>void patch({suburb:v})}/><Field label="State" value={value.state} onChangeText={v=>void patch({state:v})}/><Field label="Postcode" value={value.postcode} keyboardType="numeric" onChangeText={v=>void patch({postcode:v})}/><Button mode="contained" disabled={!value.title.trim()||!value.description.trim()||!value.suburb.trim()} onPress={()=>router.push('/marketplace/new/photos' as any)}>Continue</Button></ParityPage>;}
+function DetailsStep({draft,categories,loading,error}:{draft:MarketplaceMobileDraft;categories:any[];loading:boolean;error:string}){
+ const router=useRouter();const{value,patch}=useDraftStep(draft);
+ const[barcode,setBarcode]=useState(''),[lookupMessage,setLookupMessage]=useState(''),[lookupBusy,setLookupBusy]=useState(false);
+ const lookup=async()=>{if(!barcode.trim())return;setLookupBusy(true);setLookupMessage('');try{
+   const result=await api.lookupCatalogue({barcode:barcode.trim()});const product=asArray<any>((result as any)?.results)[0];
+   if(!product){setLookupMessage('No reviewed ordinary product matched. Continue with manual details.');return;}
+   const matchedCategory=categories.find((category:any)=>String(category.slug||'')===String(product.category?.slug||'')||String(category.name||'').toLowerCase()===String(product.category?.name||'').toLowerCase());
+   await patch({
+     ...(product.name?{title:[product.brand,product.name].filter(Boolean).join(' ').trim()}:{}),
+     ...(product.description?{description:product.description}:{}),
+     ...(matchedCategory?{category:Number(matchedCategory.id),category_name:matchedCategory.name}:{}),
+   });
+   setLookupMessage(matchedCategory?'Reviewed product details and category added.':'Reviewed product details added. Confirm the selected category before continuing.');
+ }catch(e){setLookupMessage(errorMessage(e,'Catalogue lookup failed. You can continue manually.'));}finally{setLookupBusy(false);}};
+ return <ParityPage title="Item details" subtitle="Describe the item accurately." loading={loading} error={error}>
+  <Section title="Catalogue assist" description="Optional. Use a barcode to prefill reviewed ordinary-product details; medicines still belong in Ethical Marketplace.">
+   <Field label="Barcode / identifier" value={barcode} onChangeText={setBarcode}/>
+   <Button mode="outlined" icon="barcode-scan" loading={lookupBusy} disabled={!barcode.trim()||lookupBusy} onPress={()=>void lookup()}>Look up product</Button>
+   {lookupMessage?<InfoNote title="Catalogue">{lookupMessage}</InfoNote>:null}
+  </Section>
+  <ChoiceChips value={value.mode} onChange={v=>void patch({mode:v as any})} options={[{value:'SELL',label:'Sell'},{value:'FREE',label:'Free'},{value:'SWAP',label:'Swap'}]}/>
+  <Field label="Title" value={value.title} onChangeText={v=>void patch({title:v})}/>
+  <Field label="Description" value={value.description} multiline onChangeText={v=>void patch({description:v})}/>
+  <Field label="Condition" value={value.condition} onChangeText={v=>void patch({condition:v})}/>
+  <Field label="Quantity" value={String(value.quantity)} keyboardType="numeric" onChangeText={v=>void patch({quantity:Math.max(1,toNumber(v,1))})}/>
+  <Field label="Unit" value={value.unit} onChangeText={v=>void patch({unit:v})}/>
+  {value.mode==='SELL'?<Field label="Amount (AUD)" value={value.amount} keyboardType="decimal-pad" onChangeText={v=>void patch({amount:v})}/>:null}
+  {value.mode==='SWAP'?<Field label="Desired swap" value={value.desired_swap} onChangeText={v=>void patch({desired_swap:v})}/>:null}
+  <Field label="Suburb" value={value.suburb} onChangeText={v=>void patch({suburb:v})}/>
+  <Field label="State" value={value.state} onChangeText={v=>void patch({state:v})}/>
+  <Field label="Postcode" value={value.postcode} keyboardType="numeric" onChangeText={v=>void patch({postcode:v})}/>
+  <Button mode="contained" disabled={!value.title.trim()||!value.description.trim()||!value.suburb.trim()} onPress={()=>router.push('/marketplace/new/photos' as any)}>Continue</Button>
+ </ParityPage>;
+}
 function PhotosStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const add=async()=>{const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:.85});if(!r.canceled)await patch({image_uris:[...value.image_uris,...r.assets.map(a=>a.uri)].slice(0,6)});};return <ParityPage title="Photos" subtitle="Add clear photos of the actual item." loading={loading} error={error}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{value.image_uris.map((uri,i)=><Card key={uri+i} style={{width:'47%',overflow:'hidden'}}><Image source={{uri}} style={{width:'100%',height:130}}/><Card.Actions><Button onPress={()=>void patch({image_uris:value.image_uris.filter((_,x)=>x!==i)})}>Remove</Button></Card.Actions></Card>)}</View><Button mode="outlined" icon="image-plus" onPress={()=>void add()}>Add photos</Button><Button mode="contained" onPress={()=>router.push('/marketplace/new/audience' as any)}>Continue</Button></ParityPage>;}
 function AudienceStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
  const router=useRouter();const{value,patch}=useDraftStep(draft);const toggle=(role:string)=>void patch({allowed_buyer_roles:value.allowed_buyer_roles.includes(role)?value.allowed_buyer_roles.filter(x=>x!==role):[...value.allowed_buyer_roles,role]});
@@ -64,16 +97,60 @@ function AudienceStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loadin
 }
 function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
  const router=useRouter();const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
- const publish=async()=>{setBusy(true);setLocalError('');try{
+ const complete=async(submitForReview:boolean)=>{setBusy(true);setLocalError('');try{
    const body:any={seller_context:draft.seller_context,pharmacy:draft.pharmacy,category:draft.category,mode:draft.mode,title:draft.title,description:draft.description,condition:draft.condition,quantity:draft.quantity,unit:draft.unit,amount:draft.mode==='SELL'?draft.amount:'0',desired_swap:draft.desired_swap,suburb:draft.suburb,state:draft.state,postcode:draft.postcode,private_pickup_details:draft.private_pickup_details,allowed_buyer_roles:draft.allowed_buyer_roles,delivery:{method:draft.delivery_method,postage_payer:draft.postage_payer||undefined,postage_organiser:draft.postage_organiser||undefined,known_cost:draft.known_cost||null,quote_required:draft.quote_required}};
    const created=await api.createListing(body);let expectedVersion=created.version;
    if(draft.seller_context==='PHARMACY'){const audience=await api.updateAudience(created.id,{expected_version:expectedVersion,current_circle:draft.current_circle,maximum_circle:draft.maximum_circle});expectedVersion=audience.version;}
    for(const uri of draft.image_uris){const blob=await(await fetch(uri)).blob();const data=new FormData();data.append('image',blob as any,'listing-'+Date.now()+'.jpg');await api.uploadImage(created.id,data);}
-   await api.actOnListing(created.id,'submit',expectedVersion);await clearMarketplaceDraft();router.replace('/marketplace/mine' as any);
- }catch(e){setLocalError(errorMessage(e,'Unable to submit listing.'));}finally{setBusy(false);}};
+   if(submitForReview)await api.actOnListing(created.id,'submit',expectedVersion);
+   await clearMarketplaceDraft();router.replace('/marketplace/mine' as any);
+ }catch(e){setLocalError(errorMessage(e,submitForReview?'Unable to submit listing.':'Unable to save listing draft.'));}finally{setBusy(false);}};
  const postage=draft.delivery_method!=='PICKUP';
- return <ParityPage title="Review listing" subtitle="Confirm seller, item, audience and delivery details." loading={loading} error={error||localError}><Section title={draft.title||'Untitled listing'} description={draft.category_name}><DataRow title="Seller" subtitle={draft.seller_context==='PHARMACY'?'Pharmacy #'+draft.pharmacy:'Personal'}/><DataRow title="Mode" subtitle={draft.mode==='SELL'?money(draft.amount):replaceUnderscore(draft.mode)}/><DataRow title="Location" subtitle={draft.suburb+', '+draft.state+' '+draft.postcode}/><DataRow title="Buyer roles" subtitle={draft.allowed_buyer_roles.map(replaceUnderscore).join(', ')}/>{draft.seller_context==='PHARMACY'?<DataRow title="Audience" subtitle={replaceUnderscore(draft.current_circle)+' → '+replaceUnderscore(draft.maximum_circle)}/>:null}<DataRow title="Delivery" subtitle={replaceUnderscore(draft.delivery_method)+(postage?' · '+replaceUnderscore(draft.postage_payer)+' pays · '+replaceUnderscore(draft.postage_organiser)+' organises':'')}/><DataRow title="Photos" subtitle={draft.image_uris.length+' selected'}/></Section><InfoNote title="Marketplace policy">Medicines are excluded from the ordinary Marketplace. Use Ethical Marketplace for eligible medicine exchange workflows.</InfoNote><Button mode="contained" loading={busy} disabled={busy||!draft.category||!draft.title||(postage&&(!draft.postage_payer||!draft.postage_organiser))} onPress={()=>void publish()}>Submit listing</Button></ParityPage>;
+ const disabled=busy||!draft.category||!draft.title||(postage&&(!draft.postage_payer||!draft.postage_organiser));
+ return <ParityPage title="Review listing" subtitle="Confirm seller, item, audience and delivery details." loading={loading} error={error||localError}>
+  <Section title={draft.title||'Untitled listing'} description={draft.category_name}>
+   <DataRow title="Seller" subtitle={draft.seller_context==='PHARMACY'?'Pharmacy #'+draft.pharmacy:'Personal'}/>
+   <DataRow title="Mode" subtitle={draft.mode==='SELL'?money(draft.amount):replaceUnderscore(draft.mode)}/>
+   <DataRow title="Location" subtitle={draft.suburb+', '+draft.state+' '+draft.postcode}/>
+   <DataRow title="Buyer roles" subtitle={draft.allowed_buyer_roles.map(replaceUnderscore).join(', ')}/>
+   {draft.seller_context==='PHARMACY'?<DataRow title="Audience" subtitle={replaceUnderscore(draft.current_circle)+' → '+replaceUnderscore(draft.maximum_circle)}/>:null}
+   <DataRow title="Delivery" subtitle={replaceUnderscore(draft.delivery_method)+(postage?' · '+replaceUnderscore(draft.postage_payer)+' pays · '+replaceUnderscore(draft.postage_organiser)+' organises':'')}/>
+   <DataRow title="Photos" subtitle={draft.image_uris.length+' selected'}/>
+  </Section>
+  <InfoNote title="Marketplace policy">Medicines are excluded from the ordinary Marketplace. Use Ethical Marketplace for eligible medicine exchange workflows.</InfoNote>
+  <InfoNote title="Draft or review">A private draft stays unpublished until you explicitly submit it for review.</InfoNote>
+  <ActionButtons>
+   <Button mode="outlined" loading={busy} disabled={disabled} onPress={()=>void complete(false)}>Save private draft</Button>
+   <Button mode="contained" loading={busy} disabled={disabled} onPress={()=>void complete(true)}>Submit for review</Button>
+  </ActionButtons>
+ </ParityPage>;
 }
-function MyListingDetail({row,loading,error,onReload}:{row:any;loading:boolean;error:string;onReload:()=>Promise<void>}){const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');const act=async(action:'submit'|'withdraw')=>{if(!row)return;setBusy(true);try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error||localError}>{!row?<EmptyState title="Listing not found" body="The listing is unavailable."/>:<><MetricGrid items={[{label:'Publication',value:replaceUnderscore(row.publication_status)},{label:'Availability',value:replaceUnderscore(row.availability_status)},{label:'Audience',value:replaceUnderscore(row.current_circle||'PRIVATE')}]}/><DataRow title={row.title} subtitle={row.category?.name||'Marketplace listing'}/><ActionButtons><Button mode="contained" loading={busy} onPress={()=>void act('submit')}>Submit / publish</Button><Button mode="outlined" disabled={busy} onPress={()=>void act('withdraw')}>Withdraw</Button></ActionButtons></>}</ParityPage>;}
+function MyListingDetail({row,loading,error,onReload}:{row:any;loading:boolean;error:string;onReload:()=>Promise<void>}){
+ const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[scheduleAt,setScheduleAt]=useState('');
+ const order=['OWNED_CHAIN','ORGANISATION','PLATFORM'];const labels:Record<string,string>={OWNED_CHAIN:'Owned pharmacies',ORGANISATION:'Organisation',PLATFORM:'Platform owners'};
+ const act=async(action:'submit'|'withdraw')=>{if(!row)return;setBusy(true);setLocalError('');try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+ const currentIndex=order.indexOf(String(row?.current_circle||'')),maxIndex=order.indexOf(String(row?.maximum_circle||'PLATFORM'));const next=currentIndex>=0&&currentIndex<maxIndex?order[currentIndex+1]:null;
+ const widen=async(schedule=false)=>{if(!row||!next)return;setBusy(true);setLocalError('');try{
+   const due=scheduleAt.trim();if(schedule&&!due){setLocalError('Enter a future ISO date/time before scheduling audience widening.');return;}
+   await api.updateAudience(row.id,{expected_version:row.version,current_circle:schedule?row.current_circle:next,maximum_circle:row.maximum_circle||'PLATFORM',...(schedule?{schedule:[{target_circle:next,due_at:new Date(due).toISOString()}]}:{})});
+   setScheduleAt('');await onReload();
+ }catch(e){setLocalError(errorMessage(e,'Unable to update listing audience.'));}finally{setBusy(false);}};
+ return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error||localError}>
+  {!row?<EmptyState title="Listing not found" body="The listing is unavailable."/>:<>
+   <MetricGrid items={[{label:'Publication',value:replaceUnderscore(row.publication_status)},{label:'Availability',value:replaceUnderscore(row.availability_status)},{label:'Audience',value:replaceUnderscore(row.current_circle||'PRIVATE')}]}/>
+   <DataRow title={row.title} subtitle={row.category?.name||'Marketplace listing'}/>
+   <ActionButtons>
+    {['DRAFT','REJECTED'].includes(String(row.publication_status||'').toUpperCase())?<Button mode="contained" loading={busy} onPress={()=>void act('submit')}>Submit for review</Button>:null}
+    {['PUBLISHED','PENDING_REVIEW'].includes(String(row.publication_status||'').toUpperCase())?<Button mode="outlined" disabled={busy} onPress={()=>void act('withdraw')}>Withdraw</Button>:null}
+   </ActionButtons>
+   {String(row.seller_context||'').toUpperCase()==='PHARMACY'&&String(row.publication_status||'').toUpperCase()==='PUBLISHED'&&next?<Section title="Audience widening" description={`Current: ${labels[row.current_circle]||replaceUnderscore(row.current_circle)} · Maximum: ${labels[row.maximum_circle||'PLATFORM']}`}>
+    <InfoNote title="Next permitted circle">{labels[next]}</InfoNote>
+    <Button mode="contained-tonal" disabled={busy} onPress={()=>void widen(false)}>Widen now to {labels[next]}</Button>
+    <Field label="Schedule date/time (ISO)" value={scheduleAt} onChangeText={setScheduleAt}/>
+    <Button mode="outlined" disabled={busy||!scheduleAt.trim()} onPress={()=>void widen(true)}>Schedule widening</Button>
+   </Section>:null}
+  </>}
+ </ParityPage>;
+}
 function ExchangeDetail({row,loading,error,onReload}:{row:any;loading:boolean;error:string;onReload:()=>Promise<void>}){const[message,setMessage]=useState(''),[messages,setMessages]=useState<any[]>([]),[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');useEffect(()=>{if(row?.id)api.listExchangeMessages(row.id).then(x=>setMessages(asArray(x))).catch(()=>null);},[row?.id]);const send=async()=>{if(!row||!message.trim())return;setBusy(true);try{await api.sendExchangeMessage(row.id,message.trim());setMessage('');setMessages(asArray(await api.listExchangeMessages(row.id)));}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};const act=async(action:string)=>{if(!row)return;setBusy(true);try{await api.actOnExchange(row.id,action,{expected_version:row.version});await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};return <ParityPage title="Exchange detail" subtitle="Negotiation, messages and state transitions." loading={loading} error={error||localError}>{!row?<EmptyState title="Exchange not found" body="The exchange is unavailable."/>:<><MetricGrid items={[{label:'State',value:replaceUnderscore(row.state)},{label:'Quantity',value:row.quantity||'—'},{label:'Version',value:row.version}]}/><Section title={row.listing_title||'Marketplace exchange'}>{messages.map(m=><DataRow key={m.id} title={m.author_label||'Member'} subtitle={m.body}/>)}</Section><Field label="Message" value={message} multiline onChangeText={setMessage}/><Button mode="outlined" loading={busy} disabled={!message.trim()||busy} onPress={()=>void send()}>Send message</Button><ActionButtons>{asArray<string>(row.allowed_actions).map(action=><Button key={action} mode="contained-tonal" disabled={busy} onPress={()=>void act(action)}>{replaceUnderscore(action)}</Button>)}</ActionButtons></>}</ParityPage>;}
 function ReportListing({listing,loading,error}:{listing:any;loading:boolean;error:string}){const router=useRouter();const[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[reference,setReference]=useState('');const submit=async()=>{if(!listing)return;setBusy(true);try{const r=await api.reportListing(listing.id,reason.trim());setReference(r.reference);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};return <ParityPage title="Report listing" subtitle="Send a Marketplace policy or safety report." loading={loading} error={error||localError}>{reference?<><InfoNote title="Report submitted" tone="success">Reference {reference}</InfoNote><Button onPress={()=>router.back()}>Return to listing</Button></>:<><DataRow title={listing?.title||'Listing'} subtitle={listing?.coarse_location}/><Field label="Reason" value={reason} multiline onChangeText={setReason}/><Button mode="contained" loading={busy} disabled={!reason.trim()||busy} onPress={()=>void submit()}>Submit report</Button></>}</ParityPage>;}
