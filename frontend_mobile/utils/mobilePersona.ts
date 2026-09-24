@@ -3,6 +3,7 @@ import {
   hasOrganizationAccess as sharedHasOrganizationAccess,
   normalizeAdminAssignments,
   resolvePersonaSelection,
+  type AuthorityUser,
   type NormalizedAdminAssignment,
 } from '@chemisttasker/shared-core';
 
@@ -10,16 +11,16 @@ export type MobileAdminAssignment = NormalizedAdminAssignment;
 
 const PERSONA_KEY_PREFIX = 'ct-active-persona';
 
-function storageKey(user: any) {
+function storageKey(user: AuthorityUser | null | undefined) {
   const id = user?.id ?? user?.email ?? user?.username;
   return id ? `${PERSONA_KEY_PREFIX}:${id}` : PERSONA_KEY_PREFIX;
 }
 
-export function hasOrganizationAccess(user: any) {
+export function hasOrganizationAccess(user: AuthorityUser | null | undefined) {
   return sharedHasOrganizationAccess(user);
 }
 
-export function getAdminAssignments(user: any): MobileAdminAssignment[] {
+export function getAdminAssignments(user: AuthorityUser | null | undefined): MobileAdminAssignment[] {
   return normalizeAdminAssignments(user);
 }
 
@@ -60,7 +61,7 @@ export function getRoleHome(role?: string | null) {
   }
 }
 
-export async function readPersonaSelection(user: any) {
+export async function readPersonaSelection(user: AuthorityUser | null | undefined) {
   try {
     return await AsyncStorage.getItem(storageKey(user));
   } catch {
@@ -68,7 +69,7 @@ export async function readPersonaSelection(user: any) {
   }
 }
 
-export async function selectRolePersona(user: any) {
+export async function selectRolePersona(user: AuthorityUser | null | undefined) {
   const role = String(user?.role || '').toUpperCase();
   try {
     await AsyncStorage.setItem(storageKey(user), `ROLE:${role}`);
@@ -78,7 +79,7 @@ export async function selectRolePersona(user: any) {
   return getRoleHome(role);
 }
 
-export async function selectAdminPersona(user: any, assignmentId?: number | null) {
+export async function selectAdminPersona(user: AuthorityUser | null | undefined, assignmentId?: number | null) {
   const assignments = getAdminAssignments(user);
   const selected = assignmentId != null
     ? assignments.find((assignment) => getAssignmentId(assignment) === Number(assignmentId))
@@ -93,7 +94,7 @@ export async function selectAdminPersona(user: any, assignmentId?: number | null
   return selected;
 }
 
-export async function getSelectedAdminAssignment(user: any) {
+export async function getSelectedAdminAssignment(user: AuthorityUser | null | undefined) {
   const assignments = getAdminAssignments(user);
   if (!assignments.length) return null;
 
@@ -105,7 +106,7 @@ export async function getSelectedAdminAssignment(user: any) {
   return null;
 }
 
-export async function resolveInitialWorkspace(user: any) {
+export async function resolveInitialWorkspace(user: AuthorityUser | null | undefined) {
   if (!user) return '/login';
   if (hasOrganizationAccess(user)) return '/organization/dashboard';
 
