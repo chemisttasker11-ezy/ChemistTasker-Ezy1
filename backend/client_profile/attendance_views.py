@@ -299,6 +299,7 @@ class KioskOfflineSyncView(APIView):
                 request.data.get("events"),
                 app_version=request.data.get("app_version", ""),
             )
+            result["max_offline_hours"] = int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24))
             return Response(result, status=status.HTTP_200_OK)
         except (DjangoPermissionDenied, PermissionDenied) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
