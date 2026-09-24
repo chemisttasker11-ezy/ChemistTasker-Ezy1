@@ -8,7 +8,6 @@ import { brandColors } from '@/constants/theme';
 import {
   getAssignmentId,
   getAssignmentPharmacyName,
-  getRoleHome,
   selectRolePersona,
   type MobileAdminAssignment,
 } from '@/utils/mobilePersona';
