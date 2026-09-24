@@ -252,7 +252,7 @@ export default function PharmacistTabs() {
   if (isLoading || !user || user.role !== 'PHARMACIST') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color="#5222B8" />
       </View>
     );
   }
@@ -262,12 +262,12 @@ export default function PharmacistTabs() {
       <PharmacistSidebar visible={sidebarVisible} onDismiss={() => setSidebarVisible(false)} />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#5222B8',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -455,6 +455,6 @@ const styles = StyleSheet.create({
   bellWrapper: {
     position: 'relative',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#5222B8' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
 });
