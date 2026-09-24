@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip, Dialog, Portal, Text } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import {
   claimShiftService,
   createLeaveRequestService,
@@ -27,16 +28,13 @@ import {
   ParityPage,
   Section,
 } from '@/features/parity/ParityUI';
-import { asArray, errorMessage, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
+import { asArray, dateFromIso, errorMessage, isoDate, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
 
 const addDays = (value: string, days: number) => {
-  const date = new Date(`${value}T00:00:00`);
+  const date = dateFromIso(value);
+  if (!date) return value;
   date.setDate(date.getDate() + days);
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
+  return isoDate(date);
 };
 
 const assignmentDate = (row: any) =>
@@ -267,7 +265,13 @@ export default function MyRosterScreen() {
       ) : null}
 
       <Section title="Week" description="The same weekly roster window used by the web workspace.">
-        <Field label="Week starting (YYYY-MM-DD)" value={weekStart} onChangeText={setWeekStart} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Week starting"
+          value={dateFromIso(weekStart)}
+          onChange={(date) => date && setWeekStart(startOfWeek(date))}
+          inputMode="start"
+        />
       </Section>
 
       <MetricGrid items={[
