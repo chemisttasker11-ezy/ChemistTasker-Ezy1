@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Linking, View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar } from 'react-native-paper';
+import { Text, TextInput, Icon, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -648,7 +648,10 @@ const pinnedMessage = useMemo(() => {
                                 void Linking.openURL(url).catch(() => setSnackbar('Unable to open this attachment.'));
                             }}
                         >
-                            <Text style={styles.attachment}>📎 {item.attachment_filename || 'Open attachment'}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Icon source="paperclip" size={16} />
+                                <Text style={styles.attachment}>{item.attachment_filename || 'Open attachment'}</Text>
+                            </View>
                         </TouchableOpacity>
                     ) : null}
                     {renderReactions(item)}
