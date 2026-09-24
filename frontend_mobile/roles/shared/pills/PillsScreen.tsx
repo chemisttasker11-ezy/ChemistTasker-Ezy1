@@ -151,11 +151,11 @@ export default function PillsScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadPills} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadPills} tintColor="#5222B8" />}
         showsVerticalScrollIndicator={false}
       >
         <Surface style={styles.heroSurface}>
-          <LinearGradient colors={['#4F46E5', '#0EA5E9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroGradient}>
+          <LinearGradient colors={['#06214A', '#5222B8', '#008DDB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroGradient}>
             <View style={styles.heroText}>
               <Text variant="labelMedium" style={styles.eyebrow}>
                 Pill rewards
@@ -382,7 +382,7 @@ export default function PillsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F5F8FC' },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 32 },
   heroSurface: {
@@ -429,9 +429,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 5,
   },
-  rateLabel: { color: '#6B7280', marginBottom: 8 },
-  rateValue: { color: '#111827', fontWeight: '900' },
-  rateHelp: { color: '#6B7280' },
+  rateLabel: { color: '#59677E', marginBottom: 8 },
+  rateValue: { color: '#06214A', fontWeight: '900' },
+  rateHelp: { color: '#59677E' },
   errorBox: { backgroundColor: '#FEE2E2', borderRadius: 14, padding: 14, marginTop: 18 },
   errorText: { color: '#B91C1C', fontWeight: '600' },
   activityCard: {
@@ -446,34 +446,34 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   activityHeader: { padding: 18 },
-  activityTitle: { color: '#111827', fontWeight: '800' },
-  activitySubtitle: { color: '#6B7280', marginTop: 4 },
+  activityTitle: { color: '#06214A', fontWeight: '800' },
+  activitySubtitle: { color: '#59677E', marginTop: 4 },
   emptyState: { padding: 24 },
-  emptyTitle: { color: '#111827', fontWeight: '700' },
-  emptyText: { color: '#6B7280', marginTop: 4 },
+  emptyTitle: { color: '#06214A', fontWeight: '700' },
+  emptyText: { color: '#59677E', marginTop: 4 },
   entryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, padding: 16 },
   entryCopy: { flex: 1, minWidth: 0 },
-  entryTitle: { color: '#111827', fontWeight: '800' },
-  entryMeta: { color: '#6B7280', marginTop: 3 },
+  entryTitle: { color: '#06214A', fontWeight: '800' },
+  entryMeta: { color: '#59677E', marginTop: 3 },
   entryDate: { color: '#9CA3AF', marginTop: 4 },
   entryAmount: { alignItems: 'flex-end', justifyContent: 'center' },
   entryDelta: { fontWeight: '900', fontSize: 18 },
   entryDeltaEarned: { color: '#059669' },
   entryDeltaSpent: { color: '#DC2626' },
-  entryBalance: { color: '#6B7280', fontSize: 11, marginTop: 4 },
+  entryBalance: { color: '#59677E', fontSize: 11, marginTop: 4 },
   pipelineBody: { padding: 16 },
   pipelineGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   pipelineStat: {
     width: '48%',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5E7EB',
+    borderColor: '#E6EAF2',
     backgroundColor: '#F8FAFC',
     borderRadius: 14,
     padding: 14,
   },
-  pipelineValue: { color: '#111827', fontWeight: '900', fontSize: 22 },
-  pipelineLabel: { color: '#6B7280', marginTop: 3, fontSize: 12 },
-  pipelineLatest: { color: '#6B7280', marginTop: 12, lineHeight: 18 },
+  pipelineValue: { color: '#06214A', fontWeight: '900', fontSize: 22 },
+  pipelineLabel: { color: '#59677E', marginTop: 3, fontSize: 12 },
+  pipelineLatest: { color: '#59677E', marginTop: 12, lineHeight: 18 },
   paginationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#E6EAF2',
   },
   paginationText: { color: '#374151', fontWeight: '700' },
 });
