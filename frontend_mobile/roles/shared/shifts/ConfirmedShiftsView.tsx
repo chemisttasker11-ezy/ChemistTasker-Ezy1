@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Linking, View, StyleSheet } from 'react-native';
 import {
     ActivityIndicator,
     Button,
@@ -222,7 +222,7 @@ export default function ConfirmedShiftsView() {
                                     <Text><Text style={styles.bold}>Bio:</Text> {profile.shortBio}</Text>
                                 ) : null}
                                 {profile.resume ? (
-                                    <Button mode="text" onPress={() => { }}>Download CV</Button>
+                                    <Button mode="text" onPress={() => void Linking.openURL(String(profile.resume)).catch(() => setSnackbar('Unable to open CV.'))}>Download CV</Button>
                                 ) : null}
                                 {profile.ratePreference ? (
                                     <View style={{ marginTop: 8, gap: 2 }}>
