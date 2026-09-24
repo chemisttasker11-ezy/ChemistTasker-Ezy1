@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce, type RosterMemberLike } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce, type RosterPharmacyMember, type WorkerShiftRequestRecord } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -63,8 +63,8 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [period, setPeriod] = useState<any>(null);
   const [coverage, setCoverage] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [members, setMembers] = useState<RosterMemberLike[]>([]);
+  const [requests, setRequests] = useState<WorkerShiftRequestRecord[]>([]);
+  const [members, setMembers] = useState<RosterPharmacyMember[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
   const [acknowledgements, setAcknowledgements] = useState<any>(null);
   const [validation, setValidation] = useState<any>(null);
@@ -89,10 +89,10 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
       if (screen === 'approvals' || screen === 'shift-editor') {
         const memberRows = await fetchRosterOwnerMembersService(pharmacyId);
-        setMembers(asArray<RosterMemberLike>(memberRows));
+        setMembers(asArray<RosterPharmacyMember>(memberRows));
         if (screen === 'approvals') {
           const rows = await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any);
-          setRequests(asArray(rows).filter((row:any)=>String(row.status||'').toUpperCase()==='PENDING'));
+          setRequests(asArray<WorkerShiftRequestRecord>(rows).filter((row)=>String(row.status||'').toUpperCase()==='PENDING'));
         }
       }
       if (screen === 'audit') {
@@ -269,7 +269,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   );
 }
 
-function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; members:RosterMemberLike[]; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
+function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; members:RosterPharmacyMember[]; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
   const router=useRouter();
   const [date,setDate]=useState(weekStart);
   const [start,setStart]=useState('09:00');
@@ -372,7 +372,7 @@ function TemplatesScreen({pharmacyId,period,rows,loading,error,onReload}:{pharma
   </ParityPage>;
 }
 
-function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];members:RosterMemberLike[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
+function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:WorkerShiftRequestRecord[];members:RosterPharmacyMember[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
   const [replacementByRequest,setReplacementByRequest]=useState<Record<string,number>>({});
 
