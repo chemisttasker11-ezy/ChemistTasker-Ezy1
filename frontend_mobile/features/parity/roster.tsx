@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { asArray, dateLabel, errorMessage, replaceUnderscore, startOfWeek, toNumber } from './utils';
+import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
 
 type RosterScreen =
   | 'workspace'
@@ -233,7 +234,13 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   return (
     <ParityPage title={titles[screen]} subtitle={screen === 'workspace' ? 'Plan, validate and publish weekly pharmacy coverage.' : screen === 'calendar' ? 'Week-at-a-glance shift coverage.' : 'Staff-centred roster allocation.'} loading={loading} error={error} onRetry={load} onRefresh={() => {setRefreshing(true);void load();}} refreshing={refreshing} right={<IconButton icon="plus" onPress={() => router.push('/manager/roster/shift-editor' as any)} />}>
       <View style={{ flexDirection:'row', gap:8, alignItems:'center' }}>
-        <Field label="Week starting (YYYY-MM-DD)" value={weekStart} onChangeText={setWeekStart} />
+        <DatePickerInput
+          locale="en-AU"
+          label="Week starting"
+          value={dateFromIso(weekStart)}
+          onChange={(date) => date && setWeekStart(startOfWeek(date))}
+          inputMode="start"
+        />
       </View>
       <MetricGrid items={[
         { label:'Status',value:period?.status || 'DRAFT' },
@@ -285,7 +292,13 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
   return <ParityPage title="Add roster shift" subtitle="Create a draft roster slot and optionally assign an eligible pharmacy team member." error={error}>
     <InfoNote title={pharmacyName || `Pharmacy #${pharmacyId}`}>Roster changes are transactional and server validated before publication.</InfoNote>
     <Section title="Shift details">
-      <Field label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
+      <DatePickerInput
+        locale="en-AU"
+        label="Shift date"
+        value={dateFromIso(date)}
+        onChange={(next) => next && setDate(isoDate(next))}
+        inputMode="start"
+      />
       <View style={{flexDirection:'row',gap:10}}>
         <View style={{flex:1}}><Field label="Start (HH:MM)" value={start} onChangeText={setStart} /></View>
         <View style={{flex:1}}><Field label="End (HH:MM)" value={end} onChangeText={setEnd} /></View>
@@ -327,7 +340,13 @@ function CopyWeek({period,weekStart,setWeekStart,loading,error,onReload}:{period
   const copy=async()=>{const id=Number(period?.period_id||period?.id||0);if(!id)return;setBusy(true);setLocalError('');try{await roster.copyWeek({source_period_id:id,target_week_start:target,include_assignments:include,overwrite});setWeekStart(target);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
   return <ParityPage title="Copy week" subtitle="Copy shifts into a new draft week with explicit overwrite controls." loading={loading} error={error||localError}>
     <InfoNote title="Source week">{weekStart} · {period?.status||'DRAFT'}</InfoNote>
-    <Field label="Target week start (YYYY-MM-DD)" value={target} onChangeText={setTarget} />
+    <DatePickerInput
+      locale="en-AU"
+      label="Target week start"
+      value={dateFromIso(target)}
+      onChange={(date) => date && setTarget(startOfWeek(date))}
+      inputMode="start"
+    />
     <View style={{flexDirection:'row',alignItems:'center'}}><Checkbox status={include?'checked':'unchecked'} onPress={()=>setInclude(!include)} /><Text>Include assignments</Text></View>
     <View style={{flexDirection:'row',alignItems:'center'}}><Checkbox status={overwrite?'checked':'unchecked'} onPress={()=>setOverwrite(!overwrite)} /><Text>Overwrite existing target draft</Text></View>
     <Button mode="contained" loading={busy} disabled={!target||busy||!period?.period_id} onPress={()=>void copy()}>Copy roster week</Button>
@@ -341,7 +360,15 @@ function TemplatesScreen({pharmacyId,period,rows,loading,error,onReload}:{pharma
   return <ParityPage title="Roster templates" subtitle="Save reusable weekly patterns and apply them into draft periods." loading={loading} error={error||localError}>
     <Section title="Templates">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={`${row.total_slots||0} slots · updated ${dateLabel(row.updated_at||row.created_at)}`} right={<Button compact disabled={!target||busy} onPress={()=>void apply(Number(row.id))}>Apply</Button>} />):<EmptyState title="No templates" body="Save the current roster as a reusable template." />}</Section>
     <Section title="Save current week"><Field label="Template name" value={name} onChangeText={setName} /><Button mode="outlined" loading={busy} disabled={!name.trim()||busy||!period?.period_id} onPress={()=>void save()}>Save template</Button></Section>
-    <Section title="Apply target"><Field label="Target week start (YYYY-MM-DD)" value={target} onChangeText={setTarget} /></Section>
+    <Section title="Apply target">
+      <DatePickerInput
+        locale="en-AU"
+        label="Target week start"
+        value={dateFromIso(target)}
+        onChange={(date) => date && setTarget(startOfWeek(date))}
+        inputMode="start"
+      />
+    </Section>
   </ParityPage>;
 }
 
