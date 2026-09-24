@@ -13,7 +13,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.test import TestCase
 
 from client_profile.attendance_credentials import (
     WORKER_PIN_OTP_CACHE_PREFIX,
@@ -25,10 +24,23 @@ from client_profile.attendance_credentials import (
     send_worker_pin_setup_code,
 )
 from client_profile.models import Membership, Organization, OwnerOnboarding, Pharmacy
+from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
 
 
-class KioskReleaseBlockerTests(TestCase):
+class KioskReleaseBlockerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        create_schema()
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_schema()
+        super().tearDownClass()
+
     def setUp(self):
+        clear_schema()
+        cache.clear()
         User = get_user_model()
         self.owner = User.objects.create_user(
             username="kiosk_release_owner",
