@@ -23,6 +23,7 @@ export * from './contracts/marketplace';
 export * from './contracts/ethicalMarketplace';
 export * from './contracts/attendanceRoster';
 export * from './contracts/workforce';
+export * from './contracts/roster';
 
 // Re-export all types
 export * from './types';
