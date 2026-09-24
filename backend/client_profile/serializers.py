@@ -6382,16 +6382,23 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
         }
 
     def get_leave_request(self, obj):
-        # Get latest leave request with status PENDING or APPROVED
-        leave = obj.leave_requests.filter(status__in=['PENDING', 'APPROVED']).order_by('-date_applied').first()
+        from workforce.models import WorkforceLeaveRequest
+
+        leave = WorkforceLeaveRequest.objects.filter(
+            slot_assignment=obj,
+            status__in=[
+                WorkforceLeaveRequest.Status.PENDING,
+                WorkforceLeaveRequest.Status.APPROVED,
+            ],
+        ).order_by("-created_at", "-id").first()
         if leave:
             return {
                 "id": leave.id,
                 "leave_type": leave.leave_type,
                 "status": leave.status,
                 "note": leave.note,
-                "date_applied": leave.date_applied,
-                "date_resolved": leave.date_resolved,
+                "date_applied": leave.created_at,
+                "date_resolved": leave.decided_at,
             }
         return None
 
