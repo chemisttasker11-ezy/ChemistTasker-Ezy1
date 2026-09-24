@@ -275,6 +275,8 @@ class KioskPairWithCodeView(APIView):
                 "pharmacy_name": device.pharmacy.name,
                 "activated_at": device.activated_at.isoformat(),
                 "installation_id": str(device.installation_id),
+                "server_time": timezone.now().isoformat(),
+                "max_offline_hours": int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24)),
             }, status=status.HTTP_201_CREATED)
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
