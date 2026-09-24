@@ -16,6 +16,7 @@ import {
   getRooms,
   hasAdminCapability,
   normalizeAdminAssignments,
+  resolveAdminPersonaAssignmentId,
 } from "@chemisttasker/shared-core";
 import { type PersonaMode, type AdminLevel } from "@chemisttasker/shared-core";
 import { AdminCapability } from "../constants/adminCapabilities";
@@ -344,10 +345,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const setActivePersona = useCallback(
     (next: PersonaMode) => {
       if (next === "admin") {
-        const fallbackId =
-          activeAdminAssignmentId ??
-          adminAssignments.find((assignment) => assignment.id != null)?.id ??
-          null;
+        const fallbackId = resolveAdminPersonaAssignmentId(user, activeAdminAssignmentId);
         if (fallbackId != null) {
           selectAdminPersona(fallbackId);
         }
