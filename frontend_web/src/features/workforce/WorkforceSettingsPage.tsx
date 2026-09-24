@@ -21,7 +21,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { STAFF_ROLE_OPTIONS, fetchPharmaciesService } from '@chemisttasker/shared-core';
+import { STAFF_ROLE_OPTIONS, attendance, fetchPharmaciesService } from '@chemisttasker/shared-core';
 import { useAuth } from '../../contexts/AuthContext';
 import type { WorkforcePayrollConfiguration, WorkforceWorkSettings } from '@chemisttasker/shared-core';
 import EmploymentEngagementsPanel from './EmploymentEngagementsPanel';
@@ -46,6 +46,9 @@ export default function WorkforceSettingsPage() {
   const [coverage, setCoverage] = useState<any[]>([]);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
   const [payrollConfig, setPayrollConfig] = useState<WorkforcePayrollConfiguration | null>(null);
+  const [kioskDevices, setKioskDevices] = useState<any[]>([]);
+  const [revokeDevice, setRevokeDevice] = useState<any | null>(null);
+  const [revokeBusy, setRevokeBusy] = useState(false);
   const [payrollSaving, setPayrollSaving] = useState(false);
   const [error, setError] = useState('');
   const [coverageOpen, setCoverageOpen] = useState(false);
@@ -72,14 +75,16 @@ export default function WorkforceSettingsPage() {
     if (!pharmacyId) return;
     setError('');
     try {
-      const [coverageRows, staffRows, payroll] = await Promise.all([
+      const [coverageRows, staffRows, payroll, kiosks] = await Promise.all([
         canManageRoster ? listCoverageRequirements(pharmacyId) : Promise.resolve([]),
         canManageStaff ? listWorkSettings(pharmacyId) : Promise.resolve([]),
         canManageStaff ? getPayrollConfiguration(pharmacyId) : Promise.resolve(null),
+        canManageStaff ? attendance.getManagerKioskDevices(pharmacyId) : Promise.resolve({ devices: [] }),
       ]);
       setCoverage(coverageRows);
       setStaff(staffRows);
       setPayrollConfig(payroll);
+      setKioskDevices(Array.isArray((kiosks as any)?.devices) ? (kiosks as any).devices : []);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to load workforce settings.');
     }
@@ -156,7 +161,7 @@ export default function WorkforceSettingsPage() {
           </Paper>
         )}
         <Paper variant="outlined" sx={{ borderRadius: 3 }}>
-          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" disabled={!canManageRoster} /><Tab label="Contracted hours" disabled={!canManageStaff} /><Tab label="Employment & pay" disabled={!canManageStaff} /></Tabs>
+          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" disabled={!canManageRoster} /><Tab label="Contracted hours" disabled={!canManageStaff} /><Tab label="Employment & pay" disabled={!canManageStaff} /><Tab label="Kiosk devices" disabled={!canManageStaff} /></Tabs>
           <Box sx={{ p: 2 }}>
             {tab === 0 && <Stack spacing={1.5}>
               <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography fontWeight={900}>Coverage rules</Typography><Button variant="contained" disabled={!canManageRoster} onClick={() => setCoverageOpen(true)}>Add rule</Button></Stack>
@@ -176,9 +181,66 @@ export default function WorkforceSettingsPage() {
                 </Alert>
               )
             )}
+            {tab === 3 && pharmacyId && (
+              <Stack spacing={1.5}>
+                <Alert severity="info">
+                  Revoking a kiosk blocks QR and new online authorization immediately. A native terminal may drain already-signed offline evidence, but revoked-device evidence cannot silently create attendance.
+                </Alert>
+                {!kioskDevices.length && <Alert severity="info">No kiosk terminals are registered for this pharmacy.</Alert>}
+                {kioskDevices.map((device) => (
+                  <Paper key={device.id} variant="outlined" sx={{ p: 1.5 }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
+                      <Box flex={1}>
+                        <Typography fontWeight={800}>{device.device_name || 'Kiosk terminal'}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {[device.platform || 'Unknown platform', String(device.client_kind || '').replaceAll('_', ' '), device.last_seen_at ? `Last seen ${new Date(device.last_seen_at).toLocaleString()}` : 'Not seen yet'].join(' · ')}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" fontWeight={800} color={device.is_active ? 'success.main' : 'text.secondary'}>
+                        {device.is_active ? 'Active' : 'Revoked'}
+                      </Typography>
+                      {device.is_active && <Button color="error" variant="outlined" onClick={() => setRevokeDevice(device)}>Revoke</Button>}
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
           </Box>
         </Paper>
       </Stack>
+      <Dialog open={!!revokeDevice} onClose={() => !revokeBusy && setRevokeDevice(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Revoke kiosk terminal?</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            {revokeDevice?.device_name || 'This kiosk'} will lose QR and attendance authorization. Already-signed offline evidence can still be drained for review so it is not lost.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={revokeBusy} onClick={() => setRevokeDevice(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={revokeBusy || !revokeDevice}
+            onClick={async () => {
+              if (!revokeDevice) return;
+              setRevokeBusy(true);
+              setError('');
+              try {
+                await attendance.revokeManagerKioskDevice(Number(revokeDevice.id));
+                setRevokeDevice(null);
+                await load();
+              } catch (err: any) {
+                setError(err?.response?.data?.error || err?.message || 'Unable to revoke kiosk.');
+              } finally {
+                setRevokeBusy(false);
+              }
+            }}
+          >
+            {revokeBusy ? 'Revoking…' : 'Revoke kiosk'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={coverageOpen} onClose={() => setCoverageOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add coverage requirement</DialogTitle>
         <DialogContent dividers><Stack spacing={2} pt={0.5}>
