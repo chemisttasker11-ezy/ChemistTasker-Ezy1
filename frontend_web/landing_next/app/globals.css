@@ -413,3 +413,45 @@
   .hero h1{font-size:40px}
   .hero-mobile-app-links img{width:112px;height:35px}
 }
+
+/* Public landing refinements */
+.footer-logo{
+  width:132px;
+  height:55px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:visible;
+}
+.footer-logo img{
+  position:static;
+  width:132px;
+  height:55px;
+  max-width:none;
+  object-fit:contain;
+  object-position:center;
+}
+.pharmacy-team-portrait img{object-position:center;object-fit:contain;margin-left:auto;margin-right:auto}
+.clinical-utility{display:block;margin-top:32px;margin-bottom:30px;padding-top:0}
+.clinical-utility .hero-calculator{
+  width:100%;
+  max-width:none;
+  margin-top:0;
+  padding:18px 20px;
+  background:#f7f4fd;
+  border-color:#e2d9f3;
+}
+.clinical-utility .hero-calculator-copy strong{font-size:17px}
+.clinical-utility .hero-calculator-copy>span:last-child{font-size:10px}
+.mobile-app-section{padding-bottom:70px}
+.mobile-app-section .hero-mobile-app{margin:0 auto}
+.mobile-app-section .hero-mobile-app-links{margin-top:0}
+@media(max-width:880px){
+  .mobile-app-section{padding-bottom:52px}
+}
+@media(max-width:780px){
+  .clinical-utility{margin-top:25px;margin-bottom:26px}
+  .clinical-utility .hero-calculator{padding:15px 16px}
+  .clinical-utility .hero-calculator-copy strong{font-size:15px}
+  .mobile-app-section .hero-mobile-app-links{margin-left:0}
+}
