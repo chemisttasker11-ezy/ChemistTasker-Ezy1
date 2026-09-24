@@ -1794,7 +1794,7 @@ async fn disconnect_device(
             "Could not contact ChemistTasker to revoke this kiosk. Nothing was removed locally: {error}"
         ))?;
 
-    if response.status() != StatusCode::UNAUTHORIZED && !response.status().is_success() {
+    if !response.status().is_success() {
         return Err(response
             .text()
             .await
