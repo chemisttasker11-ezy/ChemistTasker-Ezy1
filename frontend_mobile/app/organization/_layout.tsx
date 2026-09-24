@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../context/AuthContext';
 import {
+import { brandColors } from '@/constants/theme';
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
   resolveShiftNotificationRoute,
