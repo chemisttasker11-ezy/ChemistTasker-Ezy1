@@ -244,6 +244,22 @@ export function hasAdminCapability(
   return assignments.some((assignment) => assignment.capabilities.includes(capability));
 }
 
+export function resolveAdminPersonaAssignmentId(
+  user: AuthorityUser | null | undefined,
+  preferredAssignmentId?: number | string | null,
+): number | null {
+  if (!user || normalizeRole(user.role) === 'OWNER') return null;
+
+  const assignments = normalizeAdminAssignments(user);
+  const preferredId = Number(preferredAssignmentId);
+  if (Number.isFinite(preferredId)) {
+    const preferred = assignments.find((assignment) => assignment.id === preferredId);
+    if (preferred?.id != null) return preferred.id;
+  }
+
+  return assignments.find((assignment) => assignment.id != null)?.id ?? null;
+}
+
 export type ResolvedPersonaSelection = {
   mode: PersonaMode;
   assignmentId: number | null;
