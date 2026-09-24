@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient, APIRequestFactory
+from users.models import OrganizationMembership
 
 from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
 from client_profile.attendance_credentials import (
@@ -365,6 +366,47 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.device.refresh_from_db()
         self.assertFalse(self.device.is_active)
         self.assertIsNotNone(self.device.revoked_at)
+
+    def test_scoped_organization_manager_can_manage_kiosk_devices(self):
+        org_admin = User.objects.create(
+            email="org-admin@offline.test", role="PHARMACIST", is_active=True
+        )
+        membership = OrganizationMembership.objects.create(
+            user=org_admin,
+            organization=self.pharmacy.organization,
+            role="CHIEF_ADMIN",
+            admin_level="MANAGER",
+        )
+        membership.pharmacies.add(self.pharmacy)
+
+        client = APIClient()
+        client.force_authenticate(user=org_admin)
+        listing = client.get(
+            f"/attendance/manager/kiosk-devices/?pharmacy_id={self.pharmacy.id}"
+        )
+
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(len(listing.data["devices"]), 1)
+
+    def test_roster_only_organization_admin_cannot_manage_kiosk_devices(self):
+        org_admin = User.objects.create(
+            email="roster-admin@offline.test", role="PHARMACIST", is_active=True
+        )
+        membership = OrganizationMembership.objects.create(
+            user=org_admin,
+            organization=self.pharmacy.organization,
+            role="REGION_ADMIN",
+            admin_level="ROSTER_MANAGER",
+        )
+        membership.pharmacies.add(self.pharmacy)
+
+        client = APIClient()
+        client.force_authenticate(user=org_admin)
+        listing = client.get(
+            f"/attendance/manager/kiosk-devices/?pharmacy_id={self.pharmacy.id}"
+        )
+
+        self.assertEqual(listing.status_code, 403)
 
     def test_unrelated_user_cannot_manage_kiosk_devices(self):
         outsider = User.objects.create(
