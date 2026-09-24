@@ -1,9 +1,9 @@
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
 export const WORKLOAD_TAGS = ['Sole Pharmacist', 'High Script Load', 'Webster Packs'];
-export const PRIMARY = '#7c3aed';
-export const PRIMARY_LIGHT = '#F3E8FF';
-export const PRIMARY_TEXT = '#2D1B69';
+export const PRIMARY = '#5222B8';
+export const PRIMARY_LIGHT = '#F0EAFF';
+export const PRIMARY_TEXT = '#3B1A83';
 
 export type StepKey = 'details' | 'skills' | 'visibility' | 'timetable' | 'payrate';
 export type RateType = 'FLEXIBLE' | 'FIXED' | 'PHARMACIST_PROVIDED';
@@ -61,7 +61,7 @@ export const VISIBILITY_META: Record<
 
 export const RATE_TYPE_DESCRIPTIONS: Record<RateType, string> = {
     FLEXIBLE: 'The rate is flexible and negotiable with the candidate.',
-    FIXED: 'The rate is fixed in advanceand and not negotiable',
+    FIXED: 'The rate is fixed in advance and is not negotiable.',
     PHARMACIST_PROVIDED: 'Use the candidate’s preset rate. You’ll always see it before assigning the shift.',
 };
 
