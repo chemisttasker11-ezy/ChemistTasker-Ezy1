@@ -15,6 +15,7 @@ import {
   updateLeaveRequestService,
   updateWorkerShiftRequestService,
   WORKFORCE_LEAVE_TYPE_OPTIONS,
+  type LeaveRequest,
   type WorkforceLeaveType,
   type WorkerShiftRequest,
 } from '@chemisttasker/shared-core';
@@ -59,7 +60,7 @@ const pharmacyNameOf = (row: any) => row?.name ?? row?.pharmacyName ?? row?.phar
 const openShiftSlots = (shift: any) => asArray<any>(shift?.slots);
 
 type EditState =
-  | { type: 'leave'; assignment: any; existing?: WorkerShiftRequest | null }
+  | { type: 'leave'; assignment: any; existing?: LeaveRequest | null }
   | { type: 'cover'; assignment: any; existing?: WorkerShiftRequest | null }
   | { type: 'claim'; shift: any; slot: any }
   | null;
@@ -134,13 +135,13 @@ export default function MyRosterScreen() {
   };
 
   const openLeave = (assignment: any) => {
-    const existing = assignmentLeave(assignment);
-    setLeaveType((existing?.leaveType ?? existing?.leave_type ?? 'ANNUAL') as WorkforceLeaveType);
+    const existing = assignmentLeave(assignment) as LeaveRequest | null;
+    setLeaveType((existing?.leaveType ?? 'ANNUAL') as WorkforceLeaveType);
     setNote(existing?.note ?? '');
     setEdit({ type: 'leave', assignment, existing });
   };
 
-  const openCover = (assignment: any, existing?: any | null) => {
+  const openCover = (assignment: any, existing?: WorkerShiftRequest | null) => {
     setNote(existing?.note ?? '');
     setEdit({ type: 'cover', assignment, existing: existing ?? null });
   };
@@ -323,15 +324,15 @@ export default function MyRosterScreen() {
         {pendingRequests.length ? pendingRequests.map((request) => {
           const syntheticAssignment = {
             role: request.role,
-            slotDate: request.slotDate ?? request.slot_date,
-            startTime: request.startTime ?? request.start_time,
-            endTime: request.endTime ?? request.end_time,
+            slotDate: request.slotDate,
+            startTime: request.startTime,
+            endTime: request.endTime,
           };
           return (
             <DataRow
               key={request.id}
               title={replaceUnderscore(request.role || 'Cover request')}
-              subtitle={`${request.slotDate ?? request.slot_date ?? ''} · ${request.startTime ?? request.start_time ?? ''}–${request.endTime ?? request.end_time ?? ''}`}
+              subtitle={`${request.slotDate ?? ''} · ${request.startTime ?? ''}–${request.endTime ?? ''}`}
               status={replaceUnderscore(request.status || 'PENDING')}
               onPress={() => openCover(syntheticAssignment, request)}
             />
@@ -359,7 +360,7 @@ export default function MyRosterScreen() {
             <Button
               mode="contained"
               loading={busy}
-              disabled={busy || (edit?.type === 'leave' && edit.existing && String(edit.existing?.status || '').toUpperCase() !== 'PENDING')}
+              disabled={busy || Boolean(edit?.type === 'leave' && edit.existing && String(edit.existing.status || '').toUpperCase() !== 'PENDING')}
               onPress={() => void saveLeave()}
             >
               Save
