@@ -1876,6 +1876,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn device_authorization_lease_blocks_expired_and_revoked_kiosks() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE local_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+            )
+            .unwrap();
+
+        refresh_device_authorization(&connection, &Utc::now().to_rfc3339(), 1).unwrap();
+        assert!(ensure_device_offline_authorized(&connection).is_ok());
+
+        set_config_value(
+            &connection,
+            "device_authorized_until",
+            &(Utc::now() - ChronoDuration::minutes(1)).to_rfc3339(),
+        )
+        .unwrap();
+        assert!(ensure_device_offline_authorized(&connection)
+            .unwrap_err()
+            .contains("authorization expired"));
+
+        refresh_device_authorization(&connection, &Utc::now().to_rfc3339(), 1).unwrap();
+        mark_device_revoked(&connection).unwrap();
+        assert!(ensure_device_offline_authorized(&connection)
+            .unwrap_err()
+            .contains("KIOSK_REVOKED"));
+    }
+
+    #[test]
     fn preparation_resumes_only_unresolved_requests_for_all_actions() {
         let connection = Connection::open_in_memory().unwrap();
         connection.execute_batch(
