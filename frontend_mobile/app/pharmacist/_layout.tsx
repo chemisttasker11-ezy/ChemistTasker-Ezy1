@@ -238,13 +238,13 @@ export default function PharmacistTabs() {
     if (user.role !== 'PHARMACIST') {
       switch (user.role) {
         case 'OWNER':
-          router.replace('/owner' as any);
+          router.replace('/owner/dashboard' as any);
           break;
         case 'OTHER_STAFF':
           router.replace('/otherstaff' as any);
           break;
         case 'EXPLORER':
-          router.replace('/explorer' as any);
+          router.replace('/explorer/dashboard' as any);
           break;
         case 'ORGANIZATION':
           router.replace('/organization/dashboard' as any);
