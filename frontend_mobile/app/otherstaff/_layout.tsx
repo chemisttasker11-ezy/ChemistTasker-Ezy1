@@ -240,7 +240,7 @@ export default function OtherStaffTabs() {
   if (isLoading || !user || user.role !== 'OTHER_STAFF') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color="#D600C8" />
       </View>
     );
   }
@@ -250,12 +250,12 @@ export default function OtherStaffTabs() {
       <OtherStaffSidebar visible={sidebarVisible} onDismiss={() => setSidebarVisible(false)} />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#D600C8',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -439,6 +439,6 @@ const styles = StyleSheet.create({
   bellWrapper: {
     position: 'relative',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#D600C8' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
 });
