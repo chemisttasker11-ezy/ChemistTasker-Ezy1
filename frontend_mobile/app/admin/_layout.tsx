@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#06214A',
   },
   avatarLabel: {
     color: '#FFFFFF',
@@ -198,13 +198,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sidebarEyebrow: {
-    color: '#6366F1',
+    color: '#06214A',
     textTransform: 'uppercase',
     letterSpacing: 1,
     paddingHorizontal: 18,
   },
   sidebarTitle: {
-    color: '#111827',
+    color: '#06214A',
     fontWeight: '900',
     paddingHorizontal: 18,
     marginTop: 4,
