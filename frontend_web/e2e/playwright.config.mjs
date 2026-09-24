@@ -20,7 +20,7 @@ export default defineConfig({
   },
   webServer: {
     cwd: projectRoot,
-    command: 'npx vite --host 127.0.0.1 --port 5173',
+    command: 'npm run build && npx vite preview --host 127.0.0.1 --port 5173',
     url: 'http://127.0.0.1:5173/login',
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
