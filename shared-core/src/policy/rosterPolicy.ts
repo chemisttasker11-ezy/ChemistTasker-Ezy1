@@ -18,7 +18,7 @@ export type RosterMemberLike = {
 };
 
 function normalizeRole(value: unknown): string {
-  return String(value ?? '').trim().replaceAll('-', '_').toUpperCase();
+  return String(value ?? '').trim().replace(/-/g, '_').toUpperCase();
 }
 
 export function rosterMemberUserId(member: RosterMemberLike): number {
