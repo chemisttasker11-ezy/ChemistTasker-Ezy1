@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce, type RosterMemberLike } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -64,7 +64,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [coverage, setCoverage] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<RosterMemberLike[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
   const [acknowledgements, setAcknowledgements] = useState<any>(null);
   const [validation, setValidation] = useState<any>(null);
@@ -89,7 +89,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
       if (screen === 'approvals' || screen === 'shift-editor') {
         const memberRows = await fetchRosterOwnerMembersService(pharmacyId);
-        setMembers(asArray(memberRows));
+        setMembers(asArray<RosterMemberLike>(memberRows));
         if (screen === 'approvals') {
           const rows = await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any);
           setRequests(asArray(rows).filter((row:any)=>String(row.status||'').toUpperCase()==='PENDING'));
@@ -269,7 +269,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   );
 }
 
-function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; members:any[]; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
+function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; members:RosterMemberLike[]; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
   const router=useRouter();
   const [date,setDate]=useState(weekStart);
   const [start,setStart]=useState('09:00');
@@ -279,7 +279,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
 
-  const eligible=members.filter((member:any)=>isRosterMemberEligibleForRole(member,role));
+  const eligible=members.filter((member)=>isRosterMemberEligibleForRole(member,role));
 
   const save=async()=>{
     setBusy(true);setError('');
@@ -308,7 +308,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, members, ens
     <Section title="Assignment" description="Leave unassigned to create a vacant roster slot, or choose an eligible worker.">
       <Chip selected={userId===null} onPress={()=>setUserId(null)}>Leave vacant</Chip>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        {eligible.map((member:any)=>{
+        {eligible.map((member)=>{
           const id=rosterMemberUserId(member);
           return <Chip key={id} selected={userId===id} onPress={()=>setUserId(id)}>{rosterMemberLabel(member)}</Chip>;
         })}
@@ -372,7 +372,7 @@ function TemplatesScreen({pharmacyId,period,rows,loading,error,onReload}:{pharma
   </ParityPage>;
 }
 
-function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];members:any[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
+function ApprovalsScreen({rows,members,loading,error,onReload}:{rows:any[];members:RosterMemberLike[];loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
   const [replacementByRequest,setReplacementByRequest]=useState<Record<string,number>>({});
 
