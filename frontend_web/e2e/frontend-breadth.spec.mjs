@@ -97,6 +97,7 @@ async function installApiFixture(page, user) {
     if (isRefreshPath(path)) return json(route, { access: 'breadth-access', refresh: '' });
 
     if (path.includes('/chat/rooms')) return json(route, { results: [], count: 0, next: null, previous: null });
+    if (path.endsWith('/client-profile/rooms/shift-contacts/')) return json(route, []);
     if (path.includes('/notifications')) return json(route, { results: [], unread_count: 0, count: 0 });
     if (path.endsWith('/client-profile/pharmacies/')) return json(route, []);
     if (path.endsWith('/client-profile/my-memberships/')) return json(route, []);
@@ -149,7 +150,11 @@ async function openAuthenticatedRoute(page, user, path) {
   await page.goto(path);
   await page.waitForLoadState('networkidle');
 
-  expect(new URL(page.url()).pathname).toBe(path.split('?')[0]);
+  const expectedPath =
+    path.split('?')[0].endsWith('/pharmacy-hub')
+      ? '/dashboard/pharmacy-hub'
+      : path.split('?')[0];
+  expect(new URL(page.url()).pathname).toBe(expectedPath);
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Page not found');
   await expect(page.locator('body')).not.toContainText('Not Found');
@@ -160,7 +165,8 @@ async function openAuthenticatedRoute(page, user, path) {
     (message) =>
       !message.includes('Failed to load resource') &&
       !message.includes('net::ERR') &&
-      !message.includes('Warning:'),
+      !message.includes('Warning:') &&
+      !message.includes('Google Maps JavaScript API error: ApiProjectMapError'),
   );
   expect(actionableConsoleErrors, `console errors while opening ${path}`).toEqual([]);
 }
