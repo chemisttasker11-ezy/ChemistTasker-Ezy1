@@ -236,6 +236,11 @@ test.describe('public/auth wiring', () => {
 
   test('login prevents duplicate submission while request is pending', async ({ page }) => {
     let loginPosts = 0;
+    let releaseLogin;
+    const holdLogin = new Promise((resolve) => {
+      releaseLogin = resolve;
+    });
+
     await page.route('**/api/**', async (route) => {
       const request = route.request();
       const apiPath = new URL(request.url()).pathname;
@@ -243,7 +248,7 @@ test.describe('public/auth wiring', () => {
       if (bootstrap) return bootstrap;
       if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
         loginPosts += 1;
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await holdLogin;
         return json(route, { detail: 'Invalid credentials' }, 401);
       }
       return json(route, {});
@@ -256,9 +261,11 @@ test.describe('public/auth wiring', () => {
     await expect(button).toHaveText('Login');
     await button.click();
     await expect(button).toBeDisabled();
-    await page.waitForTimeout(450);
     expect(loginPosts).toBe(1);
+
+    releaseLogin();
     await expect(page.getByRole('alert')).toContainText('Invalid credentials');
+    await expect(button).toBeEnabled();
   });
 
 });
