@@ -310,10 +310,8 @@ function AuthGate() {
             canManageRoster;
           const isAdminPharmacyManagement = second === 'pharmacies';
           const isAdminCommunications =
-            second === 'chat' ||
             second === 'hub' ||
-            second === 'calendar' ||
-            second === 'messages';
+            second === 'calendar';
           const isAdminRosterManagement =
             second === 'shifts' ||
             second === 'post-shift' ||
