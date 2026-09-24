@@ -165,15 +165,65 @@ def activate_kiosk_device(
     return device, raw_token
 
 
+KIOSK_DISCONNECT_CONTEXT = "chemisttasker:kiosk-disconnect:v1"
+KIOSK_DISCONNECT_PROOF_MAX_AGE_SECONDS = 120
+
+
+def _mark_kiosk_device_revoked(kiosk_device: KioskDevice) -> KioskDevice:
+    """Single revocation state transition used by manager and device-initiated revocation."""
+    if kiosk_device.is_active:
+        kiosk_device.is_active = False
+        kiosk_device.revoked_at = timezone.now()
+        kiosk_device.save(update_fields=["is_active", "revoked_at"])
+    return kiosk_device
+
+
 def revoke_kiosk_device(user, kiosk_device: KioskDevice) -> KioskDevice:
-    """Revoke an active kiosk device, immediately disabling its ability to generate QR or check PINs."""
+    """Revoke an active kiosk device under authenticated manager authority."""
     if not is_authorized_kiosk_manager(user, kiosk_device.pharmacy):
         raise PermissionDenied("Only the pharmacy owner or manager can revoke a kiosk device.")
+    return _mark_kiosk_device_revoked(kiosk_device)
 
-    kiosk_device.is_active = False
-    kiosk_device.revoked_at = timezone.now()
-    kiosk_device.save(update_fields=["is_active", "revoked_at"])
-    return kiosk_device
+
+def revoke_kiosk_device_by_credential(
+    kiosk_device: KioskDevice,
+    *,
+    issued_at: str = "",
+    proof_signature: str = "",
+) -> KioskDevice:
+    """Allow a kiosk to revoke only itself.
+
+    Native/offline kiosks must prove possession of their registered Ed25519
+    private key in addition to presenting the restricted device token. Legacy
+    web-online kiosks have no device signing key, so their already-restricted
+    device token is the self-revocation credential.
+    """
+    if kiosk_device.client_kind == "NATIVE_OFFLINE":
+        if not kiosk_device.public_signing_key:
+            raise ValidationError("Native kiosk signing key is not registered.")
+        try:
+            parsed_issued_at = datetime.fromisoformat(str(issued_at).replace("Z", "+00:00"))
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Kiosk disconnect proof timestamp is invalid.") from exc
+        if parsed_issued_at.tzinfo is None:
+            raise ValidationError("Kiosk disconnect proof timestamp must include a timezone.")
+        age_seconds = abs((timezone.now() - parsed_issued_at).total_seconds())
+        if age_seconds > KIOSK_DISCONNECT_PROOF_MAX_AGE_SECONDS:
+            raise ValidationError("Kiosk disconnect proof has expired.")
+        message = (
+            f"{KIOSK_DISCONNECT_CONTEXT}|{kiosk_device.installation_id}|{issued_at}"
+        ).encode("utf-8")
+        try:
+            signature = base64.b64decode(str(proof_signature or ""), validate=True)
+            _validate_kiosk_public_key(kiosk_device.public_signing_key, required=True)
+            key = Ed25519PublicKey.from_public_bytes(
+                base64.b64decode(kiosk_device.public_signing_key, validate=True)
+            )
+            key.verify(signature, message)
+        except (TypeError, ValueError, InvalidSignature) as exc:
+            raise ValidationError("Native kiosk disconnect proof is invalid.") from exc
+
+    return _mark_kiosk_device_revoked(kiosk_device)
 
 
 def authenticate_kiosk_device(device_token: str) -> Optional[KioskDevice]:
