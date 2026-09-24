@@ -304,7 +304,16 @@ function AuthGate() {
           const adminPharmacyId = getAssignmentPharmacyId(activeAssignment);
           const canManageStaff = hasCapability('MANAGE_STAFF', adminPharmacyId);
           const canManageRoster = hasCapability('MANAGE_ROSTER', adminPharmacyId);
+          const canManageCommunications =
+            hasCapability('MANAGE_COMMUNICATIONS', adminPharmacyId) ||
+            canManageStaff ||
+            canManageRoster;
           const isAdminPharmacyManagement = second === 'pharmacies';
+          const isAdminCommunications =
+            second === 'chat' ||
+            second === 'hub' ||
+            second === 'calendar' ||
+            second === 'messages';
           const isAdminRosterManagement =
             second === 'shifts' ||
             second === 'post-shift' ||
@@ -315,6 +324,10 @@ function AuthGate() {
             return;
           }
           if (isAdminRosterManagement && !canManageRoster) {
+            router.replace('/admin' as any);
+            return;
+          }
+          if (isAdminCommunications && !canManageCommunications) {
             router.replace('/admin' as any);
             return;
           }
