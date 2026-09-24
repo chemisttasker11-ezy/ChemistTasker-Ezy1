@@ -3,6 +3,7 @@ import {
   hasAdminCapability,
   hasOrganizationAccess,
   normalizeAdminAssignments,
+  resolveAdminPersonaAssignmentId,
   resolvePersonaSelection,
 } from './accessPolicy';
 
@@ -119,6 +120,22 @@ describe('shared access policy', () => {
     expect(hasAdminCapability(user, 'MANAGE_STAFF', { pharmacyId: 71 })).toBe(true);
     expect(resolvePersonaSelection(user, 'ROLE:PHARMACIST')).toEqual({ mode: 'staff', assignmentId: null });
     expect(resolvePersonaSelection(user, 'ADMIN:70')).toEqual({ mode: 'admin', assignmentId: 70 });
+  });
+
+  it('resolves an explicit Admin switch independently of the active staff persona', () => {
+    const user = {
+      id: 8,
+      role: 'PHARMACIST',
+      admin_assignments: [
+        { id: 12, pharmacy_id: 60, capabilities: ['MANAGE_STAFF'] },
+        { id: 13, pharmacy_id: 61, capabilities: ['MANAGE_ROSTER'] },
+      ],
+    };
+
+    expect(resolvePersonaSelection(user, 'ROLE:PHARMACIST')).toEqual({ mode: 'staff', assignmentId: null });
+    expect(resolveAdminPersonaAssignmentId(user)).toBe(12);
+    expect(resolveAdminPersonaAssignmentId(user, 13)).toBe(13);
+    expect(resolveAdminPersonaAssignmentId(user, 999)).toBe(12);
   });
 
   it('keeps a stored matching staff persona', () => {
