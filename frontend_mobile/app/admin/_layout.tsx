@@ -49,6 +49,7 @@ function AdminSidebar({
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies' },
     { label: 'Shift Centre', icon: 'calendar-month-outline', route: '/admin/shifts' },
     { label: 'Weekly Roster', icon: 'calendar-account-outline', route: '/manager/roster' },
+    { label: 'Attendance Approvals', icon: 'check-decagram-outline', route: '/attendance/reviews' },
     { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
     { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
     { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift' },
