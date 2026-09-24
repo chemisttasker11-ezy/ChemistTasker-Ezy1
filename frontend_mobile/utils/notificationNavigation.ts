@@ -12,6 +12,7 @@ const ROLE_ROUTE_MAP: Record<string, string> = {
   otherstaff: '/otherstaff/shifts',
   explorer: '/explorer/shifts',
   organization: '/organization/shifts',
+  admin: '/admin/shifts',
 };
 
 const ROLE_CALENDAR_ROUTE_MAP: Record<string, string> = {
@@ -20,12 +21,15 @@ const ROLE_CALENDAR_ROUTE_MAP: Record<string, string> = {
   otherstaff: '/otherstaff/calendar',
   explorer: '/explorer/calendar',
   organization: '/organization/calendar',
+  admin: '/admin/calendar',
 };
 
 const ROLE_HUB_ROUTE_MAP: Record<string, string> = {
   owner: '/owner/hub',
   pharmacist: '/pharmacist/hub',
   otherstaff: '/otherstaff/hub',
+  organization: '/organization/hub',
+  admin: '/admin/hub',
 };
 
 const ROLE_MEMBERSHIP_ROUTE_MAP: Record<string, string> = {
