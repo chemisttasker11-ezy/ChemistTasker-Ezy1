@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Chip, IconButton, Modal, Portal, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, Chip, Icon, Modal, Portal, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '@/utils/apiClient';
+import { useAuth } from '@/context/AuthContext';
+import { brandColors, getPersonaPalette } from '@/constants/theme';
 
 type Membership = {
   id: number;
@@ -44,6 +46,8 @@ function adminCapabilitiesText(membership: Membership) {
 }
 
 export default function ManageMembershipsScreen() {
+  const { user } = useAuth();
+  const persona = getPersonaPalette(user?.role);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,7 +97,7 @@ export default function ManageMembershipsScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadMemberships(); }} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadMemberships(); }} tintColor={persona.accent} colors={[persona.accent]} />}
       >
         <View style={styles.header}>
           <Text variant="headlineSmall" style={styles.title}>Manage Memberships</Text>
@@ -120,8 +124,8 @@ export default function ManageMembershipsScreen() {
             <Card key={membership.id} style={styles.card}>
               <Card.Content>
                 <View style={styles.cardHeader}>
-                  <View style={styles.iconWrap}>
-                    <IconButton icon="store-outline" size={22} iconColor="#6366F1" />
+                  <View style={[styles.iconWrap, { backgroundColor: persona.soft }]}>
+                    <Icon source="store-outline" size={22} color={persona.accent} />
                   </View>
                   <View style={styles.cardHeaderText}>
                     <Text variant="titleMedium" style={styles.cardTitle}>{pharmacy?.name || 'Pharmacy'}</Text>
@@ -145,11 +149,11 @@ export default function ManageMembershipsScreen() {
                   {pending ? (
                     <>
                       <Button mode="contained" icon="check-circle-outline" loading={actingId === membership.id} onPress={() => runAction(membership, 'accept')} style={styles.primaryButton}>Accept</Button>
-                      <Button mode="outlined" icon="close-circle-outline" disabled={actingId === membership.id} onPress={() => runAction(membership, 'reject')} textColor="#DC2626" style={styles.dangerOutline}>Reject</Button>
+                      <Button mode="outlined" icon="close-circle-outline" disabled={actingId === membership.id} onPress={() => runAction(membership, 'reject')} textColor={brandColors.danger} style={styles.dangerOutline}>Reject</Button>
                     </>
                   ) : null}
                   {accepted && membership.role !== 'OWNER' ? (
-                    <Button mode="outlined" icon="logout" disabled={actingId === membership.id} onPress={() => setQuitTarget(membership)} textColor="#DC2626" style={styles.dangerOutline}>Quit membership</Button>
+                    <Button mode="outlined" icon="logout" disabled={actingId === membership.id} onPress={() => setQuitTarget(membership)} textColor={brandColors.danger} style={styles.dangerOutline}>Quit membership</Button>
                   ) : null}
                 </View>
               </Card.Content>
@@ -175,7 +179,7 @@ export default function ManageMembershipsScreen() {
             </Button>
             <Button
               mode="contained"
-              buttonColor="#DC2626"
+              buttonColor={brandColors.danger}
               loading={actingId === quitTarget?.id}
               disabled={!quitTarget || Boolean(actingId)}
               onPress={() => quitTarget && runAction(quitTarget, 'quit')}
@@ -194,31 +198,31 @@ export default function ManageMembershipsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   content: { padding: 20, paddingBottom: 32 },
   header: { marginBottom: 18 },
-  title: { color: '#111827', fontWeight: '900' },
-  subtitle: { color: '#6B7280', marginTop: 6 },
-  error: { color: '#DC2626', marginBottom: 12, fontWeight: '700' },
-  emptyText: { color: '#6B7280', textAlign: 'center', marginTop: 20 },
-  emptyCard: { borderRadius: 16, backgroundColor: '#FFFFFF' },
-  card: { borderRadius: 16, backgroundColor: '#FFFFFF', marginBottom: 14, elevation: 2 },
+  title: { color: brandColors.navy, fontWeight: '900' },
+  subtitle: { color: brandColors.body, marginTop: 6, lineHeight: 20 },
+  error: { color: brandColors.danger, marginBottom: 12, fontWeight: '700' },
+  emptyText: { color: brandColors.body, textAlign: 'center', marginTop: 20 },
+  emptyCard: { borderRadius: 16, backgroundColor: brandColors.white },
+  card: { borderRadius: 16, backgroundColor: brandColors.white, marginBottom: 12, borderWidth: 1, borderColor: brandColors.border },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconWrap: { width: 46, height: 46, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   cardHeaderText: { flex: 1 },
-  cardTitle: { color: '#111827', fontWeight: '800' },
-  muted: { color: '#6B7280', marginTop: 2 },
-  detail: { color: '#6B7280', marginTop: 8, fontSize: 13 },
+  cardTitle: { color: brandColors.navy, fontWeight: '800' },
+  muted: { color: brandColors.body, marginTop: 2 },
+  detail: { color: brandColors.body, marginTop: 8, fontSize: 13, lineHeight: 18 },
   chip: { alignSelf: 'flex-start' },
   pendingChip: { backgroundColor: '#FEF3C7' },
   acceptedChip: { backgroundColor: '#D1FAE5' },
-  neutralChip: { backgroundColor: '#E5E7EB' },
+  neutralChip: { backgroundColor: brandColors.borderSoft },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
-  primaryButton: { borderRadius: 999 },
-  dangerOutline: { borderRadius: 999, borderColor: '#FCA5A5' },
-  modal: { margin: 20, padding: 20, borderRadius: 16, backgroundColor: '#FFFFFF' },
-  modalTitle: { color: '#111827', fontWeight: '900', marginBottom: 8 },
-  modalBody: { color: '#6B7280', lineHeight: 20 },
+  primaryButton: { borderRadius: 12 },
+  dangerOutline: { borderRadius: 12, borderColor: '#E9A4AA' },
+  modal: { margin: 20, padding: 20, borderRadius: 16, backgroundColor: brandColors.white },
+  modalTitle: { color: brandColors.navy, fontWeight: '900', marginBottom: 8 },
+  modalBody: { color: brandColors.body, lineHeight: 20 },
   modalActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 18 },
-  modalButton: { borderRadius: 999 },
+  modalButton: { borderRadius: 12 },
 });
