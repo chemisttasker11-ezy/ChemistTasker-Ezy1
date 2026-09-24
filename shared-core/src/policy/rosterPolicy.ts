@@ -48,18 +48,28 @@ export function rosterMemberLabel(member: RosterMemberLike): string {
     member?.userDetails ??
     member?.userDetail ??
     member?.user_detail ??
-    (typeof member?.user === 'object' ? member.user : null) ??
-    {};
-  const first = (detail as any)?.firstName ?? (detail as any)?.first_name ?? '';
-  const last = (detail as any)?.lastName ?? (detail as any)?.last_name ?? '';
-  const full = [first, last].filter(Boolean).join(' ').trim();
+    (typeof member?.user === 'object' ? member.user : null);
+
+  const first =
+    detail && 'firstName' in detail ? detail.firstName :
+    detail && 'first_name' in detail ? detail.first_name :
+    '';
+  const last =
+    detail && 'lastName' in detail ? detail.lastName :
+    detail && 'last_name' in detail ? detail.last_name :
+    '';
+  const displayName =
+    detail && 'displayName' in detail ? detail.displayName :
+    undefined;
   const email =
-    (detail as any)?.email ??
+    detail?.email ??
     member?.email ??
     null;
+  const full = [first, last].filter(Boolean).join(' ').trim();
+
   return (
     full ||
-    (detail as any)?.displayName ||
+    displayName ||
     member?.name ||
     email ||
     member?.invitedName ||
