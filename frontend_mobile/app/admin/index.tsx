@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
+import { useAdminWorkspace } from '@/context/AdminWorkspaceContext';
 import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
@@ -14,14 +15,7 @@ export default function AdminHomeScreen() {
   const { user } = useAuth();
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
   const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
-  const assignment = useMemo(() => {
-    const assignments = Array.isArray((user as any)?.admin_assignments)
-      ? (user as any).admin_assignments
-      : [];
-    return assignments.find((item: any) => item?.pharmacy_id || item?.pharmacyId) || assignments[0] || null;
-  }, [user]);
-  const pharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy ?? null;
-  const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
+  const { activePharmacyId: pharmacyId, activePharmacyName: pharmacyName } = useAdminWorkspace();
 
   useEffect(() => {
     let mounted = true;
