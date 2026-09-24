@@ -33,6 +33,7 @@ const tabTitles: Record<string, string> = {
 const sidebarItems = [
   { label: 'Home', icon: 'home', route: '/pharmacist/dashboard' },
   { label: 'Shifts', icon: 'calendar-range', route: '/pharmacist/shifts' },
+  { label: 'My Roster', icon: 'calendar-account', route: '/my-roster' },
   { label: 'Publish Availability', icon: 'calendar-plus', route: '/pharmacist/publish-availability' },
   { label: 'Availability', icon: 'calendar-clock', route: '/pharmacist/availability' },
   { label: 'Calendar', icon: 'calendar', route: '/pharmacist/calendar' },
