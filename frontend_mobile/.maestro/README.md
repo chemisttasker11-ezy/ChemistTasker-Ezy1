@@ -4,7 +4,7 @@ These flows exercise the real installed ChemistTasker Expo/native app (com.chemi
 
 ## Safety contract
 
-Run against a disposable development or staging backend only. Do not point these flows at production. Test accounts must be mobile-verified and pre-seeded for the persona under test. The delegated Admin account must have a valid pharmacy assignment with the established capabilities required by the visible manager routes.
+Run against a disposable development or staging backend only. Do not point these flows at production. Test accounts must be mobile-verified and pre-seeded for the persona under test. The delegated Admin account must use a PHARMACIST base role, have at least two valid pharmacy admin assignments, and carry the established capabilities required by the visible manager routes. This lets the native suite verify both Staff/Admin persona switching and pharmacy-scope switching without inventing test-only application behavior.
 
 ## Required environment variables
 
