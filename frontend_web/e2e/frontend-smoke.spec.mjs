@@ -228,7 +228,7 @@ test.describe('public/auth wiring', () => {
     await page.getByLabel('Email').fill('smoke@example.test');
     await page.getByLabel('Password').fill('wrong-password');
     await page.getByRole('button', { name: 'Login' }).click();
-    await expect(page.getByRole('alert')).toContainText('unexpected error');
+    await expect(page.getByRole('alert')).toContainText('Login failed. Please check your credentials.');
     await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
   });
 
