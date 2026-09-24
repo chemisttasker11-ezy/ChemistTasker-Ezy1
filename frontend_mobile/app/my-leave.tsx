@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { Button, Chip, Dialog, Menu, Portal } from 'react-native-paper';
+import { Button, Dialog, Menu, Portal } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { workforce, WORKFORCE_LEAVE_TYPE_OPTIONS, type WorkforceLeaveType } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
