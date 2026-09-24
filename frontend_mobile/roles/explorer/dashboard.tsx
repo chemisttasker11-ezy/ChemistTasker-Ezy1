@@ -122,7 +122,7 @@ export default function ExplorerOverviewScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00A8BB" />}
         showsVerticalScrollIndicator={false}
       >
         <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
@@ -132,7 +132,7 @@ export default function ExplorerOverviewScreen() {
         <Surface style={styles.bottomSection}>
           <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/explorer/profile' as any)}>
             <View style={styles.bottomMenuIcon}>
-              <IconButton icon="account-cog" size={24} iconColor="#6366F1" />
+              <IconButton icon="account-cog" size={24} iconColor="#00A8BB" />
             </View>
             <View style={styles.bottomMenuContent}>
               <Text variant="labelLarge" style={styles.bottomMenuTitle}>
@@ -191,22 +191,22 @@ export default function ExplorerOverviewScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F5F8FC' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  loadingText: { color: '#6B7280', fontSize: 16 },
+  loadingText: { color: '#59677E', fontSize: 16 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greetingText: { color: '#6B7280', marginBottom: 4, fontSize: 14 },
-  nameText: { fontWeight: 'bold', color: '#111827', fontSize: 28 },
+  greetingText: { color: '#59677E', marginBottom: 4, fontSize: 14 },
+  nameText: { fontWeight: 'bold', color: '#06214A', fontSize: 28 },
   heroCard: {
     marginHorizontal: 20,
     marginBottom: 24,
     borderRadius: 20,
     overflow: 'hidden',
     elevation: 8,
-    shadowColor: '#6366F1',
+    shadowColor: '#00A8BB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   },
   heroButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 16, marginLeft: -8 },
   section: { marginBottom: 24, paddingHorizontal: 20 },
-  sectionHeaderText: { fontWeight: '700', color: '#111827', marginBottom: 16, fontSize: 18 },
+  sectionHeaderText: { fontWeight: '700', color: '#06214A', marginBottom: 16, fontSize: 18 },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -247,15 +247,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  quickActionTitle: { color: '#111827', fontWeight: '700', marginBottom: 2 },
-  quickActionDesc: { color: '#6B7280', fontSize: 12, textAlign: 'center' },
+  quickActionTitle: { color: '#06214A', fontWeight: '700', marginBottom: 2 },
+  quickActionDesc: { color: '#59677E', fontSize: 12, textAlign: 'center' },
   bottomSection: {
     marginHorizontal: 20,
     marginBottom: 8,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E6EAF2',
     overflow: 'hidden',
   },
   bottomMenuItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
@@ -263,13 +263,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#E5FBFD',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   bottomMenuContent: { flex: 1 },
-  bottomMenuTitle: { color: '#111827', fontWeight: '600' },
-  bottomMenuDesc: { color: '#6B7280', marginTop: 2 },
+  bottomMenuTitle: { color: '#06214A', fontWeight: '600' },
+  bottomMenuDesc: { color: '#59677E', marginTop: 2 },
 });
 
