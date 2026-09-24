@@ -22,6 +22,7 @@ jobs:
         with:
           node-version: "22"
       - run: node scripts/audit-native-tab-routes.mjs
+      - run: node scripts/audit-frontend-static-wiring.mjs
 
   playwright-web-smoke:
     runs-on: ubuntu-latest
