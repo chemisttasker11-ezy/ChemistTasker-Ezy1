@@ -19,7 +19,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from workforce.attendance_edits import append_missing_punch
-from workforce.leave_service import create_leave
+from workforce.leave_service import create_leave, decide_leave
 from workforce.models import (
     ManagerAttendanceEventAudit, Timesheet, TimesheetCheckDecision, TimesheetPeriod, WorkforceLeaveRequest
 )
@@ -99,6 +99,28 @@ class TimesheetProjectionTests(TestCase):
         self.assertEqual(row.start_at.astimezone(ZoneInfo("Australia/Brisbane")).time(), time(8, 0))
         self.assertEqual(row.end_at.astimezone(ZoneInfo("Australia/Brisbane")).time(), time(16, 0))
         self.assertEqual(LeaveRequest.objects.count(), 0)
+
+    def test_shift_leave_cannot_be_approved_after_assignment_transfer(self):
+        leave = create_leave(
+            self.worker,
+            {
+                "slot_assignment": self.assignment.pk,
+                "leave_type": "ANNUAL",
+                "note": "Pending leave",
+            },
+        )
+        self.roster_period.status = RosterPeriod.Status.DRAFT
+        self.roster_period.save(update_fields=["status"])
+        replacement = get_user_model().objects.create(
+            username="wf_replacement",
+            email="wf-replacement@example.invalid",
+            role="PHARMACIST",
+        )
+        self.assignment.user = replacement
+        self.assignment.save(update_fields=["user"])
+
+        with self.assertRaises(ValidationError):
+            decide_leave(self.owner, leave.pk, "APPROVED")
 
     def test_shift_linked_leave_does_not_require_fake_membership(self):
         self.roster_period.status = RosterPeriod.Status.DRAFT
