@@ -396,6 +396,8 @@ export const attendance = {
     reject: (provisionalId, reason) => operationalRequest(API_ENDPOINTS.attendance.managerReject, { method: 'POST', body: { provisional_id: provisionalId, reason } }),
     correct: (eventId, correctedTimestamp, reason) => operationalRequest(API_ENDPOINTS.attendance.managerCorrect, { method: 'POST', body: { event_id: eventId, corrected_timestamp: correctedTimestamp, reason } }),
     getManagerTimeline: (sessionId) => operationalRequest(API_ENDPOINTS.attendance.managerTimeline(sessionId)),
+    getManagerKioskDevices: (pharmacyId) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { query: { pharmacy_id: pharmacyId } }),
+    revokeManagerKioskDevice: (deviceId) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { method: 'POST', body: { device_id: deviceId } }),
 };
 
 export const rosterV2 = {
