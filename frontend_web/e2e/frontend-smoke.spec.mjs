@@ -468,6 +468,74 @@ test('attendance approval uses existing pharmacy-scoped pending and approve cont
   });
 });
 
+
+test('pharmacist membership accept uses the existing my-memberships action endpoint', async ({ page }) => {
+  await installApiFixture(page, roleUsers.pharmacist);
+
+  let listReads = 0;
+  let observed = null;
+
+  await page.route('**/api/client-profile/my-memberships/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname.endsWith('/client-profile/my-memberships/')) {
+      listReads += 1;
+      const status = listReads === 1 ? 'PENDING' : 'ACCEPTED';
+      return json(route, [{
+        id: 701,
+        role: 'PHARMACIST',
+        employment_type: 'FULL_TIME',
+        job_title: 'Pharmacist',
+        is_pharmacy_admin: false,
+        status,
+        created_at: '2026-09-24T10:00:00+10:00',
+        pharmacy_detail: {
+          id: 101,
+          name: 'Smoke Pharmacy',
+          suburb: 'Brisbane',
+          state: 'QLD',
+          postcode: '4000',
+        },
+        invited_by_details: {
+          first_name: 'Smoke',
+          last_name: 'Owner',
+          email: 'owner@example.test',
+        },
+      }]);
+    }
+
+    if (request.method() === 'POST' && url.pathname.endsWith('/client-profile/my-memberships/701/accept/')) {
+      observed = {
+        method: request.method(),
+        path: url.pathname,
+        body: request.postData(),
+      };
+      return json(route, {
+        id: 701,
+        role: 'PHARMACIST',
+        status: 'ACCEPTED',
+        is_active: true,
+      });
+    }
+
+    return route.fallback();
+  });
+
+  await page.goto('/dashboard/pharmacist/memberships');
+  await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Accept' }).click();
+
+  await expect(page.getByText('Accepted')).toBeVisible();
+  expect(observed).toEqual({
+    method: 'POST',
+    path: '/api/client-profile/my-memberships/701/accept/',
+    body: null,
+  });
+  expect(listReads).toBeGreaterThanOrEqual(2);
+});
+
 test('delegated admin direct route preserves requested pharmacy scope', async ({ page }) => {
   await installApiFixture(page, roleUsers.admin);
 
