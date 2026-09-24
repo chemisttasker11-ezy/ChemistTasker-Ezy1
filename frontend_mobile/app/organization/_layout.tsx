@@ -301,7 +301,7 @@ export default function OrganizationLayout() {
           headerShown: true,
           headerTitle: tabTitles[route.name] || 'Organization',
           headerRightContainerStyle: { paddingRight: 10 },
-          headerLeft: () => <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />,
+          headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open organization menu" onPress={() => setSidebarVisible(true)} />,
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
