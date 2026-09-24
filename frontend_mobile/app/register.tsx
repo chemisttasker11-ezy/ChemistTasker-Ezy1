@@ -22,17 +22,20 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
+import { brandColors, personaPalettes } from '../constants/theme';
 
 const ROLE_OPTIONS = [
-  { label: 'Pharmacy Owner', value: 'OWNER', icon: 'storefront', color: '#4f46e5' },
-  { label: 'Pharmacist', value: 'PHARMACIST', icon: 'local-pharmacy', color: '#0ea5e9' },
+  { label: 'Pharmacy Owner', description: 'Manage pharmacies, teams, shifts and business tools.', value: 'OWNER', icon: 'storefront', color: personaPalettes.owner.accent, soft: personaPalettes.owner.soft },
+  { label: 'Pharmacist', description: 'Find shifts, manage availability and build your professional profile.', value: 'PHARMACIST', icon: 'local-pharmacy', color: personaPalettes.pharmacist.accent, soft: personaPalettes.pharmacist.soft },
   {
-    label: 'Other Staff (Intern, Technician, Assistant, Student)',
+    label: 'Other Staff',
+    description: 'For interns, technicians, assistants and pharmacy students.',
     value: 'OTHER_STAFF',
     icon: 'badge',
-    color: '#22c55e',
+    color: personaPalettes.otherStaff.accent,
+    soft: personaPalettes.otherStaff.soft,
   },
-  { label: 'Explorer (Shadowing/Volunteering)', value: 'EXPLORER', icon: 'travel-explore', color: '#f97316' },
+  { label: 'Explorer', description: 'For shadowing, volunteering and pharmacy career exploration.', value: 'EXPLORER', icon: 'travel-explore', color: personaPalettes.explorer.accent, soft: personaPalettes.explorer.soft },
 ];
 
 const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
@@ -59,6 +62,8 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaModalVisible, setCaptchaModalVisible] = useState(false);
   const [captchaLoading, setCaptchaLoading] = useState(true);
@@ -92,7 +97,7 @@ export default function RegisterScreen() {
               display: flex;
               align-items: center;
               justify-content: center;
-              background: #f8fafc;
+              background: #F5F8FC;
               font-family: Arial, sans-serif;
             }
           </style>
@@ -123,6 +128,7 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     setError('');
+    setIsDuplicateEmail(false);
 
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
@@ -152,7 +158,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register({
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         password: formData.password,
         confirm_password: formData.confirm_password,
         role: formData.role,
@@ -166,9 +172,12 @@ export default function RegisterScreen() {
           ? parsedReferralEventId
           : undefined,
       });
-      router.replace({ pathname: '/verify-otp', params: { email: formData.email } } as any);
+      router.replace({ pathname: '/verify-otp', params: { email: formData.email.toLowerCase() } } as any);
     } catch (err: any) {
-      setError(err.message);
+      const message = String(err?.message || 'Registration failed');
+      const duplicate = message.toLowerCase().includes('already') || message.toLowerCase().includes('registered');
+      setIsDuplicateEmail(duplicate);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -186,8 +195,14 @@ export default function RegisterScreen() {
       </View>
 
       {error ? (
-        <Surface style={styles.errorContainer} elevation={1}>
+        <Surface style={styles.errorContainer} elevation={0}>
           <Text style={styles.errorText}>{error}</Text>
+          {isDuplicateEmail ? (
+            <View style={styles.recoveryActions}>
+              <Button compact mode="text" onPress={() => router.replace('/login')}>Sign in</Button>
+              <Button compact mode="text" onPress={() => router.push('/forgot-password')}>Reset password</Button>
+            </View>
+          ) : null}
         </Surface>
       ) : null}
 
@@ -195,11 +210,12 @@ export default function RegisterScreen() {
         <TextInput
           label="Email"
           value={formData.email}
-          onChangeText={(text) => setFormData({ ...formData, email: text })}
+          onChangeText={(text) => setFormData({ ...formData, email: text.toLowerCase() })}
           mode="outlined"
           style={styles.input}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoComplete="username"
         />
 
         <TextInput
@@ -209,6 +225,7 @@ export default function RegisterScreen() {
           mode="outlined"
           style={styles.input}
           secureTextEntry={!showPassword}
+          autoComplete="new-password"
           right={
             <TextInput.Icon
               icon={showPassword ? 'eye-off' : 'eye'}
@@ -223,11 +240,12 @@ export default function RegisterScreen() {
           onChangeText={(text) => setFormData({ ...formData, confirm_password: text })}
           mode="outlined"
           style={styles.input}
-          secureTextEntry={!showPassword}
+          secureTextEntry={!showConfirmPassword}
+          autoComplete="new-password"
           right={
             <TextInput.Icon
-              icon={showPassword ? 'eye-off' : 'eye'}
-              onPress={() => setShowPassword(!showPassword)}
+              icon={showConfirmPassword ? 'eye-off' : 'eye'}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             />
           }
         />
@@ -241,26 +259,25 @@ export default function RegisterScreen() {
             return (
               <TouchableOpacity
                 key={option.value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={`${option.label}. ${option.description}`}
                 style={[
                   styles.roleCard,
-                  { borderColor: isSelected ? option.color : '#e5e7eb' },
-                  isSelected && { backgroundColor: '#f8fafc' },
+                  { borderColor: isSelected ? option.color : brandColors.border },
+                  isSelected && { backgroundColor: option.soft },
                 ]}
                 activeOpacity={0.85}
                 onPress={() => setFormData({ ...formData, role: option.value })}
               >
-                <View style={styles.roleHeader}>
-                  <View style={[styles.roleIconWrap, { backgroundColor: `${option.color}1A` }]}>
-                    <MaterialIcons name={option.icon as any} size={22} color={option.color} />
-                  </View>
-                  <RadioButton
-                    value={option.value}
-                    status={isSelected ? 'checked' : 'unchecked'}
-                    onPress={() => setFormData({ ...formData, role: option.value })}
-                    color={option.color}
-                  />
+                <View style={[styles.roleIconWrap, { backgroundColor: option.soft }]}>
+                  <MaterialIcons name={option.icon as any} size={22} color={option.color} />
                 </View>
-                <Text style={styles.radioLabel}>{option.label}</Text>
+                <View style={styles.roleCopy}>
+                  <Text style={[styles.radioLabel, isSelected && { color: option.color }]}>{option.label}</Text>
+                  <Text style={styles.roleDescription}>{option.description}</Text>
+                </View>
+                <RadioButton value={option.value} status={isSelected ? 'checked' : 'unchecked'} color={option.color} />
               </TouchableOpacity>
             );
           })}
@@ -309,7 +326,7 @@ export default function RegisterScreen() {
             <MaterialIcons
               name={captchaToken ? 'verified-user' : 'security'}
               size={20}
-              color={captchaToken ? '#166534' : '#1d4ed8'}
+              color={captchaToken ? '#166534' : '#5222B8'}
             />
             <Text style={[
               styles.captchaButtonText,
@@ -352,7 +369,7 @@ export default function RegisterScreen() {
             <View style={styles.modalHeader}>
               <Text variant="titleMedium" style={styles.modalTitle}>Verify you are human</Text>
               <TouchableOpacity onPress={() => setCaptchaModalVisible(false)}>
-                <MaterialIcons name="close" size={22} color="#475569" />
+                <MaterialIcons name="close" size={22} color="#59677E" />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalDescription}>
@@ -366,7 +383,7 @@ export default function RegisterScreen() {
               <View style={styles.webviewWrap}>
                 {captchaLoading ? (
                   <View style={styles.webviewLoader}>
-                    <ActivityIndicator size="small" color="#2563EB" />
+                    <ActivityIndicator size="small" color="#5222B8" />
                     <Text style={styles.webviewLoaderText}>Loading CAPTCHA...</Text>
                   </View>
                 ) : null}
@@ -411,20 +428,21 @@ const styles = StyleSheet.create({
   title: {
     fontWeight: '700',
     marginBottom: 4,
-    color: '#0f172a',
+    color: '#06214A',
   },
   subtitle: {
-    color: '#4b5563',
+    color: '#59677E',
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
+    backgroundColor: '#FDEEEF',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   errorText: {
-    color: '#c62828',
+    color: brandColors.danger,
   },
+  recoveryActions: { flexDirection: 'row', marginTop: 6, gap: 4 },
   form: {
     gap: 12,
   },
@@ -445,8 +463,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   radioLabel: {
-    marginTop: 6,
-    color: '#111827',
+    color: brandColors.navy,
+    fontWeight: '800',
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -458,10 +476,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   captchaButton: {
-    borderRadius: 10,
+    borderRadius: 13,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
-    backgroundColor: '#eff6ff',
+    borderColor: '#D9CEF0',
+    backgroundColor: '#F0EAFF',
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginTop: 4,
@@ -476,14 +494,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   captchaButtonText: {
-    color: '#1d4ed8',
+    color: '#5222B8',
     fontWeight: '600',
   },
   captchaButtonTextVerified: {
     color: '#166534',
   },
   linkText: {
-    color: '#2563EB',
+    color: '#5222B8',
     textDecorationLine: 'underline',
   },
   button: {
@@ -500,26 +518,23 @@ const styles = StyleSheet.create({
     textTransform: 'none',
   },
   roleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   roleCard: {
-    width: '48%',
+    minHeight: 82,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
-    backgroundColor: '#fff',
-  },
-  roleHeader: {
+    backgroundColor: brandColors.white,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: 10,
   },
+  roleCopy: { flex: 1 },
+  roleDescription: { color: brandColors.body, fontSize: 12, lineHeight: 17, marginTop: 2 },
   roleIconWrap: {
-    width: 34,
-    height: 34,
+    width: 46,
+    height: 46,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -542,13 +557,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   modalTitle: {
-    color: '#0f172a',
+    color: '#06214A',
     fontWeight: '700',
   },
   modalDescription: {
     marginTop: 8,
     marginBottom: 14,
-    color: '#475569',
+    color: '#59677E',
   },
   webviewWrap: {
     height: 280,
@@ -556,7 +571,7 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F5F8FC',
   },
   webviewLoader: {
     position: 'absolute',
@@ -567,10 +582,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F5F8FC',
     zIndex: 1,
   },
   webviewLoaderText: {
-    color: '#475569',
+    color: '#59677E',
   },
 });
