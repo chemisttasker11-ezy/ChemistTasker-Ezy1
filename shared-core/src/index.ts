@@ -52,6 +52,7 @@ export * from './constants/personas';
 // Shared cross-client authorization/persona policy.
 export * from './policy/accessPolicy';
 export * from './policy/marketplacePolicy';
+export * from './policy/rosterPolicy';
 
 // Re-export pricing utils
 export * from './utils/pricing';
