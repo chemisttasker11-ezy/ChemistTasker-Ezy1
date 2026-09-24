@@ -14,7 +14,6 @@ from client_profile.attendance_approvals import get_effective_session_timeline
 from client_profile.models import (
     AttendanceEvent,
     AttendanceSession,
-    LeaveRequest,
     Membership,
     Pharmacy,
     ProvisionalAttendance,
@@ -244,19 +243,6 @@ def _roster_rows(user_id, period: TimesheetPeriod, tz):
             ),
         })
     return rows
-
-
-def _legacy_approved_leave(user_id, period: TimesheetPeriod):
-    return list(
-        LeaveRequest.objects.filter(
-            user_id=user_id,
-            status="APPROVED",
-            slot_assignment__shift__pharmacy=period.pharmacy,
-        ).filter(
-            Q(slot_assignment__slot_date__range=(period.start_date, period.end_date))
-            | Q(slot_assignment__slot_date__isnull=True, slot_assignment__slot__date__range=(period.start_date, period.end_date))
-        ).select_related("slot_assignment__slot", "slot_assignment__shift")
-    )
 
 
 def _modern_leave(user_id, period: TimesheetPeriod, start_bound, end_bound):
@@ -575,15 +561,18 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
         start_bound, end_bound, tz = _period_bounds(period)
         membership = _active_membership(timesheet.user_id, period.pharmacy_id)
         roster_rows = _roster_rows(timesheet.user_id, period, tz)
-        legacy_leave = _legacy_approved_leave(timesheet.user_id, period)
-        approved_legacy_assignment_ids = {leave.slot_assignment_id for leave in legacy_leave}
         modern_leave = _modern_leave(timesheet.user_id, period, start_bound, end_bound)
+        slot_linked_assignment_ids = {
+            leave.slot_assignment_id
+            for leave in modern_leave
+            if leave.slot_assignment_id
+        }
         fully_leave_covered_assignment_ids = {
             roster["assignment_id"]
             for roster in roster_rows
             if any(leave.start_at <= roster["start"] and leave.end_at >= roster["end"] for leave in modern_leave)
         }
-        approved_leave_assignment_ids = approved_legacy_assignment_ids | fully_leave_covered_assignment_ids
+        approved_leave_assignment_ids = slot_linked_assignment_ids | fully_leave_covered_assignment_ids
         session_rows, segments, checks = _session_rows(timesheet.user_id, period, start_bound, end_bound, tz)
         day_rows, comparison_checks = _compare_roster_and_actual(session_rows, roster_rows, approved_leave_assignment_ids)
         checks.extend(comparison_checks)
@@ -637,23 +626,6 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
                 "minutes": scheduled_minutes,
                 "note": "Approved leave minutes count only overlap with published rostered work in this non-payroll phase.",
             })
-
-        # Legacy leave is shift-linked. Count its rostered span, but do not count a
-        # legacy row twice when it has already been explicitly bridged to a modern leave.
-        linked_legacy_ids = {leave.legacy_leave_id for leave in modern_leave if leave.legacy_leave_id}
-        roster_by_assignment = {row["assignment_id"]: row for row in roster_rows}
-        for leave in legacy_leave:
-            if leave.pk in linked_legacy_ids:
-                continue
-            row = roster_by_assignment.get(leave.slot_assignment_id)
-            if row:
-                counted_leave_intervals.append((row["start"], row["end"]))
-                segments.append({
-                    "segment_type": "LEAVE", "started_at": row["start"], "ended_at": row["end"], "minutes": row["minutes"],
-                    "source_type": "LEGACY_LEAVE", "source_id": str(leave.pk),
-                    "metadata": {"leave_type": leave.leave_type, "assignment_id": leave.slot_assignment_id},
-                })
-                leave_rows.append({"id": leave.pk, "legacy": True, "leave_type": leave.leave_type, "start_at": row["start"].isoformat(), "end_at": row["end"].isoformat(), "minutes": row["minutes"]})
 
         # Sum the union of scheduled leave intervals so overlapping records cannot
         # inflate the summary. This is reviewed-time display, not a leave entitlement engine.
