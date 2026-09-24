@@ -294,12 +294,12 @@ export default function OrganizationLayout() {
       />
       <Tabs
         screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: '#008DDB',
+          tabBarInactiveTintColor: '#8A97AA',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
+            borderTopColor: '#E6EAF2',
           },
           tabBarLabelStyle: {
             fontSize: 11,
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
-  avatar: { backgroundColor: '#6366F1' },
+  avatar: { backgroundColor: '#008DDB' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   badgeDot: {
     position: 'absolute',
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   postTabIcon: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#008DDB',
     borderRadius: 24,
     marginTop: -20,
   },
