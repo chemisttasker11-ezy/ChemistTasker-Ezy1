@@ -105,7 +105,7 @@ from .roster_services import (
 )
 
 
-def _get_kiosk_device_from_request(request):
+def _get_kiosk_device_from_request(request, *, allow_revoked=False):
     """
     Extracts and authenticates a KioskDevice from request headers, META, or body.
     Supports:
@@ -127,7 +127,7 @@ def _get_kiosk_device_from_request(request):
     if not token:
         raise PermissionDenied("Kiosk device token required.")
 
-    device = authenticate_kiosk_device(token)
+    device = authenticate_kiosk_device(token, include_revoked=allow_revoked)
     if not device:
         raise PermissionDenied("Invalid or revoked kiosk device.")
     return device
@@ -293,7 +293,7 @@ class KioskOfflineSyncView(APIView):
 
     def post(self, request):
         try:
-            device = _get_kiosk_device_from_request(request)
+            device = _get_kiosk_device_from_request(request, allow_revoked=True)
             if device.client_kind != "NATIVE_OFFLINE":
                 raise PermissionDenied("This device is not authorized for offline attendance sync.")
             result = sync_offline_batch(
@@ -301,7 +301,9 @@ class KioskOfflineSyncView(APIView):
                 request.data.get("events"),
                 app_version=request.data.get("app_version", ""),
             )
-            result["max_offline_hours"] = int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24))
+            result["device_revoked"] = bool(device.revoked_at or not device.is_active)
+            if not result["device_revoked"]:
+                result["max_offline_hours"] = int(getattr(settings, "KIOSK_MAX_OFFLINE_HOURS", 24))
             return Response(result, status=status.HTTP_200_OK)
         except (DjangoPermissionDenied, PermissionDenied) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
