@@ -284,6 +284,80 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
+    def test_native_self_revoke_requires_device_signature_and_revokes_device(self):
+        client = APIClient()
+        issued_at = timezone.now().isoformat()
+
+        missing_proof = client.post(
+            "/attendance/kiosk/revoke-self/",
+            {"issued_at": issued_at},
+            format="json",
+            HTTP_X_DEVICE_TOKEN=self.raw_token,
+        )
+        self.assertEqual(missing_proof.status_code, 400)
+        self.device.refresh_from_db()
+        self.assertTrue(self.device.is_active)
+
+        message = (
+            f"chemisttasker:kiosk-disconnect:v1|{self.device.installation_id}|{issued_at}"
+        ).encode("utf-8")
+        proof_signature = base64.b64encode(
+            self.private_key.sign(message)
+        ).decode("ascii")
+        response = client.post(
+            "/attendance/kiosk/revoke-self/",
+            {"issued_at": issued_at, "proof_signature": proof_signature},
+            format="json",
+            HTTP_X_DEVICE_TOKEN=self.raw_token,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.device.refresh_from_db()
+        self.assertFalse(self.device.is_active)
+        self.assertIsNotNone(self.device.revoked_at)
+
+    def test_manager_can_list_and_revoke_kiosk_device(self):
+        manager_client = APIClient()
+        manager_client.force_authenticate(user=self.owner)
+
+        listing = manager_client.get(
+            f"/attendance/manager/kiosk-devices/?pharmacy_id={self.pharmacy.id}"
+        )
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(len(listing.data["devices"]), 1)
+        self.assertEqual(listing.data["devices"][0]["id"], self.device.id)
+        self.assertTrue(listing.data["devices"][0]["is_active"])
+
+        response = manager_client.post(
+            "/attendance/manager/kiosk-devices/",
+            {"device_id": self.device.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.device.refresh_from_db()
+        self.assertFalse(self.device.is_active)
+        self.assertIsNotNone(self.device.revoked_at)
+
+    def test_unrelated_user_cannot_manage_kiosk_devices(self):
+        outsider = User.objects.create(
+            email="outsider@offline.test", role="PHARMACIST", is_active=True
+        )
+        client = APIClient()
+        client.force_authenticate(user=outsider)
+
+        listing = client.get(
+            f"/attendance/manager/kiosk-devices/?pharmacy_id={self.pharmacy.id}"
+        )
+        self.assertEqual(listing.status_code, 403)
+
+        revoke = client.post(
+            "/attendance/manager/kiosk-devices/",
+            {"device_id": self.device.id},
+            format="json",
+        )
+        self.assertEqual(revoke.status_code, 403)
+        self.device.refresh_from_db()
+        self.assertTrue(self.device.is_active)
+
     def test_batch_endpoint_returns_contiguous_receipt(self):
         response = APIClient().post(
             "/attendance/kiosk/sync/batch/",
@@ -294,3 +368,4 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["acknowledged_through"], 1)
         self.assertEqual(response.data["results"][0]["result"], "accepted")
+        self.assertGreater(response.data["max_offline_hours"], 0)
