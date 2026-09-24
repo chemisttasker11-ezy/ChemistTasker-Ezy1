@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
+import { brandColors } from '@/constants/theme';
 
 const tabTitles: Record<string, string> = {
   dashboard: 'Home',
