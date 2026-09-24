@@ -76,7 +76,7 @@ export type NormalizedAdminAssignment = {
 };
 
 function normalizeRole(value: unknown): string {
-  return String(value ?? '').trim().replaceAll('-', '_').toUpperCase();
+  return String(value ?? '').trim().replace(/-/g, '_').toUpperCase();
 }
 
 function normalizeAdminLevel(value: unknown): AdminLevel {
