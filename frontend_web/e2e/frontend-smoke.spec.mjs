@@ -536,6 +536,92 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
   expect(listReads).toBeGreaterThanOrEqual(2);
 });
 
+
+test('workforce kiosk revoke uses the existing scoped manager kiosk contract', async ({ page }) => {
+  await installApiFixture(page, roleUsers.admin);
+
+  let revoked = false;
+  let observed = null;
+
+  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+      return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
+    }
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/workforce/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() !== 'GET') return route.fallback();
+
+    if (path.endsWith('/workforce/coverage-requirements/')) return json(route, []);
+    if (path.endsWith('/workforce/work-settings/')) return json(route, []);
+    if (path.endsWith('/workforce/payroll-configuration/')) {
+      return json(route, {
+        pharmacy_id: 101,
+        pharmacy_name: 'Smoke Pharmacy',
+        use_chemisttasker_payroll: false,
+        requirements: {},
+      });
+    }
+    return route.fallback();
+  });
+
+  await page.route('**/api/client-profile/attendance/manager/kiosk-devices/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET') {
+      expect(url.searchParams.get('pharmacy_id')).toBe('101');
+      return json(route, {
+        devices: revoked ? [] : [{
+          id: 901,
+          device_name: 'Smoke Kiosk',
+          platform: 'WINDOWS',
+          client_kind: 'NATIVE_KIOSK',
+          app_version: '1.0.0',
+          activated_at: '2026-09-20T10:00:00+10:00',
+          last_seen_at: '2026-09-24T10:00:00+10:00',
+          last_sync_at: '2026-09-24T10:00:00+10:00',
+          last_contiguous_sequence: 12,
+          is_active: true,
+          revoked_at: null,
+        }],
+      });
+    }
+
+    if (request.method() === 'POST') {
+      observed = {
+        method: request.method(),
+        path: url.pathname,
+        body: request.postDataJSON(),
+      };
+      revoked = true;
+      return json(route, { status: 'revoked' });
+    }
+
+    return route.fallback();
+  });
+
+  await page.goto('/dashboard/workforce/settings?pharmacy_id=101');
+  await page.getByRole('tab', { name: 'Kiosk devices' }).click();
+  await expect(page.getByText('Smoke Kiosk')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Revoke' }).click();
+  await expect(page.getByText('Revoke kiosk terminal?')).toBeVisible();
+  await page.getByRole('button', { name: 'Revoke kiosk' }).click();
+
+  await expect(page.getByText('No kiosk terminals are registered for this pharmacy.')).toBeVisible();
+  expect(observed).toEqual({
+    method: 'POST',
+    path: '/api/client-profile/attendance/manager/kiosk-devices/',
+    body: { device_id: 901 },
+  });
+});
+
 test('delegated admin direct route preserves requested pharmacy scope', async ({ page }) => {
   await installApiFixture(page, roleUsers.admin);
 
