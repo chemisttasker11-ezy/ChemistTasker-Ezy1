@@ -33,6 +33,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import CoffeeIcon from "@mui/icons-material/Coffee";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import KioskSetup from "../../kiosk/KioskSetup";
 import { API_BASE_URL } from "../../constants/api";
 import { clearTokens } from "../../utils/tokenService";
@@ -79,6 +80,7 @@ export default function KioskPage() {
   const [showSettingsUnlock, setShowSettingsUnlock] = useState(false);
   const [settingsPin, setSettingsPin] = useState("");
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [pendingDisconnectCount, setPendingDisconnectCount] = useState(0);
 
@@ -390,6 +392,7 @@ export default function KioskPage() {
 
   const openKioskSettings = async () => {
     setSettingsError(null);
+    setSettingsMessage(null);
     if (!desktopRuntime) {
       setShowDeactivateDialog(true);
       return;
@@ -421,13 +424,20 @@ export default function KioskPage() {
     }
   };
 
-  const handleSyncBeforeDisconnect = async () => {
+  const handleSyncNow = async () => {
     if (!desktopRuntime) return;
     setSettingsBusy(true);
     setSettingsError(null);
+    setSettingsMessage(null);
     try {
       await syncDesktopNow();
-      setPendingDisconnectCount(await getDesktopPendingCount());
+      const remaining = await getDesktopPendingCount();
+      setPendingDisconnectCount(remaining);
+      setSettingsMessage(
+        remaining === 0
+          ? "Sync complete. Attendance on this kiosk is up to date with ChemistTasker."
+          : `Sync finished with ${remaining} event${remaining === 1 ? "" : "s"} still waiting to upload.`
+      );
     } catch (error) {
       setSettingsError(String(error));
     } finally {
@@ -2035,6 +2045,14 @@ export default function KioskPage() {
         <DialogTitle>Kiosk Terminal Settings</DialogTitle>
         <DialogContent>
           {settingsError && <Alert severity="error" sx={{ mb: 2 }}>{settingsError}</Alert>}
+          {settingsMessage && <Alert severity="success" sx={{ mb: 2 }}>{settingsMessage}</Alert>}
+          {desktopRuntime && (
+            <Alert severity={pendingDisconnectCount > 0 ? "warning" : "info"} sx={{ mb: 2 }}>
+              {pendingDisconnectCount > 0
+                ? `${pendingDisconnectCount} attendance event${pendingDisconnectCount === 1 ? "" : "s"} waiting to sync.`
+                : "No attendance events are waiting to sync."}
+            </Alert>
+          )}
           <Typography variant="body2" color="text.secondary">
             Disconnect this terminal from <strong>{pharmacyName}</strong>. The device will be revoked
             on ChemistTasker and must be paired again before it can record attendance.
@@ -2058,8 +2076,12 @@ export default function KioskPage() {
           >
             Cancel
           </Button>
-          {desktopRuntime && pendingDisconnectCount > 0 && (
-            <Button disabled={settingsBusy} onClick={() => void handleSyncBeforeDisconnect()}>
+          {desktopRuntime && (
+            <Button
+              startIcon={<RefreshIcon />}
+              disabled={settingsBusy}
+              onClick={() => void handleSyncNow()}
+            >
               Sync Now
             </Button>
           )}
