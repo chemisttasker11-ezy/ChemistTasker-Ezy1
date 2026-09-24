@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, Button, Divider, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
 import apiClient from '@/utils/apiClient';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { brandColors, getPersonaPalette } from '@/constants/theme';
+import { getAssignmentId, getSelectedAdminAssignment, selectAdminPersona, selectRolePersona } from '@/utils/mobilePersona';
 
 export type PharmacyOption = {
   id: number;
@@ -225,7 +227,7 @@ export function DashboardScopeSwitcher({
     <>
       <TouchableOpacity style={styles.scopeButton} onPress={() => setVisible(true)} activeOpacity={0.82}>
         <View style={styles.scopeIcon}>
-          <IconButton icon={workspace === 'internal' ? 'store-outline' : 'earth'} size={20} iconColor="#4338CA" />
+          <IconButton icon={workspace === 'internal' ? 'store-outline' : 'earth'} size={20} iconColor="#5222B8" />
         </View>
         <View style={styles.scopeText}>
           <Text style={styles.scopeLabel}>Dashboard scope</Text>
@@ -233,7 +235,7 @@ export function DashboardScopeSwitcher({
             {scopeLabel}
           </Text>
         </View>
-        <IconButton icon="chevron-down" size={20} iconColor="#6B7280" />
+        <IconButton icon="chevron-down" size={20} iconColor="#59677E" />
       </TouchableOpacity>
 
       <Portal>
@@ -285,7 +287,7 @@ const toNumber = (value: unknown) => Number(value ?? 0) || 0;
 
 export function DashboardStatsOverview({ data }: { data: DashboardPayload | null }) {
   const cards = [
-    { label: 'This Week', value: toNumber(data?.upcoming_stats?.week), icon: 'calendar-week', color: '#4F46E5' },
+    { label: 'This Week', value: toNumber(data?.upcoming_stats?.week), icon: 'calendar-week', color: '#5222B8' },
     { label: 'This Month', value: toNumber(data?.upcoming_stats?.month), icon: 'calendar-range', color: '#DB2777' },
     { label: 'Confirmed Shifts', value: toNumber(data?.shift_summary?.confirmed_count), icon: 'calendar-check', color: '#059669' },
   ];
@@ -318,29 +320,46 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
   const normalizedRole = String(role || user?.role || '').toUpperCase();
   const isWorker = normalizedRole === 'PHARMACIST' || normalizedRole === 'OTHER_STAFF';
   const assignments = Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [];
+  const persona = getPersonaPalette(normalizedRole);
 
   if (!isWorker || assignments.length === 0) return null;
 
-  const workerRoute = normalizedRole === 'OTHER_STAFF' ? '/otherstaff/dashboard' : '/pharmacist/dashboard';
   const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Other Staff' : 'Pharmacist';
   const activeAdmin = String(pathname || '').startsWith('/admin');
 
+  const openRoleWorkspace = async () => {
+    const route = await selectRolePersona(user);
+    router.replace(route as any);
+  };
+
+  const openAdminWorkspace = async () => {
+    const selected = await getSelectedAdminAssignment(user);
+    const assignmentId = getAssignmentId(selected);
+    if (assignmentId == null) return;
+    await selectAdminPersona(user, assignmentId);
+    router.replace('/admin' as any);
+  };
+
   return (
-    <View style={styles.personaSwitcher}>
+    <View style={styles.personaSwitcher} accessibilityRole="tablist">
       <TouchableOpacity
-        style={[styles.personaButton, !activeAdmin && styles.personaButtonActive]}
-        onPress={() => router.replace(workerRoute as any)}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: !activeAdmin }}
+        style={[styles.personaButton, !activeAdmin && { backgroundColor: persona.accent }]}
+        onPress={() => void openRoleWorkspace()}
         activeOpacity={0.82}
       >
-        <IconButton icon="account-outline" size={18} iconColor={!activeAdmin ? '#FFFFFF' : '#4F46E5'} />
-        <Text style={[styles.personaButtonText, !activeAdmin && styles.personaButtonTextActive]}>{roleLabel}</Text>
+        <Icon source="account-outline" size={20} color={!activeAdmin ? brandColors.white : persona.accent} />
+        <Text style={[styles.personaButtonText, { color: !activeAdmin ? brandColors.white : persona.accent }]}>{roleLabel}</Text>
       </TouchableOpacity>
       <TouchableOpacity
+        accessibilityRole="tab"
+        accessibilityState={{ selected: activeAdmin }}
         style={[styles.personaButton, activeAdmin && styles.personaButtonActive]}
-        onPress={() => router.replace('/admin' as any)}
+        onPress={() => void openAdminWorkspace()}
         activeOpacity={0.82}
       >
-        <IconButton icon="shield-account-outline" size={18} iconColor={activeAdmin ? '#FFFFFF' : '#4F46E5'} />
+        <Icon source="shield-account-outline" size={20} color={activeAdmin ? brandColors.white : brandColors.navy} />
         <Text style={[styles.personaButtonText, activeAdmin && styles.personaButtonTextActive]}>Admin</Text>
       </TouchableOpacity>
     </View>
@@ -377,7 +396,7 @@ export function DashboardActivity({ data }: { data: DashboardPayload | null }) {
         disabled={!resolveActivityRoute(item)}
       >
         <View style={styles.activityIcon}>
-          <IconButton icon="pulse" size={18} iconColor="#4338CA" />
+          <IconButton icon="pulse" size={18} iconColor="#5222B8" />
         </View>
         <View style={styles.activityCopy}>
           <Text style={styles.activityTitle} numberOfLines={1}>
@@ -469,7 +488,7 @@ export function DashboardErrorState({ message, onRetry }: { message: string; onR
 export function DashboardLoadingState({ label = 'Loading your dashboard...' }: { label?: string }) {
   return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#6366F1" />
+      <ActivityIndicator size="large" color="#5222B8" />
       <Text style={styles.loadingText}>{label}</Text>
     </View>
   );
@@ -482,22 +501,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E6EAF2',
     paddingVertical: 10,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 1,
   },
-  scopeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  scopeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0EAFF', alignItems: 'center', justifyContent: 'center' },
   scopeText: { flex: 1, minWidth: 0, marginLeft: 10 },
-  scopeLabel: { color: '#6B7280', fontSize: 12 },
-  scopeValue: { color: '#111827', fontWeight: '800', fontSize: 15 },
+  scopeLabel: { color: '#59677E', fontSize: 12 },
+  scopeValue: { color: '#06214A', fontWeight: '800', fontSize: 15 },
   modal: { marginHorizontal: 18, borderRadius: 18, backgroundColor: '#FFFFFF', padding: 18 },
-  modalTitle: { fontWeight: '800', color: '#111827', marginBottom: 12 },
+  modalTitle: { fontWeight: '800', color: '#06214A', marginBottom: 12 },
   optionContent: { justifyContent: 'flex-start', minHeight: 46 },
   divider: { marginVertical: 8 },
-  emptyText: { color: '#6B7280', paddingVertical: 10 },
+  emptyText: { color: '#59677E', paddingVertical: 10 },
   statsSection: { paddingHorizontal: 20, marginBottom: 18 },
   statsGrid: { flexDirection: 'row', gap: 8 },
   statCard: {
@@ -511,13 +530,13 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   statIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 7 },
-  statValue: { color: '#111827', fontSize: 18, fontWeight: '900' },
-  statLabelText: { color: '#6B7280', fontSize: 11, marginTop: 2 },
+  statValue: { color: '#06214A', fontSize: 18, fontWeight: '900' },
+  statLabelText: { color: '#59677E', fontSize: 11, marginTop: 2 },
   personaSwitcher: {
     marginHorizontal: 20,
     marginBottom: 10,
     borderRadius: 16,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F0EAFF',
     padding: 4,
     flexDirection: 'row',
     gap: 4,
@@ -530,30 +549,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
   },
-  personaButtonActive: { backgroundColor: '#4F46E5' },
-  personaButtonText: { color: '#4F46E5', fontWeight: '800' },
+  personaButtonActive: { backgroundColor: '#5222B8' },
+  personaButtonText: { color: '#5222B8', fontWeight: '800' },
   personaButtonTextActive: { color: '#FFFFFF' },
   activitySection: { paddingHorizontal: 20, marginBottom: 20 },
   activityHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sectionTitle: { color: '#111827', fontWeight: '800', marginBottom: 10 },
+  sectionTitle: { color: '#06214A', fontWeight: '800', marginBottom: 10 },
   activityCard: { borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', elevation: 1 },
   activityItem: { flexDirection: 'row', alignItems: 'center', padding: 12 },
-  activityIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  activityIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#F0EAFF', alignItems: 'center', justifyContent: 'center' },
   activityCopy: { flex: 1, minWidth: 0, marginLeft: 10 },
-  activityTitle: { color: '#111827', fontWeight: '700' },
-  activityText: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  activityTitle: { color: '#06214A', fontWeight: '700' },
+  activityText: { color: '#59677E', fontSize: 12, marginTop: 2 },
   activityModal: { marginHorizontal: 18, borderRadius: 18, backgroundColor: '#FFFFFF', padding: 0, maxHeight: '78%' },
   activityModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 18, paddingRight: 6, paddingVertical: 8 },
   activityModalScroll: { paddingHorizontal: 14, paddingBottom: 14 },
   activityModalFooter: { marginTop: 12, marginBottom: 8 },
   activitySkeletonRow: { flexDirection: 'row', alignItems: 'center', padding: 12 },
-  activitySkeletonIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#E5E7EB' },
+  activitySkeletonIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#E6EAF2' },
   activitySkeletonCopy: { flex: 1, marginLeft: 10, gap: 8 },
-  activitySkeletonTitle: { width: '58%', height: 14, borderRadius: 8, backgroundColor: '#E5E7EB' },
+  activitySkeletonTitle: { width: '58%', height: 14, borderRadius: 8, backgroundColor: '#E6EAF2' },
   activitySkeletonText: { width: '86%', height: 12, borderRadius: 8, backgroundColor: '#EEF2F7' },
   errorCard: { margin: 20, borderRadius: 16, padding: 16, alignItems: 'center', backgroundColor: '#FFFFFF', gap: 8 },
-  errorTitle: { color: '#111827', fontWeight: '800', fontSize: 16 },
-  errorText: { color: '#6B7280', textAlign: 'center' },
+  errorTitle: { color: '#06214A', fontWeight: '800', fontSize: 16 },
+  errorText: { color: '#59677E', textAlign: 'center' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  loadingText: { color: '#6B7280', fontSize: 16 },
+  loadingText: { color: '#59677E', fontSize: 16 },
 });
