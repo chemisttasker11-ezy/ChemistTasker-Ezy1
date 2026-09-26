@@ -12,9 +12,15 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { getRooms } from "@chemisttasker/shared-core";
-import { type PersonaMode, type AdminLevel } from "@chemisttasker/shared-core";
-import { AdminCapability, ALL_ADMIN_CAPABILITIES } from "../constants/adminCapabilities";
+import {
+  getRooms,
+  hasAdminCapability,
+  normalizeAdminAssignments,
+  normalizeAdminCapability,
+  type PersonaMode,
+  type AdminLevel,
+} from "@chemisttasker/shared-core";
+import { AdminCapability } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
 import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
@@ -28,6 +34,7 @@ export interface OrgMembership {
   job_title?: string;
   region?: string | null;
   pharmacies?: { id: number; name: string }[];
+  organization_pharmacies?: { id: number; name: string }[];
   capabilities?: string[];
 }
 
@@ -151,91 +158,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return await resp.json() as User;
   }, []);
 
-  const ownedPharmacyIds = useMemo<Set<number>>(() => {
-    const ownerSet = new Set<number>();
-    const records = user?.memberships ?? [];
-    for (const record of records) {
-      if (
-        record &&
-        typeof record === "object" &&
-        "pharmacy_id" in record &&
-        "role" in record &&
-        (record as PharmacyMembership).role === "OWNER"
-      ) {
-        const pid = Number((record as PharmacyMembership).pharmacy_id);
-        if (!Number.isNaN(pid)) {
-          ownerSet.add(pid);
-        }
-      }
-    }
-    return ownerSet;
-  }, [user?.memberships]);
-
   const adminAssignments = useMemo<AdminAssignment[]>(() => {
-    const assignmentsFromApi = Array.isArray(user?.admin_assignments)
-      ? user!.admin_assignments
-      : [];
-
-    const isKnownCapability = (cap: unknown): cap is AdminCapability =>
-      typeof cap === "string" && ALL_ADMIN_CAPABILITIES.includes(cap as AdminCapability);
-
-    const byPharmacy = new Map<number, AdminAssignment>();
-    const normalizedAssignments: AdminAssignment[] = [];
-
-    assignmentsFromApi.forEach((assignmentRaw) => {
-      const rawCaps = Array.isArray(assignmentRaw.capabilities) ? assignmentRaw.capabilities : [];
-      const capabilities = rawCaps.filter(isKnownCapability);
-      const assignment: AdminAssignment = {
-        ...assignmentRaw,
-        capabilities,
-      };
-      if (typeof assignment.pharmacy_id === "number") {
-        byPharmacy.set(assignment.pharmacy_id, assignment);
-      }
-      normalizedAssignments.push(assignment);
-    });
-
-    const membershipRecords = Array.isArray(user?.memberships) ? user!.memberships : [];
-    membershipRecords.forEach((membership) => {
-      if (!membership || typeof membership !== "object" || !("pharmacy_id" in membership)) {
-        return;
-      }
-      const pharmacyId = Number((membership as PharmacyMembership).pharmacy_id);
-      if (!Number.isFinite(pharmacyId) || byPharmacy.has(pharmacyId)) {
-        return;
-      }
-      const role = String((membership as PharmacyMembership).role || "").toUpperCase();
-      const isOwner =
-        role === "OWNER" ||
-        role === "PHARMACY_OWNER" ||
-        (membership as any).is_pharmacy_owner === true;
-      if (isOwner) {
-        return;
-      }
-      const isAdminLike =
-        role === "MANAGER" ||
-        role === "PHARMACY_ADMIN" ||
-        role === "ADMIN" ||
-        role === "ROSTER_MANAGER" ||
-        role === "COMMUNICATION_MANAGER";
-      if (!isAdminLike) {
-        return;
-      }
-      const syntheticId = -Math.max(Math.abs(pharmacyId), normalizedAssignments.length + 1);
-      const synthetic: AdminAssignment = {
-        id: syntheticId,
-        pharmacy_id: pharmacyId,
-        pharmacy_name: (membership as any).pharmacy_name ?? null,
-        admin_level: isOwner ? "OWNER" : "MANAGER",
-        capabilities: [...ALL_ADMIN_CAPABILITIES],
-        staff_role: (membership as any).staff_role ?? null,
-        job_title: (membership as any).job_title ?? null,
-      };
-      byPharmacy.set(pharmacyId, synthetic);
-      normalizedAssignments.push(synthetic);
-    });
-
-    return normalizedAssignments;
+    return normalizeAdminAssignments(user);
   }, [user]);
 
   const activeAdminAssignment = useMemo<AdminAssignment | null>(() => {
@@ -353,9 +277,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (!applied) {
-      if (assignments.length > 0 && assignments[0]?.id != null) {
-        applyAdmin(assignments[0].id!);
-      } else if (user.role === "PHARMACIST" || user.role === "OTHER_STAFF") {
+      if (user.role === "PHARMACIST" || user.role === "OTHER_STAFF") {
         applyRole(user.role);
       } else {
         applyRole(null);
@@ -383,47 +305,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const hasCapability = useCallback(
     (capability: AdminCapability, pharmacyId?: number) => {
-      if (user?.role === "OWNER") {
-        return true;
-      }
-
-      const orgMemberships = (user?.memberships ?? []).filter(
-        (membership): membership is OrgMembership =>
-          Boolean(membership && typeof membership === "object" && "organization_id" in membership)
-      );
-      const orgHasCapability = orgMemberships.some((membership) => {
-        const capabilities = Array.isArray(membership.capabilities) ? membership.capabilities : [];
-        const hasRequested = capabilities.some(
-          (value) => String(value).replaceAll("-", "_").toUpperCase() === capability
-        );
-        if (!hasRequested) return false;
-        if (typeof pharmacyId !== "number") return true;
-        if (String(membership.role || "").toUpperCase() === "ORG_ADMIN") return true;
-        const scoped = Array.isArray(membership.pharmacies) ? membership.pharmacies : [];
-        return scoped.some((pharmacy) => Number(pharmacy.id) === pharmacyId);
+      const sharedCapability = normalizeAdminCapability(capability);
+      return sharedCapability != null && hasAdminCapability(user, sharedCapability, {
+        pharmacyId,
+        activeAdminAssignmentId,
       });
-
-      if (typeof pharmacyId === "number") {
-        if (ownedPharmacyIds.has(pharmacyId)) {
-          return true;
-        }
-        const match = adminAssignments.find(
-          (assignment) => assignment.pharmacy_id === pharmacyId
-        );
-        return Boolean(match?.capabilities.includes(capability) || orgHasCapability);
-      }
-
-      if (ownedPharmacyIds.size > 0 || orgHasCapability) {
-        return true;
-      }
-      if (activeAdminAssignment) {
-        return activeAdminAssignment.capabilities.includes(capability);
-      }
-      return adminAssignments.some((assignment) =>
-        assignment.capabilities.includes(capability)
-      );
     },
-    [activeAdminAssignment, adminAssignments, ownedPharmacyIds, user]
+    [activeAdminAssignmentId, user]
   );
 
   const selectRolePersona = useCallback(

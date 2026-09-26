@@ -37,7 +37,6 @@ import {
   STAFF_ROLE_LABELS,
   STAFF_ROLE_OPTIONS,
   UserPortalRole,
-  formatUserPortalRole,
   surface,
 } from "./types";
 import type { MembershipDTO } from "@chemisttasker/shared-core";
@@ -141,7 +140,7 @@ export default function PharmacyAdmins({
     });
     return collected;
   }, [authUser?.memberships]);
-  const isOwnerOfPharmacy = ownerPharmacyIds.has(numericPharmacyId) || authUser?.role === "OWNER";
+  const isOwnerOfPharmacy = ownerPharmacyIds.has(numericPharmacyId);
 
   const canManageAdmins =
     hasCapability(ADMIN_CAPABILITY_MANAGE_ADMINS, numericPharmacyId) || isOwnerOfPharmacy;
@@ -188,37 +187,8 @@ export default function PharmacyAdmins({
       return;
     }
 
-    const expectedUserRole: UserPortalRole =
-      form.admin_level === "OWNER"
-        ? "OWNER"
-        : form.staff_role === "PHARMACIST"
-        ? "PHARMACIST"
-        : "OTHER_STAFF";
-
     setSubmitting(true);
     try {
-      let currentUserRole = existingUserRole;
-      if (typeof currentUserRole === "undefined") {
-        try {
-          currentUserRole = await fetchUserRoleByEmail(trimmedEmail);
-          setExistingUserRole(currentUserRole);
-        } catch {
-          currentUserRole = undefined;
-          setExistingUserRole(undefined);
-        }
-      }
-
-      if (currentUserRole && currentUserRole !== expectedUserRole) {
-        setToast({
-          message: `Existing account is ${formatUserPortalRole(
-            currentUserRole
-          )}, but this admin level requires ${formatUserPortalRole(expectedUserRole)}.`,
-          severity: "error",
-        });
-        setSubmitting(false);
-        return;
-      }
-
       await createPharmacyAdminService({
         pharmacy: numericPharmacyId,
         email: trimmedEmail,
@@ -477,7 +447,7 @@ export default function PharmacyAdmins({
                 }));
               }}
             >
-              {ADMIN_LEVEL_OPTIONS.map((opt) => (
+              {ADMIN_LEVEL_OPTIONS.filter((opt) => opt.value !== 'OWNER').map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   <Box sx={{ display: "flex", flexDirection: "column" }}>
                     <Typography variant="body2" fontWeight={600}>

@@ -1,4 +1,7 @@
 from datetime import timedelta
+from importlib import import_module
+from django.contrib import admin
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
@@ -7,7 +10,8 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Article, Comment, Reaction, Report
+from .admin import ArticleAdmin
+from .models import Article, Comment, ContentDocument, ContentRevision, Reaction, Report
 
 
 class HubTests(TestCase):
@@ -29,6 +33,46 @@ class HubTests(TestCase):
     def login(self, user=None):
         token = RefreshToken.for_user(user or self.user)
         self.api.credentials(HTTP_AUTHORIZATION=f'Bearer {token.access_token}')
+
+    def test_article_admin_cannot_bypass_editorial_workflow(self):
+        article_admin = ArticleAdmin(Article, admin.site)
+        self.assertFalse(article_admin.has_add_permission(None))
+        self.assertFalse(article_admin.has_change_permission(None, self.article))
+        self.assertFalse(article_admin.has_delete_permission(None, self.article))
+
+    def test_legacy_article_backfill_preserves_heading_and_paragraphs(self):
+        migration = import_module('public_hub.migrations.0004_backfill_editorial_documents')
+        document = migration._body_document(self.article)
+
+        self.assertEqual([block['type'] for block in document['content']], ['heading', 'paragraph'])
+        self.assertEqual(document['content'][0]['content'][0]['text'], 'A shared plan')
+        self.assertEqual(document['content'][1]['content'][0]['text'], 'Make time for a conversation.')
+
+    def test_editorial_backfill_governs_each_publication_state_once(self):
+        future = timezone.now() + timedelta(days=1)
+        for slug, status, published_at in (
+            ('draft-guide', 'draft', None),
+            ('scheduled-guide', 'published', future),
+            ('archived-guide', 'archived', timezone.now()),
+        ):
+            Article.objects.create(
+                title=slug, slug=slug, kind='blog', topic='practice',
+                excerpt='Test editorial state.', body='Test editorial state.',
+                status=status, published_at=published_at,
+            )
+        backfill = import_module('public_hub.migrations.0004_backfill_editorial_documents').backfill_editorial_documents
+        backfill(apps, None)
+        backfill(apps, None)
+        self.assertEqual(ContentRevision.objects.count(), 4)
+        self.assertEqual(
+            ContentRevision.objects.get(document__article__slug='draft-guide').status, 'draft'
+        )
+        self.assertEqual(
+            ContentRevision.objects.get(document__article__slug='scheduled-guide').status, 'scheduled'
+        )
+        archived = ContentDocument.objects.get(article__slug='archived-guide')
+        self.assertTrue(archived.archived)
+        self.assertEqual(archived.revisions.get().status, 'superseded')
 
     def test_drafts_scheduled_and_archived_are_not_public(self):
         for status, date in [('draft', None), ('published', timezone.now() + timedelta(days=1)), ('archived', timezone.now())]:

@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
 import apiClient from '@/utils/apiClient';
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 
@@ -43,10 +44,7 @@ export type DashboardPayload = {
   bills_summary?: { total_billed?: string | number; points?: string | number };
 };
 
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
-const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(['LOCUM', 'SHIFT_HERO']);
-const INTERNAL_PHARMACY_ROLES = new Set(['OWNER', 'PHARMACY_OWNER', 'MANAGER', 'PHARMACY_ADMIN', 'ADMIN', 'ROSTER_MANAGER', 'COMMUNICATION_MANAGER']);
+const ORG_ROLES = new Set<string>(ORG_PORTAL_ROLES);
 
 const isWorkerRole = (role?: string | null) => {
   const normalized = String(role || '').toUpperCase();
@@ -55,7 +53,7 @@ const isWorkerRole = (role?: string | null) => {
 
 const addPharmacy = (map: Map<number, PharmacyOption>, idRaw: unknown, nameRaw: unknown, helper?: string) => {
   const id = Number(idRaw);
-  if (!Number.isFinite(id)) return;
+  if (!Number.isFinite(id) || id <= 0) return;
   const name = typeof nameRaw === 'string' && nameRaw.trim() ? nameRaw.trim() : `Pharmacy #${id}`;
   if (!map.has(id)) map.set(id, { id, name, helper });
 };
@@ -66,24 +64,21 @@ export function collectDashboardPharmacies(user: any): PharmacyOption[] {
   memberships.forEach((membership: any) => {
     const role = String(membership?.role ?? '').toUpperCase();
     const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
-    if (
-      !INTERNAL_PHARMACY_ROLES.has(role) &&
-      !PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType) &&
-      !FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType)
-    ) return;
-    addPharmacy(
-      byId,
-      membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
-      membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-      role === 'OWNER' || role === 'PHARMACY_OWNER'
-        ? 'Owner'
-        : employmentType === 'LOCUM'
-          ? 'Locum'
-          : employmentType === 'SHIFT_HERO'
-            ? 'Shift Hero'
-            : membership?.role
-    );
-    if (Array.isArray(membership?.pharmacies)) {
+    if (isInternalPharmacyMembership(membership)) {
+      addPharmacy(
+        byId,
+        membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
+        membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
+        role === 'OWNER' || role === 'PHARMACY_OWNER'
+          ? 'Owner'
+          : employmentType === 'LOCUM'
+            ? 'Locum'
+            : employmentType === 'SHIFT_HERO'
+              ? 'Shift Hero'
+              : membership?.role
+      );
+    }
+    if (canAccessOrganizationPharmacies(membership) && Array.isArray(membership?.pharmacies)) {
       membership.pharmacies.forEach((pharmacy: any) => addPharmacy(byId, pharmacy?.id, pharmacy?.name, 'Organization pharmacy'));
     }
   });
@@ -109,7 +104,6 @@ export function dashboardEndpointForRole(role?: string | null) {
   if (normalized === 'OWNER') return '/client-profile/dashboard/owner/';
   if (normalized === 'PHARMACIST') return '/client-profile/dashboard/pharmacist/';
   if (normalized === 'OTHER_STAFF') return '/client-profile/dashboard/otherstaff/';
-  if (ORG_ROLES.has(normalized)) return '/client-profile/dashboard/organization/';
   return null;
 }
 
@@ -125,7 +119,25 @@ export function useScopedDashboard(roleOverride?: string | null) {
     canUsePlatform,
   } = useWorkspace();
   const role = roleOverride ?? user?.role;
-  const pharmacies = useMemo(() => collectDashboardPharmacies(user), [user]);
+  const organizationId = getOrganizationMembership(user)?.organization_id;
+  const [organizationPharmacies, setOrganizationPharmacies] = useState<PharmacyOption[]>([]);
+  useEffect(() => {
+    if (!organizationId) {
+      setOrganizationPharmacies([]);
+      return;
+    }
+    let active = true;
+    setOrganizationPharmacies([]);
+    fetchAccessibleOrganizationPharmacies(organizationId)
+      .then((items) => { if (active) setOrganizationPharmacies(items); })
+      .catch(() => { if (active) setOrganizationPharmacies([]); });
+    return () => { active = false; };
+  }, [organizationId]);
+  const pharmacies = useMemo(() => {
+    const byId = new Map(collectDashboardPharmacies(user).map((item) => [item.id, item]));
+    organizationPharmacies.forEach((item) => byId.set(item.id, { ...item, helper: 'Organization pharmacy' }));
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [user, organizationPharmacies]);
   const canSelectPlatform = canUsePlatform && isWorkerRole(role);
 
   const selectPlatform = useCallback(() => {
@@ -143,10 +155,16 @@ export function useScopedDashboard(roleOverride?: string | null) {
     },
     [setSelectedPharmacyId, setSelectedPharmacyName, setWorkspace]
   );
+  const selectAllOrganizationPharmacies = useCallback(() => {
+    setWorkspace('internal');
+    setSelectedPharmacyId(null);
+    setSelectedPharmacyName(null);
+  }, [setWorkspace, setSelectedPharmacyId, setSelectedPharmacyName]);
 
   const fetchDashboard = useCallback(async () => {
-    const endpoint = dashboardEndpointForRole(role);
-    if (!endpoint) return null;
+    const isOrganizationDashboard = ORG_ROLES.has(String(role || '').toUpperCase());
+    const endpoint = isOrganizationDashboard ? null : dashboardEndpointForRole(role);
+    if (!isOrganizationDashboard && !endpoint) return null;
     const params =
       workspace === 'platform' && canSelectPlatform
         ? { workspace: 'platform' }
@@ -154,13 +172,19 @@ export function useScopedDashboard(roleOverride?: string | null) {
         ? { workspace: 'internal', pharmacy_id: selectedPharmacyId }
         : { workspace: 'internal' };
     try {
-      const response = await apiClient.get(endpoint, { params });
-      const selected = response.data?.selected_pharmacy;
+      const organizationId = getOrganizationMembership(user)?.organization_id;
+      if (isOrganizationDashboard && organizationId == null) {
+        throw new Error('Your organization membership is unavailable.');
+      }
+      const payload = isOrganizationDashboard
+        ? await getOrganizationDashboard(organizationId, params)
+        : (await apiClient.get(endpoint!, { params })).data;
+      const selected = payload?.selected_pharmacy;
       if (selected?.id != null) {
         setSelectedPharmacyId(Number(selected.id));
         setSelectedPharmacyName(selected?.name ?? selectedPharmacyName ?? null);
       }
-      return response.data as DashboardPayload;
+      return payload as DashboardPayload;
     } catch (error: any) {
       if (error?.response?.status === 403) {
         const firstPharmacy = pharmacies[0];
@@ -176,6 +200,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     canSelectPlatform,
     pharmacies,
     role,
+    user,
     selectPharmacy,
     selectPlatform,
     selectedPharmacyId,
@@ -188,7 +213,9 @@ export function useScopedDashboard(roleOverride?: string | null) {
   const scopeLabel =
     workspace === 'platform' && canSelectPlatform
       ? 'ChemistTasker Platform'
-      : selectedPharmacyName || pharmacies.find((item) => item.id === selectedPharmacyId)?.name || 'Selected pharmacy';
+      : selectedPharmacyId == null && ORG_ROLES.has(String(role || '').toUpperCase())
+        ? 'All organization pharmacies'
+        : selectedPharmacyName || pharmacies.find((item) => item.id === selectedPharmacyId)?.name || 'Selected pharmacy';
 
   return {
     workspace,
@@ -198,6 +225,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     fetchDashboard,
     selectPlatform,
     selectPharmacy,
+    selectAllOrganizationPharmacies,
     canSelectPlatform,
   };
 }
@@ -210,6 +238,7 @@ export function DashboardScopeSwitcher({
   canSelectPlatform = false,
   onSelectPlatform,
   onSelectPharmacy,
+  onSelectAllOrganizationPharmacies,
 }: {
   pharmacies: PharmacyOption[];
   scopeLabel: string;
@@ -218,6 +247,7 @@ export function DashboardScopeSwitcher({
   canSelectPlatform?: boolean;
   onSelectPlatform: () => void;
   onSelectPharmacy: (pharmacy: PharmacyOption) => void;
+  onSelectAllOrganizationPharmacies?: () => void;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -241,6 +271,19 @@ export function DashboardScopeSwitcher({
           <Text variant="titleMedium" style={styles.modalTitle}>
             Dashboard scope
           </Text>
+          {onSelectAllOrganizationPharmacies && (
+            <Button
+              mode={workspace === 'internal' && selectedPharmacyId == null ? 'contained' : 'text'}
+              icon="store-multiple-outline"
+              contentStyle={styles.optionContent}
+              onPress={() => {
+                onSelectAllOrganizationPharmacies();
+                setVisible(false);
+              }}
+            >
+              All organization pharmacies
+            </Button>
+          )}
           {canSelectPlatform && (
             <>
               <Button
@@ -315,35 +358,67 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
+  const [pendingAdminCount, setPendingAdminCount] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    getPendingPharmacyAdminInvitations()
+      .then((items: unknown) => { if (active) setPendingAdminCount(Array.isArray(items) ? items.length : 0); })
+      .catch(() => { if (active) setPendingAdminCount(0); });
+    return () => { active = false; };
+  }, [user?.id, pathname]);
   const normalizedRole = String(role || user?.role || '').toUpperCase();
-  const isWorker = normalizedRole === 'PHARMACIST' || normalizedRole === 'OTHER_STAFF';
-  const assignments = Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [];
+  const assignments = (Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [])
+    .filter((assignment: any) => assignment?.admin_level !== 'OWNER');
+  const canSwitchToOrg = hasOrganizationAccess(user) &&
+    !ORG_PORTAL_ROLES.includes(normalizedRole as (typeof ORG_PORTAL_ROLES)[number]);
 
-  if (!isWorker || assignments.length === 0) return null;
+  if (assignments.length === 0 && !canSwitchToOrg && pendingAdminCount === 0) return null;
 
-  const workerRoute = normalizedRole === 'OTHER_STAFF' ? '/otherstaff/dashboard' : '/pharmacist/dashboard';
-  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Other Staff' : 'Pharmacist';
+  const workerRoute = normalizedRole === 'OTHER_STAFF' ? '/otherstaff/dashboard' :
+    normalizedRole === 'PHARMACIST' ? '/pharmacist/dashboard' :
+    normalizedRole === 'OWNER' ? '/owner/dashboard' :
+    normalizedRole === 'EXPLORER' ? '/explorer/dashboard' : '/organization/dashboard';
+  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Other Staff' :
+    normalizedRole === 'PHARMACIST' ? 'Pharmacist' :
+    normalizedRole === 'OWNER' ? 'Owner' :
+    normalizedRole === 'EXPLORER' ? 'Explorer' : 'Organization';
   const activeAdmin = String(pathname || '').startsWith('/admin');
+  const activeOrg = String(pathname || '').startsWith('/organization');
 
   return (
-    <View style={styles.personaSwitcher}>
+    <>
+    {pendingAdminCount > 0 ? <Surface style={{ padding: 14, borderRadius: 14, marginBottom: 12, backgroundColor: '#EEF2FF' }}>
+      <Text variant="titleSmall">{pendingAdminCount} admin invitation{pendingAdminCount === 1 ? '' : 's'} awaiting your decision</Text>
+      <Button mode="text" onPress={() => router.push('/admin-invitations' as any)}>Review invitations</Button>
+    </Surface> : null}
+    {(assignments.length > 0 || canSwitchToOrg) ? <View style={styles.personaSwitcher}>
       <TouchableOpacity
-        style={[styles.personaButton, !activeAdmin && styles.personaButtonActive]}
+        style={[styles.personaButton, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonActive]}
         onPress={() => router.replace(workerRoute as any)}
         activeOpacity={0.82}
       >
-        <IconButton icon="account-outline" size={18} iconColor={!activeAdmin ? '#FFFFFF' : '#4F46E5'} />
-        <Text style={[styles.personaButtonText, !activeAdmin && styles.personaButtonTextActive]}>{roleLabel}</Text>
+        <IconButton icon="account-outline" size={18} iconColor={!activeAdmin && (!activeOrg || !canSwitchToOrg) ? '#FFFFFF' : '#4F46E5'} />
+        <Text style={[styles.personaButtonText, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonTextActive]}>{roleLabel}</Text>
       </TouchableOpacity>
-      <TouchableOpacity
+      {assignments.length > 0 ? <TouchableOpacity
         style={[styles.personaButton, activeAdmin && styles.personaButtonActive]}
         onPress={() => router.replace('/admin' as any)}
         activeOpacity={0.82}
       >
         <IconButton icon="shield-account-outline" size={18} iconColor={activeAdmin ? '#FFFFFF' : '#4F46E5'} />
         <Text style={[styles.personaButtonText, activeAdmin && styles.personaButtonTextActive]}>Admin</Text>
-      </TouchableOpacity>
-    </View>
+      </TouchableOpacity> : null}
+      {canSwitchToOrg ? <TouchableOpacity
+        style={[styles.personaButton, activeOrg && styles.personaButtonActive]}
+        onPress={() => router.replace('/organization/dashboard' as any)}
+        activeOpacity={0.82}
+      >
+        <IconButton icon="domain" size={18} iconColor={activeOrg ? '#FFFFFF' : '#4F46E5'} />
+        <Text style={[styles.personaButtonText, activeOrg && styles.personaButtonTextActive]}>Organization</Text>
+      </TouchableOpacity> : null}
+    </View> : null}
+    </>
   );
 }
 

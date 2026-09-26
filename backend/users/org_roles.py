@@ -149,7 +149,7 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
         ),
         requires_job_title=True,
         requires_region=False,
-        requires_pharmacies=False,
+        requires_pharmacies=True,
     ),
     "REGION_ADMIN": OrgRoleDefinition(
         key="REGION_ADMIN",
@@ -170,6 +170,7 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             OrgCapability.MANAGE_COMMS,
             OrgCapability.MANAGE_STAFF,
             OrgCapability.MANAGE_ADMINS,
+            OrgCapability.INVITE_STAFF,
             OrgCapability.ASSIGN_PHARMACIES,
         ),
         requires_job_title=True,

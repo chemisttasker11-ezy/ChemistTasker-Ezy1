@@ -121,7 +121,7 @@ export default function WorkforceTimesheetsScreen() {
         <View>
           <Button compact icon="arrow-left" onPress={() => router.back()} style={{ alignSelf: 'flex-start', marginBottom: 6 }}>Back</Button>
           <Text variant="headlineMedium" style={styles.title}>Timesheets</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Review rostered, worked and reviewed time before payroll or external payroll hand-off.</Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>Review rostered, worked and reviewed time before payroll or external payroll hand-off. Recalculate uses attendance already received; sync offline kiosks at the terminal first.</Text>
         </View>
 
         {!!error && <Card style={styles.error}><Card.Content><Text style={styles.errorText}>{error}</Text></Card.Content></Card>}

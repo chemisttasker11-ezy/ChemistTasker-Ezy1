@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import ParityToolsCard from '@/components/ParityToolsCard';
+import { DashboardPersonaSwitcher } from '@/roles/shared/dashboard/dashboardScope';
 
 export default function ExplorerOverviewScreen() {
   const { access, user, logout, isLoading: authLoading } = useAuth();
@@ -125,6 +126,7 @@ export default function ExplorerOverviewScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />}
         showsVerticalScrollIndicator={false}
       >
+        <DashboardPersonaSwitcher role="EXPLORER" />
         <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
 
         <ParityToolsCard />

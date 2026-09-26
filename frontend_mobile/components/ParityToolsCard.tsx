@@ -41,7 +41,6 @@ export default function ParityToolsCard() {
   const role = String(user?.role || '').toUpperCase();
   const tools = useMemo(() => {
     if (role === 'EXPLORER') return explorerTools;
-    if (role === 'OWNER') return managerTools;
 
     const canManageRoster = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
     const canManageStaff = canManageRoster || hasCapability('MANAGE_STAFF', selectedPharmacyId);

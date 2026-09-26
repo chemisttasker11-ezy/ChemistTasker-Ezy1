@@ -233,6 +233,7 @@ export const API_ENDPOINTS = {
         managerReject: '/client-profile/attendance/manager/reject/',
         managerCorrect: '/client-profile/attendance/manager/correct/',
         managerTimeline: (sessionId: number) => `/client-profile/attendance/manager/timeline/${sessionId}/`,
+        managerKioskDevices: '/client-profile/attendance/manager/kiosk-devices/',
     },
     rosterV2: {
         period: '/client-profile/attendance/roster/period/',

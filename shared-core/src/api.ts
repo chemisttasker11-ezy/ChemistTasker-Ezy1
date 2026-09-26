@@ -4,7 +4,7 @@
  * Complete API functions for ChemistTasker
  */
 import { API_ENDPOINTS } from './constants/endpoints';
-import type { ShiftOfferAcceptancePayload } from './types';
+import type { ShiftOfferAcceptancePayload, RosterPharmacyMember, WorkerShiftRequest } from './types';
 let config = null;
 export function configureApi(apiConfig) {
     config = apiConfig;
@@ -307,9 +307,9 @@ const mapShift = (api) => {
     };
 };
 const mapRosterAssignment = (api) => camelCaseKeysDeep(api);
-const mapWorkerShiftRequest = (api) => camelCaseKeysDeep(api);
+const mapWorkerShiftRequest = (api): WorkerShiftRequest => camelCaseKeysDeep(api);
 const mapOpenShift = (api) => camelCaseKeysDeep(api);
-const mapRosterPharmacyMember = (api) => camelCaseKeysDeep(api);
+const mapRosterPharmacyMember = (api): RosterPharmacyMember => camelCaseKeysDeep(api);
 const mapShiftApplication = (api) => camelCaseKeysDeep(api);
 const mapOwnerShiftSummary = (api) => camelCaseKeysDeep(api);
 const mapPharmacySummaryRecord = (api) => camelCaseKeysDeep(api);
@@ -396,6 +396,8 @@ export const attendance = {
     reject: (provisionalId, reason) => operationalRequest(API_ENDPOINTS.attendance.managerReject, { method: 'POST', body: { provisional_id: provisionalId, reason } }),
     correct: (eventId, correctedTimestamp, reason) => operationalRequest(API_ENDPOINTS.attendance.managerCorrect, { method: 'POST', body: { event_id: eventId, corrected_timestamp: correctedTimestamp, reason } }),
     getManagerTimeline: (sessionId) => operationalRequest(API_ENDPOINTS.attendance.managerTimeline(sessionId)),
+    getManagerKioskDevices: (pharmacyId) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { query: { pharmacy_id: pharmacyId } }),
+    revokeManagerKioskDevice: (deviceId) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { method: 'POST', body: { device_id: deviceId } }),
 };
 
 export const rosterV2 = {
@@ -666,6 +668,23 @@ export async function fetchPharmaciesService(params) {
     const data = await getPharmacies(params);
     return asList(data).map(mapPharmacySummaryRecord);
 }
+export async function fetchAccessibleOrganizationPharmacies(organizationId) {
+    const id = Number(organizationId);
+    if (!Number.isInteger(id) || id <= 0) return [];
+    const pharmacies = [];
+    let page = 1;
+    while (true) {
+        const data = await getPharmacies({ page });
+        const rows = asList(data);
+        pharmacies.push(...rows
+            .filter((pharmacy) => Number(pharmacy?.organization) === id)
+            .map((pharmacy) => ({ id: Number(pharmacy.id), name: pharmacy.name }))
+            .filter((pharmacy) => Number.isInteger(pharmacy.id) && pharmacy.id > 0));
+        if (!data?.next) break;
+        page += 1;
+    }
+    return pharmacies;
+}
 export async function fetchChainsService() {
     const data = await getChains();
     return asList(data).map(mapChain);
@@ -749,6 +768,13 @@ export async function createPharmacyAdminService(payload) {
 }
 export async function deletePharmacyAdminService(id) {
     await deletePharmacyAdmin(id);
+}
+export function getPendingPharmacyAdminInvitations() {
+    return fetchApi('/client-profile/pharmacy-admins/my-pending-invitations/');
+}
+export function respondToPharmacyAdminInvitation(id, accept) {
+    const action = accept ? 'accept-invitation' : 'reject-invitation';
+    return fetchApi(`/client-profile/pharmacy-admins/${id}/${action}/`, { method: 'POST' });
 }
 // ============ CHAINS ============
 export function getChains() {
@@ -1348,8 +1374,9 @@ export function createOpenShift(data) {
 export function deleteRosterAssignment(id) {
     return fetchApi(`/client-profile/roster-owner/${id}/`, { method: 'DELETE' });
 }
-export function getRosterOwnerMembers(pharmacyId) {
-    return fetchApi(`/client-profile/roster-owner/members-for-roster/?pharmacy_id=${pharmacyId}`);
+export function getRosterOwnerMembers(pharmacyId, role: string | null = null) {
+    const query = buildQuery({ pharmacy_id: pharmacyId, ...(role ? { role } : {}) });
+    return fetchApi(`/client-profile/roster-owner/members-for-roster/${query}`);
 }
 export function getRosterWorkerPharmacies() {
     return fetchApi('/client-profile/roster-worker/pharmacies/');
@@ -1362,7 +1389,7 @@ export async function fetchRosterWorkerAssignments(params) {
     const data = await getRosterWorker(toRosterQueryParams(params));
     return asList(data).map(mapRosterAssignment);
 }
-export async function fetchWorkerShiftRequestsService(params) {
+export async function fetchWorkerShiftRequestsService(params): Promise<WorkerShiftRequest[]> {
     const data = await getWorkerShiftRequests(toRosterQueryParams(params));
     return asList(data).map(mapWorkerShiftRequest);
 }
@@ -1370,8 +1397,8 @@ export async function fetchOwnerOpenShifts(params) {
     const data = await getOwnerOpenShifts(toShiftListParams(params));
     return asList(data).map(mapOpenShift);
 }
-export async function fetchRosterOwnerMembersService(pharmacyId) {
-    const data = await getRosterOwnerMembers(pharmacyId);
+export async function fetchRosterOwnerMembersService(pharmacyId, role: string | null = null): Promise<RosterPharmacyMember[]> {
+    const data = await getRosterOwnerMembers(pharmacyId, role);
     return asList(data).map(mapRosterPharmacyMember);
 }
 export async function fetchRosterWorkerPharmaciesService() {

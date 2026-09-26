@@ -3917,17 +3917,11 @@ class MembershipSerializer(serializers.ModelSerializer):
         return owner_user_id == obj.user_id
 
     def get_is_pharmacy_admin(self, obj):
-        assignment = getattr(obj, "admin_assignment", None)
-        if assignment:
-            return True
-        return PharmacyAdmin.objects.filter(
-            user=obj.user,
-            pharmacy=obj.pharmacy,
-        ).exists()
+        return self._get_admin_assignment(obj) is not None
 
     def _get_admin_assignment(self, obj):
         assignment = getattr(obj, "admin_assignment", None)
-        if assignment:
+        if assignment and assignment.is_active:
             return assignment
         return PharmacyAdmin.objects.filter(
             user=obj.user,
@@ -6172,15 +6166,6 @@ class SharedShiftSerializer(serializers.ModelSerializer):
 
         return data
 
-class LeaveRequestSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LeaveRequest
-        fields = [
-            'id', 'slot_assignment', 'user', 'leave_type', 'note',
-            'status', 'date_applied', 'date_resolved'
-        ]
-        read_only_fields = ['id', 'user', 'status', 'date_applied', 'date_resolved']
-
 class WorkerShiftRequestSerializer(serializers.ModelSerializer):
     requested_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     pharmacy_name = serializers.CharField(source="pharmacy.name", read_only=True)
@@ -6382,16 +6367,24 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
         }
 
     def get_leave_request(self, obj):
-        # Get latest leave request with status PENDING or APPROVED
-        leave = obj.leave_requests.filter(status__in=['PENDING', 'APPROVED']).order_by('-date_applied').first()
+        from workforce.models import WorkforceLeaveRequest
+
+        leave = WorkforceLeaveRequest.objects.filter(
+            slot_assignment=obj,
+            user_id=obj.user_id,
+            status__in=[
+                WorkforceLeaveRequest.Status.PENDING,
+                WorkforceLeaveRequest.Status.APPROVED,
+            ],
+        ).order_by("-created_at", "-id").first()
         if leave:
             return {
                 "id": leave.id,
                 "leave_type": leave.leave_type,
                 "status": leave.status,
                 "note": leave.note,
-                "date_applied": leave.date_applied,
-                "date_resolved": leave.date_resolved,
+                "date_applied": leave.created_at,
+                "date_resolved": leave.decided_at,
             }
         return None
 

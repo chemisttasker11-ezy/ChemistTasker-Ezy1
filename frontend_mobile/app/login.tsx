@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, View } from 'react-native';
 import { Button, Surface, Text, TextInput } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
@@ -13,17 +14,6 @@ import {
   getSavedBiometricUser,
   type BiometricUser,
 } from '../utils/biometricAuth';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
-}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -62,8 +52,7 @@ export default function LoginScreen() {
       return;
     }
 
-    // Organization access must win before owner setup because org accounts can still carry OWNER as their base role.
-    if (hasOrganizationAccess(userData)) {
+    if (hasOrganizationAccess(userData) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(userData.role)) {
       router.replace('/organization/dashboard' as never);
     } else if (userData.role === 'OWNER') {
       const setupStatus = await getOwnerSetupStatus(userData);

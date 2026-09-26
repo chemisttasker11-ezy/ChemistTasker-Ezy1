@@ -3,6 +3,8 @@ import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import { assignmentPharmacyId, selectAdminAssignment } from '@/utils/adminAssignments';
 
 function profileRouteForRole(role?: string | null) {
   const normalized = String(role || '').toUpperCase();
@@ -76,6 +78,7 @@ function AdminSidebar({
 export default function AdminLayout() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { selectedPharmacyId } = useWorkspace();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
@@ -98,12 +101,9 @@ export default function AdminLayout() {
   }, [user, isLoading]);
 
   const assignment = useMemo(() => {
-    const assignments = Array.isArray((user as any)?.admin_assignments)
-      ? (user as any).admin_assignments
-      : [];
-    return assignments.find((item: any) => item?.pharmacy_id || item?.pharmacyId) || assignments[0] || null;
-  }, [user]);
-  const pharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy ?? null;
+    return selectAdminAssignment(user, selectedPharmacyId);
+  }, [user, selectedPharmacyId]);
+  const pharmacyId = assignment ? assignmentPharmacyId(assignment) : null;
   const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
   const profileRoute = profileRouteForRole(user?.role);
   const adminPath = (route: string) => {

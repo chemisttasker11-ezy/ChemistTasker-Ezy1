@@ -18,6 +18,17 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import LogoutIcon from "@mui/icons-material/Logout";
 import apiClient from "../../../utils/apiClient";
+import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
+import { useAuth } from "../../../contexts/AuthContext";
+
+type AdminInvitation = {
+  id: number;
+  membership_id: number;
+  pharmacy_name: string;
+  admin_level: string;
+  job_title?: string;
+  membership_status: string;
+};
 
 type Membership = {
   id: number;
@@ -64,7 +75,9 @@ function adminCapabilitiesText(membership: Membership) {
 }
 
 export default function ManageMembershipsPage() {
+  const { setUser } = useAuth();
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [adminInvitations, setAdminInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<number | null>(null);
@@ -73,8 +86,12 @@ export default function ManageMembershipsPage() {
   const loadMemberships = async () => {
     setLoading(true);
     try {
-      const { data } = await apiClient.get("/client-profile/my-memberships/");
+      const [{ data }, invitations] = await Promise.all([
+        apiClient.get("/client-profile/my-memberships/"),
+        getPendingPharmacyAdminInvitations(),
+      ]);
       setMemberships(Array.isArray(data) ? data : data?.results || []);
+      setAdminInvitations(Array.isArray(invitations) ? invitations : []);
       setActionError(null);
     } catch (error: any) {
       setActionError(error?.response?.data?.detail || "Unable to load memberships.");
@@ -87,11 +104,28 @@ export default function ManageMembershipsPage() {
     void loadMemberships();
   }, []);
 
+  const refreshUser = async () => {
+    const { data } = await apiClient.get('/users/me/');
+    setUser(data);
+  };
+
+  const respondToAdmin = async (invitation: AdminInvitation, accept: boolean) => {
+    setActingId(invitation.id);
+    try {
+      await respondToPharmacyAdminInvitation(invitation.id, accept);
+      await Promise.all([loadMemberships(), refreshUser()]);
+    } catch (error: any) {
+      setActionError(error?.response?.data?.detail || 'Unable to respond to this admin invitation.');
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const runAction = async (membership: Membership, action: "accept" | "reject" | "quit") => {
     setActingId(membership.id);
     try {
       await apiClient.post(`/client-profile/my-memberships/${membership.id}/${action}/`);
-      await loadMemberships();
+      await Promise.all([loadMemberships(), refreshUser()]);
       setQuitTarget(null);
     } catch (error: any) {
       setActionError(error?.response?.data?.detail || `Unable to ${action} membership.`);
@@ -113,6 +147,24 @@ export default function ManageMembershipsPage() {
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
+      {adminInvitations.map((invitation) => (
+        <Paper key={`admin-${invitation.id}`} sx={{ p: 2.5, borderRadius: 3, border: '1px solid var(--ct-border-color)' }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
+            <Box>
+              <Typography variant="h6" fontWeight={800}>{invitation.pharmacy_name}</Typography>
+              <Typography color="text.secondary">
+                {label(invitation.admin_level)} admin invitation{invitation.job_title ? ` · ${invitation.job_title}` : ''}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">{invitation.membership_status === 'ACCEPTED' ? 'Your current pharmacy membership stays active while you decide.' : 'Accepting grants both pharmacy membership and admin access.'}</Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Button variant="contained" disabled={actingId === invitation.id} onClick={() => respondToAdmin(invitation, true)}>Accept admin access</Button>
+              <Button variant="outlined" color="error" disabled={actingId === invitation.id} onClick={() => respondToAdmin(invitation, false)}>Decline</Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      ))}
+
       {loading ? (
         <Paper sx={{ p: 4, borderRadius: 3, textAlign: "center" }}>
           <CircularProgress />
@@ -130,6 +182,7 @@ export default function ManageMembershipsPage() {
             const pharmacy = membership.pharmacy_detail;
             const isPending = membership.status === "PENDING";
             const isAccepted = membership.status === "ACCEPTED";
+            const hasAdminInvitation = adminInvitations.some((invitation) => invitation.membership_id === membership.id);
             const capabilitiesText = adminCapabilitiesText(membership);
             return (
               <Paper
@@ -174,7 +227,7 @@ export default function ManageMembershipsPage() {
                   </Stack>
 
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    {isPending && (
+                    {isPending && !hasAdminInvitation && (
                       <>
                         <Button variant="contained" startIcon={<CheckCircleIcon />} disabled={actingId === membership.id} onClick={() => runAction(membership, "accept")}>
                           Accept
@@ -184,6 +237,7 @@ export default function ManageMembershipsPage() {
                         </Button>
                       </>
                     )}
+                    {isPending && hasAdminInvitation && <Typography variant="body2" color="text.secondary">Respond to the admin invitation above.</Typography>}
                     {isAccepted && membership.role !== "OWNER" && (
                       <Button variant="outlined" color="error" startIcon={<LogoutIcon />} disabled={actingId === membership.id} onClick={() => setQuitTarget(membership)}>
                         Quit membership

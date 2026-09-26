@@ -21,7 +21,7 @@ import { useWorkspace } from "../contexts/WorkspaceContext";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
-import { getOnboardingDetail } from "@chemisttasker/shared-core";
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
 import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
 
 const DNA = {
@@ -42,10 +42,6 @@ type PharmacyOption = {
   name: string;
   helper?: string;
 };
-
-const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(["FULL_TIME", "PART_TIME", "CASUAL"]);
-const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(["LOCUM", "SHIFT_HERO"]);
-const INTERNAL_PHARMACY_ROLES = new Set(["OWNER", "PHARMACY_OWNER", "MANAGER", "PHARMACY_ADMIN", "ADMIN", "ROSTER_MANAGER", "COMMUNICATION_MANAGER"]);
 
 const dashboardAccents = [
   {
@@ -112,7 +108,7 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
   const byId = new Map<number, PharmacyOption>();
   const add = (idRaw: unknown, nameRaw: unknown, helper?: string) => {
     const id = Number(idRaw);
-    if (!Number.isFinite(id)) return;
+    if (!Number.isFinite(id) || id <= 0) return;
     const name = typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : `Pharmacy #${id}`;
     if (!byId.has(id)) byId.set(id, { id, name, helper });
   };
@@ -121,23 +117,20 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
   memberships.forEach((membership: any) => {
     const role = String(membership?.role ?? "").toUpperCase();
     const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
-    if (
-      !INTERNAL_PHARMACY_ROLES.has(role) &&
-      !PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType) &&
-      !FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType)
-    ) return;
-    add(
-      membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
-      membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-      role === "OWNER" || role === "PHARMACY_OWNER"
-        ? "Owner"
-        : employmentType === "LOCUM"
-          ? "Locum"
-          : employmentType === "SHIFT_HERO"
-            ? "Shift Hero"
-            : membership?.role
-    );
-    if (Array.isArray(membership?.pharmacies)) {
+    if (isInternalPharmacyMembership(membership)) {
+      add(
+        membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
+        membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
+        role === "OWNER" || role === "PHARMACY_OWNER"
+          ? "Owner"
+          : employmentType === "LOCUM"
+            ? "Locum"
+            : employmentType === "SHIFT_HERO"
+              ? "Shift Hero"
+              : membership?.role
+      );
+    }
+    if (canAccessOrganizationPharmacies(membership) && Array.isArray(membership?.pharmacies)) {
       membership.pharmacies.forEach((pharmacy: any) => add(pharmacy?.id, pharmacy?.name, "Organization pharmacy"));
     }
   });
@@ -152,15 +145,6 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
   });
 
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function hasFavoriteStaffMembership(user: any): boolean {
-  const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
-  return memberships.some((membership: any) => {
-    const rawPharmacyId = membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id;
-    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
-    return Number.isFinite(Number(rawPharmacyId)) && FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType);
-  });
 }
 
 function coerceVerified(value: unknown): boolean {
@@ -354,8 +338,26 @@ export default function DashboardTopShell({
     return (user as any)?.other_staff_profile?.role_type ?? (user as any)?.otherStaffProfile?.roleType ?? null;
   });
 
-  const pharmacies = useMemo(() => collectPharmacies(user, adminAssignments), [user, adminAssignments]);
-  const isOrgUser = String(user?.role || "").toUpperCase().includes("ORG") || String(user?.role || "").toUpperCase() === "ORGANIZATION";
+  const [organizationPharmacies, setOrganizationPharmacies] = useState<PharmacyOption[]>([]);
+  const organizationId = getOrganizationMembership(user)?.organization_id;
+  useEffect(() => {
+    if (!organizationId) {
+      setOrganizationPharmacies([]);
+      return;
+    }
+    let active = true;
+    setOrganizationPharmacies([]);
+    fetchAccessibleOrganizationPharmacies(organizationId)
+      .then((items) => { if (active) setOrganizationPharmacies(items); })
+      .catch(() => { if (active) setOrganizationPharmacies([]); });
+    return () => { active = false; };
+  }, [organizationId]);
+  const pharmacies = useMemo(() => {
+    const byId = new Map(collectPharmacies(user, adminAssignments).map((item) => [item.id, item]));
+    organizationPharmacies.forEach((item) => byId.set(item.id, { ...item, helper: "Organization pharmacy" }));
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [user, adminAssignments, organizationPharmacies]);
+  const isOrgUser = hasOrganizationAccess(user);
   const isOwner = String(user?.role || "").toUpperCase() === "OWNER";
   const isWorker = ["PHARMACIST", "OTHER_STAFF"].includes(String(user?.role || "").toUpperCase());
   const isFavoriteStaff = useMemo(() => hasFavoriteStaffMembership(user), [user]);
@@ -421,7 +423,7 @@ export default function DashboardTopShell({
   useEffect(() => {
     if (canUsePlatformWorkspace || workspace !== "platform") return;
     setWorkspace("internal");
-    const fallbackPharmacyId = selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
+    const fallbackPharmacyId = isOrgUser ? null : selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
     setSelectedPharmacyId(fallbackPharmacyId);
     setWorkspacePharmacyId(fallbackPharmacyId);
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -434,6 +436,7 @@ export default function DashboardTopShell({
     setSearchParams(nextParams, { replace: true });
   }, [
     canUsePlatformWorkspace,
+    isOrgUser,
     pharmacies,
     searchParams,
     selectedPharmacyId,
@@ -455,11 +458,11 @@ export default function DashboardTopShell({
       setWorkspacePharmacyId(null);
       return;
     }
-    if (selectedPharmacyId == null && pharmacies[0]) {
+    if (!isOrgUser && selectedPharmacyId == null && pharmacies[0]) {
       setSelectedPharmacyId(pharmacies[0].id);
       setWorkspacePharmacyId(pharmacies[0].id);
     }
-  }, [activeAdminPharmacyId, hidePharmacyScope, pharmacies, selectedPharmacyId, setWorkspacePharmacyId, workspace]);
+  }, [activeAdminPharmacyId, hidePharmacyScope, isOrgUser, pharmacies, selectedPharmacyId, setWorkspacePharmacyId, workspace]);
 
   const applyScopeToCurrentUrl = (pharmacyId: number | null) => {
     const scoped = addScopedParams(`${location.pathname}?${searchParams.toString()}`, pharmacyId);
@@ -493,6 +496,20 @@ export default function DashboardTopShell({
     setSelectedPharmacyId(id);
     setWorkspacePharmacyId(id);
     applyScopeToCurrentUrl(id);
+    setWorkspaceAnchor(null);
+  };
+
+  const handleSelectAllOrganizationPharmacies = () => {
+    setWorkspace("internal");
+    setSelectedPharmacyId(null);
+    setWorkspacePharmacyId(null);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("workspace", "internal");
+    nextParams.delete("pharmacy_id");
+    nextParams.delete("pharmacy");
+    nextParams.delete("pharmacyId");
+    nextParams.delete("view");
+    setSearchParams(nextParams, { replace: true });
     setWorkspaceAnchor(null);
   };
 
@@ -685,14 +702,17 @@ export default function DashboardTopShell({
               >
                 <Box sx={{ minWidth: 0, textAlign: "left" }}>
                   <Typography noWrap sx={{ fontSize: { xs: 12, md: 14 }, fontWeight: 900, color: "var(--ct-text-primary)" }}>
-                    {selectedPharmacy?.name ?? "ChemistTasker Platform"}
+                    {selectedPharmacy?.name ?? (isOrgUser && workspace === "internal" ? "All organization pharmacies" : "ChemistTasker Platform")}
                   </Typography>
                   <Typography noWrap sx={{ fontSize: { xs: 10, md: 12 }, fontWeight: 700, color: "var(--ct-text-secondary)" }}>
-                    {selectedPharmacy ? "Selected pharmacy scope" : "Public platform workspace"}
+                    {selectedPharmacy ? "Selected pharmacy scope" : isOrgUser && workspace === "internal" ? "Combined organization scope" : "Public platform workspace"}
                   </Typography>
                 </Box>
               </Button>
               <Menu anchorEl={workspaceAnchor} open={Boolean(workspaceAnchor)} onClose={() => setWorkspaceAnchor(null)}>
+                {isOrgUser && <MenuItem onClick={handleSelectAllOrganizationPharmacies}>
+                  <StoreIcon sx={{ mr: 1.5, color: DNA.blue }} /> All organization pharmacies
+                </MenuItem>}
                 {canUsePlatformWorkspace && canUseInternal && (
                   <MenuItem onClick={handleSelectPlatform}>
                     <PublicIcon sx={{ mr: 1.5, color: DNA.violet }} /> ChemistTasker Platform

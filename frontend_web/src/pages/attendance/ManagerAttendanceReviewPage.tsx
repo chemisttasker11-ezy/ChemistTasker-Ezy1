@@ -117,11 +117,13 @@ export default function ManagerAttendanceReviewPage() {
   }, []);
 
   // Fetch pending provisional attendances for the selected pharmacy
-  const fetchPending = useCallback(async () => {
+  const fetchPending = useCallback(async (clearAlert = true) => {
     if (!selectedPharmacyId) return;
     try {
       setLoadingReviews(true);
-      setAlertMsg(null);
+      if (clearAlert) {
+        setAlertMsg(null);
+      }
       const rows = await attendance.getManagerPending(Number(selectedPharmacyId));
       setPendingReviews(rows as PendingReview[]);
     } catch (err: any) {
@@ -155,7 +157,7 @@ export default function ManagerAttendanceReviewPage() {
       });
       setApprovingItem(null);
       setApprovalReason("");
-      fetchPending();
+      void fetchPending(false);
     } catch (err: any) {
       setAlertMsg({
         type: "error",
@@ -178,7 +180,7 @@ export default function ManagerAttendanceReviewPage() {
       });
       setRejectingItem(null);
       setRejectionReason("");
-      fetchPending();
+      void fetchPending(false);
     } catch (err: any) {
       setAlertMsg({
         type: "error",
@@ -322,7 +324,7 @@ export default function ManagerAttendanceReviewPage() {
           </Typography>
           <Button
             size="small"
-            onClick={fetchPending}
+            onClick={() => void fetchPending()}
             disabled={loadingReviews}
             sx={{
               color: BRAND_COLORS.purple,

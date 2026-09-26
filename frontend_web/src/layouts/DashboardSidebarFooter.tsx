@@ -9,20 +9,21 @@ import Typography from "@mui/material/Typography";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { alpha, useTheme } from "@mui/material/styles";
 import { SidebarFooterProps } from "@toolpad/core/DashboardLayout";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
-import { getOnboarding } from "@chemisttasker/shared-core";
+import { getOnboarding, hasOrganizationAccess } from "@chemisttasker/shared-core";
 import { otherStaffRoleLabel } from "../utils/roleLabels";
 
 type PersonaMenuOption =
   | {
       key: string;
       kind: "ROLE";
-      role: "PHARMACIST" | "OTHER_STAFF";
+      role: "PHARMACIST" | "OTHER_STAFF" | "OWNER" | "EXPLORER";
       label: string;
       helper?: string;
     }
+  | { key: "ORG"; kind: "ORG"; label: string; helper?: string }
   | {
       key: string;
       kind: "ADMIN";
@@ -50,6 +51,7 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
   const footerRef = useRef<HTMLDivElement | null>(null);
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     user,
     adminAssignments,
@@ -57,6 +59,7 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
     activeAdminAssignment,
     selectRolePersona,
     selectAdminPersona,
+    setActivePersona,
     isAdminUser,
   } = useAuth();
   const { workspace, setWorkspace, canUseInternal } = useWorkspace();
@@ -136,20 +139,21 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
     (rawRole === "pharmacist" || rawRole === "other_staff");
 
   const personaOptions = useMemo<PersonaMenuOption[]>(() => {
-    if (user?.role === "OWNER") {
-      return [];
-    }
-
     const options: PersonaMenuOption[] = [];
 
-    if (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF") {
+    if (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF" || user?.role === "OWNER" || user?.role === "EXPLORER") {
       options.push({
         key: `ROLE:${user.role}`,
         kind: "ROLE",
         role: user.role,
-        label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) : "Pharmacist",
-        helper: "Staff dashboard",
+        label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) :
+          user.role === "PHARMACIST" ? "Pharmacist" : user.role === "OWNER" ? "Owner" : "Explorer",
+        helper: "Original dashboard",
       });
+    }
+
+    if (hasOrganizationAccess(user)) {
+      options.push({ key: 'ORG', kind: 'ORG', label: 'Organization', helper: 'Organization dashboard' });
     }
 
     adminAssignments.forEach((assignment) => {
@@ -187,6 +191,7 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
   }, [adminAssignments, otherStaffRoleType, user?.role]);
 
   const activePersonaKey = useMemo(() => {
+    if (location.pathname.startsWith('/dashboard/organization/')) return 'ORG';
     if (activePersona === "admin") {
       const activeId =
         activeAdminAssignment?.id ??
@@ -196,12 +201,12 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
     }
     if (
       activePersona === "staff" &&
-      (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF")
+      (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF" || user?.role === "OWNER" || user?.role === "EXPLORER")
     ) {
       return `ROLE:${user.role}`;
     }
     return null;
-  }, [activeAdminAssignment?.id, activePersona, adminAssignments, user?.role]);
+  }, [activeAdminAssignment?.id, activePersona, adminAssignments, user?.role, location.pathname]);
 
   const activePersonaOption =
     personaOptions.find((option) => option.key === activePersonaKey) ??
@@ -213,14 +218,18 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
 
   const handlePersonaSelect = (option: PersonaMenuOption) => {
     if (option.kind === "ROLE") {
-      selectRolePersona(option.role);
+      if (option.role === 'PHARMACIST' || option.role === 'OTHER_STAFF') selectRolePersona(option.role);
+      else setActivePersona('staff');
       const targetPath =
         option.role === "PHARMACIST"
           ? "/dashboard/pharmacist/overview"
           : option.role === "OTHER_STAFF"
           ? "/dashboard/otherstaff/overview"
-          : "/dashboard/explorer/overview";
+          : option.role === "OWNER" ? "/dashboard/owner/overview" : "/dashboard/explorer/overview";
       navigate(targetPath);
+    } else if (option.kind === 'ORG') {
+      setActivePersona('staff');
+      navigate('/dashboard/organization/overview');
     } else {
       selectAdminPersona(option.assignmentId);
       const assignment = adminAssignments.find((item) => item.id === option.assignmentId);

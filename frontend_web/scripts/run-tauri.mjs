@@ -25,7 +25,12 @@ if (isWindows) {
   );
 }
 
-const child = spawn(executable, process.argv.slice(2), {
+const args = process.argv.slice(2);
+if (args[0] === 'build' && process.env.KIOSK_BUILD_PROFILE === 'acceptance') {
+  args.push('--config', 'src-tauri/tauri.acceptance.conf.json');
+}
+
+const child = spawn(executable, args, {
   cwd: process.cwd(),
   env: {
     ...process.env,

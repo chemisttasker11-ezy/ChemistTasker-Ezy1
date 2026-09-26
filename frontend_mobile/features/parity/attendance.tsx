@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { attendance, workforce } from '@chemisttasker/shared-core';
+import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
@@ -44,19 +44,23 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const workspace=useWorkspace();
   const pharmacyId=workspace.selectedPharmacyId;
   const manager=canManage(user);
+  const canManageKiosk=pharmacyId!=null&&canManageKioskDevices(user,pharmacyId);
   const [status,setStatus]=useState<any>(null);
   const [pending,setPending]=useState<any[]>([]);
   const [pinPharmacies,setPinPharmacies]=useState<any[]>([]);
+  const [kioskDevices,setKioskDevices]=useState<any[]>([]);
   const [timeline,setTimeline]=useState<any>(null);
   const [hours,setHours]=useState<any[]>([]);
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const loadSequence=useRef(0);
 
   const selectedPending=useMemo(()=>pending.find((row:any)=>String(row.provisional_id||row.id)===String(params.id||''))||null,[pending,params.id]);
 
   const load=useCallback(async()=>{
+    const sequence=++loadSequence.current;
     setError('');
     try{
       if(screen==='home'||screen==='clock') setStatus(await attendance.getWorkerStatus());
@@ -65,12 +69,20 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       }
       if(screen==='kiosk-status') {
         const result=await attendance.getPinPharmacies();
+        if(sequence!==loadSequence.current) return;
         setPinPharmacies(asArray((result as any)?.pharmacies??result));
+        if(canManageKiosk&&pharmacyId){
+          const devices=await attendance.getManagerKioskDevices(pharmacyId);
+          if(sequence!==loadSequence.current) return;
+          setKioskDevices(asArray((devices as any)?.devices??devices));
+        }else{
+          setKioskDevices([]);
+        }
       }
       if(screen==='correction'&&!manager) setHours(asArray(await workforce.getMyHours()));
-    }catch(e){setError(errorMessage(e,'Unable to load attendance data.'));}
-    finally{setLoading(false);setRefreshing(false);}
-  },[screen,manager,pharmacyId]);
+    }catch(e){if(sequence===loadSequence.current)setError(errorMessage(e,'Unable to load attendance data.'));}
+    finally{if(sequence===loadSequence.current){setLoading(false);setRefreshing(false);}}
+  },[screen,manager,canManageKiosk,pharmacyId]);
 
   useEffect(()=>{void load();},[load]);
 
@@ -87,7 +99,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
 
   if(screen==='clock') return <ClockScreen status={status} loading={loading} error={error} onReload={load}/>;
   if(screen==='correction') return <CorrectionScreen manager={manager} rows={hours} params={params} loading={loading} error={error} />;
-  if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} loading={loading} error={error} />;
+  if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} devices={kioskDevices} canManageKiosk={canManageKiosk} pharmacyId={pharmacyId} loading={loading} error={error} onReload={load} />;
 
   if(screen==='reviews'){
     return <ParityPage title={titles[screen]} subtitle="Review provisional and cross-site attendance before it becomes rostered history." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing}>
@@ -218,10 +230,47 @@ function CorrectionScreen({manager,rows,params,loading,error}:{manager:boolean;r
   </ParityPage>;
 }
 
-function KioskStatus({rows,loading,error}:{rows:any[];loading:boolean;error:string}) {
+function KioskStatus({rows,devices,canManageKiosk,pharmacyId,loading,error,onReload}:{rows:any[];devices:any[];canManageKiosk:boolean;pharmacyId:number|null;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const router=useRouter();
-  return <ParityPage title="Kiosk & PIN status" subtitle="Worker PIN setup across pharmacies available to your account." loading={loading} error={error}>
-    <Section title="Pharmacies">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>
-    <InfoNote title="Kiosk access">Kiosk pairing remains an explicit deep-link/device workflow. This screen exposes only the authenticated worker PIN status and setup entry point.</InfoNote>
+  const [confirmDeviceId,setConfirmDeviceId]=useState<number|null>(null);
+  const [busyDeviceId,setBusyDeviceId]=useState<number|null>(null);
+  const [localError,setLocalError]=useState('');
+  const [success,setSuccess]=useState('');
+
+  const revokeDevice=async(device:any)=>{
+    setBusyDeviceId(Number(device.id));setLocalError('');setSuccess('');
+    try{
+      await attendance.revokeManagerKioskDevice(Number(device.id));
+      setConfirmDeviceId(null);
+      setSuccess(`${device.device_name||'Kiosk terminal'} was revoked.`);
+      await onReload();
+    }catch(e){
+      setLocalError(errorMessage(e,'Unable to revoke this kiosk device.'));
+    }finally{
+      setBusyDeviceId(null);
+    }
+  };
+
+  return <ParityPage title="Kiosk devices & PINs" subtitle="Review attendance terminals and worker PIN setup." loading={loading} error={error||localError} onRetry={onReload}>
+    {success?<InfoNote title="Device updated" tone="success">{success}</InfoNote>:null}
+    {canManageKiosk?<Section title="Registered kiosk devices" description="Revocation blocks new attendance. Previously signed offline evidence can still upload for review.">
+      {!pharmacyId?<PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/>:devices.length?devices.map((device:any)=><View key={device.id} style={{paddingVertical:14,borderBottomWidth:1,borderBottomColor:palette.border,gap:8}}>
+        <DataRow title={device.device_name||'Kiosk terminal'} subtitle={[replaceUnderscore(device.client_kind||''),device.platform||'Unknown platform',device.app_version?`v${device.app_version}`:null].filter(Boolean).join(' · ')} status={device.is_active?'Active':'Revoked'} />
+        <MetricGrid items={[
+          {label:'Last seen',value:device.last_seen_at?dateLabel(device.last_seen_at):'Never'},
+          {label:'Last sync',value:device.last_sync_at?dateLabel(device.last_sync_at):'Never'},
+          {label:'Received sequence',value:Number(device.last_contiguous_sequence||0)},
+        ]}/>
+        {device.is_active?(confirmDeviceId===Number(device.id)?<>
+          <InfoNote title="Confirm revocation" tone="warning">This terminal will need pairing again before recording attendance.</InfoNote>
+          <ActionButtons>
+            <Button mode="contained" buttonColor={palette.danger} loading={busyDeviceId===Number(device.id)} disabled={busyDeviceId!==null} onPress={()=>void revokeDevice(device)}>Confirm revoke</Button>
+            <Button mode="outlined" disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(null)}>Cancel</Button>
+          </ActionButtons>
+        </>:<Button mode="outlined" textColor={palette.danger} disabled={busyDeviceId!==null} onPress={()=>setConfirmDeviceId(Number(device.id))}>Revoke kiosk</Button>):<InfoNote title="Revoked">{device.revoked_at?`Revoked ${dateLabel(device.revoked_at)}. `:''}Pair again to record new attendance.</InfoNote>}
+      </View>):<EmptyState title="No registered kiosks" body="No attendance terminal is registered for this pharmacy."/>}
+    </Section>:null}
+    <Section title="Worker attendance PINs">{rows.length?rows.map((row:any)=><DataRow key={row.id} title={row.name} subtitle={row.has_pin?'Worker PIN is configured':'Worker PIN setup required'} status={row.has_pin?'Ready':'Action needed'} onPress={()=>router.push('/attendance-pin' as any)}/>):<EmptyState title="No PIN pharmacies" body="No pharmacies are currently available for worker PIN management."/>}</Section>
+    <InfoNote title="Device lifecycle">A native kiosk needs its dashboard PIN and a server revocation before it disconnects. Unsynced attendance remains on the terminal.</InfoNote>
   </ParityPage>;
 }

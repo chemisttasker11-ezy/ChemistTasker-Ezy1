@@ -10,25 +10,14 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import StoreIcon from "@mui/icons-material/Store";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getOrganizationDashboard } from "@chemisttasker/shared-core";
+import { getOrganizationDashboard, getOrganizationMembership } from "@chemisttasker/shared-core";
 import DashboardOverviewTemplate, {
   type DashboardAction,
   type DashboardMetric,
 } from "../../../components/dashboard/DashboardOverviewTemplate";
-import { ORG_ROLES } from "../../../constants/roles";
-import { useAuth, type OrgMembership } from "../../../contexts/AuthContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import apiClient from "../../../utils/apiClient";
-
-function isOrgMembership(membership: unknown): membership is OrgMembership {
-  if (!membership || typeof membership !== "object") return false;
-  const candidate = membership as OrgMembership & { role?: string };
-  return (
-    typeof candidate.organization_id === "number" &&
-    typeof candidate.role === "string" &&
-    ORG_ROLES.includes(candidate.role as any)
-  );
-}
 
 export default function OrganizationOverviewPage() {
   const { user } = useAuth();
@@ -39,14 +28,14 @@ export default function OrganizationOverviewPage() {
   const effectivePharmacyId =
     workspace === "internal" && selectedPharmacyId
       ? selectedPharmacyId
-      : Number.isFinite(urlPharmacyId)
+      : Number.isInteger(urlPharmacyId) && urlPharmacyId > 0
         ? urlPharmacyId
         : null;
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [pillSummary, setPillSummary] = useState<{ balance: number; shift_post_cost: number } | null>(null);
 
-  const orgMembership = Array.isArray(user?.memberships) ? user.memberships.find(isOrgMembership) : undefined;
+  const orgMembership = getOrganizationMembership(user);
   const orgId = orgMembership?.organization_id ?? null;
 
   useEffect(() => {
@@ -58,7 +47,7 @@ export default function OrganizationOverviewPage() {
         ? { workspace: "internal", pharmacy_id: selectedPharmacyId }
         : effectivePharmacyId
           ? { workspace: "internal", pharmacy_id: effectivePharmacyId }
-        : { workspace: "platform" };
+        : { workspace: "internal" };
     getOrganizationDashboard(orgId, dashboardParams)
       .then((res) => {
         if (!isActive) return;
@@ -93,8 +82,10 @@ export default function OrganizationOverviewPage() {
   }, []);
 
   const claims = useMemo(() => (Array.isArray(data?.pharmacy_claims) ? data.pharmacy_claims : []), [data]);
-  const pharmacies = useMemo(() => (Array.isArray(data?.pharmacies) ? data.pharmacies : []), [data]);
-  const selectedPharmacy = effectivePharmacyId ? pharmacies.find((pharmacy: any) => Number(pharmacy?.id) === Number(effectivePharmacyId)) ?? null : null;
+  const selectedPharmacy =
+    effectivePharmacyId && Number(data?.selected_pharmacy?.id) === effectivePharmacyId
+      ? data.selected_pharmacy
+      : null;
   const scopeName = selectedPharmacy?.name ?? data?.organization?.name ?? orgMembership?.organization_name ?? "All pharmacies";
 
   const pendingClaims = claims.filter((claim: any) => claim.status === "PENDING").length;

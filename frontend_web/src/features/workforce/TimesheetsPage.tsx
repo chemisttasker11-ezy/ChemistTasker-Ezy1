@@ -148,7 +148,7 @@ export default function TimesheetsPage() {
     setError('');
     try {
       await recalculateTimesheetPeriod(periodId, true);
-      setFeedback('Timesheets recalculated from current roster, attendance, corrections and leave.');
+      setFeedback('Timesheets recalculated from attendance already received, roster, corrections and leave. Sync offline kiosks at the terminal to include pending events.');
       await loadPeriod();
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Unable to recalculate timesheets.');

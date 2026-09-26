@@ -1,12 +1,14 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import default_token_generator
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils import timezone
 from datetime import timedelta
 import jwt
+from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import patch
 
 
@@ -181,6 +183,137 @@ class PublicAndPrivateRoutePreservationTests(TestCase):
 
 
 class BrowserTokenExposureTests(TestCase):
+    @override_settings(AXES_ENABLED=False)
+    def test_expo_mobile_otp_verification_keeps_refresh_out_of_browser_json(self):
+        user = get_user_model().objects.create_user(
+            email="expo-mobile-otp@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=False,
+        )
+        user.mobile_otp_code = make_password("123456")
+        user.mobile_otp_created_at = timezone.now()
+        user.save(update_fields=["mobile_otp_code", "mobile_otp_created_at"])
+        access = str(RefreshToken.for_user(user).access_token)
+        response = self.client.post(
+            "/api/users/mobile/verify-otp/", {"otp": "123456"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {access}",
+            HTTP_ORIGIN="http://localhost:8081",
+            HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.json())
+        self.assertNotIn("refresh", response.json())
+        self.assertIn("ct_refresh", response.cookies)
+
+    @override_settings(AXES_ENABLED=False, CSRF_TRUSTED_ORIGINS=["http://localhost:8081"])
+    def test_expo_origin_cannot_spoof_native_login_or_skip_cookie_csrf(self):
+        get_user_model().objects.create_user(
+            email="expo-browser@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+        credentials = {"email": "expo-browser@example.com", "password": "CorrectPassword123!"}
+        browser = Client(enforce_csrf_checks=True)
+        csrf = browser.get("/api/users/csrf/").json()["csrfToken"]
+        browser_headers = {
+            "HTTP_ORIGIN": "http://localhost:8081",
+            "HTTP_X_CLIENT_PLATFORM": "mobile",
+        }
+        rejected = browser.post(
+            "/api/users/login/", credentials, content_type="application/json", **browser_headers
+        )
+        self.assertEqual(rejected.status_code, 403)
+
+        login = browser.post(
+            "/api/users/login/", credentials, content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf, **browser_headers
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertIn("access", login.json())
+        self.assertNotIn("refresh", login.json())
+        self.assertIn("ct_refresh", login.cookies)
+
+        cookie_write = browser.post(
+            "/api/users/ws-ticket/", {}, content_type="application/json", **browser_headers
+        )
+        self.assertEqual(cookie_write.status_code, 403)
+        rejected_refresh = browser.post(
+            "/api/users/token/refresh/", {}, content_type="application/json", **browser_headers
+        )
+        self.assertEqual(rejected_refresh.status_code, 403)
+        rejected_refresh_with_bearer = browser.post(
+            "/api/users/token/refresh/", {}, content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer arbitrary", **browser_headers
+        )
+        self.assertEqual(rejected_refresh_with_bearer.status_code, 403)
+
+        csrf = browser.get("/api/users/csrf/").json()["csrfToken"]
+        refreshed = browser.post(
+            "/api/users/token/refresh/", {}, content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf, **browser_headers
+        )
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertIn("access", refreshed.json())
+        self.assertNotIn("refresh", refreshed.json())
+
+        rejected_logout = browser.post(
+            "/api/users/logout/", {}, content_type="application/json", **browser_headers
+        )
+        self.assertEqual(rejected_logout.status_code, 403)
+        rejected_logout_with_bearer = browser.post(
+            "/api/users/logout/", {}, content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer arbitrary", **browser_headers
+        )
+        self.assertEqual(rejected_logout_with_bearer.status_code, 403)
+        csrf = browser.get("/api/users/csrf/").json()["csrfToken"]
+        logout = browser.post(
+            "/api/users/logout/", {}, content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf, **browser_headers
+        )
+        self.assertEqual(logout.status_code, 200)
+
+    @override_settings(AXES_ENABLED=False)
+    def test_native_token_refresh_still_uses_response_body(self):
+        get_user_model().objects.create_user(
+            email="native-token@example.com",
+            password="CorrectPassword123!",
+            role="PHARMACIST",
+            is_otp_verified=True,
+            is_mobile_verified=True,
+        )
+        native = Client(enforce_csrf_checks=True)
+        login = native.post(
+            "/api/users/login/",
+            {"email": "native-token@example.com", "password": "CorrectPassword123!"},
+            content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(login.status_code, 200)
+        refresh_token = login.json()["refresh"]
+        # Native clients do not use cookies; send the token on a fresh client.
+        native = Client(enforce_csrf_checks=True)
+        refreshed = native.post(
+            "/api/users/token/refresh/", {"refresh": refresh_token},
+            content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertIn("refresh", refreshed.json())
+        rotated_refresh = refreshed.json()["refresh"]
+        logout = Client(enforce_csrf_checks=True).post(
+            "/api/users/logout/", {"refresh": rotated_refresh},
+            content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(logout.status_code, 200)
+        rejected = Client(enforce_csrf_checks=True).post(
+            "/api/users/token/refresh/", {"refresh": rotated_refresh},
+            content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+        self.assertEqual(rejected.status_code, 401)
+
     @override_settings(AXES_ENABLED=False, JWT_COOKIE_SECURE=True)
     def test_web_login_keeps_refresh_token_out_of_javascript_response(self):
         get_user_model().objects.create_user(

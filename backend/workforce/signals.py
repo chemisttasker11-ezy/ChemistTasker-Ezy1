@@ -11,7 +11,6 @@ from client_profile.models import (
     AttendanceCorrection,
     AttendanceEvent,
     AttendanceSession,
-    LeaveRequest,
     ProvisionalAttendance,
     RosterPeriod,
     Shift,
@@ -162,24 +161,11 @@ def roster_shift_changed(sender, instance, **kwargs):
         log.exception("Failed to bump roster revision for shift %s", getattr(instance, "pk", None))
 
 
-@receiver(post_save, sender=LeaveRequest)
-def legacy_leave_changed(sender, instance, **kwargs):
-    assignment = instance.slot_assignment
-    work_date = assignment.slot_date or assignment.slot.date
-    _enqueue(assignment.shift.pharmacy_id, instance.user_id, work_date)
-    if assignment.is_rostered:
-        period = RosterPeriod.objects.filter(
-            pharmacy_id=assignment.shift.pharmacy_id,
-            week_start=work_date - timedelta(days=work_date.weekday()),
-        ).first()
-        if period:
-            bump_roster_revision(period.pk)
-
-
 @receiver(post_save, sender=WorkforceLeaveRequest)
 @receiver(post_delete, sender=WorkforceLeaveRequest)
 def workforce_leave_changed(sender, instance, **kwargs):
     from client_profile.timezone_utils import get_pharmacy_timezone
+
     try:
         tz = get_pharmacy_timezone(instance.pharmacy)
         current = instance.start_at.astimezone(tz).date()
@@ -187,9 +173,21 @@ def workforce_leave_changed(sender, instance, **kwargs):
     except Exception:
         current = instance.start_at.date()
         end = instance.end_at.date()
+
     while current <= end:
         _enqueue(instance.pharmacy_id, instance.user_id, current)
         current += timedelta(days=1)
+
+    if instance.slot_assignment_id:
+        try:
+            assignment = instance.slot_assignment
+            if assignment and assignment.is_rostered:
+                bump_for_assignment(assignment)
+        except Exception:
+            log.exception(
+                "Failed to bump roster revision for leave %s",
+                getattr(instance, "pk", None),
+            )
 
 
 @receiver(post_save, sender=MembershipWorkSettings)

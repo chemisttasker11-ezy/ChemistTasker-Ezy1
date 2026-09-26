@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import { assignmentPharmacyId, getAdminAssignments, selectAdminAssignment } from '@/utils/adminAssignments';
 import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
@@ -12,15 +14,12 @@ import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } fr
 export default function AdminHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { selectedPharmacyId, setSelectedPharmacyId } = useWorkspace();
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
   const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
-  const assignment = useMemo(() => {
-    const assignments = Array.isArray((user as any)?.admin_assignments)
-      ? (user as any).admin_assignments
-      : [];
-    return assignments.find((item: any) => item?.pharmacy_id || item?.pharmacyId) || assignments[0] || null;
-  }, [user]);
-  const pharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy ?? null;
+  const assignments = useMemo(() => getAdminAssignments(user), [user]);
+  const assignment = useMemo(() => selectAdminAssignment(user, selectedPharmacyId), [user, selectedPharmacyId]);
+  const pharmacyId = assignment ? assignmentPharmacyId(assignment) : null;
   const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
 
   useEffect(() => {
@@ -59,6 +58,24 @@ export default function AdminHomeScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <DashboardPersonaSwitcher role={user?.role} />
+
+        {assignments.length > 1 ? <Surface style={styles.pharmacyPicker}>
+          <Text variant="titleSmall" style={styles.pharmacyPickerTitle}>Administering pharmacy</Text>
+          <View style={styles.pharmacyPickerOptions}>
+            {assignments.map((item) => {
+              const itemId = assignmentPharmacyId(item);
+              const selected = itemId === Number(pharmacyId);
+              if (itemId == null) return null;
+              return <Chip
+                key={String(item.id ?? itemId)}
+                selected={selected}
+                mode={selected ? 'flat' : 'outlined'}
+                onPress={() => void setSelectedPharmacyId(itemId)}
+                style={selected ? styles.pharmacyPickerChipSelected : styles.pharmacyPickerChip}
+              >{item?.pharmacy_name ?? item?.pharmacyName ?? `Pharmacy #${itemId}`}</Chip>;
+            })}
+          </View>
+        </Surface> : null}
 
         <Surface style={styles.hero}>
           <Text variant="labelLarge" style={styles.eyebrow}>Admin workspace</Text>
@@ -120,6 +137,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollView: { flex: 1 },
   content: { padding: 20, gap: 16 },
+  pharmacyPicker: { borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' },
+  pharmacyPickerTitle: { fontWeight: '700', color: '#111827', marginBottom: 12 },
+  pharmacyPickerOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pharmacyPickerChip: { backgroundColor: '#FFFFFF' },
+  pharmacyPickerChipSelected: { backgroundColor: '#EEF2FF' },
   hero: { borderRadius: 22, padding: 20, backgroundColor: '#FFFFFF' },
   eyebrow: { color: '#6366F1', textTransform: 'uppercase', letterSpacing: 1 },
   title: { color: '#111827', fontWeight: '900', marginTop: 6 },

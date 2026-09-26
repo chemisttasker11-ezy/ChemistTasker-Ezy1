@@ -13,6 +13,7 @@ import {
   DashboardActivity,
   DashboardErrorState,
   DashboardLoadingState,
+  DashboardPersonaSwitcher,
   DashboardScopeSwitcher,
   DashboardStatsOverview,
   useScopedDashboard,
@@ -36,7 +37,7 @@ type PillSummary = {
 export default function OrganizationDashboard() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const scope = useScopedDashboard(user?.role);
+  const scope = useScopedDashboard('ORGANIZATION');
   const [pillSummary, setPillSummary] = useState<PillSummary>({ balance: 0, shift_post_cost: 0 });
   const [shifts, setShifts] = useState<ShiftSummary[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -137,6 +138,7 @@ export default function OrganizationDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} tintColor="#6366F1" />}
         showsVerticalScrollIndicator={false}
       >
+        <DashboardPersonaSwitcher role={user?.role} />
         <DashboardScopeSwitcher
           pharmacies={scope.pharmacies}
           scopeLabel={scope.scopeLabel}
@@ -145,6 +147,7 @@ export default function OrganizationDashboard() {
           canSelectPlatform={scope.canSelectPlatform}
           onSelectPlatform={scope.selectPlatform}
           onSelectPharmacy={scope.selectPharmacy}
+          onSelectAllOrganizationPharmacies={scope.selectAllOrganizationPharmacies}
         />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={loadData} /> : null}
         <TouchableOpacity

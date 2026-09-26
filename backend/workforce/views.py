@@ -38,6 +38,7 @@ from .employment_engagement_service import (
     membership_date_of_birth,
 )
 
+from .leave_service import create_leave, decide_leave, serialize_leave
 from .models import (
     CoverageRequirement,
     EmploymentEngagement,
@@ -625,7 +626,9 @@ class WorkforceLeaveListCreateView(APIView):
 
     def get(self, request):
         pharmacy_id = request.query_params.get("pharmacy_id")
-        qs = WorkforceLeaveRequest.objects.select_related("pharmacy", "user", "membership", "decided_by")
+        qs = WorkforceLeaveRequest.objects.select_related(
+            "pharmacy", "user", "membership", "decided_by", "slot_assignment"
+        )
         try:
             if pharmacy_id:
                 pharmacy = _pharmacy(pharmacy_id)
@@ -639,42 +642,23 @@ class WorkforceLeaveListCreateView(APIView):
             return _validation_response(exc)
         if request.query_params.get("status"):
             qs = qs.filter(status=request.query_params["status"])
-        return Response([{
-            "id": row.pk, "pharmacy_id": row.pharmacy_id, "pharmacy_name": row.pharmacy.name,
-            "user_id": row.user_id, "worker_name": row.user.get_full_name() or row.user.username,
-            "membership_id": row.membership_id, "leave_type": row.leave_type,
-            "start_at": row.start_at.isoformat(), "end_at": row.end_at.isoformat(),
-            "status": row.status, "note": row.note,
-            "manager_note": row.manager_note if can_manage_pharmacy(request.user, row.pharmacy) else "",
-            "created_at": row.created_at.isoformat(),
-        } for row in qs.order_by("-start_at", "-id")[:500]])
+        return Response([
+            serialize_leave(
+                row,
+                include_manager_note=(
+                    row.user_id == request.user.pk
+                    or can_manage_pharmacy(request.user, row.pharmacy)
+                ),
+            )
+            for row in qs.order_by("-start_at", "-id")[:500]
+        ])
 
     def post(self, request):
         try:
-            membership = Membership.objects.select_related("pharmacy", "user").get(
-                pk=request.data.get("membership_id"),
-                user=request.user,
-                is_active=True,
-                status=Membership.Status.ACCEPTED,
-            )
-            start_at = _parse_required_datetime(request.data.get("start_at"), "start_at")
-            end_at = _parse_required_datetime(request.data.get("end_at"), "end_at")
-            if end_at <= start_at:
-                raise DjangoValidationError("end_at must be after start_at.")
-            row = WorkforceLeaveRequest(
-                pharmacy=membership.pharmacy,
-                membership=membership,
-                user=request.user,
-                leave_type=request.data.get("leave_type"),
-                start_at=start_at,
-                end_at=end_at,
-                note=(request.data.get("note") or "").strip(),
-            )
-            row.full_clean()
-            row.save()
-            return Response({"id": row.pk, "status": row.status}, status=status.HTTP_201_CREATED)
-        except Membership.DoesNotExist:
-            return Response({"error": "Select one of your active pharmacy memberships."}, status=status.HTTP_403_FORBIDDEN)
+            row = create_leave(request.user, request.data)
+            return Response(serialize_leave(row), status=status.HTTP_201_CREATED)
+        except DjangoPermissionDenied as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             return _validation_response(exc)
 
@@ -684,40 +668,19 @@ class WorkforceLeaveDecisionView(APIView):
 
     def post(self, request, pk):
         try:
-            with transaction.atomic():
-                row = WorkforceLeaveRequest.objects.select_for_update().select_related("pharmacy").get(pk=pk)
-                decision = str(request.data.get("decision") or "").upper()
-                if decision == WorkforceLeaveRequest.Status.CANCELLED:
-                    if row.user_id != request.user.pk:
-                        raise DjangoPermissionDenied("Workers can only cancel their own leave requests.")
-                    if row.status != WorkforceLeaveRequest.Status.PENDING:
-                        raise DjangoValidationError("Only a pending leave request can be cancelled by the worker.")
-                    row.status = WorkforceLeaveRequest.Status.CANCELLED
-                    row.save(update_fields=["status", "updated_at"])
-                    return Response({"id": row.pk, "status": row.status})
-
-                require_manage_pharmacy(request.user, row.pharmacy)
-                if decision not in {WorkforceLeaveRequest.Status.APPROVED, WorkforceLeaveRequest.Status.REJECTED}:
-                    raise DjangoValidationError("decision must be APPROVED, REJECTED, or worker-owned CANCELLED.")
-                if row.status != WorkforceLeaveRequest.Status.PENDING:
-                    raise DjangoValidationError("Only pending leave requests can be approved or rejected.")
-                if decision == WorkforceLeaveRequest.Status.APPROVED and WorkforceLeaveRequest.objects.filter(
-                    user_id=row.user_id, pharmacy_id=row.pharmacy_id,
-                    status=WorkforceLeaveRequest.Status.APPROVED,
-                    start_at__lt=row.end_at, end_at__gt=row.start_at,
-                ).exclude(pk=row.pk).exists():
-                    raise DjangoValidationError("This leave request overlaps another approved leave request for the worker.")
-                row.status = decision
-                row.manager_note = (request.data.get("manager_note") or "").strip()
-                row.decided_by = request.user
-                row.decided_at = timezone.now()
-                row.save(update_fields=["status", "manager_note", "decided_by", "decided_at", "updated_at"])
-                return Response({"id": row.pk, "status": row.status})
-        except WorkforceLeaveRequest.DoesNotExist:
-            return Response({"error": "Leave request not found."}, status=status.HTTP_404_NOT_FOUND)
+            row = decide_leave(
+                request.user,
+                pk,
+                request.data.get("decision"),
+                request.data.get("manager_note") or "",
+            )
+            return Response({"id": row.pk, "status": row.status})
         except DjangoPermissionDenied as exc:
             return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
+            message = "; ".join(getattr(exc, "messages", [])) or str(exc)
+            if message == "Leave request not found.":
+                return Response({"error": message}, status=status.HTTP_404_NOT_FOUND)
             return _validation_response(exc)
 
 

@@ -158,6 +158,10 @@ const router = createBrowserRouter([
 
       // Direct Attendance Routes
       {
+        path: 'dashboard/admin-invitations',
+        element: <ProtectedRoute><ManageMembershipsPage /></ProtectedRoute>,
+      },
+      {
         path: 'dashboard/attendance',
         element: (
           <ProtectedRoute>
@@ -218,7 +222,7 @@ const router = createBrowserRouter([
       {
         path: 'dashboard/organization',
         Component: () => (
-          <ProtectedRoute requiredRole="ORG_ADMIN">
+          <ProtectedRoute requiredRole="ORGANIZATION">
             <OrganizationDashboardWrapper />
           </ProtectedRoute>
         ),

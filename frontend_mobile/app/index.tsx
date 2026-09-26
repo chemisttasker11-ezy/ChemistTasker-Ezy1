@@ -2,20 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import AuthLayout from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
-}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -44,7 +34,7 @@ export default function HomeScreen() {
     let active = true;
     const routeUser = async () => {
       const role = String(user.role || '').toUpperCase();
-      if (hasOrganizationAccess(user)) {
+      if (hasOrganizationAccess(user) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(role)) {
         router.replace('/organization/dashboard' as any);
       } else if (role === 'OWNER') {
         const setupStatus = await getOwnerSetupStatus(user);

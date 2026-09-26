@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
-import { getOnboardingDetail } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, hasFavoriteStaffMembership, hasInternalWorkspaceAccess } from '@chemisttasker/shared-core';
 
 type WorkspaceType = 'internal' | 'platform';
 
@@ -22,10 +22,6 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 const WORKSPACE_STORAGE_KEY = '@chemisttasker_workspace';
 const PHARMACY_ID_STORAGE_KEY = '@chemisttasker_selected_pharmacy_id';
 const PHARMACY_NAME_STORAGE_KEY = '@chemisttasker_selected_pharmacy_name';
-const PHARMACY_STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
-const FAVORITE_STAFF_EMPLOYMENT_TYPES = new Set(['LOCUM', 'SHIFT_HERO']);
-const INTERNAL_PHARMACY_ROLES = new Set(['OWNER', 'PHARMACY_OWNER', 'MANAGER', 'PHARMACY_ADMIN', 'ADMIN', 'ROSTER_MANAGER', 'COMMUNICATION_MANAGER']);
-
 function coerceVerified(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
@@ -43,50 +39,19 @@ function isWorkerRole(role?: string | null): boolean {
   return normalized === 'PHARMACIST' || normalized === 'OTHER_STAFF';
 }
 
-function hasFavoriteStaffMembership(user: any): boolean {
-  const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
-  return memberships.some((membership: any) => {
-    const rawPharmacyId = membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id;
-    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
-    return Number.isFinite(Number(rawPharmacyId)) && FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType);
-  });
-}
-
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const [workspace, setWorkspaceState] = useState<WorkspaceType>('internal');
   const [selectedPharmacyId, setSelectedPharmacyIdState] = useState<number | null>(null);
   const [selectedPharmacyName, setSelectedPharmacyNameState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [canUseInternal, setCanUseInternal] = useState(false);
   const [workerVerified, setWorkerVerified] = useState(false);
+  const canUseInternal = hasInternalWorkspaceAccess(user);
   const canUsePlatform = isWorkerRole(user?.role) && (workerVerified || hasFavoriteStaffMembership(user));
 
   useEffect(() => {
     loadWorkspace();
   }, []);
-
-  useEffect(() => {
-    const memberships = Array.isArray((user as any)?.memberships) ? (user as any).memberships : [];
-    const hasPharmacyMembership = memberships.some((membership: any) => {
-      const rawPharmacyId = membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id;
-      const role = String(membership?.role ?? '').toUpperCase();
-      const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? '').toUpperCase();
-      return Number.isFinite(Number(rawPharmacyId)) && (
-        INTERNAL_PHARMACY_ROLES.has(role) ||
-        PHARMACY_STAFF_EMPLOYMENT_TYPES.has(employmentType) ||
-        FAVORITE_STAFF_EMPLOYMENT_TYPES.has(employmentType)
-      );
-    });
-    const adminAssignments = Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [];
-    const hasAdminAssignment = adminAssignments.some((assignment: any) => {
-      const rawPharmacyId = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy;
-      return Number.isFinite(Number(rawPharmacyId));
-    });
-    const ownerPharmacies = [(user as any)?.pharmacies, (user as any)?.owner_pharmacies, (user as any)?.owned_pharmacies].find(Array.isArray) ?? [];
-    const hasOwnerPharmacy = ownerPharmacies.some((pharmacy: any) => Number.isFinite(Number(pharmacy?.id)));
-    setCanUseInternal(hasPharmacyMembership || hasAdminAssignment || hasOwnerPharmacy);
-  }, [user]);
 
   useEffect(() => {
     const initialVerified = isOverallVerified(user);
@@ -116,7 +81,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || isLoading) return;
+    if (!canUseInternal && (selectedPharmacyId != null || selectedPharmacyName != null)) {
+      setSelectedPharmacyIdState(null);
+      setSelectedPharmacyNameState(null);
+      AsyncStorage.multiRemove([PHARMACY_ID_STORAGE_KEY, PHARMACY_NAME_STORAGE_KEY]).catch(() => null);
+    }
     if (!canUsePlatform && workspace === 'platform') {
       setWorkspaceState('internal');
       AsyncStorage.setItem(WORKSPACE_STORAGE_KEY, 'internal').catch(() => null);
@@ -131,7 +101,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         AsyncStorage.multiRemove([PHARMACY_ID_STORAGE_KEY, PHARMACY_NAME_STORAGE_KEY]).catch(() => null);
       }
     }
-  }, [authLoading, canUseInternal, canUsePlatform, workspace]);
+  }, [authLoading, canUseInternal, canUsePlatform, isLoading, selectedPharmacyId, selectedPharmacyName, workspace]);
 
   const loadWorkspace = async () => {
     try {
@@ -141,7 +111,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       const rawStoredPharmacyId = await AsyncStorage.getItem(PHARMACY_ID_STORAGE_KEY);
       const storedPharmacyId = Number(rawStoredPharmacyId);
-      if (rawStoredPharmacyId != null && Number.isFinite(storedPharmacyId)) {
+      if (rawStoredPharmacyId != null && Number.isFinite(storedPharmacyId) && storedPharmacyId > 0) {
         setSelectedPharmacyIdState(storedPharmacyId);
       }
       const storedPharmacyName = await AsyncStorage.getItem(PHARMACY_NAME_STORAGE_KEY);
@@ -156,11 +126,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   };
 
   const setWorkspace = async (newWorkspace: WorkspaceType) => {
-    const targetWorkspace: WorkspaceType = newWorkspace === 'platform' && canUsePlatform ? 'platform' : 'internal';
+    const targetWorkspace: WorkspaceType = newWorkspace === 'platform' && canUsePlatform
+      ? 'platform'
+      : canUseInternal ? 'internal' : canUsePlatform ? 'platform' : 'internal';
     try {
       await AsyncStorage.setItem(WORKSPACE_STORAGE_KEY, targetWorkspace);
       setWorkspaceState(targetWorkspace);
-      if (targetWorkspace === 'platform') {
+      if (targetWorkspace === 'platform' || !canUseInternal) {
         setSelectedPharmacyIdState(null);
         setSelectedPharmacyNameState(null);
         await AsyncStorage.multiRemove([PHARMACY_ID_STORAGE_KEY, PHARMACY_NAME_STORAGE_KEY]);
@@ -168,7 +140,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to save workspace:', error);
       setWorkspaceState(targetWorkspace);
-      if (targetWorkspace === 'platform') {
+      if (targetWorkspace === 'platform' || !canUseInternal) {
         setSelectedPharmacyIdState(null);
         setSelectedPharmacyNameState(null);
       }

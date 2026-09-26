@@ -29,8 +29,15 @@ User = get_user_model()
 
 def serialize_org_memberships(queryset):
     queryset = queryset.select_related('organization').prefetch_related('pharmacies')
+    memberships = list(queryset)
+    org_admin_ids = {membership.organization_id for membership in memberships if membership.role == 'ORG_ADMIN'}
+    organization_pharmacies = {}
+    for pharmacy in Pharmacy.objects.filter(organization_id__in=org_admin_ids).values('id', 'name', 'organization_id'):
+        organization_pharmacies.setdefault(pharmacy['organization_id'], []).append({
+            'id': pharmacy['id'], 'name': pharmacy['name'],
+        })
     payload = []
-    for membership in queryset:
+    for membership in memberships:
         role_def = get_role_definition(membership.role)
         admin_def = get_admin_level_definition(membership.admin_level)
         pharmacies = getattr(membership, "pharmacies", None)
@@ -54,6 +61,8 @@ def serialize_org_memberships(queryset):
                 'job_title': membership.job_title,
                 'region': membership.region,
                 'pharmacies': pharmacy_data,
+                'organization_pharmacies': organization_pharmacies.get(membership.organization_id, [])
+                if membership.role == 'ORG_ADMIN' else [],
                 'capabilities': sorted(role_capabilities(membership.role, membership.admin_level)),
             }
         )

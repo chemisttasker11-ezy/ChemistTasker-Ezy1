@@ -4,7 +4,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
+import { getNotifications, hasOrganizationAccess, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../context/AuthContext';
 import {
   resolveCalendarNotificationRoute,
@@ -13,17 +13,6 @@ import {
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
-
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
-}
 
 const tabTitles: Record<string, string> = {
   index: 'Organization',

@@ -31,19 +31,21 @@ import { surfaceTokens } from './types';
 import { useAuth } from '../../../context/AuthContext';
 import { PendingDirectInvitationsPanel } from './MembershipApplicationsPanel';
 
-type AdminLevel = 'MANAGER' | 'SUPERVISOR' | 'COORDINATOR';
-type AdminStaffRole = 'PHARMACIST' | 'TECHNICIAN' | 'ASSISTANT';
+type AdminLevel = 'MANAGER' | 'ROSTER_MANAGER' | 'COMMUNICATION_MANAGER';
+type AdminStaffRole = 'PHARMACIST' | 'INTERN' | 'TECHNICIAN' | 'ASSISTANT' | 'STUDENT';
 
 const ADMIN_LEVEL_OPTIONS: { value: AdminLevel; label: string }[] = [
     { value: 'MANAGER', label: 'Manager' },
-    { value: 'SUPERVISOR', label: 'Supervisor' },
-    { value: 'COORDINATOR', label: 'Coordinator' },
+    { value: 'ROSTER_MANAGER', label: 'Roster Manager' },
+    { value: 'COMMUNICATION_MANAGER', label: 'Communication Manager' },
 ];
 
 const STAFF_ROLE_OPTIONS: { value: AdminStaffRole; label: string }[] = [
     { value: 'PHARMACIST', label: 'Pharmacist' },
+    { value: 'INTERN', label: 'Intern Pharmacist' },
     { value: 'TECHNICIAN', label: 'Technician' },
     { value: 'ASSISTANT', label: 'Assistant' },
+    { value: 'STUDENT', label: 'Student' },
 ];
 
 type InviteFormState = {

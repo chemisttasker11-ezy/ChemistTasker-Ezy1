@@ -3,6 +3,17 @@ import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-nativ
 import { Button, Card, Chip, IconButton, Modal, Portal, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '@/utils/apiClient';
+import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from '@chemisttasker/shared-core';
+import { useAuth } from '@/context/AuthContext';
+
+type AdminInvitation = {
+  id: number;
+  membership_id: number;
+  pharmacy_name: string;
+  admin_level: string;
+  job_title?: string;
+  membership_status: string;
+};
 
 type Membership = {
   id: number;
@@ -44,7 +55,9 @@ function adminCapabilitiesText(membership: Membership) {
 }
 
 export default function ManageMembershipsScreen() {
+  const { refreshUser } = useAuth();
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [adminInvitations, setAdminInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actingId, setActingId] = useState<number | null>(null);
@@ -54,8 +67,12 @@ export default function ManageMembershipsScreen() {
 
   const loadMemberships = useCallback(async () => {
     try {
-      const { data } = await apiClient.get('/client-profile/my-memberships/');
+      const [{ data }, invitations] = await Promise.all([
+        apiClient.get('/client-profile/my-memberships/'),
+        getPendingPharmacyAdminInvitations(),
+      ]);
       setMemberships(Array.isArray(data) ? data : data?.results || []);
+      setAdminInvitations(Array.isArray(invitations) ? invitations : []);
       setError(null);
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Unable to load memberships.');
@@ -73,7 +90,7 @@ export default function ManageMembershipsScreen() {
     setActingId(membership.id);
     try {
       await apiClient.post(`/client-profile/my-memberships/${membership.id}/${action}/`);
-      await loadMemberships();
+      await Promise.all([loadMemberships(), refreshUser()]);
       setQuitTarget(null);
       setToast(
         action === 'quit'
@@ -84,6 +101,19 @@ export default function ManageMembershipsScreen() {
       );
     } catch (err: any) {
       Alert.alert('Membership update failed', err?.response?.data?.detail || `Unable to ${action} membership.`);
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const respondToAdmin = async (invitation: AdminInvitation, accept: boolean) => {
+    setActingId(invitation.id);
+    try {
+      await respondToPharmacyAdminInvitation(invitation.id, accept);
+      await Promise.all([loadMemberships(), refreshUser()]);
+      setToast(accept ? 'Admin access accepted.' : 'Admin invitation declined.');
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Unable to respond to this admin invitation.');
     } finally {
       setActingId(null);
     }
@@ -101,6 +131,19 @@ export default function ManageMembershipsScreen() {
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {adminInvitations.map((invitation) => (
+          <Card key={`admin-${invitation.id}`} style={styles.card}>
+            <Card.Content>
+              <Text variant="titleMedium" style={styles.cardTitle}>{invitation.pharmacy_name}</Text>
+              <Text style={styles.muted}>{label(invitation.admin_level)} admin invitation{invitation.job_title ? ` · ${invitation.job_title}` : ''}</Text>
+              <Text style={styles.detail}>{invitation.membership_status === 'ACCEPTED' ? 'Your current pharmacy membership stays active while you decide.' : 'Accepting grants both pharmacy membership and admin access.'}</Text>
+              <View style={styles.actions}>
+                <Button mode="contained" disabled={actingId === invitation.id} onPress={() => respondToAdmin(invitation, true)}>Accept admin access</Button>
+                <Button mode="outlined" disabled={actingId === invitation.id} onPress={() => respondToAdmin(invitation, false)}>Decline</Button>
+              </View>
+            </Card.Content>
+          </Card>
+        ))}
         {loading ? <Text style={styles.emptyText}>Loading memberships...</Text> : null}
         {!loading && memberships.length === 0 ? (
           <Card style={styles.emptyCard}>
@@ -115,6 +158,7 @@ export default function ManageMembershipsScreen() {
           const pharmacy = membership.pharmacy_detail;
           const pending = membership.status === 'PENDING';
           const accepted = membership.status === 'ACCEPTED';
+          const hasAdminInvitation = adminInvitations.some((invitation) => invitation.membership_id === membership.id);
           const capabilitiesText = adminCapabilitiesText(membership);
           return (
             <Card key={membership.id} style={styles.card}>
@@ -142,12 +186,13 @@ export default function ManageMembershipsScreen() {
                 ) : null}
                 <Text style={styles.detail}>Invited by {invitedBy(membership)}</Text>
                 <View style={styles.actions}>
-                  {pending ? (
+                  {pending && !hasAdminInvitation ? (
                     <>
                       <Button mode="contained" icon="check-circle-outline" loading={actingId === membership.id} onPress={() => runAction(membership, 'accept')} style={styles.primaryButton}>Accept</Button>
                       <Button mode="outlined" icon="close-circle-outline" disabled={actingId === membership.id} onPress={() => runAction(membership, 'reject')} textColor="#DC2626" style={styles.dangerOutline}>Reject</Button>
                     </>
                   ) : null}
+                  {pending && hasAdminInvitation ? <Text style={styles.detail}>Respond to the admin invitation above.</Text> : null}
                   {accepted && membership.role !== 'OWNER' ? (
                     <Button mode="outlined" icon="logout" disabled={actingId === membership.id} onPress={() => setQuitTarget(membership)} textColor="#DC2626" style={styles.dangerOutline}>Quit membership</Button>
                   ) : null}

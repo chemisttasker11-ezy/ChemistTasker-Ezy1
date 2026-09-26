@@ -1,15 +1,34 @@
+import os
+import unittest
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
+
+import django
+django.setup()
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.attendance_credentials import worker_update_own_pin
 from client_profile.attendance_views import KioskRequestPairingCodeView, WorkerUpdatePinView
 from client_profile.models import Membership, OwnerOnboarding, Pharmacy, WorkerPIN
+from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
 
 
-class PharmacyPinScopeTests(TestCase):
+class PharmacyPinScopeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        create_schema()
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_schema()
+        super().tearDownClass()
+
     def setUp(self):
+        clear_schema()
         User = get_user_model()
         self.owner = User.objects.create(username="scope_owner", email="owner@scope.invalid", role="OWNER")
         self.other = User.objects.create(username="other_owner", email="other@scope.invalid", role="OWNER")

@@ -45,6 +45,7 @@ from .serializers import (
     UserProfileSerializer,
     CustomTokenRefreshSerializer,
     OrganizationMembershipDetailSerializer,
+    serialize_org_memberships,
 )
 User = get_user_model()
 import requests
@@ -262,6 +263,10 @@ def _login_invalid_credentials_response(user, attempt_state, *, password_matches
 
 
 def _is_web_client(request):
+    # A browser's Origin/Referer takes precedence over a caller-supplied
+    # platform label. Browser responses must never expose the refresh token.
+    if request.headers.get("Origin") or request.headers.get("Referer"):
+        return True
     platform = (
         request.headers.get("X-Client-Platform")
         or request.headers.get("x-client-platform")
@@ -271,9 +276,8 @@ def _is_web_client(request):
         return False
     if platform in {"web", "browser"}:
         return True
-    # Browser state-changing requests send Origin. Keep legacy/API clients that
-    # do not send Origin on the token-response contract.
-    return bool(request.headers.get("Origin"))
+    # Legacy API clients without a browser origin retain the token response.
+    return False
 
 def _cookie_kwargs():
     kwargs = {
@@ -329,17 +333,7 @@ def _clear_auth_cookies(response):
 
 def _build_authenticated_user_payload(user):
     org_memberships = OrganizationMembership.objects.filter(user=user)
-    org_payload = [
-        {
-            "organization_id": membership.organization_id,
-            "organization_name": membership.organization.name,
-            "role": membership.role,
-            "region": membership.region,
-            "pharmacies": [{"id": p.id, "name": p.name} for p in membership.pharmacies.all()],
-            "capabilities": sorted(list(membership_capabilities(membership))),
-        }
-        for membership in org_memberships
-    ]
+    org_payload = serialize_org_memberships(org_memberships)
 
     pharm_memberships = Membership.objects.filter(
         user=user,
@@ -973,6 +967,8 @@ class VerifyMobileOTPView(APIView):
             status=status.HTTP_200_OK,
         )
         _set_auth_cookies(response, access_token=access, refresh_token=str(refresh))
+        if _is_web_client(request):
+            response.data.pop("refresh", None)
         return response
 
 
@@ -1313,10 +1309,41 @@ class ContactMessageCreateView(generics.CreateAPIView):
             text_template="emails/contact_us.txt",
         )
 
+def _enforce_org_delegation(actor_membership, *, role, admin_level, region, pharmacy_ids, existing=None, allow_self_promotion=False):
+    """Scoped admins cannot delegate a higher role, level, or pharmacy scope."""
+    actor_role = actor_membership.role
+    if actor_role not in {'CHIEF_ADMIN', 'REGION_ADMIN'}:
+        return
+    if (actor_role == 'CHIEF_ADMIN' and allow_self_promotion and existing and
+            existing.pk == actor_membership.pk and role == 'ORG_ADMIN'):
+        return
+    actor_ids = set(actor_membership.pharmacies.values_list('id', flat=True))
+    requested_ids = set(pharmacy_ids)
+    actor_level = ADMIN_LEVEL_DEFINITIONS.get(actor_membership.admin_level)
+    requested_level = ADMIN_LEVEL_DEFINITIONS.get(admin_level)
+    allowed_roles = {'CHIEF_ADMIN', 'REGION_ADMIN'} if actor_role == 'CHIEF_ADMIN' else {'REGION_ADMIN'}
+    if role not in allowed_roles or (existing and existing.role not in allowed_roles):
+        raise PermissionDenied('Cannot delegate an organization role above your own.')
+    if not actor_level or not requested_level or not set(requested_level.pharmacy_capabilities).issubset(actor_level.pharmacy_capabilities):
+        raise PermissionDenied('Cannot grant an admin level above your own.')
+    if actor_role == 'REGION_ADMIN' and (region or '').strip().casefold() != (actor_membership.region or '').strip().casefold():
+        raise PermissionDenied('Region admins may assign members only within their region.')
+    if not requested_ids or not requested_ids.issubset(actor_ids):
+        raise PermissionDenied('Region admins may assign only their scoped pharmacies.')
+    if existing:
+        existing_ids = set(existing.pharmacies.values_list('id', flat=True))
+        existing_level = ADMIN_LEVEL_DEFINITIONS.get(existing.admin_level)
+        if not existing_level or not set(existing_level.pharmacy_capabilities).issubset(actor_level.pharmacy_capabilities):
+            raise PermissionDenied('Cannot manage an admin above your own level.')
+        if (actor_role == 'REGION_ADMIN' and
+                (existing.region or '').strip().casefold() != (actor_membership.region or '').strip().casefold()):
+            raise PermissionDenied('Cannot manage a membership outside your region scope.')
+        if not existing_ids or not existing_ids.issubset(actor_ids):
+            raise PermissionDenied('Cannot manage a membership outside your region scope.')
+
+
 class InviteOrgUserView(generics.CreateAPIView):
-    """
-    Only ORG_ADMIN may invite into this organization.
-    """
+    """Invite organization admins within the actor's delegation scope."""
     serializer_class   = InviteOrgUserSerializer
 
     # Allow role-based access; capability checks enforce fine-grained control.
@@ -1332,6 +1359,18 @@ class InviteOrgUserView(generics.CreateAPIView):
         ).first()
         if not actor_membership or OrgCapability.INVITE_STAFF not in membership_capabilities(actor_membership):
             raise PermissionDenied("You do not have permission to invite staff for this organization.")
+
+        existing_membership = OrganizationMembership.objects.filter(
+            user__email__iexact=data['email'], organization=organization
+        ).first()
+        _enforce_org_delegation(
+            actor_membership,
+            role=data['role'],
+            admin_level=data['admin_level'],
+            region=data.get('region'),
+            pharmacy_ids=[pharmacy.id for pharmacy in data.get('pharmacies') or []],
+            existing=existing_membership,
+        )
 
         # 1) Find or create the User
         try:
@@ -1645,6 +1684,16 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
         request_user = self.request.user
         if instance.user_id == request_user.id:
             raise PermissionDenied("You cannot remove your own organization membership.")
+        actor_membership = request_user.organization_memberships.filter(organization=instance.organization).first()
+        if actor_membership:
+            _enforce_org_delegation(
+                actor_membership,
+                role=instance.role,
+                admin_level=instance.admin_level,
+                region=instance.region,
+                pharmacy_ids=instance.pharmacies.values_list('id', flat=True),
+                existing=instance,
+            )
         if instance.role == 'ORG_ADMIN':
             remaining = OrganizationMembership.objects.filter(
                 organization=instance.organization,
@@ -1657,6 +1706,18 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
     def perform_update(self, serializer):
         instance = serializer.instance
         new_role = serializer.validated_data.get('role', instance.role)
+        actor_membership = self.request.user.organization_memberships.filter(organization=instance.organization).first()
+        if actor_membership:
+            requested_pharmacies = getattr(serializer, '_validated_pharmacy_ids', None)
+            _enforce_org_delegation(
+                actor_membership,
+                role=new_role,
+                admin_level=serializer.validated_data.get('admin_level', instance.admin_level),
+                region=serializer.validated_data.get('region', instance.region),
+                pharmacy_ids=requested_pharmacies if requested_pharmacies is not None else instance.pharmacies.values_list('id', flat=True),
+                existing=instance,
+                allow_self_promotion=True,
+            )
         if instance.role == 'ORG_ADMIN' and new_role != 'ORG_ADMIN':
             remaining = OrganizationMembership.objects.filter(
                 organization=instance.organization,

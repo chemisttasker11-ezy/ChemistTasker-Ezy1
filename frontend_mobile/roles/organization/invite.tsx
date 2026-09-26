@@ -18,7 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   deleteOrganizationMembership,
-  fetchPharmaciesService,
+  fetchAccessibleOrganizationPharmacies,
+  canDelegateOrganizationAdminLevel,
+  canDelegateOrganizationRole,
+  canManageOrganizationMember,
   getOrganizationMemberships,
   getOrganizationRoleDefinitions,
   inviteOrgUser,
@@ -130,6 +133,8 @@ export default function OrganizationInviteScreen() {
   }, [user]);
 
   const orgId = orgMembership?.organization_id ?? orgMembership?.organizationId ?? null;
+  const isRegionAdmin = orgMembership?.role === 'REGION_ADMIN';
+  const isScopedAdmin = isRegionAdmin || orgMembership?.role === 'CHIEF_ADMIN';
   const inviterCapabilities = useMemo(
     () => new Set<string>(Array.isArray(orgMembership?.capabilities) ? orgMembership.capabilities : []),
     [orgMembership]
@@ -139,10 +144,22 @@ export default function OrganizationInviteScreen() {
   const eligibleRoles = useMemo(
     () =>
       roleDefinitions.filter((definition) => {
-        if (definition.key === 'ORG_ADMIN') return inviterCapabilities.has('claim_pharmacy') || canInvite;
+        if (!canDelegateOrganizationRole(orgMembership?.role, definition.key)) return false;
+        if (definition.key === 'ORG_ADMIN') return inviterCapabilities.has('claim_pharmacy');
         return true;
       }),
-    [canInvite, inviterCapabilities, roleDefinitions]
+    [inviterCapabilities, orgMembership?.role, roleDefinitions]
+  );
+
+  const canManageMember = (member: OrganizationMember) =>
+    (orgMembership?.role === 'CHIEF_ADMIN' && member.user?.id === user?.id) ||
+    canManageOrganizationMember(orgMembership, member, adminLevelMap);
+
+  const availablePharmacies = useMemo(
+    () => isScopedAdmin
+      ? pharmacies.filter((pharmacy) => orgMembership?.pharmacies?.some((assigned: PharmacyOption) => assigned.id === pharmacy.id))
+      : pharmacies,
+    [isScopedAdmin, orgMembership?.pharmacies, pharmacies]
   );
 
   const selectedRoleDefinition = useMemo(
@@ -190,7 +207,7 @@ export default function OrganizationInviteScreen() {
     try {
       const [roleResponse, pharmaciesResponse] = await Promise.all([
         getOrganizationRoleDefinitions(),
-        fetchPharmaciesService({ organization: orgId, limit: 200 }),
+        fetchAccessibleOrganizationPharmacies(orgId),
       ]);
       const adminLevels: AdminLevelDefinition[] = (roleResponse as any)?.admin_levels ?? [];
       const roles: RoleDefinition[] = (roleResponse as any)?.roles ?? [];
@@ -198,7 +215,7 @@ export default function OrganizationInviteScreen() {
         acc[level.key] = level;
         return acc;
       }, {});
-      const pharmacyList = normalizeList(pharmaciesResponse).map((item: any) => ({
+      const pharmacyList = (Array.isArray(pharmaciesResponse) ? pharmaciesResponse : []).map((item: any) => ({
         id: Number(item.id),
         name: item.name || `Pharmacy #${item.id}`,
       }));
@@ -207,15 +224,22 @@ export default function OrganizationInviteScreen() {
       setAdminLevelMap(levelMap);
       setPharmacies(pharmacyList);
       if (!selectedRole && roles.length) {
-        setSelectedRole(roles[0].key);
+        setSelectedRole(isScopedAdmin ? orgMembership?.role ?? roles[0].key : roles[0].key);
       }
+      if (isRegionAdmin) setRegion(orgMembership?.region ?? '');
       await loadMembers();
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Unable to load organization invite data.');
     } finally {
       setLoading(false);
     }
-  }, [loadMembers, orgId, selectedRole]);
+  }, [loadMembers, orgId, selectedRole, isRegionAdmin, isScopedAdmin, orgMembership?.role, orgMembership?.region]);
+
+  useEffect(() => {
+    if (eligibleRoles.length && !eligibleRoles.some((role) => role.key === selectedRole)) {
+      setSelectedRole(eligibleRoles[0].key);
+    }
+  }, [eligibleRoles, selectedRole]);
 
   useEffect(() => {
     void loadMetadata();
@@ -223,17 +247,20 @@ export default function OrganizationInviteScreen() {
 
   useEffect(() => {
     if (!selectedRoleDefinition) return;
-    if (!selectedRoleDefinition.allowed_admin_levels.includes(selectedAdminLevel)) {
-      setSelectedAdminLevel(selectedRoleDefinition.default_admin_level);
+    const allowedLevels = selectedRoleDefinition.allowed_admin_levels.filter((level) =>
+      !isScopedAdmin || canDelegateOrganizationAdminLevel(orgMembership?.admin_level, level, adminLevelMap)
+    );
+    if (!allowedLevels.includes(selectedAdminLevel)) {
+      setSelectedAdminLevel(allowedLevels[0] ?? '');
     }
     if (!selectedRoleDefinition.requires_job_title) setJobTitle('');
     if (!selectedRoleDefinition.requires_region) setRegion('');
     if (!selectedRoleDefinition.requires_pharmacies) setSelectedPharmacyIds([]);
-  }, [selectedAdminLevel, selectedRoleDefinition]);
+  }, [selectedAdminLevel, selectedRoleDefinition, isScopedAdmin, orgMembership?.admin_level, adminLevelMap]);
 
   useEffect(() => {
     if (selectedRoleDefinition?.key === 'REGION_ADMIN' && selectedAdminLevel === 'ROSTER_MANAGER') {
-      setWarning('Roster Managers can manage shifts but cannot invite or manage staff.');
+      setWarning('Roster Managers can delegate Region Admin access within their assigned pharmacies and region.');
       return;
     }
     setWarning('');
@@ -250,6 +277,13 @@ export default function OrganizationInviteScreen() {
     if (!selectedRoleDefinition) return 'Select an organization role.';
     if (!email.trim()) return 'Email is required.';
     if (!selectedAdminLevel) return 'Select an admin level.';
+    if (isScopedAdmin && (
+      !canDelegateOrganizationRole(orgMembership?.role, selectedRole) ||
+      !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, selectedAdminLevel, adminLevelMap) ||
+      (isRegionAdmin && region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
+      !selectedPharmacyIds.length ||
+      selectedPharmacyIds.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
+    )) return 'This invitation exceeds your region delegation scope.';
     if (selectedRoleDefinition.requires_job_title && !jobTitle.trim()) return 'Job title is required for this role.';
     if (selectedRoleDefinition.requires_region && !region.trim()) return 'Region is required for this role.';
     if (selectedRoleDefinition.requires_pharmacies && selectedPharmacyIds.length === 0) {
@@ -280,7 +314,7 @@ export default function OrganizationInviteScreen() {
       setToast('Invitation sent successfully.');
       setEmail('');
       setJobTitle('');
-      setRegion('');
+      setRegion(isRegionAdmin ? orgMembership?.region ?? '' : '');
       setSelectedPharmacyIds([]);
       await loadMembers();
     } catch (err: any) {
@@ -294,6 +328,7 @@ export default function OrganizationInviteScreen() {
   };
 
   const openEdit = (member: OrganizationMember) => {
+    if (!canManageMember(member)) return;
     setEditForm({
       id: member.id,
       role: member.role,
@@ -306,6 +341,23 @@ export default function OrganizationInviteScreen() {
 
   const handleSaveMember = async () => {
     if (!editForm) return;
+    const existing = members.find((member) => member.id === editForm.id);
+    if (!existing || !canManageMember(existing)) {
+      setError('This member is outside your delegation scope.');
+      return;
+    }
+    const selfPromotion = orgMembership?.role === 'CHIEF_ADMIN' &&
+      existing.user?.id === user?.id && editForm.role === 'ORG_ADMIN';
+    if (isScopedAdmin && !selfPromotion && (
+      !canDelegateOrganizationRole(orgMembership?.role, editForm.role) ||
+      !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, editForm.admin_level, adminLevelMap) ||
+      (isRegionAdmin && editForm.region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
+      !editForm.pharmacy_ids.length ||
+      editForm.pharmacy_ids.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
+    )) {
+      setError('This update exceeds your region delegation scope.');
+      return;
+    }
     const definition = roleDefinitions.find((role) => role.key === editForm.role);
     if (!definition) {
       setError('Invalid role selection.');
@@ -362,6 +414,7 @@ export default function OrganizationInviteScreen() {
 
   const renderMember = ({ item }: { item: OrganizationMember }) => {
     const isSelf = item.user?.id != null && item.user.id === user?.id;
+    const manageable = canManageMember(item);
     return (
       <Card style={styles.memberCard}>
         <Card.Content>
@@ -373,12 +426,12 @@ export default function OrganizationInviteScreen() {
               {item.user?.email ? <Text style={styles.memberEmail}>{item.user.email}</Text> : null}
             </View>
             <View style={styles.memberActions}>
-              <IconButton icon="pencil" size={20} onPress={() => openEdit(item)} />
+              <IconButton icon="pencil" size={20} onPress={() => openEdit(item)} disabled={!manageable} />
               <IconButton
                 icon="delete"
                 size={20}
                 iconColor={surfaceTokens.error}
-                disabled={isSelf}
+                disabled={isSelf || !manageable}
                 onPress={() => setDeleteTarget(item)}
               />
             </View>
@@ -499,7 +552,9 @@ export default function OrganizationInviteScreen() {
                           </Button>
                         }
                       >
-                        {(selectedRoleDefinition?.allowed_admin_levels ?? []).map((levelKey) => (
+                        {(selectedRoleDefinition?.allowed_admin_levels ?? []).filter((levelKey) =>
+                          !isScopedAdmin || canDelegateOrganizationAdminLevel(orgMembership?.admin_level, levelKey, adminLevelMap)
+                        ).map((levelKey) => (
                           <Menu.Item
                             key={levelKey}
                             title={adminLevelMap[levelKey]?.label || titleCase(levelKey)}
@@ -518,12 +573,12 @@ export default function OrganizationInviteScreen() {
                         <TextInput label="Job Title" value={jobTitle} onChangeText={setJobTitle} mode="outlined" style={styles.input} />
                       ) : null}
                       {selectedRoleDefinition?.requires_region ? (
-                        <TextInput label="Region" value={region} onChangeText={setRegion} mode="outlined" style={styles.input} />
+                        <TextInput label="Region" value={region} onChangeText={setRegion} disabled={isRegionAdmin} mode="outlined" style={styles.input} />
                       ) : null}
                       {selectedRoleDefinition?.requires_pharmacies ? (
                         <View style={styles.pharmacyPicker}>
                           <Text style={styles.sectionLabel}>Pharmacies</Text>
-                          {pharmacies.map((pharmacy) => (
+                          {availablePharmacies.map((pharmacy) => (
                             <Checkbox.Item
                               key={pharmacy.id}
                               label={pharmacy.name}
@@ -576,7 +631,10 @@ export default function OrganizationInviteScreen() {
               <>
                 <Text style={styles.sectionLabel}>Role</Text>
                 <View style={styles.optionGrid}>
-                  {roleDefinitions.map((role) => (
+                  {roleDefinitions.filter((role) =>
+                    eligibleRoles.some((eligible) => eligible.key === role.key) ||
+                    (orgMembership?.role === 'CHIEF_ADMIN' && editForm.id === members.find((member) => member.user?.id === user?.id)?.id && role.key === 'ORG_ADMIN')
+                  ).map((role) => (
                     <Chip
                       key={role.key}
                       selected={editForm.role === role.key}
@@ -606,7 +664,9 @@ export default function OrganizationInviteScreen() {
 
                 <Text style={styles.sectionLabel}>Admin Level</Text>
                 <View style={styles.optionGrid}>
-                  {(roleDefinitions.find((role) => role.key === editForm.role)?.allowed_admin_levels ?? []).map((levelKey) => (
+                  {(roleDefinitions.find((role) => role.key === editForm.role)?.allowed_admin_levels ?? []).filter((levelKey) =>
+                    !isScopedAdmin || canDelegateOrganizationAdminLevel(orgMembership?.admin_level, levelKey, adminLevelMap)
+                  ).map((levelKey) => (
                     <Chip
                       key={levelKey}
                       selected={editForm.admin_level === levelKey}
@@ -632,6 +692,7 @@ export default function OrganizationInviteScreen() {
                     label="Region"
                     value={editForm.region}
                     onChangeText={(value) => setEditForm((prev) => (prev ? { ...prev, region: value } : prev))}
+                    disabled={isRegionAdmin}
                     mode="outlined"
                     style={styles.input}
                   />
@@ -639,7 +700,7 @@ export default function OrganizationInviteScreen() {
                 {roleDefinitions.find((role) => role.key === editForm.role)?.requires_pharmacies ? (
                   <View style={styles.pharmacyPicker}>
                     <Text style={styles.sectionLabel}>Pharmacies</Text>
-                    {pharmacies.map((pharmacy) => (
+                    {availablePharmacies.map((pharmacy) => (
                       <Checkbox.Item
                         key={pharmacy.id}
                         label={pharmacy.name}

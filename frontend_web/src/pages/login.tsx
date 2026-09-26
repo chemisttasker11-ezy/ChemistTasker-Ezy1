@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
-import { ORG_ROLES } from '../constants/roles';
+import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import { useAuth } from '../contexts/AuthContext';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
@@ -68,6 +68,7 @@ export default function Login() {
 
       // The refresh credential remains in the HttpOnly cookie for web clients.
       // Only the short-lived access token is intentionally exposed to JS memory.
+      if (userInfo?.id != null) localStorage.removeItem(`${PERSONA_KEY_PREFIX}:${userInfo.id}`);
       login(access, refresh || '', userInfo, rememberMe);
 
       if (!userInfo?.is_mobile_verified) {
@@ -75,14 +76,7 @@ export default function Login() {
         return;
       }
 
-      const isOrgMember = Array.isArray(userInfo?.memberships)
-        ? userInfo.memberships.some((m: any) => {
-            const membershipRole = String(m?.role || '').toUpperCase();
-            return ORG_ROLES.includes(membershipRole as any);
-          })
-        : false;
-
-      if (isOrgMember || ORG_ROLES.includes(String(userInfo?.role || '').toUpperCase() as any)) {
+      if (hasOrganizationAccess(userInfo) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(userInfo.role)) {
         navigate('/dashboard/organization/overview');
         return;
       }
@@ -95,51 +89,7 @@ export default function Login() {
         }
       }
 
-      const personaKey =
-        typeof userInfo?.id === 'number'
-          ? `${PERSONA_KEY_PREFIX}:${userInfo.id}`
-          : PERSONA_KEY_PREFIX;
-      const storedPersona = personaKey ? localStorage.getItem(personaKey) : null;
-      const adminAssignments = Array.isArray(userInfo?.admin_assignments)
-        ? userInfo.admin_assignments
-        : [];
-
-      const findAssignmentById = (assignmentId: number) =>
-        adminAssignments.find((assignment: any) => assignment?.id === assignmentId);
-
-      let redirectPath: string | null = null;
-
-      if (storedPersona?.startsWith('ADMIN:')) {
-        const storedId = Number(storedPersona.split(':')[1]);
-        const matchedAssignment = Number.isFinite(storedId) ? findAssignmentById(storedId) : null;
-        const fallbackAssignment = adminAssignments.find(
-          (assignment: any) => typeof assignment?.pharmacy_id === 'number'
-        );
-        const targetAssignment = matchedAssignment ?? fallbackAssignment ?? null;
-
-        if (targetAssignment?.pharmacy_id != null) {
-          redirectPath = `/dashboard/admin/${targetAssignment.pharmacy_id}/overview`;
-        } else if (personaKey) {
-          localStorage.removeItem(personaKey);
-        }
-      } else if (storedPersona?.startsWith('ROLE:')) {
-        const storedRole = storedPersona.split(':')[1];
-        if (storedRole === 'PHARMACIST' && userInfo.role === 'PHARMACIST') {
-          redirectPath = '/dashboard/pharmacist/overview';
-        } else if (storedRole === 'OTHER_STAFF' && userInfo.role === 'OTHER_STAFF') {
-          redirectPath = '/dashboard/otherstaff/overview';
-        } else if (storedRole === 'OWNER' && userInfo.role === 'OWNER') {
-          redirectPath = '/dashboard/owner/overview';
-        } else if (personaKey) {
-          localStorage.removeItem(personaKey);
-        }
-      }
-
-      if (!redirectPath) {
-        redirectPath = resolveDashboardPath(userInfo.role);
-      }
-
-      navigate(redirectPath);
+      navigate(resolveDashboardPath(userInfo.role));
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const code = err.response?.data?.code;

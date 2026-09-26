@@ -21,7 +21,7 @@ export function canAccessRoute({
   if (requireAdmin) return isAdminUser;
   if (!requiredRole) return true;
   if (userRole === requiredRole) return true;
-  if (requiredRole === "ORG_ADMIN") return hasOrgRole;
+  if (requiredRole === "ORGANIZATION") return hasOrgRole;
 
   // ChemistTasker pharmacy admins intentionally inherit the owner-side
   // workspace/persona. Their individual capabilities still determine which

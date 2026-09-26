@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -21,7 +21,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { STAFF_ROLE_OPTIONS, fetchPharmaciesService } from '@chemisttasker/shared-core';
+import { STAFF_ROLE_OPTIONS, attendance, canManageKioskDevices, fetchPharmaciesService } from '@chemisttasker/shared-core';
 import { useAuth } from '../../contexts/AuthContext';
 import type { WorkforcePayrollConfiguration, WorkforceWorkSettings } from '@chemisttasker/shared-core';
 import EmploymentEngagementsPanel from './EmploymentEngagementsPanel';
@@ -38,7 +38,7 @@ import {
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function WorkforceSettingsPage() {
-  const { hasCapability } = useAuth();
+  const { hasCapability, user } = useAuth();
   const initialPharmacy = Number(new URLSearchParams(window.location.search).get('pharmacy_id') || '') || null;
   const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(initialPharmacy);
@@ -46,8 +46,13 @@ export default function WorkforceSettingsPage() {
   const [coverage, setCoverage] = useState<any[]>([]);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
   const [payrollConfig, setPayrollConfig] = useState<WorkforcePayrollConfiguration | null>(null);
+  const [kioskDevices, setKioskDevices] = useState<any[]>([]);
+  const [revokeDevice, setRevokeDevice] = useState<any | null>(null);
+  const [revokeBusy, setRevokeBusy] = useState(false);
+  const [kioskMessage, setKioskMessage] = useState('');
   const [payrollSaving, setPayrollSaving] = useState(false);
   const [error, setError] = useState('');
+  const loadSequence = useRef(0);
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [coverageForm, setCoverageForm] = useState({ weekday: 0, start_time: '08:00', end_time: '18:00', role: 'PHARMACIST', minimum_staff: 1 });
 
@@ -59,6 +64,7 @@ export default function WorkforceSettingsPage() {
       ? hasCapability('MANAGE_STAFF', pharmacyId)
       : hasCapability('MANAGE_STAFF')
   );
+  const canManageKiosk = pharmacyId != null && canManageKioskDevices(user, pharmacyId);
 
   useEffect(() => {
     fetchPharmaciesService({}).then((rows: any[]) => {
@@ -69,25 +75,35 @@ export default function WorkforceSettingsPage() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!pharmacyId) return;
+    const sequence = ++loadSequence.current;
+    if (!pharmacyId) {
+      setKioskDevices([]);
+      return;
+    }
     setError('');
     try {
-      const [coverageRows, staffRows, payroll] = await Promise.all([
+      const [coverageRows, staffRows, payroll, kiosks] = await Promise.all([
         canManageRoster ? listCoverageRequirements(pharmacyId) : Promise.resolve([]),
         canManageStaff ? listWorkSettings(pharmacyId) : Promise.resolve([]),
         canManageStaff ? getPayrollConfiguration(pharmacyId) : Promise.resolve(null),
+        canManageKiosk ? attendance.getManagerKioskDevices(pharmacyId) : Promise.resolve({ devices: [] }),
       ]);
+      if (sequence !== loadSequence.current) return;
       setCoverage(coverageRows);
       setStaff(staffRows);
       setPayrollConfig(payroll);
+      setKioskDevices(Array.isArray((kiosks as any)?.devices) ? (kiosks as any).devices : []);
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Unable to load workforce settings.');
+      if (sequence === loadSequence.current) {
+        setError(err?.response?.data?.error || err?.message || 'Unable to load workforce settings.');
+      }
     }
-  }, [canManageRoster, canManageStaff, pharmacyId]);
+  }, [canManageRoster, canManageStaff, canManageKiosk, pharmacyId]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!canManageRoster && tab === 0) setTab(1);
-  }, [canManageRoster, tab]);
+    if (!canManageKiosk && tab === 3) setTab(canManageRoster ? 0 : 1);
+  }, [canManageRoster, canManageKiosk, tab]);
 
   const saveHours = async (membershipId: number, raw: string) => {
     const hours = raw.trim() === '' ? null : Number(raw);
@@ -110,6 +126,7 @@ export default function WorkforceSettingsPage() {
         </Box>
         <FormControl size="small" sx={{ maxWidth: 320 }}><InputLabel>Pharmacy</InputLabel><Select value={pharmacyId ?? ''} label="Pharmacy" onChange={(e) => setPharmacyId(Number(e.target.value))}>{pharmacies.map((row) => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</Select></FormControl>
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+        {kioskMessage && <Alert severity="success" onClose={() => setKioskMessage('')}>{kioskMessage}</Alert>}
 
         {pharmacyId && payrollConfig && (
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
@@ -156,7 +173,7 @@ export default function WorkforceSettingsPage() {
           </Paper>
         )}
         <Paper variant="outlined" sx={{ borderRadius: 3 }}>
-          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" disabled={!canManageRoster} /><Tab label="Contracted hours" disabled={!canManageStaff} /><Tab label="Employment & pay" disabled={!canManageStaff} /></Tabs>
+          <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Coverage requirements" disabled={!canManageRoster} /><Tab label="Contracted hours" disabled={!canManageStaff} /><Tab label="Employment & pay" disabled={!canManageStaff} /><Tab label="Kiosk devices" disabled={!canManageKiosk} /></Tabs>
           <Box sx={{ p: 2 }}>
             {tab === 0 && <Stack spacing={1.5}>
               <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography fontWeight={900}>Coverage rules</Typography><Button variant="contained" disabled={!canManageRoster} onClick={() => setCoverageOpen(true)}>Add rule</Button></Stack>
@@ -176,9 +193,91 @@ export default function WorkforceSettingsPage() {
                 </Alert>
               )
             )}
+            {tab === 3 && pharmacyId && canManageKiosk && (
+              <Stack spacing={1.5}>
+                <Alert severity="info">
+                  Revoking a kiosk blocks QR and new online authorization immediately. A native terminal may drain already-signed offline evidence, but revoked-device evidence cannot silently create attendance.
+                </Alert>
+                {!kioskDevices.length && <Alert severity="info">No kiosk terminals are registered for this pharmacy.</Alert>}
+                {kioskDevices.map((device) => (
+                  <Paper key={device.id} variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
+                        <Box flex={1}>
+                          <Typography fontWeight={900} color="#06214A">{device.device_name || 'Kiosk terminal'}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {[
+                              device.platform || 'Unknown platform',
+                              String(device.client_kind || '').replaceAll('_', ' '),
+                              device.app_version ? `v${device.app_version}` : null,
+                            ].filter(Boolean).join(' · ')}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" fontWeight={900} color={device.is_active ? 'success.main' : 'text.secondary'}>
+                          {device.is_active ? 'Active' : 'Revoked'}
+                        </Typography>
+                        {device.is_active && <Button color="error" variant="outlined" onClick={() => setRevokeDevice(device)}>Revoke</Button>}
+                      </Stack>
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                        {[
+                          ['Activated', device.activated_at ? new Date(device.activated_at).toLocaleString() : '—'],
+                          ['Last seen', device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : 'Never'],
+                          ['Last sync', device.last_sync_at ? new Date(device.last_sync_at).toLocaleString() : 'Never'],
+                          ['Received sequence', String(device.last_contiguous_sequence || 0)],
+                        ].map(([label, value]) => (
+                          <Box key={label} sx={{ flex: 1, p: 1.25, borderRadius: 2, bgcolor: '#F5F8FC' }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={800}>{label}</Typography>
+                            <Typography variant="body2" fontWeight={800} color="#06214A">{value}</Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                      {!device.is_active && device.revoked_at && (
+                        <Alert severity="warning">
+                          Revoked {new Date(device.revoked_at).toLocaleString()}. This terminal must be paired again before it can record new attendance.
+                        </Alert>
+                      )}
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
           </Box>
         </Paper>
       </Stack>
+      <Dialog open={!!revokeDevice} onClose={() => !revokeBusy && setRevokeDevice(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Revoke kiosk terminal?</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            {revokeDevice?.device_name || 'This kiosk'} will lose QR and attendance authorization. Already-signed offline evidence can still be drained for review so it is not lost.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={revokeBusy} onClick={() => setRevokeDevice(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={revokeBusy || !revokeDevice}
+            onClick={async () => {
+              if (!revokeDevice) return;
+              setRevokeBusy(true);
+              setError('');
+              try {
+                await attendance.revokeManagerKioskDevice(Number(revokeDevice.id));
+                setKioskMessage(`${revokeDevice.device_name || 'Kiosk terminal'} was revoked.`);
+                setRevokeDevice(null);
+                await load();
+              } catch (err: any) {
+                setError(err?.response?.data?.error || err?.message || 'Unable to revoke kiosk.');
+              } finally {
+                setRevokeBusy(false);
+              }
+            }}
+          >
+            {revokeBusy ? 'Revoking…' : 'Revoke kiosk'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={coverageOpen} onClose={() => setCoverageOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add coverage requirement</DialogTitle>
         <DialogContent dividers><Stack spacing={2} pt={0.5}>

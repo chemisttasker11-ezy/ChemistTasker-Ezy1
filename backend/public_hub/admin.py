@@ -4,11 +4,21 @@ from .models import Article, Comment, Reaction, Report
 
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
+    """Read-only projection of published editorial content.
+
+    Authoring and publication must go through ContentDocument/ContentRevision so
+    revision history, permissions and audit records cannot be bypassed.
+    """
+
     list_display = ['title', 'kind', 'topic', 'status', 'published_at', 'featured', 'comments_open']
     list_filter = ['kind', 'status', 'topic', 'featured']
     search_fields = ['title', 'excerpt', 'body']
-    prepopulated_fields = {'slug': ('title',)}
-    readonly_fields = ['created_by', 'created_at', 'updated_at']
+    readonly_fields = [
+        'title', 'slug', 'kind', 'topic', 'author_name', 'excerpt', 'body',
+        'cover_url', 'cover_alt', 'source_name', 'source_url',
+        'status', 'published_at', 'featured', 'comments_open',
+        'seo_title', 'seo_description', 'created_by', 'created_at', 'updated_at',
+    ]
     fieldsets = [
         ('Article', {'fields': ['title', 'slug', 'kind', 'topic', 'author_name', 'excerpt', 'body']}),
         ('Image & attribution', {'fields': ['cover_url', 'cover_alt', 'source_name', 'source_url']}),
@@ -17,10 +27,14 @@ class ArticleAdmin(admin.ModelAdmin):
         ('Audit', {'fields': ['created_by', 'created_at', 'updated_at']}),
     ]
 
-    def save_model(self, request, obj, form, change):
-        if not obj.created_by_id:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Comment)

@@ -3,7 +3,7 @@ import {loginHref} from '../../landing_next/shared/browser-session';
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { ORG_ROLES } from "../constants/roles";
+import { hasOrganizationAccess } from "@chemisttasker/shared-core";
 import { resolveDashboardPath } from "../utils/dashboardPath";
 import { canAccessRoute } from "./routeAccess";
 import type { AdminCapability } from "../constants/adminCapabilities";
@@ -42,9 +42,7 @@ export default function ProtectedRoute({
     return <div role="status">Opening sign in…</div>;
   }
 
-  const hasOrgRole =
-    Array.isArray(user.memberships) &&
-    user.memberships.some((m: any) => ORG_ROLES.includes(m.role as any));
+  const hasOrgRole = hasOrganizationAccess(user);
 
   const isMobileVerificationRoute = location.pathname.startsWith(MOBILE_VERIFY_PATH);
 

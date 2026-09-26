@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   configureApi,
+  fetchAccessibleOrganizationPharmacies,
   fetchHubPollComments,
   fetchMembershipsByPharmacy,
 } from './api';
@@ -24,6 +25,24 @@ function configure(fetchImpl: typeof fetch) {
 }
 
 describe('legacy api.ts shared mappings', () => {
+  it('loads every page of pharmacies visible under an organization and excludes other accounts', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const page = new URL(String(input)).searchParams.get('page');
+      return json(page === '1'
+        ? { next: 'https://example.test/api/client-profile/pharmacies/?page=2', results: [
+            { id: 11, name: 'North', organization: 4 },
+            { id: 12, name: 'Personal', organization: null },
+          ] }
+        : { next: null, results: [{ id: 13, name: 'South', organization: 4 }] });
+    });
+    configure(fetchImpl as typeof fetch);
+
+    await expect(fetchAccessibleOrganizationPharmacies(4)).resolves.toEqual([
+      { id: 11, name: 'North' },
+      { id: 13, name: 'South' },
+    ]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
   it('preserves membership serializer fields and exposes camelCase aliases', async () => {
     const fetchImpl = vi.fn(async () => json({
       count: 1,

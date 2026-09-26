@@ -236,7 +236,16 @@ class WorkforceLeaveRequest(models.Model):
     )
     membership = models.ForeignKey(
         "client_profile.Membership",
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workforce_leave_requests",
+    )
+    slot_assignment = models.ForeignKey(
+        "client_profile.ShiftSlotAssignment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="workforce_leave_requests",
     )
     user = models.ForeignKey(
@@ -276,6 +285,7 @@ class WorkforceLeaveRequest(models.Model):
         indexes = [
             models.Index(fields=["pharmacy", "start_at", "end_at"]),
             models.Index(fields=["user", "status", "start_at"]),
+            models.Index(fields=["slot_assignment", "status"], name="wf_leave_slot_status_idx"),
         ]
 
     def clean(self):
@@ -284,6 +294,10 @@ class WorkforceLeaveRequest(models.Model):
             raise ValidationError("Leave membership does not belong to the selected worker.")
         if self.membership_id and self.pharmacy_id and self.membership.pharmacy_id != self.pharmacy_id:
             raise ValidationError("Leave membership does not belong to the selected pharmacy.")
+        if self.slot_assignment_id and self.pharmacy_id and self.slot_assignment.shift.pharmacy_id != self.pharmacy_id:
+            raise ValidationError("Leave roster assignment does not belong to the selected pharmacy.")
+        if not self.membership_id and not self.slot_assignment_id:
+            raise ValidationError("Leave requires either a pharmacy membership or a roster assignment.")
 
 
 class TimesheetPeriod(models.Model):

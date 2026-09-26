@@ -68,12 +68,13 @@ def _detect_local_hosts() -> list[str]:
 
 
 def _build_dev_origins(hosts: list[str]) -> list[str]:
-    dev_ports = [3000, 5173, 5174, 5175, 5176, 19006, 8081]
+    dev_ports = [3000, 3080, 5173, 5174, 5175, 5176, 5180, 19006, 8081, 8082]
     origins: set[str] = set()
     for host in hosts:
         for port in dev_ports:
             origins.add(f"http://{host}:{port}")
         origins.add(f"exp://{host}:8081")
+        origins.add(f"exp://{host}:8082")
     return sorted(origins)
 
 

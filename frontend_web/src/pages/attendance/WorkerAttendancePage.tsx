@@ -293,7 +293,7 @@ export default function WorkerAttendancePage() {
       </Box>
 
       {/* Notifications */}
-      {errorMsg && (
+      {errorMsg && !scanModalOpen && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setErrorMsg(null)}>
           {errorMsg}
         </Alert>
@@ -727,6 +727,11 @@ export default function WorkerAttendancePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Point your mobile camera at the rotating QR code on the pharmacy terminal or paste the scanned token.
           </Typography>
+          {errorMsg && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorMsg}
+            </Alert>
+          )}
 
           <TextField
             label="QR Code Token"

@@ -13,6 +13,7 @@ import {
   DashboardActivity,
   DashboardErrorState,
   DashboardLoadingState,
+  DashboardPersonaSwitcher,
   DashboardScopeSwitcher,
   DashboardStatsOverview,
   type DashboardPayload,
@@ -169,6 +170,7 @@ export default function OwnerDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor="#6366F1" />}
         showsVerticalScrollIndicator={false}
       >
+        <DashboardPersonaSwitcher role="OWNER" />
         <DashboardScopeSwitcher
           pharmacies={scope.pharmacies}
           scopeLabel={scope.scopeLabel}

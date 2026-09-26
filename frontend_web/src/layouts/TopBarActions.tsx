@@ -37,11 +37,11 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useColorMode } from "../theme/sleekTheme";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchNotifications, markNotificationsRead, NotificationItem } from "../api/notifications";
-import { fetchRooms, getOnboarding } from "@chemisttasker/shared-core";
+import { fetchRooms, getOnboarding, hasOrganizationAccess } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../constants/api";
 import { dashboardGreetingName } from "../utils/displayName";
 import { otherStaffRoleLabel, userRoleLabel } from "../utils/roleLabels";
@@ -85,9 +85,11 @@ export default function TopBarActions({
     activeAdminAssignment,
     selectRolePersona,
     selectAdminPersona,
+    setActivePersona,
     isAdminUser,
   } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const downSm = useMediaQuery(theme.breakpoints.down("sm"));
   const [query, setQuery] = React.useState("");
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -122,18 +124,20 @@ export default function TopBarActions({
   );
 
   const personaOptions = React.useMemo<PersonaMenuOption[]>(() => {
-    if (user?.role === "OWNER") {
-      return [];
-    }
     const options: PersonaMenuOption[] = [];
-    if (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF") {
+    if (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF" || user?.role === "OWNER" || user?.role === "EXPLORER") {
       options.push({
         key: `ROLE:${user.role}`,
         kind: "ROLE",
         role: user.role,
-        label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) : "Pharmacist",
-        helper: "Staff dashboard",
+        label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) :
+          user.role === "PHARMACIST" ? "Pharmacist" : user.role === "OWNER" ? "Owner" : "Explorer",
+        helper: "Original dashboard",
       });
+    }
+
+    if (hasOrganizationAccess(user)) {
+      options.push({ key: 'ORG', kind: 'ORG', label: 'Organization', helper: 'Organization dashboard' });
     }
 
     adminAssignments.forEach((assignment) => {
@@ -174,6 +178,7 @@ export default function TopBarActions({
   }, [adminAssignments, otherStaffRoleType, user?.role]);
 
   const activePersonaKey = React.useMemo(() => {
+    if (location.pathname.startsWith('/dashboard/organization/')) return 'ORG';
     if (activePersona === "admin") {
       const activeId =
         activeAdminAssignment?.id ??
@@ -183,12 +188,12 @@ export default function TopBarActions({
     }
     if (
       activePersona === "staff" &&
-      (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF")
+      (user?.role === "PHARMACIST" || user?.role === "OTHER_STAFF" || user?.role === "OWNER" || user?.role === "EXPLORER")
     ) {
       return `ROLE:${user.role}`;
     }
     return null;
-  }, [activePersona, activeAdminAssignment?.id, adminAssignments, user?.role]);
+  }, [activePersona, activeAdminAssignment?.id, adminAssignments, user?.role, location.pathname]);
 
   const showPersonaSwitcher =
     personaOptions.length > 0 && (isAdminUser || personaOptions.length > 1);
@@ -309,13 +314,17 @@ export default function TopBarActions({
         return;
       }
       if (option.kind === "ROLE") {
-        selectRolePersona(option.role);
+        if (option.role === 'PHARMACIST' || option.role === 'OTHER_STAFF') selectRolePersona(option.role);
+        else setActivePersona('staff');
         const targetPath = option.role === 'PHARMACIST'
           ? '/dashboard/pharmacist/overview'
           : option.role === 'OTHER_STAFF'
             ? '/dashboard/otherstaff/overview'
-            : '/dashboard/explorer/overview';
+            : option.role === 'OWNER' ? '/dashboard/owner/overview' : '/dashboard/explorer/overview';
         navigate(targetPath);
+      } else if (option.kind === 'ORG') {
+        setActivePersona('staff');
+        navigate('/dashboard/organization/overview');
       } else {
         selectAdminPersona(option.assignmentId);
         const assignment = adminAssignments.find((item) => item.id === option.assignmentId);
@@ -325,7 +334,7 @@ export default function TopBarActions({
       }
       setProfileAnchor(null);
     },
-    [activePersonaKey, adminAssignments, navigate, selectAdminPersona, selectRolePersona]
+    [activePersonaKey, adminAssignments, navigate, selectAdminPersona, selectRolePersona, setActivePersona]
   );
 
   const handleLogout = React.useCallback(async () => {

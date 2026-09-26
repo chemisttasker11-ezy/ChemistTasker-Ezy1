@@ -49,7 +49,10 @@ import { useAuth } from '../../../contexts/AuthContext';
 import type { OrgMembership, PharmacyMembership } from '../../../contexts/AuthContext';
 import { ORG_ROLES } from '../../../constants/roles';
 import {
-  fetchPharmaciesService,
+  fetchAccessibleOrganizationPharmacies,
+  canDelegateOrganizationAdminLevel,
+  canDelegateOrganizationRole,
+  canManageOrganizationMember,
   getOrganizationMemberships,
   getOrganizationRoleDefinitions,
   inviteOrgUser,
@@ -182,24 +185,33 @@ export default function InviteStaffPage() {
   }, [user]);
 
   const orgId = orgMembership?.organization_id ?? null;
+  const isRegionAdmin = orgMembership?.role === 'REGION_ADMIN';
+  const isScopedAdmin = isRegionAdmin || orgMembership?.role === 'CHIEF_ADMIN';
   const inviterCapabilities = new Set(orgMembership?.capabilities ?? []);
   const canInvite = inviterCapabilities.has('invite_staff');
 
   const eligibleRoles = useMemo(
     () =>
       roleDefinitions.filter((definition) => {
+        if (!canDelegateOrganizationRole(orgMembership?.role, definition.key)) return false;
         if (definition.key === 'ORG_ADMIN') {
           return inviterCapabilities.has('claim_pharmacy');
         }
         return true;
       }),
-    [roleDefinitions, inviterCapabilities]
+    [roleDefinitions, inviterCapabilities, orgMembership?.role]
   );
 
   const roleDefinition = useMemo(
     () => eligibleRoles.find((definition) => definition.key === selectedRole) ?? null,
     [eligibleRoles, selectedRole]
   );
+
+  useEffect(() => {
+    if (eligibleRoles.length && !eligibleRoles.some((role) => role.key === selectedRole)) {
+      setSelectedRole(eligibleRoles[0].key);
+    }
+  }, [eligibleRoles, selectedRole]);
 
   const adminLevelDefinition = useMemo(
     () => (selectedAdminLevel ? adminLevelMap[selectedAdminLevel] ?? null : null),
@@ -214,9 +226,15 @@ export default function InviteStaffPage() {
     return map;
   }, [roleDefinitions]);
 
-  const adminLevelOptions = useMemo(
-    () => Object.values(adminLevelMap),
-    [adminLevelMap]
+  const adminLevelOptions = useMemo(() => Object.values(adminLevelMap), [adminLevelMap]);
+  const canManageMember = (member: OrganizationMember) =>
+    (orgMembership?.role === 'CHIEF_ADMIN' && member.user?.id === user?.id) ||
+    canManageOrganizationMember(orgMembership, member, adminLevelMap);
+  const availablePharmacies = useMemo(
+    () => isScopedAdmin
+      ? pharmacies.filter((pharmacy) => orgMembership?.pharmacies?.some((assigned) => assigned.id === pharmacy.id))
+      : pharmacies,
+    [isScopedAdmin, orgMembership?.pharmacies, pharmacies]
   );
 
   const currentUserId = user?.id ?? null;
@@ -258,7 +276,7 @@ export default function InviteStaffPage() {
       try {
         const [roleResponse, pharmaciesResponse] = await Promise.all([
           getOrganizationRoleDefinitions(),
-          fetchPharmaciesService({ organization: orgId, limit: 200 }),
+          fetchAccessibleOrganizationPharmacies(orgId),
         ]);
 
         if (!isMounted) return;
@@ -285,8 +303,9 @@ export default function InviteStaffPage() {
         );
 
         if (!selectedRole && roleDefs.length) {
-          setSelectedRole(roleDefs[0].key);
+          setSelectedRole(isScopedAdmin ? orgMembership?.role ?? roleDefs[0].key : roleDefs[0].key);
         }
+        if (isRegionAdmin) setRegion(orgMembership?.region ?? '');
       } catch (err) {
         console.error(err);
         if (isMounted) {
@@ -303,13 +322,16 @@ export default function InviteStaffPage() {
     return () => {
       isMounted = false;
     };
-  }, [orgId]);
+  }, [orgId, isRegionAdmin, isScopedAdmin, orgMembership?.role, orgMembership?.region]);
 
   useEffect(() => {
     if (!roleDefinition) return;
 
-    if (!roleDefinition.allowed_admin_levels.includes(selectedAdminLevel)) {
-      setSelectedAdminLevel(roleDefinition.default_admin_level);
+    const allowedLevels = roleDefinition.allowed_admin_levels.filter((level) =>
+      !isScopedAdmin || canDelegateOrganizationAdminLevel(orgMembership?.admin_level, level, adminLevelMap)
+    );
+    if (!allowedLevels.includes(selectedAdminLevel)) {
+      setSelectedAdminLevel(allowedLevels[0] ?? '');
     }
 
     if (!roleDefinition.requires_job_title) {
@@ -321,13 +343,13 @@ export default function InviteStaffPage() {
     if (!roleDefinition.requires_pharmacies) {
       setSelectedPharmacyIds([]);
     }
-  }, [roleDefinition, selectedAdminLevel]);
+  }, [roleDefinition, selectedAdminLevel, isScopedAdmin, orgMembership?.admin_level, adminLevelMap]);
 
   useEffect(() => {
     if (!roleDefinition) return;
     if (roleDefinition.key === 'REGION_ADMIN' && selectedAdminLevel === 'ROSTER_MANAGER') {
       setWarning(
-        'Roster Managers can manage shifts but cannot invite or manage staff. This invitation will have limited permissions.'
+        'Roster Managers can delegate Region Admin access within their assigned pharmacies and region.'
       );
     } else {
       setWarning('');
@@ -381,6 +403,16 @@ export default function InviteStaffPage() {
       setError('Select an admin level.');
       return;
     }
+    if (isScopedAdmin && (
+      !canDelegateOrganizationRole(orgMembership?.role, selectedRole) ||
+      !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, selectedAdminLevel, adminLevelMap) ||
+      (isRegionAdmin && region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
+      !selectedPharmacyIds.length ||
+      selectedPharmacyIds.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
+    )) {
+      setError('This invitation exceeds your region delegation scope.');
+      return;
+    }
     if (roleDefinition.requires_job_title && !jobTitle.trim()) {
       setError('Job title is required for this role.');
       return;
@@ -418,7 +450,7 @@ export default function InviteStaffPage() {
       setMessage('Invitation sent successfully.');
       setEmail('');
       if (roleDefinition.requires_job_title) setJobTitle('');
-      if (roleDefinition.requires_region) setRegion('');
+      if (roleDefinition.requires_region) setRegion(isRegionAdmin ? orgMembership?.region ?? '' : '');
       if (roleDefinition.requires_pharmacies) setSelectedPharmacyIds([]);
     } catch (err: any) {
       console.error(err);
@@ -431,6 +463,7 @@ export default function InviteStaffPage() {
   };
 
   const handleOpenEditDialog = (member: OrganizationMember) => {
+    if (!canManageMember(member)) return;
     setEditError('');
     setEditForm({
       id: member.id,
@@ -456,6 +489,23 @@ export default function InviteStaffPage() {
 
   const handleSaveMember = async () => {
     if (!editForm) return;
+    const existing = members.find((member) => member.id === editForm.id);
+    if (!existing || !canManageMember(existing)) {
+      setEditError('This member is outside your delegation scope.');
+      return;
+    }
+    const selfPromotion = orgMembership?.role === 'CHIEF_ADMIN' &&
+      existing.user?.id === user?.id && editForm.role === 'ORG_ADMIN';
+    if (isScopedAdmin && !selfPromotion && (
+      !canDelegateOrganizationRole(orgMembership?.role, editForm.role) ||
+      !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, editForm.admin_level, adminLevelMap) ||
+      (isRegionAdmin && editForm.region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
+      !editForm.pharmacy_ids.length ||
+      editForm.pharmacy_ids.some((id) => !orgMembership?.pharmacies?.some((pharmacy) => pharmacy.id === id))
+    )) {
+      setEditError('This role or admin level exceeds your delegation scope.');
+      return;
+    }
     const definition = roleDefinitionMap.get(editForm.role);
     if (!definition) {
       setEditError('Invalid role selection.');
@@ -620,7 +670,9 @@ export default function InviteStaffPage() {
                         label="Admin Level"
                         onChange={(event) => setSelectedAdminLevel(event.target.value)}
                       >
-                        {roleDefinition.allowed_admin_levels.map((levelKey) => {
+                        {roleDefinition.allowed_admin_levels.filter((level) =>
+                          !isScopedAdmin || canDelegateOrganizationAdminLevel(orgMembership?.admin_level, level, adminLevelMap)
+                        ).map((levelKey) => {
                           const levelDef = adminLevelMap[levelKey];
                           return (
                             <MenuItem key={levelKey} value={levelKey}>
@@ -657,6 +709,7 @@ export default function InviteStaffPage() {
                       margin="normal"
                       value={region}
                       onChange={(e) => setRegion(e.target.value)}
+                      disabled={isRegionAdmin}
                     />
                   )}
 
@@ -683,7 +736,7 @@ export default function InviteStaffPage() {
                             .join(', ');
                         }}
                       >
-                        {pharmacies.map((pharmacy) => (
+                        {availablePharmacies.map((pharmacy) => (
                           <MenuItem key={pharmacy.id} value={pharmacy.id}>
                             <Checkbox checked={selectedPharmacyIds.includes(pharmacy.id)} />
                             <ListItemText primary={pharmacy.name} />
@@ -853,7 +906,7 @@ export default function InviteStaffPage() {
                         </TableCell>
                         <TableCell align="right">
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => handleOpenEditDialog(member)}>
+                            <IconButton size="small" onClick={() => handleOpenEditDialog(member)} disabled={!canManageMember(member)}>
                               <EditOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -864,7 +917,7 @@ export default function InviteStaffPage() {
                               <IconButton
                                 size="small"
                                 onClick={() => handleOpenDeleteDialog(member)}
-                                disabled={member.user?.id === currentUserId}
+                                disabled={member.user?.id === currentUserId || !canManageMember(member)}
                                 color="error"
                               >
                                 <DeleteOutlineIcon fontSize="small" />
@@ -913,7 +966,10 @@ export default function InviteStaffPage() {
                     }
                   }}
                 >
-                  {roleDefinitions.map((definition) => (
+                  {roleDefinitions.filter((definition) =>
+                    eligibleRoles.some((role) => role.key === definition.key) ||
+                    (orgMembership?.role === 'CHIEF_ADMIN' && editForm.id === members.find((member) => member.user?.id === user?.id)?.id && definition.key === 'ORG_ADMIN')
+                  ).map((definition) => (
                     <MenuItem key={definition.key} value={definition.key}>
                       {definition.label}
                     </MenuItem>
@@ -935,7 +991,9 @@ export default function InviteStaffPage() {
                   label="Admin Level"
                   onChange={(event) => handleEditFieldChange('admin_level', event.target.value)}
                 >
-                  {(editRoleDefinition?.allowed_admin_levels ?? []).map((levelKey) => {
+                  {(editRoleDefinition?.allowed_admin_levels ?? []).filter((level) =>
+                    !isScopedAdmin || canDelegateOrganizationAdminLevel(orgMembership?.admin_level, level, adminLevelMap)
+                  ).map((levelKey) => {
                     const levelDef = adminLevelMap[levelKey];
                     return (
                       <MenuItem key={levelKey} value={levelKey}>
@@ -967,6 +1025,7 @@ export default function InviteStaffPage() {
                   label="Region"
                   value={editForm.region}
                   onChange={(event) => handleEditFieldChange('region', event.target.value)}
+                  disabled={isRegionAdmin}
                 />
               )}
 
@@ -994,7 +1053,7 @@ export default function InviteStaffPage() {
                         .join(', ');
                     }}
                   >
-                    {pharmacies.map((pharmacy) => (
+                    {availablePharmacies.map((pharmacy) => (
                       <MenuItem key={pharmacy.id} value={pharmacy.id}>
                         <Checkbox checked={editForm.pharmacy_ids.includes(pharmacy.id)} />
                         <ListItemText primary={pharmacy.name} />

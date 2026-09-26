@@ -3,10 +3,10 @@ import { AppState, Linking, Platform, StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
-import crashlytics from '@react-native-firebase/crashlytics';
+import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
-import { AuthProvider, useAuth } from '../context/AuthContext';
+import { AuthProvider, useAuth, type User } from '../context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
@@ -17,15 +17,14 @@ import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChang
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
 
-const ORG_ROLES = new Set(['ORGANIZATION', 'ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN']);
-
-function hasOrganizationAccess(user: any) {
-  const role = String(user?.role || '').toUpperCase();
-  if (ORG_ROLES.has(role)) return true;
-  return Array.isArray(user?.memberships) && user.memberships.some((membership: any) => {
-    const membershipRole = String(membership?.role || '').toUpperCase();
-    return ORG_ROLES.has(membershipRole);
-  });
+function getCrashlytics() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('@react-native-firebase/crashlytics');
+    return typeof mod?.default === 'function' ? mod.default() : null;
+  } catch {
+    return null;
+  }
 }
 
 function hasAdminAccess(user: any) {
@@ -47,9 +46,12 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     try {
       const err = error instanceof Error ? error : new Error(String(error));
       const stack = (info as { componentStack?: string })?.componentStack;
-      crashlytics().recordError(err);
-      if (stack) {
-        crashlytics().setAttribute('componentStack', stack);
+      const cl = getCrashlytics();
+      if (cl) {
+        cl.recordError(err);
+        if (stack) {
+          cl.setAttribute('componentStack', stack);
+        }
       }
     } catch {
       // ignore crash reporting errors
@@ -218,9 +220,9 @@ function AuthGate() {
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
 
-  const getRoleHome = (role?: string | null) => {
-    const normalized = String(role || '').toUpperCase();
-    if (ORG_ROLES.has(normalized)) {
+  const getRoleHome = (currentUser?: User | null) => {
+    const normalized = String(currentUser?.role || '').toUpperCase();
+    if (hasOrganizationAccess(currentUser) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(normalized)) {
       return '/organization/dashboard';
     }
     switch (normalized) {
@@ -246,7 +248,7 @@ function AuthGate() {
     const isPublic = publicRoutes.has(top ?? '');
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
-    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave', 'workforce-timesheets', 'workforce-settings']);
+    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-leave', 'workforce-timesheets', 'workforce-settings', 'admin-invitations']);
     const sharedProductPrefixes = new Set(['workforce', 'manager', 'attendance', 'finance', 'marketplace', 'profile', 'rewards']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '') || sharedProductPrefixes.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
@@ -273,7 +275,7 @@ function AuthGate() {
       }
 
       if (user && isPublic && !isSharedAuthenticatedRoute) {
-        if (hasOrganizationAccess(user)) {
+        if (hasOrganizationAccess(user) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(String(user.role || '').toUpperCase())) {
           router.replace('/organization/dashboard' as any);
           return;
         }
@@ -285,16 +287,14 @@ function AuthGate() {
           return;
         }
 
-        router.replace(getRoleHome(user.role) as any);
+        router.replace(getRoleHome(user) as any);
         return;
       }
 
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
-          const normalizedSharedRole = String(user.role || '').toUpperCase();
-          const ownerAccess = normalizedSharedRole === 'OWNER';
-          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', selectedPharmacyId);
-          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+          const rosterCapability = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
+          const workforceCapability = rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
 
           const isManagerRoute = top === 'manager';
           const isRosterWorkforceRoute = top === 'workforce-timesheets' || (top === 'workforce' && second === 'payroll-export');
@@ -302,12 +302,12 @@ function AuthGate() {
           const isAttendanceReviewRoute = top === 'attendance' && second === 'reviews';
 
           if ((isManagerRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
-            router.replace(getRoleHome(user.role) as any);
+            router.replace(getRoleHome(user) as any);
             return;
           }
 
           if (isStaffWorkforceRoute && !workforceCapability) {
-            router.replace(getRoleHome(user.role) as any);
+            router.replace(getRoleHome(user) as any);
             return;
           }
 
@@ -321,10 +321,11 @@ function AuthGate() {
         }
 
         if (hasOrganizationAccess(user)) {
-          if (top !== 'organization') {
+          if (top === 'organization') return;
+          if (!['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(normalizedRole)) {
             router.replace('/organization/dashboard' as any);
+            return;
           }
-          return;
         }
 
         if (normalizedRole === 'OWNER') {
@@ -356,13 +357,13 @@ function AuthGate() {
         }
 
         if (top === 'setup') {
-          router.replace(getRoleHome(user.role) as any);
+          router.replace(getRoleHome(user) as any);
           return;
         }
 
         const expectedTop = expectedTopByRole[normalizedRole];
         if (expectedTop && top !== expectedTop) {
-          router.replace(getRoleHome(user.role) as any);
+          router.replace(getRoleHome(user) as any);
           return;
         }
       }

@@ -11,10 +11,11 @@ export type PersonaMenuOption =
   | {
     key: string;
     kind: "ROLE";
-    role: "PHARMACIST" | "OTHER_STAFF";
+    role: "PHARMACIST" | "OTHER_STAFF" | "OWNER" | "EXPLORER";
     label: string;
     helper?: string;
   }
+  | { key: "ORG"; kind: "ORG"; label: string; helper?: string }
   | {
     key: string;
     kind: "ADMIN";

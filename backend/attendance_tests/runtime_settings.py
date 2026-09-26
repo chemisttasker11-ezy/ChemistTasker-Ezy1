@@ -3,9 +3,9 @@ from attendance_tests.migration_settings import *  # noqa: F403
 
 DEBUG = True
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
-CORS_ALLOWED_ORIGINS = ["http://tauri.localhost", "tauri://localhost", "http://localhost:5173"]
+CORS_ALLOWED_ORIGINS = ["http://tauri.localhost", "tauri://localhost", "http://localhost:5173", "http://127.0.0.1:8082"]
 CORS_ALLOW_HEADERS = [*CORS_ALLOW_HEADERS, "x-device-token"]  # noqa: F405
-CSRF_TRUSTED_ORIGINS = ["http://tauri.localhost", "http://localhost:5173"]
+CSRF_TRUSTED_ORIGINS = ["http://tauri.localhost", "http://localhost:5173", "http://127.0.0.1:8082"]
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
     "security": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "kiosk-runtime-tests"},
