@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Switch, Text } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
+import { dateFromIso, errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
 
 type WorkforceScreen =
   | 'engagements'
@@ -84,8 +86,10 @@ function usePharmacy() {
 
 export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
   const router = useRouter();
+  const { hasCapability } = useAuth();
   const params = useLocalSearchParams<{ id?: string; membershipId?: string; supersedes?: string; edit?: string }>();
   const { pharmacyId, pharmacyName, missing, missingView } = usePharmacy();
+  const canReviewLeave = Boolean(pharmacyId && hasCapability('MANAGE_ROSTER', pharmacyId));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -350,6 +354,7 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
         )) : <EmptyState title="No employment engagements" body="Add dated employment terms for eligible employee memberships." actionLabel="New engagement" onAction={() => router.push('/workforce/employment-engagements/new' as any)} />}
       </Section>
       <Section title="Workforce tools">
+        {canReviewLeave ? <ScreenLink title="Leave requests" subtitle="Review dated and partial-day workforce leave." onPress={() => router.push('/workforce/leave-requests' as any)} /> : null}
         <ScreenLink title="Award preview" subtitle="Preview classifications and rates." onPress={() => router.push('/workforce/award-preview' as any)} />
         <ScreenLink title="Payroll configuration" subtitle="Control payroll preparation for this pharmacy." onPress={() => router.push('/workforce/payroll-configuration' as any)} />
         <ScreenLink title="Work settings" subtitle="Contracted hours and worker settings." onPress={() => router.push('/workforce/work-settings' as any)} />
@@ -413,7 +418,17 @@ function AwardPreview({ staff, loading, error }: { staff: any[]; loading: boolea
             onChange={(value) => { setEmploymentType(value); setPreview(null); }}
             options={[{ value: 'FULL_TIME', label: 'Full time' }, { value: 'PART_TIME', label: 'Part time' }, { value: 'CASUAL', label: 'Casual' }]}
           />
-          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
+          <DatePickerInput
+            locale="en-AU"
+            label="Effective from"
+            value={dateFromIso(effectiveFrom)}
+            onChange={(date) => {
+              setEffectiveFrom(date ? isoDate(date) : '');
+              setPreview(null);
+            }}
+            inputMode="start"
+            disabled={busy}
+          />
           {classificationOptions.length ? (
             <Section title="Award classification" description="Choose from the backend-provided classifications for this worker.">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -693,8 +708,25 @@ function EngagementEditor({
 
       {worker ? (
         <>
-          <Field label="Effective from (YYYY-MM-DD)" value={effectiveFrom} disabled={historical} onChangeText={(value) => { setEffectiveFrom(value); setPreview(null); }} />
-          <Field label="Effective to (optional, YYYY-MM-DD)" value={effectiveTo} disabled={completedHistorical} onChangeText={setEffectiveTo} />
+          <DatePickerInput
+            locale="en-AU"
+            label="Effective from"
+            value={dateFromIso(effectiveFrom)}
+            onChange={(date) => {
+              setEffectiveFrom(date ? isoDate(date) : '');
+              setPreview(null);
+            }}
+            inputMode="start"
+            disabled={historical || busy}
+          />
+          <DatePickerInput
+            locale="en-AU"
+            label="Effective to (optional)"
+            value={dateFromIso(effectiveTo)}
+            onChange={(date) => setEffectiveTo(date ? isoDate(date) : '')}
+            inputMode="start"
+            disabled={completedHistorical || busy}
+          />
 
           {!historical ? (
             <>

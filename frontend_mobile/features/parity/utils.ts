@@ -24,7 +24,23 @@ export const dateLabel = (value: any) => {
   return date.toLocaleString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-export const isoDate = (date = new Date()) => date.toISOString().slice(0, 10);
+export const isoDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Date-only API values must stay on the selected local calendar day. Parsing
+// YYYY-MM-DD with Date's string constructor treats it as UTC and can show the
+// previous day in Australian time zones.
+export const dateFromIso = (value?: string | null): Date | undefined => {
+  if (!value) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return undefined;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? undefined : date;
+};
 
 export const startOfWeek = (date = new Date()) => {
   const next = new Date(date);
