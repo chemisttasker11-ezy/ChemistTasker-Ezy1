@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar } from 'react-native-paper';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
+import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar, Icon } from 'react-native-paper';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -23,6 +24,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { triggerUnreadBump } from '@/utils/pushNotifications';
 import { setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
+import { resolveApiBaseUrl } from '@/utils/apiUrl';
 
 type MessageDisplay = ChatMessage & { is_me: boolean };
 type ChatIdentity = {
@@ -38,6 +40,22 @@ type ChatIdentity = {
     profilePhoto?: string | null;
 };
 type IdentityRecord = { details: ChatIdentity; invited_name?: string | null };
+
+const CHAT_ATTACHMENT_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+];
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const isImageAttachment = (item: MessageDisplay) => /\.(?:gif|jpe?g|png|webp)(?:$|[?#])/i.test(item.attachment_filename || item.attachment_url || '');
+const absoluteAttachmentUrl = (value: string) => {
+    if (/^https?:\/\//i.test(value)) return value;
+    const origin = resolveApiBaseUrl().replace(/\/api\/?$/, '');
+    return `${origin}${value.startsWith('/') ? '' : '/'}${value}`;
+};
 
 const messageKey = (item: MessageDisplay) => item.id ?? `${item.created_at}-${item.body}`;
 const messageTime = (item: MessageDisplay) => {
@@ -422,18 +440,25 @@ export default function SharedMessageDetailScreen() {
     };
 
     const pickAttachment = async () => {
-        const res = await DocumentPicker.getDocumentAsync({ multiple: false });
+        const res = await DocumentPicker.getDocumentAsync({
+            multiple: false,
+            copyToCacheDirectory: true,
+            type: CHAT_ATTACHMENT_TYPES,
+        });
         if (res.canceled || !res.assets?.length) return;
         const file = res.assets[0];
         const roomId = parseRoomId();
         if (!roomId) return;
+        if (file.size && file.size > MAX_ATTACHMENT_BYTES) {
+            setSnackbar('Attachments must be 10 MB or smaller.');
+            return;
+        }
 
         setSending(true);
         try {
             const form = new FormData();
-            const body = newMessage.trim() || file.name || 'Attachment';
-            form.append('body', body);
-            form.append('content', body);
+            const body = newMessage.trim();
+            if (body) form.append('body', body);
             form.append('attachment', {
                 uri: file.uri,
                 name: file.name || 'upload',
@@ -602,6 +627,16 @@ const pinnedMessage = useMemo(() => {
         const isMe = item.is_me;
         const senderName = senderNameOf(item);
         const senderPhoto = photoOf(resolveMessageIdentity(item));
+        const attachmentUrl = item.attachment_url ? absoluteAttachmentUrl(item.attachment_url) : null;
+        const openAttachment = async () => {
+            if (!attachmentUrl) return;
+            try {
+                if (!await Linking.canOpenURL(attachmentUrl)) throw new Error('Unsupported attachment URL');
+                await Linking.openURL(attachmentUrl);
+            } catch {
+                setSnackbar('Unable to open this attachment.');
+            }
+        };
         return (
             <View style={[
                 styles.messageContainer,
@@ -637,8 +672,23 @@ const pinnedMessage = useMemo(() => {
                             {item.is_edited ? ' (edited)' : ''}
                             </Text>
                         </View>
-                    {item.attachment_url ? (
-                        <Text style={styles.attachment}>{item.attachment_filename || 'Attachment'}</Text>
+                    {attachmentUrl ? (
+                        <TouchableOpacity
+                            accessibilityRole="link"
+                            accessibilityLabel={`Open attachment ${item.attachment_filename || ''}`.trim()}
+                            activeOpacity={0.8}
+                            onPress={() => void openAttachment()}
+                            style={styles.attachment}
+                        >
+                            {isImageAttachment(item) ? (
+                                <Image source={{ uri: attachmentUrl }} style={styles.attachmentImage} contentFit="cover" transition={150} />
+                            ) : (
+                                <View style={styles.attachmentFile}>
+                                    <Icon source="file-document-outline" size={22} />
+                                    <Text numberOfLines={2} style={styles.attachmentLabel}>{item.attachment_filename || 'Open attachment'}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     ) : null}
                     {renderReactions(item)}
                         <Text style={[
@@ -901,9 +951,32 @@ const styles = StyleSheet.create({
         textAlign: 'left',
     },
     attachment: {
-        marginTop: 4,
-        color: '#2563EB',
-        textDecorationLine: 'underline',
+        marginTop: 8,
+        minHeight: 44,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    attachmentImage: {
+        width: 220,
+        maxWidth: '100%',
+        aspectRatio: 4 / 3,
+        borderRadius: 10,
+        backgroundColor: '#E5E7EB',
+    },
+    attachmentFile: {
+        minHeight: 48,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.72)',
+    },
+    attachmentLabel: {
+        flex: 1,
+        color: '#1D4ED8',
+        fontWeight: '600',
     },
     reactionsRow: {
         flexDirection: 'row',

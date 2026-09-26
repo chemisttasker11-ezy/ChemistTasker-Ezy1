@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text, Avatar, Badge, Menu, IconButton, Divider } from 'react-native-paper';
+import { Text, Avatar, Badge, Menu, IconButton, useTheme } from 'react-native-paper';
 import { formatDistanceToNow } from 'date-fns';
 import type { ChatRoom } from './types';
 
@@ -20,6 +20,7 @@ const getTitle = (room: ChatRoom) => {
 };
 
 export default function ChatListItem({ room, onPress, onTogglePin, onDelete, onEdit, canEditDelete }: Props) {
+  const theme = useTheme();
   const lastMessage = (room as any)?.last_message;
   const subtitle = lastMessage?.body || 'No messages yet';
   const ts = lastMessage?.created_at || room.updated_at;
@@ -28,7 +29,7 @@ export default function ChatListItem({ room, onPress, onTogglePin, onDelete, onE
 
   return (
     <TouchableOpacity style={styles.container} onPress={() => onPress(room)}>
-      <Avatar.Text size={40} label={getTitle(room).slice(0, 2).toUpperCase()} style={styles.avatar} />
+      <Avatar.Text size={40} label={getTitle(room).slice(0, 2).toUpperCase()} style={[styles.avatar, { backgroundColor: theme.colors.primaryContainer }]} />
       <View style={styles.content}>
         <View style={styles.titleRow}>
           <Text variant="titleSmall" numberOfLines={1} style={styles.title}>
@@ -36,7 +37,7 @@ export default function ChatListItem({ room, onPress, onTogglePin, onDelete, onE
           </Text>
           <View style={styles.rightBadges}>
             {room.is_pinned ? <Badge style={styles.pinBadge}>📌</Badge> : null}
-            {room.unread_count ? <Badge style={styles.badge}>{room.unread_count}</Badge> : null}
+            {room.unread_count ? <Badge style={[styles.badge, { backgroundColor: theme.colors.primary }]}>{room.unread_count}</Badge> : null}
             <Menu
               visible={menuVisible}
               onDismiss={() => setMenuVisible(false)}
@@ -72,7 +73,6 @@ const styles = StyleSheet.create({
   },
   avatar: {
     marginRight: 12,
-    backgroundColor: '#EEF2FF',
   },
   content: {
     flex: 1,
@@ -88,7 +88,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   badge: {
-    backgroundColor: '#6366F1',
   },
   pinBadge: {
     backgroundColor: '#F59E0B',

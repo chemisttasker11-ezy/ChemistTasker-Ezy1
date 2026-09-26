@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
-import { Searchbar, Button, Text, Divider, Chip, IconButton, Menu } from 'react-native-paper';
+import { Searchbar, Button, Text, Divider, Chip, IconButton, Menu, useTheme } from 'react-native-paper';
 import type { ChatRoom } from './types';
 import ChatListItem from './ChatListItem';
 import { deleteRoomService } from '@chemisttasker/shared-core';
@@ -41,6 +41,7 @@ export default function ChatSidebar({
   onDeleteRoom,
   onEditRoom,
 }: Props) {
+  const theme = useTheme();
   const [filter, setFilter] = React.useState<'all' | 'group' | 'dm' | 'shift'>('all');
   const [createMenu, setCreateMenu] = React.useState(false);
 
@@ -113,7 +114,7 @@ export default function ChatSidebar({
   }, [filter, grouped, filtered, shiftItems]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.headerRow}>
         <Text variant="titleMedium" style={{ fontWeight: '700' }}>Messages</Text>
         {canCreate ? (
@@ -168,7 +169,7 @@ export default function ChatSidebar({
         <ScrollView>
           {filter === 'all' && grouped.pinned.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Pinned</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Pinned</Text>
               {grouped.pinned.map((item) => (
                 <ChatListItem
                   key={`p-${item.id}`}
@@ -186,7 +187,7 @@ export default function ChatSidebar({
 
           {(filter === 'all' || filter === 'group') && grouped.groupChats.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Groups</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Groups</Text>
               {grouped.groupChats.map((item) => (
                 <ChatListItem
                   key={`g-${item.id}`}
@@ -204,7 +205,7 @@ export default function ChatSidebar({
 
           {filter === 'shift' && shiftItems.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Shifts</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Shifts</Text>
               {shiftItems.map(({ key, room, contact, matched }) => (
                 <ChatListItem
                   key={key}
@@ -222,7 +223,7 @@ export default function ChatSidebar({
 
           {(filter === 'all' || filter === 'dm') && grouped.dmChats.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>DMs</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>DMs</Text>
               {grouped.dmChats.map((item) => (
                 <ChatListItem
                   key={`dm-${item.id}`}
@@ -245,7 +246,6 @@ export default function ChatSidebar({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
     padding: 12,
     gap: 8,
   },
@@ -270,5 +270,5 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   section: { paddingVertical: 6 },
-  sectionTitle: { fontWeight: '700', color: '#6B7280' },
+  sectionTitle: { fontWeight: '700' },
 });

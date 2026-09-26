@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Snackbar, Text, FAB, Menu, Portal } from 'react-native-paper';
+import { ActivityIndicator, Button, FAB, Menu, Modal, Portal, Snackbar, Text, TextInput, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import ChatSidebar from './ChatSidebar';
@@ -9,7 +9,7 @@ import NewChatModal from './NewChatModal';
 import NewGroupModal from './NewGroupModal';
 import GroupManageModal from './GroupManageModal';
 import { useChatRooms, useShiftContacts, startDirectChat } from './hooks';
-import { toggleRoomPinService, fetchChatParticipants, deleteRoomService } from '@chemisttasker/shared-core';
+import { createOrUpdateGroupRoom, toggleRoomPinService, fetchChatParticipants, deleteRoomService } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
 import type { ChatRoom } from './types';
 import { subscribeChatNavigation, subscribeUnreadBump, subscribeUnreadCount } from '@/utils/pushNotifications';
@@ -28,6 +28,7 @@ function resolveName(room: ChatRoom): string {
 export default function ChatPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const theme = useTheme();
   const { rooms, loading, refreshing, error, refresh, reload } = useChatRooms();
   const { contacts: shiftContacts } = useShiftContacts();
   const role = (user?.role || '').toUpperCase();
@@ -38,6 +39,9 @@ export default function ChatPage() {
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [participantAdmins, setParticipantAdmins] = useState<Record<number, boolean>>({});
   const [fabMenuVisible, setFabMenuVisible] = useState(false);
+  const [editRoom, setEditRoom] = useState<ChatRoom | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [savingTitle, setSavingTitle] = useState(false);
 
   const sortedRooms = useMemo(() => {
     const pinned = rooms.filter((r) => r.is_pinned);
@@ -179,7 +183,7 @@ export default function ChatPage() {
   }, [rooms, reload]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['left', 'right']}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />
@@ -211,25 +215,12 @@ export default function ChatPage() {
           }
         }}
         onEditRoom={(room) => {
-          // Simple inline title edit prompt
-          const newTitle = prompt('Edit group name', (room as any).title || '');
-          if (newTitle && newTitle.trim()) {
-            // Only allow for custom groups
-            if ((room as any)?.pharmacy) {
-              setSnackbar('Cannot edit pharmacy chats');
-              return;
-            }
-            // Use shared-core createOrUpdateGroupRoom
-            import('@chemisttasker/shared-core').then(async (mod) => {
-              try {
-                await (mod as any).createOrUpdateGroupRoom({ roomId: (room as any).id, title: newTitle.trim() });
-                setSnackbar('Updated');
-                reload();
-              } catch (err: any) {
-                setSnackbar(err?.message || 'Update failed');
-              }
-            });
+          if ((room as any)?.pharmacy) {
+            setSnackbar('Pharmacy chat names cannot be changed.');
+            return;
           }
+          setEditRoom(room);
+          setEditTitle((room as any).title || '');
         }}
       />
       )}
@@ -253,6 +244,65 @@ export default function ChatPage() {
         canManage={manageGroupRoom ? canManageGroup(manageGroupRoom) : false}
       />
 
+      <Portal>
+        <Modal
+          visible={!!editRoom}
+          onDismiss={() => {
+            if (!savingTitle) {
+              setEditRoom(null);
+              setEditTitle('');
+            }
+          }}
+          contentContainerStyle={[styles.editModal, { backgroundColor: theme.colors.surface }]}
+        >
+          <Text variant="titleMedium" style={[styles.editTitle, { color: theme.colors.onSurface }]}>Rename group</Text>
+          <Text variant="bodySmall" style={[styles.editHint, { color: theme.colors.onSurfaceVariant }]}>Choose a clear name your group members will recognise.</Text>
+          <TextInput
+            mode="outlined"
+            label="Group name"
+            value={editTitle}
+            onChangeText={setEditTitle}
+            autoFocus
+            maxLength={80}
+            disabled={savingTitle}
+          />
+          <View style={styles.editActions}>
+            <Button
+              mode="text"
+              disabled={savingTitle}
+              onPress={() => {
+                setEditRoom(null);
+                setEditTitle('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              loading={savingTitle}
+              disabled={savingTitle || !editTitle.trim()}
+              onPress={async () => {
+                if (!editRoom || !editTitle.trim()) return;
+                setSavingTitle(true);
+                try {
+                  await createOrUpdateGroupRoom({ roomId: (editRoom as any).id, title: editTitle.trim() });
+                  setSnackbar('Group name updated');
+                  setEditRoom(null);
+                  setEditTitle('');
+                  reload();
+                } catch (err: any) {
+                  setSnackbar(err?.message || 'Unable to update the group name.');
+                } finally {
+                  setSavingTitle(false);
+                }
+              }}
+            >
+              Save
+            </Button>
+          </View>
+        </Modal>
+      </Portal>
+
       <Snackbar visible={!!(error || snackbar)} onDismiss={() => { setSnackbar(null); }} duration={3000}>
         {error || snackbar || ''}
       </Snackbar>
@@ -265,7 +315,7 @@ export default function ChatPage() {
             anchor={
               <FAB
                 icon="plus"
-                style={styles.fab}
+                style={[styles.fab, { backgroundColor: theme.colors.primary }]}
                 onPress={() => setFabMenuVisible(true)}
                 color="#fff"
               />
@@ -283,7 +333,6 @@ export default function ChatPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   center: {
     flex: 1,
@@ -292,12 +341,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   muted: {
-    color: '#6B7280',
+    opacity: 0.72,
   },
   fab: {
     position: 'absolute',
     bottom: 24,
     alignSelf: 'center',
-    backgroundColor: '#6366F1',
+  },
+  editModal: {
+    marginHorizontal: 20,
+    padding: 20,
+    borderRadius: 16,
+    gap: 12,
+  },
+  editTitle: {
+    fontWeight: '800',
+  },
+  editHint: {
+    lineHeight: 18,
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 4,
   },
 });
