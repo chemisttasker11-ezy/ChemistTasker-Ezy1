@@ -322,7 +322,10 @@ jobs:
     steps:
       - name: Install macOS PDF runtime dependencies
         shell: bash
-        run: brew install pango
+        run: |
+          set -euo pipefail
+          brew install pango
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib:$(brew --prefix glib)/lib:$(brew --prefix pango)/lib" >> "$GITHUB_ENV"
 
       - name: Checkout exact approved source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
