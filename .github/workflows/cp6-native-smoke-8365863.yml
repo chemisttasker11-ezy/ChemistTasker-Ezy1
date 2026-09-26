@@ -485,7 +485,8 @@ jobs:
           fi
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data["workspace"]["schemes"][0])')
+          SCHEME="ChemistTasker"
+          xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; data=json.load(sys.stdin); assert "ChemistTasker" in data["workspace"]["schemes"], data["workspace"]["schemes"]'
           SIM_UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for runtime in d.values() for x in runtime if "iPhone" in x["name"] and x.get("isAvailable", True)))')
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
