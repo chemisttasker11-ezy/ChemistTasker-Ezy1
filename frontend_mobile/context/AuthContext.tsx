@@ -4,6 +4,7 @@ import axios from 'axios';
 import {
   getOnboarding,
   hasAdminCapability,
+  logoutSession as sharedLogoutSession,
   normalizeAdminCapability,
   login as sharedLogin,
   type AuthorityMembership,
@@ -493,14 +494,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const baseURL = resolveApiBaseUrl();
     const session = await readStoredSession();
     try {
-      await axios.post('/users/logout/', isWeb ? {} : { refresh: session?.refresh ?? session?.tokens?.refresh }, {
-        baseURL,
-        withCredentials: isWeb,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Client-Platform': isWeb ? 'web' : 'mobile',
-          ...(isWeb ? { 'X-CSRFToken': await getBrowserCsrfToken(baseURL || '') } : {}),
-        },
+      await sharedLogoutSession({
+        isBrowser: isWeb,
+        refreshToken: session?.refresh ?? session?.tokens?.refresh ?? null,
+        csrfToken: isWeb ? await getBrowserCsrfToken(baseURL || '') : null,
       });
     } catch (error) {
       if (isWeb) {

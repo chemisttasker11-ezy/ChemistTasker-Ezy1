@@ -93,7 +93,7 @@ async function performApiRequest(endpoint, options = {}, policy = {}) {
         onAuthFailure,
         credentials = 'include',
     } = getApiConfig();
-    const { skipAuth = false, ...requestOptions } = options;
+    const { skipAuth = false, credentials: requestCredentials, ...requestOptions } = options;
     const includeAuth = !skipAuth;
     const targetUrl = buildRequestUrl(baseURL, endpoint);
     assertRequestPolicy(baseURL, targetUrl, policy);
@@ -114,7 +114,7 @@ async function performApiRequest(endpoint, options = {}, policy = {}) {
             ...requestOptions,
             body,
             headers,
-            credentials,
+            credentials: requestCredentials ?? credentials,
         });
     };
 
@@ -541,6 +541,25 @@ export const financeApi = {
 // ============ AUTH ============
 export function login(credentials) {
     return fetchApi('/users/login/', { method: 'POST', body: JSON.stringify(credentials) });
+}
+export type LogoutSessionOptions = {
+    refreshToken?: string | null;
+    isBrowser?: boolean;
+    csrfToken?: string | null;
+};
+export function logoutSession({ refreshToken = null, isBrowser = false, csrfToken = null }: LogoutSessionOptions = {}) {
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-Client-Platform': isBrowser ? 'web' : 'mobile',
+        ...(isBrowser && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+    };
+    return fetchApi('/users/logout/', {
+        method: 'POST',
+        body: JSON.stringify(isBrowser ? {} : { refresh: refreshToken }),
+        headers,
+        credentials: isBrowser ? 'include' : 'omit',
+        skipAuth: true,
+    });
 }
 export function register(data) {
     return fetchApi('/users/register/', { method: 'POST', body: JSON.stringify(data) });

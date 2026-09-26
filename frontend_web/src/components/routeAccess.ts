@@ -21,7 +21,9 @@ export function canAccessRoute({
   if (requireAdmin) return isAdminUser;
   if (!requiredRole) return true;
   if (userRole === requiredRole) return true;
-  if (requiredRole === "ORGANIZATION") return hasOrgRole;
+  // Both values have historically represented the organization portal shell.
+  // Capabilities and backend authorization still protect privileged actions.
+  if (requiredRole === "ORGANIZATION" || requiredRole === "ORG_ADMIN") return hasOrgRole;
 
   // ChemistTasker pharmacy admins intentionally inherit the owner-side
   // workspace/persona. Their individual capabilities still determine which
