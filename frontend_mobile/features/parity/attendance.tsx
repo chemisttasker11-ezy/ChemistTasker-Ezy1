@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
-import { Button, Chip } from 'react-native-paper';
+import { Linking, StyleSheet, View } from 'react-native';
+import { Button, Chip, Icon, Text } from 'react-native-paper';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -136,29 +137,120 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   const [qrToken,setQrToken]=useState('');
   const [busy,setBusy]=useState(false);
   const [localError,setLocalError]=useState('');
+  const [scannerOpen,setScannerOpen]=useState(false);
+  const [scanLocked,setScanLocked]=useState(false);
+  const [permission,requestPermission]=useCameraPermissions();
   const active=Boolean(status?.has_active_session);
-  const run=async(kind:'in'|'out'|'break-start'|'break-end')=>{
+  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string)=>{
+    const token=(scannedToken??qrToken).trim();
     setBusy(true);setLocalError('');
     try{
-      if(kind==='in') await attendance.clockIn(qrToken.trim());
-      if(kind==='out') await attendance.clockOut(qrToken.trim());
+      if(kind==='in') await attendance.clockIn(token);
+      if(kind==='out') await attendance.clockOut(token);
       if(kind==='break-start') await attendance.breakStart();
       if(kind==='break-end') await attendance.breakEnd();
+      setQrToken('');
+      setScannerOpen(false);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Attendance action failed.'));}finally{setBusy(false);}
+    }catch(e){setLocalError(errorMessage(e,'Attendance action failed.'));}
+    finally{setBusy(false);setScanLocked(false);}
   };
-  return <ParityPage title="Clock & breaks" subtitle="Use the pharmacy kiosk QR token for clock in/out. Break actions use the active session." loading={loading} error={error||localError}>
-    <MetricGrid items={[{label:'Status',value:active?'Clocked in':'Not clocked in',tone:active?'success':'primary'},{label:'Pharmacy',value:status?.pharmacy_name||'—'},{label:'Started',value:status?.started_at?dateLabel(status.started_at):'—'}]}/>
-    {!active||!status?.is_on_break?<Field label="Kiosk QR token" value={qrToken} onChangeText={setQrToken} placeholder="Paste or enter token from the pharmacy kiosk"/>:null}
-    <ActionButtons>
-      {!active?<Button mode="contained" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('in')}>Clock in</Button>:null}
-      {active&&!status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-start')}>Start break</Button>:null}
-      {active&&status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-end')}>End break</Button>:null}
-      {active?<Button mode="outlined" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('out')}>Clock out</Button>:null}
-    </ActionButtons>
-    <InfoNote title="Audit trail">Clock, break and correction events are retained as attendance history. Manager corrections append audit records rather than rewriting raw scan events.</InfoNote>
+
+  const openScanner=async()=>{
+    setLocalError('');
+    if(!permission?.granted){
+      if(permission&&!permission.canAskAgain){
+        setLocalError('Camera access is blocked. Open device settings and allow camera access for ChemistTasker.');
+        return;
+      }
+      const next=await requestPermission();
+      if(!next.granted){
+        setLocalError(next.canAskAgain
+          ? 'Camera permission is required to scan the pharmacy attendance QR code.'
+          : 'Camera access is blocked. Open device settings and allow camera access for ChemistTasker.');
+        return;
+      }
+    }
+    setScanLocked(false);
+    setScannerOpen(true);
+  };
+
+  const handleBarcodeScanned=({data}:BarcodeScanningResult)=>{
+    if(scanLocked||busy||!data?.trim()) return;
+    const token=data.trim();
+    setScanLocked(true);
+    setQrToken(token);
+    void run(active?'out':'in',token);
+  };
+
+  const cameraBlocked=permission?.status==='denied'&&!permission.canAskAgain;
+
+  return <ParityPage title="Clock & breaks" subtitle="Scan the rotating pharmacy kiosk QR to clock in or out. Break actions use your active session." loading={loading} error={error||localError}>
+    <MetricGrid minItemWidth={140} items={[{label:'Status',value:active?'Clocked in':'Not clocked in',tone:active?'success':'primary'},{label:'Pharmacy',value:status?.pharmacy_name||'—'},{label:'Started',value:status?.started_at?dateLabel(status.started_at):'—'}]}/>
+
+    <Section title={active?'Scan to clock out':'Scan to clock in'} description="The kiosk QR changes regularly and is valid only for its pharmacy.">
+      {scannerOpen ? <View style={scannerStyles.scannerShell}>
+        <View style={scannerStyles.cameraFrame}>
+          <CameraView
+            accessibilityLabel="Attendance QR camera"
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{barcodeTypes:['qr']}}
+            onBarcodeScanned={scanLocked||busy?undefined:handleBarcodeScanned}
+          />
+          <View pointerEvents="none" style={scannerStyles.scanOverlay}>
+            <View style={scannerStyles.guideFrame} />
+          </View>
+          <View style={scannerStyles.cameraStatus}>
+            <Icon source={busy?'progress-clock':'qrcode-scan'} size={20} color="#FFFFFF" />
+            <Text style={scannerStyles.cameraStatusText}>{busy?'Verifying attendance…':'Centre the kiosk QR inside the frame'}</Text>
+          </View>
+        </View>
+        <Button mode="outlined" disabled={busy} icon="close" onPress={()=>setScannerOpen(false)}>Cancel scanner</Button>
+      </View> : <View style={scannerStyles.scanStart}>
+        <View style={scannerStyles.scanIcon} accessibilityElementsHidden>
+          <Icon source="qrcode-scan" size={30} color={palette.primary} />
+        </View>
+        <View style={scannerStyles.scanCopy}>
+          <Text variant="titleSmall" style={scannerStyles.scanTitle}>Ready to scan</Text>
+          <Text variant="bodySmall" style={scannerStyles.scanBody}>Hold your phone steady in front of the QR displayed on the kiosk.</Text>
+        </View>
+        <Button mode="contained" loading={busy} disabled={busy} icon="camera-outline" onPress={()=>void openScanner()}>
+          Open camera
+        </Button>
+        {cameraBlocked?<Button mode="text" icon="cog-outline" onPress={()=>void Linking.openSettings()}>Open device settings</Button>:null}
+      </View>}
+    </Section>
+
+    <Section title="Manual fallback" description="Use the token only when the camera cannot scan the displayed code.">
+      <Field label="Kiosk QR token" value={qrToken} onChangeText={setQrToken} placeholder="Paste or enter the QR token"/>
+      {!active?<Button mode="outlined" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('in')}>Clock in with token</Button>:null}
+      {active?<Button mode="outlined" loading={busy} disabled={!qrToken.trim()||busy} onPress={()=>void run('out')}>Clock out with token</Button>:null}
+    </Section>
+
+    {active?<Section title="Breaks" description="Break actions use your current attendance session and do not need another scan.">
+      <ActionButtons>
+        {!status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-start')}>Start break</Button>:null}
+        {status?.is_on_break?<Button mode="contained-tonal" disabled={busy} onPress={()=>void run('break-end')}>End break</Button>:null}
+      </ActionButtons>
+    </Section>:null}
+    <InfoNote title="Audit trail">QR clocking, kiosk PIN clocking, breaks and corrections feed the same attendance history and timesheet workflow.</InfoNote>
   </ParityPage>;
 }
+
+const scannerStyles=StyleSheet.create({
+  scannerShell:{gap:12},
+  cameraFrame:{height:360,borderRadius:16,overflow:'hidden',backgroundColor:'#07111F',position:'relative'},
+  scanOverlay:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(7,17,31,0.24)'},
+  guideFrame:{width:'68%',aspectRatio:1,borderWidth:3,borderRadius:16,borderColor:'#FFFFFF',backgroundColor:'transparent'},
+  cameraStatus:{position:'absolute',left:16,right:16,bottom:16,minHeight:48,borderRadius:12,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,backgroundColor:'rgba(7,17,31,0.82)'},
+  cameraStatusText:{color:'#FFFFFF',fontWeight:'700',textAlign:'center',flexShrink:1},
+  scanStart:{gap:12,alignItems:'stretch'},
+  scanIcon:{width:56,height:56,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:palette.primarySoft},
+  scanCopy:{gap:4},
+  scanTitle:{color:palette.text,fontWeight:'700'},
+  scanBody:{color:palette.muted,lineHeight:20},
+});
 
 function ReviewDetail({screen,row,timeline,loading,error,onReload}:{screen:AttendanceScreen;row:any;timeline:any;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const router=useRouter();

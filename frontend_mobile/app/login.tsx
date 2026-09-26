@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, View } from 'react-native';
 import { Button, Surface, Text, TextInput } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
+import { hasOrganizationAccess, resolveInitialWorkspace, selectRolePersona } from '../utils/mobilePersona';
 import {
   authenticateWithBiometrics,
   disableBiometricLogin,
@@ -52,19 +52,17 @@ export default function LoginScreen() {
       return;
     }
 
+    // A fresh sign-in always starts in the account's original persona.
+    await selectRolePersona(userData);
+
     if (hasOrganizationAccess(userData) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(userData.role)) {
       router.replace('/organization/dashboard' as never);
     } else if (userData.role === 'OWNER') {
       const setupStatus = await getOwnerSetupStatus(userData);
       router.replace((setupStatus.nextPath || '/owner/dashboard') as never);
-    } else if (userData.role === 'PHARMACIST') {
-      router.replace('/pharmacist/dashboard' as never);
-    } else if (userData.role === 'OTHER_STAFF') {
-      router.replace('/otherstaff/dashboard' as never);
-    } else if (userData.role === 'EXPLORER') {
-      router.replace('/explorer' as never);
     } else {
-      router.replace('/login' as never);
+      const workspaceRoute = await resolveInitialWorkspace(userData);
+      router.replace(workspaceRoute as never);
     }
   };
 

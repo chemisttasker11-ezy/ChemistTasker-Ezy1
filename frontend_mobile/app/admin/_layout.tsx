@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { ActivityIndicator, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { assignmentPharmacyId, selectAdminAssignment } from '@/utils/adminAssignments';
+import { AdminWorkspaceProvider, useAdminWorkspace } from '@/context/AdminWorkspaceContext';
+import { selectRolePersona } from '@/utils/mobilePersona';
 
 function profileRouteForRole(role?: string | null) {
   const normalized = String(role || '').toUpperCase();
@@ -20,11 +21,15 @@ function AdminSidebar({
   onDismiss,
   onNavigate,
   pharmacyName,
+  onReturnToRole,
+  roleLabel,
 }: {
   visible: boolean;
   onDismiss: () => void;
   onNavigate: (route: string) => void;
   pharmacyName: string;
+  onReturnToRole: () => void;
+  roleLabel: string;
 }) {
   const { logout } = useAuth();
   const router = useRouter();
@@ -67,6 +72,12 @@ function AdminSidebar({
           />
         ))}
         <Divider style={styles.sidebarDivider} />
+        <List.Item
+          title={`Return to ${roleLabel} workspace`}
+          description="Switch back to your original persona"
+          left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
+          onPress={onReturnToRole}
+        />
         <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
           Logout
         </Button>
@@ -75,10 +86,11 @@ function AdminSidebar({
   );
 }
 
-export default function AdminLayout() {
+function AdminLayoutInner() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { selectedPharmacyId } = useWorkspace();
+  const { reloadWorkspace } = useWorkspace();
+  const { activePharmacyId: pharmacyId, activePharmacyName: pharmacyName, isLoading: adminWorkspaceLoading } = useAdminWorkspace();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
@@ -100,12 +112,12 @@ export default function AdminLayout() {
     setPhotoUrl(newPhoto);
   }, [user, isLoading]);
 
-  const assignment = useMemo(() => {
-    return selectAdminAssignment(user, selectedPharmacyId);
-  }, [user, selectedPharmacyId]);
-  const pharmacyId = assignment ? assignmentPharmacyId(assignment) : null;
-  const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
+  if (isLoading || adminWorkspaceLoading) {
+    return <View style={styles.loading}><ActivityIndicator size="large" /><Text>Restoring admin workspace…</Text></View>;
+  }
+
   const profileRoute = profileRouteForRole(user?.role);
+  const roleLabel = String(user?.role || 'staff').toLowerCase().replace('_', ' ');
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
     if (route === '/admin/pills' && pharmacyId) return `/admin/${pharmacyId}/pills`;
@@ -116,6 +128,13 @@ export default function AdminLayout() {
     router.push(adminPath(route) as any);
   };
 
+  const returnToRole = async () => {
+    setSidebarVisible(false);
+    const route = await selectRolePersona(user);
+    await reloadWorkspace();
+    router.replace(route as any);
+  };
+
   return (
     <>
       <AdminSidebar
@@ -123,6 +142,8 @@ export default function AdminLayout() {
         onDismiss={() => setSidebarVisible(false)}
         onNavigate={navigateAdmin}
         pharmacyName={pharmacyName}
+        onReturnToRole={() => void returnToRole()}
+        roleLabel={roleLabel}
       />
       <Stack
         screenOptions={{
@@ -131,7 +152,7 @@ export default function AdminLayout() {
           headerStyle: { backgroundColor: '#FFFFFF' },
           headerShadowVisible: true,
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+            <IconButton icon="menu" accessibilityLabel="Open admin menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => (
             <View style={styles.headerRight}>
@@ -178,7 +199,12 @@ export default function AdminLayout() {
   );
 }
 
+export default function AdminLayout() {
+  return <AdminWorkspaceProvider><AdminLayoutInner /></AdminWorkspaceProvider>;
+}
+
 const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#FFFFFF' },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',

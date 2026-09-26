@@ -31,6 +31,7 @@
     "expo": "~54.0.36",
     "expo-blur": "~15.0.8",
     "expo-build-properties": "~1.0.10",
+    "expo-camera": "~17.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
@@ -84,9 +85,7 @@
   },
   "overrides": {
     "decode-uri-component": "0.5.0",
-    "image-size": "2.0.4",
     "postcss": "8.5.28",
-    "query-string": "9.5.1",
     "uuid": "11.1.1"
   },
   "private": true

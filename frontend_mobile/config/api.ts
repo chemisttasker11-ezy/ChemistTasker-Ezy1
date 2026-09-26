@@ -2,12 +2,7 @@ import { configureApi, configureStorage, createChemistTaskerApi } from '@chemist
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSecureKey, secureGet, secureRemove, secureRemoveMany, secureSet } from '../utils/secureStorage';
 import { getValidAccessToken, refreshAccessToken } from '../utils/authSession';
-
-const normalizeApiBaseUrl = (value?: string) => {
-  const trimmed = (value || '').trim().replace(/\/+$/, '');
-  if (!trimmed) return '';
-  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
-};
+import { resolveApiBaseUrl } from '../utils/apiUrl';
 
 // Configure shared-core to use mobile storage and API endpoint
 configureStorage({
@@ -15,7 +10,7 @@ configureStorage({
   setItem: (key: string, value: string) => (isSecureKey(key) ? secureSet(key, value) : AsyncStorage.setItem(key, value)),
   removeItem: (key: string) => (isSecureKey(key) ? secureRemove(key) : AsyncStorage.removeItem(key)),
 });
-const baseURL = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_URL);
+const baseURL = resolveApiBaseUrl();
 if (!baseURL) {
   throw new Error(
     'EXPO_PUBLIC_API_URL is not set. Please set it to your backend base URL (e.g., https://yourdomain.com/api).'
@@ -23,7 +18,8 @@ if (!baseURL) {
 }
 configureApi({
   baseURL,
-  credentials: 'same-origin',
+  // Shared requests carry a bearer token; only authSession uses browser cookies.
+  credentials: 'omit',
   getToken: async () => {
     return await getValidAccessToken(baseURL);
   },
@@ -33,6 +29,7 @@ configureApi({
 /** Shared request/contract facade; device storage and lifecycle remain mobile-owned. */
 export const chemistTaskerApi = createChemistTaskerApi({
   baseUrl: baseURL,
+  fetchImpl: (input, init) => fetch(input, { ...init, credentials: 'omit' }),
   getAuthToken: () => getValidAccessToken(baseURL),
   refreshAuthToken: () => refreshAccessToken(baseURL),
 });

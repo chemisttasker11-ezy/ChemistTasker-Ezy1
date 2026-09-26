@@ -3,10 +3,9 @@ import { AppState, Linking, Platform, StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
-import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
-import { AuthProvider, useAuth, type User } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
@@ -16,6 +15,14 @@ import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
+import {
+  getAssignmentPharmacyId,
+  getRoleHome,
+  getSelectedAdminAssignment,
+  hasOrganizationAccess,
+  readPersonaSelection,
+  resolveInitialWorkspace,
+} from '../utils/mobilePersona';
 
 function getCrashlytics() {
   try {
@@ -220,30 +227,12 @@ function AuthGate() {
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
 
-  const getRoleHome = (currentUser?: User | null) => {
-    const normalized = String(currentUser?.role || '').toUpperCase();
-    if (hasOrganizationAccess(currentUser) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(normalized)) {
-      return '/organization/dashboard';
-    }
-    switch (normalized) {
-      case 'OWNER':
-        return '/owner/dashboard';
-      case 'PHARMACIST':
-        return '/pharmacist/dashboard';
-      case 'OTHER_STAFF':
-        return '/otherstaff/dashboard';
-      case 'EXPLORER':
-        return '/explorer/dashboard';
-      default:
-        return '/login';
-    }
-  };
-
   useEffect(() => {
     if (isLoading) return;
     const top = segments[0];
     const segmentList = segments as readonly string[];
     const second = segmentList[1];
+    const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
@@ -287,27 +276,37 @@ function AuthGate() {
           return;
         }
 
-        router.replace(getRoleHome(user) as any);
+        const workspaceRoute = await resolveInitialWorkspace(user);
+        if (active) router.replace(workspaceRoute as any);
         return;
       }
 
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
-          const rosterCapability = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
-          const workforceCapability = rosterCapability || hasCapability('MANAGE_STAFF', selectedPharmacyId);
+          const normalizedSharedRole = String(user.role || '').toUpperCase();
+          const ownerAccess = normalizedSharedRole === 'OWNER';
+          const storedPersona = await readPersonaSelection(user);
+          const activeAdminAssignment = storedPersona?.startsWith('ADMIN:')
+            ? await getSelectedAdminAssignment(user)
+            : null;
+          if (!active) return;
+          const capabilityPharmacyId = getAssignmentPharmacyId(activeAdminAssignment) ?? selectedPharmacyId;
+          const rosterCapability = ownerAccess || hasCapability('MANAGE_ROSTER', capabilityPharmacyId);
+          const workforceCapability = ownerAccess || rosterCapability || hasCapability('MANAGE_STAFF', capabilityPharmacyId);
 
           const isManagerRoute = top === 'manager';
+          const isManagerLeaveRoute = top === 'workforce' && second === 'leave-requests';
           const isRosterWorkforceRoute = top === 'workforce-timesheets' || (top === 'workforce' && second === 'payroll-export');
-          const isStaffWorkforceRoute = top === 'workforce-settings' || (top === 'workforce' && second !== 'payroll-export');
+          const isStaffWorkforceRoute = top === 'workforce-settings' || (top === 'workforce' && second !== 'payroll-export' && second !== 'leave-requests');
           const isAttendanceReviewRoute = top === 'attendance' && second === 'reviews';
 
-          if ((isManagerRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
-            router.replace(getRoleHome(user) as any);
+          if ((isManagerRoute || isManagerLeaveRoute || isAttendanceReviewRoute || isRosterWorkforceRoute) && !rosterCapability) {
+            router.replace(getRoleHome(user.role) as any);
             return;
           }
 
           if (isStaffWorkforceRoute && !workforceCapability) {
-            router.replace(getRoleHome(user) as any);
+            router.replace(getRoleHome(user.role) as any);
             return;
           }
 
@@ -317,6 +316,28 @@ function AuthGate() {
         const normalizedRole = String(user.role || '').toUpperCase();
 
         if (top === 'admin' && hasAdminAccess(user)) {
+          const activeAssignment = await getSelectedAdminAssignment(user);
+          if (!active) return;
+          const adminPharmacyId = getAssignmentPharmacyId(activeAssignment);
+          const canManageStaff = hasCapability('MANAGE_STAFF', adminPharmacyId);
+          const canManageRoster = hasCapability('MANAGE_ROSTER', adminPharmacyId);
+          const canManageCommunications = hasCapability('MANAGE_COMMUNICATIONS', adminPharmacyId) || canManageStaff || canManageRoster;
+          const isAdminPharmacyManagement = second === 'pharmacies';
+          const isAdminCommunications = second === 'hub' || second === 'calendar';
+          const isAdminRosterManagement = second === 'shifts' || second === 'post-shift' || (second != null && /^\d+$/.test(second) && third === 'post-shift');
+
+          if (isAdminPharmacyManagement && !canManageStaff) {
+            router.replace('/admin' as any);
+            return;
+          }
+          if (isAdminRosterManagement && !canManageRoster) {
+            router.replace('/admin' as any);
+            return;
+          }
+          if (isAdminCommunications && !canManageCommunications) {
+            router.replace('/admin' as any);
+            return;
+          }
           return;
         }
 
@@ -357,13 +378,13 @@ function AuthGate() {
         }
 
         if (top === 'setup') {
-          router.replace(getRoleHome(user) as any);
+          router.replace(getRoleHome(user.role) as any);
           return;
         }
 
         const expectedTop = expectedTopByRole[normalizedRole];
         if (expectedTop && top !== expectedTop) {
-          router.replace(getRoleHome(user) as any);
+          router.replace(getRoleHome(user.role) as any);
           return;
         }
       }

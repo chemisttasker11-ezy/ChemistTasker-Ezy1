@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Chip, Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
-import { useWorkspace } from '@/context/WorkspaceContext';
-import { assignmentPharmacyId, getAdminAssignments, selectAdminAssignment } from '@/utils/adminAssignments';
+import { useAdminWorkspace } from '@/context/AdminWorkspaceContext';
 import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
@@ -14,13 +13,9 @@ import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } fr
 export default function AdminHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { selectedPharmacyId, setSelectedPharmacyId } = useWorkspace();
+  const { assignments, activeAssignment, activePharmacyId: pharmacyId, activePharmacyName: pharmacyName, selectAssignment } = useAdminWorkspace();
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
   const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
-  const assignments = useMemo(() => getAdminAssignments(user), [user]);
-  const assignment = useMemo(() => selectAdminAssignment(user, selectedPharmacyId), [user, selectedPharmacyId]);
-  const pharmacyId = assignment ? assignmentPharmacyId(assignment) : null;
-  const pharmacyName = assignment?.pharmacy_name ?? assignment?.pharmacyName ?? (pharmacyId ? `Pharmacy #${pharmacyId}` : 'Admin pharmacy');
 
   useEffect(() => {
     let mounted = true;
@@ -63,16 +58,17 @@ export default function AdminHomeScreen() {
           <Text variant="titleSmall" style={styles.pharmacyPickerTitle}>Administering pharmacy</Text>
           <View style={styles.pharmacyPickerOptions}>
             {assignments.map((item) => {
-              const itemId = assignmentPharmacyId(item);
-              const selected = itemId === Number(pharmacyId);
-              if (itemId == null) return null;
+              const assignmentId = Number(item.id);
+              const itemId = Number(item.pharmacy_id);
+              const selected = assignmentId === Number(activeAssignment?.id);
+              if (!Number.isFinite(assignmentId) || !Number.isFinite(itemId)) return null;
               return <Chip
-                key={String(item.id ?? itemId)}
+                key={String(assignmentId)}
                 selected={selected}
                 mode={selected ? 'flat' : 'outlined'}
-                onPress={() => void setSelectedPharmacyId(itemId)}
+                onPress={() => void selectAssignment(assignmentId)}
                 style={selected ? styles.pharmacyPickerChipSelected : styles.pharmacyPickerChip}
-              >{item?.pharmacy_name ?? item?.pharmacyName ?? `Pharmacy #${itemId}`}</Chip>;
+              >{item?.pharmacy_name ?? `Pharmacy #${itemId}`}</Chip>;
             })}
           </View>
         </Surface> : null}

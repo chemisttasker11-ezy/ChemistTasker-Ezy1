@@ -2,10 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import AuthLayout from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
+import { hasOrganizationAccess, resolveInitialWorkspace } from '../utils/mobilePersona';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -41,12 +41,9 @@ export default function HomeScreen() {
         if (active) {
           router.replace((setupStatus.nextPath || '/owner/dashboard') as any);
         }
-      } else if (role === 'PHARMACIST') {
-        router.replace('/pharmacist/dashboard' as any);
-      } else if (role === 'OTHER_STAFF') {
-        router.replace('/otherstaff/dashboard' as any);
-      } else if (role === 'EXPLORER') {
-        router.replace('/explorer/dashboard' as any);
+      } else {
+        const workspaceRoute = await resolveInitialWorkspace(user);
+        if (active) router.replace(workspaceRoute as any);
       }
     };
     void routeUser();

@@ -6,6 +6,7 @@ import apiClient from '@/utils/apiClient';
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { selectAdminPersona, selectRolePersona } from '@/utils/mobilePersona';
 
 export type PharmacyOption = {
   id: number;
@@ -358,6 +359,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
+  const { reloadWorkspace } = useWorkspace();
   const [pendingAdminCount, setPendingAdminCount] = useState(0);
   useEffect(() => {
     if (!user) return;
@@ -375,16 +377,25 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
 
   if (assignments.length === 0 && !canSwitchToOrg && pendingAdminCount === 0) return null;
 
-  const workerRoute = normalizedRole === 'OTHER_STAFF' ? '/otherstaff/dashboard' :
-    normalizedRole === 'PHARMACIST' ? '/pharmacist/dashboard' :
-    normalizedRole === 'OWNER' ? '/owner/dashboard' :
-    normalizedRole === 'EXPLORER' ? '/explorer/dashboard' : '/organization/dashboard';
   const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Other Staff' :
     normalizedRole === 'PHARMACIST' ? 'Pharmacist' :
     normalizedRole === 'OWNER' ? 'Owner' :
     normalizedRole === 'EXPLORER' ? 'Explorer' : 'Organization';
   const activeAdmin = String(pathname || '').startsWith('/admin');
   const activeOrg = String(pathname || '').startsWith('/organization');
+
+  const openRoleWorkspace = async () => {
+    const route = await selectRolePersona(user);
+    await reloadWorkspace();
+    router.replace(route as any);
+  };
+
+  const openAdminWorkspace = async () => {
+    const selected = await selectAdminPersona(user);
+    if (!selected) return;
+    await reloadWorkspace();
+    router.replace('/admin' as any);
+  };
 
   return (
     <>
@@ -395,7 +406,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
     {(assignments.length > 0 || canSwitchToOrg) ? <View style={styles.personaSwitcher}>
       <TouchableOpacity
         style={[styles.personaButton, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonActive]}
-        onPress={() => router.replace(workerRoute as any)}
+        onPress={() => void openRoleWorkspace()}
         activeOpacity={0.82}
       >
         <IconButton icon="account-outline" size={18} iconColor={!activeAdmin && (!activeOrg || !canSwitchToOrg) ? '#FFFFFF' : '#4F46E5'} />
@@ -403,7 +414,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
       </TouchableOpacity>
       {assignments.length > 0 ? <TouchableOpacity
         style={[styles.personaButton, activeAdmin && styles.personaButtonActive]}
-        onPress={() => router.replace('/admin' as any)}
+        onPress={() => void openAdminWorkspace()}
         activeOpacity={0.82}
       >
         <IconButton icon="shield-account-outline" size={18} iconColor={activeAdmin ? '#FFFFFF' : '#4F46E5'} />

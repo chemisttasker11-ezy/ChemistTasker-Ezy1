@@ -1,16 +1,15 @@
 // utils/apiClient.ts
 import axios from 'axios';
+import { Platform } from 'react-native';
 import { clearStoredSession, getValidAccessToken, refreshAccessToken } from './authSession';
+import { getBrowserCsrfToken } from './browserAuth';
+import { resolveApiBaseUrl } from './apiUrl';
 
 // Prefer an env-driven base URL so the app can talk to the backend from devices/emulators.
 // Set EXPO_PUBLIC_API_URL for Expo (e.g. http://192.168.1.10:8000/api).
-const normalizeApiBaseUrl = (value?: string) => {
-    const trimmed = (value || '').trim().replace(/\/+$/, '');
-    if (!trimmed) return '';
-    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
-};
-
-const API_BASE_URL = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_URL);
+const API_BASE_URL = resolveApiBaseUrl();
+const IS_WEB = Platform.OS === 'web';
+const CLIENT_PLATFORM = IS_WEB ? 'web' : 'mobile';
 
 if (!API_BASE_URL) {
     // Fail fast in development so we don't silently point to localhost on devices.
@@ -24,16 +23,21 @@ if (!API_BASE_URL) {
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
     timeout: 15000,
-    withCredentials: true,
+    withCredentials: IS_WEB,
     headers: {
         'Content-Type': 'application/json',
+        'X-Client-Platform': CLIENT_PLATFORM,
     },
 });
 
 // Cookie-based auth fallback AND Bearer token injection
 apiClient.interceptors.request.use(
     async (config) => {
-        config.withCredentials = true;
+        config.withCredentials = IS_WEB;
+        config.headers['X-Client-Platform'] = CLIENT_PLATFORM;
+        if (IS_WEB && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
+            config.headers['X-CSRFToken'] = await getBrowserCsrfToken(API_BASE_URL);
+        }
         try {
             const token = await getValidAccessToken(API_BASE_URL);
             if (token) {

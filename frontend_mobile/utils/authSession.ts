@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { secureGet, secureRemove, secureSet } from './secureStorage';
+import { getBrowserCsrfToken } from './browserAuth';
 
 type StoredUserSession = {
   access?: string | null;
@@ -23,6 +25,10 @@ let legacyMigrationPromise: Promise<StoredUserSession | null> | null = null;
 
 function normalizeToken(value: unknown): string | null {
   return typeof value === 'string' && value && value !== 'cookie-session' ? value : null;
+}
+
+function normalizeRefreshToken(value: unknown): string | null {
+  return Platform.OS === 'web' ? null : normalizeToken(value);
 }
 
 function decodeBase64Url(value: string): string {
@@ -113,9 +119,15 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
       secureGet(REFRESH_STORAGE_KEY),
     ]);
     const existingAccess = normalizeToken(storedAccess);
-    const existingRefresh = normalizeToken(storedRefresh);
+    const existingRefresh = normalizeRefreshToken(storedRefresh);
+    if (Platform.OS === 'web' && storedRefresh) {
+      await secureRemove(REFRESH_STORAGE_KEY).catch(() => null);
+    }
 
     if (existingAccess || existingRefresh) {
+      if (Platform.OS === 'web') {
+        await removeLegacyAsyncSession();
+      }
       const storedUser = await readStoredUser();
       return {
         access: existingAccess,
@@ -127,7 +139,7 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
 
     const legacySession = await readLegacyAsyncSession();
     const legacyAccess = normalizeToken(legacySession?.access ?? legacySession?.tokens?.access);
-    const legacyRefresh = normalizeToken(legacySession?.refresh ?? legacySession?.tokens?.refresh);
+    const legacyRefresh = normalizeRefreshToken(legacySession?.refresh ?? legacySession?.tokens?.refresh);
 
     if (!legacyAccess && !legacyRefresh) {
       await removeLegacyAsyncSession();
@@ -168,7 +180,7 @@ export async function readStoredSession(): Promise<StoredUserSession | null> {
     readStoredUser(),
   ]);
   const access = normalizeToken(storedAccess);
-  const refresh = normalizeToken(storedRefresh);
+  const refresh = normalizeRefreshToken(storedRefresh);
 
   if (!access && !refresh) {
     return null;
@@ -186,7 +198,7 @@ export async function readStoredSession(): Promise<StoredUserSession | null> {
 export async function writeStoredSession(next: StoredUserSession): Promise<void> {
   const current = (await readStoredSession()) || {};
   const access = normalizeToken(next.access ?? next.tokens?.access ?? current.access ?? current.tokens?.access);
-  const refresh = normalizeToken(next.refresh ?? next.tokens?.refresh ?? current.refresh ?? current.tokens?.refresh);
+  const refresh = normalizeRefreshToken(next.refresh ?? next.tokens?.refresh ?? current.refresh ?? current.tokens?.refresh);
   const merged: StoredUserSession = {
     ...current,
     ...next,
@@ -219,16 +231,22 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
 
   refreshPromise = (async () => {
     const session = await readStoredSession();
-    const refresh = normalizeToken(session?.refresh ?? session?.tokens?.refresh);
-    if (!refresh) {
+    const refresh = normalizeRefreshToken(session?.refresh ?? session?.tokens?.refresh);
+    if (Platform.OS !== 'web' && !refresh) {
       return null;
     }
 
     try {
+      const isWeb = Platform.OS === 'web';
       const response = await fetch(`${baseURL}${TOKEN_REFRESH_PATH}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh }),
+        credentials: isWeb ? 'include' : 'omit',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Platform': isWeb ? 'web' : 'mobile',
+          ...(isWeb ? { 'X-CSRFToken': await getBrowserCsrfToken(baseURL) } : {}),
+        },
+        body: JSON.stringify(isWeb ? {} : { refresh }),
       });
 
       if (response.status === 400 || response.status === 401) {
@@ -242,7 +260,7 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
 
       const data = await response.json().catch(() => ({}));
       const nextAccess = normalizeToken(data.access);
-      const nextRefresh = normalizeToken(data.refresh) ?? refresh;
+      const nextRefresh = normalizeRefreshToken(data.refresh) ?? refresh;
       if (!nextAccess) {
         throw new Error('Refresh response missing access token');
       }

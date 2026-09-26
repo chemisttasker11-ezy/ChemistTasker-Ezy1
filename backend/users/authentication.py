@@ -8,17 +8,8 @@ from rest_framework.authentication import SessionAuthentication
 
 
 def enforce_browser_csrf(request):
-    """Bearer clients retain their contract; browser cookie operations require CSRF."""
-    client_platform = (request.headers.get('X-Client-Platform') or request.headers.get('x-client-platform') or '').lower()
-    if client_platform in ('mobile', 'app', 'expo'):
-        return
-
-    origin = request.headers.get('Origin') or ''
-    # Expo web development server runs on port 8081 or 19006, or uses exp://
-    if ':8081' in origin or ':19006' in origin or origin.startswith('exp://'):
-        return
-
-    if not request.headers.get('Authorization') and (request.headers.get('Origin') or request.COOKIES):
+    """Browser auth writes require CSRF even if a caller adds an Authorization header."""
+    if request.headers.get('Origin') or request.headers.get('Referer') or request.COOKIES:
         SessionAuthentication().enforce_csrf(request)
 
 

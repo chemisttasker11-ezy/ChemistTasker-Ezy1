@@ -1,7 +1,17 @@
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { Alert, Platform } from 'react-native';
 import axios from 'axios';
-import { login as sharedLogin, getOnboarding } from '@chemisttasker/shared-core';
+import {
+  getOnboarding,
+  hasAdminCapability,
+  normalizeAdminCapability,
+  login as sharedLogin,
+  type AuthorityMembership,
+  type AuthorityAdminAssignment,
+} from '@chemisttasker/shared-core';
 import apiClient from '../utils/apiClient';
+import { getBrowserCsrfToken } from '../utils/browserAuth';
+import { resolveApiBaseUrl } from '../utils/apiUrl';
 import { registerForPushNotificationsAsync, registerDeviceTokenWithBackend } from '../utils/pushNotifications';
 import * as Device from 'expo-device';
 import { clearStoredSession, getValidAccessToken, primeInMemorySession, readStoredSession, writeStoredSession } from '../utils/authSession';
@@ -14,16 +24,6 @@ import {
 import { authenticateWithBiometrics, disableBiometricLogin, getBiometricAvailability, getSavedBiometricUser } from '../utils/biometricAuth';
 
 // --- Types ---
-export interface OrgMembership {
-  organization_id: number;
-  organization_name: string;
-  role: string;
-  region: string;
-  admin_level?: string;
-  pharmacies?: Array<{ id: number; name?: string }>;
-  capabilities?: string[];
-}
-
 export type User = {
   id?: number;
   username: string;
@@ -35,7 +35,8 @@ export type User = {
   last_name?: string;
   profile_photo?: string;
   profile_photo_url?: string;
-  memberships?: OrgMembership[];
+  memberships?: AuthorityMembership[];
+  admin_assignments?: AuthorityAdminAssignment[];
   billing_active?: boolean;
   in_free_trial?: boolean;
 };
@@ -61,7 +62,7 @@ type AuthContextType = {
   refresh: string | null;
   user: User | null;
   hasCapability: (capability: string, pharmacyId?: number | string | null) => boolean;
-  login: (access: string, refresh: string, user: User) => Promise<void>;
+  login: (access: string, refresh: string | null, user: User) => Promise<void>;
   loginWithCredentials: (email: string, password: string) => Promise<User>;
   loginWithStoredSession: () => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
@@ -112,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const loadStoredAuth = async () => {
       const bootstrapId = authMutationIdRef.current;
       try {
-        const baseURL = process.env.EXPO_PUBLIC_API_URL?.trim();
+        const baseURL = resolveApiBaseUrl();
         const session = await readStoredSession();
         const nextAccess = session?.access || session?.tokens?.access || null;
         const nextRefresh = session?.refresh || session?.tokens?.refresh || null;
@@ -249,7 +250,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return error?.message || 'Login failed';
   };
 
-  const login = async (newAccess: string, newRefresh: string, userInfo: User) => {
+  const login = async (newAccess: string, newRefresh: string | null, userInfo: User) => {
     authMutationIdRef.current += 1;
     const baseUser = normalizeUser(userInfo);
     await writeStoredSession({
@@ -283,11 +284,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const payload = response?.data ?? response;
       const userData = payload.user || payload.userData || payload.profile;
       const newAccess = payload.access;
-      const newRefresh = payload.refresh;
+      const newRefresh = Platform.OS === 'web' ? null : payload.refresh;
       if (!userData) {
         throw new Error('Unexpected login response');
       }
-      if (!newAccess || !newRefresh) {
+      if (!newAccess || (Platform.OS !== 'web' && !newRefresh)) {
         throw new Error('Login did not return API tokens.');
       }
       await login(newAccess, newRefresh, userData);
@@ -296,6 +297,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       addNetworkDiagnostic('login-axios-error', describeRequestError('axios', directError));
       const status = directError?.response?.status;
       if ([400, 401, 403, 429].includes(status)) {
+        throw new Error(getLoginErrorMessage(directError));
+      }
+      if (Platform.OS === 'web') {
+        // Shared-core's native fallback does not carry the browser cookie/CSRF session.
         throw new Error(getLoginErrorMessage(directError));
       }
       try {
@@ -325,7 +330,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const loginWithStoredSession = async () => {
-    const baseURL = process.env.EXPO_PUBLIC_API_URL?.trim();
+    const baseURL = resolveApiBaseUrl();
     if (!baseURL) {
       throw new Error('API URL is not configured.');
     }
@@ -484,12 +489,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [access, user, isRefreshingProfile, triedPhotoRefresh]);
 
   const logout = async () => {
+    const isWeb = Platform.OS === 'web';
+    const baseURL = resolveApiBaseUrl();
+    const session = await readStoredSession();
+    try {
+      await axios.post('/users/logout/', isWeb ? {} : { refresh: session?.refresh ?? session?.tokens?.refresh }, {
+        baseURL,
+        withCredentials: isWeb,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Platform': isWeb ? 'web' : 'mobile',
+          ...(isWeb ? { 'X-CSRFToken': await getBrowserCsrfToken(baseURL || '') } : {}),
+        },
+      });
+    } catch (error) {
+      if (isWeb) {
+        // The HttpOnly cookie cannot be removed by JavaScript. Keep the session
+        // visible until the backend confirms that it revoked the cookie.
+        if (typeof window !== 'undefined') {
+          window.alert('Could not sign out. Please check your connection and try again.');
+        }
+        throw error;
+      }
+      Alert.alert('Sign out', 'Signed out on this device, but the server session could not be revoked.');
+    }
     authMutationIdRef.current += 1;
-    await axios.post('/users/logout/', {}, {
-      baseURL: process.env.EXPO_PUBLIC_API_URL?.trim(),
-      withCredentials: true,
-      headers: { 'Content-Type': 'application/json' },
-    }).catch(() => null);
     setAccess(null);
     setRefresh(null);
     setUser(null);
@@ -497,37 +521,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await clearStoredSession();
   };
 
-  const hasCapability = (capability: string, pharmacyId?: number | string | null) => {
+  const hasCapability = useCallback((capability: string, pharmacyId?: number | string | null) => {
     if (!user) return false;
-    const role = String(user.role || '').toUpperCase();
-    if (role === 'OWNER') return true;
-
-    const requested = String(capability || '').trim().toUpperCase();
-    const assignments: any[] = (user as any).admin_assignments || [];
-    const pharmacyAdminMatch = assignments.some((assignment) => {
-      const caps: string[] = assignment?.capabilities || [];
-      const pid = assignment?.pharmacy_id ?? assignment?.pharmacyId ?? assignment?.pharmacy;
-      const matchesPharmacy = pharmacyId ? String(pid ?? '') === String(pharmacyId) : true;
-      return matchesPharmacy && caps.some((value) => String(value).toUpperCase() === requested);
+    const sharedCapability = normalizeAdminCapability(capability);
+    return sharedCapability != null && hasAdminCapability(user, sharedCapability, {
+      pharmacyId,
     });
-    if (pharmacyAdminMatch) return true;
-
-    const orgMemberships = Array.isArray(user.memberships) ? user.memberships : [];
-    return orgMemberships.some((membership) => {
-      const caps = Array.isArray(membership?.capabilities) ? membership.capabilities : [];
-      const hasRequestedCapability = caps.some(
-        (value) => String(value).replaceAll('-', '_').toUpperCase() === requested,
-      );
-      if (!hasRequestedCapability) return false;
-
-      // Organisation admins have VIEW_ALL_PHARMACIES in the backend role model.
-      if (String(membership?.role || '').toUpperCase() === 'ORG_ADMIN') return true;
-      if (!pharmacyId) return true;
-
-      const scopedPharmacies = Array.isArray(membership?.pharmacies) ? membership.pharmacies : [];
-      return scopedPharmacies.some((pharmacy) => String(pharmacy?.id ?? '') === String(pharmacyId));
-    });
-  };
+  }, [user]);
 
   return (
     <AuthContext.Provider

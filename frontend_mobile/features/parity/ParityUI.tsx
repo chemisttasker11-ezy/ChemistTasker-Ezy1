@@ -102,7 +102,10 @@ export function Section({
   );
 }
 
-export function MetricGrid({ items }: { items: Array<{ label: string; value: string | number; tone?: 'primary' | 'success' | 'warning' | 'danger' }> }) {
+export function MetricGrid({ items, minItemWidth = 100 }: {
+  items: Array<{ label: string; value: string | number; tone?: 'primary' | 'success' | 'warning' | 'danger' }>;
+  minItemWidth?: number;
+}) {
   return (
     <View style={styles.metricGrid}>
       {items.map((item) => {
@@ -110,7 +113,7 @@ export function MetricGrid({ items }: { items: Array<{ label: string; value: str
         const backgroundColor = tone === 'success' ? palette.successSoft : tone === 'warning' ? palette.warningSoft : tone === 'danger' ? palette.dangerSoft : palette.primarySoft;
         const color = tone === 'success' ? '#047857' : tone === 'warning' ? '#B45309' : tone === 'danger' ? '#B91C1C' : palette.primary;
         return (
-          <Card key={item.label} mode="contained" style={[styles.metric, { backgroundColor }]}>
+          <Card key={item.label} mode="contained" style={[styles.metric, { backgroundColor, flexBasis: minItemWidth, minWidth: minItemWidth }]}>
             <Card.Content style={styles.metricContent}>
               <Text variant="labelSmall" style={styles.muted}>{item.label}</Text>
               <Text variant="titleLarge" style={{ color, fontWeight: '800' }}>{item.value}</Text>
