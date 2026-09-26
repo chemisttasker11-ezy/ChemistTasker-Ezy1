@@ -191,7 +191,7 @@ jobs:
           PLIST
           npm ci
 
-      - name: Prebuild and compile Android release
+      - name: Prebuild and compile Android development build
         shell: bash
         run: |
           set -euo pipefail
@@ -206,8 +206,8 @@ jobs:
           path.write_text(text)
           PY
           cd android
-          ./gradlew assembleRelease --no-daemon
-          test -f app/build/outputs/apk/release/app-release.apk
+          ./gradlew assembleDebug --no-daemon --max-workers=2
+          test -f app/build/outputs/apk/debug/app-debug.apk
 
       - name: Boot Android emulator and install app
         shell: bash
@@ -226,7 +226,7 @@ jobs:
             sleep 2
           done
           adb reverse tcp:8000 tcp:8000
-          adb install -r frontend_mobile/android/app/build/outputs/apk/release/app-release.apk
+          adb install -r frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Install Maestro
         shell: bash
@@ -472,7 +472,7 @@ jobs:
           PLIST
           npm ci
 
-      - name: Prebuild and compile iOS simulator release
+      - name: Prebuild and compile iOS simulator development build
         shell: bash
         run: |
           set -euo pipefail
@@ -491,8 +491,8 @@ jobs:
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcodebuild             -workspace "$WORKSPACE"             -scheme "$SCHEME"             -configuration Release             -sdk iphonesimulator             -destination "platform=iOS Simulator,id=$SIM_UDID"             -derivedDataPath /tmp/cp6-ios-derived             CODE_SIGNING_ALLOWED=NO             build
-          APP_PATH=$(find /tmp/cp6-ios-derived/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
+          xcodebuild             -workspace "$WORKSPACE"             -scheme "$SCHEME"             -configuration Debug             -sdk iphonesimulator             -destination "platform=iOS Simulator,id=$SIM_UDID"             -derivedDataPath /tmp/cp6-ios-derived             CODE_SIGNING_ALLOWED=NO             build
+          APP_PATH=$(find /tmp/cp6-ios-derived/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP_PATH"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
