@@ -169,26 +169,6 @@ jobs:
           assert data.get("access") and data.get("refresh"), data.keys()
           PY
 
-      - name: Validate native-smoke authority contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -fsS -H "Content-Type: application/json" \
-            -d '{"email":"native-smoke@example.test","password":"NativeSmoke1234"}' \
-            http://127.0.0.1:8000/api/users/login/ > /tmp/native-login.json
-          python - <<'PY'
-          import json
-          data=json.load(open("/tmp/native-login.json"))
-          user=data["user"]
-          assert user["role"] == "PHARMACIST", user
-          assignments=user.get("admin_assignments") or []
-          assert len(assignments) == 2, assignments
-          assert {a.get("pharmacy_name") for a in assignments} == {"Native Pharmacy A", "Native Pharmacy B"}, assignments
-          assert all(a.get("admin_level") == "MANAGER" for a in assignments), assignments
-          assert all("MANAGE_ROSTER" in (a.get("capabilities") or []) for a in assignments), assignments
-          assert data.get("access") and data.get("refresh"), data.keys()
-          PY
-
       - name: Install mobile dependencies and test-only Firebase descriptors
         shell: bash
         run: |
@@ -537,6 +517,26 @@ jobs:
           done
           cat /tmp/native-backend.log
           exit 1
+
+      - name: Validate native-smoke authority contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -H "Content-Type: application/json" \
+            -d '{"email":"native-smoke@example.test","password":"NativeSmoke1234"}' \
+            http://127.0.0.1:8000/api/users/login/ > /tmp/native-login.json
+          python - <<'PY'
+          import json
+          data=json.load(open("/tmp/native-login.json"))
+          user=data["user"]
+          assert user["role"] == "PHARMACIST", user
+          assignments=user.get("admin_assignments") or []
+          assert len(assignments) == 2, assignments
+          assert {a.get("pharmacy_name") for a in assignments} == {"Native Pharmacy A", "Native Pharmacy B"}, assignments
+          assert all(a.get("admin_level") == "MANAGER" for a in assignments), assignments
+          assert all("MANAGE_ROSTER" in (a.get("capabilities") or []) for a in assignments), assignments
+          assert data.get("access") and data.get("refresh"), data.keys()
+          PY
 
       - name: Install mobile dependencies and test-only Firebase descriptors
         shell: bash
