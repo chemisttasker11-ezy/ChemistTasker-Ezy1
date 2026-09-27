@@ -14,6 +14,13 @@ concurrency:
   group: chemisttasker-staging-preview
   cancel-in-progress: true
 
+env:
+  STAGING_POSTGRES_PASSWORD: ci-staging-postgres
+  STAGING_DJANGO_SECRET_KEY: ci-staging-django-secret-not-production
+  STAGING_WEB_MAPS_API_KEY: ci-staging-placeholder
+  STAGING_RECAPTCHA_SITE_KEY: ci-staging-placeholder
+  STAGING_RECAPTCHA_SECRET_KEY: ci-staging-placeholder
+
 jobs:
   deploy-staging:
     name: GitHub-hosted staging preview
@@ -41,11 +48,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export STAGING_POSTGRES_PASSWORD=compose-validation-only
-          export STAGING_DJANGO_SECRET_KEY=compose-validation-only
-          export STAGING_WEB_MAPS_API_KEY=ci-staging-placeholder
-          export STAGING_RECAPTCHA_SITE_KEY=ci-staging-placeholder
-          export STAGING_RECAPTCHA_SECRET_KEY=ci-staging-placeholder
           docker compose -f docker-compose.staging.yml config --quiet
 
       - name: Deploy isolated staging stack
