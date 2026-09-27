@@ -35,11 +35,16 @@ export const isoDate = (date = new Date()) => {
 // YYYY-MM-DD with Date's string constructor treats it as UTC and can show the
 // previous day in Australian time zones.
 export const dateFromIso = (value?: string | null): Date | undefined => {
-  if (!value) return undefined;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return undefined;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return Number.isNaN(date.getTime()) ? undefined : date;
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) return undefined;
+  return date;
 };
 
 export const startOfWeek = (date = new Date()) => {

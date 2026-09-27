@@ -5,9 +5,9 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 
-type Tool = { title: string; subtitle: string; icon: string; route: string };
+export type PlatformTool = { title: string; subtitle: string; icon: string; route: string };
 
-const managerTools: Tool[] = [
+export const managerTools: PlatformTool[] = [
   { title: 'Workforce', subtitle: 'Employment terms, rates and payroll prep', icon: 'account-hard-hat-outline', route: '/workforce/employment-engagements' },
   { title: 'Roster', subtitle: 'Plan, validate and publish weekly coverage', icon: 'calendar-month-outline', route: '/manager/roster' },
   { title: 'Attendance', subtitle: 'Clocking, exceptions and manager review', icon: 'clock-check-outline', route: '/attendance' },
@@ -17,7 +17,7 @@ const managerTools: Tool[] = [
   { title: 'Pill rewards', subtitle: 'Balance, activity and referrals', icon: 'pill', route: '/rewards/pills' },
 ];
 
-const workerTools: Tool[] = [
+const workerTools: PlatformTool[] = [
   { title: 'Attendance', subtitle: 'Clock, breaks and attendance corrections', icon: 'clock-check-outline', route: '/attendance' },
   { title: 'Finance', subtitle: 'Invoices, expenses and finance records', icon: 'cash-multiple', route: '/finance' },
   { title: 'Marketplace', subtitle: 'Browse and exchange pharmacy goods', icon: 'storefront-outline', route: '/marketplace' },
@@ -26,7 +26,7 @@ const workerTools: Tool[] = [
   { title: 'Pill rewards', subtitle: 'Balance, activity and referrals', icon: 'pill', route: '/rewards/pills' },
 ];
 
-const explorerTools: Tool[] = [
+const explorerTools: PlatformTool[] = [
   { title: 'Marketplace', subtitle: 'Browse ChemistTasker Marketplace', icon: 'storefront-outline', route: '/marketplace' },
   { title: 'My ratings', subtitle: 'Relationship rating summary and history', icon: 'star-outline', route: '/profile/ratings' },
   { title: 'Pill rewards', subtitle: 'Balance, activity and referrals', icon: 'pill', route: '/rewards/pills' },
@@ -46,7 +46,7 @@ export default function ParityToolsCard() {
     const canManageStaff = canManageRoster || hasCapability('MANAGE_STAFF', selectedPharmacyId);
     const isOrganizationRole = managerRoles.has(role);
 
-    const delegated: Tool[] = [];
+    const delegated: PlatformTool[] = [];
     if (canManageStaff) delegated.push(managerTools[0]);
     if (canManageRoster) {
       delegated.push(managerTools[1]);

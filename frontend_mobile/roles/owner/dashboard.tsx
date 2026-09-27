@@ -1,26 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Card, Chip, Divider, IconButton, Surface, Text } from 'react-native-paper';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Icon, Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
 import apiClient from '@/utils/apiClient';
-import HomeNavigationGrid from '@/components/HomeNavigationGrid';
-import ParityToolsCard from '@/components/ParityToolsCard';
+import { managerTools } from '@/components/ParityToolsCard';
+import { brandColors } from '@/constants/theme';
 import {
   DashboardActivity,
   DashboardErrorState,
   DashboardLoadingState,
   DashboardPersonaSwitcher,
   DashboardScopeSwitcher,
-  DashboardStatsOverview,
   type DashboardPayload,
   useScopedDashboard,
 } from '@/roles/shared/dashboard/dashboardScope';
-
-const { width } = Dimensions.get('window');
 
 type ShiftSummary = {
   id: number;
@@ -37,6 +34,9 @@ type PillSummary = {
 
 export default function OwnerDashboard() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 760;
+  const showTwoColumnActions = width >= 460;
   const { access, user, logout, isLoading: authLoading } = useAuth();
   const normalizedRole = String(user?.role || '').toUpperCase();
   const scope = useScopedDashboard('OWNER');
@@ -45,8 +45,8 @@ export default function OwnerDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [slideAnim] = useState(new Animated.Value(30));
+  const [toolsExpanded, setToolsExpanded] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   const formatShiftDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '';
@@ -76,6 +76,7 @@ export default function OwnerDashboard() {
 
       setDashboardData(dashboardPayload);
       setErrorMessage(null);
+      setLastUpdatedAt(new Date());
       if (pillRes?.data) {
         setPillSummary({
           balance: Number(pillRes.data?.balance ?? 0),
@@ -83,10 +84,6 @@ export default function OwnerDashboard() {
         });
       }
 
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }),
-      ]).start();
     } catch (err: any) {
       console.error('Failed to load dashboard', err);
       setDashboardData(null);
@@ -99,7 +96,7 @@ export default function OwnerDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [normalizedRole, access, fadeAnim, slideAnim, scope.fetchDashboard]);
+  }, [normalizedRole, access, scope.fetchDashboard]);
 
   useEffect(() => {
     if (authLoading) {
@@ -134,7 +131,6 @@ export default function OwnerDashboard() {
         { title: 'Talent Board', description: 'Find talent', icon: 'account-search-outline', route: '/owner/talent-board' },
         { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/owner/hub' },
         { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/owner/chat' },
-        { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/owner/shifts' },
         { title: 'Subscription', description: 'Billing seats', icon: 'credit-card-outline', route: '/owner/subscription-seats' },
         { title: 'Profile', description: 'Account details', icon: 'account-circle-outline', route: '/owner/profile' },
       ];
@@ -154,6 +150,47 @@ export default function OwnerDashboard() {
     [dashboardData?.shifts]
   );
 
+  const greetingName =
+    dashboardData?.user?.first_name ||
+    user?.first_name ||
+    user?.username ||
+    'there';
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const metrics = useMemo(
+    () => [
+      {
+        label: 'Open shifts',
+        value: Number(dashboardData?.shift_summary?.open_count ?? 0),
+        icon: 'calendar-alert',
+        tone: brandColors.purple,
+      },
+      {
+        label: 'This week',
+        value: Number(dashboardData?.upcoming_stats?.week ?? 0),
+        icon: 'calendar-week',
+        tone: brandColors.blue,
+      },
+      {
+        label: 'Confirmed',
+        value: Number(dashboardData?.shift_summary?.confirmed_count ?? 0),
+        icon: 'check-decagram-outline',
+        tone: brandColors.success,
+      },
+    ],
+    [dashboardData]
+  );
+
+  const featuredActions = quickActions.slice(0, 2);
+  const workspaceActions = quickActions.slice(2);
+  const supplementalTools = managerTools.filter((tool) => !quickActions.some((action) => action.route === tool.route));
+  const visibleTools = toolsExpanded ? supplementalTools : supplementalTools.slice(0, 4);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
@@ -166,11 +203,67 @@ export default function OwnerDashboard() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor="#6366F1" />}
+        contentContainerStyle={[styles.scrollContent, isWide && styles.scrollContentWide]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={brandColors.purple} />}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.pageHeader}>
+          <View style={styles.pageHeaderCopy}>
+            <Text style={styles.pageTitle}>Owner overview</Text>
+            <Text style={styles.pageSubtitle}>Your pharmacy, shifts and team in one clear view.</Text>
+          </View>
+          {dashboardData && lastUpdatedAt && !errorMessage ? (
+            <View style={styles.livePill} accessibilityLabel={`Dashboard updated at ${lastUpdatedAt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Updated {lastUpdatedAt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</Text>
+            </View>
+          ) : null}
+        </View>
+
         <DashboardPersonaSwitcher role="OWNER" />
+
+        <View style={styles.hero}>
+          <LinearGradient
+            colors={['#081C3E', '#281457', '#5222B8']}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            <View pointerEvents="none" style={styles.heroOrbitLarge} />
+            <View pointerEvents="none" style={styles.heroOrbitSmall} />
+            <Text style={styles.heroGreeting}>{greeting}, {greetingName}</Text>
+            <Text style={styles.heroTitle}>Keep your pharmacy moving.</Text>
+            <Text style={styles.heroBody}>
+              Post coverage, check staffing and move directly into today&apos;s work.
+            </Text>
+            <View style={styles.featuredActions}>
+              {featuredActions.map((action, index) => (
+                <Pressable
+                  key={`${action.route}-${action.title}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${action.title}. ${action.description}`}
+                  onPress={() => router.push(action.route as any)}
+                  style={({ pressed }) => [
+                    styles.featuredAction,
+                    index === 0 ? styles.featuredActionPrimary : styles.featuredActionSecondary,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Icon
+                    source={action.icon}
+                    size={20}
+                    color={index === 0 ? brandColors.navy : brandColors.white}
+                  />
+                  <Text style={index === 0 ? styles.featuredActionPrimaryText : styles.featuredActionSecondaryText}>
+                    {action.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </LinearGradient>
+        </View>
+
         <DashboardScopeSwitcher
           pharmacies={scope.pharmacies}
           scopeLabel={scope.scopeLabel}
@@ -181,380 +274,492 @@ export default function OwnerDashboard() {
           onSelectPharmacy={scope.selectPharmacy}
         />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={fetchData} /> : null}
-        {/* <View style={styles.statsContainer}>
-          <View style={styles.sectionHeader}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Performance Overview
-            </Text>
-          </View>
-          <View style={styles.statsGrid}>
-            {statCards.map((stat) => (
-              <Animated.View key={stat.label} style={{ opacity: fadeAnim, transform: [{ scale: fadeAnim }] }}>
-                <Card style={styles.statCard}>
-                  <Card.Content style={styles.statCardContent}>
-                    <View style={styles.statCardHeader}>
-                      <View style={[styles.statIcon, { backgroundColor: `${stat.color}15` }]}>
-                        <IconButton icon={stat.icon} size={20} iconColor={stat.color} />
+
+        <Surface style={styles.metricRail} elevation={0}>
+          {metrics.map((metric, index) => (
+            <View key={metric.label} style={[styles.metricItem, index > 0 && styles.metricDivider]}>
+              <Icon source={metric.icon} size={20} color={metric.tone} />
+              <Text style={styles.metricValue}>{metric.value}</Text>
+              <Text style={styles.metricLabel}>{metric.label}</Text>
+            </View>
+          ))}
+        </Surface>
+
+        <View style={[styles.dashboardColumns, isWide && styles.dashboardColumnsWide]}>
+          <View style={styles.dashboardColumn}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Run your pharmacy</Text>
+                <Text style={styles.sectionDescription}>Daily operations without the dashboard clutter.</Text>
+              </View>
+            </View>
+            <Surface style={styles.workspacePanel} elevation={0}>
+              <View style={styles.actionMatrix}>
+                {workspaceActions.map((action) => (
+                  <Pressable
+                    key={`${action.route}-${action.title}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.description ? `${action.title}. ${action.description}` : action.title}
+                    onPress={() => router.push(action.route as any)}
+                    style={({ pressed }) => [styles.actionCell, showTwoColumnActions && styles.actionCellTwoColumn, pressed && styles.actionCellPressed]}
+                  >
+                    <View style={styles.actionIcon}>
+                      <Icon source={action.icon} size={22} color={brandColors.purple} />
+                    </View>
+                    <View style={styles.actionCopy}>
+                      <Text style={styles.actionTitle} numberOfLines={1}>{action.title}</Text>
+                      <Text style={styles.actionDescription} numberOfLines={1}>{action.description}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </Surface>
+
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Upcoming shifts</Text>
+                <Text style={styles.sectionDescription}>The next coverage commitments in this workspace.</Text>
+              </View>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/owner/shifts' as any)} hitSlop={8}>
+                <Text style={styles.sectionLink}>View all</Text>
+              </Pressable>
+            </View>
+            <Surface style={styles.listPanel} elevation={0}>
+              {upcomingShifts.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Icon source="calendar-check-outline" size={26} color={brandColors.purple} />
+                  </View>
+                  <Text style={styles.emptyTitle}>No upcoming shifts</Text>
+                  <Text style={styles.emptyText}>Newly confirmed coverage will appear here.</Text>
+                </View>
+              ) : (
+                upcomingShifts.slice(0, 4).map((shift, index) => {
+                  const confirmed = shift.status?.toUpperCase() === 'CONFIRMED';
+                  return (
+                    <View
+                      key={shift.id}
+                      style={[styles.shiftRow, index < Math.min(upcomingShifts.length, 4) - 1 && styles.rowDivider]}
+                    >
+                      <View style={styles.dateTile}>
+                        <Icon source="calendar-clock" size={20} color={brandColors.navy} />
+                      </View>
+                      <View style={styles.shiftCopy}>
+                        <Text style={styles.shiftPharmacy} numberOfLines={1}>{shift.pharmacy_name}</Text>
+                        <Text style={styles.shiftMeta} numberOfLines={1}>
+                          {shift.role || 'Staff'}{formatShiftDate(shift.date) ? ` · ${formatShiftDate(shift.date)}` : ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusPill, confirmed ? styles.statusConfirmed : styles.statusPending]}>
+                        <Text style={[styles.statusText, confirmed ? styles.statusConfirmedText : styles.statusPendingText]}>
+                          {shift.status || 'Pending'}
+                        </Text>
                       </View>
                     </View>
-                    <Text variant="headlineSmall" style={styles.statValue}>
-                      {stat.value}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.statLabel}>
-                      {stat.label}
-                    </Text>
-                  </Card.Content>
-                </Card>
-              </Animated.View>
-            ))}
+                  );
+                })
+              )}
+            </Surface>
           </View>
-        </View> */}
 
-        <TouchableOpacity
-          style={styles.pillHero}
-          onPress={() => router.push('/owner/pills' as any)}
-          activeOpacity={0.82}
-        >
-          <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.pillHeroGradient}>
-            <View pointerEvents="none" style={styles.heroAngleOne} />
-            <View pointerEvents="none" style={styles.heroAngleTwo} />
-            <View style={styles.pillHeroCopy}>
-              <Text variant="labelMedium" style={styles.pillHeroEyebrow}>
-                Owner rewards
-              </Text>
-              <View style={styles.pillBalanceRow}>
-                <Text variant="displaySmall" style={styles.pillBalanceValue}>
-                  {pillSummary.balance}
-                </Text>
-                <Text variant="titleMedium" style={styles.pillBalanceLabel}>
-                  pills
-                </Text>
+          <View style={styles.dashboardColumn}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${pillSummary.balance} pills available. View rewards activity.`}
+              onPress={() => router.push('/owner/pills' as any)}
+              style={({ pressed }) => [styles.rewardBanner, pressed && styles.pressed]}
+            >
+              <View style={styles.rewardIcon}>
+                <Icon source="pill" size={24} color={brandColors.cyan} />
               </View>
-              <Text variant="bodySmall" style={styles.pillHeroText}>
-                Use pills toward owner actions instead of paying every time.
-              </Text>
-              <View style={styles.pillMetaRow}>
-                <Chip compact style={styles.pillMetaChip} textStyle={styles.pillMetaChipText}>
-                  {pillSummary.shift_post_cost} pills per shift post
-                </Chip>
-                <Chip compact style={styles.pillMetaChip} textStyle={styles.pillMetaChipText}>
-                  View activity
-                </Chip>
+              <View style={styles.rewardCopy}>
+                <Text style={styles.rewardValue}>{pillSummary.balance} pills available</Text>
+                <Text style={styles.rewardDescription}>{pillSummary.shift_post_cost} pills per shift post</Text>
               </View>
-            </View>
-            <Image source={require('@/assets/images/drugs.png')} style={styles.pillHeroImage} resizeMode="contain" />
-          </LinearGradient>
-        </TouchableOpacity>
+              <Icon source="arrow-top-right" size={20} color={brandColors.white} />
+            </Pressable>
 
-        <DashboardStatsOverview data={dashboardData} />
-
-        <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
-
-        <ParityToolsCard />
-
-        <DashboardActivity data={dashboardData} />
-
-        {upcomingShifts.length > 0 && (
-          <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Upcoming Shifts
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/owner/shifts' as any)}>
-                <Text style={styles.seeAllText}>View All</Text>
-              </TouchableOpacity>
+              <View>
+                <Text style={styles.sectionTitle}>Work and platform tools</Text>
+                <Text style={styles.sectionDescription}>Specialist workflows when you need them.</Text>
+              </View>
             </View>
-            {upcomingShifts.slice(0, 3).map((shift) => (
-              <Card key={shift.id} style={styles.shiftPreviewCard}>
-                <Card.Content style={styles.shiftPreviewContent}>
-                  <View style={styles.shiftPreviewLeft}>
-                    <View style={styles.shiftIconContainer}>
-                      <IconButton icon="calendar-clock" size={20} iconColor="#6366F1" />
-                    </View>
-                    <View style={styles.shiftTextColumn}>
-                      <Text variant="labelMedium" style={styles.shiftPharmacyName} numberOfLines={1} ellipsizeMode="tail">
-                        {shift.pharmacy_name}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.shiftRole} numberOfLines={1} ellipsizeMode="tail">
-                        {shift.role || 'Staff'}
-                        {formatShiftDate(shift.date) ? ` · ${formatShiftDate(shift.date)}` : ''}
-                      </Text>
-                    </View>
+            <Surface style={styles.listPanel} elevation={0}>
+              {visibleTools.map((tool, index) => (
+                <Pressable
+                  key={tool.route}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tool.title}. ${tool.subtitle}`}
+                  onPress={() => router.push(tool.route as any)}
+                  style={({ pressed }) => [
+                    styles.toolRow,
+                    index < visibleTools.length - 1 && styles.rowDivider,
+                    pressed && styles.toolRowPressed,
+                  ]}
+                >
+                  <View style={styles.toolIcon}>
+                    <Icon source={tool.icon} size={21} color={brandColors.navy} />
                   </View>
-                  <Chip
-                    style={[
-                      styles.shiftStatusChip,
-                      { backgroundColor: shift.status?.toUpperCase() === 'CONFIRMED' ? '#D1FAE5' : '#FEF3C7' },
-                    ]}
-                    textStyle={{
-                      color: shift.status?.toUpperCase() === 'CONFIRMED' ? '#059669' : '#D97706',
-                      fontSize: 11,
-                      lineHeight: 14,
-                    }}
-                    compact
-                  >
-                    {shift.status || 'Pending'}
-                  </Chip>
-                </Card.Content>
-              </Card>
-            ))}
+                  <View style={styles.toolCopy}>
+                    <Text style={styles.toolTitle}>{tool.title}</Text>
+                    <Text style={styles.toolDescription} numberOfLines={1}>{tool.subtitle}</Text>
+                  </View>
+                  <Icon source="chevron-right" size={20} color="#8A97AA" />
+                </Pressable>
+              ))}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: toolsExpanded }}
+                onPress={() => setToolsExpanded((value) => !value)}
+                style={({ pressed }) => [styles.expandButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.expandButtonText}>{toolsExpanded ? 'Show fewer tools' : 'Show all tools'}</Text>
+                <Icon source={toolsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={brandColors.purple} />
+              </Pressable>
+            </Surface>
+
+            <DashboardActivity data={dashboardData} />
           </View>
-        )}
+        </View>
 
-        <Surface style={styles.bottomSection}>
-          <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/owner/profile' as any)}>
-            <View style={styles.bottomMenuIcon}>
-              <IconButton icon="account-cog" size={24} iconColor="#6366F1" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={styles.bottomMenuTitle}>
-                Account Settings
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Manage your profile and preferences
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-
-          <Divider />
-
-          <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/contact' as any)}>
-            <View style={styles.bottomMenuIcon}>
-              <IconButton icon="help-circle" size={24} iconColor="#10B981" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={styles.bottomMenuTitle}>
-                Help & Support
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Get assistance and view FAQs
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-
-          <Divider />
-
-          <TouchableOpacity
-            style={styles.bottomMenuItem}
+        <View style={styles.footerActions}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/owner/profile' as any)} style={styles.footerAction}>
+            <Icon source="account-cog-outline" size={20} color={brandColors.navy} />
+            <Text style={styles.footerActionText}>Account</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/contact' as any)} style={styles.footerAction}>
+            <Icon source="help-circle-outline" size={20} color={brandColors.navy} />
+            <Text style={styles.footerActionText}>Support</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
             onPress={async () => {
               await logout();
               router.replace('/login' as any);
             }}
+            style={styles.footerAction}
           >
-            <View style={[styles.bottomMenuIcon, { backgroundColor: '#FEE2E2' }]}>
-              <IconButton icon="logout" size={24} iconColor="#DC2626" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={[styles.bottomMenuTitle, { color: '#DC2626' }]}>
-                Sign Out
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Logout from your account
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-        </Surface>
+            <Icon source="logout" size={20} color={brandColors.danger} />
+            <Text style={[styles.footerActionText, styles.signOutText]}>Sign out</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: brandColors.mist },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 24 },
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greetingText: { color: '#6B7280', marginBottom: 4, fontSize: 14 },
-  nameText: { fontWeight: 'bold', color: '#111827', fontSize: 28 },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconButton: { position: 'relative' },
-  notificationBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#EF4444' },
-  avatar: { backgroundColor: '#6366F1' },
-  avatarLabel: { color: '#FFFFFF', fontWeight: 'bold' },
-  pillHero: {
-    marginHorizontal: 20,
-    marginBottom: 24,
+  scrollContent: {
+    width: '100%',
+    maxWidth: 1180,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  scrollContentWide: { paddingHorizontal: 28, paddingTop: 20 },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 18,
+  },
+  pageHeaderCopy: { flex: 1 },
+  pageTitle: {
+    color: brandColors.navy,
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.5,
+  },
+  pageSubtitle: {
+    color: brandColors.body,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 3,
+  },
+  livePill: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 999,
+    backgroundColor: brandColors.successSoft,
+    paddingHorizontal: 12,
+    marginTop: 4,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: brandColors.success },
+  liveText: { color: brandColors.success, fontSize: 12 },
+  hero: {
     borderRadius: 22,
     overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
+    marginBottom: 18,
+    shadowColor: brandColors.navy,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 4,
   },
-  pillHeroGradient: {
-    minHeight: 176,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'relative',
-  },
-  heroAngleOne: {
+  heroGradient: { minHeight: 196, padding: 22, justifyContent: 'center', position: 'relative' },
+  heroOrbitLarge: {
     position: 'absolute',
-    top: -58,
-    left: 158,
-    width: 150,
-    height: 310,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    transform: [{ rotate: '-28deg' }],
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    borderWidth: 38,
+    borderColor: 'rgba(255,255,255,0.07)',
+    right: -76,
+    top: -86,
   },
-  heroAngleTwo: {
+  heroOrbitSmall: {
     position: 'absolute',
-    right: -50,
-    bottom: -70,
-    width: 230,
-    height: 300,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    transform: [{ rotate: '30deg' }],
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: 'rgba(0,189,210,0.16)',
+    right: 42,
+    bottom: -44,
   },
-  pillHeroCopy: { flex: 1, paddingRight: 8 },
-  pillHeroEyebrow: {
-    color: 'rgba(255, 255, 255, 0.78)',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 8,
+  heroGreeting: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 14,
+    lineHeight: 20,
   },
-  pillBalanceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  pillBalanceValue: { color: '#FFFFFF', fontWeight: '900', lineHeight: 48 },
-  pillBalanceLabel: { color: 'rgba(255, 255, 255, 0.9)', fontWeight: '700' },
-  pillHeroText: { color: 'rgba(255, 255, 255, 0.88)', marginTop: 6, maxWidth: 230 },
-  pillMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  pillMetaChip: { backgroundColor: 'rgba(255, 255, 255, 0.18)' },
-  pillMetaChipText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
-  pillHeroImage: { width: 126, height: 126, marginRight: -8 },
-  heroCard: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+  heroTitle: {
+    color: brandColors.white,
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: -0.5,
+    maxWidth: 480,
+    marginTop: 5,
   },
-  gradientCard: { padding: 24 },
-  heroContent: { gap: 20 },
-  heroStats: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  heroStatItem: { alignItems: 'center', flex: 1 },
-  heroStatValue: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 44, lineHeight: 52 },
-  heroStatLabel: { color: 'rgba(255, 255, 255, 0.9)', marginTop: 4, fontSize: 13 },
-  heroDivider: { width: 1, height: 40, backgroundColor: 'rgba(255, 255, 255, 0.3)' },
-  heroButton: { borderRadius: 12, overflow: 'hidden' },
-  heroButtonGradient: {
+  heroBody: {
+    color: 'rgba(255,255,255,0.84)',
+    fontSize: 14,
+    lineHeight: 21,
+    maxWidth: 510,
+    marginTop: 8,
+  },
+  featuredActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 22 },
+  featuredAction: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    gap: 9,
+    borderRadius: 11,
+    paddingHorizontal: 18,
+  },
+  featuredActionPrimary: { backgroundColor: brandColors.white },
+  featuredActionSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  heroButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 16, marginLeft: -8 },
-  statsContainer: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontWeight: '700', color: '#111827', fontSize: 18 },
-  seeAllText: { color: '#6366F1', fontWeight: '600', fontSize: 14 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },
-  statCard: {
-    width: 180,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+  featuredActionPrimaryText: {
+    color: brandColors.navy,
+    fontSize: 14,
   },
-  statCardContent: { paddingVertical: 20, paddingHorizontal: 18, gap: 10, alignItems: 'center' },
-  statCardHeader: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  statIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  statValue: { fontWeight: 'bold', color: '#111827', fontSize: 30 },
-  statLabel: { color: '#6B7280', fontSize: 13 },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionHeaderText: { fontWeight: '700', color: '#111827', marginBottom: 16, fontSize: 18 },
-  quickActionsGrid: {
+  featuredActionSecondaryText: {
+    color: brandColors.white,
+    fontSize: 14,
+  },
+  pressed: { opacity: 0.72 },
+  metricRail: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    borderRadius: 16,
+    backgroundColor: brandColors.white,
+    overflow: 'hidden',
+    marginTop: 18,
+    marginBottom: 26,
+  },
+  metricItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 112, padding: 12 },
+  metricDivider: { borderLeftWidth: 1, borderLeftColor: brandColors.borderSoft },
+  metricValue: {
+    color: brandColors.navy,
+    fontSize: 27,
+    lineHeight: 32,
+    marginTop: 5,
+  },
+  metricLabel: {
+    color: brandColors.body,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  dashboardColumns: { gap: 26 },
+  dashboardColumnsWide: { flexDirection: 'row', alignItems: 'flex-start' },
+  dashboardColumn: { flex: 1, minWidth: 0, gap: 0 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 11,
+  },
+  sectionTitle: {
+    color: brandColors.navy,
+    fontSize: 21,
+    lineHeight: 27,
+  },
+  sectionDescription: {
+    color: brandColors.body,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  sectionLink: { color: brandColors.purple, fontSize: 13, paddingVertical: 6 },
+  workspacePanel: {
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    borderRadius: 16,
+    backgroundColor: brandColors.white,
+    padding: 10,
+    marginBottom: 26,
+  },
+  actionMatrix: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  actionCell: {
+    width: '100%',
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 11,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  actionCellTwoColumn: { width: '48.9%' },
+  actionCellPressed: { backgroundColor: '#F2EEFB' },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#F2EEFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: { color: brandColors.navy, fontSize: 13, lineHeight: 18 },
+  actionDescription: { color: brandColors.body, fontSize: 11, lineHeight: 16, marginTop: 1 },
+  listPanel: {
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    borderRadius: 16,
+    backgroundColor: brandColors.white,
+    overflow: 'hidden',
+    marginBottom: 26,
+  },
+  emptyState: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 30 },
+  emptyIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#F2EEFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 11,
+  },
+  emptyTitle: { color: brandColors.navy, fontSize: 14, lineHeight: 20 },
+  emptyText: {
+    color: brandColors.body,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 3,
+  },
+  shiftRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, paddingVertical: 11 },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: brandColors.borderSoft },
+  dateTile: {
+    width: 42,
+    height: 42,
+    borderRadius: 11,
+    backgroundColor: '#EEF4FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shiftCopy: { flex: 1, minWidth: 0 },
+  shiftPharmacy: { color: brandColors.navy, fontSize: 13, lineHeight: 18 },
+  shiftMeta: { color: brandColors.body, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  statusPill: { minHeight: 28, justifyContent: 'center', borderRadius: 999, paddingHorizontal: 9, flexShrink: 0 },
+  statusConfirmed: { backgroundColor: brandColors.successSoft },
+  statusPending: { backgroundColor: brandColors.warningSoft },
+  statusText: { fontSize: 10 },
+  statusConfirmedText: { color: brandColors.success },
+  statusPendingText: { color: brandColors.warning },
+  rewardBanner: {
+    minHeight: 84,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    backgroundColor: brandColors.navy,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 26,
+  },
+  rewardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,189,210,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rewardCopy: { flex: 1 },
+  rewardValue: { color: brandColors.white, fontSize: 18, lineHeight: 23 },
+  rewardDescription: {
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 1,
+  },
+  toolRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, paddingVertical: 10 },
+  toolRowPressed: { backgroundColor: brandColors.surfaceMuted },
+  toolIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: '#EEF4FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolCopy: { flex: 1, minWidth: 0 },
+  toolTitle: { color: brandColors.navy, fontSize: 13, lineHeight: 18 },
+  toolDescription: { color: brandColors.body, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  expandButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: brandColors.surfaceMuted,
+  },
+  expandButtonText: { color: brandColors.purple, fontSize: 12 },
+  footerActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    justifyContent: 'center',
-  },
-  quickActionCard: { width: (width - 64) / 2, alignItems: 'center', gap: 8 },
-  quickActionGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  quickActionTitle: { fontWeight: '600', color: '#111827', textAlign: 'center', fontSize: 12 },
-  activityCard: {
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  activityItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
-  activityIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  activityContent: { flex: 1, gap: 2 },
-  activityTitle: { color: '#111827', fontWeight: '600' },
-  activityDesc: { color: '#6B7280', fontSize: 12 },
-  activityTime: { color: '#9CA3AF', fontSize: 11 },
-  activityDivider: { marginHorizontal: 16 },
-  shiftPreviewCard: {
-    marginBottom: 12,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  shiftPreviewContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
-  shiftPreviewLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  shiftIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
-  shiftTextColumn: { flex: 1, minWidth: 0 },
-  shiftPharmacyName: { color: '#111827', fontWeight: '600' },
-  shiftRole: { color: '#6B7280', fontSize: 12, marginTop: 2 },
-  shiftStatusChip: {
-    height: 26,
-    alignSelf: 'center',
-    marginLeft: 8,
-    paddingHorizontal: 8,
     justifyContent: 'center',
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: brandColors.border,
+    paddingTop: 18,
   },
-  bottomSection: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+  footerAction: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderRadius: 10,
+    paddingHorizontal: 14,
   },
-  bottomMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-  bottomMenuIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
-  bottomMenuContent: { flex: 1, marginLeft: 12 },
-  bottomMenuTitle: { color: '#111827', fontWeight: '600' },
-  bottomMenuDesc: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  footerActionText: { color: brandColors.navy, fontSize: 13 },
+  signOutText: { color: brandColors.danger },
 });
