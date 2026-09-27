@@ -230,6 +230,8 @@ jobs:
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
         with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+        with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: "false"
 
@@ -300,22 +302,14 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-
-          MANIFEST_URL="http://127.0.0.1:8081?disableOnboarding=1"
-          export MANIFEST_URL
-          ENCODED_URL=$(python3 - <<'PY'
-          import os, urllib.parse
-          print(urllib.parse.quote(os.environ["MANIFEST_URL"], safe=""))
+          MANIFEST_URL=$(python3 - <<'PY'
+          from urllib.parse import quote
+          print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
           PY
           )
-          DEV_URL="frontendmobile://expo-development-client/?url=$ENCODED_URL&disableFab=1&disableAutoLaunch=1"
-          printf '%s\n' "$DEV_URL" > /tmp/dev-client-url-android.txt
-
-          ADB="$(command -v adb)"
-          "$ADB" shell monkey -p com.chemisttasker.app 1 >/dev/null 2>&1 || true
-          sleep 3
-          ESCAPED_DEV_URL=$(printf '%q' "$DEV_URL")
-          "$ADB" shell "am start -W -a android.intent.action.VIEW -d $ESCAPED_DEV_URL"
+          DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
+          printf '%s\n' "$DEV_URL"
+          "$ADB" shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
           sleep 15
 
       - name: Install Maestro
@@ -639,19 +633,14 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-
-          MANIFEST_URL="http://127.0.0.1:8081?disableOnboarding=1"
-          export MANIFEST_URL
-          ENCODED_URL=$(python3 - <<'PY'
-          import os, urllib.parse
-          print(urllib.parse.quote(os.environ["MANIFEST_URL"], safe=""))
+          MANIFEST_URL=$(python3 - <<'PY'
+          from urllib.parse import quote
+          print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
           PY
           )
-          DEV_URL="frontendmobile://expo-development-client/?url=$ENCODED_URL&disableFab=1&disableAutoLaunch=1"
-          printf '%s\n' "$DEV_URL" > /tmp/dev-client-url-ios.txt
-
-          xcrun simctl launch "$SIM_UDID" com.chemisttasker.app >/dev/null 2>&1 || true
-          sleep 3
+          DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
+          printf '%s\n' "$DEV_URL"
+          xcrun simctl launch "$SIM_UDID" com.chemisttasker.app -EXDevMenuIsOnboardingFinished 1 -EXDevMenuShowsAtLaunch 0 -EXDevMenuShowFloatingActionButton 0 >/dev/null 2>&1 || true
           xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
           sleep 15
 
