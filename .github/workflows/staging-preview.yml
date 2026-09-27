@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - verification/github-hosted-staging-preview
   workflow_dispatch:
 
 permissions:
@@ -13,28 +14,46 @@ concurrency:
   group: chemisttasker-staging-preview
   cancel-in-progress: true
 
-env:
-  STAGING_DIR: "/opt/apps/chemisttasker-staging"
-
 jobs:
   deploy-staging:
-    runs-on: [self-hosted, linux, x64, chemisttasker-staging]
+    name: GitHub-hosted staging preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout staging
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - name: Sync isolated staging source
+      - name: Prepare isolated CI staging integrations
         shell: bash
         run: |
-          mkdir -p "$STAGING_DIR/env"
-          find "$STAGING_DIR" -mindepth 1 -maxdepth 1 ! -name env -exec rm -rf -- {} +
-          tar --exclude='.git' --exclude='./env' -czf - . | tar -xzf - -C "$STAGING_DIR"
+          set -euo pipefail
+          mkdir -p env
+          umask 077
+          cat > env/staging.integrations.env <<'EOF'
+          STAGING_WEB_MAPS_API_KEY=ci-staging-placeholder
+          STAGING_RECAPTCHA_SITE_KEY=ci-staging-placeholder
+          STAGING_RECAPTCHA_SECRET_KEY=ci-staging-placeholder
+          EOF
+
+      - name: Validate staging compose
+        shell: bash
+        run: |
+          set -euo pipefail
+          export STAGING_POSTGRES_PASSWORD=compose-validation-only
+          export STAGING_DJANGO_SECRET_KEY=compose-validation-only
+          export STAGING_WEB_MAPS_API_KEY=ci-staging-placeholder
+          export STAGING_RECAPTCHA_SITE_KEY=ci-staging-placeholder
+          export STAGING_RECAPTCHA_SECRET_KEY=ci-staging-placeholder
+          docker compose -f docker-compose.staging.yml config --quiet
 
       - name: Deploy isolated staging stack
         id: deploy
         shell: bash
         run: |
-          output="$(cd "$STAGING_DIR" && bash scripts/deploy-staging.sh)"
+          set -euo pipefail
+          output="$(bash scripts/deploy-staging.sh)"
           printf '%s\n' "$output"
           preview_url="$(printf '%s\n' "$output" | sed -n 's/^PREVIEW_URL=//p' | tail -n 1)"
           test -n "$preview_url"
@@ -44,14 +63,13 @@ jobs:
             echo ""
             echo "Preview: $preview_url"
             echo ""
-            echo "This deployment runs on the OVH self-hosted runner and uses staging-only PostgreSQL, Redis, volumes and containers."
+            echo "Ephemeral staging runs on a GitHub-hosted Ubuntu runner with isolated PostgreSQL, Redis, Django, Celery, Vite/Next, nginx and a Cloudflare quick tunnel."
           } >> "$GITHUB_STEP_SUMMARY"
-
 
       - name: Smoke-test deployed staging
         shell: bash
         run: |
-          cd "$STAGING_DIR"
+          set -euo pipefail
           bash scripts/smoke-staging.sh "${{ steps.deploy.outputs.preview_url }}"
 
       - name: Smoke-test summary
@@ -66,3 +84,16 @@ jobs:
             echo "- refresh CSRF enforcement"
             echo "- email OTP CSRF enforcement"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Staging diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          docker compose -f docker-compose.staging.yml ps || true
+          docker compose -f docker-compose.staging.yml logs --no-color --tail=200 gateway web landing frontend cloudflared || true
+
+      - name: Tear down ephemeral staging
+        if: always()
+        shell: bash
+        run: |
+          docker compose -f docker-compose.staging.yml down -v --remove-orphans || true
