@@ -1,13 +1,19 @@
-name: Mobile Lint
+name: Frontend Static and Mobile Lint
 
 on:
   pull_request:
     paths:
       - "frontend_mobile/**"
+      - "frontend_web/src/**"
+      - "scripts/audit-native-tab-routes.mjs"
+      - "scripts/audit-frontend-static-wiring.mjs"
   push:
     branches: [ main ]
     paths:
       - "frontend_mobile/**"
+      - "frontend_web/src/**"
+      - "scripts/audit-native-tab-routes.mjs"
+      - "scripts/audit-frontend-static-wiring.mjs"
   workflow_dispatch:
 
 permissions:
@@ -29,6 +35,10 @@ jobs:
       - name: Install deps
         working-directory: frontend_mobile
         run: npm ci
+      - name: Audit native tab routes
+        run: node scripts/audit-native-tab-routes.mjs
+      - name: Audit frontend static wiring
+        run: node scripts/audit-frontend-static-wiring.mjs
       - name: Lint
         working-directory: frontend_mobile
         run: npm run lint

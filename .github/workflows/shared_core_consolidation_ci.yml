@@ -194,6 +194,21 @@ jobs:
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
         run: python backend/manage.py test client_profile.test_membership_application_integrity client_profile.test_invoice_integrity --settings=core.contract_test_settings
+      - name: Attendance and kiosk contracts
+        working-directory: backend
+        run: |
+          python -m unittest attendance_tests.test_attendance_credentials
+          python -m unittest attendance_tests.test_attendance_eligibility
+          python -m unittest attendance_tests.test_attendance_transitions
+          python -m unittest attendance_tests.test_attendance_api
+          python -m unittest attendance_tests.test_kiosk_pairing_code
+          python -m unittest attendance_tests.test_kiosk_qr_pin_security
+          python -m unittest attendance_tests.test_kiosk_offline_protocol
+          python -m unittest attendance_tests.test_kiosk_release_blockers
+          python -m unittest attendance_tests.test_kiosk_staff_breaks
+          python -m unittest attendance_tests.test_pharmacy_pin_scope
+          python -m unittest attendance_tests.test_worker_pin_setup
+          python -m unittest attendance_tests.test_security_boundaries
       - name: Workforce and finance contracts
         run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
       - name: Isolated finance API contracts
