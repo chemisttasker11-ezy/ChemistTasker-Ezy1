@@ -261,8 +261,9 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          curl -fsS "http://127.0.0.1:8081/_expo/open?platform=android&runtime=custom" > /tmp/expo-open-android.json
-          DEV_URL=$(python - <<'PY'
+          DEV_URL=""
+          if curl -fsS "http://127.0.0.1:8081/_expo/open?platform=android&runtime=custom" > /tmp/expo-open-android.json 2>/dev/null; then
+            DEV_URL=$(python - <<'PY' || true
           import json
           data=json.load(open("/tmp/expo-open-android.json"))
           def strings(value):
@@ -274,9 +275,16 @@ jobs:
               elif isinstance(value,list):
                   for item in value:
                       yield from strings(item)
-          print(next(v for v in strings(data) if "expo-development-client" in v))
+          print(next((v for v in strings(data) if "expo-development-client" in v), ""))
           PY
-          )
+            )
+          fi
+          if [ -z "$DEV_URL" ]; then
+            curl -sS -D /tmp/expo-link-android.headers -o /dev/null "http://127.0.0.1:8081/_expo/link?platform=android"
+            DEV_URL=$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}' /tmp/expo-link-android.headers)
+          fi
+          test -n "$DEV_URL"
+          printf '%s\n' "$DEV_URL"
           adb shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
           sleep 15
 
@@ -570,8 +578,9 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          curl -fsS "http://127.0.0.1:8081/_expo/open?platform=ios&runtime=custom" > /tmp/expo-open-ios.json
-          DEV_URL=$(python3 - <<'PY'
+          DEV_URL=""
+          if curl -fsS "http://127.0.0.1:8081/_expo/open?platform=ios&runtime=custom" > /tmp/expo-open-ios.json 2>/dev/null; then
+            DEV_URL=$(python3 - <<'PY' || true
           import json
           data=json.load(open("/tmp/expo-open-ios.json"))
           def strings(value):
@@ -583,9 +592,16 @@ jobs:
               elif isinstance(value,list):
                   for item in value:
                       yield from strings(item)
-          print(next(v for v in strings(data) if "expo-development-client" in v))
+          print(next((v for v in strings(data) if "expo-development-client" in v), ""))
           PY
-          )
+            )
+          fi
+          if [ -z "$DEV_URL" ]; then
+            curl -sS -D /tmp/expo-link-ios.headers -o /dev/null "http://127.0.0.1:8081/_expo/link?platform=ios"
+            DEV_URL=$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}' /tmp/expo-link-ios.headers)
+          fi
+          test -n "$DEV_URL"
+          printf '%s\n' "$DEV_URL"
           xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
           sleep 15
 
