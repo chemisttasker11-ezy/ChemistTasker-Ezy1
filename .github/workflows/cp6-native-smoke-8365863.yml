@@ -209,24 +209,21 @@ jobs:
           ./gradlew assembleDebug --no-daemon --max-workers=2
           test -f app/build/outputs/apk/debug/app-debug.apk
 
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v3
+
       - name: Boot Android emulator and install app
         shell: bash
         run: |
           set -euo pipefail
           sudo chmod 666 /dev/kvm || true
-          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          AVDMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -perm -u+x 2>/dev/null | head -n 1)"
-          fi
-          if [ ! -x "$AVDMANAGER" ]; then
-            AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name avdmanager -perm -u+x 2>/dev/null | head -n 1)"
-          fi
+          SDKMANAGER="$(command -v sdkmanager)"
+          AVDMANAGER="$(command -v avdmanager)"
+          ADB="$(command -v adb)"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$(dirname "$(dirname "$ADB")")}}"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
           test -x "$SDKMANAGER"
           test -x "$AVDMANAGER"
-          ADB="$SDK_ROOT/platform-tools/adb"
-          EMULATOR="$SDK_ROOT/emulator/emulator"
           test -x "$ADB"
           test -x "$EMULATOR"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
@@ -240,7 +237,10 @@ jobs:
             fi
             sleep 2
           done
-          test "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1"
+          if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; then
+            cat /tmp/android-emulator.log || true
+            exit 1
+          fi
           "$ADB" reverse tcp:8000 tcp:8000
           "$ADB" install -r frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
