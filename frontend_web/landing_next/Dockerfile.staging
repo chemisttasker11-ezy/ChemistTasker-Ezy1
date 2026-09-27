@@ -1,8 +1,8 @@
 FROM node:22-alpine AS build
-WORKDIR /app
+WORKDIR /workspace/frontend_web/landing_next
 
-COPY shared-core /shared-core
-COPY scripts /scripts
+COPY shared-core /workspace/shared-core
+COPY scripts /workspace/scripts
 COPY frontend_web/landing_next/package*.json ./
 RUN npm ci --no-audit --no-fund
 
@@ -28,9 +28,9 @@ RUN if [ "$REQUIRE_WEB_INTEGRATIONS" = "1" ]; then \
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
-COPY --from=build --chown=node:node /app/.next/standalone ./
-COPY --from=build --chown=node:node /app/.next/static ./.next/static
-COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /workspace/frontend_web/landing_next/.next/standalone ./
+COPY --from=build --chown=node:node /workspace/frontend_web/landing_next/.next/static ./.next/static
+COPY --from=build --chown=node:node /workspace/frontend_web/landing_next/public ./public
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
