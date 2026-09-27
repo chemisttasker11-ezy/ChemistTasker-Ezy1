@@ -2,7 +2,7 @@ services:
   landing:
     image: node:22-alpine
     working_dir: /app
-    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
+    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
     ports:
       - "3000:3000"
     environment:
@@ -10,8 +10,11 @@ services:
       HUB_API_URL: "http://web:8000/api"
       NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
       DASHBOARD_INTERNAL_URL: "http://frontend_5173:5173"
+      CT_SHARED_CORE_SKIP_PREPARE: "1"
     volumes:
       - ./frontend_web/landing_next:/app
+      - ./scripts:/scripts
+      - ./shared-core:/shared-core
       - landing_node_modules:/app/node_modules
       - landing_next_cache:/app/.next
     networks:
@@ -70,8 +73,12 @@ services:
       - ./backend/billing:/app/billing
       - ./backend/client_profile:/app/client_profile
       - ./backend/core:/app/core
+      - ./backend/ethical_marketplace:/app/ethical_marketplace
+      - ./backend/marketplace:/app/marketplace
       - ./backend/templates:/app/templates
       - ./backend/users:/app/users
+      - ./backend/worker_finance:/app/worker_finance
+      - ./backend/workforce:/app/workforce
       - ./backend/public_hub:/app/public_hub
       - ./backend/manage.py:/app/manage.py
       - ./backend/media:/app/media
@@ -119,8 +126,12 @@ services:
       - ./backend/billing:/app/billing
       - ./backend/client_profile:/app/client_profile
       - ./backend/core:/app/core
+      - ./backend/ethical_marketplace:/app/ethical_marketplace
+      - ./backend/marketplace:/app/marketplace
       - ./backend/templates:/app/templates
       - ./backend/users:/app/users
+      - ./backend/worker_finance:/app/worker_finance
+      - ./backend/workforce:/app/workforce
       - ./backend/public_hub:/app/public_hub
       - ./backend/manage.py:/app/manage.py
       - ./backend/media:/app/media
@@ -159,8 +170,12 @@ services:
       - ./backend/billing:/app/billing
       - ./backend/client_profile:/app/client_profile
       - ./backend/core:/app/core
+      - ./backend/ethical_marketplace:/app/ethical_marketplace
+      - ./backend/marketplace:/app/marketplace
       - ./backend/templates:/app/templates
       - ./backend/users:/app/users
+      - ./backend/worker_finance:/app/worker_finance
+      - ./backend/workforce:/app/workforce
       - ./backend/public_hub:/app/public_hub
       - ./backend/manage.py:/app/manage.py
       - celerybeat_dev_data:/app/celerybeat
@@ -191,13 +206,15 @@ services:
       VITE_API_URL: "/api"
       VITE_DEV_PROXY_TARGET: "http://web:8000"
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
-    command: ["sh", "-c", "npm install && npx vite --port 5173 --host 0.0.0.0"]
+      CT_SHARED_CORE_SKIP_PREPARE: "1"
+    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx vite --port 5173 --host 0.0.0.0"]
     ports:
       - "5173:5173"
     networks:
       - chemisttasker_network
     volumes:
       - ./frontend_web:/app
+      - ./scripts:/scripts
       - ./shared-core:/shared-core
       - frontend_5173_node_modules:/app/node_modules
 
@@ -211,13 +228,15 @@ services:
     environment:
       VITE_DEV_PROXY_TARGET: "http://web:8000"
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
-    command: ["sh", "-c", "npm install && npx vite --port 5174 --host 0.0.0.0"]
+      CT_SHARED_CORE_SKIP_PREPARE: "1"
+    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx vite --port 5174 --host 0.0.0.0"]
     ports:
       - "5174:5174"
     networks:
       - chemisttasker_network
     volumes:
       - ./frontend_web:/app
+      - ./scripts:/scripts
       - ./shared-core:/shared-core
       - frontend_5174_node_modules:/app/node_modules
 
@@ -231,13 +250,15 @@ services:
     environment:
       VITE_DEV_PROXY_TARGET: "http://web:8000"
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
-    command: ["sh", "-c", "npm install && npx vite --port 5175 --host 0.0.0.0"]
+      CT_SHARED_CORE_SKIP_PREPARE: "1"
+    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx vite --port 5175 --host 0.0.0.0"]
     ports:
       - "5175:5175"
     networks:
       - chemisttasker_network
     volumes:
       - ./frontend_web:/app
+      - ./scripts:/scripts
       - ./shared-core:/shared-core
       - frontend_5175_node_modules:/app/node_modules
 
@@ -248,7 +269,9 @@ services:
     working_dir: /app
     env_file:
       - ./env/mobile.dev.env
-    command: ["sh", "-c", "npm install && npx expo start --dev-client --lan --clear"]
+    environment:
+      CT_SHARED_CORE_SKIP_PREPARE: "1"
+    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx expo start --dev-client --lan --clear"]
     ports:
       - "8081:8081"
       - "19000:19000"
@@ -258,6 +281,8 @@ services:
       - chemisttasker_network
     volumes:
       - ./frontend_mobile:/app
+      - ./scripts:/scripts
+      - ./shared-core:/shared-core
       - mobile_node_modules:/app/node_modules
 
 volumes:
