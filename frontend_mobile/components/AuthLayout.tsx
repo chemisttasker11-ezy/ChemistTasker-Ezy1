@@ -1,8 +1,9 @@
-import React from 'react';
-import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAnimationEnabled } from '@/hooks/useAnimationEnabled';
 
 type AuthLayoutProps = {
   title: string;
@@ -11,10 +12,80 @@ type AuthLayoutProps = {
 };
 
 export default function AuthLayout({ title, children, showTitle = true }: AuthLayoutProps) {
+  const animationEnabled = useAnimationEnabled();
+  const networkMotion = useRef(new Animated.Value(0)).current;
+  const ambientMotion = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    networkMotion.stopAnimation();
+    ambientMotion.stopAnimation();
+
+    if (!animationEnabled) {
+      networkMotion.setValue(0);
+      ambientMotion.setValue(0);
+      return;
+    }
+
+    const networkLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(networkMotion, {
+          toValue: 1,
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(networkMotion, {
+          toValue: 0,
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]),
+    );
+    const ambientLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ambientMotion, {
+          toValue: 1,
+          duration: 7000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(ambientMotion, {
+          toValue: 0,
+          duration: 7000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]),
+    );
+
+    networkLoop.start();
+    ambientLoop.start();
+    return () => {
+      networkLoop.stop();
+      ambientLoop.stop();
+    };
+  }, [ambientMotion, animationEnabled, networkMotion]);
+
+  const networkRotate = networkMotion.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-1.5deg', '1.5deg'],
+  });
+  const networkY = networkMotion.interpolate({ inputRange: [0, 1], outputRange: [-3, 5] });
+  const blobOneY = ambientMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
+  const blobTwoX = ambientMotion.interpolate({ inputRange: [0, 1], outputRange: [0, 10] });
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <LinearGradient colors={['#f7f9fb', '#eef1f7']} style={StyleSheet.absoluteFillObject} />
-      <View style={styles.network} pointerEvents="none">
+      <Animated.View
+        style={[styles.network, { transform: [{ translateY: networkY }, { rotate: networkRotate }] }]}
+        pointerEvents="none"
+      >
         <View style={[styles.node, styles.nodeOne]} />
         <View style={[styles.node, styles.nodeTwo]} />
         <View style={[styles.node, styles.nodeThree]} />
@@ -22,9 +93,9 @@ export default function AuthLayout({ title, children, showTitle = true }: AuthLa
         <View style={[styles.line, styles.lineOne]} />
         <View style={[styles.line, styles.lineTwo]} />
         <View style={[styles.line, styles.lineThree]} />
-      </View>
-      <View style={[styles.blob, styles.blobOne]} pointerEvents="none" />
-      <View style={[styles.blob, styles.blobTwo]} pointerEvents="none" />
+      </Animated.View>
+      <Animated.View style={[styles.blob, styles.blobOne, { transform: [{ translateY: blobOneY }] }]} pointerEvents="none" />
+      <Animated.View style={[styles.blob, styles.blobTwo, { transform: [{ translateX: blobTwoX }] }]} pointerEvents="none" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

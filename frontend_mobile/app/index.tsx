@@ -1,15 +1,42 @@
-import React, { useEffect } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import AuthLayout from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { hasOrganizationAccess, resolveInitialWorkspace } from '../utils/mobilePersona';
+import { useAnimationEnabled } from '../hooks/useAnimationEnabled';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const animationEnabled = useAnimationEnabled();
+  const heroMotion = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    heroMotion.stopAnimation();
+    if (!animationEnabled) {
+      heroMotion.setValue(0);
+      return;
+    }
+
+    const heroLoop = Animated.loop(
+      Animated.timing(heroMotion, {
+        toValue: 1,
+        duration: 10000,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+        isInteraction: false,
+      }),
+    );
+    heroLoop.start();
+    return () => heroLoop.stop();
+  }, [animationEnabled, heroMotion]);
+
+  const heroY = heroMotion.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -8, 0] });
+  const heroRotate = heroMotion.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '0.6deg', '0deg'] });
+
   useEffect(() => {
     if (isLoading || !user) return;
     let active = true;
@@ -38,9 +65,9 @@ export default function HomeScreen() {
   return (
     <AuthLayout title="Welcome" showTitle={false}>
       <View style={styles.hero}>
-        <Image
+        <Animated.Image
           source={require('../assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png')}
-          style={styles.heroImage}
+          style={[styles.heroImage, { transform: [{ translateY: heroY }, { rotate: heroRotate }] }]}
           resizeMode="contain"
         />
         <Text variant="headlineSmall" style={styles.title}>
