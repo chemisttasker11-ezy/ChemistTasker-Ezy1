@@ -111,6 +111,7 @@ services:
 
   celery_worker:
     image: chemisttasker_backend_staging:latest
+    pull_policy: never
     container_name: chemisttasker_celery_staging
     restart: unless-stopped
     environment:
@@ -129,6 +130,7 @@ services:
 
   celery_beat:
     image: chemisttasker_backend_staging:latest
+    pull_policy: never
     container_name: chemisttasker_celery_beat_staging
     restart: unless-stopped
     environment:
@@ -159,7 +161,8 @@ services:
 
   landing:
     build:
-      context: ./frontend_web/landing_next
+      context: .
+      dockerfile: frontend_web/landing_next/Dockerfile.staging
       args:
         REQUIRE_WEB_INTEGRATIONS: "1"
         NEXT_PUBLIC_SITE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
