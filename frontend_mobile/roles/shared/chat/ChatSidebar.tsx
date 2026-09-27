@@ -22,6 +22,8 @@ type Props = {
   onSelectShiftContact?: (contact: any) => void;
   onDeleteRoom?: (room: ChatRoom) => void;
   onEditRoom?: (room: ChatRoom) => void;
+  onManageGroup?: (room: ChatRoom) => void;
+  canManageGroup?: (room: ChatRoom) => boolean;
 };
 
 export default function ChatSidebar({
@@ -40,6 +42,8 @@ export default function ChatSidebar({
   onSelectShiftContact,
   onDeleteRoom,
   onEditRoom,
+  onManageGroup,
+  canManageGroup,
 }: Props) {
   const theme = useTheme();
   const [filter, setFilter] = React.useState<'all' | 'group' | 'dm' | 'shift'>('all');
@@ -178,6 +182,8 @@ export default function ChatSidebar({
                   onTogglePin={canPin ? onTogglePin : () => {}}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
+                  onManageMembers={onManageGroup}
+                  canManageMembers={item.type === 'GROUP' && Boolean(canManageGroup?.(item))}
                   canEditDelete={!item.pharmacy && ((item as any).can_delete ?? true)}
                 />
               ))}
@@ -196,6 +202,8 @@ export default function ChatSidebar({
                   onTogglePin={canPin ? onTogglePin : () => {}}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
+                  onManageMembers={onManageGroup}
+                  canManageMembers={Boolean(canManageGroup?.(item))}
                   canEditDelete={!item.pharmacy && ((item as any).can_delete ?? true)}
                 />
               ))}
@@ -232,6 +240,8 @@ export default function ChatSidebar({
                   onTogglePin={canPin ? onTogglePin : () => {}}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
+                  onManageMembers={onManageGroup}
+                  canManageMembers={false}
                   canEditDelete={!item.pharmacy && ((item as any).can_delete ?? true)}
                 />
               ))}

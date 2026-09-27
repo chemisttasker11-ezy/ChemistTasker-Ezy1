@@ -204,13 +204,13 @@ export default function OtherStaffTabs() {
     if (user.role !== 'OTHER_STAFF') {
       switch (user.role) {
         case 'OWNER':
-          router.replace('/owner' as any);
+          router.replace('/owner/dashboard' as any);
           break;
         case 'PHARMACIST':
           router.replace('/pharmacist' as any);
           break;
         case 'EXPLORER':
-          router.replace('/explorer' as any);
+          router.replace('/explorer/dashboard' as any);
           break;
         case 'ORGANIZATION':
           router.replace('/organization/dashboard' as any);
@@ -402,6 +402,7 @@ export default function OtherStaffTabs() {
         <Tabs.Screen name="profile-bio" options={{ href: null }} />
         <Tabs.Screen name="interests" options={{ href: null }} />
         <Tabs.Screen name="learning" options={{ href: null }} />
+        <Tabs.Screen name="memberships" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
         <Tabs.Screen name="messages/[id]" options={{ href: null }} />

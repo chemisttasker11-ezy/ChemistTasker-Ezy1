@@ -10,7 +10,9 @@ type Props = {
   onTogglePin: (room: ChatRoom) => void;
   onDelete?: (room: ChatRoom) => void;
   onEdit?: (room: ChatRoom) => void;
+  onManageMembers?: (room: ChatRoom) => void;
   canEditDelete?: boolean;
+  canManageMembers?: boolean;
 };
 
 const getTitle = (room: ChatRoom) => {
@@ -19,7 +21,16 @@ const getTitle = (room: ChatRoom) => {
   return room.title || pharmacyName || room.id?.toString() || 'Chat';
 };
 
-export default function ChatListItem({ room, onPress, onTogglePin, onDelete, onEdit, canEditDelete }: Props) {
+export default function ChatListItem({
+  room,
+  onPress,
+  onTogglePin,
+  onDelete,
+  onEdit,
+  onManageMembers,
+  canEditDelete,
+  canManageMembers,
+}: Props) {
   const theme = useTheme();
   const lastMessage = (room as any)?.last_message;
   const subtitle = lastMessage?.body || 'No messages yet';
@@ -44,6 +55,7 @@ export default function ChatListItem({ room, onPress, onTogglePin, onDelete, onE
               anchor={<IconButton icon="dots-vertical" size={18} onPress={() => setMenuVisible(true)} />}
             >
               <Menu.Item leadingIcon={room.is_pinned ? 'pin-off' : 'pin'} onPress={() => { setMenuVisible(false); onTogglePin(room); }} title={room.is_pinned ? 'Unpin' : 'Pin'} />
+              {canManageMembers ? <Menu.Item leadingIcon="account-multiple-outline" onPress={() => { setMenuVisible(false); onManageMembers?.(room); }} title="Manage members" /> : null}
               {canEditDelete ? <Menu.Item leadingIcon="pencil" onPress={() => { setMenuVisible(false); onEdit?.(room); }} title="Edit" /> : null}
               {canEditDelete ? <Menu.Item leadingIcon="delete" onPress={() => { setMenuVisible(false); onDelete?.(room); }} title="Delete" /> : null}
             </Menu>

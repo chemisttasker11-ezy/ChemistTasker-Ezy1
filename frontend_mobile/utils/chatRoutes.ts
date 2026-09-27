@@ -9,7 +9,7 @@ export function getMessageDetailRoute(userRole: string | null | undefined, roomI
           ? 'otherstaff'
           : normalized === 'EXPLORER'
             ? 'explorer'
-            : normalized === 'ORGANIZATION'
+            : normalized === 'ORGANIZATION' || normalized === 'ORG_ADMIN' || normalized === 'ORG_OWNER' || normalized === 'ORG_STAFF' || normalized === 'CHIEF_ADMIN' || normalized === 'REGION_ADMIN'
               ? 'organization'
               : normalized === 'ADMIN' || normalized === 'SUPERUSER'
                 ? 'admin'

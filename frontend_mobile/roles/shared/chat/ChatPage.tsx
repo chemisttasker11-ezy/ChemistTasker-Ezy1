@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, FAB, Menu, Modal, Portal, Snackbar, Text, TextInput, useTheme } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import ChatSidebar from './ChatSidebar';
 import NewChatModal from './NewChatModal';
@@ -27,6 +27,7 @@ function resolveName(room: ChatRoom): string {
 
 export default function ChatPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
   const theme = useTheme();
   const { rooms, loading, refreshing, error, refresh, reload } = useChatRooms();
@@ -91,12 +92,14 @@ export default function ChatPage() {
   const openRoom = (room: ChatRoom, nameOverride?: string) => {
     const id = room.id;
     if (!id) return;
-    if (room.type === 'GROUP' && canManageGroup(room)) {
-      setManageGroupRoom(room);
-    }
+    const routeRole = pathname.startsWith('/admin')
+      ? 'ADMIN'
+      : pathname.startsWith('/organization')
+        ? 'ORGANIZATION'
+        : user?.role;
     setActiveRoomId(id);
     router.push({
-      pathname: getMessageDetailRoute(user?.role, id) as any,
+      pathname: getMessageDetailRoute(routeRole, id) as any,
       params: { id: id.toString(), name: nameOverride || resolveName(room) },
     });
   };
@@ -222,6 +225,8 @@ export default function ChatPage() {
           setEditRoom(room);
           setEditTitle((room as any).title || '');
         }}
+        onManageGroup={(room) => setManageGroupRoom(room)}
+        canManageGroup={canManageGroup}
       />
       )}
 
