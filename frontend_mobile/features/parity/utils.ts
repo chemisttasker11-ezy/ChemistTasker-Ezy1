@@ -50,8 +50,15 @@ export const startOfWeek = (date = new Date()) => {
   return isoDate(next);
 };
 
-export const idempotencyKey = (prefix = 'mobile') =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+export const idempotencyKey = (_prefix = 'mobile') => {
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  if (randomUuid) return randomUuid;
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+};
 
 export const replaceUnderscore = (value: any) => String(value ?? '').replaceAll('_', ' ');
 

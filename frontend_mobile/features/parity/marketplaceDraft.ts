@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { idempotencyKey } from './utils';
 
 const KEY_PREFIX='@chemisttasker_marketplace_mobile_draft_v2';
 const LEGACY_KEY='@chemisttasker_marketplace_mobile_draft_v1';
@@ -12,12 +13,13 @@ export type MarketplaceMobileDraft = {
   allowed_buyer_roles:string[]; delivery_method:'PICKUP'|'POSTAGE'|'BOTH'; postage_payer:'BUYER'|'SELLER'|'';
   postage_organiser:'BUYER'|'SELLER'|''; known_cost:string; quote_required:boolean; current_circle:'OWNED_CHAIN'|'ORGANISATION'|'PLATFORM'; maximum_circle:'OWNED_CHAIN'|'ORGANISATION'|'PLATFORM'; image_uris:string[];
   created_listing_id:string|null; created_listing_version:number|null; uploaded_image_uris:string[];
+  create_request_id:string;
 };
 export const emptyMarketplaceDraft=():MarketplaceMobileDraft=>({
   seller_context:'PERSONAL',pharmacy:null,category:null,category_name:'',mode:'SELL',title:'',description:'',condition:'GOOD',
   quantity:1,unit:'item',amount:'',desired_swap:'',suburb:'',state:'QLD',postcode:'',private_pickup_details:'',
   allowed_buyer_roles:[],delivery_method:'PICKUP',postage_payer:'',postage_organiser:'',known_cost:'',quote_required:false,current_circle:'OWNED_CHAIN',maximum_circle:'PLATFORM',image_uris:[],
-  created_listing_id:null,created_listing_version:null,uploaded_image_uris:[]
+  created_listing_id:null,created_listing_version:null,uploaded_image_uris:[],create_request_id:idempotencyKey('marketplace-listing')
 });
 export async function loadMarketplaceDraft(scope:string):Promise<MarketplaceMobileDraft>{
   await AsyncStorage.removeItem(LEGACY_KEY).catch(()=>null);

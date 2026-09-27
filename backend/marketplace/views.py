@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from client_profile.models import Pharmacy
 from .models import (ListingEscalationStep, MarketplaceAuditEvent, MarketplaceCategory, MarketplaceExchange,
                      MarketplaceCatalogueProduct, MarketplaceExchangeParticipant, MarketplaceImage, MarketplaceInternalTransfer, MarketplaceListing, MarketplaceMessage,
-                     MarketplaceReport, MarketplaceSavedListing)
+                     MarketplaceReport, MarketplaceRequestReceipt, MarketplaceSavedListing)
 from .policy import evaluate_marketplace_access, owns_pharmacy
 from .serializers import ExchangeSerializer, ListingWriteSerializer, MessageSerializer, PublicCategorySerializer, PublicListingSerializer
 from .services import accept_exchange, assert_listing_manager, buyer_can_contact, request_receipt
@@ -61,6 +61,7 @@ class Listings(APIView):
     def get_permissions(self):
         return [permission() for permission in self.permission_classes_by_method.get(self.request.method, self.permission_classes)]
 
+    @transaction.atomic
     def post(self, request):
         if not settings.MARKETPLACE_ALL_WRITES_ENABLED or not settings.MARKETPLACE_NEW_LISTINGS_ENABLED:
             return Response({"code": "NEW_LISTINGS_DISABLED", "detail": "New listings are not enabled."}, status=503)
@@ -68,17 +69,37 @@ class Listings(APIView):
         if decision.blockers:
             raise PermissionDenied({"code": decision.blockers[0]["code"], "detail": decision.blockers[0]["message"]})
         data = request.data.copy()
+        request_id = data.pop("client_request_id", None)
+        if request_id:
+            try:
+                request_id = uuid.UUID(str(request_id))
+            except (TypeError, ValueError, AttributeError):
+                raise ValidationError({"client_request_id": "Enter a valid UUID."})
         pharmacy = None
         if data.get("seller_context") == "PHARMACY":
             pharmacy = get_object_or_404(Pharmacy, pk=data.get("pharmacy"))
             if not owns_pharmacy(request.user, pharmacy):
                 raise PermissionDenied("Verified current ownership is required.")
         data["slug"] = slugify(data.get("title", "listing"))[:160] or "listing"
+        payload = dict(data)
+        if request_id:
+            existing, payload_hash = request_receipt(request.user, "LISTING_CREATE", request_id, payload)
+            if existing:
+                return Response(existing.outcome)
         serializer = ListingWriteSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         listing = serializer.save(creator=request.user, pharmacy=pharmacy)
         MarketplaceAuditEvent.objects.create(actor=request.user, acting_pharmacy=pharmacy, action="LISTING_CREATED", target_type="listing", target_id=str(listing.id))
-        return Response(ListingWriteSerializer(listing).data, status=201)
+        outcome = dict(ListingWriteSerializer(listing).data)
+        if request_id:
+            MarketplaceRequestReceipt.objects.create(
+                actor=request.user,
+                action="LISTING_CREATE",
+                client_request_id=request_id,
+                payload_hash=payload_hash,
+                outcome=outcome,
+            )
+        return Response(outcome, status=201)
 
 
 class ListingDetail(APIView):

@@ -1,6 +1,7 @@
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
+import uuid
 
 from client_profile.models import OwnerOnboarding, Pharmacy
 from users.models import User
@@ -74,3 +75,62 @@ class MarketplaceTestCase(TestCase):
         client = APIClient(); client.force_authenticate(stranger)
         response = client.post("/api/marketplace/listings/", {"seller_context":"PHARMACY","pharmacy":self.pharmacy.id,"category":self.category.id,"mode":"FREE","title":"Forged","description":"No","condition":"Used","quantity":1,"unit":"bundle","amount":"0","desired_swap":"","suburb":"Brisbane","state":"QLD","postcode":"4000","allowed_buyer_roles":["OWNER"],"delivery":{"method":"PICKUP"}}, format="json")
         self.assertEqual(response.status_code, 403)
+
+    @override_settings(MARKETPLACE_NEW_LISTINGS_ENABLED=True, MARKETPLACE_ALL_WRITES_ENABLED=True)
+    def test_listing_create_replays_same_request_without_duplicate(self):
+        client = APIClient(); client.force_authenticate(self.user)
+        request_id = str(uuid.uuid4())
+        payload = {
+            "client_request_id": request_id,
+            "seller_context": "PHARMACY",
+            "pharmacy": self.pharmacy.id,
+            "category": self.category.id,
+            "mode": "FREE",
+            "title": "Idempotent fixture",
+            "description": "Created once even when the response is retried.",
+            "condition": "Good",
+            "quantity": 1,
+            "unit": "item",
+            "amount": "0",
+            "desired_swap": "",
+            "suburb": "Brisbane",
+            "state": "QLD",
+            "postcode": "4000",
+            "allowed_buyer_roles": ["OWNER"],
+            "delivery": {"method": "PICKUP"},
+        }
+        first = client.post("/api/marketplace/listings/", payload, format="json")
+        replay = client.post("/api/marketplace/listings/", payload, format="json")
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(replay.status_code, 200)
+        self.assertEqual(first.data["id"], replay.data["id"])
+        self.assertEqual(MarketplaceListing.objects.filter(title="Idempotent fixture").count(), 1)
+
+    @override_settings(MARKETPLACE_NEW_LISTINGS_ENABLED=True, MARKETPLACE_ALL_WRITES_ENABLED=True)
+    def test_listing_create_rejects_request_id_reuse_with_changed_payload(self):
+        client = APIClient(); client.force_authenticate(self.user)
+        request_id = str(uuid.uuid4())
+        payload = {
+            "client_request_id": request_id,
+            "seller_context": "PHARMACY",
+            "pharmacy": self.pharmacy.id,
+            "category": self.category.id,
+            "mode": "FREE",
+            "title": "Original fixture",
+            "description": "Original payload.",
+            "condition": "Good",
+            "quantity": 1,
+            "unit": "item",
+            "amount": "0",
+            "desired_swap": "",
+            "suburb": "Brisbane",
+            "state": "QLD",
+            "postcode": "4000",
+            "allowed_buyer_roles": ["OWNER"],
+            "delivery": {"method": "PICKUP"},
+        }
+        self.assertEqual(client.post("/api/marketplace/listings/", payload, format="json").status_code, 201)
+        payload["title"] = "Changed fixture"
+        response = client.post("/api/marketplace/listings/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(MarketplaceListing.objects.filter(creator=self.user).count(), 1)

@@ -79,6 +79,7 @@ export interface MarketplaceDeliveryInput {
 }
 
 export interface MarketplaceListingWrite {
+  client_request_id?: string;
   seller_context: 'PERSONAL' | 'PHARMACY';
   pharmacy?: number | null;
   category: number;
