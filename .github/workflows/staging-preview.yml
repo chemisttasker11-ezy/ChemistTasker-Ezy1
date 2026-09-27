@@ -55,9 +55,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          output="$(bash scripts/deploy-staging.sh)"
-          printf '%s\n' "$output"
-          preview_url="$(printf '%s\n' "$output" | sed -n 's/^PREVIEW_URL=//p' | tail -n 1)"
+          bash scripts/deploy-staging.sh | tee /tmp/staging-deploy.log
+          preview_url="$(sed -n 's/^PREVIEW_URL=//p' /tmp/staging-deploy.log | tail -n 1)"
           test -n "$preview_url"
           echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
           {
