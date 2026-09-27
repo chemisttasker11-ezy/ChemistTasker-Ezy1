@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -12,6 +12,7 @@ function profileRouteForRole(role?: string | null) {
   if (normalized === 'PHARMACIST') return '/pharmacist/profile';
   if (normalized === 'OTHER_STAFF') return '/otherstaff/profile';
   if (normalized === 'OWNER') return '/owner/profile';
+  if (normalized === 'EXPLORER') return '/explorer/profile';
   if (normalized.includes('ORG') || normalized === 'ORGANIZATION') return '/organization/profile';
   return '/admin';
 }
@@ -21,6 +22,7 @@ function AdminSidebar({
   onDismiss,
   onNavigate,
   pharmacyName,
+  canManageCommunications,
   onReturnToRole,
   roleLabel,
 }: {
@@ -28,6 +30,7 @@ function AdminSidebar({
   onDismiss: () => void;
   onNavigate: (route: string) => void;
   pharmacyName: string;
+  canManageCommunications: boolean;
   onReturnToRole: () => void;
   roleLabel: string;
 }) {
@@ -43,8 +46,10 @@ function AdminSidebar({
     { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift' },
     { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat' },
     { label: 'Pills', icon: 'pill', route: '/admin/pills' },
-    { label: 'Notifications', icon: 'bell-outline', route: '/admin/notifications' },
-  ];
+    { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: canManageCommunications },
+    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: canManageCommunications },
+    { label: 'Notifications', icon: 'bell-outline', route: '/admin/notifications', visible: true },
+  ].filter((item) => item.visible !== false);
 
   const handleLogout = async () => {
     onDismiss();
@@ -55,32 +60,34 @@ function AdminSidebar({
   return (
     <Portal>
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.sidebar}>
-        <Text variant="labelMedium" style={styles.sidebarEyebrow}>Admin workspace</Text>
-        <Text variant="titleMedium" style={styles.sidebarTitle} numberOfLines={2}>
-          {pharmacyName}
-        </Text>
-        <Divider style={styles.sidebarDivider} />
-        {items.map((item) => (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text variant="labelMedium" style={styles.sidebarEyebrow}>Admin workspace</Text>
+          <Text variant="titleMedium" style={styles.sidebarTitle} numberOfLines={2}>
+            {pharmacyName}
+          </Text>
+          <Divider style={styles.sidebarDivider} />
+          {items.map((item) => (
+            <List.Item
+              key={`${item.route}-${item.label}`}
+              title={item.label}
+              left={(props) => <List.Icon {...props} icon={item.icon} />}
+              onPress={() => {
+                onDismiss();
+                onNavigate(item.route);
+              }}
+            />
+          ))}
+          <Divider style={styles.sidebarDivider} />
           <List.Item
-            key={`${item.route}-${item.label}`}
-            title={item.label}
-            left={(props) => <List.Icon {...props} icon={item.icon} />}
-            onPress={() => {
-              onDismiss();
-              onNavigate(item.route);
-            }}
+            title={`Return to ${roleLabel} workspace`}
+            description="Switch back to your original persona"
+            left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
+            onPress={onReturnToRole}
           />
-        ))}
-        <Divider style={styles.sidebarDivider} />
-        <List.Item
-          title={`Return to ${roleLabel} workspace`}
-          description="Switch back to your original persona"
-          left={(props) => <List.Icon {...props} icon="account-switch-outline" />}
-          onPress={onReturnToRole}
-        />
-        <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
-          Logout
-        </Button>
+          <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
+            Logout
+          </Button>
+        </ScrollView>
       </Modal>
     </Portal>
   );
@@ -88,7 +95,7 @@ function AdminSidebar({
 
 function AdminLayoutInner() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasCapability } = useAuth();
   const { reloadWorkspace } = useWorkspace();
   const { activePharmacyId: pharmacyId, activePharmacyName: pharmacyName, isLoading: adminWorkspaceLoading } = useAdminWorkspace();
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -118,6 +125,9 @@ function AdminLayoutInner() {
 
   const profileRoute = profileRouteForRole(user?.role);
   const roleLabel = String(user?.role || 'staff').toLowerCase().replace('_', ' ');
+  const canManageCommunications = Boolean(
+    pharmacyId && hasCapability('MANAGE_COMMUNICATIONS', pharmacyId),
+  );
   const adminPath = (route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
     if (route === '/admin/pills' && pharmacyId) return `/admin/${pharmacyId}/pills`;
@@ -142,6 +152,7 @@ function AdminLayoutInner() {
         onDismiss={() => setSidebarVisible(false)}
         onNavigate={navigateAdmin}
         pharmacyName={pharmacyName}
+        canManageCommunications={canManageCommunications}
         onReturnToRole={() => void returnToRole()}
         roleLabel={roleLabel}
       />
@@ -158,9 +169,10 @@ function AdminLayoutInner() {
             <View style={styles.headerRight}>
               <IconButton
                 icon="bell-outline"
+                accessibilityLabel="Notifications"
                 onPress={() => router.push('/admin/notifications' as any)}
               />
-              <TouchableOpacity onPress={() => router.push(profileRoute as any)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push(profileRoute as any)}>
                 {photoUrl ? (
                   <Avatar.Image size={32} source={{ uri: photoUrl }} />
                 ) : (
@@ -193,6 +205,8 @@ function AdminLayoutInner() {
         <Stack.Screen name="pills" options={{ headerTitle: 'Pills' }} />
         <Stack.Screen name="[pharmacyId]/pills" options={{ headerTitle: 'Pills' }} />
         <Stack.Screen name="chat" options={{ headerTitle: 'Chat' }} />
+        <Stack.Screen name="hub" options={{ headerTitle: 'Pharmacy Hub' }} />
+        <Stack.Screen name="calendar" options={{ headerTitle: 'Calendar' }} />
         <Stack.Screen name="notifications" options={{ headerTitle: 'Notifications' }} />
       </Stack>
     </>
@@ -218,6 +232,7 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     marginHorizontal: 16,
+    maxHeight: '88%',
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
     paddingVertical: 14,
