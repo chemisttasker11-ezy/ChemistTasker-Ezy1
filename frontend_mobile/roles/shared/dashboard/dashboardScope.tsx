@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, Button, Divider, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
 import apiClient from '@/utils/apiClient';
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
@@ -256,7 +256,7 @@ export function DashboardScopeSwitcher({
     <>
       <TouchableOpacity style={styles.scopeButton} onPress={() => setVisible(true)} activeOpacity={0.82}>
         <View style={styles.scopeIcon}>
-          <IconButton icon={workspace === 'internal' ? 'store-outline' : 'earth'} size={20} iconColor="#4338CA" />
+          <Icon source={workspace === 'internal' ? 'store-outline' : 'earth'} size={20} color="#4338CA" />
         </View>
         <View style={styles.scopeText}>
           <Text style={styles.scopeLabel}>Dashboard scope</Text>
@@ -264,7 +264,7 @@ export function DashboardScopeSwitcher({
             {scopeLabel}
           </Text>
         </View>
-        <IconButton icon="chevron-down" size={20} iconColor="#6B7280" />
+        <View importantForAccessibility="no-hide-descendants"><Icon source="chevron-down" size={20} color="#6B7280" /></View>
       </TouchableOpacity>
 
       <Portal>
@@ -403,29 +403,38 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
       <Text variant="titleSmall">{pendingAdminCount} admin invitation{pendingAdminCount === 1 ? '' : 's'} awaiting your decision</Text>
       <Button mode="text" onPress={() => router.push('/admin-invitations' as any)}>Review invitations</Button>
     </Surface> : null}
-    {(assignments.length > 0 || canSwitchToOrg) ? <View style={styles.personaSwitcher}>
+    {(assignments.length > 0 || canSwitchToOrg) ? <View style={styles.personaSwitcher} accessibilityRole="tablist">
       <TouchableOpacity
+        accessibilityRole="tab"
+        accessibilityState={{ selected: !activeAdmin && (!activeOrg || !canSwitchToOrg) }}
+        accessibilityLabel={`${roleLabel} workspace`}
         style={[styles.personaButton, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonActive]}
         onPress={() => void openRoleWorkspace()}
         activeOpacity={0.82}
       >
-        <IconButton icon="account-outline" size={18} iconColor={!activeAdmin && (!activeOrg || !canSwitchToOrg) ? '#FFFFFF' : '#4F46E5'} />
+        <Icon source="account-outline" size={18} color={!activeAdmin && (!activeOrg || !canSwitchToOrg) ? '#FFFFFF' : '#4F46E5'} />
         <Text style={[styles.personaButtonText, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonTextActive]}>{roleLabel}</Text>
       </TouchableOpacity>
       {assignments.length > 0 ? <TouchableOpacity
+        accessibilityRole="tab"
+        accessibilityState={{ selected: activeAdmin }}
+        accessibilityLabel="Admin workspace"
         style={[styles.personaButton, activeAdmin && styles.personaButtonActive]}
         onPress={() => void openAdminWorkspace()}
         activeOpacity={0.82}
       >
-        <IconButton icon="shield-account-outline" size={18} iconColor={activeAdmin ? '#FFFFFF' : '#4F46E5'} />
+        <Icon source="shield-account-outline" size={18} color={activeAdmin ? '#FFFFFF' : '#4F46E5'} />
         <Text style={[styles.personaButtonText, activeAdmin && styles.personaButtonTextActive]}>Admin</Text>
       </TouchableOpacity> : null}
       {canSwitchToOrg ? <TouchableOpacity
+        accessibilityRole="tab"
+        accessibilityState={{ selected: activeOrg }}
+        accessibilityLabel="Organization workspace"
         style={[styles.personaButton, activeOrg && styles.personaButtonActive]}
         onPress={() => router.replace('/organization/dashboard' as any)}
         activeOpacity={0.82}
       >
-        <IconButton icon="domain" size={18} iconColor={activeOrg ? '#FFFFFF' : '#4F46E5'} />
+        <Icon source="domain" size={18} color={activeOrg ? '#FFFFFF' : '#4F46E5'} />
         <Text style={[styles.personaButtonText, activeOrg && styles.personaButtonTextActive]}>Organization</Text>
       </TouchableOpacity> : null}
     </View> : null}
@@ -463,7 +472,7 @@ export function DashboardActivity({ data }: { data: DashboardPayload | null }) {
         disabled={!resolveActivityRoute(item)}
       >
         <View style={styles.activityIcon}>
-          <IconButton icon="pulse" size={18} iconColor="#4338CA" />
+          <Icon source="pulse" size={18} color="#4338CA" />
         </View>
         <View style={styles.activityCopy}>
           <Text style={styles.activityTitle} numberOfLines={1}>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { Avatar, Button, Divider, Icon, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { getNotifications, hasOrganizationAccess, markNotificationsAsRead } from '@chemisttasker/shared-core';
@@ -297,7 +297,7 @@ export default function OrganizationLayout() {
           headerShown: true,
           headerTitle: tabTitles[route.name] || 'Organization',
           headerRightContainerStyle: { paddingRight: 10 },
-          headerLeft: () => <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />,
+          headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open organization menu" onPress={() => setSidebarVisible(true)} />,
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
@@ -317,9 +317,9 @@ export default function OrganizationLayout() {
                     }}
                   />
                 ) : null}
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -469,6 +469,10 @@ const styles = StyleSheet.create({
   },
   bellWrapper: {
     position: 'relative',
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   postTabIcon: {
     backgroundColor: '#6366F1',

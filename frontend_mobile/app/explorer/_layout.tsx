@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
+import { Avatar, Button, Divider, Icon, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
@@ -235,7 +235,7 @@ export default function ExplorerTabs() {
           headerShown: true,
           headerTitle: tabTitles[route.name] || 'Explorer',
           headerRightContainerStyle: { paddingRight: 10 },
-          headerLeft: () => <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />,
+          headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open explorer menu" onPress={() => setSidebarVisible(true)} />,
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
             const showBack = !isDashboard;
@@ -255,9 +255,9 @@ export default function ExplorerTabs() {
                     }
                   }}
                 />
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -276,9 +276,9 @@ export default function ExplorerTabs() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -370,6 +370,10 @@ const styles = StyleSheet.create({
   },
   bellWrapper: {
     position: 'relative',
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: { backgroundColor: '#6366F1' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },

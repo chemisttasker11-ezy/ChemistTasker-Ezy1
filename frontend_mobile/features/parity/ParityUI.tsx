@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Chip, Divider, IconButton, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Chip, Divider, Icon, IconButton, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -147,7 +147,7 @@ export function DataRow({
         </View>
         {status ? <Chip compact>{status}</Chip> : null}
         {right}
-        {onPress ? <IconButton icon="chevron-right" size={20} /> : null}
+        {onPress ? <View importantForAccessibility="no-hide-descendants"><Icon source="chevron-right" size={20} /></View> : null}
       </Card.Content>
     </Card>
   );
@@ -246,7 +246,7 @@ export function ScreenLink({ title, subtitle, onPress, icon = 'chevron-right' }:
           <Text variant="titleSmall">{title}</Text>
           {subtitle ? <Text variant="bodySmall" style={styles.muted}>{subtitle}</Text> : null}
         </View>
-        <IconButton icon={icon} />
+        <View importantForAccessibility="no-hide-descendants"><Icon source={icon} size={24} /></View>
       </Card.Content>
     </Card>
   );
@@ -269,7 +269,7 @@ export const styles = StyleSheet.create({
   metric: { flexGrow: 1, flexBasis: 100, minWidth: 100, borderRadius: 12 },
   metricContent: { minHeight: 82, justifyContent: 'space-between' },
   rowCard: { borderRadius: 12, backgroundColor: palette.surface },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
   rowTitle: { fontWeight: '600', color: palette.text },
   muted: { color: palette.muted },
   note: { borderRadius: 12, padding: 14, gap: 5 },

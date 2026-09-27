@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, IconButton, Text } from 'react-native-paper';
+import { Card, Icon, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -64,14 +64,20 @@ export default function ParityToolsCard() {
       <Text variant="titleMedium" style={styles.heading}>Work & platform tools</Text>
       <View style={styles.grid}>
         {tools.map((tool) => (
-          <Card key={tool.route} mode="outlined" style={styles.card} onPress={() => router.push(tool.route as any)}>
+          <Card
+            key={tool.route}
+            mode="outlined"
+            style={styles.card}
+            accessibilityLabel={`${tool.title}. ${tool.subtitle}`}
+            onPress={() => router.push(tool.route as any)}
+          >
             <Card.Content style={styles.content}>
-              <View style={styles.icon}><IconButton icon={tool.icon} size={22} iconColor="#6366F1" /></View>
+              <View style={styles.icon} importantForAccessibility="no-hide-descendants"><Icon source={tool.icon} size={22} color="#6366F1" /></View>
               <View style={styles.copy}>
                 <Text variant="titleSmall" style={styles.title}>{tool.title}</Text>
                 <Text variant="bodySmall" style={styles.subtitle}>{tool.subtitle}</Text>
               </View>
-              <IconButton icon="chevron-right" size={18} iconColor="#9CA3AF" />
+              <View importantForAccessibility="no-hide-descendants"><Icon source="chevron-right" size={18} color="#9CA3AF" /></View>
             </Card.Content>
           </Card>
         ))}
@@ -85,7 +91,7 @@ const styles = StyleSheet.create({
   heading: { color: '#111827', fontWeight: '700' },
   grid: { gap: 10 },
   card: { borderRadius: 14, backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' },
-  content: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  content: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 66 },
   icon: { width: 46, height: 46, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1 },
   title: { color: '#111827', fontWeight: '700' },

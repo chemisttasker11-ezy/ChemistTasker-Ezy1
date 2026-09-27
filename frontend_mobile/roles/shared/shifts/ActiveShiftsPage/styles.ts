@@ -154,7 +154,7 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         flexWrap: 'nowrap',
         justifyContent: 'flex-end',
-        width: 96,
+        width: 144,
     },
     directBadgeRow: {
         flexDirection: 'row',
@@ -179,8 +179,8 @@ export const styles = StyleSheet.create({
     },
     actionButton: {
         margin: 0,
-        width: 30,
-        height: 30,
+        width: 48,
+        height: 48,
         backgroundColor: '#F8FAFC',
     },
     statsRow: {

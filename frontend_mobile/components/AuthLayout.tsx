@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, Easing } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,57 +11,10 @@ type AuthLayoutProps = {
 };
 
 export default function AuthLayout({ title, children, showTitle = true }: AuthLayoutProps) {
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const driftAnim = useRef(new Animated.Value(0)).current;
-  const spinAnim = useRef(new Animated.Value(0)).current;
-  const swayAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, { toValue: 1, duration: 4000, useNativeDriver: true }),
-        Animated.timing(floatAnim, { toValue: 0, duration: 4000, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(driftAnim, { toValue: 1, duration: 6000, useNativeDriver: true }),
-        Animated.timing(driftAnim, { toValue: 0, duration: 6000, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.timing(spinAnim, {
-        toValue: 1,
-        duration: 28000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(swayAnim, { toValue: 1, duration: 7000, useNativeDriver: true }),
-        Animated.timing(swayAnim, { toValue: 0, duration: 7000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [floatAnim, driftAnim, spinAnim, swayAnim]);
-
-  const floatY = floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
-  const driftX = driftAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
-  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const swayY = swayAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 14] });
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <LinearGradient colors={['#f7f9fb', '#eef1f7']} style={StyleSheet.absoluteFillObject} />
-      <Animated.View
-        style={[
-          styles.network,
-          { transform: [{ rotate: spin }, { translateY: swayY }], pointerEvents: 'none' },
-        ]}
-      >
+      <View style={styles.network} pointerEvents="none">
         <View style={[styles.node, styles.nodeOne]} />
         <View style={[styles.node, styles.nodeTwo]} />
         <View style={[styles.node, styles.nodeThree]} />
@@ -69,9 +22,9 @@ export default function AuthLayout({ title, children, showTitle = true }: AuthLa
         <View style={[styles.line, styles.lineOne]} />
         <View style={[styles.line, styles.lineTwo]} />
         <View style={[styles.line, styles.lineThree]} />
-      </Animated.View>
-      <Animated.View style={[styles.blob, styles.blobOne, { transform: [{ translateY: floatY }] }]} />
-      <Animated.View style={[styles.blob, styles.blobTwo, { transform: [{ translateX: driftX }] }]} />
+      </View>
+      <View style={[styles.blob, styles.blobOne]} pointerEvents="none" />
+      <View style={[styles.blob, styles.blobTwo]} pointerEvents="none" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

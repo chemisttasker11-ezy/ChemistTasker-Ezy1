@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import AuthLayout from '../components/AuthLayout';
@@ -10,25 +10,6 @@ import { hasOrganizationAccess, resolveInitialWorkspace } from '../utils/mobileP
 export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const tiltAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, { toValue: 1, duration: 3600, useNativeDriver: true }),
-        Animated.timing(floatAnim, { toValue: 0, duration: 3600, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(tiltAnim, { toValue: 1, duration: 5000, useNativeDriver: true }),
-        Animated.timing(tiltAnim, { toValue: 0, duration: 5000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [floatAnim, tiltAnim]);
-
   useEffect(() => {
     if (isLoading || !user) return;
     let active = true;
@@ -52,16 +33,14 @@ export default function HomeScreen() {
     };
   }, [isLoading, user, router]);
 
-  const translateY = floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -16] });
-  const rotate = tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] });
   const shouldShowAuthActions = !isLoading && !user;
 
   return (
     <AuthLayout title="Welcome" showTitle={false}>
       <View style={styles.hero}>
-        <Animated.Image
+        <Image
           source={require('../assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png')}
-          style={[styles.heroImage, { transform: [{ translateY }, { rotate }] }]}
+          style={styles.heroImage}
           resizeMode="contain"
         />
         <Text variant="headlineSmall" style={styles.title}>

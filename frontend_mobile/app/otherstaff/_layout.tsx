@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { ActivityIndicator, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Avatar, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
+import { Avatar, Icon, IconButton, Modal, Portal, List, Divider, Button, Text } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
@@ -265,7 +265,7 @@ export default function OtherStaffTabs() {
           headerTitle: tabTitles[route.name] || 'Other Staff',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => (
-            <IconButton icon="menu" onPress={() => setSidebarVisible(true)} />
+              <IconButton icon="menu" accessibilityLabel="Open other staff menu" onPress={() => setSidebarVisible(true)} />
           ),
           headerRight: () => {
             const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
@@ -286,9 +286,9 @@ export default function OtherStaffTabs() {
                     }
                   }}
                 />
-                <TouchableOpacity onPress={openNotifications} style={{ marginHorizontal: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
                   <View style={styles.bellWrapper}>
-                    <IconButton icon="bell-outline" />
+                    <Icon source="bell-outline" size={24} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -307,9 +307,9 @@ export default function OtherStaffTabs() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => router.push('/otherstaff/notifications' as any)} style={{ marginHorizontal: 4 }}>
-                  <View>
-                    <IconButton icon="bell-outline" />
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={() => router.push('/otherstaff/notifications' as any)} style={{ marginHorizontal: 4 }}>
+                  <View style={styles.bellWrapper}>
+                    <Icon source="bell-outline" size={24} />
                     {unreadCount > 0 && <View style={styles.badgeDot} />}
                   </View>
                 </TouchableOpacity>
@@ -438,6 +438,10 @@ const styles = StyleSheet.create({
   },
   bellWrapper: {
     position: 'relative',
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: { backgroundColor: '#6366F1' },
   avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },

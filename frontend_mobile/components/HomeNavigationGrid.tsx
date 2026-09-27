@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { IconButton, Text } from 'react-native-paper';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Icon, Text } from 'react-native-paper';
 
 const horizontalPadding = 20;
 
@@ -25,13 +25,16 @@ export default function HomeNavigationGrid({ items, onNavigate }: HomeNavigation
           const palette = navPalette[index % navPalette.length];
           const cardStyle = index % 5 === 3 || index % 5 === 4 ? styles.cardCompact : styles.card;
           return (
-            <TouchableOpacity
+            <Pressable
               key={`${item.route}-${item.title}`}
+              accessibilityRole="button"
+              accessibilityLabel={item.description ? `${item.title}. ${item.description}` : item.title}
               style={[cardStyle, { backgroundColor: palette.bg }]}
               onPress={() => onNavigate(item.route)}
-              activeOpacity={0.78}
             >
-              <IconButton icon={item.icon} size={38} iconColor={item.color || palette.icon} style={styles.icon} />
+              <View style={styles.icon} importantForAccessibility="no-hide-descendants">
+                <Icon source={item.icon} size={38} color={item.color || palette.icon} />
+              </View>
               <Text variant="titleSmall" style={styles.title} numberOfLines={2}>
                 {item.title}
               </Text>
@@ -40,7 +43,7 @@ export default function HomeNavigationGrid({ items, onNavigate }: HomeNavigation
                   {item.description}
                 </Text>
               ) : null}
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
       </View>

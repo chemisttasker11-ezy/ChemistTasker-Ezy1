@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
-import { Text, Surface, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
+import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect } from '@react-navigation/native';
@@ -162,37 +162,37 @@ export default function NotificationsScreen() {
   };
 
   const renderItem = ({ item }: { item: Notification }) => (
-    <TouchableOpacity onPress={() => handleNotificationPress(item)} activeOpacity={0.85}>
-      <Surface
-        style={[styles.notificationItem, !item.readAt && styles.unreadItem]}
-        elevation={1}
+    <Surface
+      style={[styles.notificationItem, !item.readAt && styles.unreadItem]}
+      elevation={1}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${item.title}. ${item.body}`}
+        style={styles.notificationAction}
+        onPress={() => handleNotificationPress(item)}
       >
-      <View style={styles.iconContainer}>
-        <Surface style={styles.iconSurface} elevation={0}>
-          <IconButton
-            icon={getIconForType(item.type)}
-            size={24}
-            iconColor="#6366F1"
-            accessibilityLabel={`Notification type ${item.type}`}
-            accessibilityRole="button"
-          />
-        </Surface>
-        {!item.readAt && <Badge size={8} style={styles.unreadDot} />}
-      </View>
+        <View style={styles.iconContainer} importantForAccessibility="no-hide-descendants">
+          <Surface style={styles.iconSurface} elevation={0}>
+            <Icon source={getIconForType(item.type)} size={24} color="#6366F1" />
+          </Surface>
+          {!item.readAt && <Badge size={8} style={styles.unreadDot} />}
+        </View>
 
-      <View style={styles.contentContainer}>
-        <View style={styles.headerRow}>
-          <Text variant="titleSmall" style={styles.title}>
-            {item.title}
-          </Text>
-          <Text variant="bodySmall" style={styles.time}>
-            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+        <View style={styles.contentContainer}>
+          <View style={styles.headerRow}>
+            <Text variant="titleSmall" style={styles.title}>
+              {item.title}
+            </Text>
+            <Text variant="bodySmall" style={styles.time}>
+              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+            </Text>
+          </View>
+          <Text variant="bodyMedium" style={styles.message} numberOfLines={2}>
+            {item.body}
           </Text>
         </View>
-        <Text variant="bodyMedium" style={styles.message} numberOfLines={2}>
-          {item.body}
-        </Text>
-      </View>
+      </Pressable>
 
       {!item.readAt && (
         <IconButton
@@ -204,8 +204,7 @@ export default function NotificationsScreen() {
           accessibilityRole="button"
         />
       )}
-      </Surface>
-    </TouchableOpacity>
+    </Surface>
   );
 
   return (
@@ -252,10 +251,17 @@ const styles = StyleSheet.create({
   },
   notificationItem: {
     flexDirection: 'row',
-    padding: 12,
     marginBottom: 12,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  notificationAction: {
+    flex: 1,
+    minHeight: 68,
+    padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   unreadItem: {

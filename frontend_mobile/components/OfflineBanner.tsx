@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Icon, Text } from 'react-native-paper';
 import { useNetInfo } from '@react-native-community/netinfo';
 
 export default function OfflineBanner() {
@@ -10,8 +10,9 @@ export default function OfflineBanner() {
   if (!isOffline) return null;
 
   return (
-    <View style={styles.banner}>
-      <Text style={styles.text}>You&apos;re offline. Some features may not work.</Text>
+    <View style={styles.banner} accessibilityRole="alert">
+      <Icon source="wifi-off" size={20} color="#7C2D12" />
+      <Text style={styles.text}>You&apos;re offline. Some features are unavailable until your connection returns.</Text>
     </View>
   );
 }
@@ -19,12 +20,16 @@ export default function OfflineBanner() {
 const styles = StyleSheet.create({
   banner: {
     backgroundColor: '#FEF3C7',
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   text: {
     color: '#92400E',
-    textAlign: 'center',
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

@@ -24,15 +24,16 @@ import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 
 const ROLE_OPTIONS = [
-  { label: 'Pharmacy Owner', value: 'OWNER', icon: 'storefront', color: '#4f46e5' },
-  { label: 'Pharmacist', value: 'PHARMACIST', icon: 'local-pharmacy', color: '#0ea5e9' },
+  { label: 'Pharmacy Owner', description: 'Manage pharmacies, teams, shifts and business tools.', value: 'OWNER', icon: 'storefront', color: '#4f46e5' },
+  { label: 'Pharmacist', description: 'Find shifts, manage availability and build your professional profile.', value: 'PHARMACIST', icon: 'local-pharmacy', color: '#0ea5e9' },
   {
     label: 'Other Staff (Intern, Technician, Assistant, Student)',
+    description: 'Manage shifts, availability, attendance and your work profile.',
     value: 'OTHER_STAFF',
     icon: 'badge',
     color: '#22c55e',
   },
-  { label: 'Explorer (Shadowing/Volunteering)', value: 'EXPLORER', icon: 'travel-explore', color: '#f97316' },
+  { label: 'Explorer (Shadowing/Volunteering)', description: 'Explore pharmacy opportunities and build an entry-level profile.', value: 'EXPLORER', icon: 'travel-explore', color: '#f97316' },
 ];
 
 const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
@@ -241,6 +242,9 @@ export default function RegisterScreen() {
             return (
               <TouchableOpacity
                 key={option.value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={`${option.label}. ${option.description}`}
                 style={[
                   styles.roleCard,
                   { borderColor: isSelected ? option.color : '#e5e7eb' },
@@ -253,14 +257,16 @@ export default function RegisterScreen() {
                   <View style={[styles.roleIconWrap, { backgroundColor: `${option.color}1A` }]}>
                     <MaterialIcons name={option.icon as any} size={22} color={option.color} />
                   </View>
-                  <RadioButton
-                    value={option.value}
-                    status={isSelected ? 'checked' : 'unchecked'}
-                    onPress={() => setFormData({ ...formData, role: option.value })}
-                    color={option.color}
-                  />
+                  <View pointerEvents="none" importantForAccessibility="no-hide-descendants">
+                    <RadioButton
+                      value={option.value}
+                      status={isSelected ? 'checked' : 'unchecked'}
+                      color={option.color}
+                    />
+                  </View>
                 </View>
                 <Text style={styles.radioLabel}>{option.label}</Text>
+                <Text style={styles.roleDescription}>{option.description}</Text>
               </TouchableOpacity>
             );
           })}
@@ -506,6 +512,7 @@ const styles = StyleSheet.create({
   },
   roleCard: {
     width: '48%',
+    minHeight: 82,
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
@@ -523,6 +530,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  roleDescription: {
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 4,
   },
   modalBackdrop: {
     flex: 1,
