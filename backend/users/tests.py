@@ -178,6 +178,34 @@ class PublicAndPrivateRoutePreservationTests(TestCase):
         self.assertEqual(client.patch(path, {'name': 'Changed'}, format='json').status_code, 404)
         client.force_authenticate(owner)
         self.assertEqual(client.get(path).status_code, 200)
+
+
+class AuthenticatedScopePayloadTests(TestCase):
+    def test_only_accepted_pharmacy_memberships_are_exposed_as_active_scope(self):
+        from client_profile.models import Membership, Pharmacy
+        from users.views import _build_authenticated_user_payload
+
+        user = get_user_model().objects.create_user(email='scope-worker@example.test', role='PHARMACIST')
+        accepted = Pharmacy.objects.create(name='Accepted pharmacy')
+        pending = Pharmacy.objects.create(name='Pending pharmacy')
+        Membership.objects.create(
+            user=user,
+            pharmacy=accepted,
+            role='PHARMACIST',
+            employment_type='LOCUM',
+            status=Membership.Status.ACCEPTED,
+        )
+        Membership.objects.create(
+            user=user,
+            pharmacy=pending,
+            role='PHARMACIST',
+            employment_type='LOCUM',
+            status=Membership.Status.PENDING,
+        )
+
+        payload = _build_authenticated_user_payload(user)
+
+        self.assertEqual([item['pharmacy_id'] for item in payload['memberships']], [accepted.id])
         pharmacy.refresh_from_db()
         self.assertEqual(pharmacy.name, 'Private pharmacy')
 

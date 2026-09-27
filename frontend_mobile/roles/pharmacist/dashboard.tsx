@@ -65,7 +65,7 @@ export default function PharmacistOverviewScreen() {
   const normalizedRole = String(user?.role || '').toUpperCase();
 
   const loadDashboard = useCallback(async () => {
-    if (normalizedRole !== 'PHARMACIST' || !access) {
+    if (normalizedRole !== 'PHARMACIST' || !access || scope.isLoading) {
       return;
     }
     // If not refreshing, we might want to show loading initially
@@ -101,10 +101,10 @@ export default function PharmacistOverviewScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [normalizedRole, access, refreshing, fadeAnim, slideAnim, scope.fetchDashboard]);
+  }, [normalizedRole, access, refreshing, fadeAnim, slideAnim, scope.fetchDashboard, scope.isLoading]);
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || scope.isLoading) {
       return;
     }
     if (normalizedRole !== 'PHARMACIST') {
@@ -116,7 +116,7 @@ export default function PharmacistOverviewScreen() {
       return;
     }
     void loadDashboard();
-  }, [loadDashboard, normalizedRole, access, authLoading]);
+  }, [loadDashboard, normalizedRole, access, authLoading, scope.isLoading]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

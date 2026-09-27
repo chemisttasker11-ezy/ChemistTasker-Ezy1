@@ -39,6 +39,9 @@ export type AuthorityMembership = {
   staff_role?: string | null;
   job_title?: string | null;
   is_pharmacy_owner?: boolean;
+  is_active?: boolean;
+  isActive?: boolean;
+  status?: string | null;
 };
 
 export type AuthorityAdminAssignment = {
@@ -66,6 +69,14 @@ export type AuthorityUser = {
   owned_pharmacies?: AuthorityPharmacyRef[] | null;
 };
 
+type WorkerVerificationSource = {
+  verified?: unknown;
+  ahpra_verified?: unknown;
+  pharmacist_profile?: WorkerVerificationSource | null;
+  other_staff_profile?: WorkerVerificationSource | null;
+  data?: WorkerVerificationSource | null;
+};
+
 const INTERNAL_PHARMACY_ROLES = new Set([
   'OWNER', 'PHARMACY_OWNER', 'MANAGER', 'PHARMACY_ADMIN', 'ADMIN',
   'ROSTER_MANAGER', 'COMMUNICATION_MANAGER',
@@ -85,6 +96,67 @@ export type NormalizedAdminAssignment = {
 
 function normalizeRole(value: unknown): string {
   return String(value ?? '').trim().replace(/-/g, '_').toUpperCase();
+}
+
+function coerceVerified(value: unknown): boolean {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+/**
+ * Reads worker verification from either the authenticated user payload or an
+ * onboarding response. A false generic flag must not mask a true professional
+ * verification flag such as ahpra_verified.
+ */
+export function hasVerifiedWorkerProfile(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const source = value as WorkerVerificationSource;
+  const candidates = [
+    source,
+    source.data,
+    source.pharmacist_profile,
+    source.other_staff_profile,
+    source.data?.pharmacist_profile,
+    source.data?.other_staff_profile,
+  ];
+  return candidates.some((candidate) =>
+    Boolean(candidate) && (
+      coerceVerified(candidate?.verified) ||
+      coerceVerified(candidate?.ahpra_verified)
+    ),
+  );
+}
+
+export type WorkspaceMode = 'internal' | 'platform';
+
+export function resolveWorkspaceMode({
+  role,
+  preferred,
+  hasInternal,
+  hasPlatform,
+  persona,
+}: {
+  role?: string | null;
+  preferred: WorkspaceMode;
+  hasInternal: boolean;
+  hasPlatform: boolean;
+  persona?: string | null;
+}): WorkspaceMode {
+  const normalizedRole = normalizeRole(role);
+  if (String(persona || '').toUpperCase().startsWith('ADMIN:')) return 'internal';
+  if (
+    normalizedRole === 'OWNER' ||
+    normalizedRole === 'ORGANIZATION' ||
+    normalizedRole.startsWith('ORG_') ||
+    normalizedRole === 'CHIEF_ADMIN' ||
+    normalizedRole === 'REGION_ADMIN'
+  ) return 'internal';
+  if (normalizedRole === 'EXPLORER') return 'platform';
+  if (normalizedRole === 'PHARMACIST' || normalizedRole === 'OTHER_STAFF') {
+    if (!hasInternal) return 'platform';
+    if (!hasPlatform) return 'internal';
+    return preferred;
+  }
+  return hasInternal && hasPlatform ? preferred : hasPlatform ? 'platform' : 'internal';
 }
 
 function normalizeAdminLevel(value: unknown): AdminLevel {
@@ -115,6 +187,9 @@ function membershipPharmacyId(membership: AuthorityMembership): number | null {
 
 export function isInternalPharmacyMembership(membership?: AuthorityMembership | null): boolean {
   if (!membership || membershipPharmacyId(membership) == null) return false;
+  if (membership.is_active === false || membership.isActive === false) return false;
+  const status = normalizeRole(membership.status);
+  if (status && status !== 'ACCEPTED') return false;
   const role = normalizeRole(membership.role);
   const employmentType = normalizeRole(membership.employment_type ?? membership.employmentType);
   return INTERNAL_PHARMACY_ROLES.has(role) ||
@@ -126,7 +201,7 @@ export function hasFavoriteStaffMembership(user?: AuthorityUser | null): boolean
   return (user?.memberships ?? []).some((membership) =>
     Boolean(
       membership &&
-      membershipPharmacyId(membership) != null &&
+      isInternalPharmacyMembership(membership) &&
       FAVORITE_STAFF_EMPLOYMENT_TYPES.has(
         normalizeRole(membership.employment_type ?? membership.employmentType),
       ),

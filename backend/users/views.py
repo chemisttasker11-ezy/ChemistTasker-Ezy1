@@ -338,6 +338,7 @@ def _build_authenticated_user_payload(user):
     pharm_memberships = Membership.objects.filter(
         user=user,
         is_active=True,
+        status=Membership.Status.ACCEPTED,
     ).select_related("pharmacy")
     pharm_payload = [
         {
@@ -612,6 +613,7 @@ class VerifyOTPView(APIView):
         pharm_memberships = PharmacyMembership.objects.filter(
             user=user,
             is_active=True,
+            status=PharmacyMembership.Status.ACCEPTED,
         ).select_related('pharmacy')
 
         pharm_payload = [

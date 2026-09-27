@@ -7,10 +7,12 @@ import {
   canManageOrganizationMember,
   canManageKioskDevices,
   hasFavoriteStaffMembership,
+  hasVerifiedWorkerProfile,
   hasInternalWorkspaceAccess,
   hasOrganizationAccess,
   getOrganizationMembership,
   isInternalPharmacyMembership,
+  resolveWorkspaceMode,
   normalizeAdminAssignments,
   resolveAdminPersonaAssignmentId,
   resolvePersonaSelection,
@@ -66,6 +68,8 @@ describe('shared access policy', () => {
     expect(hasInternalWorkspaceAccess(assignedAdmin)).toBe(true);
     expect(hasInternalWorkspaceAccess({ role: 'OWNER', owner_pharmacies: [{ id: 40 }] })).toBe(true);
     expect(isInternalPharmacyMembership({ pharmacy_id: 0, role: 'OWNER' })).toBe(false);
+    expect(isInternalPharmacyMembership({ pharmacy_id: 20, role: 'PHARMACIST', employment_type: 'CASUAL', status: 'PENDING' })).toBe(false);
+    expect(isInternalPharmacyMembership({ pharmacy_id: 20, role: 'PHARMACIST', employment_type: 'CASUAL', is_active: false })).toBe(false);
     expect(hasInternalWorkspaceAccess({ role: 'OWNER', memberships: [{ pharmacy_id: null, role: 'OWNER' }] })).toBe(false);
     expect(hasFavoriteStaffMembership({ role: 'PHARMACIST', memberships: [{ pharmacy_id: null, employment_type: 'LOCUM' }] })).toBe(false);
     expect(hasInternalWorkspaceAccess({ role: 'ORG_ADMIN', memberships: [{ organization_id: 8, role: 'ORG_ADMIN' }] })).toBe(false);
@@ -80,6 +84,24 @@ describe('shared access policy', () => {
       memberships: [{ organization_id: 8, role: 'ORG_ADMIN', capabilities: ['view_all_pharmacies'] }],
     })).toBe(true);
     expect(canAccessOrganizationPharmacies({ organization_id: 8, role: 'ORG_STAFF', pharmacies: [{ id: 50 }] })).toBe(false);
+  });
+
+  it('does not let a false generic flag mask professional verification', () => {
+    expect(hasVerifiedWorkerProfile({ verified: false, ahpra_verified: true })).toBe(true);
+    expect(hasVerifiedWorkerProfile({ data: { verified: 'false', ahpra_verified: 'true' } })).toBe(true);
+    expect(hasVerifiedWorkerProfile({ other_staff_profile: { verified: 1 } })).toBe(true);
+    expect(hasVerifiedWorkerProfile({ verified: false, ahpra_verified: false })).toBe(false);
+  });
+
+  it('resolves public and pharmacy workspace access for every persona type', () => {
+    expect(resolveWorkspaceMode({ role: 'PHARMACIST', preferred: 'internal', hasInternal: false, hasPlatform: true })).toBe('platform');
+    expect(resolveWorkspaceMode({ role: 'OTHER_STAFF', preferred: 'platform', hasInternal: true, hasPlatform: false })).toBe('internal');
+    expect(resolveWorkspaceMode({ role: 'PHARMACIST', preferred: 'platform', hasInternal: true, hasPlatform: true })).toBe('platform');
+    expect(resolveWorkspaceMode({ role: 'PHARMACIST', preferred: 'internal', hasInternal: true, hasPlatform: true })).toBe('internal');
+    expect(resolveWorkspaceMode({ role: 'EXPLORER', preferred: 'internal', hasInternal: false, hasPlatform: true })).toBe('platform');
+    expect(resolveWorkspaceMode({ role: 'OWNER', preferred: 'platform', hasInternal: true, hasPlatform: false })).toBe('internal');
+    expect(resolveWorkspaceMode({ role: 'ORG_ADMIN', preferred: 'platform', hasInternal: true, hasPlatform: false })).toBe('internal');
+    expect(resolveWorkspaceMode({ role: 'PHARMACIST', preferred: 'platform', hasInternal: true, hasPlatform: true, persona: 'ADMIN:42' })).toBe('internal');
   });
 
   it('grants owners full capability without synthesizing admin persona', () => {

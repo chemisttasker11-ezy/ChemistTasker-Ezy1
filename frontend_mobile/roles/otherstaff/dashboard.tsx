@@ -63,7 +63,7 @@ export default function OtherStaffOverviewScreen() {
   const [slideAnim] = useState(new Animated.Value(50));
 
   const loadDashboard = useCallback(async () => {
-    if (normalizedRole !== 'OTHER_STAFF' || !access) {
+    if (normalizedRole !== 'OTHER_STAFF' || !access || scope.isLoading) {
       return;
     }
     if (!refreshing) setLoading(true);
@@ -97,10 +97,10 @@ export default function OtherStaffOverviewScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [normalizedRole, access, refreshing, fadeAnim, slideAnim, scope.fetchDashboard]);
+  }, [normalizedRole, access, refreshing, fadeAnim, slideAnim, scope.fetchDashboard, scope.isLoading]);
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || scope.isLoading) {
       return;
     }
     if (normalizedRole !== 'OTHER_STAFF') {
@@ -112,7 +112,7 @@ export default function OtherStaffOverviewScreen() {
       return;
     }
     void loadDashboard();
-  }, [loadDashboard, normalizedRole, access, authLoading]);
+  }, [loadDashboard, normalizedRole, access, authLoading, scope.isLoading]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

@@ -65,7 +65,7 @@ export default function OwnerDashboard() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    if (normalizedRole !== 'OWNER' || !access) return;
+    if (normalizedRole !== 'OWNER' || !access || scope.isLoading) return;
     setRefreshing(true);
     setErrorMessage(null);
     try {
@@ -99,10 +99,10 @@ export default function OwnerDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [normalizedRole, access, fadeAnim, slideAnim, scope.fetchDashboard]);
+  }, [normalizedRole, access, fadeAnim, slideAnim, scope.fetchDashboard, scope.isLoading]);
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || scope.isLoading) {
       return;
     }
     if (normalizedRole !== 'OWNER') {
@@ -114,7 +114,7 @@ export default function OwnerDashboard() {
       return;
     }
     void fetchData();
-  }, [fetchData, normalizedRole, access, authLoading]);
+  }, [fetchData, normalizedRole, access, authLoading, scope.isLoading]);
 
   const quickActions = useMemo(
     () => {

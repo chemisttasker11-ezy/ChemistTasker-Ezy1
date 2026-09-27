@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
-import { getOnboardingDetail, hasFavoriteStaffMembership, hasInternalWorkspaceAccess } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, hasFavoriteStaffMembership, hasInternalWorkspaceAccess, hasVerifiedWorkerProfile, resolveWorkspaceMode } from '@chemisttasker/shared-core';
 import { readPersonaSelection } from '@/utils/mobilePersona';
 
 type WorkspaceType = 'internal' | 'platform';
@@ -22,21 +22,13 @@ interface WorkspaceContextType {
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 const WORKSPACE_STORAGE_PREFIX = '@chemisttasker_workspace_v2';
-function coerceVerified(value: unknown): boolean {
-  return value === true || value === 'true' || value === 1 || value === '1';
-}
-
-function isOverallVerified(user: any): boolean {
-  return (
-    coerceVerified(user?.verified) ||
-    coerceVerified(user?.pharmacist_profile?.verified) ||
-    coerceVerified(user?.other_staff_profile?.verified)
-  );
-}
-
 function isWorkerRole(role?: string | null): boolean {
   const normalized = String(role || '').toUpperCase();
   return normalized === 'PHARMACIST' || normalized === 'OTHER_STAFF';
+}
+
+function isPlatformOnlyRole(role?: string | null): boolean {
+  return String(role || '').toUpperCase() === 'EXPLORER';
 }
 
 async function storageKeys(user: any) {
@@ -46,6 +38,7 @@ async function storageKeys(user: any) {
   const persona = storedPersona || `ROLE:${String(user?.role || 'UNKNOWN').toUpperCase()}`;
   const scope = `${String(identity)}:${persona}`;
   return {
+    persona,
     workspace: `${WORKSPACE_STORAGE_PREFIX}:${scope}:workspace`,
     pharmacyId: `${WORKSPACE_STORAGE_PREFIX}:${scope}:pharmacy-id`,
     pharmacyName: `${WORKSPACE_STORAGE_PREFIX}:${scope}:pharmacy-name`,
@@ -54,34 +47,49 @@ async function storageKeys(user: any) {
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
-  const [workspace, setWorkspaceState] = useState<WorkspaceType>('internal');
+  const [workspacePreference, setWorkspacePreference] = useState<WorkspaceType>('platform');
+  const [activePersona, setActivePersona] = useState('');
   const [selectedPharmacyId, setSelectedPharmacyIdState] = useState<number | null>(null);
   const [selectedPharmacyName, setSelectedPharmacyNameState] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [storageLoading, setStorageLoading] = useState(true);
+  const [verificationLoading, setVerificationLoading] = useState(true);
   const [workerVerified, setWorkerVerified] = useState(false);
   const canUseInternal = hasInternalWorkspaceAccess(user);
-  const canUsePlatform = isWorkerRole(user?.role) && (workerVerified || hasFavoriteStaffMembership(user));
+  const workerRole = isWorkerRole(user?.role);
+  const platformOnlyRole = isPlatformOnlyRole(user?.role);
+  const canUsePlatform = platformOnlyRole || (workerRole && (workerVerified || hasFavoriteStaffMembership(user)));
+  const workspace = resolveWorkspaceMode({
+    role: user?.role,
+    preferred: workspacePreference,
+    hasInternal: canUseInternal,
+    hasPlatform: canUsePlatform,
+    persona: activePersona,
+  });
+  const isLoading = storageLoading || verificationLoading;
 
   useEffect(() => {
-    const initialVerified = isOverallVerified(user);
+    const initialVerified = hasVerifiedWorkerProfile(user);
     setWorkerVerified(initialVerified);
 
-    if (!user || !isWorkerRole(user?.role) || initialVerified) return;
+    if (!user || !isWorkerRole(user?.role) || initialVerified) {
+      setVerificationLoading(false);
+      return;
+    }
 
     let cancelled = false;
+    setVerificationLoading(true);
     const roleKey = String(user.role).toUpperCase() === 'PHARMACIST' ? 'pharmacist' : 'other_staff';
 
     getOnboardingDetail(roleKey)
       .then((onboarding: any) => {
         if (cancelled) return;
-        const verifiedFlag =
-          onboarding?.verified ??
-          onboarding?.data?.verified ??
-          (roleKey === 'pharmacist' ? onboarding?.ahpra_verified : undefined);
-        setWorkerVerified(coerceVerified(verifiedFlag));
+        setWorkerVerified(hasVerifiedWorkerProfile(onboarding));
       })
       .catch(() => {
         if (!cancelled) setWorkerVerified(false);
+      })
+      .finally(() => {
+        if (!cancelled) setVerificationLoading(false);
       });
 
     return () => {
@@ -90,11 +98,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const reloadWorkspace = useCallback(async () => {
-    setIsLoading(true);
+    setStorageLoading(true);
     try {
       const keys = await storageKeys(user);
       if (!keys) {
-        setWorkspaceState('internal');
+        setWorkspacePreference('platform');
+        setActivePersona('');
         setSelectedPharmacyIdState(null);
         setSelectedPharmacyNameState(null);
         return;
@@ -103,16 +112,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const storedWorkspace = values[0][1];
       const rawPharmacyId = values[1][1];
       const parsedPharmacyId = Number(rawPharmacyId);
-      setWorkspaceState(storedWorkspace === 'platform' ? 'platform' : 'internal');
+      setActivePersona(keys.persona);
+      setWorkspacePreference(storedWorkspace === 'internal' ? 'internal' : 'platform');
       setSelectedPharmacyIdState(rawPharmacyId != null && Number.isFinite(parsedPharmacyId) && parsedPharmacyId > 0 ? parsedPharmacyId : null);
       setSelectedPharmacyNameState(values[2][1] || null);
     } catch (error) {
       console.error('Failed to load workspace:', error);
-      setWorkspaceState('internal');
+      setWorkspacePreference('platform');
+      setActivePersona('');
       setSelectedPharmacyIdState(null);
       setSelectedPharmacyNameState(null);
     } finally {
-      setIsLoading(false);
+      setStorageLoading(false);
     }
   }, [user]);
 
@@ -122,10 +133,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [authLoading, reloadWorkspace]);
 
   const setWorkspace = useCallback(async (newWorkspace: WorkspaceType) => {
-    const targetWorkspace: WorkspaceType = newWorkspace === 'platform' && canUsePlatform
-      ? 'platform'
-      : canUseInternal ? 'internal' : canUsePlatform ? 'platform' : 'internal';
-    setWorkspaceState(targetWorkspace);
+    const targetWorkspace = resolveWorkspaceMode({
+      role: user?.role,
+      preferred: newWorkspace,
+      hasInternal: canUseInternal,
+      hasPlatform: canUsePlatform,
+      persona: activePersona,
+    });
+    setWorkspacePreference(targetWorkspace);
     const keys = await storageKeys(user);
     if (!keys) return;
     try {
@@ -138,7 +153,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to save workspace:', error);
     }
-  }, [canUseInternal, canUsePlatform, user]);
+  }, [activePersona, canUseInternal, canUsePlatform, user]);
 
   const setSelectedPharmacyId = useCallback(async (pharmacyId: number | null) => {
     setSelectedPharmacyIdState(pharmacyId);
@@ -171,15 +186,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    if (authLoading || isLoading) return;
-    if (!canUsePlatform && workspace === 'platform') {
-      void setWorkspace('internal');
-      return;
-    }
-    if (!canUseInternal && canUsePlatform && workspace !== 'platform') {
-      void setWorkspace('platform');
-    }
-  }, [authLoading, canUseInternal, canUsePlatform, isLoading, setWorkspace, workspace]);
+    if (authLoading || isLoading || workspacePreference === workspace) return;
+    void setWorkspace(workspace);
+  }, [authLoading, isLoading, setWorkspace, workspace, workspacePreference]);
 
   return (
     <WorkspaceContext.Provider

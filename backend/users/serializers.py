@@ -338,6 +338,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         pharm_memberships = PharmacyMembership.objects.filter(
             user=self.user,
             is_active=True,
+            status=PharmacyMembership.Status.ACCEPTED,
         ).select_related('pharmacy')
 
         pharm_payload = [
@@ -409,6 +410,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             pharm_memberships = PharmacyMembership.objects.filter(
                 user=user,
                 is_active=True,
+                status=PharmacyMembership.Status.ACCEPTED,
             ).select_related('pharmacy')
 
             pharm_payload = [

@@ -21,7 +21,7 @@ import { useWorkspace } from "../contexts/WorkspaceContext";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
 import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
 
 const DNA = {
@@ -145,18 +145,6 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
   });
 
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function coerceVerified(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function isOverallVerified(user: any): boolean {
-  return (
-    coerceVerified(user?.verified) ||
-    coerceVerified(user?.pharmacist_profile?.verified) ||
-    coerceVerified(user?.other_staff_profile?.verified)
-  );
 }
 
 function MegaMenu({
@@ -333,7 +321,7 @@ export default function DashboardTopShell({
   const [workspaceAnchor, setWorkspaceAnchor] = useState<HTMLElement | null>(null);
   const [adminAnchor, setAdminAnchor] = useState<HTMLElement | null>(null);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(activeAdminPharmacyId ?? workspaceSelectedPharmacyId ?? null);
-  const [workerVerified, setWorkerVerified] = useState<boolean>(() => isOverallVerified(user));
+  const [workerVerified, setWorkerVerified] = useState<boolean>(() => hasVerifiedWorkerProfile(user));
   const [otherStaffRoleType, setOtherStaffRoleType] = useState<string | null>(() => {
     return (user as any)?.other_staff_profile?.role_type ?? (user as any)?.otherStaffProfile?.roleType ?? null;
   });
@@ -369,7 +357,7 @@ export default function DashboardTopShell({
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
 
   useEffect(() => {
-    const initialVerified = isOverallVerified(user);
+    const initialVerified = hasVerifiedWorkerProfile(user);
     setWorkerVerified(initialVerified);
 
     if (!user || !isWorker) return;
@@ -380,11 +368,7 @@ export default function DashboardTopShell({
     getOnboardingDetail(roleKey)
       .then((onboarding: any) => {
         if (cancelled) return;
-        const verifiedFlag =
-          onboarding?.verified ??
-          onboarding?.data?.verified ??
-          (roleKey === "pharmacist" ? onboarding?.ahpra_verified : undefined);
-        setWorkerVerified(coerceVerified(verifiedFlag));
+        setWorkerVerified(hasVerifiedWorkerProfile(onboarding));
         if (roleKey === "other_staff") {
           const roleType = onboarding?.role_type ?? onboarding?.data?.role_type ?? null;
           setOtherStaffRoleType(roleType);

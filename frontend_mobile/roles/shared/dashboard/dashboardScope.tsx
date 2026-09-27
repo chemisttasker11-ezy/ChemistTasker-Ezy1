@@ -118,8 +118,11 @@ export function useScopedDashboard(roleOverride?: string | null) {
     setSelectedPharmacyId,
     setSelectedPharmacyName,
     canUsePlatform,
+    isLoading: workspaceLoading,
   } = useWorkspace();
   const role = roleOverride ?? user?.role;
+  const isOrganizationDashboard = ORG_ROLES.has(String(role || '').toUpperCase());
+  const scopedWorkspace = isOrganizationDashboard ? 'internal' : workspace;
   const organizationId = getOrganizationMembership(user)?.organization_id;
   const [organizationPharmacies, setOrganizationPharmacies] = useState<PharmacyOption[]>([]);
   useEffect(() => {
@@ -163,11 +166,11 @@ export function useScopedDashboard(roleOverride?: string | null) {
   }, [setWorkspace, setSelectedPharmacyId, setSelectedPharmacyName]);
 
   const fetchDashboard = useCallback(async () => {
-    const isOrganizationDashboard = ORG_ROLES.has(String(role || '').toUpperCase());
+    if (workspaceLoading) return null;
     const endpoint = isOrganizationDashboard ? null : dashboardEndpointForRole(role);
     if (!isOrganizationDashboard && !endpoint) return null;
     const params =
-      workspace === 'platform' && canSelectPlatform
+      scopedWorkspace === 'platform'
         ? { workspace: 'platform' }
         : selectedPharmacyId != null
         ? { workspace: 'internal', pharmacy_id: selectedPharmacyId }
@@ -189,7 +192,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     } catch (error: any) {
       if (error?.response?.status === 403) {
         const firstPharmacy = pharmacies[0];
-        if (firstPharmacy && workspace === 'internal') {
+        if (firstPharmacy && scopedWorkspace === 'internal') {
           selectPharmacy(firstPharmacy);
         } else if (canSelectPlatform) {
           selectPlatform();
@@ -199,6 +202,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     }
   }, [
     canSelectPlatform,
+    isOrganizationDashboard,
     pharmacies,
     role,
     user,
@@ -208,18 +212,19 @@ export function useScopedDashboard(roleOverride?: string | null) {
     selectedPharmacyName,
     setSelectedPharmacyId,
     setSelectedPharmacyName,
-    workspace,
+    scopedWorkspace,
+    workspaceLoading,
   ]);
 
   const scopeLabel =
-    workspace === 'platform' && canSelectPlatform
+    scopedWorkspace === 'platform'
       ? 'ChemistTasker Platform'
       : selectedPharmacyId == null && ORG_ROLES.has(String(role || '').toUpperCase())
         ? 'All organization pharmacies'
         : selectedPharmacyName || pharmacies.find((item) => item.id === selectedPharmacyId)?.name || 'Selected pharmacy';
 
   return {
-    workspace,
+    workspace: scopedWorkspace,
     selectedPharmacyId,
     pharmacies,
     scopeLabel,
@@ -228,6 +233,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     selectPharmacy,
     selectAllOrganizationPharmacies,
     canSelectPlatform,
+    isLoading: workspaceLoading,
   };
 }
 

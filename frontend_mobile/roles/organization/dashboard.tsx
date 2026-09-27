@@ -46,6 +46,7 @@ export default function OrganizationDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (scope.isLoading) return;
     setRefreshing(true);
     try {
       const [dashboardPayload, pillRes] = await Promise.all([
@@ -86,11 +87,12 @@ export default function OrganizationDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [scope.fetchDashboard]);
+  }, [scope.fetchDashboard, scope.isLoading]);
 
   useEffect(() => {
+    if (scope.isLoading) return;
     void loadData();
-  }, [loadData]);
+  }, [loadData, scope.isLoading]);
 
   const quickActions = useMemo(
     () => [
