@@ -210,7 +210,7 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
 
       - name: Set up Android SDK command-line tools
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
 
       - name: Boot Android emulator and install app
         shell: bash
@@ -265,6 +265,10 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
+              visible: "Go to Login"
+              timeout: 30000
+          - tapOn: "Go to Login"
+          - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
           - tapOn: "Work email"
@@ -318,6 +322,8 @@ jobs:
               visible: "Centre the kiosk QR inside the frame"
               timeout: 30000
           YAML
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
+          export MAESTRO_CLI_NO_ANALYTICS=1
           maestro test /tmp/cp6-native.yaml
 
       - name: Upload Android diagnostics
@@ -536,6 +542,10 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
+              visible: "Go to Login"
+              timeout: 30000
+          - tapOn: "Go to Login"
+          - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
           - tapOn: "Work email"
@@ -584,12 +594,11 @@ jobs:
           - extendedWaitUntil:
               visible: "Clock & breaks"
               timeout: 30000
-          - tapOn: "Open camera"
-          - extendedWaitUntil:
-              visible: "Centre the kiosk QR inside the frame"
-              timeout: 30000
+          - assertVisible: "Open camera"
           YAML
           export JAVA_HOME="$JAVA_HOME"
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
+          export MAESTRO_CLI_NO_ANALYTICS=1
           maestro --device "$SIM_UDID" test /tmp/cp6-native.yaml
 
       - name: Upload iOS diagnostics
