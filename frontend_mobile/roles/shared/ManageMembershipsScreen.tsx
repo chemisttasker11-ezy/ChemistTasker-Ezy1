@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Chip, IconButton, Modal, Portal, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, Chip, Icon, Modal, Portal, Snackbar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '@/utils/apiClient';
 import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from '@chemisttasker/shared-core';
@@ -56,24 +56,32 @@ function adminCapabilitiesText(membership: Membership) {
 
 export default function ManageMembershipsScreen() {
   const { refreshUser } = useAuth();
+  const theme = useTheme();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [adminInvitations, setAdminInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [actingId, setActingId] = useState<number | null>(null);
+  const [actingKey, setActingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [quitTarget, setQuitTarget] = useState<Membership | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const loadMemberships = useCallback(async () => {
     try {
-      const [{ data }, invitations] = await Promise.all([
+      const [membershipsResult, invitationsResult] = await Promise.allSettled([
         apiClient.get('/client-profile/my-memberships/'),
         getPendingPharmacyAdminInvitations(),
       ]);
+      if (membershipsResult.status === 'rejected') throw membershipsResult.reason;
+      const { data } = membershipsResult.value;
       setMemberships(Array.isArray(data) ? data : data?.results || []);
-      setAdminInvitations(Array.isArray(invitations) ? invitations : []);
-      setError(null);
+      if (invitationsResult.status === 'fulfilled') {
+        setAdminInvitations(Array.isArray(invitationsResult.value) ? invitationsResult.value : []);
+        setError(null);
+      } else {
+        setAdminInvitations([]);
+        setError('Memberships loaded, but admin invitations could not be refreshed. Pull down to try again.');
+      }
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Unable to load memberships.');
     } finally {
@@ -87,7 +95,7 @@ export default function ManageMembershipsScreen() {
   }, [loadMemberships]);
 
   const runAction = async (membership: Membership, action: 'accept' | 'reject' | 'quit') => {
-    setActingId(membership.id);
+    setActingKey(`membership-${membership.id}`);
     try {
       await apiClient.post(`/client-profile/my-memberships/${membership.id}/${action}/`);
       await Promise.all([loadMemberships(), refreshUser()]);
@@ -102,12 +110,12 @@ export default function ManageMembershipsScreen() {
     } catch (err: any) {
       Alert.alert('Membership update failed', err?.response?.data?.detail || `Unable to ${action} membership.`);
     } finally {
-      setActingId(null);
+      setActingKey(null);
     }
   };
 
   const respondToAdmin = async (invitation: AdminInvitation, accept: boolean) => {
-    setActingId(invitation.id);
+    setActingKey(`admin-${invitation.id}`);
     try {
       await respondToPharmacyAdminInvitation(invitation.id, accept);
       await Promise.all([loadMemberships(), refreshUser()]);
@@ -115,38 +123,39 @@ export default function ManageMembershipsScreen() {
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Unable to respond to this admin invitation.');
     } finally {
-      setActingId(null);
+      setActingKey(null);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadMemberships(); }} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadMemberships(); }} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />}
       >
         <View style={styles.header}>
-          <Text variant="headlineSmall" style={styles.title}>Manage Memberships</Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>Review pharmacy invitations and manage the pharmacies you belong to.</Text>
+          <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onSurface }]}>Manage Memberships</Text>
+          <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>Review pharmacy invitations and manage the pharmacies you belong to.</Text>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {adminInvitations.length ? <Text variant="titleSmall" style={styles.sectionTitle}>Admin invitations</Text> : null}
         {adminInvitations.map((invitation) => (
-          <Card key={`admin-${invitation.id}`} style={styles.card}>
+          <Card key={`admin-${invitation.id}`} style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.cardTitle}>{invitation.pharmacy_name}</Text>
               <Text style={styles.muted}>{label(invitation.admin_level)} admin invitation{invitation.job_title ? ` · ${invitation.job_title}` : ''}</Text>
               <Text style={styles.detail}>{invitation.membership_status === 'ACCEPTED' ? 'Your current pharmacy membership stays active while you decide.' : 'Accepting grants both pharmacy membership and admin access.'}</Text>
               <View style={styles.actions}>
-                <Button mode="contained" disabled={actingId === invitation.id} onPress={() => respondToAdmin(invitation, true)}>Accept admin access</Button>
-                <Button mode="outlined" disabled={actingId === invitation.id} onPress={() => respondToAdmin(invitation, false)}>Decline</Button>
+                <Button mode="contained" loading={actingKey === `admin-${invitation.id}`} disabled={Boolean(actingKey)} onPress={() => respondToAdmin(invitation, true)}>Accept admin access</Button>
+                <Button mode="outlined" disabled={Boolean(actingKey)} onPress={() => respondToAdmin(invitation, false)}>Decline</Button>
               </View>
             </Card.Content>
           </Card>
         ))}
         {loading ? <Text style={styles.emptyText}>Loading memberships...</Text> : null}
         {!loading && memberships.length === 0 ? (
-          <Card style={styles.emptyCard}>
+          <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.cardTitle}>No memberships yet</Text>
               <Text style={styles.muted}>Pharmacy invitations will appear here when an owner or admin invites you.</Text>
@@ -161,11 +170,11 @@ export default function ManageMembershipsScreen() {
           const hasAdminInvitation = adminInvitations.some((invitation) => invitation.membership_id === membership.id);
           const capabilitiesText = adminCapabilitiesText(membership);
           return (
-            <Card key={membership.id} style={styles.card}>
+            <Card key={membership.id} style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
               <Card.Content>
                 <View style={styles.cardHeader}>
-                  <View style={styles.iconWrap}>
-                    <IconButton icon="store-outline" size={22} iconColor="#6366F1" />
+                  <View style={[styles.iconWrap, { backgroundColor: theme.colors.primaryContainer }]}>
+                    <Icon source="store-outline" size={22} color={theme.colors.primary} />
                   </View>
                   <View style={styles.cardHeaderText}>
                     <Text variant="titleMedium" style={styles.cardTitle}>{pharmacy?.name || 'Pharmacy'}</Text>
@@ -188,13 +197,13 @@ export default function ManageMembershipsScreen() {
                 <View style={styles.actions}>
                   {pending && !hasAdminInvitation ? (
                     <>
-                      <Button mode="contained" icon="check-circle-outline" loading={actingId === membership.id} onPress={() => runAction(membership, 'accept')} style={styles.primaryButton}>Accept</Button>
-                      <Button mode="outlined" icon="close-circle-outline" disabled={actingId === membership.id} onPress={() => runAction(membership, 'reject')} textColor="#DC2626" style={styles.dangerOutline}>Reject</Button>
+                      <Button mode="contained" icon="check-circle-outline" loading={actingKey === `membership-${membership.id}`} disabled={Boolean(actingKey)} onPress={() => runAction(membership, 'accept')} style={styles.primaryButton}>Accept</Button>
+                      <Button mode="outlined" icon="close-circle-outline" disabled={Boolean(actingKey)} onPress={() => runAction(membership, 'reject')} textColor={theme.colors.error} style={styles.dangerOutline}>Reject</Button>
                     </>
                   ) : null}
                   {pending && hasAdminInvitation ? <Text style={styles.detail}>Respond to the admin invitation above.</Text> : null}
                   {accepted && membership.role !== 'OWNER' ? (
-                    <Button mode="outlined" icon="logout" disabled={actingId === membership.id} onPress={() => setQuitTarget(membership)} textColor="#DC2626" style={styles.dangerOutline}>Quit membership</Button>
+                    <Button mode="outlined" icon="logout" disabled={Boolean(actingKey)} onPress={() => setQuitTarget(membership)} textColor={theme.colors.error} style={styles.dangerOutline}>Quit membership</Button>
                   ) : null}
                 </View>
               </Card.Content>
@@ -206,23 +215,23 @@ export default function ManageMembershipsScreen() {
         <Modal
           visible={Boolean(quitTarget)}
           onDismiss={() => {
-            if (!actingId) setQuitTarget(null);
+            if (!actingKey) setQuitTarget(null);
           }}
-          contentContainerStyle={styles.modal}
+          contentContainerStyle={[styles.modal, { backgroundColor: theme.colors.surface }]}
         >
           <Text variant="titleLarge" style={styles.modalTitle}>Quit membership?</Text>
           <Text style={styles.modalBody}>
             This action cannot be undone. If you want to join this pharmacy again, the owner or admin will need to invite you all over again.
           </Text>
           <View style={styles.modalActions}>
-            <Button mode="outlined" disabled={Boolean(actingId)} onPress={() => setQuitTarget(null)} style={styles.modalButton}>
+            <Button mode="outlined" disabled={Boolean(actingKey)} onPress={() => setQuitTarget(null)} style={styles.modalButton}>
               Cancel
             </Button>
             <Button
               mode="contained"
-              buttonColor="#DC2626"
-              loading={actingId === quitTarget?.id}
-              disabled={!quitTarget || Boolean(actingId)}
+              buttonColor={theme.colors.error}
+              loading={actingKey === `membership-${quitTarget?.id}`}
+              disabled={!quitTarget || Boolean(actingKey)}
               onPress={() => quitTarget && runAction(quitTarget, 'quit')}
               style={styles.modalButton}
             >
@@ -239,31 +248,32 @@ export default function ManageMembershipsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1 },
   content: { padding: 20, paddingBottom: 32 },
   header: { marginBottom: 18 },
-  title: { color: '#111827', fontWeight: '900' },
-  subtitle: { color: '#6B7280', marginTop: 6 },
+  title: { fontWeight: '900' },
+  subtitle: { marginTop: 6, lineHeight: 20 },
+  sectionTitle: { marginBottom: 10, fontWeight: '800' },
   error: { color: '#DC2626', marginBottom: 12, fontWeight: '700' },
   emptyText: { color: '#6B7280', textAlign: 'center', marginTop: 20 },
   emptyCard: { borderRadius: 16, backgroundColor: '#FFFFFF' },
-  card: { borderRadius: 16, backgroundColor: '#FFFFFF', marginBottom: 14, elevation: 2 },
+  card: { borderRadius: 16, marginBottom: 12, borderWidth: 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconWrap: { width: 46, height: 46, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   cardHeaderText: { flex: 1 },
   cardTitle: { color: '#111827', fontWeight: '800' },
   muted: { color: '#6B7280', marginTop: 2 },
-  detail: { color: '#6B7280', marginTop: 8, fontSize: 13 },
+  detail: { color: '#6B7280', marginTop: 8, fontSize: 13, lineHeight: 18 },
   chip: { alignSelf: 'flex-start' },
   pendingChip: { backgroundColor: '#FEF3C7' },
   acceptedChip: { backgroundColor: '#D1FAE5' },
   neutralChip: { backgroundColor: '#E5E7EB' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
-  primaryButton: { borderRadius: 999 },
-  dangerOutline: { borderRadius: 999, borderColor: '#FCA5A5' },
-  modal: { margin: 20, padding: 20, borderRadius: 16, backgroundColor: '#FFFFFF' },
+  primaryButton: { borderRadius: 12 },
+  dangerOutline: { borderRadius: 12, borderColor: '#FCA5A5' },
+  modal: { margin: 20, padding: 20, borderRadius: 16 },
   modalTitle: { color: '#111827', fontWeight: '900', marginBottom: 8 },
   modalBody: { color: '#6B7280', lineHeight: 20 },
   modalActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 18 },
-  modalButton: { borderRadius: 999 },
+  modalButton: { borderRadius: 12 },
 });
