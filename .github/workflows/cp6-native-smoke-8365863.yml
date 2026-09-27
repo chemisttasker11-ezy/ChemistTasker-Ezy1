@@ -214,19 +214,35 @@ jobs:
         run: |
           set -euo pipefail
           sudo chmod 666 /dev/kvm || true
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
-          echo no | avdmanager create avd --force -n cp6native -k "system-images;android-35;google_apis;x86_64"
-          nohup emulator -avd cp6native -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
-          adb wait-for-device
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          AVDMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -perm -u+x 2>/dev/null | head -n 1)"
+          fi
+          if [ ! -x "$AVDMANAGER" ]; then
+            AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name avdmanager -perm -u+x 2>/dev/null | head -n 1)"
+          fi
+          test -x "$SDKMANAGER"
+          test -x "$AVDMANAGER"
+          ADB="$SDK_ROOT/platform-tools/adb"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
+          test -x "$ADB"
+          test -x "$EMULATOR"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
+          echo no | "$AVDMANAGER" create avd --force -n cp6native -k "system-images;android-35;google_apis;x86_64"
+          nohup "$EMULATOR" -avd cp6native -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
+          "$ADB" wait-for-device
           for attempt in $(seq 1 120); do
-            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
               break
             fi
             sleep 2
           done
-          adb reverse tcp:8000 tcp:8000
-          adb install -r frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          test "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1"
+          "$ADB" reverse tcp:8000 tcp:8000
+          "$ADB" install -r frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Install Maestro
         shell: bash
