@@ -229,6 +229,9 @@ jobs:
 
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: "false"
 
       - name: Prebuild and compile Android development build
         shell: bash
@@ -264,8 +267,8 @@ jobs:
           test -x "$EMULATOR"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
-          echo no | "$AVDMANAGER" create avd --force -n cp6native -k "system-images;android-35;google_apis;x86_64"
-          nohup "$EMULATOR" -avd cp6native -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
+          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native -k "system-images;android-35;google_apis;x86_64"
+          nohup "$EMULATOR" -avd chemisttasker-native -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
           "$ADB" wait-for-device
           for attempt in $(seq 1 120); do
             if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
@@ -297,31 +300,22 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          DEV_URL=""
-          if curl -fsS "http://127.0.0.1:8081/_expo/open?platform=android&runtime=custom" > /tmp/expo-open-android.json 2>/dev/null; then
-            DEV_URL=$(python - <<'PY' || true
-          import json
-          data=json.load(open("/tmp/expo-open-android.json"))
-          def strings(value):
-              if isinstance(value,str):
-                  yield value
-              elif isinstance(value,dict):
-                  for item in value.values():
-                      yield from strings(item)
-              elif isinstance(value,list):
-                  for item in value:
-                      yield from strings(item)
-          print(next((v for v in strings(data) if "expo-development-client" in v), ""))
+
+          MANIFEST_URL="http://127.0.0.1:8081?disableOnboarding=1"
+          export MANIFEST_URL
+          ENCODED_URL=$(python3 - <<'PY'
+          import os, urllib.parse
+          print(urllib.parse.quote(os.environ["MANIFEST_URL"], safe=""))
           PY
-            )
-          fi
-          if [ -z "$DEV_URL" ]; then
-            curl -sS -D /tmp/expo-link-android.headers -o /dev/null "http://127.0.0.1:8081/_expo/link?platform=android"
-            DEV_URL=$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}' /tmp/expo-link-android.headers)
-          fi
-          test -n "$DEV_URL"
-          printf '%s\n' "$DEV_URL"
-          adb shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
+          )
+          DEV_URL="frontendmobile://expo-development-client/?url=$ENCODED_URL&disableFab=1&disableAutoLaunch=1"
+          printf '%s\n' "$DEV_URL" > /tmp/dev-client-url-android.txt
+
+          ADB="$(command -v adb)"
+          "$ADB" shell monkey -p com.chemisttasker.app 1 >/dev/null 2>&1 || true
+          sleep 3
+          ESCAPED_DEV_URL=$(printf '%q' "$DEV_URL")
+          "$ADB" shell "am start -W -a android.intent.action.VIEW -d $ESCAPED_DEV_URL"
           sleep 15
 
       - name: Install Maestro
@@ -338,7 +332,7 @@ jobs:
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/users/mobile/app-config/ >/dev/null
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          cat > /tmp/cp6-native.yaml <<'YAML'
+          cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
           - launchApp:
@@ -405,17 +399,18 @@ jobs:
           YAML
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
-          maestro test /tmp/cp6-native.yaml
+          maestro test /tmp/native-acceptance.yaml
 
       - name: Upload Android diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cp6-native-android-diagnostics
+          name: native-android-diagnostics
           path: |
             /tmp/native-backend.log
             /tmp/android-emulator.log
             /tmp/metro.log
+            /tmp/dev-client-url-android.txt
             ~/.maestro/tests
           if-no-files-found: ignore
 
@@ -622,8 +617,8 @@ jobs:
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcodebuild             -workspace "$WORKSPACE"             -scheme "$SCHEME"             -configuration Debug             -sdk iphonesimulator             -destination "platform=iOS Simulator,id=$SIM_UDID"             -derivedDataPath /tmp/cp6-ios-derived             CODE_SIGNING_ALLOWED=NO             build
-          APP_PATH=$(find /tmp/cp6-ios-derived/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
+          xcodebuild             -workspace "$WORKSPACE"             -scheme "$SCHEME"             -configuration Debug             -sdk iphonesimulator             -destination "platform=iOS Simulator,id=$SIM_UDID"             -derivedDataPath /tmp/native-ios-derived             CODE_SIGNING_ALLOWED=NO             build
+          APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP_PATH"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
@@ -644,30 +639,19 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          DEV_URL=""
-          if curl -fsS "http://127.0.0.1:8081/_expo/open?platform=ios&runtime=custom" > /tmp/expo-open-ios.json 2>/dev/null; then
-            DEV_URL=$(python3 - <<'PY' || true
-          import json
-          data=json.load(open("/tmp/expo-open-ios.json"))
-          def strings(value):
-              if isinstance(value,str):
-                  yield value
-              elif isinstance(value,dict):
-                  for item in value.values():
-                      yield from strings(item)
-              elif isinstance(value,list):
-                  for item in value:
-                      yield from strings(item)
-          print(next((v for v in strings(data) if "expo-development-client" in v), ""))
+
+          MANIFEST_URL="http://127.0.0.1:8081?disableOnboarding=1"
+          export MANIFEST_URL
+          ENCODED_URL=$(python3 - <<'PY'
+          import os, urllib.parse
+          print(urllib.parse.quote(os.environ["MANIFEST_URL"], safe=""))
           PY
-            )
-          fi
-          if [ -z "$DEV_URL" ]; then
-            curl -sS -D /tmp/expo-link-ios.headers -o /dev/null "http://127.0.0.1:8081/_expo/link?platform=ios"
-            DEV_URL=$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}' /tmp/expo-link-ios.headers)
-          fi
-          test -n "$DEV_URL"
-          printf '%s\n' "$DEV_URL"
+          )
+          DEV_URL="frontendmobile://expo-development-client/?url=$ENCODED_URL&disableFab=1&disableAutoLaunch=1"
+          printf '%s\n' "$DEV_URL" > /tmp/dev-client-url-ios.txt
+
+          xcrun simctl launch "$SIM_UDID" com.chemisttasker.app >/dev/null 2>&1 || true
+          sleep 3
           xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
           sleep 15
 
@@ -687,7 +671,7 @@ jobs:
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/users/mobile/app-config/ >/dev/null
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          cat > /tmp/cp6-native.yaml <<'YAML'
+          cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
           - launchApp:
@@ -752,15 +736,16 @@ jobs:
           export JAVA_HOME="$JAVA_HOME"
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
-          maestro --device "$SIM_UDID" test /tmp/cp6-native.yaml
+          maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
 
       - name: Upload iOS diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cp6-native-ios-diagnostics
+          name: native-ios-diagnostics
           path: |
             /tmp/native-backend.log
             /tmp/metro.log
+            /tmp/dev-client-url-ios.txt
             ~/.maestro/tests
           if-no-files-found: ignore
