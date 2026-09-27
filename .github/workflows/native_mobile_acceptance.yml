@@ -307,7 +307,7 @@ jobs:
           )
           DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
           printf '%s\n' "$DEV_URL"
-          "$ADB" shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
+          adb shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
           sleep 15
 
       - name: Install Maestro
@@ -374,12 +374,10 @@ jobs:
               visible: "Welcome Native,"
               timeout: 30000
           - assertVisible: "Admin"
-          - stopApp
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
               visible: "Shift Center"
               timeout: 30000
-          - stopApp
           - openLink: "frontendmobile://attendance/clock"
           - extendedWaitUntil:
               visible: "Clock & breaks"
@@ -708,12 +706,10 @@ jobs:
               visible: "Welcome Native,"
               timeout: 30000
           - assertVisible: "Admin"
-          - stopApp
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
               visible: "Shift Center"
               timeout: 30000
-          - stopApp
           - openLink: "frontendmobile://attendance/clock"
           - extendedWaitUntil:
               visible: "Clock & breaks"
