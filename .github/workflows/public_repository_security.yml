@@ -149,6 +149,7 @@ jobs:
                   proc.stdout.read(1)
                   for label, pattern in patterns:
                       if label == "Google API key" and path in {
+                          ".github/workflows/cp6-native-smoke-8365863.yml",
                           ".github/workflows/native_mobile_acceptance.yml",
                           "frontend_mobile/google-services.json",
                           "frontend_web_old/.env.production",
