@@ -46,6 +46,7 @@ jobs:
               ("AWS access key", re.compile(rb"AKIA[0-9A-Z]{16}")),
               ("Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{30,}")),
           ]
+          allowed_google_api_keys = {b"AIzaSyNativeSmokeOnly000000000000000000"}
           allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
           findings = []
 
@@ -62,9 +63,9 @@ jobs:
               if len(data) > 5_000_000:
                   continue
               for label, pattern in patterns:
-                  if label == "Google API key" and str(path) in {
-                      ".github/workflows/native_mobile_acceptance.yml",
-                  }:
+                  if label == "Google API key":
+                      if any(match.group(0) not in allowed_google_api_keys for match in pattern.finditer(data)):
+                          findings.append((str(path), label))
                       continue
                   if pattern.search(data):
                       findings.append((str(path), label))
@@ -103,6 +104,7 @@ jobs:
               ("AWS access key", re.compile(rb"AKIA[0-9A-Z]{16}")),
               ("Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{30,}")),
           ]
+          allowed_google_api_keys = {b"AIzaSyNativeSmokeOnly000000000000000000"}
           allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
 
           objects = {}
@@ -148,12 +150,14 @@ jobs:
                   data = proc.stdout.read(int(header[2]))
                   proc.stdout.read(1)
                   for label, pattern in patterns:
-                      if label == "Google API key" and path in {
-                          ".github/workflows/cp6-native-smoke-8365863.yml",
-                          ".github/workflows/native_mobile_acceptance.yml",
-                          "frontend_mobile/google-services.json",
-                          "frontend_web_old/.env.production",
-                      }:
+                      if label == "Google API key":
+                          if path in {
+                              "frontend_mobile/google-services.json",
+                              "frontend_web_old/.env.production",
+                          }:
+                              continue
+                          if any(match.group(0) not in allowed_google_api_keys for match in pattern.finditer(data)):
+                              findings.append((path, sha, label))
                           continue
                       if pattern.search(data):
                           findings.append((path, sha, label))

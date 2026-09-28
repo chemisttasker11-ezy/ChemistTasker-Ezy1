@@ -2,7 +2,7 @@ services:
   landing:
     image: node:22-alpine
     working_dir: /app
-    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
+    command: ["sh", "-c", "npm ci --prefix /shared-core --ignore-scripts --no-audit --no-fund && npm run --prefix /shared-core build && npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
     ports:
       - "3000:3000"
     environment:
@@ -208,7 +208,7 @@ services:
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
       VITE_PUBLIC_SITE_URL: "http://localhost:3000"
       CT_SHARED_CORE_SKIP_PREPARE: "1"
-    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx vite --port 5173 --host 0.0.0.0"]
+    command: ["sh", "-c", "npm ci --prefix /shared-core --ignore-scripts --no-audit --no-fund && npm run --prefix /shared-core build && npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npx vite --port 5173 --host 0.0.0.0"]
     ports:
       - "5173:5173"
     networks:
@@ -231,7 +231,7 @@ services:
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
       VITE_PUBLIC_SITE_URL: "http://localhost:3000"
       CT_SHARED_CORE_SKIP_PREPARE: "1"
-    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx vite --port 5174 --host 0.0.0.0"]
+    command: ["sh", "-c", "npm ci --prefix /shared-core --ignore-scripts --no-audit --no-fund && npm run --prefix /shared-core build && npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npx vite --port 5174 --host 0.0.0.0"]
     ports:
       - "5174:5174"
     networks:
@@ -254,7 +254,7 @@ services:
       VITE_DEV_WS_PROXY_TARGET: "ws://web:8000"
       VITE_PUBLIC_SITE_URL: "http://localhost:3000"
       CT_SHARED_CORE_SKIP_PREPARE: "1"
-    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx vite --port 5175 --host 0.0.0.0"]
+    command: ["sh", "-c", "npm ci --prefix /shared-core --ignore-scripts --no-audit --no-fund && npm run --prefix /shared-core build && npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npx vite --port 5175 --host 0.0.0.0"]
     ports:
       - "5175:5175"
     networks:
@@ -274,7 +274,7 @@ services:
       - ./env/mobile.dev.env
     environment:
       CT_SHARED_CORE_SKIP_PREPARE: "1"
-    command: ["sh", "-c", "npm install --package-lock=false --ignore-scripts --legacy-peer-deps && npx expo start --dev-client --lan --clear"]
+    command: ["sh", "-c", "npm ci --prefix /shared-core --ignore-scripts --no-audit --no-fund && npm run --prefix /shared-core build && npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund && npx expo start --dev-client --lan --clear"]
     ports:
       - "8081:8081"
       - "19000:19000"
