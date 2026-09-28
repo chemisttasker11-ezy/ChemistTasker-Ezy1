@@ -6,6 +6,7 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.models import (
@@ -310,20 +311,26 @@ class TimesheetProjectionTests(TestCase):
         self.roster_period.status = RosterPeriod.Status.DRAFT
         self.roster_period.save(update_fields=["status"])
         tz = ZoneInfo("Australia/Brisbane")
-        next_day = self.period.start_date + timedelta(days=1)
+        now_local = timezone.now().astimezone(tz)
+        started = now_local - timedelta(hours=2)
+        finished = now_local - timedelta(minutes=5)
+        next_day = started.date()
         shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner, dedicated_user=self.worker,
             role_needed="PHARMACIST", employment_type="FULL_TIME", min_hourly_rate=50, max_hourly_rate=50,
         )
         slot = ShiftSlot.objects.create(
-            shift=shift, date=next_day, start_time=time(9, 0), end_time=time(17, 0), roster_period=self.roster_period,
+            shift=shift,
+            date=next_day,
+            start_time=started.time().replace(tzinfo=None),
+            end_time=finished.time().replace(tzinfo=None),
+            roster_period=self.roster_period,
         )
         assignment = ShiftSlotAssignment.objects.create(
             shift=shift, slot=slot, slot_date=next_day, user=self.worker, is_rostered=True,
         )
         self.roster_period.status = RosterPeriod.Status.PUBLISHED
         self.roster_period.save(update_fields=["status"])
-        started = datetime.combine(next_day, time(9, 0), tzinfo=tz)
         open_session = AttendanceSession.objects.create(
             pharmacy=self.pharmacy, user=self.worker, assignment=assignment, source_membership=self.membership,
             started_at=started, ended_at=None,
@@ -340,7 +347,7 @@ class TimesheetProjectionTests(TestCase):
         event = append_missing_punch(
             timesheet=self.timesheet, manager=self.owner, session_id=open_session.pk,
             event_type=AttendanceEvent.EventType.CLOCK_OUT,
-            occurred_at=datetime.combine(next_day, time(17, 5), tzinfo=tz),
+            occurred_at=finished,
             reason="Worker confirmed finish; manager verified closing duties.",
         )
         self.assertEqual(event.source, AttendanceEvent.Source.MANAGER)
