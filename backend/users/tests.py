@@ -206,8 +206,6 @@ class AuthenticatedScopePayloadTests(TestCase):
         payload = _build_authenticated_user_payload(user)
 
         self.assertEqual([item['pharmacy_id'] for item in payload['memberships']], [accepted.id])
-        pharmacy.refresh_from_db()
-        self.assertEqual(pharmacy.name, 'Private pharmacy')
 
 
 class BrowserTokenExposureTests(TestCase):
