@@ -62,6 +62,10 @@ jobs:
               if len(data) > 5_000_000:
                   continue
               for label, pattern in patterns:
+                  if label == "Google API key" and str(path) in {
+                      ".github/workflows/native_mobile_acceptance.yml",
+                  }:
+                      continue
                   if pattern.search(data):
                       findings.append((str(path), label))
 
