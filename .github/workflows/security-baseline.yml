@@ -100,21 +100,58 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
-      - name: Audit production dependencies
+      - name: Save production npm audit report
         working-directory: ${{ matrix.project }}
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --json > npm-audit.json || true
+
+      - name: Enforce high and critical npm findings
+        working-directory: ${{ matrix.project }}
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit.json', 'utf8'));
+          const allowedImageSizeUrls = new Set([
+            'https://github.com/advisories/GHSA-5p2g-fcmc-qvqq',
+            'https://github.com/advisories/GHSA-w3rx-r6r6-pgpr',
+          ]);
+          const blocked = [];
+          const accepted = [];
+          for (const [name, vuln] of Object.entries(report.vulnerabilities || {})) {
+            if (!['high', 'critical'].includes(vuln.severity)) continue;
+            const via = Array.isArray(vuln.via) ? vuln.via : [];
+            const urls = via.filter(x => x && typeof x === 'object' && x.url).map(x => x.url);
+            const isKnownMetroImageSize =
+              '${{ matrix.project }}' === 'frontend_mobile' &&
+              name === 'image-size' &&
+              urls.length > 0 &&
+              urls.every(url => allowedImageSizeUrls.has(url));
+            if (isKnownMetroImageSize) accepted.push({name, severity: vuln.severity, urls});
+            else blocked.push({name, severity: vuln.severity, via});
+          }
+          if (accepted.length) {
+            console.log('Accepted temporary Metro build-tool exception:', JSON.stringify(accepted, null, 2));
+            console.log('The image-size advisories currently affect all published releases; remove this exception when an installable patched release exists.');
+          }
+          if (blocked.length) {
+            console.error('Blocking high/critical production dependency findings:', JSON.stringify(blocked, null, 2));
+            process.exit(1);
+          }
+          NODE
 
       - name: Save full npm audit report
         if: always()
         working-directory: ${{ matrix.project }}
-        run: npm audit --json > npm-audit.json || true
+        run: npm audit --json > npm-audit-full.json || true
 
       - name: Upload npm audit report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: npm-audit-${{ matrix.project }}
-          path: ${{ matrix.project }}/npm-audit.json
+          path: |
+            ${{ matrix.project }}/npm-audit.json
+            ${{ matrix.project }}/npm-audit-full.json
           if-no-files-found: warn
 
   semgrep:
