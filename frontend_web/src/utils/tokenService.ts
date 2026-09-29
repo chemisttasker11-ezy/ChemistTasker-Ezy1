@@ -1,6 +1,5 @@
-import {refreshBrowserSession, watchSession} from '../../landing_next/shared/browser-session';
+import {browserRequest, refreshBrowserSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/utils/tokenService.ts
-import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
 
 export const AUTH_TOKENS_CLEARED_EVENT = 'auth:tokens-cleared';
@@ -90,7 +89,7 @@ export function clearTokens() {
 }
 
 // Kept name for backwards compatibility; refresh is cookie-backed on web clients.
-export async function refreshCookieSession(force = false, preserveBearerOnUnauthorized = false): Promise<{ access: string; refresh: string } | null> {
+export async function refreshCookieSession(force = false): Promise<{ access: string; refresh: string } | null> {
   if (!force && accessToken && !isTokenExpired(accessToken)) {
     return { access: accessToken, refresh: refreshToken ?? '' };
   }
@@ -103,7 +102,7 @@ export async function refreshCookieSession(force = false, preserveBearerOnUnauth
     try {
       const data = await refreshBrowserSession(API_BASE_URL);
       if (!data.access) {
-        if (!preserveBearerOnUnauthorized) clearTokens();
+        clearTokens();
         return null;
       }
       const nextRefresh = data.refresh ?? refreshToken ?? '';
@@ -111,7 +110,7 @@ export async function refreshCookieSession(force = false, preserveBearerOnUnauth
       return { access: data.access, refresh: nextRefresh };
     } catch (error) {
       if ((error as {status?:number}).status !== 401) throw error;
-      if (!preserveBearerOnUnauthorized) clearTokens();
+      clearTokens();
       return null;
     } finally {
       refreshPromise = null;
@@ -122,37 +121,14 @@ export async function refreshCookieSession(force = false, preserveBearerOnUnauth
 }
 
 export async function fetchWsTicket(): Promise<string | null> {
-  const requestTicket = async (token: string) => {
-    const response = await axios.post(
-      `${API_BASE_URL}/users/ws-ticket/`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    return response.data?.ticket || null;
-  };
-
-  let token = getAccessToken();
-  if (!token || isTokenExpired(token)) {
-    token = (await refreshCookieSession(true))?.access ?? null;
-  }
-  if (!token) return null;
-
   try {
-    return await requestTicket(token);
+    const response = await browserRequest<{ ticket?: string }>(
+      `${API_BASE_URL}/users/ws-ticket/`,
+      'POST',
+      {},
+    );
+    return response?.ticket || null;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      const refreshed = (await refreshCookieSession(true))?.access ?? null;
-      if (refreshed) {
-        try {
-          return await requestTicket(refreshed);
-        } catch (retryError) {
-          console.error('Failed to fetch WS ticket after session refresh:', retryError);
-          return null;
-        }
-      }
-    }
     console.error('Failed to fetch WS ticket:', error);
     return null;
   }

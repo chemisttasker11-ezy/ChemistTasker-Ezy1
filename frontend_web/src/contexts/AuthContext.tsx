@@ -1,4 +1,4 @@
-import {bearerNeedsCookieReconciliation, logoutSession} from '../../landing_next/shared/browser-session';
+import {bearerBelongsToDifferentUser, logoutSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -163,23 +163,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const fetchSessionUser = useCallback(async (): Promise<User | null> => {
-    let cookieUser = await fetchCurrentUser(true);
-    if (!cookieUser) {
-      const refreshed = await refreshCookieSession(true, true);
-      if (refreshed) cookieUser = await fetchCurrentUser(true);
-    }
+    const cookieUser = await fetchCurrentUser(true);
+    const existingBearer = getAccessToken();
+
     if (cookieUser) {
-      // Authorization headers take precedence over cookies at the API. Keep an
-      // in-memory Bearer only when it validates as the same cookie-authenticated user.
-      const existingBearer = getAccessToken();
-      const bearerUser = existingBearer ? await fetchCurrentUser() : null;
-      if (bearerNeedsCookieReconciliation(Boolean(existingBearer), bearerUser?.id, cookieUser.id)) {
-        if (existingBearer) clearTokens();
-        await refreshCookieSession(true);
+      // Browser-only reconciliation: Authorization headers take precedence over
+      // cookies, so discard a Bearer only when both identities are known and differ.
+      if (existingBearer) {
+        const bearerUser = await fetchCurrentUser();
+        if (bearerBelongsToDifferentUser(bearerUser?.id, cookieUser.id)) {
+          clearTokens();
+        }
       }
       return cookieUser;
     }
-    return fetchCurrentUser();
+
+    // No cookie identity was established. Fall back to the existing browser
+    // token lifecycle: current Bearer/cookie request, then the established refresh.
+    let currentUser = await fetchCurrentUser();
+    if (!currentUser) {
+      const refreshed = await refreshCookieSession(true);
+      if (refreshed) currentUser = await fetchCurrentUser();
+    }
+    return currentUser;
   }, [fetchCurrentUser]);
 
   const adminAssignments = useMemo<AdminAssignment[]>(() => {

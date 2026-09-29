@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {bearerNeedsCookieReconciliation,safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
+import {bearerBelongsToDifferentUser,safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
 import {canAccessRoute} from '../src/components/routeAccess.ts';
 import {safeHubAttachmentUrl} from '../landing_next/lib/safe-hub-attachment.ts';
 
@@ -9,11 +9,11 @@ test('return links preserve permitted destinations and reject external or login 
  for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login',null])assert.equal(safeNext(path),null);
 });
 
-test('cookie authority replaces missing, invalid, or cross-user bearer state',()=>{
- assert.equal(bearerNeedsCookieReconciliation(false,null,12),true);
- assert.equal(bearerNeedsCookieReconciliation(true,null,12),true);
- assert.equal(bearerNeedsCookieReconciliation(true,11,12),true);
- assert.equal(bearerNeedsCookieReconciliation(true,12,12),false);
+test('cookie authority only reconciles a known cross-user bearer identity',()=>{
+ assert.equal(bearerBelongsToDifferentUser(11,12),true);
+ assert.equal(bearerBelongsToDifferentUser(12,12),false);
+ assert.equal(bearerBelongsToDifferentUser(null,12),false);
+ assert.equal(bearerBelongsToDifferentUser(12,null),false);
 });
 test('concurrent consumers share one cookie refresh and failures release the pending request',async()=>{
  const original=globalThis.fetch;let rotations=0;
