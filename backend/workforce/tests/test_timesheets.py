@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta
 from importlib import import_module
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.apps import apps
@@ -307,27 +308,25 @@ class TimesheetProjectionTests(TestCase):
         self.assertEqual(self.timesheet.revisions.count(), 1)
 
     def test_missing_clock_out_must_be_fixed_at_source(self):
-        # Create a second open session in the same period with a clock-in only.
+        # Keep the clock and roster date deterministic and inside this timesheet period.
         self.roster_period.status = RosterPeriod.Status.DRAFT
         self.roster_period.save(update_fields=["status"])
         tz = ZoneInfo("Australia/Brisbane")
-        now_local = timezone.now().astimezone(tz)
-        started = now_local - timedelta(hours=2)
-        finished = now_local - timedelta(minutes=5)
-        next_day = started.date()
+        work_date = self.period.start_date + timedelta(days=1)
+        now_local = datetime.combine(work_date, time(18, 0), tzinfo=tz)
+        now_utc = now_local.astimezone(ZoneInfo("UTC"))
+        started = datetime.combine(work_date, time(9, 0), tzinfo=tz)
+        finished = datetime.combine(work_date, time(17, 5), tzinfo=tz)
         shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner, dedicated_user=self.worker,
             role_needed="PHARMACIST", employment_type="FULL_TIME", min_hourly_rate=50, max_hourly_rate=50,
         )
         slot = ShiftSlot.objects.create(
-            shift=shift,
-            date=next_day,
-            start_time=started.time().replace(tzinfo=None),
-            end_time=finished.time().replace(tzinfo=None),
+            shift=shift, date=work_date, start_time=time(9, 0), end_time=time(17, 0),
             roster_period=self.roster_period,
         )
         assignment = ShiftSlotAssignment.objects.create(
-            shift=shift, slot=slot, slot_date=next_day, user=self.worker, is_rostered=True,
+            shift=shift, slot=slot, slot_date=work_date, user=self.worker, is_rostered=True,
         )
         self.roster_period.status = RosterPeriod.Status.PUBLISHED
         self.roster_period.save(update_fields=["status"])
@@ -339,20 +338,23 @@ class TimesheetProjectionTests(TestCase):
             session=open_session, event_type=AttendanceEvent.EventType.CLOCK_IN, occurred_at=started,
             source=AttendanceEvent.Source.QR_KIOSK,
         )
-        revision = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
-        blocker = revision.checks.get(code="MISSING_CLOCK_OUT")
-        with self.assertRaises(ValidationError):
-            decide_check(blocker, self.owner, TimesheetCheckDecision.Decision.WAIVED, "Ignore it")
 
-        event = append_missing_punch(
-            timesheet=self.timesheet, manager=self.owner, session_id=open_session.pk,
-            event_type=AttendanceEvent.EventType.CLOCK_OUT,
-            occurred_at=finished,
-            reason="Worker confirmed finish; manager verified closing duties.",
-        )
-        self.assertEqual(event.source, AttendanceEvent.Source.MANAGER)
-        self.assertTrue(ManagerAttendanceEventAudit.objects.filter(event=event, created_by=self.owner).exists())
-        updated = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        with patch("django.utils.timezone.now", return_value=now_utc):
+            revision = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+            blocker = revision.checks.get(code="MISSING_CLOCK_OUT")
+            with self.assertRaises(ValidationError):
+                decide_check(blocker, self.owner, TimesheetCheckDecision.Decision.WAIVED, "Ignore it")
+
+            event = append_missing_punch(
+                timesheet=self.timesheet, manager=self.owner, session_id=open_session.pk,
+                event_type=AttendanceEvent.EventType.CLOCK_OUT,
+                occurred_at=finished,
+                reason="Worker confirmed finish; manager verified closing duties.",
+            )
+            self.assertEqual(event.source, AttendanceEvent.Source.MANAGER)
+            self.assertTrue(ManagerAttendanceEventAudit.objects.filter(event=event, created_by=self.owner).exists())
+            updated = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+
         self.assertFalse(updated.checks.filter(code="MISSING_CLOCK_OUT").exists())
 
     def test_full_day_leave_counts_only_published_roster_overlap(self):
