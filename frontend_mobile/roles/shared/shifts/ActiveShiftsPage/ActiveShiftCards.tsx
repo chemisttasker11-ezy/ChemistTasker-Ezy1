@@ -11,13 +11,13 @@ import {
   Text,
 } from 'react-native-paper';
 import type { Dispatch, SetStateAction } from 'react';
-import type {
-  EscalationLevelKey,
-  Shift,
-  ShiftInterest,
-  ShiftMemberStatus,
+import {
   getShiftAudience,
   getShiftJourneyStatus,
+  type EscalationLevelKey,
+  type Shift,
+  type ShiftInterest,
+  type ShiftMemberStatus,
 } from '@chemisttasker/shared-core';
 
 import EscalationStepper from './components/Escalation/EscalationStepper';
@@ -298,8 +298,21 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                         ...allInterests,
                         ...allOffers.filter(isActiveCounterOffer),
                     ]);
+                    const isAwaiting = (item: any) =>
+                        item.pendingConfirmation || item.pending_confirmation || item.awaitingPayment || item.awaiting_payment;
+                    const actionableCount = countUniquePeople([
+                        ...allMembers.filter((item: any) => item.status === 'interested' && !isAwaiting(item)),
+                        ...allInterests.filter((item: any) => !isAwaiting(item)),
+                        ...allOffers.filter(isActiveCounterOffer),
+                    ]);
+                    const pendingConfirmationCount = countUniquePeople(
+                        [...allMembers, ...allInterests].filter((item: any) => item.pendingConfirmation || item.pending_confirmation)
+                    );
                     const journeyStatus = getShiftJourneyStatus(shift, {
-                        section: 'active', paymentRequired: showPaymentRequired, interestedCount: interestsCount,
+                        section: 'active',
+                        paymentRequired: showPaymentRequired,
+                        interestedCount: actionableCount,
+                        pendingConfirmationCount,
                     });
                     const audience = getShiftAudience(shift.visibility);
                     const slotCandidateCounts = slotIds.reduce<Record<number, number>>((acc, slotId) => {
