@@ -7,6 +7,7 @@ import {useSession} from '@/shared/session-provider';
 import {loginHref} from '@/shared/browser-session';
 import {type GoodsAccess} from '@/features/marketplace/api';
 import {chemistTaskerApi} from '@/lib/chemisttasker-api';
+import {marketplaceImageUrl} from '@/lib/marketplace-image-url';
 import {ApiError} from '@chemisttasker/shared-core';
 
 type ListingImage={url?:string;derivative_url?:string;alt?:string};
@@ -30,7 +31,7 @@ export default function MarketplaceItem({id}:{id:string}){
  return <main className="container marketplace-item-page">
   <Link className="marketplace-back-link" href="/marketplace"><ArrowLeft size={17}/> Back to marketplace</Link>
   <div className="marketplace-item-grid">
-   <div className="marketplace-item-gallery">{images.length?<>{images.slice(0,4).map((image,index)=><figure className={index===0?'marketplace-item-primary':''} key={(image.derivative_url||image.url)+String(index)}><img src={image.derivative_url||image.url} alt={image.alt||listing.title}/></figure>)}</>:<div className="marketplace-item-placeholder"><PackageOpen size={38}/> Image awaiting approval</div>}</div>
+   <div className="marketplace-item-gallery">{images.length?<>{images.slice(0,4).map((image,index)=><figure className={index===0?'marketplace-item-primary':''} key={(image.derivative_url||image.url)+String(index)}><img src={marketplaceImageUrl(image.derivative_url||image.url)} alt={image.alt||listing.title}/></figure>)}</>:<div className="marketplace-item-placeholder"><PackageOpen size={38}/> Image awaiting approval</div>}</div>
    <aside className="marketplace-item-summary">
     <span className="marketplace-item-category">{textCategory(listing)}</span>
     <h1>{listing.title}</h1>

@@ -82,11 +82,11 @@ class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     form = OwnerOnboardingAdminForm
     list_display = [
         'user', 'role', 'chain_pharmacy', 'number_of_pharmacies', 'verified',
-        'submitted_for_verification', 'organization', 'ahpra_verified', 'ahpra_verification_note',
+        'submitted_for_verification', 'organization', 'gov_id_verified', 'ahpra_verified', 'ahpra_verification_note',
         'ahpra_first_registration_date', 'ahpra_years_since_first_registration'
     ]
     list_filter = [
-        'role', 'chain_pharmacy', 'verified', 'submitted_for_verification',
+        'role', 'chain_pharmacy', 'verified', 'gov_id_verified', 'submitted_for_verification',
         'organization',
     ]
     search_fields = [
@@ -96,7 +96,9 @@ class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     fields = [
         'user', 'phone_number', 'role', 'chain_pharmacy', 'number_of_pharmacies',
         'ahpra_number', 'ahpra_first_registration_date', 'ahpra_years_since_first_registration',
-        'ahpra_verified', 'verified', 'submitted_for_verification', 'organization'
+        'ahpra_verified', 'verified', 'submitted_for_verification', 'organization',
+        'government_id_type', 'government_id', 'identity_secondary_file',
+        'identity_meta', 'gov_id_verified', 'gov_id_verification_note',
     ]
     readonly_fields = ['ahpra_years_since_first_registration']
 

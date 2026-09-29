@@ -88,7 +88,9 @@ if DEBUG:
     # Dev-only auto-detection for localhost + current private/LAN addresses.
     _dev_hosts = sorted(set(_detect_local_hosts() + ALLOWED_HOSTS))
     ALLOWED_HOSTS = ["*"]
-    CORS_ALLOWED_ORIGINS = _build_dev_origins(_dev_hosts)
+    CORS_ALLOWED_ORIGINS = sorted(set(
+        _build_dev_origins(_dev_hosts) + _clean_env_list("CORS_ALLOWED_ORIGINS", default=[])
+    ))
     CSRF_TRUSTED_ORIGINS = sorted(set(
         _clean_env_list("CSRF_TRUSTED_ORIGINS", default=[]) + CORS_ALLOWED_ORIGINS
     ))

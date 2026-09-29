@@ -7,6 +7,7 @@ urlpatterns = [
     path("listings/", views.Listings.as_view()),
     path("listings/<uuid:pk>/", views.ListingDetail.as_view()),
     path("me/access/", views.MyAccess.as_view()),
+    path("me/terms/", views.MyTerms.as_view()),
     path("me/listing-options/", ListingOptions.as_view()),
     path("me/listings/", views.MyListings.as_view()),
     path("me/listings/dashboard/", MyListingDashboard.as_view()),

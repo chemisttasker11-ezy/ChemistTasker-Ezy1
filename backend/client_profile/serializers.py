@@ -427,6 +427,8 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
     ahpra_years_since_first_registration = serializers.SerializerMethodField(read_only=True)
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
+        "government_id": DOCUMENT_UPLOAD_POLICY,
+        "identity_secondary_file": DOCUMENT_UPLOAD_POLICY,
     }
 
     class Meta:
@@ -442,6 +444,12 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
             "number_of_pharmacies",
             "profile_photo",
             "profile_photo_url",
+            "government_id",
+            "government_id_type",
+            "identity_meta",
+            "identity_secondary_file",
+            "gov_id_verified",
+            "gov_id_verification_note",
             "ahpra_number",
             "ahpra_verified",
             "ahpra_registration_status",
@@ -467,12 +475,20 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
             "ahpra_verification_note": {"read_only": True},
             "verified": {"read_only": True},
             "profile_photo": {"required": False, "allow_null": True},
+            "government_id": {"required": False, "allow_null": True},
+            "government_id_type": {"required": False, "allow_blank": True, "allow_null": True},
+            "identity_meta": {"required": False},
+            "identity_secondary_file": {"required": False, "allow_null": True},
+            "gov_id_verified": {"read_only": True},
+            "gov_id_verification_note": {"read_only": True},
         }
 
     def update(self, instance, validated_data):
         tab = (self.initial_data.get("tab") or "basic").strip().lower()
         submit = bool(validated_data.pop("submitted_for_verification", False))
 
+        if tab == "identity":
+            return PharmacistOnboardingV2Serializer._identity_tab(self, instance, validated_data, submit)
         if tab != "basic":
             tab = "basic"
 
@@ -1248,8 +1264,9 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             instance.gov_id_verification_note = ""
             update_fields += ['gov_id_verified', 'gov_id_verification_note']
 
-        # submitting this tab does not make the whole profile verified by itself
-        if submit:
+        # Owner identity is a separate marketplace gate; do not revoke an
+        # approved owner profile or unrelated dashboard access on submission.
+        if submit and not isinstance(instance, OwnerOnboarding):
             instance.verified = False
             update_fields.append('verified')
 

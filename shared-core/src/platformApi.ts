@@ -106,6 +106,8 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       listListings: (query?: ApiQuery) => client.get<MarketplaceListingPage>(PLATFORM_ENDPOINTS.marketplace.listings, query, { auth: false }),
       getListing: (id: string) => client.get<MarketplacePublicListing>(PLATFORM_ENDPOINTS.marketplace.listing(id), undefined, { auth: false }),
       getAccess: () => client.get<MarketplaceAccess>(PLATFORM_ENDPOINTS.marketplace.access),
+      getTerms: () => client.get<{ version: string; accepted: boolean; accepted_at: string | null; terms_url: string }>(PLATFORM_ENDPOINTS.marketplace.terms),
+      acceptTerms: (version: string) => client.post<{ version: string; accepted: boolean; accepted_at: string }>(PLATFORM_ENDPOINTS.marketplace.terms, { version, accepted: true }),
       getListingOptions: () => client.get<MarketplaceListingOptions>(PLATFORM_ENDPOINTS.marketplace.listingOptions),
       getMyListings: (query?: ApiQuery) => client.get<MarketplaceOwnedListing[]>(PLATFORM_ENDPOINTS.marketplace.myListings, query),
       getDashboard: () => client.get<MarketplaceDashboardListing[]>(PLATFORM_ENDPOINTS.marketplace.dashboard),

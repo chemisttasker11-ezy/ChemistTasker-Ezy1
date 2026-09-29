@@ -52,6 +52,7 @@ export const PLATFORM_ENDPOINTS = {
     listings: '/marketplace/listings/',
     listing: (id: string) => `/marketplace/listings/${id}/`,
     access: '/marketplace/me/access/',
+    terms: '/marketplace/me/terms/',
     listingOptions: '/marketplace/me/listing-options/',
     myListings: '/marketplace/me/listings/',
     dashboard: '/marketplace/me/listings/dashboard/',
