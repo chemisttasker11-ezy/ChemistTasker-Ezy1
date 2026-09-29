@@ -1,6 +1,5 @@
-import {refreshBrowserSession, watchSession} from '../../landing_next/shared/browser-session';
+import {browserRequest, refreshBrowserSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/utils/tokenService.ts
-import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
 
 export const AUTH_TOKENS_CLEARED_EVENT = 'auth:tokens-cleared';
@@ -122,17 +121,13 @@ export async function refreshCookieSession(force = false): Promise<{ access: str
 }
 
 export async function fetchWsTicket(): Promise<string | null> {
-  const token = getAccessToken();
-  if (!token) return null;
   try {
-    const response = await axios.post(
+    const response = await browserRequest<{ ticket?: string }>(
       `${API_BASE_URL}/users/ws-ticket/`,
+      'POST',
       {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
     );
-    return response.data?.ticket || null;
+    return response?.ticket || null;
   } catch (error) {
     console.error('Failed to fetch WS ticket:', error);
     return null;

@@ -2,6 +2,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 import uuid
+from unittest.mock import patch
 
 from client_profile.models import OwnerOnboarding, Pharmacy
 from users.models import User
@@ -37,6 +38,60 @@ class MarketplaceTestCase(TestCase):
         decision = evaluate_marketplace_access(self.user)
         self.assertFalse(decision.can_trade_personally)
         self.assertIn("MARKETPLACE_TERMS_REQUIRED", {row["code"] for row in decision.blockers})
+
+    def test_terms_acceptance_requires_authentication_explicit_consent_and_current_version(self):
+        path = "/api/marketplace/me/terms/"
+        MarketplaceTermsAcceptance.objects.filter(user=self.user).delete()
+        self.assertEqual(APIClient().post(path, {"accepted": True, "version": "2026-09"}, format="json").status_code, 401)
+        client = APIClient(); client.force_authenticate(self.user)
+        self.assertFalse(client.get(path).data["accepted"])
+        self.assertEqual(client.post(path, {"version": "2026-09"}, format="json").status_code, 400)
+        self.assertEqual(client.post(path, {"accepted": True, "version": "old"}, format="json").status_code, 400)
+        self.assertEqual(MarketplaceTermsAcceptance.objects.filter(user=self.user).count(), 0)
+        self.assertEqual(client.post(path, {"accepted": True, "version": "2026-09"}, format="json").status_code, 201)
+        self.assertEqual(client.post(path, {"accepted": True, "version": "2026-09"}, format="json").status_code, 200)
+        self.assertEqual(MarketplaceTermsAcceptance.objects.filter(user=self.user).count(), 1)
+        self.assertTrue(client.get(path).data["accepted"])
+        self.assertNotIn("MARKETPLACE_TERMS_REQUIRED", {row["code"] for row in evaluate_marketplace_access(self.user).blockers})
+
+    def test_accepting_terms_does_not_bypass_identity_verification(self):
+        MarketplaceTermsAcceptance.objects.filter(user=self.user).delete()
+        IdentityVerification.objects.filter(user=self.user).delete()
+        client = APIClient(); client.force_authenticate(self.user)
+        response = client.post("/api/marketplace/me/terms/", {"accepted": True, "version": "2026-09"}, format="json")
+        self.assertEqual(response.status_code, 201)
+        blockers = {row["code"] for row in client.get("/api/marketplace/me/access/").data["blockers"]}
+        self.assertIn("IDENTITY_UNVERIFIED", blockers)
+        self.assertNotIn("MARKETPLACE_TERMS_REQUIRED", blockers)
+
+    def test_owner_identity_is_a_marketplace_gate_not_general_profile_approval(self):
+        IdentityVerification.objects.filter(user=self.user).delete()
+        self.assertTrue(self.owner.verified)
+        self.assertIn("IDENTITY_UNVERIFIED", {row["code"] for row in evaluate_marketplace_access(self.user).blockers})
+        self.owner.gov_id_verified = True
+        self.owner.save(update_fields=["gov_id_verified"])
+        self.assertTrue(evaluate_marketplace_access(self.user).can_trade_personally)
+        self.owner.gov_id_verified = False
+        self.owner.save(update_fields=["gov_id_verified"])
+        self.assertTrue(self.owner.verified)
+        self.assertFalse(evaluate_marketplace_access(self.user).can_trade_personally)
+
+    def test_owner_identity_submission_preserves_dashboard_profile_approval(self):
+        self.owner.government_id = "users/test/gov_ids/example.pdf"
+        self.owner.save(update_fields=["government_id"])
+        client = APIClient(); client.force_authenticate(self.user)
+        with patch("client_profile.serializers.async_task") as queue_task:
+            response = client.patch(
+                "/api/client-profile/owner/onboarding/me/",
+                {"tab": "identity", "government_id_type": "AUS_PASSPORT", "identity_meta": {"expiry": "2030-01-01"}, "submitted_for_verification": True},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.owner.refresh_from_db()
+        self.assertTrue(self.owner.verified)
+        self.assertFalse(self.owner.gov_id_verified)
+        queue_task.assert_called_once()
+        self.assertEqual(queue_task.call_args.args[1], "owneronboarding")
 
     def test_public_projection_never_contains_identity_or_pharmacy_name(self):
         payload = PublicListingSerializer(self.listing()).data

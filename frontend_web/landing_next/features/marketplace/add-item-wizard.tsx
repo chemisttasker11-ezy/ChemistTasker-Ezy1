@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,6 +24,7 @@ import {
 import { loginHref } from '@/shared/browser-session';
 import { useSession } from '@/shared/session-provider';
 import { marketplaceApi, type Blocker } from './api';
+import MarketplaceAccessSteps from './access-steps';
 import styles from './add-item-wizard.module.css';
 
 type PharmacyOption = { id: number; label: string; suburb: string; state: string };
@@ -115,15 +116,16 @@ export default function AddItemWizard() {
     photoUrls.current.clear();
   }, []);
 
+  const refreshOptions = useCallback(async () => {
+    const next = await marketplaceApi.getListingOptions();
+    setOptions(next);
+    setPharmacyId(next.eligible_pharmacies[0]?.id);
+  }, []);
+
   useEffect(() => {
     if (session.status !== 'authenticated') return;
-    marketplaceApi.getListingOptions()
-      .then((next) => {
-        setOptions(next);
-        setPharmacyId(next.eligible_pharmacies[0]?.id);
-      })
-      .catch((reason) => setError((reason as Error).message));
-  }, [session.status]);
+    void refreshOptions().catch((reason) => setError((reason as Error).message));
+  }, [session.status, refreshOptions]);
 
   const categories = useMemo(
     () => (context === 'PHARMACY' ? options?.pharmacy_categories || [] : options?.personal_categories || []),
@@ -300,14 +302,7 @@ export default function AddItemWizard() {
           <section className="workspace-panel">
             <LockKeyhole />
             <h2>Complete these steps before listing</h2>
-            <ul>
-              {options.blockers.map((row) => (
-                <li key={row.code}>{row.message || row.detail}</li>
-              ))}
-            </ul>
-            <Link className="button secondary" href="/dashboard">
-              Open dashboard
-            </Link>
+            <MarketplaceAccessSteps blockers={options.blockers} role={options.role_code} onAccepted={refreshOptions} />
           </section>
         </div>
       </main>

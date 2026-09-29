@@ -16,6 +16,7 @@ import { Candidate } from "./types";
 import { ENGAGEMENT_LABELS } from "./constants";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
+  canPublishTalent,
   createExplorerPost,
   deleteExplorerPost,
   fetchUserAvailabilityService,
@@ -23,9 +24,9 @@ import {
   getRatingsSummary,
   likeExplorerPost,
   unlikeExplorerPost,
+  updateOnboardingForm,
   updateExplorerPost,
 } from "@chemisttasker/shared-core";
-import { API_BASE_URL } from "../../../../constants/api";
 import { otherStaffRoleLabel } from "../../../../utils/roleLabels";
 import skillsCatalog from "../../../../../../shared-core/skills_catalog.json";
 
@@ -161,7 +162,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const loading = externalLoading ?? feed.loading;
   const error = externalError ?? feed.error;
   const reload = feed.reload;
-  const { user, token, isAdminUser } = useAuth();
+  const { user, isAdminUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -188,7 +189,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const ratingFetchRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
     const ids = new Set<number>();
     posts.forEach((post) => {
       if (typeof post.authorUserId === "number") ids.add(post.authorUserId);
@@ -209,7 +210,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           // Leave unset so we can fall back to any rating data already in the post payload.
         });
     });
-  }, [posts, token]);
+  }, [posts, user?.id]);
 
   const candidates = useMemo<Candidate[]>(() => {
     return posts.map((post) => {
@@ -565,10 +566,24 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const isExplorer = user?.role === "EXPLORER";
   const isPharmacist = user?.role === "PHARMACIST";
   const isOtherStaff = user?.role === "OTHER_STAFF";
+  const [staffPublicAccess, setStaffPublicAccess] = useState(false);
+  useEffect(() => {
+    if (!isPharmacist && !isOtherStaff) { setStaffPublicAccess(false); return; }
+    let active = true;
+    const checkAccess = async () => {
+      try {
+        const profile: any = await getOnboarding(isPharmacist ? "pharmacist" : "otherstaff");
+        if (active) setStaffPublicAccess(canPublishTalent(user, profile, todayIso()));
+      } catch { if (active) setStaffPublicAccess(false); }
+    };
+    void checkAccess();
+    window.addEventListener("onboarding-updated", checkAccess);
+    return () => { active = false; window.removeEventListener("onboarding-updated", checkAccess); };
+  }, [isPharmacist, isOtherStaff, user?.id, user?.is_mobile_verified]);
   const showPitchButton =
     !publicMode &&
     user?.role &&
-    ["EXPLORER", "PHARMACIST", "OTHER_STAFF"].includes(user.role);
+    (isExplorer || ((isPharmacist || isOtherStaff) && staffPublicAccess));
 
   const resetPitchForm = useCallback(() => {
       setPitchForm({
@@ -736,7 +751,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   }, [location.pathname, location.search, navigate, publicMode, showPitchButton]);
 
   const updateOnboardingLocationPrefs = useCallback(async () => {
-    if (!token) return;
     const safeRole = isOtherStaff ? "otherstaff" : isPharmacist ? "pharmacist" : "explorer";
     const form = new FormData();
     form.append("street_address", pitchForm.streetAddress || "");
@@ -750,16 +764,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     if (pitchForm.longitude != null) form.append("longitude", String(pitchForm.longitude));
     if (pitchForm.googlePlaceId) form.append("google_place_id", pitchForm.googlePlaceId);
 
-    const response = await fetch(`${API_BASE_URL}/client-profile/${safeRole}/onboarding/me/`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ detail: "Failed to update location preferences" }));
-      throw new Error(err.detail || "Failed to update location preferences");
-    }
-  }, [token, isOtherStaff, isPharmacist, pitchForm]);
+    await updateOnboardingForm(safeRole, form);
+  }, [isOtherStaff, isPharmacist, pitchForm]);
 
   const handlePitchSave = async () => {
     setPitchSaving(true);
@@ -875,6 +881,12 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       )}
 
       <Box sx={{ px: { xs: 0, lg: 2 }, py: 2, width: "100%" }}>
+        {!publicMode && (isPharmacist || isOtherStaff) && !staffPublicAccess && (
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="body2">Your pharmacy invitation gives you internal team access. Verify your public-platform profile before publishing availability in Talent Hub.</Typography>
+            <Button onClick={() => navigate(`/dashboard/${isPharmacist ? "pharmacist" : "otherstaff"}/onboarding`)}>Open public profile</Button>
+          </Paper>
+        )}
         {error && (
           <Typography color="error" variant="body2" sx={{ mb: 2 }}>
             {error}

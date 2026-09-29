@@ -5,6 +5,7 @@ import {ArrowRight,Clock3,ImagePlus,PackagePlus,RefreshCw,ShieldCheck} from 'luc
 import {loginHref} from '@/shared/browser-session';
 import {useSession} from '@/shared/session-provider';
 import {marketplaceApi,type GoodsAccess} from './api';
+import MarketplaceAccessSteps from './access-steps';
 
 type Row={id:string;slug:string;title:string;seller_context:'PERSONAL'|'PHARMACY';category:{slug:string;name:string};pharmacy?:{id:number;label:string}|null;publication_status:string;availability_status:string;version:number;current_circle?:'OWNED_CHAIN'|'ORGANISATION'|'PLATFORM'|null;maximum_circle?:'OWNED_CHAIN'|'ORGANISATION'|'PLATFORM'|null;allowed_buyer_roles:string[];images:{id:number;status:string;position:number}[];escalation_steps:{id:number;target_circle:string;due_at:string;status:string}[]};
 const ORDER=['OWNED_CHAIN','ORGANISATION','PLATFORM'] as const;const LABELS:Record<string,string>={OWNED_CHAIN:'Owned chain',ORGANISATION:'Organisation owners',PLATFORM:'All eligible platform owners'};
@@ -15,7 +16,7 @@ export default function GoodsListingsV2(){
  if(session.status==='loading'||(loading&&session.status==='authenticated'))return <main className="market-workspace"><div className="container workspace-loading">Loading your marketplace listings…</div></main>;
  if(session.status==='anonymous')return <main className="market-workspace"><div className="container"><section className="workspace-panel"><h1>Sign in to manage your listings</h1><a className="button primary" href={loginHref('/marketplace/mine')}>Sign in</a></section></div></main>;
  if(session.status==='unavailable')return <main className="market-workspace"><div className="container"><section className="workspace-panel"><button onClick={()=>void session.reload()}>Reconnect</button></section></div></main>;
- if(access?.blockers.length)return <main className="market-workspace"><div className="container"><section className="workspace-panel"><h2>Trading is currently blocked</h2><ul>{access.blockers.map(row=><li key={row.code}>{row.message||row.detail}</li>)}</ul></section></div></main>;
+ if(access?.blockers.length)return <main className="market-workspace"><div className="container"><section className="workspace-panel"><h2>Trading is currently blocked</h2><MarketplaceAccessSteps blockers={access.blockers} role={access.role_code} onAccepted={load}/>{error&&<p className="workspace-alert" role="alert">{error}</p>}</section></div></main>;
  async function action(row:Row,name:'submit'|'withdraw'){try{await marketplaceApi.actOnListing(row.id,name,row.version);await load()}catch(reason){setError((reason as Error).message)}}
  async function audience(row:Row,current:string,schedule:unknown[]=[]){try{await marketplaceApi.updateAudience(row.id,{expected_version:row.version,current_circle:current,maximum_circle:row.maximum_circle||'PLATFORM',schedule: schedule as Array<{target_circle:string;due_at:string}>});await load()}catch(reason){setError((reason as Error).message)}}
  async function upload(row:Row,event:FormEvent<HTMLFormElement>){event.preventDefault();try{await marketplaceApi.uploadImage(row.id,new FormData(event.currentTarget));event.currentTarget.reset();await load()}catch(reason){setError((reason as Error).message)}}

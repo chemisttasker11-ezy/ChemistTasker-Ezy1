@@ -34,6 +34,7 @@ import { useAuth, type User } from '../../contexts/AuthContext';
 import { UnsavedChangesBoundary, useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { AHPRA_CONSENT_TEXT } from '../../constants/ahpraConsent';
 import AccountDeletionSection from '../../components/AccountDeletionSection';
+import IdentityV2 from './onboarding_pharmacist/IdentityV2';
 
 interface FormData {
   username: string;
@@ -373,6 +374,14 @@ const handleSubmit = async (e: React.FormEvent) => {
     if (ok === false)  return <Chip icon={<ErrorOutlineIcon />}   color="error"   label={`${label}`} variant="outlined" />;
     return               <Chip icon={<HourglassBottomIcon />}      label={`${label}`}               variant="outlined" />;
   };
+
+  useEffect(() => {
+    if (loading || standalone || new URLSearchParams(window.location.search).get('marketplace_identity') !== '1') return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById('marketplace-identity')?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [loading, standalone]);
 
   if (loading) return <Typography>Loading…</Typography>;
 
@@ -762,6 +771,18 @@ const handleSubmit = async (e: React.FormEvent) => {
           </Paper>
           </Box>
         </Paper>
+
+        {!standalone && (
+        <Paper id="marketplace-identity" sx={{ ...sectionCardSx, scrollMarginTop: '96px' }} elevation={0}>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#111827', mb: 1 }}>
+            Marketplace identity verification
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748B', mb: 3 }}>
+            Verify your identity to add marketplace listings. This step does not affect your owner dashboard, pharmacy workspace, or other account features.
+          </Typography>
+          <IdentityV2 roleKey="owner" />
+        </Paper>
+        )}
 
         {!standalone && (
         <Paper sx={sectionCardSx} elevation={0}>

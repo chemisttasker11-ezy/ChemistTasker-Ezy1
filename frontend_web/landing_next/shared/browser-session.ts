@@ -22,6 +22,7 @@ export function rememberDestination(value:unknown){const path=safeNext(value);if
 export function returnDestination(){return safeNext(new URLSearchParams(window.location.search).get('next'))||safeNext(sessionStorage.getItem('ct:return-to'));}
 export function finishDestination(path:string){sessionStorage.removeItem('ct:return-to');window.location.assign(path);}
 export function loginHref(path:string){return `/login?next=${encodeURIComponent(safeNext(path)||'/dashboard')}`;}
+export function bearerBelongsToDifferentUser(bearerUserId:unknown,cookieUserId:unknown){return bearerUserId!=null&&cookieUserId!=null&&String(bearerUserId)!==String(cookieUserId);}
 
 async function decode<T>(response:Response):Promise<T>{
  if(response.status===204)return undefined as T;

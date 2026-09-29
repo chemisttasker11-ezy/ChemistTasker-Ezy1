@@ -1,4 +1,4 @@
-import {logoutSession} from '../../landing_next/shared/browser-session';
+import {bearerBelongsToDifferentUser, logoutSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -150,13 +150,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setActiveAdminAssignmentId(null);
   }, []);
 
-  const fetchCurrentUser = useCallback(async (): Promise<User | null> => {
-    const token=getAccessToken();
-    const resp=await fetch(`${API_BASE_URL}/users/me/`,{credentials:'include',headers:token?{Authorization:`Bearer ${token}`}:{}});
-    if(resp.status===401)return null;
-    if(!resp.ok)throw new Error('Your account is temporarily unavailable.');
+  const fetchCurrentUser = useCallback(async (cookieOnly = false): Promise<User | null> => {
+    const token = cookieOnly ? null : getAccessToken();
+    if (!cookieOnly && !token) return null;
+    const resp = await fetch(`${API_BASE_URL}/users/me/`, {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (resp.status === 401) return null;
+    if (!resp.ok) throw new Error('Your account is temporarily unavailable.');
     return await resp.json() as User;
   }, []);
+
+  const fetchSessionUser = useCallback(async (): Promise<User | null> => {
+    const cookieUser = await fetchCurrentUser(true);
+    const existingBearer = getAccessToken();
+
+    if (cookieUser) {
+      // Browser-only reconciliation: Authorization headers take precedence over
+      // cookies, so discard a Bearer only when both identities are known and differ.
+      if (existingBearer) {
+        const bearerUser = await fetchCurrentUser();
+        if (bearerBelongsToDifferentUser(bearerUser?.id, cookieUser.id)) {
+          clearTokens();
+        }
+      }
+      return cookieUser;
+    }
+
+    // No cookie identity was established. Fall back to the existing browser
+    // token lifecycle: current Bearer/cookie request, then the established refresh.
+    let currentUser = await fetchCurrentUser();
+    if (!currentUser) {
+      const refreshed = await refreshCookieSession(true);
+      if (refreshed) currentUser = await fetchCurrentUser();
+    }
+    return currentUser;
+  }, [fetchCurrentUser]);
 
   const adminAssignments = useMemo<AdminAssignment[]>(() => {
     return normalizeAdminAssignments(user);
@@ -181,16 +211,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const bootstrap = async () => {
       try {
         await restoreTokensFromStorage();
-        let parsedUser: User | null = await fetchCurrentUser();
-
-        if (!parsedUser) {
-          {
-            const refreshed = await refreshCookieSession(true);
-            if (refreshed) {
-              parsedUser = await fetchCurrentUser();
-            }
-          }
-        }
+        const parsedUser = await fetchSessionUser();
 
         if (!parsedUser) {
           clearTokens();
@@ -210,7 +231,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     void bootstrap();
-  }, [clearLocalAuthState, fetchCurrentUser]);
+  }, [clearLocalAuthState, fetchSessionUser]);
+
+  useEffect(() => {
+    let active = true;
+    let inFlight = false;
+    const synchronizeSession = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      setIsLoading(true);
+      try {
+        // The cookie is shared by the Next site, Vite dashboard and playground.
+        // A cached Bearer token can still belong to the previously opened user.
+        const current = await fetchSessionUser();
+        if (!active) return;
+        if (!current) {
+          clearTokens();
+          clearLocalAuthState();
+        } else {
+          setAccess(getAccessToken());
+          setRefresh(getRefreshToken());
+          setUser(current);
+          setSessionError('');
+        }
+      } catch {
+        if (active) setSessionError('Unable to connect to your account. Please retry.');
+      } finally {
+        inFlight = false;
+        if (active) setIsLoading(false);
+      }
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') void synchronizeSession(); };
+    window.addEventListener('focus', synchronizeSession);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { active = false; window.removeEventListener('focus', synchronizeSession); document.removeEventListener('visibilitychange', onVisible); };
+  }, [clearLocalAuthState, fetchSessionUser]);
   useEffect(() => {
     if (!user) {
       setActivePersonaState("staff");

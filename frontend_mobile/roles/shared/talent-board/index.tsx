@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import {
+  canPublishTalent,
   createExplorerPost,
   deleteExplorerPost,
   fetchUserAvailabilityService,
@@ -336,9 +337,36 @@ export default function TalentBoard({
     [user?.role]
   );
 
-  const canPitch = useMemo(() => {
-    return ['EXPLORER', 'PHARMACIST', 'OTHER_STAFF'].includes(normalizedRole);
-  }, [normalizedRole]);
+  const isTalentStaff = normalizedRole === 'PHARMACIST' || normalizedRole === 'OTHER_STAFF';
+  const [staffPublicAccess, setStaffPublicAccess] = useState<boolean | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isTalentStaff) {
+        setStaffPublicAccess(null);
+        return undefined;
+      }
+
+      let active = true;
+      setStaffPublicAccess(null);
+      const roleKey = normalizedRole === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
+      void getOnboarding(roleKey)
+        .then((profile: any) => {
+          if (active) setStaffPublicAccess(canPublishTalent(user, profile, todayIso()));
+        })
+        .catch(() => {
+          if (active) setStaffPublicAccess(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [isTalentStaff, normalizedRole, user?.id, user?.is_mobile_verified])
+  );
+
+  const canPitch =
+    normalizedRole === 'EXPLORER' ||
+    (isTalentStaff && staffPublicAccess === true);
 
   const canRequestBookingByRole = useMemo(() => {
     if (!normalizedRole) return false;
@@ -659,6 +687,20 @@ export default function TalentBoard({
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} tintColor="#6366F1" />}
       >
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {isTalentStaff && staffPublicAccess === false ? (
+          <View style={styles.emptyBox}>
+            <Text variant="titleMedium" style={{ fontWeight: '700' }}>Public Talent profile verification required</Text>
+            <Text style={styles.subtitle}>
+              Your pharmacy invitation gives you internal access. Verify your public-platform profile before publishing availability.
+            </Text>
+            <Button
+              mode="outlined"
+              onPress={() => router.push((normalizedRole === 'PHARMACIST' ? '/pharmacist/profile' : '/otherstaff/profile') as any)}
+            >
+              Open public profile
+            </Button>
+          </View>
+        ) : null}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text variant="headlineSmall" style={styles.title}>Find Talent</Text>

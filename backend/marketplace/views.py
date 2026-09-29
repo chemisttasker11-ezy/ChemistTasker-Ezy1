@@ -7,6 +7,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.text import slugify
+from azure.core.exceptions import ResourceNotFoundError
 from PIL import Image, UnidentifiedImageError
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -18,8 +19,8 @@ from rest_framework.views import APIView
 from client_profile.models import Pharmacy
 from .models import (ListingEscalationStep, MarketplaceAuditEvent, MarketplaceCategory, MarketplaceExchange,
                      MarketplaceCatalogueProduct, MarketplaceExchangeParticipant, MarketplaceImage, MarketplaceInternalTransfer, MarketplaceListing, MarketplaceMessage,
-                     MarketplaceReport, MarketplaceRequestReceipt, MarketplaceSavedListing)
-from .policy import evaluate_marketplace_access, owns_pharmacy
+                     MarketplaceReport, MarketplaceRequestReceipt, MarketplaceSavedListing, MarketplaceTermsAcceptance)
+from .policy import CURRENT_TERMS_VERSION, evaluate_marketplace_access, owns_pharmacy
 from .serializers import ExchangeSerializer, ListingWriteSerializer, MessageSerializer, PublicCategorySerializer, PublicListingSerializer
 from .services import accept_exchange, assert_listing_manager, buyer_can_contact, request_receipt
 
@@ -127,6 +128,29 @@ class MyAccess(APIView):
     permission_classes = (IsAuthenticated,)
     def get(self, request):
         response = Response(evaluate_marketplace_access(request.user).payload())
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class MyTerms(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        acceptance = MarketplaceTermsAcceptance.objects.filter(user=request.user, version=CURRENT_TERMS_VERSION).first()
+        response = Response({"version": CURRENT_TERMS_VERSION, "accepted": acceptance is not None,
+                             "accepted_at": acceptance.accepted_at if acceptance else None,
+                             "terms_url": "/terms-of-service"})
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    def post(self, request):
+        if request.data.get("accepted") is not True or request.data.get("version") != CURRENT_TERMS_VERSION:
+            raise ValidationError({"detail": "Read the current terms and explicitly confirm this version."})
+        acceptance, created = MarketplaceTermsAcceptance.objects.get_or_create(
+            user=request.user, version=CURRENT_TERMS_VERSION
+        )
+        response = Response({"version": CURRENT_TERMS_VERSION, "accepted": True,
+                             "accepted_at": acceptance.accepted_at}, status=201 if created else 200)
         response["Cache-Control"] = "private, no-store"
         return response
 
@@ -243,7 +267,10 @@ class ImageDetail(APIView):
             raise Http404
         if not image.derivative:
             raise Http404
-        response = FileResponse(image.derivative.open("rb"), content_type="image/jpeg")
+        try:
+            response = FileResponse(image.derivative.open("rb"), content_type="image/jpeg")
+        except (FileNotFoundError, ResourceNotFoundError) as exc:
+            raise Http404("Listing image is unavailable.") from exc
         response["Cache-Control"] = "public, max-age=300" if public else "private, no-store"
         return response
     def delete(self, request, pk):

@@ -44,6 +44,14 @@ def owner_profile_photo_upload_path(instance, filename):
     return onboarding_upload_path(instance, filename, "profile_photos")
 
 
+def owner_gov_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids")
+
+
+def owner_secondary_id_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "gov_ids_secondary")
+
+
 def pharmacist_profile_photo_upload_path(instance, filename):
     return onboarding_upload_path(instance, filename, "profile_photos")
 
@@ -187,6 +195,16 @@ class OwnerOnboarding(models.Model):
     chain_pharmacy  = models.BooleanField(default=False)
     number_of_pharmacies = models.PositiveIntegerField(default=1)
     profile_photo = models.ImageField(upload_to=owner_profile_photo_upload_path, blank=True, null=True)
+    government_id = models.FileField(upload_to=owner_gov_id_upload_path, blank=True, null=True)
+    government_id_type = models.CharField(max_length=32, choices=[
+        ('DRIVER_LICENSE', 'Driving license'), ('VISA', 'Visa'),
+        ('AUS_PASSPORT', 'Australian Passport'), ('OTHER_PASSPORT', 'Other Passport'),
+        ('AGE_PROOF', 'Age Proof Card'),
+    ], blank=True, null=True)
+    identity_meta = models.JSONField(default=dict, blank=True)
+    identity_secondary_file = models.FileField(upload_to=owner_secondary_id_upload_path, blank=True, null=True)
+    gov_id_verified = models.BooleanField(default=False, db_index=True)
+    gov_id_verification_note = models.TextField(blank=True, null=True)
 
     # Regulatory Info for pharmacists only
     ahpra_number    = models.CharField(max_length=100, blank=True, null=True)
