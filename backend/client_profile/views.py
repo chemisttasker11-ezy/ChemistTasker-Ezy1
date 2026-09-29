@@ -8788,6 +8788,12 @@ class IsPostOwner(permissions.BasePermission):
         return getattr(obj.explorer_profile, "user_id", None) == request.user.id
 
 
+class TalentPostPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+
 class ExplorerPostViewSet(viewsets.ModelViewSet):
     """
     Authenticated users can view.
@@ -8810,6 +8816,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         .order_by("-created_at")
     )
     parser_classes = (MultiPartParser, FormParser, JSONParser)
+    pagination_class = TalentPostPagination
 
     # --------- serializers ---------
     def get_serializer_class(self):
@@ -8846,17 +8853,33 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         and stamp author_user.
         """
         if not (self.request.user.is_explorer() or self.request.user.is_pharmacist() or self.request.user.is_otherstaff()):
-            raise permissions.PermissionDenied("Only Explorer, Pharmacist, or Other Staff can create posts.")
+            raise PermissionDenied("Only Explorer, Pharmacist, or Other Staff can create posts.")
+        self._require_public_staff_access()
         explorer_profile = serializer.validated_data.get("explorer_profile")
         if explorer_profile is not None and explorer_profile.user_id != self.request.user.id:
-            raise permissions.PermissionDenied("You can only post from your own explorer profile.")
+            raise PermissionDenied("You can only post from your own explorer profile.")
         serializer.save(author_user=self.request.user)
 
     def perform_update(self, serializer):
         # Only owner can update (object-level)
         instance = self.get_object()
         self.check_object_permissions_for_write(instance)
+        self._require_public_staff_access()
         serializer.save()
+
+    def _require_public_staff_access(self):
+        """An owner invitation grants internal membership, not public Talent access."""
+        user = self.request.user
+        if user.role not in ("PHARMACIST", "OTHER_STAFF"):
+            return
+        profile = (PharmacistOnboarding if user.role == "PHARMACIST" else OtherStaffOnboarding).objects.filter(user=user).first()
+        if not user.is_active or not user.is_mobile_verified or not profile or not profile.verified:
+            raise PermissionDenied("Verify your public-platform onboarding before publishing availability.")
+        if user.role == "PHARMACIST" and (
+            not profile.ahpra_verified or
+            (profile.ahpra_expiry_date and profile.ahpra_expiry_date < timezone.localdate())
+        ):
+            raise PermissionDenied("A current verified pharmacist registration is required to publish availability.")
 
     def perform_destroy(self, instance):
         # Only owner can delete (object-level)
@@ -8865,7 +8888,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
 
     def check_object_permissions_for_write(self, obj):
         if not IsPostOwner().has_object_permission(self.request, self, obj):
-            raise permissions.PermissionDenied("Only the owner can modify this post.")
+            raise PermissionDenied("Only the owner can modify this post.")
 
     def _visible_posts(self, queryset):
         today = timezone.localdate()

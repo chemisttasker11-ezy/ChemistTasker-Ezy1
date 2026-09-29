@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getExplorerPostFeed } from '@chemisttasker/shared-core';
+import { loadAllTalentPages } from './loadAllTalentPages';
 
 type ExplorerPost = Record<string, any>;
 
@@ -42,7 +43,7 @@ export const useTalentFeed = (options?: { enabled?: boolean }) => {
     setLoading(true);
     setError(null);
     try {
-      const res: any = await getExplorerPostFeed({ page: 1, page_size: 200 });
+      const res: any = await loadAllTalentPages((page) => getExplorerPostFeed({ page, page_size: 200 }));
       if (Array.isArray(res)) {
         const mapped = res.map(mapPost);
         setPosts(mapped);

@@ -90,7 +90,7 @@ export function clearTokens() {
 }
 
 // Kept name for backwards compatibility; refresh is cookie-backed on web clients.
-export async function refreshCookieSession(force = false): Promise<{ access: string; refresh: string } | null> {
+export async function refreshCookieSession(force = false, preserveBearerOnUnauthorized = false): Promise<{ access: string; refresh: string } | null> {
   if (!force && accessToken && !isTokenExpired(accessToken)) {
     return { access: accessToken, refresh: refreshToken ?? '' };
   }
@@ -103,7 +103,7 @@ export async function refreshCookieSession(force = false): Promise<{ access: str
     try {
       const data = await refreshBrowserSession(API_BASE_URL);
       if (!data.access) {
-        clearTokens();
+        if (!preserveBearerOnUnauthorized) clearTokens();
         return null;
       }
       const nextRefresh = data.refresh ?? refreshToken ?? '';
@@ -111,7 +111,7 @@ export async function refreshCookieSession(force = false): Promise<{ access: str
       return { access: data.access, refresh: nextRefresh };
     } catch (error) {
       if ((error as {status?:number}).status !== 401) throw error;
-      clearTokens();
+      if (!preserveBearerOnUnauthorized) clearTokens();
       return null;
     } finally {
       refreshPromise = null;

@@ -13,6 +13,7 @@ import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import {useAuth} from "../contexts/AuthContext";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
 import { API_BASE_URL } from "../constants/api";
+import { loadAllTalentPages } from "./dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
 export default function PublicTalentBoardPage() {
@@ -45,15 +46,14 @@ export default function PublicTalentBoardPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/client-profile/explorer-posts/public-feed/?page=1&page_size=200`
-      );
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ detail: "Failed to load talent feed." }));
-        throw new Error(err.detail || `HTTP ${response.status}`);
-      }
-      const res: any = await response.json();
-      const list = Array.isArray(res) ? res : Array.isArray(res?.results) ? res.results : [];
+      const list = await loadAllTalentPages(async (page) => {
+        const response = await fetch(`${API_BASE_URL}/client-profile/explorer-posts/public-feed/?page=${page}&page_size=200`);
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ detail: "Failed to load talent feed." }));
+          throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+        return response.json();
+      });
       const mapped = list.map((post: any) => ({
         ...post,
         authorUserId: post.author_user_id ?? post.authorUserId ?? null,

@@ -12,6 +12,7 @@ import AuthLayout from "../layouts/AuthLayout";
 import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
 import { getPublicTalentFeed } from "@chemisttasker/shared-core";
+import { loadAllTalentPages } from "./dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
 export default function PublicTalentBoardPage() {
@@ -43,7 +44,7 @@ export default function PublicTalentBoardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res: any = await getPublicTalentFeed({ page: 1, page_size: 200 });
+      const res: any = await loadAllTalentPages((page) => getPublicTalentFeed({ page, page_size: 200 }));
       const list = Array.isArray(res) ? res : Array.isArray(res?.results) ? res.results : [];
       const mapped = list.map((post: any) => ({
         ...post,

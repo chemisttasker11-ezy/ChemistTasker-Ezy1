@@ -566,10 +566,25 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const isExplorer = user?.role === "EXPLORER";
   const isPharmacist = user?.role === "PHARMACIST";
   const isOtherStaff = user?.role === "OTHER_STAFF";
+  const [staffPublicAccess, setStaffPublicAccess] = useState(false);
+  useEffect(() => {
+    if (!isPharmacist && !isOtherStaff) { setStaffPublicAccess(false); return; }
+    let active = true;
+    const checkAccess = async () => {
+      try {
+        const profile: any = await getOnboarding(isPharmacist ? "pharmacist" : "otherstaff");
+        const registrationCurrent = !isPharmacist || (Boolean(profile?.ahpra_verified) && (!profile?.ahpra_expiry_date || profile.ahpra_expiry_date >= todayIso()));
+        if (active) setStaffPublicAccess(Boolean(user?.is_mobile_verified && profile?.verified && registrationCurrent));
+      } catch { if (active) setStaffPublicAccess(false); }
+    };
+    void checkAccess();
+    window.addEventListener("onboarding-updated", checkAccess);
+    return () => { active = false; window.removeEventListener("onboarding-updated", checkAccess); };
+  }, [isPharmacist, isOtherStaff, user?.id, user?.is_mobile_verified]);
   const showPitchButton =
     !publicMode &&
     user?.role &&
-    ["EXPLORER", "PHARMACIST", "OTHER_STAFF"].includes(user.role);
+    (isExplorer || ((isPharmacist || isOtherStaff) && staffPublicAccess));
 
   const resetPitchForm = useCallback(() => {
       setPitchForm({
@@ -876,6 +891,12 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       )}
 
       <Box sx={{ px: { xs: 0, lg: 2 }, py: 2, width: "100%" }}>
+        {!publicMode && (isPharmacist || isOtherStaff) && !staffPublicAccess && (
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="body2">Your pharmacy invitation gives you internal team access. Verify your public-platform profile before publishing availability in Talent Hub.</Typography>
+            <Button onClick={() => navigate(`/dashboard/${isPharmacist ? "pharmacist" : "otherstaff"}/onboarding`)}>Open public profile</Button>
+          </Paper>
+        )}
         {error && (
           <Typography color="error" variant="body2" sx={{ mb: 2 }}>
             {error}
