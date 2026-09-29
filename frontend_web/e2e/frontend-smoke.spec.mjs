@@ -130,10 +130,13 @@ async function openAuthenticatedRoute(page, user, path) {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await installApiFixture(page, user);
-  await page.goto(path);
-  await page.waitForLoadState('networkidle');
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#root')).not.toBeEmpty({ timeout: 15_000 });
+  await expect.poll(
+    () => new URL(page.url()).pathname,
+    { timeout: 15_000, message: `route did not settle at ${path}` },
+  ).toBe(path.split('?')[0]);
 
-  expect(new URL(page.url()).pathname).toBe(path.split('?')[0]);
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Page not found');
   await expect(page.locator('body')).not.toContainText('Not Found');
