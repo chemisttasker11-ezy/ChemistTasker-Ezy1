@@ -122,9 +122,7 @@ export async function refreshCookieSession(force = false, preserveBearerOnUnauth
 }
 
 export async function fetchWsTicket(): Promise<string | null> {
-  const token = getAccessToken();
-  if (!token) return null;
-  try {
+  const requestTicket = async (token: string) => {
     const response = await axios.post(
       `${API_BASE_URL}/users/ws-ticket/`,
       {},
@@ -133,7 +131,28 @@ export async function fetchWsTicket(): Promise<string | null> {
       }
     );
     return response.data?.ticket || null;
+  };
+
+  let token = getAccessToken();
+  if (!token || isTokenExpired(token)) {
+    token = (await refreshCookieSession(true))?.access ?? null;
+  }
+  if (!token) return null;
+
+  try {
+    return await requestTicket(token);
   } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const refreshed = (await refreshCookieSession(true))?.access ?? null;
+      if (refreshed) {
+        try {
+          return await requestTicket(refreshed);
+        } catch (retryError) {
+          console.error('Failed to fetch WS ticket after session refresh:', retryError);
+          return null;
+        }
+      }
+    }
     console.error('Failed to fetch WS ticket:', error);
     return null;
   }

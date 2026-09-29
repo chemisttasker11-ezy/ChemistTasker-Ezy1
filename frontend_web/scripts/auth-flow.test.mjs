@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
+import {bearerNeedsCookieReconciliation,safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
 import {canAccessRoute} from '../src/components/routeAccess.ts';
 import {safeHubAttachmentUrl} from '../landing_next/lib/safe-hub-attachment.ts';
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
  for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login',null])assert.equal(safeNext(path),null);
+});
+
+test('cookie authority replaces missing, invalid, or cross-user bearer state',()=>{
+ assert.equal(bearerNeedsCookieReconciliation(false,null,12),true);
+ assert.equal(bearerNeedsCookieReconciliation(true,null,12),true);
+ assert.equal(bearerNeedsCookieReconciliation(true,11,12),true);
+ assert.equal(bearerNeedsCookieReconciliation(true,12,12),false);
 });
 test('concurrent consumers share one cookie refresh and failures release the pending request',async()=>{
  const original=globalThis.fetch;let rotations=0;

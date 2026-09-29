@@ -1,4 +1,4 @@
-import {logoutSession} from '../../landing_next/shared/browser-session';
+import {bearerNeedsCookieReconciliation, logoutSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -169,10 +169,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (refreshed) cookieUser = await fetchCurrentUser(true);
     }
     if (cookieUser) {
-      // Authorization headers take precedence over cookies at the API. Never
-      // retain a token belonging to a different user after a cross-app switch.
-      const bearerUser = getAccessToken() ? await fetchCurrentUser() : null;
-      if (bearerUser && bearerUser.id !== cookieUser.id) clearTokens();
+      // Authorization headers take precedence over cookies at the API. Keep an
+      // in-memory Bearer only when it validates as the same cookie-authenticated user.
+      const existingBearer = getAccessToken();
+      const bearerUser = existingBearer ? await fetchCurrentUser() : null;
+      if (bearerNeedsCookieReconciliation(Boolean(existingBearer), bearerUser?.id, cookieUser.id)) {
+        if (existingBearer) clearTokens();
+        await refreshCookieSession(true);
+      }
       return cookieUser;
     }
     return fetchCurrentUser();
