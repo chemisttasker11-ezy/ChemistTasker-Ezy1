@@ -17,6 +17,7 @@ import { Candidate } from "./types";
 import { ENGAGEMENT_LABELS } from "./constants";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
+  canPublishTalent,
   createExplorerPost,
   deleteExplorerPost,
   fetchUserAvailabilityService,
@@ -24,9 +25,9 @@ import {
   getRatingsSummary,
   likeExplorerPost,
   unlikeExplorerPost,
+  updateOnboardingForm,
   updateExplorerPost,
 } from "@chemisttasker/shared-core";
-import { API_BASE_URL } from "../../../../constants/api";
 import { otherStaffRoleLabel } from "../../../../utils/roleLabels";
 import skillsCatalog from "@chemisttasker/shared-core/skills_catalog.json";
 
@@ -162,7 +163,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const loading = externalLoading ?? feed.loading;
   const error = externalError ?? feed.error;
   const reload = feed.reload;
-  const { user, token, isAdminUser } = useAuth();
+  const { user, isAdminUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -189,7 +190,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const ratingFetchRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
     const ids = new Set<number>();
     posts.forEach((post) => {
       if (typeof post.authorUserId === "number") ids.add(post.authorUserId);
@@ -210,7 +211,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           // Leave unset so we can fall back to any rating data already in the post payload.
         });
     });
-  }, [posts, token]);
+  }, [posts, user?.id]);
 
   const candidates = useMemo<Candidate[]>(() => {
     return posts.map((post) => {
@@ -573,8 +574,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     const checkAccess = async () => {
       try {
         const profile: any = await getOnboarding(isPharmacist ? "pharmacist" : "otherstaff");
-        const registrationCurrent = !isPharmacist || (Boolean(profile?.ahpra_verified) && (!profile?.ahpra_expiry_date || profile.ahpra_expiry_date >= todayIso()));
-        if (active) setStaffPublicAccess(Boolean(user?.is_mobile_verified && profile?.verified && registrationCurrent));
+        if (active) setStaffPublicAccess(canPublishTalent(user, profile, todayIso()));
       } catch { if (active) setStaffPublicAccess(false); }
     };
     void checkAccess();
@@ -752,7 +752,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   }, [location.pathname, location.search, navigate, publicMode, showPitchButton]);
 
   const updateOnboardingLocationPrefs = useCallback(async () => {
-    if (!token) return;
     const safeRole = isOtherStaff ? "otherstaff" : isPharmacist ? "pharmacist" : "explorer";
     const form = new FormData();
     form.append("street_address", pitchForm.streetAddress || "");
@@ -766,16 +765,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     if (pitchForm.longitude != null) form.append("longitude", String(pitchForm.longitude));
     if (pitchForm.googlePlaceId) form.append("google_place_id", pitchForm.googlePlaceId);
 
-    const response = await fetch(`${API_BASE_URL}/client-profile/${safeRole}/onboarding/me/`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ detail: "Failed to update location preferences" }));
-      throw new Error(err.detail || "Failed to update location preferences");
-    }
-  }, [token, isOtherStaff, isPharmacist, pitchForm]);
+    await updateOnboardingForm(safeRole, form);
+  }, [isOtherStaff, isPharmacist, pitchForm]);
 
   const handlePitchSave = async () => {
     setPitchSaving(true);
