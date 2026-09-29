@@ -174,7 +174,7 @@ jobs:
 
       - name: Scan application source
         run: |
-          semgrep scan             --config auto             --metrics=off             --sarif             --output semgrep.sarif             backend frontend_web frontend_mobile shared-core presentation_web scripts
+          semgrep scan             --config p/security-audit             --config p/owasp-top-ten             --metrics=off             --sarif             --output semgrep.sarif             backend frontend_web frontend_mobile shared-core presentation_web scripts
 
       - name: Upload Semgrep report artifact
         if: always()
