@@ -25,6 +25,7 @@ import {
   viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { ShiftLoadError, ShiftSectionHeading } from '../shiftCenter/ShiftJourneyUI';
 
 const gradientButtonSx = {
   borderRadius: 999,
@@ -43,6 +44,8 @@ export default function HistoryShiftsPage() {
       : null;
 
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<{ open: boolean; msg: string }>({ open: false, msg: '' });
   const [profile, setProfile] = useState<ShiftUser | null>(null);
@@ -56,6 +59,8 @@ export default function HistoryShiftsPage() {
   const [savingWorkerRating, setSavingWorkerRating] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setLoadError(false);
     setLoading(true);
     fetchHistoryShifts()
       .then((data) => {
@@ -67,11 +72,12 @@ export default function HistoryShiftsPage() {
                 return Number(targetId ?? NaN) === scopedPharmacyId;
               })
             : data;
-        setShifts(filtered);
+        if (active) setShifts(filtered);
       })
-      .catch(() => setSnackbar({ open: true, msg: 'Failed to load history shifts' }))
-      .finally(() => setLoading(false));
-  }, [scopedPharmacyId]);
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [scopedPharmacyId, reloadVersion]);
 
   const closeSnackbar = () => setSnackbar((s) => ({ ...s, open: false }));
   const closeDialog = () => setDialogOpen(false);
@@ -117,16 +123,10 @@ export default function HistoryShiftsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
-          Shift History
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
-          Review completed shifts and rate assigned team members
-        </Typography>
-      </Box>
+      <ShiftSectionHeading title="Shift history" description="Review past slots, see who was assigned and leave feedback." />
+      {loadError && <ShiftLoadError onRetry={() => setReloadVersion((value) => value + 1)} />}
 
-      <OwnerAssignedShiftBoard
+      {!loadError && <OwnerAssignedShiftBoard
         title="Shift History"
         shifts={shifts}
         loading={loading}
@@ -134,7 +134,7 @@ export default function HistoryShiftsPage() {
         mode="history"
         onViewAssigned={openProfile}
         onRateAssigned={openRateWorker}
-      />
+      />}
 
       <Snackbar
         open={snackbar.open}
@@ -142,7 +142,7 @@ export default function HistoryShiftsPage() {
         onClose={closeSnackbar}
         message={snackbar.msg}
         action={
-          <IconButton size="small" onClick={closeSnackbar} color="inherit">
+          <IconButton size="small" aria-label="Dismiss notification" onClick={closeSnackbar} color="inherit">
             <CloseIcon fontSize="small" />
           </IconButton>
         }

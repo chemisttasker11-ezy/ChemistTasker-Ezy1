@@ -8,6 +8,7 @@ import {
 export function useCounterOffers() {
     const [counterOffersByShift, setCounterOffersByShift] = useState<Record<number, any[]>>({});
     const [counterOffersLoadingByShift, setCounterOffersLoadingByShift] = useState<Record<number, boolean>>({});
+    const [counterOffersErrorByShift, setCounterOffersErrorByShift] = useState<Record<number, boolean>>({});
     const [counterActionLoading, setCounterActionLoading] = useState<number | null>(null);
 
     const resolveOfferSlotId = useCallback((offer: any): number | null => {
@@ -23,6 +24,7 @@ export function useCounterOffers() {
 
     const loadCounterOffers = useCallback(async (shiftId: number) => {
         setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: true }));
+        setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: false }));
         try {
             const offers = await fetchShiftCounterOffersService(shiftId);
             const pendingOffers = (offers || []).filter(
@@ -31,6 +33,7 @@ export function useCounterOffers() {
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: pendingOffers }));
         } catch (error) {
             console.error('Failed to load counter offers', error);
+            setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: true }));
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: [] }));
         } finally {
             setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
@@ -101,6 +104,7 @@ export function useCounterOffers() {
     return {
         counterOffersByShift,
         counterOffersLoadingByShift,
+        counterOffersErrorByShift,
         loadCounterOffers,
         acceptOffer,
         rejectOffer,

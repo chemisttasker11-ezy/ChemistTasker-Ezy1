@@ -16,6 +16,8 @@ import type {
   Shift,
   ShiftInterest,
   ShiftMemberStatus,
+  getShiftAudience,
+  getShiftJourneyStatus,
 } from '@chemisttasker/shared-core';
 
 import EscalationStepper from './components/Escalation/EscalationStepper';
@@ -296,6 +298,10 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                         ...allInterests,
                         ...allOffers.filter(isActiveCounterOffer),
                     ]);
+                    const journeyStatus = getShiftJourneyStatus(shift, {
+                        section: 'active', paymentRequired: showPaymentRequired, interestedCount: interestsCount,
+                    });
+                    const audience = getShiftAudience(shift.visibility);
                     const slotCandidateCounts = slotIds.reduce<Record<number, number>>((acc, slotId) => {
                         const slotMembers = consolidatedMembersBySlot[slotId] || [];
                         const slotInterests = allInterests.filter((interest: any) => interestBelongsToSlot(interest, slotId));
@@ -434,6 +440,10 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                         {location}
                                     </Text>
                                 </View>
+                                <Text variant="labelMedium" style={{ color: cardBorderColor }}>
+                                    {journeyStatus.label} · {audience?.label ?? 'Audience unavailable'}
+                                </Text>
+                                <Text variant="bodySmall">{journeyStatus.description}</Text>
 
                                 <View style={styles.statsRow}>
                                         <View style={styles.statBox}>

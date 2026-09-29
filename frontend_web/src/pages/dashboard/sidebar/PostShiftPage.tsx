@@ -5,6 +5,9 @@ import {
   Paper,
   Snackbar,
   Typography,
+  Button,
+  Box,
+  Stack,
   createTheme,
   ThemeProvider,
   useMediaQuery,
@@ -17,8 +20,10 @@ import {
   VerifiedUser as SkillsIcon,
   AttachMoney as RateIcon,
   Schedule as ScheduleIcon,
+  FactCheckOutlined as ReviewIcon,
+  ArrowBackRounded,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import dayjs from 'dayjs';
 import {
@@ -27,12 +32,15 @@ import {
   fetchPharmaciesService,
   fetchActiveShiftDetailService,
   calculateShiftRates,
+  formatShiftLabel,
+  getShiftAudience,
   createOwnerShiftService,
   updateOwnerShiftService,
 } from '@chemisttasker/shared-core';
 import { useColorMode } from '../../../theme/sleekTheme';
 import apiClient from '../../../utils/apiClient';
 import PostShiftWizardShell from './PostShiftWizardShell';
+import PostShiftReviewStep from './PostShiftReviewStep';
 import PostShiftDetailsStep from './PostShiftDetailsStep';
 import PostShiftSkillsStep from './PostShiftSkillsStep';
 import PostShiftVisibilityStep from './PostShiftVisibilityStep';
@@ -168,6 +176,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [activeStep, setActiveStep] = useState(0);
+  const [formError, setFormError] = useState('');
   const [prefillAppliedFor, setPrefillAppliedFor] = useState<string | null>(null);
 
   // --- Calendar Control State ---
@@ -624,11 +633,12 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
     const base = [
       { key: 'details', label: 'Shift Details', icon: WorkIcon },
       { key: 'skills', label: 'Skills', icon: SkillsIcon },
-      { key: 'visibility', label: 'Visibility', icon: VisibilityIcon },
+      { key: 'visibility', label: 'Audience', icon: VisibilityIcon },
     ];
     const tail = [
       ...(isLocumLike ? [{ key: 'timetable', label: 'Timetable', icon: ScheduleIcon }] : []),
-      { key: 'pay', label: 'Pay Rate', icon: RateIcon },
+      { key: 'pay', label: 'Pay rate', icon: RateIcon },
+      { key: 'review', label: 'Review', icon: ReviewIcon },
     ];
     return [...base, ...tail];
   }, [isLocumLike]);
@@ -1098,15 +1108,25 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
     setSlots((current) => current.filter((_, idx) => idx !== index));
   };
 
+  const validateStep = (key: string) => {
+    let error = '';
+    if (key === 'details' && (!pharmacyId || !roleNeeded || !employmentType)) error = 'Choose a pharmacy, role and employment type to continue.';
+    if (key === 'timetable' && isLocumLike && slots.length === 0) error = 'Add at least one timetable entry to continue.';
+    if (key === 'visibility' && !visibility) error = 'Choose who can see this shift.';
+    if (key === 'pay' && !isLocumLike) {
+      if (ftptPayMode === 'HOURLY' && (!minHourly || !maxHourly)) error = 'Enter the minimum and maximum hourly rates.';
+      if (ftptPayMode === 'ANNUAL' && (!minAnnual || !maxAnnual || !superPercent)) error = 'Enter the minimum and maximum annual salary and super percentage.';
+    }
+    setFormError(error);
+    return !error;
+  };
+  const shiftCentrePath = adminRedirectBase ? `${adminRedirectBase}/shift-center/active`
+    : isOrganizationUser ? '/dashboard/organization/shift-center/active' : '/dashboard/owner/shift-center/active';
+
   const handleSubmit = async () => {
-    if (!pharmacyId || !roleNeeded || !employmentType) return showSnackbar('Please fill all required fields in Step 1.', 'error');
-    if (isLocumLike && slots.length === 0) return showSnackbar('Please add at least one schedule entry.', 'error');
-    if (!isLocumLike) {
-      if (ftptPayMode === 'HOURLY') {
-        if (!minHourly || !maxHourly) return showSnackbar('Enter min and max hourly rates.', 'error');
-      } else {
-        if (!minAnnual || !maxAnnual || !superPercent) return showSnackbar('Enter min/max annual and super %.', 'error');
-      }
+    if (submitting) return;
+    for (const [index, step] of steps.entries()) {
+      if (!validateStep(step.key)) { setActiveStep(index); return; }
     }
 
     setSubmitting(true);
@@ -1181,7 +1201,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       }
     }
 
-    let success = false;
     try {
       if (editingShiftId) {
         await updateOwnerShiftService(Number(editingShiftId), payload);
@@ -1190,27 +1209,14 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         await createOwnerShiftService(payload);
         showSnackbar('Shift posted successfully!');
       }
-      success = true;
-      if (onCompleted) {
-        onCompleted();
-        return;
-      }
-
-      const targetPath = adminRedirectBase
-        ? `${adminRedirectBase}/shift-center`
-        : isOrganizationUser
-          ? '/dashboard/organization/shift-center/active'
-          : '/dashboard/owner/shift-center';
-
-      setTimeout(() => navigate(targetPath), 1500);
+      if (onCompleted) { onCompleted(); return; }
+      navigate(shiftCentrePath, { state: { shiftNotice: editingShiftId ? 'Shift updated. Review its audience and candidate responses below.' : 'Shift posted. Track responses and widen the audience from here.' } });
     } catch (err: any) {
       console.error('Post shift failed', err);
+      setFormError(formatErrorMessage(err));
       showSnackbar(formatErrorMessage(err), 'error');
     } finally {
       setSubmitting(false);
-      if (success && onCompleted) {
-        onCompleted();
-      }
     }
   };
   useEffect(() => {
@@ -1222,6 +1228,30 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const renderStepContent = (step: number) => {
     const stepKey = steps[step]?.key;
     switch (stepKey) {
+      case 'review':
+        return <PostShiftReviewStep isEditing={Boolean(editingShiftId)} onEdit={(key) => { setFormError(''); setActiveStep(steps.findIndex((item) => item.key === key)); }} sections={[
+          { key: 'details', title: 'Shift details', content: <Stack spacing={1}>
+            <Typography fontWeight={600}>{selectedPharmacy?.name}</Typography>
+            <Typography>{formatShiftLabel(roleNeeded)} · {formatShiftLabel(employmentType)}{isUrgent ? ' · Urgent' : ''}</Typography>
+            {description && <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{description}</Typography>}
+            <Typography variant="body2" color="text.secondary">{[hasTravel && 'Travel allowance', hasAccommodation && 'Accommodation provided', ...workloadTags].filter(Boolean).join(' · ') || 'No additional benefits selected'}</Typography>
+          </Stack> },
+          { key: 'skills', title: 'Skills', content: <Stack spacing={1}><Typography>Required: {mustHave.join(', ') || 'None selected'}</Typography><Typography>Preferred: {niceToHave.join(', ') || 'None selected'}</Typography></Stack> },
+          { key: 'visibility', title: 'Audience and escalation', content: <Stack spacing={1}>
+            <Typography>{dedicatedUserId ? 'Direct / private offer' : `${getShiftAudience(visibility)?.label ?? visibility}${postAnonymously ? ' · Anonymous post' : ''}`}</Typography>
+            {Object.entries(escalationDates).filter(([key, value]) => value && allowedVis.indexOf(key) > allowedVis.indexOf(visibility)).map(([key, value]) => <Typography key={key} variant="body2">{getShiftAudience(key)?.label ?? key}: {dayjs(value).format('D MMM YYYY, h:mm a')}</Typography>)}
+            {!editingShiftId && <Typography variant="body2" color="text.secondary">Additional notifications: {[showNotifyPharmacyStaff && notifyPharmacyStaff && 'pharmacy staff', showNotifyFavoriteStaff && notifyFavoriteStaff && 'favourites', showNotifyChainMembers && notifyChainMembers && 'chain members'].filter(Boolean).join(', ') || 'none selected'}</Typography>}
+          </Stack> },
+          ...(isLocumLike ? [{ key: 'timetable', title: 'Timetable', content: <Stack spacing={1}>
+            <Typography>{expandedSlots.length} scheduled slot{expandedSlots.length === 1 ? '' : 's'} · {singleUserOnly ? 'One person for all slots' : 'Slots can be filled separately'}{flexibleTiming ? ' · Flexible timing' : ''}</Typography>
+            {expandedSlots.map((slot, index) => <Typography key={`${slot.date}-${index}`} variant="body2">{dayjs(slot.date).format('ddd D MMM YYYY')} · {slot.startTime}–{slot.endTime}</Typography>)}
+          </Stack> }] : []),
+          { key: 'pay', title: 'Pay rate', content: <Stack spacing={1}>
+            <Typography>{isLocumLike ? `${paymentPreference} · ${roleNeeded === 'PHARMACIST' ? formatShiftLabel(rateType) : 'Calculated rate'}` : ftptPayMode === 'HOURLY' ? `$${minHourly}–$${maxHourly} per hour` : `$${minAnnual}–$${maxAnnual} per year · ${superPercent}% super`}</Typography>
+            {isLocumLike && <Typography variant="body2">{locumSuperIncluded ? `${DEFAULT_SUPER_PERCENT}% super included` : 'Super not included'}</Typography>}
+            {isLocumLike && expandedSlots.map((slot, index) => <Typography key={index} variant="body2">{dayjs(slot.date).format('D MMM')}: {slotRateRows[index]?.rate ? `$${slotRateRows[index].rate}/hr` : rateType === 'PHARMACIST_PROVIDED' ? 'Candidate’s preset rate' : 'Rate not calculated'}</Typography>)}
+          </Stack> },
+        ]} />;
       case 'details':
         return (
           <PostShiftDetailsStep
@@ -1393,14 +1423,14 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
   const theme = createTheme({
     palette: {
       mode,
-      primary: { main: '#6D28D9', light: '#8B5CF6', dark: '#5B21B6' },
+      primary: { main: isDarkMode ? '#A9C9F4' : '#06214A', light: '#477ABF', dark: '#041731', contrastText: isDarkMode ? '#06214A' : '#FFFFFF' },
       secondary: { main: '#10B981', light: '#6EE7B7', dark: '#047857' },
       background: {
-        default: isDarkMode ? '#07111f' : '#F9FAFB',
+        default: isDarkMode ? '#07111f' : '#F5F8FC',
         paper: isDarkMode ? '#101b2f' : '#FFFFFF',
       },
       text: {
-        primary: isDarkMode ? '#F8FAFC' : '#111827',
+        primary: isDarkMode ? '#F8FAFC' : '#06214A',
         secondary: isDarkMode ? '#CBD5E1' : '#64748B',
       },
       divider: isDarkMode ? 'rgba(148, 163, 184, 0.28)' : 'rgba(15, 23, 42, 0.12)',
@@ -1575,7 +1605,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           px: isEmbedded ? { xs: 1, sm: 2, md: 3 } : { xs: 1.5, sm: 2.5, md: 4 },
           py: isEmbedded ? { xs: 1, sm: 1.5 } : 4,
           bgcolor: isEmbedded ? 'transparent' : 'background.default',
-          minHeight: isEmbedded ? 'auto' : '100vh',
+          minHeight: 'auto',
           maxWidth: isEmbedded ? '100%' : { xs: '100%', lg: 1200, xl: 1400 },
         }}
       >
@@ -1583,21 +1613,19 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           sx={{
             p: isEmbedded ? 0 : { xs: 2, md: 4 },
             borderRadius: isEmbedded ? 0 : 4,
-            boxShadow: isEmbedded ? 'none' : '0 8px 32px 0 rgba(0,0,0,0.1)',
+            boxShadow: 'none',
+            border: isEmbedded ? 0 : '1px solid',
+            borderColor: 'divider',
             bgcolor: isEmbedded ? 'transparent' : 'background.paper',
             width: '100%',
           }}
         >
-          {!isEmbedded && (
-            <>
-              <Typography variant="h4" gutterBottom align="center" fontWeight={600}>
-                {editingShiftId ? 'Edit Shift' : 'Create a New Shift'}
-              </Typography>
-              <Typography variant="body1" color="text.secondary" align="center" mb={4}>
-                Follow the steps to post a new shift opportunity.
-              </Typography>
-            </>
-          )}
+          {!isEmbedded && <Box sx={{ mb: 3 }}>
+            <Button component={Link} to={shiftCentrePath} startIcon={<ArrowBackRounded />} sx={{ mb: 1.5 }}>Shift Centre</Button>
+            <Typography component="h1" variant="h4" fontWeight={700}>{editingShiftId ? 'Edit shift' : 'Post a shift'}</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>Set the details, choose your audience and review before posting.</Typography>
+          </Box>}
+          {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
 
           <PostShiftWizardShell
             steps={steps}
@@ -1606,8 +1634,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
             isMobile={isMobile}
             isEmbedded={isEmbedded}
             isEditing={Boolean(editingShiftId)}
-            slotsLength={slots.length}
-            showError={(message) => showSnackbar(message, 'error')}
+            validateStep={validateStep}
             onSubmit={handleSubmit}
             submitting={submitting}
           >

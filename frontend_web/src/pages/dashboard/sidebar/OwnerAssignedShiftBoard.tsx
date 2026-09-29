@@ -1,25 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import {
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  Collapse,
-  Pagination,
-  Paper,
-  Skeleton,
-  Stack,
-  Typography,
-} from '@mui/material';
-import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
-import Groups2RoundedIcon from '@mui/icons-material/Groups2Rounded';
-import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
-import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
-import AssignmentIndRoundedIcon from '@mui/icons-material/AssignmentIndRounded';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
-import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
+import { useMemo, useState } from 'react';
+import { Box, Button, Collapse, Divider, Pagination, Paper, Stack, Typography } from '@mui/material';
+import { ExpandMoreRounded } from '@mui/icons-material';
+import { useSearchParams } from 'react-router-dom';
+import { formatShiftLabel, getShiftJourneyStatus, getShiftSearchText, type Shift, type ShiftAssignment } from '@chemisttasker/shared-core';
+import { ShiftAudienceChip, ShiftEmptyState, ShiftListLoading, ShiftListToolbar, ShiftStatusChip } from '../shiftCenter/ShiftJourneyUI';
+import { getShiftSummary } from './ActiveShiftsPage/utils/shiftHelpers';
 
 type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
 
@@ -33,59 +18,6 @@ type Props = {
   title: string;
 };
 
-const palette = {
-  surface: '#FFFFFF',
-  page: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
-  border: '#D9E2F2',
-  text: '#0F172A',
-  muted: '#64748B',
-  violet: '#7C3AED',
-  violetSoft: '#F3E8FF',
-  cyan: '#06B6D4',
-  cyanSoft: '#ECFEFF',
-  emerald: '#10B981',
-  emeraldSoft: '#ECFDF5',
-  amber: '#F59E0B',
-  amberSoft: '#FFFBEB',
-};
-
-const statCardSx = {
-  borderRadius: 3,
-  border: `1px solid ${palette.border}`,
-  background: '#FFFFFFCC',
-  minWidth: 0,
-  width: '100%',
-  px: { xs: 1.25, sm: 2 },
-  py: { xs: 1.25, sm: 1.75 },
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: { xs: 0.75, sm: 1.25 },
-};
-
-const actionButtonSx = {
-  borderRadius: 999,
-  textTransform: 'none',
-  fontWeight: 700,
-  px: 1.75,
-};
-
-const primaryButtonSx = {
-  ...actionButtonSx,
-  color: '#fff',
-  background: 'linear-gradient(135deg, #8B5CF6 0%, #2563EB 100%)',
-  '&:hover': {
-    background: 'linear-gradient(135deg, #7C3AED 0%, #1D4ED8 100%)',
-  },
-};
-
-const secondaryButtonSx = {
-  ...actionButtonSx,
-  borderColor: '#BAE6FD',
-  color: '#0F172A',
-  backgroundColor: '#fff',
-};
-
 const getAssignmentSlotId = (assignment: AssignmentLike): number | null =>
   'slotId' in assignment ? assignment.slotId ?? null : assignment.slot_id ?? null;
 
@@ -97,8 +29,8 @@ const formatDateLabel = (rawDate?: string | null) => {
   const parsed = new Date(`${rawDate}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return { day: 'TBD', date: rawDate };
   return {
-    day: parsed.toLocaleDateString(undefined, { weekday: 'short' }),
-    date: parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+    day: parsed.toLocaleDateString('en-AU', { weekday: 'short' }),
+    date: parsed.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }),
   };
 };
 
@@ -116,7 +48,7 @@ const formatTimeRange = (slot: any) => {
 
 const formatLockedRate = (slot: any) => {
   const rawRate = slot?.rate ?? slot?.hourlyRate ?? slot?.hourly_rate;
-  if (rawRate == null || rawRate === '') return 'Rate locked';
+  if (rawRate == null || rawRate === '') return 'Rate not provided';
   const numeric = Number(rawRate);
   const value = Number.isFinite(numeric)
     ? numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -199,417 +131,73 @@ const getSlotEntries = (shift: Shift) => {
   });
 };
 
-const StatCard = ({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) => (
-  <Paper elevation={0} sx={statCardSx}>
-    <Avatar sx={{ width: { xs: 30, sm: 36 }, height: { xs: 30, sm: 36 }, bgcolor: palette.violetSoft, color: palette.violet }}>
-      {icon}
-    </Avatar>
-    <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-      <Typography variant="h6" sx={{ fontWeight: 800, color: palette.text, lineHeight: 1.05, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-        {value}
-      </Typography>
-      <Typography variant="caption" sx={{ color: palette.muted, textTransform: 'uppercase', letterSpacing: { xs: 0.2, sm: 0.6 }, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
-        {label}
-      </Typography>
-    </Box>
-  </Paper>
-);
-
-export default function OwnerAssignedShiftBoard({
-  emptyText,
-  loading,
-  mode,
-  onRateAssigned,
-  onViewAssigned,
-  shifts,
-  title,
-}: Props) {
-  const itemsPerPage = 6;
+export default function OwnerAssignedShiftBoard({ emptyText, loading, mode, onRateAssigned, onViewAssigned, shifts, title }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('q') ?? '';
   const [page, setPage] = useState(1);
   const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
-
-  const visibleShifts = useMemo(
-    () => shifts.slice((page - 1) * itemsPerPage, page * itemsPerPage),
-    [page, shifts]
-  );
-  const pageCount = Math.ceil(shifts.length / itemsPerPage);
-
-  const toggleShift = (shiftId: number) => {
-    setExpandedShiftIds((prev) => ({
-      ...prev,
-      [shiftId]: !prev[shiftId],
-    }));
+  const itemsPerPage = 6;
+  const filtered = useMemo(() => shifts.filter((shift) => getShiftSearchText(shift).includes(search.trim().toLowerCase())), [shifts, search]);
+  const pageCount = Math.ceil(filtered.length / itemsPerPage);
+  const currentPage = Math.min(page, Math.max(1, pageCount));
+  const visibleShifts = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const onSearch = (value: string) => {
+    setPage(1);
+    setSearchParams((previous) => { const next = new URLSearchParams(previous); if (value) next.set('q', value); else next.delete('q'); return next; }, { replace: true });
   };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'grid', gap: 2.5 }}>
-        {[...Array(3)].map((_, index) => (
-          <Paper
-            key={index}
-            sx={{
-              p: 3,
-              borderRadius: 5,
-              border: `1px solid ${palette.border}`,
-              background: palette.surface,
-            }}
-          >
-            <Skeleton variant="text" width="42%" height={34} />
-            <Skeleton variant="text" width="24%" height={22} />
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5, mt: 2 }}>
-              {[...Array(3)].map((__, slotIndex) => (
-                <Skeleton key={slotIndex} variant="rounded" height={144} />
-              ))}
-            </Box>
-          </Paper>
-        ))}
-      </Box>
-    );
-  }
-
-  if (!shifts.length) {
-    return (
-      <Paper
-        sx={{
-          p: 5,
-          textAlign: 'center',
-          borderRadius: 5,
-          border: `1px solid ${palette.border}`,
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-        }}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 800, color: palette.text, mb: 1 }}>
-          {title}
-        </Typography>
-        <Typography sx={{ color: palette.muted }}>{emptyText}</Typography>
-      </Paper>
-    );
-  }
-
-  return (
-    <Box sx={{ display: 'grid', gap: 3 }}>
-      {visibleShifts.map((shift) => {
-        const shiftAny = shift as any;
-        const assignedEntries = getAssignedEntries(shift);
-        const slotEntries = mode === 'history' ? getSlotEntries(shift) : assignedEntries.map((entry) => ({ ...entry, assigned: true }));
-        const totalSlots = (shift.slots ?? []).length;
-        const interests = shiftAny.interestedUsersCount ?? shiftAny.interested_users_count ?? 0;
-        const location = shift.uiAddressLine ?? shiftAny.ui_address_line ?? shift.pharmacyDetail?.streetAddress ?? '';
-        const modeChip = mode === 'history'
-          ? { label: 'Completed', fg: palette.amber, bg: palette.amberSoft }
-          : { label: 'Assigned', fg: palette.emerald, bg: palette.emeraldSoft };
-        const isExpanded = Boolean(expandedShiftIds[shift.id]);
-
-        return (
-          <Paper
-            key={shift.id}
-            elevation={0}
-            role="button"
-            tabIndex={0}
-            aria-expanded={isExpanded}
-            onClick={() => toggleShift(shift.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                toggleShift(shift.id);
-              }
-            }}
-            sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 6,
-              border: `1px solid ${palette.border}`,
-              background: palette.page,
-              overflow: 'hidden',
-              position: 'relative',
-              cursor: 'pointer',
-              transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
-              '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: '0 18px 42px rgba(15,23,42,.08)',
-                borderColor: '#C7D2FE',
-              },
-              '&:focus-visible': {
-                outline: '3px solid rgba(124,58,237,.28)',
-                outlineOffset: 3,
-              },
-            }}
-          >
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                pointerEvents: 'none',
-                background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
-              }}
-            />
-
-            <Stack spacing={2} sx={{ position: 'relative' }}>
-              <Stack
-                direction={{ xs: 'column', xl: 'row' }}
-                justifyContent="space-between"
-                spacing={2}
-                alignItems={{ xs: 'stretch', xl: 'flex-start' }}
-              >
-                <Stack spacing={1.5} sx={{ minWidth: 0, flex: 1 }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar
-                      variant="rounded"
-                      sx={{
-                        width: 58,
-                        height: 58,
-                        borderRadius: 3.5,
-                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
-                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
-                      }}
-                    >
-                      <AssignmentIndRoundedIcon />
-                    </Avatar>
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 900, color: palette.text, lineHeight: 1.05 }}>
-                        {shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}
-                      </Typography>
-                      <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
-                        <Chip
-                          size="small"
-                          label={shift.roleLabel ?? shift.roleNeeded ?? shiftAny.role_needed ?? 'Role'}
-                          sx={{ bgcolor: palette.emeraldSoft, color: palette.emerald, fontWeight: 800 }}
-                        />
-                        {shift.employmentType && (
-                          <Chip
-                            size="small"
-                            label={String(shift.employmentType).replace('_', ' ')}
-                            sx={{ bgcolor: '#E0F2FE', color: '#0369A1', fontWeight: 800 }}
-                          />
-                        )}
-                        {shift.uiIsUrgent && (
-                          <Chip
-                            size="small"
-                            label="Urgent"
-                            sx={{ bgcolor: '#FEE2E2', color: '#DC2626', fontWeight: 800 }}
-                          />
-                        )}
-                      </Stack>
-                    </Box>
-                  </Stack>
-
-                  {location && (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <LocationOnOutlinedIcon sx={{ fontSize: 18, color: palette.muted }} />
-                      <Typography variant="body2" sx={{ color: palette.muted }}>
-                        {location}
-                      </Typography>
-                    </Stack>
-                  )}
-                </Stack>
-
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                    gap: { xs: 0.75, sm: 1.25 },
-                    width: '100%',
-                    maxWidth: { xs: '100%', xl: 520 },
-                    alignSelf: { xs: 'stretch', xl: 'flex-end' },
-                  }}
-                >
-                  <StatCard icon={<CalendarMonthRoundedIcon fontSize="small" />} label="Slots" value={totalSlots} />
-                  <StatCard icon={<Groups2RoundedIcon fontSize="small" />} label="Assigned" value={assignedEntries.length} />
-                  <StatCard icon={<FavoriteBorderRoundedIcon fontSize="small" />} label="Interests" value={interests} />
-                </Box>
-              </Stack>
-
-              <Collapse in={isExpanded} timeout="auto" unmountOnExit onClick={(event) => event.stopPropagation()}>
-                <Box
-                  sx={{
-                    pt: 2.5,
-                    borderTop: `1px solid ${palette.border}`,
-                    position: 'relative',
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 900, color: palette.text }}>
-                      {mode === 'history' ? 'Shift Slot Grid' : 'Assigned Slot Grid'}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={modeChip.label}
-                      sx={{ bgcolor: modeChip.bg, color: modeChip.fg, fontWeight: 800 }}
-                    />
-                  </Stack>
-
-                  <Typography variant="body2" sx={{ color: palette.muted, mb: 2.25 }}>
-                    {mode === 'history'
-                      ? 'All past slots are shown. Assigned ones keep profile and rating actions.'
-                      : 'Focused on paid and assigned chemists only.'}
-                  </Typography>
-
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: 1.75 }}>
-                    {slotEntries.map(({ slot, userId, assigned, assignment }) => {
-                      const dateBits = formatDateLabel(slot?.date);
-                      const assignedMember = getAssignedMember(shift, userId);
-                      const assignedName = getAssignedName(assignment, assignedMember);
-                      const assignedDetails = getAssignedDetails(assignment, assignedMember);
-                      const lockedRate = formatLockedRate(slot);
-                      return (
-                        <Paper
-                          key={`${shift.id}_${slot?.id}`}
-                          elevation={0}
-                          sx={{
-                            p: 2,
-                            borderRadius: 4,
-                            border: `1px solid ${assigned ? (mode === 'history' ? '#FDE68A' : '#C7D2FE') : palette.border}`,
-                            background: assigned
-                              ? (mode === 'history'
-                                ? 'linear-gradient(180deg, #FFFFFF 0%, #FFFBEB 100%)'
-                                : 'linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%)')
-                              : 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-                            cursor: assigned ? 'pointer' : 'default',
-                            transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
-                            '&:hover': assigned ? {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 16px 30px rgba(15,23,42,.10)',
-                              borderColor: mode === 'history' ? '#F59E0B' : '#6366F1',
-                            } : undefined,
-                          }}
-                          onClick={assigned ? () => onViewAssigned(shift.id, slot?.id ?? null, userId as number) : undefined}
-                        >
-                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-                            <Box>
-                              <Typography variant="caption" sx={{ color: palette.muted, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                                {dateBits.day}
-                              </Typography>
-                              <Typography variant="h6" sx={{ color: palette.text, fontWeight: 900, lineHeight: 1.1 }}>
-                                {dateBits.date}
-                              </Typography>
-                            </Box>
-                            <Stack spacing={0.75} alignItems="flex-end">
-                              <Chip
-                                size="small"
-                                label={assigned ? 'Assigned' : 'Open'}
-                                sx={{
-                                  bgcolor: assigned
-                                    ? (mode === 'history' ? palette.amberSoft : palette.cyanSoft)
-                                    : '#E2E8F0',
-                                  color: assigned
-                                    ? (mode === 'history' ? palette.amber : palette.cyan)
-                                    : palette.muted,
-                                  fontWeight: 800,
-                                }}
-                              />
-                              <Avatar sx={{ width: 36, height: 36, bgcolor: assigned ? (mode === 'history' ? palette.amberSoft : palette.cyanSoft) : '#E2E8F0', color: assigned ? (mode === 'history' ? palette.amber : palette.cyan) : palette.muted }}>
-                                <PersonRoundedIcon fontSize="small" />
-                              </Avatar>
-                            </Stack>
-                          </Stack>
-
-                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.25 }}>
-                            <AccessTimeRoundedIcon sx={{ fontSize: 16, color: palette.violet }} />
-                            <Typography variant="body2" sx={{ color: palette.violet, fontWeight: 800 }}>
-                              {formatTimeRange(slot)}
-                            </Typography>
-                          </Stack>
-
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              mt: 1.75,
-                              p: 1.5,
-                              borderRadius: 3,
-                              border: `1px solid ${palette.border}`,
-                              background: '#FFFFFFD9',
-                            }}
-                          >
-                            <Typography variant="body2" sx={{ color: palette.text, fontWeight: 800 }}>
-                              {assigned ? assignedName : 'Unassigned Slot'}
-                            </Typography>
-                            {assigned ? (
-                              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: palette.muted }}>
-                                  {assignedDetails}
-                                </Typography>
-                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                  <LockRoundedIcon sx={{ fontSize: 14, color: mode === 'history' ? palette.amber : palette.cyan }} />
-                                  <Typography variant="caption" sx={{ color: palette.text, fontWeight: 800 }}>
-                                    {lockedRate}
-                                  </Typography>
-                                </Stack>
-                              </Stack>
-                            ) : (
-                              <Typography variant="caption" sx={{ color: palette.muted }}>
-                                No one was assigned to this slot
-                              </Typography>
-                            )}
-                          </Paper>
-
-                          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1.75 }}>
-                            {assigned ? (
-                              <Button
-                                variant="contained"
-                                size="small"
-                                sx={primaryButtonSx}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onViewAssigned(shift.id, slot?.id ?? null, userId as number);
-                                }}
-                              >
-                                View Assigned
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                sx={secondaryButtonSx}
-                                disabled
-                              >
-                                No Assignment
-                              </Button>
-                            )}
-                            {assigned && mode === 'history' && onRateAssigned && (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                sx={secondaryButtonSx}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onRateAssigned(userId as number);
-                                }}
-                              >
-                                Rate Chemist
-                              </Button>
-                            )}
-                          </Stack>
-                        </Paper>
-                      );
-                    })}
+  if (loading) return <ShiftListLoading />;
+  if (!shifts.length) return <ShiftEmptyState title={emptyText} description={mode === 'confirmed'
+    ? 'Confirmed assignments will appear here after the candidate and any required payment are finalised.'
+    : 'Past shifts will appear here with their assignment details and feedback actions.'} />;
+  return <Stack spacing={2.5}>
+    <ShiftListToolbar search={search} onSearch={onSearch} count={filtered.length} total={shifts.length} />
+    {!filtered.length && <ShiftEmptyState filtered title={title} description="" onReset={() => onSearch('')} />}
+    {visibleShifts.map((shift) => {
+      const entries = mode === 'history' ? getSlotEntries(shift) : getAssignedEntries(shift).map((entry) => ({ ...entry, assigned: true }));
+      const assignedCount = entries.filter((entry) => entry.assigned).length;
+      const isExpanded = Boolean(expandedShiftIds[shift.id]);
+      const status = getShiftJourneyStatus(shift, { section: mode });
+      return <Paper component="article" key={shift.id} aria-labelledby={`assigned-shift-${shift.id}`} elevation={0}
+        sx={{ p: { xs: 2, md: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 3, minWidth: 0 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+          <Box sx={{ minWidth: 0 }}>
+            <Typography color="text.secondary" variant="body2">Shift #{shift.id}</Typography>
+            <Typography id={`assigned-shift-${shift.id}`} component="h3" variant="h6" fontWeight={700} sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>{shift.pharmacyDetail?.name ?? shift.pharmacyName ?? 'Pharmacy'}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{shift.roleLabel ?? formatShiftLabel(shift.roleNeeded)} · {formatShiftLabel(shift.employmentType)}</Typography>
+            <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} sx={{ my: 1.5 }}><ShiftStatusChip status={status} /><ShiftAudienceChip shift={shift} /></Stack>
+            <Typography variant="body2">{getShiftSummary(shift)}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{assignedCount} assigned slot{assignedCount === 1 ? '' : 's'}{mode === 'history' ? ` · ${entries.length - assignedCount} unfilled` : ''}</Typography>
+          </Box>
+          <Button variant="outlined" onClick={() => setExpandedShiftIds((previous) => ({ ...previous, [shift.id]: !previous[shift.id] }))}
+            aria-expanded={isExpanded} aria-controls={`assignments-${shift.id}`} endIcon={<ExpandMoreRounded sx={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }} />}
+            sx={{ minHeight: 44, alignSelf: { xs: 'stretch', md: 'center' }, flexShrink: 0 }}>{isExpanded ? 'Hide details' : mode === 'history' ? 'View past slots' : 'View assignments'}</Button>
+        </Stack>
+        <Collapse in={isExpanded} unmountOnExit>
+          <Box id={`assignments-${shift.id}`} sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Typography component="h4" variant="subtitle1" fontWeight={700}>{mode === 'history' ? 'Past slots and feedback' : 'Confirmed assignments'}</Typography>
+            {!entries.length && <Typography color="text.secondary" sx={{ mt: 1 }}>No slot details are available for this post.</Typography>}
+            <Stack divider={<Divider />}>
+              {entries.map(({ slot, assignment, assigned, userId }) => {
+                const dateBits = formatDateLabel(slot?.date);
+                const member = getAssignedMember(shift, userId);
+                return <Stack key={`${shift.id}-${slot?.id}`} direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ py: 2.5 }} alignItems={{ md: 'center' }}>
+                  <Box sx={{ minWidth: { md: 160 } }}><Typography fontWeight={600}>{dateBits.day} {dateBits.date}</Typography><Typography variant="body2" color="text.secondary">{formatTimeRange(slot)}</Typography></Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography fontWeight={600} sx={{ overflowWrap: 'anywhere' }}>{assigned ? getAssignedName(assignment, member) : 'Unfilled slot'}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{assigned ? getAssignedDetails(assignment, member) : 'No team member was assigned.'}</Typography>
+                    {assigned && <Typography variant="body2" color="text.secondary">{formatLockedRate(slot)}</Typography>}
                   </Box>
-                </Box>
-              </Collapse>
+                  {assigned && <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1}>
+                    <Button variant="outlined" onClick={() => onViewAssigned(shift.id, slot?.id ?? null, userId as number)} sx={{ minHeight: 44 }}>View profile</Button>
+                    {mode === 'history' && onRateAssigned && <Button variant="contained" onClick={() => onRateAssigned(userId as number)} sx={{ minHeight: 44 }}>Rate team member</Button>}
+                  </Stack>}
+                </Stack>;
+              })}
             </Stack>
-          </Paper>
-        );
-      })}
-
-      {pageCount > 1 && (
-        <Box display="flex" justifyContent="center" mt={1}>
-          <Pagination
-            count={pageCount}
-            page={page}
-            onChange={(_, value) => {
-              setPage(value);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            color="primary"
-          />
-        </Box>
-      )}
-    </Box>
-  );
+          </Box>
+        </Collapse>
+      </Paper>;
+    })}
+    {pageCount > 1 && <Pagination aria-label="Shift pages" count={pageCount} page={currentPage} onChange={(_, value) => setPage(value)} />}
+  </Stack>;
 }
