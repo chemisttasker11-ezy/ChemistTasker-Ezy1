@@ -28,18 +28,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify Strix credentials
+      - name: Detect Strix credentials
+        id: creds
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
-          test -n "$STRIX_LLM" || { echo "Missing STRIX_LLM repository secret"; exit 1; }
-          test -n "$LLM_API_KEY" || { echo "Missing LLM_API_KEY repository secret"; exit 1; }
+          if [ -n "$STRIX_LLM" ] && [ -n "$LLM_API_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Strix credentials are not configured; skipping the agentic Strix scan. Credential-free security jobs still run."
+          fi
 
       - name: Install Strix
+        if: steps.creds.outputs.configured == 'true'
         run: curl -sSL https://strix.ai/install | bash
 
       - name: Run diff-scoped Strix pentest
+        if: steps.creds.outputs.configured == 'true'
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -47,7 +54,7 @@ jobs:
           strix -n -t ./ --scan-mode quick --scope-mode diff --diff-base "origin/${{ github.base_ref }}" --max-budget 20
 
       - name: Require completed scan
-        if: always()
+        if: always() && steps.creds.outputs.configured == 'true' && steps.creds.outputs.configured == 'true'
         run: |
           run_json=$(ls -t strix_runs/*/run.json 2>/dev/null | head -1)
           test -n "$run_json" || { echo "No Strix run.json produced"; exit 1; }
@@ -55,7 +62,7 @@ jobs:
           test "$status" = "completed" || { echo "Strix scan incomplete: $status"; exit 1; }
 
       - name: Upload Strix artifacts
-        if: always()
+        if: always() && steps.creds.outputs.configured == 'true' && steps.creds.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: strix-pr-results
@@ -63,7 +70,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload SARIF
-        if: always()
+        if: always() && steps.creds.outputs.configured == 'true' && steps.creds.outputs.configured == 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: strix_runs
@@ -77,18 +84,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify Strix credentials
+      - name: Detect Strix credentials
+        id: creds
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
-          test -n "$STRIX_LLM" || { echo "Missing STRIX_LLM repository secret"; exit 1; }
-          test -n "$LLM_API_KEY" || { echo "Missing LLM_API_KEY repository secret"; exit 1; }
+          if [ -n "$STRIX_LLM" ] && [ -n "$LLM_API_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Strix credentials are not configured; skipping the agentic Strix scan."
+          fi
 
       - name: Install Strix
+        if: steps.creds.outputs.configured == 'true'
         run: curl -sSL https://strix.ai/install | bash
 
       - name: Run whole-repository Strix pentest
+        if: steps.creds.outputs.configured == 'true'
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
