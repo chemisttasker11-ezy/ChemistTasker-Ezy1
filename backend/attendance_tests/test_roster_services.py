@@ -13,7 +13,6 @@ from django.db import connection
 from django.utils import timezone
 
 from client_profile.models import (
-    LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
@@ -36,6 +35,7 @@ from client_profile.domains.roster.services import (
     unpublish_roster_period,
     validate_roster_period,
 )
+from attendance_tests.roster_fixtures import approved_workforce_leave
 
 User = get_user_model()
 
@@ -71,6 +71,7 @@ class RosterServicesTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.assistant = User.objects.create(username="assist_bob", email="bob@pharmacy.com", role="ASSISTANT")
@@ -80,6 +81,7 @@ class RosterServicesTests(unittest.TestCase):
             role="ASSISTANT",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         # A Monday date
@@ -195,12 +197,7 @@ class RosterServicesTests(unittest.TestCase):
         )
 
         # Approved leave on that day
-        LeaveRequest.objects.create(
-            slot_assignment=assignment,
-            user=self.pharmacist,
-            leave_type="ANNUAL",
-            status="APPROVED",
-        )
+        approved_workforce_leave(user=self.pharmacist, pharmacy=self.pharmacy, day=self.monday)
 
         validation = validate_roster_period(period)
         self.assertFalse(validation["is_valid"])

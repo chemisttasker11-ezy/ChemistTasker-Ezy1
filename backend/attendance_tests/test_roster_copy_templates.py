@@ -92,6 +92,7 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
         Membership.objects.create(
             user=self.intern,
@@ -99,6 +100,7 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
             role="INTERN",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         # Standard test week: Monday 2026-10-05

@@ -63,6 +63,7 @@ class RosterAPITests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.monday = date(2026, 9, 21)

@@ -145,6 +145,7 @@ class RosterSafetyRegressionTests(unittest.TestCase):
             status=Membership.Status.ACCEPTED,
             is_active=True,
             role="PHARMACIST",
+            employment_type="FULL_TIME",
         )
 
         today = date.today()

@@ -26,7 +26,6 @@ from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from client_profile.models import (
     Chain,
-    LeaveRequest,
     Membership,
     Organization,
     OwnerOnboarding,
@@ -55,6 +54,7 @@ from client_profile.domains.roster.worker_actions import (
     submit_cover_request,
 )
 from client_profile.domains.shifts.worker_requests import WorkerShiftRequestViewSet
+from attendance_tests.roster_fixtures import approved_workforce_leave
 
 User = get_user_model()
 
@@ -124,6 +124,7 @@ class RosterWorkerActionsDeterministicTests(unittest.TestCase):
                 role="PHARMACIST",
                 status=Membership.Status.ACCEPTED,
                 is_active=True,
+                employment_type="FULL_TIME",
             )
 
         # Baseline Shift & Assignment for Worker A
@@ -282,12 +283,7 @@ class RosterWorkerActionsDeterministicTests(unittest.TestCase):
         )
 
         # Worker B gets an approved leave request on slot_date
-        LeaveRequest.objects.create(
-            user=self.worker_b,
-            slot_assignment=self.assignment,
-            status="APPROVED",
-            leave_type="ANNUAL",
-        )
+        approved_workforce_leave(user=self.worker_b, pharmacy=self.pharmacy, day=self.shift_date)
 
         # Approval must fail validation
         with self.assertRaises(ValidationError) as ctx:

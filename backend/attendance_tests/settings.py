@@ -22,6 +22,13 @@ class AttendanceChatConfig(AppConfig):
     label = "chat"
 
 
+class AttendanceWorkforceConfig(AppConfig):
+    """Load the workforce models (timesheets, leave, roster revisions) without connecting its signal receivers."""
+
+    name = "workforce"
+    label = "workforce"
+
+
 class AttendanceRewardsConfig(AppConfig):
     """Load the rewards models without connecting the production signal receivers."""
 
@@ -52,6 +59,7 @@ INSTALLED_APPS = [
     "talent.apps.TalentConfig",
     "ratings.apps.RatingsConfig",
     "attendance_tests.settings.AttendanceRewardsConfig",
+    "attendance_tests.settings.AttendanceWorkforceConfig",
 ]
 
 DATABASES = {
@@ -81,6 +89,7 @@ MIGRATION_MODULES = {
     "talent": None,
     "ratings": None,
     "rewards": None,
+    "workforce": None,
     "worker_finance": None,
     "billing": None,
 }

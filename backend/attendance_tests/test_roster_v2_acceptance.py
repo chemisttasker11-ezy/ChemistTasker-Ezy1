@@ -13,7 +13,6 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from client_profile.models import (
-    LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
@@ -30,6 +29,7 @@ from client_profile.models import (
 )
 from talent.models import UserAvailability
 from client_profile.domains.roster.services import get_or_create_roster_period, publish_roster_period
+from attendance_tests.roster_fixtures import approved_workforce_leave
 
 User = get_user_model()
 
@@ -101,6 +101,7 @@ class RosterV2AcceptanceTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.assistant = User.objects.create(
@@ -116,6 +117,7 @@ class RosterV2AcceptanceTests(unittest.TestCase):
             role="ASSISTANT",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         # Unauthorized user (no membership / owner relationship)
@@ -290,12 +292,7 @@ class RosterV2AcceptanceTests(unittest.TestCase):
         asgn_overlap.save()
 
         # Case C: Approved leave conflict
-        leave = LeaveRequest.objects.create(
-            user=self.pharmacist,
-            slot_assignment=asgn_mismatch,
-            status="APPROVED",
-            leave_type="ANNUAL",
-        )
+        leave = approved_workforce_leave(user=self.pharmacist, pharmacy=self.pharmacy, day=self.monday)
 
         val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id}, format="json")
         self.assertFalse(val_res.json()["is_valid"])

@@ -14,7 +14,6 @@ from rest_framework.test import APIClient
 
 from client_profile.models import (
     Chain,
-    LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
@@ -41,6 +40,7 @@ from client_profile.domains.roster.worker_actions import (
     submit_cover_request,
     validate_worker_replacement_eligibility,
 )
+from attendance_tests.roster_fixtures import approved_workforce_leave
 
 User = get_user_model()
 
@@ -106,6 +106,7 @@ class RosterWorkerActionsTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.worker_b = User.objects.create(
@@ -121,6 +122,7 @@ class RosterWorkerActionsTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.other_staff_user = User.objects.create(
@@ -136,6 +138,7 @@ class RosterWorkerActionsTests(unittest.TestCase):
             role="OTHER_STAFF",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.unauthorized_user = User.objects.create(
@@ -236,12 +239,7 @@ class RosterWorkerActionsTests(unittest.TestCase):
 
     def test_direct_swap_validation_approved_leave(self):
         """Target worker on approved leave cannot be requested."""
-        LeaveRequest.objects.create(
-            user=self.worker_b,
-            slot_assignment=self.assignment,  # reference assignment
-            leave_type="ANNUAL",
-            status="APPROVED",
-        )
+        approved_workforce_leave(user=self.worker_b, pharmacy=self.pharmacy, day=self.shift_date)
 
         with self.assertRaises(ValidationError) as ctx:
             request_direct_swap(
@@ -508,7 +506,7 @@ class RosterWorkerActionsTests(unittest.TestCase):
         pub_period = RosterPeriod.objects.create(
             pharmacy=self.pharmacy,
             week_start=next_monday,
-            status=RosterPeriod.Status.PUBLISHED,
+            status=RosterPeriod.Status.DRAFT,
         )
 
         # Shift in Draft period (is_rostered=True) -> already self.assignment on self.shift_date
@@ -535,6 +533,8 @@ class RosterWorkerActionsTests(unittest.TestCase):
             user=self.worker_a,
             is_rostered=True,
         )
+        # A published roster is immutable, so the period is published once its assignment exists.
+        RosterPeriod.objects.filter(pk=pub_period.pk).update(status=RosterPeriod.Status.PUBLISHED)
 
         # Shift 3: Non-rostered marketplace shift (is_rostered=False)
         market_shift = Shift.objects.create(
