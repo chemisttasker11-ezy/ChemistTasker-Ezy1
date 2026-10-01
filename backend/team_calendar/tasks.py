@@ -13,10 +13,11 @@ from django.apps import apps
 from django.db.models import Q
 from django.utils import timezone
 
-from client_profile.notifications import notify_users
+from notifications.services import notify_users
 from client_profile.timezone_utils import get_pharmacy_timezone
 from client_profile.utils import get_frontend_dashboard_url
-from client_profile.models import Membership, Notification, Pharmacy, ShiftSlotAssignment
+from client_profile.models import Membership, Pharmacy, ShiftSlotAssignment
+from notifications.models import Notification
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee
 
 logger = logging.getLogger(__name__)

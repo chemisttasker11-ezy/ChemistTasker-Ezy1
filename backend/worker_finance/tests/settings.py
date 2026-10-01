@@ -2,6 +2,7 @@ SECRET_KEY = 'isolated-finance-tests-only'
 INSTALLED_APPS = [
     'django.contrib.auth', 'django.contrib.contenttypes', 'django.contrib.sessions', 'rest_framework',
     'worker_finance.tests.contracts.client_profile.apps.ContractClientProfileConfig',
+    'worker_finance.tests.contracts.notifications.apps.ContractNotificationsConfig',
     'worker_finance.apps.WorkerFinanceConfig',
 ]
 DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}}
@@ -16,4 +17,4 @@ TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates', 'APP
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 FINANCE_CONTRACT_TESTS = True
-MIGRATION_MODULES = {'client_profile': None, 'worker_finance': None}
+MIGRATION_MODULES = {'client_profile': None, 'notifications': None, 'worker_finance': None}

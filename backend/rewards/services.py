@@ -215,7 +215,7 @@ def _send_pill_award_message(*, event: PillReferralEvent, ledger: PillLedgerEntr
     }
 
     try:
-        from client_profile.notifications import notify_users
+        from notifications.services import notify_users
         notify_users(
             [user.id],
             title=title,

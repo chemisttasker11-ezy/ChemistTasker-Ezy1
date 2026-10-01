@@ -1,13 +1,7 @@
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import mixins, permissions, status, viewsets
-from client_profile.models import (
-    Membership,
-    Notification,
-    OwnerOnboarding,
-    Pharmacy,
-    PharmacyAdmin,
-    PharmacyClaim,
-)
+from client_profile.models import Membership, OwnerOnboarding, Pharmacy, PharmacyAdmin, PharmacyClaim
+from notifications.models import Notification
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView

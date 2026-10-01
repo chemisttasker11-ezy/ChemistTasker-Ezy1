@@ -1,7 +1,7 @@
 """Characterization of notifications and device tokens (/notifications/, /device-tokens/)."""
 from django.test import TestCase
 
-from client_profile.models import Notification
+from notifications.models import Notification
 from client_profile.characterization_support import BASE, client_for, make_user
 from users.models import DeviceToken
 

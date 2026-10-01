@@ -24,7 +24,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from django.apps import apps
 Invoice = apps.get_model('client_profile', 'Invoice')
-Notification = apps.get_model('client_profile', 'Notification')
+Notification = apps.get_model('notifications', 'Notification')
 from .calculations import CalculationError, expense_gst_credit, shift_hours, ZERO
 from .models import Customer, CatalogueItem, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
 from .serializers import CustomerSerializer, ItemSerializer, InvoiceInput, ExpenseSerializer, MoneyField

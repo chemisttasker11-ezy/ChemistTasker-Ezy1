@@ -21,7 +21,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from users.models import OrganizationMembership
-from client_profile.notifications import notify_users
+from notifications.services import notify_users
 
 from ..models import (
     PHARMACY_STAFF_EMPLOYMENT_TYPES,

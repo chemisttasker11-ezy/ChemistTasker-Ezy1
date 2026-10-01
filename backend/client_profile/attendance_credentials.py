@@ -345,7 +345,7 @@ def generate_kiosk_pairing_code(
 
     # Dispatch notification to the user (triggers Expo push + WebSocket + DB in-app notification)
     try:
-        from client_profile.notifications import notify_users, Notification
+        from notifications.services import Notification, notify_users
         notify_users(
             user_ids=[user.id],
             title="Kiosk Terminal Pairing Code",
@@ -482,7 +482,7 @@ def redeem_kiosk_pairing_code(
 
     if not recovered:
         try:
-            from client_profile.notifications import notify_users, Notification
+            from notifications.services import Notification, notify_users
             notify_users(
                 user_ids=[authorization.authorized_by_id],
                 title="Kiosk Device Paired",
@@ -863,7 +863,7 @@ def send_worker_pin_setup_code(
 
     # Send in-app notification / push as well
     try:
-        from client_profile.notifications import notify_users, Notification
+        from notifications.services import Notification, notify_users
         notify_users(
             user_ids=[worker.id],
             title="Kiosk PIN Setup Code",

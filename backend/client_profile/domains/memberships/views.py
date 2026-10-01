@@ -4,13 +4,13 @@ from client_profile.models import (
     Membership,
     MembershipApplication,
     MembershipInviteLink,
-    Notification,
     OtherStaffOnboarding,
     OwnerOnboarding,
     PharmacistOnboarding,
     Pharmacy,
     PharmacyAdmin,
 )
+from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
 from client_profile.utils import clean_email, membership_role_label
-from client_profile.notifications import notify_users
+from notifications.services import notify_users
 from django.utils.crypto import get_random_string
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode

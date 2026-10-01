@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 from client_profile.models import (
     InvoiceLineItem,
-    Notification,
     OtherStaffOnboarding,
     OwnerOnboarding,
     Pharmacy,
@@ -18,6 +17,7 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from notifications.models import Notification
 from client_profile.domains.invoices.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
 from client_profile.domains.invoices.views import InvoiceDetailView, send_invoice_email

@@ -68,7 +68,6 @@ from .domains.onboarding.views import (
     RefereeSubmitResponseView,
 )
 from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
-from .domains.notifications.views import DeviceTokenViewSet, NotificationViewSet
 from .hub.api import (
     HubCommentViewSet,
     HubCommunityGroupViewSet,
@@ -133,6 +132,7 @@ from rewards.urls import router as rewards_router
 from ratings.urls import router as ratings_router
 from talent.urls import router as talent_router
 from team_calendar.urls import router as team_calendar_router
+from notifications.urls import router as notifications_router
 
 
 router = DefaultRouter()
@@ -179,8 +179,7 @@ router.registry.extend(ratings_router.registry)   # ratings routes, declared in 
 router.register(r'rooms', ConversationViewSet, basename='conversation')
 router.register(r'my-memberships', MyMembershipsViewSet, basename='my-memberships')
 router.register(r'messages', MessageViewSet, basename='message')
-router.register(r'notifications', NotificationViewSet, basename='notification')
-router.register(r'device-tokens', DeviceTokenViewSet, basename='device-token')
+router.registry.extend(notifications_router.registry)   # notifications routes, declared in notifications/urls.py
 
 
 # explorer post

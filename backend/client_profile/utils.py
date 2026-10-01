@@ -15,7 +15,6 @@ from rest_framework.exceptions import ValidationError
 
 from client_profile.models import (
     Membership,
-    Notification,
     OtherStaffOnboarding,
     Shift,
     ShiftCounterOffer,
@@ -23,6 +22,7 @@ from client_profile.models import (
     ShiftOffer,
     ShiftSlotAssignment,
 )
+from notifications.models import Notification
 from client_profile.services import expand_shift_slots, get_locked_rate_for_slot
 from client_profile.admin_helpers import is_admin_of
 
@@ -293,7 +293,7 @@ def _worker_display_name(user):
 
 
 def send_shift_not_selected_after_payment_notifications(*, shift, selected_offers):
-    from client_profile.notifications import notify_users
+    from notifications.services import notify_users
 
     selected_offers = [offer for offer in selected_offers if offer and getattr(offer, "id", None)]
     if not selected_offers:
@@ -497,7 +497,7 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
 
 
 def send_shift_updated_notifications(shift):
-    from client_profile.notifications import notify_users
+    from notifications.services import notify_users
 
     user_ids = set()
     user_ids.update(

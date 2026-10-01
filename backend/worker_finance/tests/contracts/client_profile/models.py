@@ -8,15 +8,6 @@ class Pharmacy(models.Model):
     name = models.CharField(max_length=255)
 
 
-class Notification(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    type = models.CharField(max_length=32, default='task')
-    title = models.CharField(max_length=255)
-    body = models.TextField(blank=True)
-    action_url = models.CharField(max_length=512, blank=True)
-    payload = models.JSONField(default=dict, blank=True)
-
-
 class ShiftSlotAssignment(models.Model):
     slot_date = models.DateField(default=date.today)
 

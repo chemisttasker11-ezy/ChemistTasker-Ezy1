@@ -151,6 +151,7 @@ INSTALLED_APPS = [
 
     # my apps
     "client_profile.apps.ClientProfileConfig",
+    "notifications.apps.NotificationsConfig",
     "team_calendar.apps.TeamCalendarConfig",
     "talent.apps.TalentConfig",
     "ratings.apps.RatingsConfig",

@@ -1,3 +1,4 @@
+"""Notification services: create/deliver notifications (database, WebSocket, Expo push) and mark them read."""
 from __future__ import annotations
 
 from typing import Iterable, Optional, Sequence
@@ -8,13 +9,8 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from client_profile.models import (
-    Membership,
-    Notification,
-    Participant,
-    Message,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-)
+from client_profile.models import Membership, Message, Participant, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from notifications.models import Notification
 from users.models import DeviceToken
 
 USER_GROUP_FMT = "user.{user_id}"

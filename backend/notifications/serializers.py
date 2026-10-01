@@ -1,6 +1,6 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for the notifications and device-token APIs."""
 from rest_framework import serializers
-from client_profile.models import Notification
+from notifications.models import Notification
 from users.models import DeviceToken
 
 

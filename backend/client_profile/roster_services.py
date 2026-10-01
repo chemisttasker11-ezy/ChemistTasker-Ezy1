@@ -53,7 +53,7 @@ def _validate_and_price(roster_period, slot_ids=None):
 
 
 def _notify_roster_publication(period_id, worker_ids, revision):
-    from .notifications import notify_users
+    from notifications.services import notify_users
     period = RosterPeriod.objects.select_related("pharmacy").get(pk=period_id)
     for worker in User.objects.filter(pk__in=worker_ids):
         role_path = {"PHARMACIST": "pharmacist", "OTHER_STAFF": "otherstaff", "EXPLORER": "explorer"}.get(worker.role, "owner")

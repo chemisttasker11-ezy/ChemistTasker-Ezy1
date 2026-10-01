@@ -25,7 +25,6 @@ from client_profile.models import (
     Chain,
     KioskDevice,
     Membership,
-    Notification,
     Organization,
     OwnerOnboarding,
     Pharmacy,
@@ -37,6 +36,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
     WorkerPIN,
 )
+from notifications.models import Notification
 from client_profile.attendance_credentials import (
     activate_kiosk_device,
 )
@@ -161,7 +161,7 @@ class KioskStaffBreakTests(unittest.TestCase):
         cache.clear()
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_notification",
+                "notifications_notification",
                 "client_profile_attendancecorrection",
                 "client_profile_attendanceevent",
                 "client_profile_provisionalattendance",

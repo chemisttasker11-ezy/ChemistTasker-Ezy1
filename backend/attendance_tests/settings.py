@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "worker_finance.apps.WorkerFinanceConfig",
     "attendance_tests.settings.AttendanceClientProfileConfig",
+    "notifications.apps.NotificationsConfig",
     "team_calendar.apps.TeamCalendarConfig",
     "talent.apps.TalentConfig",
     "ratings.apps.RatingsConfig",
@@ -53,6 +54,7 @@ CACHES = {
 MIGRATION_MODULES = {
     "users": None,
     "client_profile": None,
+    "notifications": None,
     "team_calendar": None,
     "talent": None,
     "ratings": None,

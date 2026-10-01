@@ -1,14 +1,7 @@
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import permissions, status, viewsets
-from client_profile.models import (
-    Chain,
-    Membership,
-    Notification,
-    Organization,
-    OwnerOnboarding,
-    Pharmacy,
-    PharmacyAdmin,
-)
+from client_profile.models import Chain, Membership, Organization, OwnerOnboarding, Pharmacy, PharmacyAdmin
+from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
 from django.core.exceptions import ValidationError
 from client_profile.domains.memberships.serializers import required_user_role_for_membership

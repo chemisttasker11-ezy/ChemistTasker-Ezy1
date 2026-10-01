@@ -1,6 +1,7 @@
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import generics, permissions, status
-from client_profile.models import Invoice, Notification, Pharmacy, Shift
+from client_profile.models import Invoice, Pharmacy, Shift
+from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -16,7 +17,7 @@ from client_profile.services import (
     generate_preview_invoice_lines,
     render_invoice_to_pdf,
 )
-from client_profile.notifications import notify_users
+from notifications.services import notify_users
 from core.task_queue import async_task
 from django.db import transaction
 from django.http import HttpResponse

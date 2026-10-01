@@ -109,10 +109,6 @@ from client_profile.models.chat import (
     MessageReaction,
     make_dm_key,
 )
-from client_profile.models.notifications import (
-    NotificationQuerySet,
-    Notification,
-)
 from client_profile.models.attendance import (
     KioskDevice,
     KioskPairingAuthorization,

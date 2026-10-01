@@ -1,3 +1,4 @@
+"""Notifications API: paginated list, mark-read and device-token registration."""
 import logging
 
 log = logging.getLogger(__name__)
@@ -6,14 +7,14 @@ log = logging.getLogger(__name__)
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
-from client_profile.models import Notification
+from notifications.models import Notification
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.exceptions import NotAuthenticated
 from rest_framework.decorators import action
-from client_profile.notifications import mark_notifications_read
+from notifications.services import mark_notifications_read
 from users.models import DeviceToken
-from client_profile.domains.notifications.serializers import DeviceTokenSerializer, NotificationSerializer
+from notifications.serializers import DeviceTokenSerializer, NotificationSerializer
 
 
 # -----------------------------------------------------------------------------

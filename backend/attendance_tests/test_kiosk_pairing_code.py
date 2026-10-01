@@ -42,12 +42,12 @@ from client_profile.models import (
     KioskDevice,
     KioskPairingAuthorization,
     Membership,
-    Notification,
-    OwnerOnboarding,
     Organization,
+    OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
 )
+from notifications.models import Notification
 
 PAIRING_SCHEMA_MODELS = (
     ContentType,
@@ -134,7 +134,7 @@ class KioskPairingCodeTests(unittest.TestCase):
         cache.clear()
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_notification",
+                "notifications_notification",
                 "client_profile_kioskpairingauthorization",
                 "client_profile_kioskdevice",
                 "client_profile_pharmacyadmin",

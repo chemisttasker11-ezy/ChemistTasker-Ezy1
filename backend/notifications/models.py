@@ -1,4 +1,4 @@
-"""client_profile models: notifications (split verbatim from client_profile/models.py)."""
+"""In-app notifications delivered to users (task, message, alert, work-note), with read state."""
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
