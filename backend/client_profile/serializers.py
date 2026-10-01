@@ -6321,16 +6321,6 @@ class WorkerShiftRequestSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-# === Notifications / Devices ===
-class DeviceTokenSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DeviceToken
-        fields = ["id", "platform", "token", "active", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
-        # Allow upsert-by-token logic in the view without the unique validator blocking the request
-        extra_kwargs = {
-            "token": {"validators": []},
-        }
 
 # === Rosters ===
 class RosterUserDetailSerializer(serializers.ModelSerializer):
@@ -7043,20 +7033,6 @@ class ShiftContactSerializer(serializers.Serializer):
     role = serializers.CharField()
     user = ChatMemberSerializer()
 
-class NotificationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Notification
-        fields = [
-            "id",
-            "type",
-            "title",
-            "body",
-            "payload",
-            "action_url",
-            "created_at",
-            "read_at",
-        ]
-        read_only_fields = fields
 
 
 # --- Pharmacy Hub Serializers --------------------------------------------------------
@@ -8309,9 +8285,11 @@ _MOVED_LAZY = {
     "ClaimReferralSerializer": "client_profile.domains.pills.serializers",
     "CreateFriendReferralSerializer": "client_profile.domains.pills.serializers",
     "CreateShiftReferralSerializer": "client_profile.domains.pills.serializers",
+    "DeviceTokenSerializer": "client_profile.domains.notifications.serializers",
     "ExplorerPostReadSerializer": "client_profile.domains.explorer.serializers",
     "ExplorerPostWriteSerializer": "client_profile.domains.explorer.serializers",
     "MyRatingSerializer": "client_profile.domains.ratings.serializers",
+    "NotificationSerializer": "client_profile.domains.notifications.serializers",
     "PendingRatingsSerializer": "client_profile.domains.ratings.serializers",
     "PillBalanceSerializer": "client_profile.domains.pills.serializers",
     "PillLedgerEntrySerializer": "client_profile.domains.pills.serializers",
@@ -8344,5 +8322,6 @@ def __dir__():
 if False:  # pragma: no cover - static analysis / IDE navigation only
     from client_profile.domains.availability.serializers import UserAvailabilitySerializer  # noqa: F401
     from client_profile.domains.explorer.serializers import ExplorerPostReadSerializer, ExplorerPostWriteSerializer, PublicExplorerPostReadSerializer  # noqa: F401
+    from client_profile.domains.notifications.serializers import DeviceTokenSerializer, NotificationSerializer  # noqa: F401
     from client_profile.domains.pills.serializers import ClaimReferralSerializer, CreateFriendReferralSerializer, CreateShiftReferralSerializer, PillBalanceSerializer, PillLedgerEntrySerializer, PillReferralCodeSerializer, PillReferralEventSerializer, PillRewardRuleSerializer  # noqa: F401
     from client_profile.domains.ratings.serializers import MyRatingSerializer, PendingRatingsSerializer, RatingReadSerializer, RatingSummarySerializer, RatingWriteSerializer  # noqa: F401
