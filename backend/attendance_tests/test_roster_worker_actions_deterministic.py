@@ -326,7 +326,7 @@ class RosterWorkerActionsDeterministicTests(unittest.TestCase):
 
         request = factory.post(f"/api/client-profile/worker-shift-requests/{req.id}/approve/")
         force_authenticate(request, user=self.owner_user)
-        with patch("client_profile.views.async_task"):
+        with patch("client_profile.domains.shifts.worker_requests.async_task"):
             response = view(request, pk=req.id)
 
         self.assertEqual(response.status_code, 200)

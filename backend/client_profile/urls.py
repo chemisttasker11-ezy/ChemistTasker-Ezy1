@@ -1,33 +1,37 @@
 # client_profile/urls.py
 from django.urls import path, include
 from .views import (
-    ActiveShiftViewSet,
-    CommunityShiftViewSet,
-    ConfirmedShiftViewSet,
     CreateShiftAndAssignView,
     ExplorerDashboard,
-    HistoryShiftViewSet,
-    LeaveRequestViewSet,
-    MyConfirmedShiftsViewSet,
-    MyHistoryShiftsViewSet,
     OrganizationDashboardView,
     OtherStaffDashboard,
     OwnerDashboard,
     PharmacistDashboard,
-    PublicJobBoardView,
-    PublicShiftViewSet,
     RosterOwnerViewSet,
     RosterShiftManageViewSet,
     RosterWorkerViewSet,
+)
+from .domains.shifts.browse import (
+    ActiveShiftViewSet,
+    CommunityShiftViewSet,
+    ConfirmedShiftViewSet,
+    HistoryShiftViewSet,
+    MyConfirmedShiftsViewSet,
+    MyHistoryShiftsViewSet,
+    PublicJobBoardView,
+    PublicShiftViewSet,
     SharedShiftDetailView,
     ShiftDescriptionTemplateViewSet,
     ShiftDetailViewSet,
+)
+from .domains.shifts.leave import LeaveRequestViewSet
+from .domains.shifts.offers import (
     ShiftInterestViewSet,
     ShiftOfferViewSet,
     ShiftRejectionViewSet,
     ShiftSavedViewSet,
-    WorkerShiftRequestViewSet,
 )
+from .domains.shifts.worker_requests import WorkerShiftRequestViewSet
 from .domains.memberships.views import (
     MagicLinkInfoView,
     MembershipApplicationViewSet,
