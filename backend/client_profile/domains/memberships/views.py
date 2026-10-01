@@ -1059,7 +1059,7 @@ class MembershipApplicationViewSet(viewsets.ModelViewSet):
         )
 
         if app.category == 'FULL_PART_TIME':
-            from client_profile.serializers import _application_payment_profile_status
+            from client_profile.domains.memberships.serializers import _application_payment_profile_status
             payment_profile = _application_payment_profile_status(app)
             if payment_profile.get('payment_preference') != 'TFN':
                 return Response(

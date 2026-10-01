@@ -35,7 +35,7 @@ from django.utils.text import slugify
 from django.core.files.storage import default_storage
 from client_profile.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, validate_uploaded_file
 # Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.serializers import (
+from client_profile.domains.common.serializers import (
     _build_absolute_media_url,
     _delete_file_if_unreferenced,
     _file_has_changed,

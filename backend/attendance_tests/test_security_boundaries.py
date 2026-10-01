@@ -15,12 +15,12 @@ from django.test import override_settings
 
 from client_profile.attendance_credentials import _count_security_attempt
 from client_profile.models import Conversation, ExplorerPost, Message
-from client_profile.serializers import (
+from client_profile.domains.chat.serializers import MessageSerializer
+from client_profile.domains.explorer.serializers import (
     ExplorerPostReadSerializer,
-    MessageSerializer,
     PublicExplorerPostReadSerializer,
 )
-from client_profile.views import MessageViewSet
+from client_profile.domains.chat.views import MessageViewSet
 from users.models import User
 from users.jwt_ws import JWTAuthMiddleware
 

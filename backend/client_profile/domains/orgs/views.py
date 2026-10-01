@@ -11,7 +11,7 @@ from client_profile.models import (
 )
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
 from django.core.exceptions import ValidationError
-from client_profile.serializers import required_user_role_for_membership
+from client_profile.domains.memberships.serializers import required_user_role_for_membership
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound, PermissionDenied

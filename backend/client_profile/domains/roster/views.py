@@ -1,12 +1,9 @@
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import Membership, Pharmacy, RosterPeriod, Shift, ShiftSlot, ShiftSlotAssignment
-from client_profile.serializers import (
-    MembershipSerializer,
-    OpenShiftSerializer,
-    RosterAssignmentSerializer,
-    ShiftSerializer,
-)
+from client_profile.domains.memberships.serializers import MembershipSerializer
+from client_profile.domains.roster.serializers import RosterAssignmentSerializer
+from client_profile.domains.shifts.serializers import OpenShiftSerializer, ShiftSerializer
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView

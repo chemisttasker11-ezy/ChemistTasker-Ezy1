@@ -18,9 +18,9 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from client_profile.serializers import InvoiceSerializer
+from client_profile.domains.invoices.serializers import InvoiceSerializer
 from client_profile.services import generate_invoice_from_shifts
-from client_profile.views import InvoiceDetailView, send_invoice_email
+from client_profile.domains.invoices.views import InvoiceDetailView, send_invoice_email
 from worker_finance.views import ReceivedInvoiceViewSet
 from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision
 from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record

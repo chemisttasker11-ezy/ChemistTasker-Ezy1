@@ -32,7 +32,7 @@ def managed_legacy(request, invoice_id, operation='detail'):
 def detail(request, pk):
     if Invoice.objects.filter(pk=pk, request_key__isnull=False).exists():
         return managed_legacy(request, invoice_id=pk)
-    from client_profile.views import InvoiceDetailView
+    from client_profile.domains.invoices.views import InvoiceDetailView
     return InvoiceDetailView.as_view()(request, pk=pk)
 
 
@@ -40,7 +40,7 @@ def detail(request, pk):
 def pdf(request, invoice_id):
     if Invoice.objects.filter(pk=invoice_id, request_key__isnull=False).exists():
         return managed_legacy(request, invoice_id=invoice_id, operation='pdf')
-    from client_profile.views import invoice_pdf_view
+    from client_profile.domains.invoices.views import invoice_pdf_view
     return invoice_pdf_view(request, invoice_id=invoice_id)
 
 
@@ -48,5 +48,5 @@ def pdf(request, invoice_id):
 def send(request, invoice_id):
     if Invoice.objects.filter(pk=invoice_id, request_key__isnull=False).exists():
         return managed_legacy(request, invoice_id=invoice_id, operation='send')
-    from client_profile.views import send_invoice_email
+    from client_profile.domains.invoices.views import send_invoice_email
     return send_invoice_email(request, invoice_id=invoice_id)

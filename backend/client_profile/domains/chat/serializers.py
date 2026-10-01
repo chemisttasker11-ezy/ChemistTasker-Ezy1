@@ -7,7 +7,7 @@ User = get_user_model()
 from rest_framework import serializers
 from client_profile.models import Conversation, Membership, Message, MessageReaction, Participant
 # Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.serializers import _chat_member_identity
+from client_profile.domains.common.serializers import _chat_member_identity
 
 
 # --- Chat Serializers --------------------------------------------------------

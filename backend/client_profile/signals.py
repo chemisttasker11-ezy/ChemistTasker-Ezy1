@@ -7,7 +7,7 @@ from asgiref.sync import async_to_sync
 from client_profile.models import Message
 from django.utils.text import slugify
 import logging
-from client_profile.serializers import MessageSerializer
+from client_profile.domains.chat.serializers import MessageSerializer
 from client_profile.notifications import (
     broadcast_message_badge,
     notify_users,

@@ -35,7 +35,7 @@ from client_profile.domains.pills.serializers import (
     PillRewardRuleSerializer,
 )
 # Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.views import BaseShiftViewSet
+from client_profile.domains.shifts.base import BaseShiftViewSet
 
 
 class PillRewardsViewSet(viewsets.GenericViewSet):

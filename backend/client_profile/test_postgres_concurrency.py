@@ -20,7 +20,7 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from client_profile.serializers import MembershipApplicationSerializer
+from client_profile.domains.memberships.serializers import MembershipApplicationSerializer
 from client_profile.services import generate_invoice_from_shifts
 
 

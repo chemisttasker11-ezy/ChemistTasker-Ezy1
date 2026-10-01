@@ -21,7 +21,7 @@ from client_profile.models import (
 from django.db import transaction
 from client_profile.file_validation import IMAGE_UPLOAD_POLICY
 # Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.serializers import (
+from client_profile.domains.common.serializers import (
     _build_absolute_media_url,
     _chat_member_identity,
     _resolve_user_profile_photo,

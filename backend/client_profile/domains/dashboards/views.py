@@ -11,7 +11,8 @@ from client_profile.models import (
     Shift,
     ShiftProfileAccessAudit,
 )
-from client_profile.serializers import PharmacyClaimSerializer, ShiftSerializer
+from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
+from client_profile.domains.shifts.serializers import ShiftSerializer
 from users.permissions import IsExplorer, IsOtherstaff, IsPharmacist, OrganizationRolePermission
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response

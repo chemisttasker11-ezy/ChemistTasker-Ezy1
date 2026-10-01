@@ -55,7 +55,7 @@ from client_profile.roster_worker_actions import (
     request_direct_swap,
     submit_cover_request,
 )
-from client_profile.views import WorkerShiftRequestViewSet
+from client_profile.domains.shifts.worker_requests import WorkerShiftRequestViewSet
 
 User = get_user_model()
 

@@ -43,7 +43,7 @@ from client_profile.domains.chat.serializers import (
     ShiftContactSerializer,
 )
 # Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.views import BaseShiftViewSet
+from client_profile.domains.shifts.base import BaseShiftViewSet
 
 
 class ChatMessagePagination(PageNumberPagination):

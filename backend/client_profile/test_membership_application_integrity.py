@@ -30,17 +30,14 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from client_profile.serializers import (
+from client_profile.domains.memberships.serializers import (
     MembershipApplicationReviewSerializer,
     MembershipApplicationSerializer,
-    RosterAssignmentSerializer,
 )
+from client_profile.domains.roster.serializers import RosterAssignmentSerializer
 from client_profile.services import validate_internal_invoice_shifts
-from client_profile.views import (
-    MembershipApplicationViewSet,
-    ShiftOfferViewSet,
-    SubmitMembershipApplication,
-)
+from client_profile.domains.memberships.views import MembershipApplicationViewSet, SubmitMembershipApplication
+from client_profile.domains.shifts.offers import ShiftOfferViewSet
 from client_profile.utils import finalize_shift_offer
 from workforce.models import Timesheet, TimesheetPeriod
 
@@ -842,7 +839,7 @@ class DeferredPayrollActivationTests(TestCase):
         force_authenticate(request, user=self.manager)
         view = ShiftOfferViewSet.as_view({"post": "activate_payroll"})
         with patch(
-            "client_profile.views.BaseShiftViewSet._user_can_manage_pharmacy",
+            "client_profile.domains.shifts.base.BaseShiftViewSet._user_can_manage_pharmacy",
             return_value=True,
         ):
             return view(request, pk=self.offer.id)
@@ -918,7 +915,7 @@ class DeferredPayrollActivationTests(TestCase):
         force_authenticate(request, user=self.manager)
         view = ShiftOfferViewSet.as_view({"post": "activate_payroll"})
         with patch(
-            "client_profile.views.BaseShiftViewSet._user_can_manage_pharmacy",
+            "client_profile.domains.shifts.base.BaseShiftViewSet._user_can_manage_pharmacy",
             return_value=True,
         ):
             response = view(request, pk=offer.id)

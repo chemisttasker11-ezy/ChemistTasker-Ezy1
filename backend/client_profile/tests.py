@@ -29,8 +29,9 @@ from client_profile.rewards import (
     get_pill_balance,
     seed_default_reward_rules,
 )
-from client_profile.serializers import OwnerOnboardingV2Serializer, WorkerShiftRequestSerializer
-from client_profile.views import WorkerShiftRequestViewSet
+from client_profile.domains.onboarding.serializers import OwnerOnboardingV2Serializer
+from client_profile.domains.shifts.serializers import WorkerShiftRequestSerializer
+from client_profile.domains.shifts.worker_requests import WorkerShiftRequestViewSet
 
 
 class OnboardingRoleInvariantTests(TestCase):
