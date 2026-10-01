@@ -1,1 +1,1 @@
-"""onboarding domain (Stage 2 split of client_profile)."""
+"""Onboarding of owners, pharmacists, other staff and explorers: profiles, referees, verification and e-mails."""

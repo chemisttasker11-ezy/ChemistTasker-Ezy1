@@ -1,3 +1,4 @@
+"""Serializers for shifts, slots, interests, offers, counter-offers and the worker's own shifts."""
 import logging
 from django.contrib.auth import get_user_model
 
@@ -5,7 +6,6 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from client_profile.models import (
@@ -379,7 +379,6 @@ class ShiftSerializer(serializers.ModelSerializer):
 
         tiers.append('PLATFORM')
         return tiers
-
 
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))

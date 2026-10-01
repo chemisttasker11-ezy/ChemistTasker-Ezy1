@@ -36,7 +36,6 @@ from rewards.serializers import (
     PillReferralEventSerializer,
     PillRewardRuleSerializer,
 )
-# Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.shifts.base import BaseShiftViewSet
 
 

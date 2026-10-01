@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Permission classes and helpers shared by the client_profile views."""
 from rest_framework import permissions, status
 from client_profile.models import Membership, OtherStaffOnboarding, Pharmacy
 from rest_framework.exceptions import APIException

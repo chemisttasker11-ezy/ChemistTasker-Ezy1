@@ -4,7 +4,6 @@ import logging
 log = logging.getLogger(__name__)
 
 
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.pagination import PageNumberPagination
 from client_profile.models import Membership, Pharmacy, PHARMACY_STAFF_EMPLOYMENT_TYPES, ShiftSlotAssignment
@@ -34,7 +33,6 @@ from chat.serializers import (
     MessageSerializer,
     ShiftContactSerializer,
 )
-# Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.shifts.base import BaseShiftViewSet
 
 
@@ -509,7 +507,6 @@ class ConversationViewSet(mixins.ListModelMixin,
                     ],
                     ignore_conflicts=True
                 )
-
 
 
     @action(detail=True, methods=['post'], url_path='toggle-pin')

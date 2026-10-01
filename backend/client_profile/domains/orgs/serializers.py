@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from client_profile.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
@@ -308,7 +308,6 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         if not obj.owner:
             return False
         return Chain.objects.filter(owner=obj.owner, pharmacies=obj).exists()
-
 
 
     @extend_schema_field(OpenApiTypes.BOOL)

@@ -1,1 +1,1 @@
-"""orgs domain (Stage 2 split of client_profile)."""
+"""Organisations, pharmacies, chains, pharmacy admins and ownership claims."""

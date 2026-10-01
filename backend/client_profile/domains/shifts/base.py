@@ -1,9 +1,9 @@
+"""Base viewset shared by the shift viewsets."""
 import logging
 
 log = logging.getLogger(__name__)
 
 
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import (
     Chain,

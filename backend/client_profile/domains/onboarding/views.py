@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Onboarding API: per-role onboarding profiles, referee responses and verification triggers."""
 from rest_framework import generics, permissions
 from client_profile.models import (
     ExplorerOnboarding,

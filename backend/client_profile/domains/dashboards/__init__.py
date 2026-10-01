@@ -1,1 +1,1 @@
-"""dashboards domain (Stage 2 split of client_profile)."""
+"""Role dashboards: owner, pharmacist, other staff, organisation and explorer overviews."""

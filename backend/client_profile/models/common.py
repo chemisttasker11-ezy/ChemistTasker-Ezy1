@@ -1,4 +1,4 @@
-"""client_profile models: common (split verbatim from client_profile/models.py)."""
+"""Shared choices and upload-path helpers of the client_profile models."""
 import uuid
 import os
 

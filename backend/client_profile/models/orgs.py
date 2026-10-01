@@ -1,4 +1,4 @@
-"""client_profile models: orgs (split verbatim from client_profile/models.py)."""
+"""Organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
 from django.db import models
 from django.db.models import Q
 from django.conf import settings

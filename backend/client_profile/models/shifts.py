@@ -1,4 +1,4 @@
-"""client_profile models: shifts (split verbatim from client_profile/models.py)."""
+"""Shifts, slots, assignments, interests, offers, counter-offers, leave and worker shift requests."""
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError

@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Worker shift requests (swap and cover) API."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import Pharmacy, PharmacyAdmin, Shift, ShiftSlot, WorkerShiftRequest
 from django.core.exceptions import ValidationError

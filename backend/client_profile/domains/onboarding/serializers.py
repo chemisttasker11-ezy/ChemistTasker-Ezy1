@@ -1,3 +1,4 @@
+"""Serializers for the onboarding flows (owner, pharmacist, other staff, explorer) and referee responses."""
 from pathlib import Path
 
 
@@ -18,7 +19,6 @@ def _load_skills_catalog():
     return _SKILLS_CATALOG_CACHE
 
 
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
 from client_profile.models import (
     ExplorerOnboarding,
@@ -34,7 +34,6 @@ import json
 from django.utils.text import slugify
 from django.core.files.storage import default_storage
 from client_profile.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, validate_uploaded_file
-# Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.common.serializers import (
     _build_absolute_media_url,
     _delete_file_if_unreferenced,

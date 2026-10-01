@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Response serializers of the role dashboards."""
 from rest_framework import serializers
 from users.serializers import UserProfileSerializer
 

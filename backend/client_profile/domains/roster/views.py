@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Roster API (V1): owner and manager roster views, shift assignment and the worker roster."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import Membership, Pharmacy, RosterPeriod, Shift, ShiftSlot, ShiftSlotAssignment
 from client_profile.domains.memberships.serializers import MembershipSerializer

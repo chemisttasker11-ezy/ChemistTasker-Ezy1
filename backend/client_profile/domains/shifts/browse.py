@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Shift browsing API: community, public, active, confirmed and history shift lists, details and description templates."""
 from rest_framework import generics, permissions, status, viewsets
 from client_profile.models import (
     Chain,

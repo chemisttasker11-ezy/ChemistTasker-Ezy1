@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Shift interests, rejections, saved shifts and offers."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import (
     Shift,

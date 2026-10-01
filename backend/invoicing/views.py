@@ -23,7 +23,6 @@ from core.task_queue import async_task
 from django.db import transaction
 from django.http import HttpResponse
 from invoicing.serializers import InvoiceSerializer
-# Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.common.access import _get_org_pharmacies_queryset
 from client_profile.domains.dashboards.views import _dashboard_invoice_action_url
 

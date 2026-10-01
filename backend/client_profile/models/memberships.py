@@ -1,4 +1,4 @@
-"""client_profile models: memberships (split verbatim from client_profile/models.py)."""
+"""Memberships, invite links and membership applications."""
 from django.db import models
 from django.conf import settings
 import uuid

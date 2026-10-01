@@ -1,4 +1,4 @@
-"""client_profile models: onboarding (split verbatim from client_profile/models.py)."""
+"""Onboarding profiles (owner, pharmacist, other staff, explorer), referee responses and onboarding notifications."""
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError

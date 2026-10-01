@@ -1,9 +1,9 @@
+"""Serializers for the roster views: users, shifts and assignments."""
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
 from client_profile.models import Membership, Shift, ShiftSlotAssignment
 from client_profile.domains.shifts.serializers import ShiftSerializer, ShiftSlotSerializer

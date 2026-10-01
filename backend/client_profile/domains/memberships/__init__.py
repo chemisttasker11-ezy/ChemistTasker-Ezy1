@@ -1,1 +1,1 @@
-"""memberships domain (Stage 2 split of client_profile)."""
+"""Memberships: staff and locum memberships, invite links, applications and the magic-link flow."""

@@ -1,4 +1,4 @@
-"""client_profile models: roster (split verbatim from client_profile/models.py)."""
+"""Roster periods, publication audits, acknowledgements, templates and action audits."""
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError

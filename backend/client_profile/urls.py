@@ -104,9 +104,9 @@ router.register(r'membership-applications', MembershipApplicationViewSet, basena
 router.register(r'community-shifts', CommunityShiftViewSet, basename='community-shifts')
 router.register(r'public-shifts',    PublicShiftViewSet,    basename='public-shifts')
 router.register(r'shift-description-templates', ShiftDescriptionTemplateViewSet, basename='shift-description-template')
-# My shifts by status for posters
 router.registry.extend(talent_router.registry)   # talent routes, declared in talent/urls.py
 router.registry.extend(rewards_router.registry)   # rewards routes, declared in rewards/urls.py
+# My shifts by status for posters
 router.register(r'shifts/active',    ActiveShiftViewSet,    basename='active-shifts')
 router.register(r'shifts/confirmed', ConfirmedShiftViewSet, basename='confirmed-shifts')
 router.register(r'shifts/history',   HistoryShiftViewSet,   basename='history-shifts')
@@ -128,15 +128,10 @@ router.register(r'leave-requests', LeaveRequestViewSet, basename='leaverequest')
 router.register(r"worker-shift-requests",WorkerShiftRequestViewSet,basename="worker-shift-requests")
 router.registry.extend(ratings_router.registry)   # ratings routes, declared in ratings/urls.py
 
-#chat app
 router.registry.extend(chat_router.registry)   # chat routes, declared in chat/urls.py
 router.register(r'my-memberships', MyMembershipsViewSet, basename='my-memberships')
 router.registry.extend(notifications_router.registry)   # notifications routes, declared in notifications/urls.py
 
-
-# explorer post
-
-# Calendar & Work Notes
 router.registry.extend(team_calendar_router.registry)   # team_calendar routes, declared in team_calendar/urls.py
 
 
@@ -163,7 +158,7 @@ urlpatterns = [
     path('dashboard/pharmacist/', PharmacistDashboard.as_view()),
     path('dashboard/otherstaff/', OtherStaffDashboard.as_view()),
     path('dashboard/explorer/', ExplorerDashboard.as_view()),
-    
+
     # Claim endpoint for OwnerOnboarding
     path('owner-onboarding/claim/',  OwnerOnboardingClaim.as_view(), name='owneronboarding-claim' ),
 
@@ -172,12 +167,6 @@ urlpatterns = [
 
 
     path('roster/create-and-assign-shift/', CreateShiftAndAssignView.as_view(), name='create-shift-and-assign'),
-
-    # Invoice
-    # list and create (manual or via shifts)
-    # retrieve/update/delete
-    # alternate generate endpoint (optional—your front end can use POST to /invoices/ directly)
-
 
     # Roster V2 Endpoints
     path('attendance/roster/period/', RosterPeriodDetailView.as_view(), name='roster-period-detail'),
@@ -202,7 +191,7 @@ urlpatterns = [
     path('attendance/roster/manager/reject-request/', RosterManagerRejectRequestView.as_view(), name='roster-manager-reject-request'),
     path('attendance/roster/audits/', RosterActionAuditListView.as_view(), name='roster-action-audits'),
 
-    # Include the API routes for CRUD operations
+    # Routes of the apps split out of this kernel (each declares its own paths), then the router
     path('', include('chat.urls')),
     path('', include('pharmacy_hub.urls')),
     path('', include('invoicing.urls')),

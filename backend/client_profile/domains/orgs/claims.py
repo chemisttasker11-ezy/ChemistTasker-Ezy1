@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Ownership claims: owner onboarding claims and pharmacy claim review."""
 from rest_framework import mixins, permissions, status, viewsets
 from client_profile.models import Membership, OwnerOnboarding, Pharmacy, PharmacyAdmin, PharmacyClaim
 from notifications.models import Notification

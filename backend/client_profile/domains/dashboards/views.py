@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Role dashboards: owner, pharmacist, other staff, organisation and explorer overviews."""
 from rest_framework import permissions, status
 from client_profile.models import (
     FAVORITE_STAFF_EMPLOYMENT_TYPES,

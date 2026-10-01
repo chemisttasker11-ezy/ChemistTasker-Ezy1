@@ -4,7 +4,6 @@ import logging
 log = logging.getLogger(__name__)
 
 
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
 from notifications.models import Notification

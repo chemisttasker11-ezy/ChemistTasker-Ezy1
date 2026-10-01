@@ -4,11 +4,9 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
 from client_profile.models import Membership
 from chat.models import Conversation, Message, MessageReaction, Participant
-# Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.common.serializers import _chat_member_identity
 
 
