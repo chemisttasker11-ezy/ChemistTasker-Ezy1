@@ -9,7 +9,6 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from client_profile.models import Membership, Message, Participant, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from notifications.models import Notification
 from users.models import DeviceToken
 

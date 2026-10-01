@@ -1,7 +1,7 @@
 """client_profile models: chat (split verbatim from client_profile/models.py)."""
 from django.db import models
 from django.conf import settings
-from client_profile.models.common import _unique_upload_path
+from client_profile.models.common import chat_upload_path
 from client_profile.models.memberships import Membership
 
 
@@ -91,11 +91,6 @@ class Participant(models.Model):
 
     def __str__(self):
         return f"Participant m#{self.membership_id} in c#{self.conversation_id}"
-
-
-def chat_upload_path(instance, filename):
-    conversation_id = instance.conversation_id or "new"
-    return _unique_upload_path(f"chat/{conversation_id}", filename)
 
 
 class Message(models.Model):

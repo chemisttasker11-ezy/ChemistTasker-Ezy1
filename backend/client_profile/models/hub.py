@@ -4,12 +4,8 @@ from django.db.models import Q
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from client_profile.models.common import _unique_upload_path
+from client_profile.models.common import hub_attachment_upload_path
 from client_profile.models.memberships import Membership
-
-
-def hub_attachment_upload_path(instance, filename):
-    return _unique_upload_path("pharmacy_hub/attachments", filename)
 
 
 # PharmacyHub

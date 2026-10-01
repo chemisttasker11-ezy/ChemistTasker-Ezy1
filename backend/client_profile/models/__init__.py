@@ -3,6 +3,8 @@ from client_profile.models.common import (
     GENDER_CHOICES,
     _safe_ext,
     _unique_upload_path,
+    chat_upload_path,
+    hub_attachment_upload_path,
     PHARMACIST_AWARD_LEVEL_CHOICES,
     OTHERSTAFF_CLASSIFICATION_CHOICES,
     INTERN_HALF_CHOICES,
@@ -54,7 +56,6 @@ from client_profile.models.memberships import (
     MembershipApplication,
 )
 from client_profile.models.hub import (
-    hub_attachment_upload_path,
     PharmacyCommunityGroup,
     PharmacyCommunityGroupMembership,
     PharmacyHubPost,
@@ -104,7 +105,6 @@ from client_profile.models.invoices import (
 from client_profile.models.chat import (
     Conversation,
     Participant,
-    chat_upload_path,
     Message,
     MessageReaction,
     make_dm_key,

@@ -14,6 +14,13 @@ class AttendanceClientProfileConfig(AppConfig):
     name = "client_profile"
     label = "client_profile"
 
+
+class AttendanceRewardsConfig(AppConfig):
+    """Load the rewards models without connecting the production signal receivers."""
+
+    name = "rewards"
+    label = "rewards"
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "attendance-tests-only-never-production"
 DEBUG = False
@@ -33,7 +40,7 @@ INSTALLED_APPS = [
     "team_calendar.apps.TeamCalendarConfig",
     "talent.apps.TalentConfig",
     "ratings.apps.RatingsConfig",
-    "rewards.apps.RewardsConfig",
+    "attendance_tests.settings.AttendanceRewardsConfig",
 ]
 
 DATABASES = {

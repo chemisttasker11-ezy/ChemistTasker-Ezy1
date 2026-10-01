@@ -19,6 +19,18 @@ def _unique_upload_path(prefix, filename):
     return f"{prefix}/{uuid.uuid4().hex}{_safe_ext(filename)}"
 
 
+# Upload paths of the chat and pharmacy-hub attachments. They live here (not next to their models) because the
+# squashed baseline migration refers to them as client_profile.models.<name>; that must keep working after the
+# models moved into their own apps.
+def chat_upload_path(instance, filename):
+    conversation_id = instance.conversation_id or "new"
+    return _unique_upload_path(f"chat/{conversation_id}", filename)
+
+
+def hub_attachment_upload_path(instance, filename):
+    return _unique_upload_path("pharmacy_hub/attachments", filename)
+
+
 PHARMACIST_AWARD_LEVEL_CHOICES = [
     ('PHARMACIST', 'Pharmacist'),
     ('EXPERIENCED_PHARMACIST', 'Experienced Pharmacist'),
