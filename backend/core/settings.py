@@ -571,6 +571,10 @@ LOGGING = {
     }
 }
 
+# Apps split out of client_profile keep the logging behaviour their code had there (console, level from APP_LOG_LEVEL).
+for _app in ("rewards", "ratings", "talent", "team_calendar", "notifications"):
+    LOGGING['loggers'][_app] = dict(LOGGING['loggers']['client_profile'])
+
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.zoho.com'
