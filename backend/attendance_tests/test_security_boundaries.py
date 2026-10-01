@@ -84,7 +84,7 @@ class SecurityBoundaryTests(unittest.TestCase):
         message.attachment.storage = storage
         view = MessageViewSet()
         view.get_object = Mock(return_value=message)
-        with patch("client_profile.views.get_channel_layer") as get_layer, patch("client_profile.views.async_to_sync") as as_sync:
+        with patch("client_profile.domains.chat.views.get_channel_layer") as get_layer, patch("client_profile.domains.chat.views.async_to_sync") as as_sync:
             response = view.destroy(SimpleNamespace(user=object()))
         self.assertEqual(response.status_code, 204)
         self.assertTrue(message.is_deleted)
