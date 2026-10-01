@@ -27,7 +27,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from client_profile.utils import sanitize_chat_text
-from client_profile.notifications import broadcast_message_badge, broadcast_message_read
+from client_profile.domains.chat.realtime import broadcast_message_badge, broadcast_message_read
 from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from datetime import date
 from django.db import transaction

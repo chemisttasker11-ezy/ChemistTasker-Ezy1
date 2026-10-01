@@ -8,11 +8,8 @@ from client_profile.models import Message
 from django.utils.text import slugify
 import logging
 from client_profile.domains.chat.serializers import MessageSerializer
-from client_profile.notifications import (
-    broadcast_message_badge,
-    notify_users,
-    participant_can_receive_chat_updates,
-)
+from client_profile.notifications import notify_users
+from client_profile.domains.chat.realtime import broadcast_message_badge, participant_can_receive_chat_updates
 
 from .models import (
     Membership,
