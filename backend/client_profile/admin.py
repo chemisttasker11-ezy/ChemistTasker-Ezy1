@@ -1,7 +1,39 @@
 from django.contrib import admin
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import *
+from .models import (
+    Chain,
+    ExplorerOnboarding,
+    ExplorerPost,
+    Invoice,
+    InvoiceLineItem,
+    Membership,
+    MembershipApplication,
+    Message,
+    Organization,
+    OtherStaffOnboarding,
+    OwnerOnboarding,
+    PharmacistOnboarding,
+    Pharmacy,
+    PharmacyAdmin,
+    PharmacyHubComment,
+    PharmacyHubPost,
+    PillLedgerEntry,
+    PillReferralCode,
+    PillReferralEvent,
+    PillRewardRule,
+    Rating,
+    RefereeResponse,
+    Shift,
+    ShiftCounterOffer,
+    ShiftCounterOfferSlot,
+    ShiftInterest,
+    ShiftOffer,
+    ShiftRejection,
+    ShiftSlot,
+    ShiftSlotAssignment,
+    WorkerShiftRequest,
+)
 
 
 class RoleScopedOnboardingAdminMixin:

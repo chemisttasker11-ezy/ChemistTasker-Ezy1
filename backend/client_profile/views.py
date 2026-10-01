@@ -1,18 +1,129 @@
 # client_profile/views.py
 from rest_framework import generics, permissions, status, viewsets, mixins, serializers
 from rest_framework.pagination import PageNumberPagination
-from .serializers import *
+from .models import (
+    Chain,
+    Conversation,
+    ExplorerOnboarding,
+    ExplorerPost,
+    ExplorerPostReaction,
+    FAVORITE_STAFF_EMPLOYMENT_TYPES,
+    Invoice,
+    make_dm_key,
+    Membership,
+    MembershipApplication,
+    MembershipInviteLink,
+    Message,
+    MessageReaction,
+    Notification,
+    Organization,
+    OtherStaffOnboarding,
+    OwnerOnboarding,
+    Participant,
+    PharmacistOnboarding,
+    Pharmacy,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+    PharmacyAdmin,
+    PharmacyClaim,
+    PharmacyHubPost,
+    PillLedgerEntry,
+    PillReferralEvent,
+    PillRewardRule,
+    Rating,
+    RefereeResponse,
+    RosterPeriod,
+    Shift,
+    ShiftCounterOffer,
+    ShiftDescriptionTemplate,
+    ShiftInterest,
+    ShiftOffer,
+    ShiftProfileAccessAudit,
+    ShiftRejection,
+    ShiftSaved,
+    ShiftSlot,
+    ShiftSlotAssignment,
+    UserAvailability,
+    WorkerShiftRequest,
+)
+from .serializers import (
+    ChainSerializer,
+    ChatParticipantSerializer,
+    ClaimReferralSerializer,
+    ConversationCreateSerializer,
+    ConversationDetailSerializer,
+    ConversationListSerializer,
+    CreateFriendReferralSerializer,
+    CreateShiftReferralSerializer,
+    ExplorerOnboardingV2Serializer,
+    ExplorerPostReadSerializer,
+    ExplorerPostWriteSerializer,
+    InvoiceSerializer,
+    MembershipApplicationReviewSerializer,
+    MembershipApplicationSerializer,
+    MembershipInviteLinkSerializer,
+    MembershipSerializer,
+    MessageSerializer,
+    MyRatingSerializer,
+    MyShiftSerializer,
+    NotificationSerializer,
+    OpenShiftSerializer,
+    OrganizationSerializer,
+    OtherStaffOnboardingV2Serializer,
+    OwnerOnboardingV2Serializer,
+    PendingRatingsSerializer,
+    PharmacistOnboardingV2Serializer,
+    PharmacyAdminSerializer,
+    PharmacyClaimCreateSerializer,
+    PharmacyClaimSerializer,
+    PharmacySerializer,
+    PillBalanceSerializer,
+    PillLedgerEntrySerializer,
+    PillReferralCodeSerializer,
+    PillReferralEventSerializer,
+    PillRewardRuleSerializer,
+    PublicExplorerPostReadSerializer,
+    PublicOrganizationSerializer,
+    RatingReadSerializer,
+    RatingSummarySerializer,
+    RatingWriteSerializer,
+    RefereeResponseSerializer,
+    RosterAssignmentSerializer,
+    SharedShiftSerializer,
+    ShiftCounterOfferSerializer,
+    ShiftDescriptionTemplateSerializer,
+    ShiftInterestSerializer,
+    ShiftOfferSerializer,
+    ShiftRejectionSerializer,
+    ShiftSavedSerializer,
+    ShiftSerializer,
+    ShiftSlotSerializer,
+    UserAvailabilitySerializer,
+    WorkerShiftRequestSerializer,
+)
+from users.permissions import (
+    AuthenticatedOrganizationMember,
+    IsExplorer,
+    IsOtherstaff,
+    IsOTPVerified,
+    IsOwner,
+    IsPharmacist,
+    OrganizationRolePermission,
+)
+from django.db import models
+# KNOWN QUIRK (frozen on purpose, see the "KNOWN QUIRK" characterization tests): `ValidationError` has always
+# resolved to Django's class in this module, because `from .models import *` used to rebind it over DRF's.
+# DRF does not convert Django's, so raise sites using this name return 500. Switching to DRF's is a behaviour change.
+from django.core.exceptions import ValidationError
 from .serializers import required_user_role_for_membership
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, SAFE_METHODS, AllowAny
 from rest_framework.generics import RetrieveUpdateAPIView
-from rest_framework.exceptions import NotFound, APIException, PermissionDenied, ValidationError, NotAuthenticated
+from rest_framework.exceptions import NotFound, APIException, PermissionDenied, NotAuthenticated
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action, api_view, permission_classes
-from .models import *
 from .admin_helpers import (
     pharmacies_user_admins,
     has_admin_capability,
@@ -23,7 +134,6 @@ from .admin_helpers import (
     is_any_admin,
     is_admin_of,
 )
-from users.permissions import *
 from users.serializers import (
     UserProfileSerializer,
 )
