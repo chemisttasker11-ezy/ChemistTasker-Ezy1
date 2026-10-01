@@ -220,8 +220,42 @@ class CalendarFeedTests(CalendarBase):
         self.assertEqual(len(client_for(self.owner).get(url).json()["work_notes"][0]["completed_by"]), 1)
         self.assertNotIn("completed_by", client_for(self.staff).get(url).json()["work_notes"][0])
 
-    def test_malformed_date_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately: date.fromisoformat() is not guarded in CalendarFeedView.list.
+    def test_malformed_dates_and_ids_are_rejected(self):
         c = client_for(self.owner)
-        c.raise_request_exception = False
-        self.assertEqual(c.get(FEED + "?date_from=garbage").status_code, 500)
+        for query, field, message in (
+            ("date_from=garbage", "date_from", "Invalid date format. Use YYYY-MM-DD."),
+            ("date_to=2026-02-30", "date_to", "Invalid date format. Use YYYY-MM-DD."),
+            ("pharmacy_id=abc", "pharmacy_id", "A valid integer is required."),
+            ("organization_id=abc", "organization_id", "A valid integer is required."),
+        ):
+            with self.subTest(query=query):
+                res = c.get(f"{FEED}?{query}")
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json(), {field: message})
+
+
+class CalendarQueryParameterTests(CalendarBase):
+    """The event and work-note lists parse the same parameters as the feed."""
+
+    def test_malformed_dates_and_ids_are_rejected_by_both_lists(self):
+        c = client_for(self.owner)
+        for url in (EVENTS, NOTES):
+            for query, field, message in (
+                ("date_from=garbage", "date_from", "Invalid date format. Use YYYY-MM-DD."),
+                ("date_to=2026-13-01", "date_to", "Invalid date format. Use YYYY-MM-DD."),
+                ("pharmacy_id=abc", "pharmacy_id", "A valid integer is required."),
+            ):
+                with self.subTest(url=url, query=query):
+                    res = c.get(f"{url}?{query}")
+                    self.assertEqual(res.status_code, 400)
+                    self.assertEqual(res.json(), {field: message})
+        res = c.get(EVENTS + "?organization_id=abc")
+        self.assertEqual((res.status_code, res.json()), (400, {"organization_id": "A valid integer is required."}))
+
+    def test_valid_and_empty_parameters_filter_as_before(self):
+        march, april = self.event(date=date(2026, 3, 10)), self.event(date=date(2026, 4, 10))
+        c = client_for(self.owner)
+        ids = lambda url: [row["id"] for row in self.rows(c.get(url))]  # noqa: E731
+        self.assertEqual(ids(f"{EVENTS}?pharmacy_id={self.pharmacy.id}&date_from=2026-04-01"), [april.id])
+        self.assertEqual(ids(EVENTS + "?date_from=2026-4-1"), [april.id])   # the ORM's DateField form keeps working
+        self.assertEqual(ids(EVENTS + "?date_to=2026-03-31&pharmacy_id="), [march.id])   # an empty id is no filter

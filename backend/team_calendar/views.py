@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -26,6 +27,38 @@ from client_profile.models import Membership, OtherStaffOnboarding, PharmacistOn
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
 from team_calendar.recurrence import expand_recurrence_dates
+
+
+def _query_id(request, name):
+    """Query parameter `name` as an integer id; None when absent or empty. A malformed value is a 400."""
+    value = request.query_params.get(name)
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise ValidationError({name: "A valid integer is required."})
+
+
+def _query_date(request, name):
+    """Query parameter `name` as a date; None when absent or empty. A malformed value is a 400.
+
+    Accepts what the views accepted before: ISO 8601 dates (date.fromisoformat) and the forms the ORM parses for a
+    DateField (django.utils.dateparse.parse_date, e.g. 2026-3-1)."""
+    value = request.query_params.get(name)
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        pass
+    try:
+        parsed = parse_date(value)
+    except ValueError:   # well formed but impossible, e.g. 2026-02-30
+        parsed = None
+    if parsed is None:
+        raise ValidationError({name: "Invalid date format. Use YYYY-MM-DD."})
+    return parsed
 
 
 class CalendarScopeMixin:
@@ -157,10 +190,10 @@ class CalendarEventViewSet(
     
     def get_queryset(self):
         user = self.request.user
-        pharmacy_id = self.request.query_params.get('pharmacy_id')
-        organization_id = self.request.query_params.get('organization_id')
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
+        pharmacy_id = _query_id(self.request, 'pharmacy_id')
+        organization_id = _query_id(self.request, 'organization_id')
+        date_from = _query_date(self.request, 'date_from')
+        date_to = _query_date(self.request, 'date_to')
         source = self.request.query_params.get('source')
         
         queryset = CalendarEvent.objects.select_related(
@@ -168,18 +201,18 @@ class CalendarEventViewSet(
         )
         
         # Scope by pharmacy or organization
-        if pharmacy_id:
+        if pharmacy_id is not None:
             accessible = self.get_accessible_pharmacy_ids(user)
-            if int(pharmacy_id) not in accessible:
+            if pharmacy_id not in accessible:
                 return CalendarEvent.objects.none()
             queryset = queryset.filter(pharmacy_id=pharmacy_id)
             
             # Filter out birthdays if user can't view them
-            if not self.can_view_birthdays(user, int(pharmacy_id)):
+            if not self.can_view_birthdays(user, pharmacy_id):
                 queryset = queryset.exclude(source=CalendarEvent.Source.BIRTHDAY)
-        elif organization_id:
+        elif organization_id is not None:
             accessible = self.get_accessible_organization_ids(user)
-            if int(organization_id) not in accessible:
+            if organization_id not in accessible:
                 return CalendarEvent.objects.none()
             queryset = queryset.filter(organization_id=organization_id)
         else:
@@ -285,9 +318,9 @@ class WorkNoteViewSet(
     
     def get_queryset(self):
         user = self.request.user
-        pharmacy_id = self.request.query_params.get('pharmacy_id')
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
+        pharmacy_id = _query_id(self.request, 'pharmacy_id')
+        date_from = _query_date(self.request, 'date_from')
+        date_to = _query_date(self.request, 'date_to')
         status_filter = self.request.query_params.get('status')
         assigned_to_me = self.request.query_params.get('assigned_to_me')
         
@@ -296,9 +329,9 @@ class WorkNoteViewSet(
         ).prefetch_related('assignees__membership__user')
         
         # Scope by pharmacy or user's accessible pharmacies
-        if pharmacy_id:
+        if pharmacy_id is not None:
             accessible = self.get_accessible_pharmacy_ids(user)
-            if int(pharmacy_id) not in accessible:
+            if pharmacy_id not in accessible:
                 return WorkNote.objects.none()
             queryset = queryset.filter(pharmacy_id=pharmacy_id)
         else:
@@ -420,21 +453,14 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
     
     def list(self, request):
         user = request.user
-        pharmacy_id = request.query_params.get('pharmacy_id')
-        organization_id = request.query_params.get('organization_id')
-        date_from_str = request.query_params.get('date_from')
-        date_to_str = request.query_params.get('date_to')
+        pharmacy_id = _query_id(request, 'pharmacy_id')
+        organization_id = _query_id(request, 'organization_id')
         
         # Default to current month
         today = timezone.now().date()
-        if date_from_str:
-            date_from = date.fromisoformat(date_from_str)
-        else:
-            date_from = today.replace(day=1)
-        
-        if date_to_str:
-            date_to = date.fromisoformat(date_to_str)
-        else:
+        date_from = _query_date(request, 'date_from') or today.replace(day=1)
+        date_to = _query_date(request, 'date_to')
+        if date_to is None:
             # End of month
             next_month = date_from.replace(day=28) + timedelta(days=4)
             date_to = next_month - timedelta(days=next_month.day)
@@ -453,8 +479,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             'pharmacy', 'created_by'
         ).prefetch_related('assignees__membership__user')
         
-        if pharmacy_id:
-            pharmacy_id = int(pharmacy_id)
+        if pharmacy_id is not None:
             if pharmacy_id not in accessible_pharmacy_ids:
                 return Response({"error": "Access denied"}, status=status.HTTP_403_FORBIDDEN)
             event_query = event_query.filter(pharmacy_id=pharmacy_id)
@@ -463,8 +488,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             # Filter birthdays based on permissions
             if not self.can_view_birthdays(user, pharmacy_id):
                 event_query = event_query.exclude(source=CalendarEvent.Source.BIRTHDAY)
-        elif organization_id:
-            organization_id = int(organization_id)
+        elif organization_id is not None:
             if organization_id not in accessible_org_ids:
                 return Response({"error": "Access denied"}, status=status.HTTP_403_FORBIDDEN)
             event_query = event_query.filter(organization_id=organization_id)
