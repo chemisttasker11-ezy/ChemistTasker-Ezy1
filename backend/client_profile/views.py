@@ -195,6 +195,7 @@ from client_profile.rewards import (
 
 
 
+
 # --- Stage 2: names moved to client_profile/domains that this module still uses itself (imported here so module-level uses keep working) ---
 from client_profile.domains.common.access import (
     _get_request_ip,
@@ -203,6 +204,7 @@ from client_profile.domains.common.access import (
     Http400,
     IsPharmacistOrOtherStaff,
 )
+from client_profile.domains.common.logs import log
 # --- end Stage 2 imports ---
 
 NON_INTERN_OTHER_STAFF_SHIFT_ROLES = ("ASSISTANT", "TECHNICIAN", "STUDENT")
@@ -252,7 +254,6 @@ from asgiref.sync import async_to_sync
 import mimetypes
 import logging
 
-log = logging.getLogger("client_profile.views")
 import re
 SHIFT_OFFER_BUZZ_COOLDOWN = timedelta(hours=1)
 # import logging
@@ -6002,6 +6003,7 @@ if False:  # pragma: no cover - static analysis / IDE navigation only
     from client_profile.domains.availability.views import UserAvailabilityViewSet  # noqa: F401
     from client_profile.domains.chat.views import ChatMessagePagination, ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet  # noqa: F401
     from client_profile.domains.common.access import Http400, IsPharmacistOrOtherStaff, MAX_ACTIVE_PHARMACY_MEMBERSHIPS, _collect_org_access_scope, _count_active_memberships, _get_org_pharmacies_queryset, _get_request_ip, _normalized_role_code, _otherstaff_onboarding_role  # noqa: F401
+    from client_profile.domains.common.logs import log  # noqa: F401
     from client_profile.domains.explorer.views import ExplorerPostViewSet, IsPostOwner, TalentPostPagination  # noqa: F401
     from client_profile.domains.invoices.views import GenerateInvoiceView, InvoiceDetailView, InvoiceListView, _invoice_queryset_for_user, invoice_pdf_view, preview_invoice_lines, report_invoice_issue, send_invoice_email  # noqa: F401
     from client_profile.domains.memberships.views import MagicLinkInfoView, MembershipApplicationViewSet, MembershipInviteLinkViewSet, MembershipViewSet, MyMembershipsViewSet, SubmitMembershipApplication, _format_membership_person, _frontend_base_url_for_notifications, _membership_controller_users, _notify_membership_invitation_sent, _notify_membership_response, _pharmacy_membership_manage_url, _user_can_invite_members_to_pharmacy, _worker_membership_url  # noqa: F401
