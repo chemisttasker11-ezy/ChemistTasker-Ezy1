@@ -2,7 +2,6 @@
 from django.urls import path, include
 from .views import (
     ActiveShiftViewSet,
-    ChainViewSet,
     CommunityShiftViewSet,
     ConfirmedShiftViewSet,
     CreateShiftAndAssignView,
@@ -17,16 +16,10 @@ from .views import (
     MyHistoryShiftsViewSet,
     MyMembershipsViewSet,
     OrganizationDashboardView,
-    OrganizationViewSet,
     OtherStaffDashboard,
     OwnerDashboard,
-    OwnerOnboardingClaim,
     PharmacistDashboard,
-    PharmacyAdminViewSet,
-    PharmacyClaimViewSet,
-    PharmacyViewSet,
     PublicJobBoardView,
-    PublicOrganizationDetailView,
     PublicShiftViewSet,
     RosterOwnerViewSet,
     RosterShiftManageViewSet,
@@ -40,6 +33,14 @@ from .views import (
     ShiftSavedViewSet,
     SubmitMembershipApplication,
     WorkerShiftRequestViewSet,
+)
+from .domains.orgs.claims import OwnerOnboardingClaim, PharmacyClaimViewSet
+from .domains.orgs.views import (
+    ChainViewSet,
+    OrganizationViewSet,
+    PharmacyAdminViewSet,
+    PharmacyViewSet,
+    PublicOrganizationDetailView,
 )
 from .domains.invoices.views import (
     GenerateInvoiceView,
