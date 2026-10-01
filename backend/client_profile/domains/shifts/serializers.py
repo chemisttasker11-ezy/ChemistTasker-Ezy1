@@ -24,9 +24,9 @@ from client_profile.models import (
     ShiftSaved,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
     WorkerShiftRequest,
 )
+from talent.models import UserAvailability
 from django.db import transaction
 from decimal import Decimal
 from client_profile.utils import (

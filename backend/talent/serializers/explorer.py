@@ -1,12 +1,7 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for the talent/explorer posts API."""
 from rest_framework import serializers
-from client_profile.models import (
-    ExplorerOnboarding,
-    ExplorerPost,
-    ExplorerPostReaction,
-    OtherStaffOnboarding,
-    PharmacistOnboarding,
-)
+from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
+from talent.models import ExplorerPost, ExplorerPostReaction
 import uuid
 import json
 

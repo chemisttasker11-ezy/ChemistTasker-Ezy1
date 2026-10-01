@@ -71,10 +71,10 @@ from client_profile.models import (
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
     WorkerPIN,
     WorkerShiftRequest,
 )
+from talent.models import UserAvailability
 from client_profile.roster_services import (
     acknowledge_roster_period,
     apply_roster_template,

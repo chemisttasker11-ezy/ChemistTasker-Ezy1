@@ -101,14 +101,6 @@ from client_profile.models.invoices import (
     Invoice,
     InvoiceLineItem,
 )
-from client_profile.models.explorer import (
-    explorer_post_upload_path,
-    ExplorerPost,
-    ExplorerPostReaction,
-)
-from client_profile.models.availability import (
-    UserAvailability,
-)
 from client_profile.models.chat import (
     Conversation,
     Participant,

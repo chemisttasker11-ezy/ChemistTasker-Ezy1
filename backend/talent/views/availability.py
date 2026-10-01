@@ -1,7 +1,7 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Users' own availability slots API."""
 from rest_framework import permissions, viewsets
-from client_profile.models import UserAvailability
-from client_profile.domains.availability.serializers import UserAvailabilitySerializer
+from talent.models import UserAvailability
+from talent.serializers.availability import UserAvailabilitySerializer
 
 
 # Availability

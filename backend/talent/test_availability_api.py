@@ -1,7 +1,7 @@
 """Characterization of the availability API (/api/client-profile/user-availability/)."""
 from django.test import TestCase
 
-from client_profile.models import UserAvailability
+from talent.models import UserAvailability
 from client_profile.characterization_support import BASE, client_for, make_user
 
 URL = BASE + "user-availability/"

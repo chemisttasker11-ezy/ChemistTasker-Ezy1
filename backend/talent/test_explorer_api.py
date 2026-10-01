@@ -4,7 +4,8 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from client_profile.models import ExplorerPost, ExplorerPostReaction, OtherStaffOnboarding
+from client_profile.models import OtherStaffOnboarding
+from talent.models import ExplorerPost, ExplorerPostReaction
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_user,
 )

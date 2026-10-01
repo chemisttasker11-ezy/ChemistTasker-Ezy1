@@ -43,9 +43,9 @@ from client_profile.models import (
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
     WorkerShiftRequest,
 )
+from talent.models import UserAvailability
 from users.models import OrganizationMembership
 from client_profile.roster_worker_actions import (
     approve_cover_replacement,

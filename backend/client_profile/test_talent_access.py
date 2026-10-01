@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from client_profile.models import OtherStaffOnboarding, PharmacistOnboarding
-from client_profile.domains.explorer.views import ExplorerPostViewSet
+from talent.views.explorer import ExplorerPostViewSet
 
 
 class TalentPublishingAccessTests(TestCase):

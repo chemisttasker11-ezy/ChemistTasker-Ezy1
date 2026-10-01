@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from django.apps import apps
 from django.db.models import Q
 
-from .models import Membership, ShiftSlotAssignment, UserAvailability
+from .models import Membership, ShiftSlotAssignment
+from talent.models import UserAvailability
 from .timezone_utils import get_pharmacy_timezone
 
 

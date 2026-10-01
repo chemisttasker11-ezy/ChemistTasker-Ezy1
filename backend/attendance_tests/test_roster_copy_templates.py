@@ -27,8 +27,8 @@ from client_profile.models import (
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
 )
+from talent.models import UserAvailability
 from client_profile.roster_services import (
     apply_roster_template,
     bulk_edit_roster_period,

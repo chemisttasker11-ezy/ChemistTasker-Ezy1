@@ -1,12 +1,8 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Talent/explorer posts API: feeds, public feed, create/update/delete, views and reactions."""
 from rest_framework import permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
-from client_profile.models import (
-    ExplorerPost,
-    ExplorerPostReaction,
-    OtherStaffOnboarding,
-    PharmacistOnboarding,
-)
+from client_profile.models import OtherStaffOnboarding, PharmacistOnboarding
+from talent.models import ExplorerPost, ExplorerPostReaction
 from ratings.models import Rating
 from django.db import models
 from rest_framework.response import Response
@@ -17,7 +13,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from django.db import transaction
-from client_profile.domains.explorer.serializers import (
+from talent.serializers.explorer import (
     ExplorerPostReadSerializer,
     ExplorerPostWriteSerializer,
     PublicExplorerPostReadSerializer,

@@ -49,6 +49,8 @@ Security_Audit_Tracking.md
 !backend/rewards/migrations/*.py
 !backend/ratings/migrations/
 !backend/ratings/migrations/*.py
+!backend/talent/migrations/
+!backend/talent/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/

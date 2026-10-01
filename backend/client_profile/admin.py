@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from .models import (
     Chain,
     ExplorerOnboarding,
-    ExplorerPost,
     Invoice,
     InvoiceLineItem,
     Membership,
@@ -447,7 +446,6 @@ class InvoiceAdmin(admin.ModelAdmin):
     inlines      = [InvoiceLineItemInline]
     readonly_fields = ('subtotal','gst_amount','super_amount','total')
 
-admin.site.register(ExplorerPost)
 
 admin.site.register(WorkerShiftRequest)
 

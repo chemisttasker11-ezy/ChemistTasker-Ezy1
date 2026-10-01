@@ -67,9 +67,7 @@ from .domains.onboarding.views import (
     RefereeRejectView,
     RefereeSubmitResponseView,
 )
-from .domains.availability.views import UserAvailabilityViewSet
 from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
-from .domains.explorer.views import ExplorerPostViewSet
 from .domains.notifications.views import DeviceTokenViewSet, NotificationViewSet
 from .calendar_views import (
     CalendarEventViewSet,
@@ -138,6 +136,7 @@ from .attendance_views import (
 from rest_framework.routers import DefaultRouter
 from rewards.urls import router as rewards_router
 from ratings.urls import router as ratings_router
+from talent.urls import router as talent_router
 
 
 router = DefaultRouter()
@@ -157,7 +156,7 @@ router.register(r'community-shifts', CommunityShiftViewSet, basename='community-
 router.register(r'public-shifts',    PublicShiftViewSet,    basename='public-shifts')
 router.register(r'shift-description-templates', ShiftDescriptionTemplateViewSet, basename='shift-description-template')
 # My shifts by status for posters
-router.register(r'user-availability', UserAvailabilityViewSet, basename='user-availability')
+router.registry.extend(talent_router.registry)   # talent routes, declared in talent/urls.py
 router.registry.extend(rewards_router.registry)   # rewards routes, declared in rewards/urls.py
 router.register(r'shifts/active',    ActiveShiftViewSet,    basename='active-shifts')
 router.register(r'shifts/confirmed', ConfirmedShiftViewSet, basename='confirmed-shifts')
@@ -189,7 +188,6 @@ router.register(r'device-tokens', DeviceTokenViewSet, basename='device-token')
 
 
 # explorer post
-router.register(r'explorer-posts', ExplorerPostViewSet, basename='explorer-post')
 
 # Calendar & Work Notes
 router.register(r'calendar-events', CalendarEventViewSet, basename='calendar-event')
