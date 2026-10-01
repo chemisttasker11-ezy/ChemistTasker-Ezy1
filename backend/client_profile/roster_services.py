@@ -25,7 +25,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from talent.models import UserAvailability
-from client_profile.attendance_approvals import is_authorized_attendance_manager
+from client_profile.domains.roster.permissions import is_authorized_attendance_manager
 from client_profile.engagement_routing import staff_assignment_defaults
 
 User = get_user_model()

@@ -12,7 +12,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from client_profile.attendance_approvals import is_authorized_attendance_manager
+from client_profile.domains.roster.permissions import is_authorized_attendance_manager
 from client_profile.models import (
     LeaveRequest,
     Membership,

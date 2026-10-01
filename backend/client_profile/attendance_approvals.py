@@ -40,14 +40,7 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-
-
-def is_authorized_attendance_manager(user, pharmacy: Pharmacy) -> bool:
-    """Validate roster-management authority for this destination pharmacy."""
-    # Keep attendance, roster and workforce route authorization on one capability
-    # contract, including scoped organisation memberships.
-    from workforce.permissions import can_manage_roster_pharmacy
-    return bool(can_manage_roster_pharmacy(user, pharmacy))
+from client_profile.domains.roster.permissions import is_authorized_attendance_manager
 
 
 def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:

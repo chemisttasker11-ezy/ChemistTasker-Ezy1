@@ -17,9 +17,9 @@ User = get_user_model()
 from client_profile.attendance_approvals import (
     approve_provisional_attendance,
     create_attendance_correction,
-    is_authorized_attendance_manager,
     reject_provisional_attendance,
 )
+from client_profile.domains.roster.permissions import is_authorized_attendance_manager
 from client_profile.attendance_credentials import activate_kiosk_device, generate_signed_pharmacy_qr
 from client_profile.attendance_transitions import clock_in, clock_out
 from client_profile.attendance_views import (

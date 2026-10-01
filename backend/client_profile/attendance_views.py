@@ -29,9 +29,9 @@ from .attendance_approvals import (
     create_attendance_correction,
     get_effective_session_timeline,
     get_pending_provisional_attendances,
-    is_authorized_attendance_manager,
     reject_provisional_attendance,
 )
+from client_profile.domains.roster.permissions import is_authorized_attendance_manager
 from .attendance_credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,

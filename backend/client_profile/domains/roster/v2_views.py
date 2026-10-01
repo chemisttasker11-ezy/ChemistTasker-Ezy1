@@ -1,5 +1,5 @@
 """Roster V2 API: periods, validation, publication, worker acknowledgement, copy/templates, bulk edits, swap and cover requests, action audits."""
-from client_profile.attendance_approvals import is_authorized_attendance_manager
+from client_profile.domains.roster.permissions import is_authorized_attendance_manager
 from client_profile.models import (
     Pharmacy,
     RosterActionAudit,
