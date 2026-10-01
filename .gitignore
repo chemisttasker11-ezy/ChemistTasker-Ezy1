@@ -51,6 +51,8 @@ Security_Audit_Tracking.md
 !backend/ratings/migrations/*.py
 !backend/talent/migrations/
 !backend/talent/migrations/*.py
+!backend/team_calendar/migrations/
+!backend/team_calendar/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/

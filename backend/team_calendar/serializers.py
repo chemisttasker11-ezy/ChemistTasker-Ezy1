@@ -4,12 +4,8 @@ Calendar and Work Notes serializers.
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import (
-    CalendarEvent,
-    Membership,
-    WorkNote,
-    WorkNoteAssignee,
-)
+from client_profile.models import Membership
+from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee
 
 
 MEMBERSHIP_ROLE_LABELS = dict(Membership.ROLE_CHOICES)

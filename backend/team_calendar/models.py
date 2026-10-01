@@ -1,4 +1,4 @@
-"""client_profile models: calendar (split verbatim from client_profile/models.py)."""
+"""Team calendar: pharmacy/organization calendar events and assignable, completable work notes."""
 from django.db import models
 from django.conf import settings
 
@@ -15,14 +15,14 @@ class CalendarEvent(models.Model):
         ORG_EVENT = 'org_event', 'Organization Event'
 
     pharmacy = models.ForeignKey(
-        'Pharmacy',
+        'client_profile.Pharmacy',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='calendar_events',
     )
     organization = models.ForeignKey(
-        'Organization',
+        'client_profile.Organization',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -39,7 +39,7 @@ class CalendarEvent(models.Model):
     
     # For birthday idempotency: link to the membership whose birthday this represents
     source_membership = models.ForeignKey(
-        'Membership',
+        'client_profile.Membership',
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -85,7 +85,7 @@ class WorkNote(models.Model):
         DONE = 'done', 'Done'
 
     pharmacy = models.ForeignKey(
-        'Pharmacy',
+        'client_profile.Pharmacy',
         on_delete=models.CASCADE,
         related_name='work_notes',
     )
@@ -146,7 +146,7 @@ class WorkNoteAssignee(models.Model):
         related_name='assignees',
     )
     membership = models.ForeignKey(
-        'Membership',
+        'client_profile.Membership',
         on_delete=models.CASCADE,
         related_name='assigned_work_notes',
     )
@@ -178,7 +178,7 @@ class WorkNoteCompletion(models.Model):
         related_name="completions",
     )
     membership = models.ForeignKey(
-        "Membership",
+        "client_profile.Membership",
         on_delete=models.CASCADE,
         related_name="work_note_completions",
     )

@@ -113,12 +113,6 @@ from client_profile.models.notifications import (
     NotificationQuerySet,
     Notification,
 )
-from client_profile.models.calendar import (
-    CalendarEvent,
-    WorkNote,
-    WorkNoteAssignee,
-    WorkNoteCompletion,
-)
 from client_profile.models.attendance import (
     KioskDevice,
     KioskPairingAuthorization,

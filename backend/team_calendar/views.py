@@ -20,24 +20,12 @@ from users.org_roles import (
 )
 from users.models import OrganizationMembership
 
-from .admin_helpers import is_admin_of, pharmacies_user_admins
-from .hub.api import HubScopeResolver
-from .models import (
-    CalendarEvent,
-    Membership,
-    Pharmacy,
-    WorkNote,
-    WorkNoteAssignee,
-    WorkNoteCompletion,
-    PharmacistOnboarding,
-    OtherStaffOnboarding,
-)
-from .calendar_serializers import (
-    CalendarEventSerializer,
-    CalendarFeedSerializer,
-    WorkNoteSerializer,
-)
-from .recurrence_utils import expand_recurrence_dates
+from client_profile.admin_helpers import is_admin_of, pharmacies_user_admins
+from client_profile.hub.api import HubScopeResolver
+from client_profile.models import Membership, OtherStaffOnboarding, PharmacistOnboarding, Pharmacy
+from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
+from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
+from team_calendar.recurrence import expand_recurrence_dates
 
 
 class CalendarScopeMixin:

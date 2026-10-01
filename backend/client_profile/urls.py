@@ -69,11 +69,6 @@ from .domains.onboarding.views import (
 )
 from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
 from .domains.notifications.views import DeviceTokenViewSet, NotificationViewSet
-from .calendar_views import (
-    CalendarEventViewSet,
-    CalendarFeedView,
-    WorkNoteViewSet,
-)
 from .hub.api import (
     HubCommentViewSet,
     HubCommunityGroupViewSet,
@@ -137,6 +132,7 @@ from rest_framework.routers import DefaultRouter
 from rewards.urls import router as rewards_router
 from ratings.urls import router as ratings_router
 from talent.urls import router as talent_router
+from team_calendar.urls import router as team_calendar_router
 
 
 router = DefaultRouter()
@@ -190,9 +186,7 @@ router.register(r'device-tokens', DeviceTokenViewSet, basename='device-token')
 # explorer post
 
 # Calendar & Work Notes
-router.register(r'calendar-events', CalendarEventViewSet, basename='calendar-event')
-router.register(r'work-notes', WorkNoteViewSet, basename='work-note')
-router.register(r'calendar-feed', CalendarFeedView, basename='calendar-feed')
+router.registry.extend(team_calendar_router.registry)   # team_calendar routes, declared in team_calendar/urls.py
 
 
 hub_group_list = HubCommunityGroupViewSet.as_view({"get": "list", "post": "create"})

@@ -4,7 +4,7 @@ from datetime import date
 
 from django.test import TestCase
 
-from client_profile.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
+from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
 )
