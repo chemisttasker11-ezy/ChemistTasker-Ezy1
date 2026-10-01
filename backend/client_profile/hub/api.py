@@ -43,17 +43,17 @@ from ..models import (
     PharmacyHubPollReaction,
     PharmacyHubPollVote,
 )
-from ..serializers import (
+from .serializers import (
     HubCommentSerializer,
     HubCommunityGroupSerializer,
     HubOrganizationProfileSerializer,
     HubOrganizationSerializer,
     HubPharmacyProfileSerializer,
     HubPharmacySerializer,
+    HubPollCommentSerializer,
+    HubPollSerializer,
     HubPostSerializer,
     HubReactionSerializer,
-    HubPollSerializer,
-    HubPollCommentSerializer,
 )
 from ..file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 
