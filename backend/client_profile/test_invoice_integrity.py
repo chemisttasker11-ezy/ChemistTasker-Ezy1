@@ -524,8 +524,8 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
             force_authenticate(req, user=self.worker)
             return req
 
-        with patch("client_profile.views.render_invoice_to_pdf", return_value=b"%PDF-test"), patch(
-            "client_profile.views.async_task"
+        with patch("client_profile.domains.invoices.views.render_invoice_to_pdf", return_value=b"%PDF-test"), patch(
+            "client_profile.domains.invoices.views.async_task"
         ) as enqueue:
             first = send_invoice_email(request(), invoice.id)
             second = send_invoice_email(request(), invoice.id)
