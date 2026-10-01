@@ -526,6 +526,7 @@ class ChainViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def check_permissions(self, request):
+        super().check_permissions(request)   # permission_classes (IsAuthenticated) first: the lookups below need a user
         if request.method in permissions.SAFE_METHODS:
             return
 
