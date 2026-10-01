@@ -15,6 +15,13 @@ class AttendanceClientProfileConfig(AppConfig):
     label = "client_profile"
 
 
+class AttendanceChatConfig(AppConfig):
+    """Load the chat models without connecting the production signal receivers."""
+
+    name = "chat"
+    label = "chat"
+
+
 class AttendanceRewardsConfig(AppConfig):
     """Load the rewards models without connecting the production signal receivers."""
 
@@ -36,6 +43,7 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "worker_finance.apps.WorkerFinanceConfig",
     "attendance_tests.settings.AttendanceClientProfileConfig",
+    "attendance_tests.settings.AttendanceChatConfig",
     "notifications.apps.NotificationsConfig",
     "team_calendar.apps.TeamCalendarConfig",
     "talent.apps.TalentConfig",
@@ -61,6 +69,7 @@ CACHES = {
 MIGRATION_MODULES = {
     "users": None,
     "client_profile": None,
+    "chat": None,
     "notifications": None,
     "team_calendar": None,
     "talent": None,

@@ -1,3 +1,4 @@
+"""Chat API: conversations, messages, reactions, participants and shift contacts."""
 import logging
 
 log = logging.getLogger(__name__)
@@ -6,17 +7,8 @@ log = logging.getLogger(__name__)
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.pagination import PageNumberPagination
-from client_profile.models import (
-    Conversation,
-    make_dm_key,
-    Membership,
-    Message,
-    MessageReaction,
-    Participant,
-    Pharmacy,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-    ShiftSlotAssignment,
-)
+from client_profile.models import Membership, Pharmacy, PHARMACY_STAFF_EMPLOYMENT_TYPES, ShiftSlotAssignment
+from chat.models import Conversation, make_dm_key, Message, MessageReaction, Participant
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,14 +19,14 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from client_profile.utils import sanitize_chat_text
-from client_profile.domains.chat.realtime import broadcast_message_badge, broadcast_message_read
+from chat.realtime import broadcast_message_badge, broadcast_message_read
 from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from datetime import date
 from django.db import transaction
 from users.models import OrganizationMembership, User
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from client_profile.domains.chat.serializers import (
+from chat.serializers import (
     ChatParticipantSerializer,
     ConversationCreateSerializer,
     ConversationDetailSerializer,

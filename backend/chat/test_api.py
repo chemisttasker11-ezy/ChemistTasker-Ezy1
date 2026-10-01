@@ -1,9 +1,8 @@
 """Characterization of the chat REST API (/rooms/, /messages/, /messages/<id>/react/, /chat-participants/)."""
 from django.test import TestCase
 
-from client_profile.models import (
-    Conversation, Membership, Message, MessageReaction, Participant,
-)
+from client_profile.models import Membership
+from chat.models import Conversation, Message, MessageReaction, Participant
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
 )

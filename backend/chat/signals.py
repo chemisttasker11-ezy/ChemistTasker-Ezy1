@@ -1,27 +1,21 @@
-# client_profile/signals.py
+"""Signal receivers of the chat app: realtime delivery of new messages and community-chat membership sync."""
+import logging
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.db import transaction
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
-from client_profile.models import Message
-from django.utils.text import slugify
-import logging
-from client_profile.domains.chat.serializers import MessageSerializer
-from notifications.services import notify_users
-from client_profile.domains.chat.realtime import broadcast_message_badge, participant_can_receive_chat_updates
 
-from .models import (
-    Conversation,
-    Membership,
-    Participant,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-)
+from chat.models import Conversation, Message, Participant
+from chat.realtime import ROOM_GROUP_FMT, broadcast_message_badge, participant_can_receive_chat_updates
+from chat.serializers import MessageSerializer
+from client_profile.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from notifications.models import Notification
+from notifications.services import notify_users
 
-log = logging.getLogger("client_profile.signals")
+log = logging.getLogger(__name__)
 
-ROOM_GROUP_FMT = "room.{room_id}"
 CHAT_ROUTE_BY_ROLE = {
     "OWNER": "/dashboard/owner/chat",
     "PHARMACIST": "/dashboard/pharmacist/chat",
@@ -32,24 +26,12 @@ CHAT_ROUTE_BY_ROLE = {
     "EXPLORER": "/dashboard/explorer/chat",
 }
 
+
 def _chat_action_url_for_user(user, conversation_id: int) -> str:
     role = (getattr(user, "role", "") or "").upper()
     base = CHAT_ROUTE_BY_ROLE.get(role, "/dashboard/owner/chat")
     return f"{base}?conversationId={conversation_id}"
 
-def _user_initials(user):
-    try:
-        fn = (user.first_name or "").strip()[:1]
-        ln = (user.last_name or "").strip()[:1]
-        if not (fn or ln):
-            # fallback: split full_name or username
-            base = (getattr(user, "full_name", None) or user.get_username() or "").strip()
-            parts = base.split()
-            fn = (parts[0][:1] if parts else "") or "?"
-            ln = (parts[1][:1] if len(parts) > 1 else "")
-        return (fn + ln).upper() or "?"
-    except Exception:
-        return "?"
 
 @receiver(post_save, sender=Message)
 def broadcast_new_message(sender, instance, created, **kwargs):

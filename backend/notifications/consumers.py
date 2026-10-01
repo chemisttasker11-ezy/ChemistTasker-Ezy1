@@ -3,9 +3,9 @@ import logging
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
-log = logging.getLogger("client_profile.ws")
+from notifications.services import USER_GROUP_FMT
 
-USER_GROUP_FMT = "user.{user_id}"
+log = logging.getLogger(__name__)
 
 
 class NotificationConsumer(AsyncJsonWebsocketConsumer):

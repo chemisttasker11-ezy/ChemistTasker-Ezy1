@@ -102,13 +102,6 @@ from client_profile.models.invoices import (
     Invoice,
     InvoiceLineItem,
 )
-from client_profile.models.chat import (
-    Conversation,
-    Participant,
-    Message,
-    MessageReaction,
-    make_dm_key,
-)
 from client_profile.models.attendance import (
     KioskDevice,
     KioskPairingAuthorization,

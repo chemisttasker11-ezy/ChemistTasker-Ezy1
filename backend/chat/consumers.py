@@ -5,14 +5,12 @@ import time
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
-from client_profile.domains.chat.realtime import participant_can_receive_chat_updates
-from client_profile.models import Conversation, Membership, Message, Participant
+from chat.models import Conversation, Message, Participant
+from chat.realtime import ROOM_GROUP_FMT, participant_can_receive_chat_updates
+from client_profile.models import Membership
 from client_profile.utils import sanitize_chat_text
 
-log = logging.getLogger("client_profile.ws")
-
-# Keep group naming consistent so HTTP + WS clients share the same Redis keys.
-ROOM_GROUP_FMT = "room.{room_id}"
+log = logging.getLogger(__name__)
 
 
 class RoomConsumer(AsyncJsonWebsocketConsumer):

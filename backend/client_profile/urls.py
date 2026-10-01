@@ -67,7 +67,6 @@ from .domains.onboarding.views import (
     RefereeRejectView,
     RefereeSubmitResponseView,
 )
-from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
 from .hub.api import (
     HubCommentViewSet,
     HubCommunityGroupViewSet,
@@ -133,6 +132,7 @@ from ratings.urls import router as ratings_router
 from talent.urls import router as talent_router
 from team_calendar.urls import router as team_calendar_router
 from notifications.urls import router as notifications_router
+from chat.urls import router as chat_router
 
 
 router = DefaultRouter()
@@ -176,9 +176,8 @@ router.register(r"worker-shift-requests",WorkerShiftRequestViewSet,basename="wor
 router.registry.extend(ratings_router.registry)   # ratings routes, declared in ratings/urls.py
 
 #chat app
-router.register(r'rooms', ConversationViewSet, basename='conversation')
+router.registry.extend(chat_router.registry)   # chat routes, declared in chat/urls.py
 router.register(r'my-memberships', MyMembershipsViewSet, basename='my-memberships')
-router.register(r'messages', MessageViewSet, basename='message')
 router.registry.extend(notifications_router.registry)   # notifications routes, declared in notifications/urls.py
 
 
@@ -256,10 +255,6 @@ urlpatterns = [
     path('invoices/<int:invoice_id>/pdf/', invoice_pdf_view, name='invoice_pdf'),
     path('invoices/<int:invoice_id>/send/', send_invoice_email, name='send-invoice-email'),
     path('invoices/<int:invoice_id>/report-issue/', report_invoice_issue, name='report-invoice-issue'),
-
-
-    path('messages/<int:message_id>/react/', MessageReactionView.as_view(), name='message-react'),
-    path('chat-participants/', ChatParticipantView.as_view(), name='chat-participants-list'),
 
 
     path('hub/context/', HubContextView.as_view(), name='hub-context'),
@@ -358,5 +353,6 @@ urlpatterns = [
     path('attendance/roster/audits/', RosterActionAuditListView.as_view(), name='roster-action-audits'),
 
     # Include the API routes for CRUD operations
+    path('', include('chat.urls')),
     path('', include(router.urls)),
 ]

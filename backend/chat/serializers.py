@@ -1,3 +1,4 @@
+"""Serializers for the chat API."""
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -5,7 +6,8 @@ User = get_user_model()
 
 """Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
-from client_profile.models import Conversation, Membership, Message, MessageReaction, Participant
+from client_profile.models import Membership
+from chat.models import Conversation, Message, MessageReaction, Participant
 # Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.common.serializers import _chat_member_identity
 
@@ -373,7 +375,7 @@ class ChatParticipantSerializer(serializers.ModelSerializer):
 
     def get_is_admin(self, obj):
         # A membership can have multiple participant rows; return True if any mark this membership as admin.
-        from client_profile.models import Participant  # local import to avoid cycles
+        from chat.models import Participant
         return Participant.objects.filter(membership=obj, is_admin=True).exists()
 
     class Meta:

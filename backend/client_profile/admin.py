@@ -8,7 +8,6 @@ from .models import (
     InvoiceLineItem,
     Membership,
     MembershipApplication,
-    Message,
     Organization,
     OtherStaffOnboarding,
     OwnerOnboarding,
@@ -452,8 +451,6 @@ admin.site.register(WorkerShiftRequest)
 admin.site.register(RefereeResponse)
 
 admin.site.register(MembershipApplication)
-
-admin.site.register(Message)
 
 
 class ShiftCounterOfferSlotInline(admin.TabularInline):

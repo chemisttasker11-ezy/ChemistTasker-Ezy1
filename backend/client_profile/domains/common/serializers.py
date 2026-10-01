@@ -3,7 +3,6 @@ from rest_framework import serializers
 from client_profile.models import (
     Chain,
     ExplorerOnboarding,
-    Message,
     Organization,
     OtherStaffOnboarding,
     OwnerOnboarding,
@@ -11,6 +10,7 @@ from client_profile.models import (
     Pharmacy,
     PharmacyHubAttachment,
 )
+from chat.models import Message
 from client_profile.file_validation import validate_upload_mapping
 
 

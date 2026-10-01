@@ -1,4 +1,4 @@
-"""client_profile models: chat (split verbatim from client_profile/models.py)."""
+"""Chat: conversations (pharmacy community groups and direct messages), their participants, messages and reactions."""
 from django.db import models
 from django.conf import settings
 from client_profile.models.common import chat_upload_path
@@ -63,7 +63,7 @@ class Conversation(models.Model):
 
 
 class Participant(models.Model):
-    conversation = models.ForeignKey('client_profile.Conversation',
+    conversation = models.ForeignKey('chat.Conversation',
                                      on_delete=models.CASCADE,
                                      related_name='participants')
     membership = models.ForeignKey(Membership, on_delete=models.SET_NULL, null=True, blank=True, related_name='chat_participations')
@@ -75,7 +75,7 @@ class Participant(models.Model):
     is_pinned = models.BooleanField(default=False)
     # Per-user pinned message (replaces global conversation.pinned_message for user-specific pins)
     pinned_message = models.ForeignKey(
-        'client_profile.Message',
+        'chat.Message',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -98,7 +98,7 @@ class Message(models.Model):
     A message in a conversation.
     Attachments use your existing MEDIA storage config.
     """
-    conversation = models.ForeignKey('client_profile.Conversation',
+    conversation = models.ForeignKey('chat.Conversation',
                                      on_delete=models.CASCADE,
                                      related_name='messages')
     sender = models.ForeignKey('client_profile.Membership',

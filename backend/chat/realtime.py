@@ -1,7 +1,10 @@
 """Chat realtime helpers: unread-message badges, read receipts and who may receive chat updates."""
 from typing import Optional
-from client_profile.models import Membership, Message, Participant, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from client_profile.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from chat.models import Message, Participant
 from notifications.services import _broadcast
+
+ROOM_GROUP_FMT = "room.{room_id}"   # channel-layer group of one chat room
 
 
 def broadcast_message_badge(
