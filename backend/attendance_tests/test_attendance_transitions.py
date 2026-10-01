@@ -363,7 +363,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
         t_start = timezone.now().replace(hour=22, minute=0, second=0)
         t_end = t_start + timedelta(hours=8)  # 06:00 next day
 
-        with patch("client_profile.models.timezone.now", return_value=t_start), \
+        with patch("client_profile.models.attendance.timezone.now", return_value=t_start), \
              patch("client_profile.attendance_transitions.timezone.now", return_value=t_start):
             qr_data_start = generate_signed_pharmacy_qr(self.kiosk_a)
             session, in_event = clock_in(
@@ -373,7 +373,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
             )
             self.assertEqual(session.started_at, t_start)
 
-        with patch("client_profile.models.timezone.now", return_value=t_end), \
+        with patch("client_profile.models.attendance.timezone.now", return_value=t_end), \
              patch("client_profile.attendance_transitions.timezone.now", return_value=t_end):
             qr_data_end = generate_signed_pharmacy_qr(self.kiosk_a)
             closed_session, out_event = clock_out(
@@ -403,7 +403,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
     def test_reject_clock_in_with_expired_qr(self):
         qr_a = generate_signed_pharmacy_qr(self.kiosk_a)
         now = timezone.now()
-        with patch("client_profile.models.timezone.now", return_value=now + timedelta(minutes=10)):
+        with patch("client_profile.models.attendance.timezone.now", return_value=now + timedelta(minutes=10)):
             with self.assertRaises(ValidationError) as ctx:
                 clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr_a["signed_token"])
             self.assertIn("QR_EXPIRED", str(ctx.exception))

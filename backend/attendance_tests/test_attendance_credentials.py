@@ -234,12 +234,12 @@ class AttendanceCredentialsTests(unittest.TestCase):
         expires_at = qr_info["expires_at"]
 
         # 1 microsecond before deadline -> Valid
-        with patch("client_profile.models.timezone.now", return_value=expires_at - timedelta(microseconds=1)):
+        with patch("client_profile.models.attendance.timezone.now", return_value=expires_at - timedelta(microseconds=1)):
             valid, _, _ = verify_signed_pharmacy_qr(token, expected_pharmacy_id=self.pharmacy_a.id)
             self.assertTrue(valid)
 
         # At exact deadline -> Expired
-        with patch("client_profile.models.timezone.now", return_value=expires_at):
+        with patch("client_profile.models.attendance.timezone.now", return_value=expires_at):
             valid, _, reason = verify_signed_pharmacy_qr(token, expected_pharmacy_id=self.pharmacy_a.id)
             self.assertFalse(valid)
             self.assertEqual(reason, "QR_EXPIRED")

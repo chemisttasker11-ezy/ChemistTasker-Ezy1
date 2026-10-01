@@ -1,0 +1,151 @@
+"""client_profile models, organised by domain. Every model and helper is re-exported here, so `from client_profile.models import X` keeps working and Django registers every model on app load."""
+from client_profile.models.common import (
+    GENDER_CHOICES,
+    _safe_ext,
+    _unique_upload_path,
+    PHARMACIST_AWARD_LEVEL_CHOICES,
+    OTHERSTAFF_CLASSIFICATION_CHOICES,
+    INTERN_HALF_CHOICES,
+    STUDENT_YEAR_CHOICES,
+)
+from client_profile.models.onboarding import (
+    onboarding_upload_path,
+    owner_profile_photo_upload_path,
+    owner_gov_id_upload_path,
+    owner_secondary_id_upload_path,
+    pharmacist_profile_photo_upload_path,
+    pharmacist_gov_id_upload_path,
+    pharmacist_secondary_id_upload_path,
+    pharmacist_resume_upload_path,
+    otherstaff_profile_photo_upload_path,
+    otherstaff_gov_id_upload_path,
+    otherstaff_secondary_id_upload_path,
+    otherstaff_role_doc_upload_path,
+    otherstaff_resume_upload_path,
+    explorer_gov_id_upload_path,
+    explorer_resume_upload_path,
+    explorer_profile_photo_upload_path,
+    explorer_secondary_id_upload_path,
+    OnboardingNotification,
+    OwnerOnboarding,
+    PharmacistOnboarding,
+    OtherStaffOnboarding,
+    ExplorerOnboarding,
+    RefereeResponse,
+)
+from client_profile.models.orgs import (
+    organization_cover_upload_path,
+    pharmacy_upload_path,
+    pharmacy_reg_doc_upload_path,
+    pharmacy_other_doc_upload_path,
+    pharmacy_cover_upload_path,
+    chain_logo_upload_path,
+    Organization,
+    Pharmacy,
+    PharmacyClaim,
+    PharmacyAdmin,
+    Chain,
+)
+from client_profile.models.memberships import (
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+    FAVORITE_STAFF_EMPLOYMENT_TYPES,
+    Membership,
+    MembershipInviteLink,
+    MembershipApplication,
+)
+from client_profile.models.hub import (
+    hub_attachment_upload_path,
+    PharmacyCommunityGroup,
+    PharmacyCommunityGroupMembership,
+    PharmacyHubPost,
+    PharmacyHubPostMention,
+    PharmacyHubComment,
+    HubReactionType,
+    PharmacyHubCommentReaction,
+    PharmacyHubReaction,
+    PharmacyHubAttachment,
+    PharmacyHubPoll,
+    PharmacyHubPollOption,
+    PharmacyHubPollVote,
+    PharmacyHubPollComment,
+    PharmacyHubPollReaction,
+)
+from client_profile.models.roster import (
+    RosterPeriod,
+    RosterPublicationAudit,
+    RosterAcknowledgement,
+    RosterTemplate,
+    RosterActionAudit,
+)
+from client_profile.models.shifts import (
+    Shift,
+    ShiftDescriptionTemplate,
+    _published_roster_period,
+    _published_period_for_slot,
+    _assert_roster_slot_mutable,
+    _assert_roster_shift_mutable,
+    _assert_roster_assignment_mutable,
+    ShiftSlot,
+    ShiftInterest,
+    ShiftSlotAssignment,
+    ShiftProfileAccessAudit,
+    ShiftRejection,
+    ShiftCounterOffer,
+    ShiftOffer,
+    ShiftCounterOfferSlot,
+    ShiftSaved,
+    LeaveRequest,
+    WorkerShiftRequest,
+)
+from client_profile.models.pills import (
+    PillRewardRule,
+    PillReferralCode,
+    PillReferralEvent,
+    PillLedgerEntry,
+)
+from client_profile.models.ratings import (
+    Rating,
+    RatingReport,
+)
+from client_profile.models.invoices import (
+    Invoice,
+    InvoiceLineItem,
+)
+from client_profile.models.explorer import (
+    explorer_post_upload_path,
+    ExplorerPost,
+    ExplorerPostReaction,
+)
+from client_profile.models.availability import (
+    UserAvailability,
+)
+from client_profile.models.chat import (
+    Conversation,
+    Participant,
+    chat_upload_path,
+    Message,
+    MessageReaction,
+    make_dm_key,
+)
+from client_profile.models.notifications import (
+    NotificationQuerySet,
+    Notification,
+)
+from client_profile.models.calendar import (
+    CalendarEvent,
+    WorkNote,
+    WorkNoteAssignee,
+    WorkNoteCompletion,
+)
+from client_profile.models.attendance import (
+    KioskDevice,
+    KioskPairingAuthorization,
+    PharmacyQRSession,
+    WorkerPIN,
+    AttendanceSession,
+    ImmutableAttendanceQuerySet,
+    AttendanceEvent,
+    KioskAttendanceEvent,
+    ProvisionalAttendance,
+    AttendanceCorrection,
+)
