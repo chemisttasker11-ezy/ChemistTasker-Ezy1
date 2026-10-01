@@ -8,13 +8,8 @@ from .views import (
     ExplorerDashboard,
     HistoryShiftViewSet,
     LeaveRequestViewSet,
-    MagicLinkInfoView,
-    MembershipApplicationViewSet,
-    MembershipInviteLinkViewSet,
-    MembershipViewSet,
     MyConfirmedShiftsViewSet,
     MyHistoryShiftsViewSet,
-    MyMembershipsViewSet,
     OrganizationDashboardView,
     OtherStaffDashboard,
     OwnerDashboard,
@@ -31,8 +26,15 @@ from .views import (
     ShiftOfferViewSet,
     ShiftRejectionViewSet,
     ShiftSavedViewSet,
-    SubmitMembershipApplication,
     WorkerShiftRequestViewSet,
+)
+from .domains.memberships.views import (
+    MagicLinkInfoView,
+    MembershipApplicationViewSet,
+    MembershipInviteLinkViewSet,
+    MembershipViewSet,
+    MyMembershipsViewSet,
+    SubmitMembershipApplication,
 )
 from .domains.orgs.claims import OwnerOnboardingClaim, PharmacyClaimViewSet
 from .domains.orgs.views import (

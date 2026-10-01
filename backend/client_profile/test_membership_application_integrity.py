@@ -163,7 +163,7 @@ class MembershipApplicationIntegrityTests(TestCase):
         )
         force_authenticate(request, user=self.manager)
 
-        with patch("client_profile.views.async_task") as queued:
+        with patch("client_profile.domains.memberships.views.async_task") as queued:
             with self.captureOnCommitCallbacks(execute=True):
                 response = MembershipApplicationViewSet.as_view({"patch": "partial_update"})(
                     request,
@@ -192,7 +192,7 @@ class MembershipApplicationIntegrityTests(TestCase):
         )
 
         with patch(
-            "client_profile.views.async_task",
+            "client_profile.domains.memberships.views.async_task",
             side_effect=ConnectionError("notification queue unavailable"),
         ):
             with self.captureOnCommitCallbacks(execute=True):
