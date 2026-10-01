@@ -1,3 +1,10 @@
+import logging
+from django.contrib.auth import get_user_model
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
+
+
 """Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
@@ -47,8 +54,6 @@ from client_profile.utils import (
     extract_travel_origin_from_message,
     TRAVEL_ORIGIN_PREFIX,
 )
-# Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.serializers import logger, User
 
 
 OFFER_EXPIRY_HOURS = 48

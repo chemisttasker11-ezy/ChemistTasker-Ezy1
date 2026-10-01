@@ -1,3 +1,23 @@
+from pathlib import Path
+
+
+_SKILLS_CATALOG_CACHE = None
+
+
+def _load_skills_catalog():
+    global _SKILLS_CATALOG_CACHE
+    if _SKILLS_CATALOG_CACHE is not None:
+        return _SKILLS_CATALOG_CACHE
+    base_dir = Path(__file__).resolve().parents[4]
+    catalog_path = base_dir / "shared-core" / "skills_catalog.json"
+    try:
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            _SKILLS_CATALOG_CACHE = json.load(f)
+    except Exception:
+        _SKILLS_CATALOG_CACHE = {}
+    return _SKILLS_CATALOG_CACHE
+
+
 """Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
 from rest_framework import serializers
 from client_profile.models import (
@@ -19,7 +39,6 @@ from client_profile.serializers import (
     _build_absolute_media_url,
     _delete_file_if_unreferenced,
     _file_has_changed,
-    _load_skills_catalog,
     _should_clear_flag,
     _update_locked_user_fields,
     clean_email,

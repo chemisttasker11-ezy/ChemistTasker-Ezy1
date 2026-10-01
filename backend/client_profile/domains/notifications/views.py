@@ -1,3 +1,8 @@
+import logging
+
+log = logging.getLogger(__name__)
+
+
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
@@ -9,8 +14,6 @@ from rest_framework.decorators import action
 from client_profile.notifications import mark_notifications_read
 from users.models import DeviceToken
 from client_profile.domains.notifications.serializers import DeviceTokenSerializer, NotificationSerializer
-# Shared helpers that still live in the legacy module until their own domain is extracted:
-from client_profile.views import log
 
 
 # -----------------------------------------------------------------------------

@@ -1,3 +1,8 @@
+import logging
+
+log = logging.getLogger(__name__)
+
+
 """Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import (
@@ -51,7 +56,6 @@ from client_profile.domains.common.access import (
     _normalized_role_code,
     _otherstaff_onboarding_role,
 )
-from client_profile.domains.common.logs import log
 from datetime import timedelta
 from decimal import Decimal
 import uuid
