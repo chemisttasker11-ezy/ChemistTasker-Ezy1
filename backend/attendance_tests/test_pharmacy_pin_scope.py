@@ -10,9 +10,10 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from client_profile.attendance_credentials import worker_update_own_pin
-from client_profile.attendance_views import KioskRequestPairingCodeView, WorkerUpdatePinView
-from client_profile.models import Membership, OwnerOnboarding, Pharmacy, WorkerPIN
+from attendance.credentials import worker_update_own_pin
+from attendance.views import KioskRequestPairingCodeView, WorkerUpdatePinView
+from client_profile.models import Membership, OwnerOnboarding, Pharmacy
+from attendance.models import WorkerPIN
 from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
 
 

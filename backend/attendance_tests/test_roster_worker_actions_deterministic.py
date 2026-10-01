@@ -25,7 +25,6 @@ from unittest.mock import patch
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from client_profile.models import (
-    AttendanceSession,
     Chain,
     LeaveRequest,
     Membership,
@@ -33,7 +32,6 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    ProvisionalAttendance,
     RosterAcknowledgement,
     RosterActionAudit,
     RosterPeriod,
@@ -45,6 +43,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
+from attendance.models import AttendanceSession, ProvisionalAttendance
 from talent.models import UserAvailability
 from users.models import OrganizationMembership
 from client_profile.roster_worker_actions import (

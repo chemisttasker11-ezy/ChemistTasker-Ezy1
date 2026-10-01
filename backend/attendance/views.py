@@ -1,9 +1,4 @@
-"""
-Attendance REST API views connecting to:
-- attendance_credentials.py
-- attendance_transitions.py
-- attendance_approvals.py
-"""
+"""Attendance and kiosk REST API: device activation and pairing, QR and PIN clocking, offline sync, worker clock actions and manager approvals."""
 import hashlib
 from datetime import datetime, timedelta
 
@@ -24,7 +19,7 @@ from rest_framework.views import APIView
 
 User = get_user_model()
 
-from .attendance_approvals import (
+from attendance.approvals import (
     approve_provisional_attendance,
     create_attendance_correction,
     get_effective_session_timeline,
@@ -32,12 +27,12 @@ from .attendance_approvals import (
     reject_provisional_attendance,
 )
 from client_profile.domains.roster.permissions import is_authorized_attendance_manager
-from .attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_kiosk_pairing_code,
-    is_authorized_kiosk_manager,
     generate_signed_pharmacy_qr,
+    is_authorized_kiosk_manager,
     redeem_kiosk_pairing_code,
     revoke_kiosk_device,
     revoke_kiosk_device_by_credential,
@@ -47,30 +42,20 @@ from .attendance_credentials import (
     verify_signed_pharmacy_qr,
     worker_update_own_pin,
 )
-from .attendance_throttles import (
+from attendance.throttles import (
     KioskPINRateThrottle,
     KioskQRRateThrottle,
     WorkerClockInThrottle,
     WorkerClockOutThrottle,
 )
-from .attendance_transitions import (
-    clock_in,
-    clock_out,
-    end_break,
-    get_active_session_status,
-    start_break,
-)
-from .attendance_protocol import sync_offline_batch
-from .models import (
+from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
+from attendance.protocol import sync_offline_batch
+from client_profile.models import Membership, Pharmacy, RosterAcknowledgement, RosterPublicationAudit, Shift
+from attendance.models import (
     AttendanceEvent,
     AttendanceSession,
     KioskDevice,
-    Membership,
-    Pharmacy,
     ProvisionalAttendance,
-    RosterAcknowledgement,
-    RosterPublicationAudit,
-    Shift,
     WorkerPIN,
 )
 
@@ -162,7 +147,7 @@ class KioskRequestPairingCodeView(APIView):
     def get(self, request):
         from django.db.models import Q
         from users.models import OrganizationMembership
-        from .models import PharmacyAdmin
+        from client_profile.models import PharmacyAdmin
 
         pharmacies = Pharmacy.objects.select_related("owner").order_by("name", "pk")
         if not request.user.is_superuser:
@@ -564,7 +549,7 @@ class KioskWorkerPinStatusView(APIView):
             if not identifier:
                 return Response({"error": "Staff Email or ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-            from .attendance_credentials import _find_kiosk_candidate_membership
+            from attendance.credentials import _find_kiosk_candidate_membership
             membership = _find_kiosk_candidate_membership(device, identifier, require_pin=False)
             if membership is None:
                 return Response({

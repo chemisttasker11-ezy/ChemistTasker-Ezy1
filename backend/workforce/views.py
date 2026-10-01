@@ -13,12 +13,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from client_profile.models import (
-    AttendanceSession,
-    Membership,
-    Pharmacy,
-    RosterPeriod,
-)
+from client_profile.models import Membership, Pharmacy, RosterPeriod
+from attendance.models import AttendanceSession
 from client_profile.timezone_utils import get_pharmacy_timezone
 
 from .attendance_edits import append_missing_punch

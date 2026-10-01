@@ -13,7 +13,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.test import override_settings
 
-from client_profile.attendance_credentials import _count_security_attempt
+from attendance.credentials import _count_security_attempt
 from chat.models import Conversation, Message
 from talent.models import ExplorerPost
 from chat.serializers import MessageSerializer

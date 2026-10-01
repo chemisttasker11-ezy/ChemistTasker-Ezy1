@@ -10,7 +10,7 @@ from client_profile.models import (
     Organization, OwnerOnboarding, Pharmacy, Membership,
     Shift, ShiftSlot, ShiftSlotAssignment,
 )
-from client_profile.attendance_credentials import generate_kiosk_pairing_code
+from attendance.credentials import generate_kiosk_pairing_code
 
 assert settings.SETTINGS_MODULE == "attendance_tests.runtime_settings"
 assert settings.DATABASES["default"]["NAME"].startswith("chemisttasker_kiosk_test_")

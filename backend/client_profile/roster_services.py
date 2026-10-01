@@ -530,7 +530,7 @@ def _parse_date(val):
 
 
 def _protect_assignment_history(assignment):
-    from .models import AttendanceSession, ProvisionalAttendance
+    from attendance.models import AttendanceSession, ProvisionalAttendance
     if (LeaveRequest.objects.filter(slot_assignment=assignment).exists()
             or AttendanceSession.objects.filter(assignment=assignment).exists()
             or ProvisionalAttendance.objects.filter(backfill_assignment=assignment).exists()):

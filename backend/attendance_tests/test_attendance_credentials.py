@@ -19,7 +19,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.utils import timezone
 
-from client_profile.attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_signed_pharmacy_qr,
@@ -29,17 +29,8 @@ from client_profile.attendance_credentials import (
     verify_kiosk_worker_pin,
     verify_signed_pharmacy_qr,
 )
-from client_profile.models import (
-    Chain,
-    KioskDevice,
-    Membership,
-    Organization,
-    OwnerOnboarding,
-    Pharmacy,
-    PharmacyAdmin,
-    PharmacyQRSession,
-    WorkerPIN,
-)
+from client_profile.models import Chain, Membership, Organization, OwnerOnboarding, Pharmacy, PharmacyAdmin
+from attendance.models import KioskDevice, PharmacyQRSession, WorkerPIN
 
 User = get_user_model()
 
@@ -140,9 +131,9 @@ class AttendanceCredentialsTests(unittest.TestCase):
     def tearDown(self):
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_workerpin",
-                "client_profile_pharmacyqrsession",
-                "client_profile_kioskdevice",
+                "attendance_workerpin",
+                "attendance_pharmacyqrsession",
+                "attendance_kioskdevice",
                 "client_profile_membership",
                 "client_profile_chain_pharmacies",
                 "client_profile_chain",
@@ -234,12 +225,12 @@ class AttendanceCredentialsTests(unittest.TestCase):
         expires_at = qr_info["expires_at"]
 
         # 1 microsecond before deadline -> Valid
-        with patch("client_profile.models.attendance.timezone.now", return_value=expires_at - timedelta(microseconds=1)):
+        with patch("attendance.models.timezone.now", return_value=expires_at - timedelta(microseconds=1)):
             valid, _, _ = verify_signed_pharmacy_qr(token, expected_pharmacy_id=self.pharmacy_a.id)
             self.assertTrue(valid)
 
         # At exact deadline -> Expired
-        with patch("client_profile.models.attendance.timezone.now", return_value=expires_at):
+        with patch("attendance.models.timezone.now", return_value=expires_at):
             valid, _, reason = verify_signed_pharmacy_qr(token, expected_pharmacy_id=self.pharmacy_a.id)
             self.assertFalse(valid)
             self.assertEqual(reason, "QR_EXPIRED")
@@ -327,7 +318,7 @@ class AttendanceCredentialsTests(unittest.TestCase):
         lockout_deadline = pin_row.locked_until
 
         # Additional attempts during lockout do NOT extend the lockout timer
-        with patch("client_profile.attendance_credentials.timezone.now", return_value=now + timedelta(minutes=5)):
+        with patch("attendance.credentials.timezone.now", return_value=now + timedelta(minutes=5)):
             valid, _, reason = verify_kiosk_worker_pin(device, "worker@test.com", "012345")
             self.assertFalse(valid)
             self.assertEqual(reason, "PIN_LOCKED")
@@ -346,7 +337,7 @@ class AttendanceCredentialsTests(unittest.TestCase):
 
         # Advance past 15-minute lockout duration
         past_lockout = now + timedelta(minutes=16)
-        with patch("client_profile.attendance_credentials.timezone.now", return_value=past_lockout):
+        with patch("attendance.credentials.timezone.now", return_value=past_lockout):
             # Now correct PIN succeeds and clears lockout
             valid, mem, reason = verify_kiosk_worker_pin(device, "worker@test.com", "012345")
             self.assertTrue(valid)

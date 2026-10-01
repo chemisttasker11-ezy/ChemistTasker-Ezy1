@@ -24,20 +24,10 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from client_profile.attendance_credentials import (
-    verify_kiosk_worker_pin,
-    verify_signed_pharmacy_qr,
-)
-from client_profile.attendance_eligibility import (
-    resolve_attendance_eligibility,
-)
-from client_profile.models import (
-    AttendanceEvent,
-    AttendanceSession,
-    KioskDevice,
-    Pharmacy,
-    ProvisionalAttendance,
-)
+from attendance.credentials import verify_kiosk_worker_pin, verify_signed_pharmacy_qr
+from attendance.eligibility import resolve_attendance_eligibility
+from client_profile.models import Pharmacy
+from attendance.models import AttendanceEvent, AttendanceSession, KioskDevice, ProvisionalAttendance
 
 
 def clock_in(

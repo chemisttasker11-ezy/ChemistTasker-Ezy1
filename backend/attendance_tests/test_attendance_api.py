@@ -20,26 +20,25 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from client_profile.attendance_credentials import (
-    activate_kiosk_device,
-    set_worker_personal_code,
-)
+from attendance.credentials import activate_kiosk_device, set_worker_personal_code
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
     WorkerPIN,
 )
 
@@ -148,13 +147,13 @@ class AttendanceAPITests(unittest.TestCase):
         connection.disable_constraint_checking()
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_attendancecorrection",
-                "client_profile_provisionalattendance",
-                "client_profile_attendanceevent",
-                "client_profile_attendancesession",
-                "client_profile_workerpin",
-                "client_profile_pharmacyqrsession",
-                "client_profile_kioskdevice",
+                "attendance_attendancecorrection",
+                "attendance_provisionalattendance",
+                "attendance_attendanceevent",
+                "attendance_attendancesession",
+                "attendance_workerpin",
+                "attendance_pharmacyqrsession",
+                "attendance_kioskdevice",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",

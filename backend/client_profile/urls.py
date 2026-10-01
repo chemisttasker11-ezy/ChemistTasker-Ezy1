@@ -58,33 +58,6 @@ from .domains.onboarding.views import (
     RefereeRejectView,
     RefereeSubmitResponseView,
 )
-from .attendance_views import (
-    KioskActivateView,
-    KioskActiveStaffView,
-    KioskConfigView,
-    KioskOfflineSyncView,
-    KioskPairWithCodeView,
-    KioskPinClockView,
-    KioskQRView,
-    KioskRequestPairingCodeView,
-    KioskSelfRevokeView,
-    KioskStaffBreakActionView,
-    KioskWorkerEnrolView,
-    KioskWorkerPinStatusView,
-    KioskWorkerSetupPinView,
-    ManagerApproveAttendanceView,
-    ManagerCreateCorrectionView,
-    ManagerKioskDevicesView,
-    ManagerPendingAttendancesView,
-    ManagerRejectAttendanceView,
-    ManagerSessionTimelineView,
-    WorkerAttendanceStatusView,
-    WorkerBreakEndView,
-    WorkerBreakStartView,
-    WorkerClockInView,
-    WorkerClockOutView,
-    WorkerUpdatePinView,
-)
 from client_profile.domains.roster.v2_views import (
     RosterAcknowledgementStatusView,
     RosterActionAuditListView,
@@ -206,38 +179,6 @@ urlpatterns = [
     # alternate generate endpoint (optional—your front end can use POST to /invoices/ directly)
 
 
-    # Attendance V1 Endpoints
-    # Kiosk
-    path('attendance/kiosk/activate/', KioskActivateView.as_view(), name='attendance-kiosk-activate'),
-    path('attendance/kiosk/pairing/request/', KioskRequestPairingCodeView.as_view(), name='attendance-kiosk-pairing-request'),
-    path('attendance/kiosk/pairing/pair/', KioskPairWithCodeView.as_view(), name='attendance-kiosk-pairing-pair'),
-    path('attendance/kiosk/qr/', KioskQRView.as_view(), name='attendance-kiosk-qr'),
-    path('attendance/kiosk/pin-clock/', KioskPinClockView.as_view(), name='attendance-kiosk-pin-clock'),
-    path('attendance/kiosk/sync/batch/', KioskOfflineSyncView.as_view(), name='attendance-kiosk-sync-batch'),
-    path('attendance/kiosk/config/', KioskConfigView.as_view(), name='attendance-kiosk-config'),
-    path('attendance/kiosk/revoke-self/', KioskSelfRevokeView.as_view(), name='attendance-kiosk-revoke-self'),
-    path('attendance/kiosk/workers/enrol/', KioskWorkerEnrolView.as_view(), name='attendance-kiosk-worker-enrol'),
-    path('attendance/kiosk/worker-pin/status/', KioskWorkerPinStatusView.as_view(), name='attendance-kiosk-worker-pin-status'),
-    path('attendance/kiosk/worker-pin/setup/', KioskWorkerSetupPinView.as_view(), name='attendance-kiosk-worker-pin-setup'),
-    path('attendance/kiosk/active-staff/', KioskActiveStaffView.as_view(), name='attendance-kiosk-active-staff'),
-    path('attendance/kiosk/break/', KioskStaffBreakActionView.as_view(), name='attendance-kiosk-break'),
-
-    # Worker
-    path('attendance/worker/status/', WorkerAttendanceStatusView.as_view(), name='attendance-worker-status'),
-    path('attendance/worker/clock-in/', WorkerClockInView.as_view(), name='attendance-worker-clock-in'),
-    path('attendance/worker/break-start/', WorkerBreakStartView.as_view(), name='attendance-worker-break-start'),
-    path('attendance/worker/break-end/', WorkerBreakEndView.as_view(), name='attendance-worker-break-end'),
-    path('attendance/worker/clock-out/', WorkerClockOutView.as_view(), name='attendance-worker-clock-out'),
-    path('attendance/worker/pin/update/', WorkerUpdatePinView.as_view(), name='attendance-worker-pin-update'),
-
-    # Manager
-    path('attendance/manager/pending/', ManagerPendingAttendancesView.as_view(), name='attendance-manager-pending'),
-    path('attendance/manager/approve/', ManagerApproveAttendanceView.as_view(), name='attendance-manager-approve'),
-    path('attendance/manager/reject/', ManagerRejectAttendanceView.as_view(), name='attendance-manager-reject'),
-    path('attendance/manager/correct/', ManagerCreateCorrectionView.as_view(), name='attendance-manager-correct'),
-    path('attendance/manager/timeline/<int:session_id>/', ManagerSessionTimelineView.as_view(), name='attendance-manager-timeline'),
-    path('attendance/manager/kiosk-devices/', ManagerKioskDevicesView.as_view(), name='attendance-manager-kiosk-devices'),
-
     # Roster V2 Endpoints
     path('attendance/roster/period/', RosterPeriodDetailView.as_view(), name='roster-period-detail'),
     path('attendance/roster/validate/', RosterValidateView.as_view(), name='roster-validate'),
@@ -265,5 +206,6 @@ urlpatterns = [
     path('', include('chat.urls')),
     path('', include('pharmacy_hub.urls')),
     path('', include('invoicing.urls')),
+    path('', include('attendance.urls')),
     path('', include(router.urls)),
 ]

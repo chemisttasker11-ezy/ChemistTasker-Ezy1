@@ -43,7 +43,7 @@ from rest_framework import permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from client_profile.attendance_views import User
+from attendance.views import User
 
 
 class RosterPeriodDetailView(APIView):

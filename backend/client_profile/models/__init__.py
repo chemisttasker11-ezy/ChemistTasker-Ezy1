@@ -82,15 +82,3 @@ from client_profile.models.shifts import (
     LeaveRequest,
     WorkerShiftRequest,
 )
-from client_profile.models.attendance import (
-    KioskDevice,
-    KioskPairingAuthorization,
-    PharmacyQRSession,
-    WorkerPIN,
-    AttendanceSession,
-    ImmutableAttendanceQuerySet,
-    AttendanceEvent,
-    KioskAttendanceEvent,
-    ProvisionalAttendance,
-    AttendanceCorrection,
-)

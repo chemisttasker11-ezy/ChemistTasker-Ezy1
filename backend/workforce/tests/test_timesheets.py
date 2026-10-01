@@ -11,8 +11,6 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.models import (
-    AttendanceEvent,
-    AttendanceSession,
     LeaveRequest,
     Membership,
     Organization,
@@ -24,6 +22,7 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from attendance.models import AttendanceEvent, AttendanceSession
 from workforce.attendance_edits import append_missing_punch
 from workforce.leave_service import create_leave, decide_leave
 from workforce.models import (

@@ -19,28 +19,17 @@ from rest_framework.test import APIClient, APIRequestFactory
 from users.models import OrganizationMembership
 
 from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema
-from client_profile.attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     generate_signed_pharmacy_qr,
     revoke_kiosk_device,
     set_worker_personal_code,
 )
-from client_profile.attendance_transitions import clock_in
-from client_profile.attendance_protocol import (
-    calculate_event_hash,
-    canonical_event_payload,
-    sync_offline_batch,
-)
-from client_profile.attendance_views import KioskOfflineSyncView, KioskWorkerEnrolView
-from client_profile.models import (
-    AttendanceEvent,
-    AttendanceSession,
-    KioskAttendanceEvent,
-    Membership,
-    Organization,
-    OwnerOnboarding,
-    Pharmacy,
-)
+from attendance.transitions import clock_in
+from attendance.protocol import calculate_event_hash, canonical_event_payload, sync_offline_batch
+from attendance.views import KioskOfflineSyncView, KioskWorkerEnrolView
+from client_profile.models import Membership, Organization, OwnerOnboarding, Pharmacy
+from attendance.models import AttendanceEvent, AttendanceSession, KioskAttendanceEvent
 
 
 User = get_user_model()

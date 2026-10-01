@@ -20,34 +20,30 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.utils import timezone
 
-from client_profile.attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     generate_signed_pharmacy_qr,
     set_worker_personal_code,
 )
-from client_profile.attendance_transitions import (
-    clock_in,
-    clock_out,
-    end_break,
-    get_active_session_status,
-    start_break,
-)
+from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
     WorkerPIN,
 )
 
@@ -158,13 +154,13 @@ class AttendanceTransitionsTests(unittest.TestCase):
     def tearDown(self):
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_attendancecorrection",
-                "client_profile_provisionalattendance",
-                "client_profile_attendanceevent",
-                "client_profile_attendancesession",
-                "client_profile_workerpin",
-                "client_profile_pharmacyqrsession",
-                "client_profile_kioskdevice",
+                "attendance_attendancecorrection",
+                "attendance_provisionalattendance",
+                "attendance_attendanceevent",
+                "attendance_attendancesession",
+                "attendance_workerpin",
+                "attendance_pharmacyqrsession",
+                "attendance_kioskdevice",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",
@@ -363,8 +359,8 @@ class AttendanceTransitionsTests(unittest.TestCase):
         t_start = timezone.now().replace(hour=22, minute=0, second=0)
         t_end = t_start + timedelta(hours=8)  # 06:00 next day
 
-        with patch("client_profile.models.attendance.timezone.now", return_value=t_start), \
-             patch("client_profile.attendance_transitions.timezone.now", return_value=t_start):
+        with patch("attendance.models.timezone.now", return_value=t_start), \
+             patch("attendance.transitions.timezone.now", return_value=t_start):
             qr_data_start = generate_signed_pharmacy_qr(self.kiosk_a)
             session, in_event = clock_in(
                 self.worker_user,
@@ -373,8 +369,8 @@ class AttendanceTransitionsTests(unittest.TestCase):
             )
             self.assertEqual(session.started_at, t_start)
 
-        with patch("client_profile.models.attendance.timezone.now", return_value=t_end), \
-             patch("client_profile.attendance_transitions.timezone.now", return_value=t_end):
+        with patch("attendance.models.timezone.now", return_value=t_end), \
+             patch("attendance.transitions.timezone.now", return_value=t_end):
             qr_data_end = generate_signed_pharmacy_qr(self.kiosk_a)
             closed_session, out_event = clock_out(
                 self.worker_user,
@@ -403,7 +399,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
     def test_reject_clock_in_with_expired_qr(self):
         qr_a = generate_signed_pharmacy_qr(self.kiosk_a)
         now = timezone.now()
-        with patch("client_profile.models.attendance.timezone.now", return_value=now + timedelta(minutes=10)):
+        with patch("attendance.models.timezone.now", return_value=now + timedelta(minutes=10)):
             with self.assertRaises(ValidationError) as ctx:
                 clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr_a["signed_token"])
             self.assertIn("QR_EXPIRED", str(ctx.exception))

@@ -1,7 +1,7 @@
 """Only the attendance endpoints exercised by the isolated SQLite suites."""
 
 from django.urls import path
-from client_profile.attendance_views import (
+from attendance.views import (
     KioskActivateView,
     KioskActiveStaffView,
     KioskOfflineSyncView,

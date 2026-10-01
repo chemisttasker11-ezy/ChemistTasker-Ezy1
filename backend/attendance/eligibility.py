@@ -29,11 +29,11 @@ from client_profile.models import (
     Chain,
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
     Membership,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
     Pharmacy,
-    ProvisionalAttendance,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
     ShiftSlotAssignment,
 )
+from attendance.models import ProvisionalAttendance
 
 
 class EligibilityType:

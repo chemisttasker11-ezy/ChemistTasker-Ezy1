@@ -31,22 +31,15 @@ from rest_framework.test import APIClient
 
 User = get_user_model()
 
-from client_profile.attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_kiosk_pairing_code,
-    redeem_kiosk_pairing_code,
     KIOSK_PAIR_CACHE_PREFIX,
+    redeem_kiosk_pairing_code,
 )
-from client_profile.models import (
-    KioskDevice,
-    KioskPairingAuthorization,
-    Membership,
-    Organization,
-    OwnerOnboarding,
-    Pharmacy,
-    PharmacyAdmin,
-)
+from client_profile.models import Membership, Organization, OwnerOnboarding, Pharmacy, PharmacyAdmin
+from attendance.models import KioskDevice, KioskPairingAuthorization
 from notifications.models import Notification
 
 PAIRING_SCHEMA_MODELS = (
@@ -135,8 +128,8 @@ class KioskPairingCodeTests(unittest.TestCase):
         with connection.cursor() as cursor:
             for table in (
                 "notifications_notification",
-                "client_profile_kioskpairingauthorization",
-                "client_profile_kioskdevice",
+                "attendance_kioskpairingauthorization",
+                "attendance_kioskdevice",
                 "client_profile_pharmacyadmin",
                 "client_profile_pharmacy",
                 "client_profile_owneronboarding",

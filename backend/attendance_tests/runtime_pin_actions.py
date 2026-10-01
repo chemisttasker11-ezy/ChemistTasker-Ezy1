@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import requests
 from django.conf import settings
-from client_profile.models import AttendanceEvent, AttendanceSession
+from attendance.models import AttendanceEvent, AttendanceSession
 from notifications.models import Notification
 
 assert settings.SETTINGS_MODULE == "attendance_tests.runtime_settings"

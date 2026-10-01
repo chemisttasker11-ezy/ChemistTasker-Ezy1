@@ -13,14 +13,12 @@ from django.db import connection
 from rest_framework.test import APIClient
 
 from client_profile.models import (
-    AttendanceSession,
     Chain,
     LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    ProvisionalAttendance,
     RosterAcknowledgement,
     RosterActionAudit,
     RosterPeriod,
@@ -32,6 +30,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
+from attendance.models import AttendanceSession, ProvisionalAttendance
 from talent.models import UserAvailability
 from client_profile.roster_worker_actions import (
     approve_cover_replacement,

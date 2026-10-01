@@ -18,21 +18,18 @@ from django.contrib.auth import get_user_model
 from django.db import connection
 from django.utils import timezone
 
-from client_profile.attendance_eligibility import (
-    EligibilityType,
-    resolve_attendance_eligibility,
-)
+from attendance.eligibility import EligibilityType, resolve_attendance_eligibility
 from client_profile.models import (
     Chain,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
-    ProvisionalAttendance,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from attendance.models import ProvisionalAttendance
 
 User = get_user_model()
 

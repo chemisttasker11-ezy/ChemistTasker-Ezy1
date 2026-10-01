@@ -19,30 +19,28 @@ User = get_user_model()
 
 from users.models import DeviceToken
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
     WorkerPIN,
 )
 from notifications.models import Notification
-from client_profile.attendance_credentials import (
-    activate_kiosk_device,
-)
-from client_profile.attendance_transitions import (
-    clock_in,
-)
+from attendance.credentials import activate_kiosk_device
+from attendance.transitions import clock_in
 
 KIOSK_BREAK_SCHEMA_MODELS = (
     User,
@@ -162,17 +160,17 @@ class KioskStaffBreakTests(unittest.TestCase):
         with connection.cursor() as cursor:
             for table in (
                 "notifications_notification",
-                "client_profile_attendancecorrection",
-                "client_profile_attendanceevent",
-                "client_profile_provisionalattendance",
-                "client_profile_attendancesession",
-                "client_profile_pharmacyqrsession",
-                "client_profile_workerpin",
+                "attendance_attendancecorrection",
+                "attendance_attendanceevent",
+                "attendance_provisionalattendance",
+                "attendance_attendancesession",
+                "attendance_pharmacyqrsession",
+                "attendance_workerpin",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",
                 "client_profile_membership",
-                "client_profile_kioskdevice",
+                "attendance_kioskdevice",
                 "client_profile_pharmacyadmin",
                 "client_profile_pharmacy",
                 "client_profile_chain",

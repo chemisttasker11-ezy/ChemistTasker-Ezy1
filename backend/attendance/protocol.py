@@ -14,8 +14,8 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .attendance_transitions import clock_in, clock_out, end_break, start_break
-from .models import AttendanceEvent, KioskAttendanceEvent, KioskDevice
+from attendance.transitions import clock_in, clock_out, end_break, start_break
+from attendance.models import AttendanceEvent, KioskAttendanceEvent, KioskDevice
 
 
 PROTOCOL_VERSION = 1

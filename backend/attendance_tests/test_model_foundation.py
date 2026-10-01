@@ -22,7 +22,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection
 from django.utils import timezone
 
-from client_profile.models import (
+from attendance.models import (
     AttendanceCorrection,
     AttendanceEvent,
     AttendanceSession,
@@ -188,10 +188,10 @@ class CredentialBoundaryTests(unittest.TestCase):
     def test_qr_expires_at_exact_deadline(self):
         deadline = timezone.now()
         qr = PharmacyQRSession(expires_at=deadline)
-        with patch("client_profile.models.attendance.timezone.now", return_value=deadline):
+        with patch("attendance.models.timezone.now", return_value=deadline):
             self.assertTrue(qr.is_expired)
         with patch(
-            "client_profile.models.attendance.timezone.now",
+            "attendance.models.timezone.now",
             return_value=deadline - timedelta(microseconds=1),
         ):
             self.assertFalse(qr.is_expired)

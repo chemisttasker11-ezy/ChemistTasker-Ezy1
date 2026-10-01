@@ -32,31 +32,33 @@ security_cache = caches["security"]
 
 from users.models import DeviceToken
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
     WorkerPIN,
 )
 from notifications.models import Notification
-from client_profile.attendance_credentials import (
-    WORKER_PIN_OTP_CACHE_PREFIX,
+from attendance.credentials import (
     activate_kiosk_device,
     mask_email,
     send_worker_pin_setup_code,
     setup_worker_kiosk_pin,
     verify_kiosk_worker_pin,
+    WORKER_PIN_OTP_CACHE_PREFIX,
     worker_update_own_pin,
 )
 
@@ -181,17 +183,17 @@ class WorkerPinSetupTests(unittest.TestCase):
         with connection.cursor() as cursor:
             for table in (
                 "notifications_notification",
-                "client_profile_attendancecorrection",
-                "client_profile_attendanceevent",
-                "client_profile_provisionalattendance",
-                "client_profile_attendancesession",
-                "client_profile_pharmacyqrsession",
-                "client_profile_workerpin",
+                "attendance_attendancecorrection",
+                "attendance_attendanceevent",
+                "attendance_provisionalattendance",
+                "attendance_attendancesession",
+                "attendance_pharmacyqrsession",
+                "attendance_workerpin",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",
                 "client_profile_membership",
-                "client_profile_kioskdevice",
+                "attendance_kioskdevice",
                 "client_profile_pharmacyadmin",
                 "client_profile_pharmacy",
                 "client_profile_chain",

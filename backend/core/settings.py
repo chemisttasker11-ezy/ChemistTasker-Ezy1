@@ -151,6 +151,7 @@ INSTALLED_APPS = [
 
     # my apps
     "client_profile.apps.ClientProfileConfig",
+    "attendance.apps.AttendanceConfig",
     "invoicing.apps.InvoicingConfig",
     "pharmacy_hub.apps.PharmacyHubConfig",
     "chat.apps.ChatConfig",
@@ -575,7 +576,7 @@ LOGGING = {
 }
 
 # Apps split out of client_profile keep the logging behaviour their code had there (console, level from APP_LOG_LEVEL).
-for _app in ("rewards", "ratings", "talent", "team_calendar", "notifications", "chat", "pharmacy_hub", "invoicing"):
+for _app in ("rewards", "ratings", "talent", "team_calendar", "notifications", "chat", "pharmacy_hub", "invoicing", "attendance"):
     LOGGING['loggers'][_app] = dict(LOGGING['loggers']['client_profile'])
 
 

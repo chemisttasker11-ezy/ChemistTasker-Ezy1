@@ -35,16 +35,8 @@ from django.utils.crypto import salted_hmac
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from client_profile.models import (
-    Chain,
-    KioskDevice,
-    KioskPairingAuthorization,
-    Membership,
-    Pharmacy,
-    PharmacyAdmin,
-    PharmacyQRSession,
-    WorkerPIN,
-)
+from client_profile.models import Chain, Membership, Pharmacy, PharmacyAdmin
+from attendance.models import KioskDevice, KioskPairingAuthorization, PharmacyQRSession, WorkerPIN
 
 
 QR_SALT = "chemisttasker_attendance_kiosk_qr"

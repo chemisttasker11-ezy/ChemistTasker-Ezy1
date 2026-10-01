@@ -1,4 +1,4 @@
-"""client_profile models: attendance (split verbatim from client_profile/models.py)."""
+"""Attendance and kiosk: kiosk devices and pairing, pharmacy QR sessions, worker PINs, attendance sessions, append-only events, offline kiosk events, provisional approvals and corrections."""
 from django.db import models, transaction
 from django.contrib.auth.hashers import check_password, make_password
 from django.db.models import Q

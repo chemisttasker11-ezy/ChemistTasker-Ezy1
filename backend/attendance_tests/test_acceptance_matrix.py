@@ -23,14 +23,14 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.utils import timezone
 
-from client_profile.attendance_approvals import (
+from attendance.approvals import (
     approve_provisional_attendance,
     create_attendance_correction,
     get_effective_session_timeline,
     reject_provisional_attendance,
 )
 from client_profile.domains.roster.permissions import is_authorized_attendance_manager
-from client_profile.attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_signed_pharmacy_qr,
@@ -38,30 +38,15 @@ from client_profile.attendance_credentials import (
     verify_kiosk_worker_pin,
     verify_signed_pharmacy_qr,
 )
-from client_profile.attendance_eligibility import (
-    EligibilityType,
-    resolve_attendance_eligibility,
-)
-from client_profile.attendance_transitions import (
-    clock_in,
-    clock_out,
-    end_break,
-    get_active_session_status,
-    start_break,
-)
+from attendance.eligibility import EligibilityType, resolve_attendance_eligibility
+from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
     RosterAcknowledgement,
     RosterActionAudit,
     RosterPeriod,
@@ -71,8 +56,16 @@ from client_profile.models import (
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
-    WorkerPIN,
     WorkerShiftRequest,
+)
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
+    WorkerPIN,
 )
 from talent.models import UserAvailability
 from client_profile.roster_services import (

@@ -5,16 +5,16 @@ from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from client_profile.models import PharmacyQRSession, WorkerPIN
+from attendance.models import PharmacyQRSession, WorkerPIN
 
 
 class AttendanceCredentialTests(SimpleTestCase):
     def test_qr_expires_at_exact_deadline(self):
         deadline = timezone.now()
         qr = PharmacyQRSession(expires_at=deadline)
-        with patch("client_profile.models.attendance.timezone.now", return_value=deadline):
+        with patch("attendance.models.timezone.now", return_value=deadline):
             self.assertTrue(qr.is_expired)
-        with patch("client_profile.models.attendance.timezone.now", return_value=deadline - timedelta(microseconds=1)):
+        with patch("attendance.models.timezone.now", return_value=deadline - timedelta(microseconds=1)):
             self.assertFalse(qr.is_expired)
 
     def test_pin_is_hashed_and_preserves_leading_zero(self):
@@ -37,7 +37,7 @@ class AttendanceCredentialTests(SimpleTestCase):
     def test_lock_expires_at_deadline(self):
         now = timezone.now()
         pin = WorkerPIN(locked_until=now)
-        with patch("client_profile.models.attendance.timezone.now", return_value=now):
+        with patch("attendance.models.timezone.now", return_value=now):
             self.assertFalse(pin.is_locked)
 
     def test_setting_code_resets_attempts_without_enabling_it(self):

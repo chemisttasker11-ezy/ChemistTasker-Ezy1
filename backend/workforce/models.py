@@ -550,7 +550,7 @@ class ManagerAttendanceEventAudit(models.Model):
     """Reason/actor for an append-only manager-created missing punch."""
 
     event = models.OneToOneField(
-        "client_profile.AttendanceEvent",
+        "attendance.AttendanceEvent",
         on_delete=models.PROTECT,
         related_name="manager_creation_audit",
     )
