@@ -1,15 +1,12 @@
 # client_profile/urls.py
 from django.urls import path, include
-from .views import (
-    CreateShiftAndAssignView,
+from .views import CreateShiftAndAssignView, RosterOwnerViewSet, RosterShiftManageViewSet, RosterWorkerViewSet
+from .domains.dashboards.views import (
     ExplorerDashboard,
     OrganizationDashboardView,
     OtherStaffDashboard,
     OwnerDashboard,
     PharmacistDashboard,
-    RosterOwnerViewSet,
-    RosterShiftManageViewSet,
-    RosterWorkerViewSet,
 )
 from .domains.shifts.browse import (
     ActiveShiftViewSet,
