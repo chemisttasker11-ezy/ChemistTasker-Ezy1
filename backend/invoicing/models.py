@@ -1,4 +1,4 @@
-"""client_profile models: invoices (split verbatim from client_profile/models.py)."""
+"""Invoices raised for completed shifts and in the finance workspace, with their line items."""
 from django.db import models
 from datetime import date
 

@@ -4,6 +4,16 @@ from decimal import Decimal
 from uuid import NAMESPACE_URL, uuid5
 
 
+def _invoicing_model(apps, name):
+    # Invoice and InvoiceLineItem now live in the invoicing app (state-only move, see invoicing.0001_initial). Depending on
+    # where this migration lands in the plan, the migration state knows them under either label; the invoicing label, when
+    # present, always carries the table name that currently exists in the database.
+    try:
+        return apps.get_model("invoicing", name)
+    except LookupError:
+        return apps.get_model("client_profile", name)
+
+
 def _notification_model(apps):
     # Notification now lives in the notifications app (state-only move, see notifications.0001_initial). Depending on
     # where this migration lands in the plan, the migration state knows it under either label; the notifications
@@ -15,14 +25,14 @@ def _notification_model(apps):
 
 
 def copy_finance_records(apps, schema_editor):
-    Invoice = apps.get_model("client_profile", "Invoice")
+    Invoice = _invoicing_model(apps, "Invoice")
     InvoiceRecord = apps.get_model("worker_finance", "InvoiceRecord")
     InvoiceRevision = apps.get_model("worker_finance", "InvoiceRevision")
     InvoiceReviewRequest = apps.get_model("worker_finance", "InvoiceReviewRequest")
     Payment = apps.get_model("worker_finance", "Payment")
     Delivery = apps.get_model("worker_finance", "Delivery")
     Customer = apps.get_model("worker_finance", "Customer")
-    InvoiceLineItem = apps.get_model("client_profile", "InvoiceLineItem")
+    InvoiceLineItem = _invoicing_model(apps, "InvoiceLineItem")
     Notification = _notification_model(apps)
 
     record_to_invoice = dict(InvoiceRecord.objects.values_list("pk", "invoice_id"))

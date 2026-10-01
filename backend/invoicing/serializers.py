@@ -1,6 +1,6 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for the invoice API."""
 from rest_framework import serializers
-from client_profile.models import Invoice, InvoiceLineItem
+from invoicing.models import Invoice, InvoiceLineItem
 from decimal import Decimal
 
 
@@ -85,7 +85,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             item['invoice'] = invoice
             InvoiceLineItemSerializer().create(item)
 
-        from client_profile.domains.invoices.services import recalculate_invoice_totals
+        from invoicing.services import recalculate_invoice_totals
         invoice.refresh_from_db()
         return recalculate_invoice_totals(invoice)
 
@@ -116,5 +116,5 @@ class InvoiceSerializer(serializers.ModelSerializer):
                     item['invoice'] = instance
                     InvoiceLineItemSerializer().create(item)
 
-        from client_profile.domains.invoices.services import recalculate_invoice_totals
+        from invoicing.services import recalculate_invoice_totals
         return recalculate_invoice_totals(instance)

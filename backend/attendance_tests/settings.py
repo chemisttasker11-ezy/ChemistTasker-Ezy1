@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "worker_finance.apps.WorkerFinanceConfig",
     "attendance_tests.settings.AttendanceClientProfileConfig",
+    "invoicing.apps.InvoicingConfig",
     "pharmacy_hub.apps.PharmacyHubConfig",
     "attendance_tests.settings.AttendanceChatConfig",
     "notifications.apps.NotificationsConfig",
@@ -70,6 +71,7 @@ CACHES = {
 MIGRATION_MODULES = {
     "users": None,
     "client_profile": None,
+    "invoicing": None,
     "pharmacy_hub": None,
     "chat": None,
     "notifications": None,

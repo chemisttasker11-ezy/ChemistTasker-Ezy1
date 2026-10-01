@@ -9,7 +9,6 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from unittest.mock import patch
 
 from client_profile.models import (
-    InvoiceLineItem,
     OtherStaffOnboarding,
     OwnerOnboarding,
     Pharmacy,
@@ -17,10 +16,11 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from invoicing.models import InvoiceLineItem
 from notifications.models import Notification
-from client_profile.domains.invoices.serializers import InvoiceSerializer
-from client_profile.domains.invoices.services import generate_invoice_from_shifts
-from client_profile.domains.invoices.views import InvoiceDetailView, send_invoice_email
+from invoicing.serializers import InvoiceSerializer
+from invoicing.services import generate_invoice_from_shifts
+from invoicing.views import InvoiceDetailView, send_invoice_email
 from worker_finance.views import ReceivedInvoiceViewSet
 from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision
 from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record
@@ -524,8 +524,8 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
             force_authenticate(req, user=self.worker)
             return req
 
-        with patch("client_profile.domains.invoices.views.render_invoice_to_pdf", return_value=b"%PDF-test"), patch(
-            "client_profile.domains.invoices.views.async_task"
+        with patch("invoicing.views.render_invoice_to_pdf", return_value=b"%PDF-test"), patch(
+            "invoicing.views.async_task"
         ) as enqueue:
             first = send_invoice_email(request(), invoice.id)
             second = send_invoice_email(request(), invoice.id)

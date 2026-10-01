@@ -4,8 +4,6 @@ from django.core.exceptions import ValidationError
 from .models import (
     Chain,
     ExplorerOnboarding,
-    Invoice,
-    InvoiceLineItem,
     Membership,
     MembershipApplication,
     Organization,
@@ -422,26 +420,6 @@ class ShiftRejectionAdmin(admin.ModelAdmin):
     list_display = ('id','shift','slot','user','rejected_at')
     list_filter  = ('slot','shift')
     search_fields = ('user__username','shift__pharmacy__name')
-
-class InvoiceLineItemInline(admin.TabularInline):
-    model = InvoiceLineItem
-    extra = 0
-    fields = (
-        'category_code','unit','description',
-        'quantity','unit_price','discount','total',
-        'gst_applicable','super_applicable','is_manual'
-    )
-    readonly_fields = ('total',)
-
-@admin.register(Invoice)
-class InvoiceAdmin(admin.ModelAdmin):
-    list_display = (
-        'id','user','status','invoice_date',
-        'due_date','total'
-    )
-    list_filter  = ('status','gst_registered')
-    inlines      = [InvoiceLineItemInline]
-    readonly_fields = ('subtotal','gst_amount','super_amount','total')
 
 
 admin.site.register(WorkerShiftRequest)

@@ -82,10 +82,6 @@ from client_profile.models.shifts import (
     LeaveRequest,
     WorkerShiftRequest,
 )
-from client_profile.models.invoices import (
-    Invoice,
-    InvoiceLineItem,
-)
 from client_profile.models.attendance import (
     KioskDevice,
     KioskPairingAuthorization,

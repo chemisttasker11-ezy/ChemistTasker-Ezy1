@@ -50,15 +50,6 @@ from .domains.orgs.views import (
     PharmacyViewSet,
     PublicOrganizationDetailView,
 )
-from .domains.invoices.views import (
-    GenerateInvoiceView,
-    invoice_pdf_view,
-    InvoiceDetailView,
-    InvoiceListView,
-    preview_invoice_lines,
-    report_invoice_issue,
-    send_invoice_email,
-)
 from .domains.onboarding.views import (
     ExplorerOnboardingV2MeView,
     OtherStaffOnboardingV2MeView,
@@ -209,15 +200,8 @@ urlpatterns = [
 
     # Invoice
     # list and create (manual or via shifts)
-    path('invoices/', InvoiceListView.as_view(), name='invoice-list'),
-    path('invoices/preview/<int:shift_id>/', preview_invoice_lines, name='invoice-preview'),
     # retrieve/update/delete
-    path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'),
     # alternate generate endpoint (optional—your front end can use POST to /invoices/ directly)
-    path('invoices/generate/', GenerateInvoiceView.as_view(), name='generate-invoice'),
-    path('invoices/<int:invoice_id>/pdf/', invoice_pdf_view, name='invoice_pdf'),
-    path('invoices/<int:invoice_id>/send/', send_invoice_email, name='send-invoice-email'),
-    path('invoices/<int:invoice_id>/report-issue/', report_invoice_issue, name='report-invoice-issue'),
 
 
     # Attendance V1 Endpoints
@@ -278,5 +262,6 @@ urlpatterns = [
     # Include the API routes for CRUD operations
     path('', include('chat.urls')),
     path('', include('pharmacy_hub.urls')),
+    path('', include('invoicing.urls')),
     path('', include(router.urls)),
 ]

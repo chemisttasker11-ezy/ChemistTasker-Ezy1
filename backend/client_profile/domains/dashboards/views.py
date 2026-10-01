@@ -2,7 +2,6 @@
 from rest_framework import permissions, status
 from client_profile.models import (
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
-    Invoice,
     Membership,
     Pharmacy,
     PHARMACY_STAFF_EMPLOYMENT_TYPES,
@@ -10,6 +9,7 @@ from client_profile.models import (
     Shift,
     ShiftProfileAccessAudit,
 )
+from invoicing.models import Invoice
 from pharmacy_hub.models import PharmacyHubPost
 from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
 from client_profile.domains.shifts.serializers import ShiftSerializer

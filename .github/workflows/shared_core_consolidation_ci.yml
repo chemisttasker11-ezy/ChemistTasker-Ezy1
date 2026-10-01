@@ -193,7 +193,7 @@ jobs:
       - name: Public content contracts
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
-        run: python backend/manage.py test client_profile.test_membership_application_integrity client_profile.test_invoice_integrity --settings=core.contract_test_settings
+        run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
       - name: Attendance and kiosk contracts
         working-directory: backend
         run: |

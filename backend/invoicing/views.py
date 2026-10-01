@@ -1,6 +1,7 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Invoice API: list, detail, generation from shifts, preview, PDF, email and issue reports."""
 from rest_framework import generics, permissions, status
-from client_profile.models import Invoice, Pharmacy, Shift
+from client_profile.models import Pharmacy, Shift
+from invoicing.models import Invoice
 from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,7 +13,7 @@ from client_profile.admin_helpers import pharmacies_user_admins
 from django.shortcuts import get_object_or_404
 import json
 from django.db.models import F, Q
-from client_profile.domains.invoices.services import (
+from invoicing.services import (
     generate_invoice_from_shifts,
     generate_preview_invoice_lines,
     render_invoice_to_pdf,
@@ -21,7 +22,7 @@ from notifications.services import notify_users
 from core.task_queue import async_task
 from django.db import transaction
 from django.http import HttpResponse
-from client_profile.domains.invoices.serializers import InvoiceSerializer
+from invoicing.serializers import InvoiceSerializer
 # Shared helpers that still live in the legacy module until their own domain is extracted:
 from client_profile.domains.common.access import _get_org_pharmacies_queryset
 from client_profile.domains.dashboards.views import _dashboard_invoice_action_url

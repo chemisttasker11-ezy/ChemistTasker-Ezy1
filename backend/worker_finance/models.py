@@ -48,7 +48,7 @@ class CatalogueItem(OwnedRecord):
 
 
 class InvoiceRevision(models.Model):
-    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='revisions')
+    invoice = models.ForeignKey('invoicing.Invoice', on_delete=models.CASCADE, related_name='revisions')
     version = models.PositiveIntegerField()
     payload = models.JSONField(default=dict)
     calculation = models.JSONField(default=dict)
@@ -65,7 +65,7 @@ class InvoiceRevision(models.Model):
 
 
 class InvoiceReviewRequest(models.Model):
-    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='review_requests')
+    invoice = models.ForeignKey('invoicing.Invoice', on_delete=models.CASCADE, related_name='review_requests')
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='invoice_revision_requests')
     requested_version = models.PositiveIntegerField()
     note = models.TextField()
@@ -78,7 +78,7 @@ class InvoiceReviewRequest(models.Model):
 
 
 class Payment(models.Model):
-    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='payments')
+    invoice = models.ForeignKey('invoicing.Invoice', on_delete=models.CASCADE, related_name='payments')
     request_key = models.UUIDField()
     date = models.DateField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -93,7 +93,7 @@ class Payment(models.Model):
 
 
 class Delivery(models.Model):
-    invoice = models.ForeignKey('client_profile.Invoice', on_delete=models.CASCADE, related_name='deliveries')
+    invoice = models.ForeignKey('invoicing.Invoice', on_delete=models.CASCADE, related_name='deliveries')
     version = models.PositiveIntegerField()
     status = models.CharField(max_length=16, default='preparing')
     recipient = models.EmailField()

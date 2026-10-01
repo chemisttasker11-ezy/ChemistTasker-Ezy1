@@ -1732,7 +1732,7 @@ class MyShiftSerializer(serializers.ModelSerializer):
         return ShiftSlotSerializer(qs, many=True).data
     def get_line_items(self, obj):
         user = self.context['request'].user
-        from client_profile.domains.invoices.services import generate_preview_invoice_lines
+        from invoicing.services import generate_preview_invoice_lines
 
         try:
             return generate_preview_invoice_lines(shift=obj, user=user)
