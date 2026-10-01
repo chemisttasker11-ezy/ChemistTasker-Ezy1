@@ -8664,99 +8664,33 @@ class ShiftSavedSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+# --- Stage 2: code moved to client_profile/domains (re-exported so existing import paths keep working) ---
+_MOVED_LAZY = {
+    "ClaimReferralSerializer": "client_profile.domains.pills.serializers",
+    "CreateFriendReferralSerializer": "client_profile.domains.pills.serializers",
+    "CreateShiftReferralSerializer": "client_profile.domains.pills.serializers",
+    "PillBalanceSerializer": "client_profile.domains.pills.serializers",
+    "PillLedgerEntrySerializer": "client_profile.domains.pills.serializers",
+    "PillReferralCodeSerializer": "client_profile.domains.pills.serializers",
+    "PillReferralEventSerializer": "client_profile.domains.pills.serializers",
+    "PillRewardRuleSerializer": "client_profile.domains.pills.serializers",
+}
 
-# Pills and Refferals
-class PillRewardRuleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PillRewardRule
-        fields = [
-            "id",
-            "code",
-            "name",
-            "description",
-            "event_type",
-            "audience",
-            "pill_amount",
-            "is_active",
-            "starts_at",
-            "ends_at",
-            "metadata",
-        ]
-        read_only_fields = fields
-
-
-class PillReferralCodeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PillReferralCode
-        fields = ["code", "is_active", "created_at"]
-        read_only_fields = fields
+def __getattr__(name):
+    # Lazy re-export: avoids import-time cycles between this legacy module and the domain modules, which
+    # still import shared helpers back from here. Result is cached so later lookups are plain attributes.
+    target = _MOVED_LAZY.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+    value = getattr(importlib.import_module(target), name)
+    globals()[name] = value
+    return value
 
 
-class PillLedgerEntrySerializer(serializers.ModelSerializer):
-    rule_code = serializers.CharField(source="rule.code", read_only=True)
-    referral_type = serializers.CharField(source="referral_event.referral_type", read_only=True)
-    shift_id = serializers.IntegerField(source="shift.id", read_only=True)
-
-    class Meta:
-        model = PillLedgerEntry
-        fields = [
-            "id",
-            "entry_type",
-            "source",
-            "delta",
-            "balance_after",
-            "description",
-            "rule_code",
-            "referral_type",
-            "shift_id",
-            "metadata",
-            "created_at",
-        ]
-        read_only_fields = fields
+def __dir__():
+    return sorted(set(globals()) | set(_MOVED_LAZY))
 
 
-class PillReferralEventSerializer(serializers.ModelSerializer):
-    referral_code = serializers.CharField(source="referral_code.code", read_only=True)
-    referrer_email = serializers.EmailField(source="referrer.email", read_only=True)
-    referred_user_email = serializers.EmailField(source="referred_user.email", read_only=True)
-    shift_id = serializers.IntegerField(source="shift.id", read_only=True)
-
-    class Meta:
-        model = PillReferralEvent
-        fields = [
-            "id",
-            "referral_code",
-            "referral_type",
-            "status",
-            "referrer_email",
-            "referred_user_email",
-            "referred_email",
-            "shift_id",
-            "claimed_at",
-            "awarded_at",
-            "created_at",
-        ]
-        read_only_fields = fields
-
-
-class PillBalanceSerializer(serializers.Serializer):
-    balance = serializers.SerializerMethodField()
-    shift_post_cost = serializers.IntegerField(read_only=True)
-
-    def get_balance(self, obj):
-        return get_pill_balance(self.context["request"].user)
-
-
-class CreateFriendReferralSerializer(serializers.Serializer):
-    referred_email = serializers.EmailField(required=False, allow_blank=True)
-
-
-class CreateShiftReferralSerializer(serializers.Serializer):
-    shift_id = serializers.IntegerField()
-    referred_email = serializers.EmailField(required=False, allow_blank=True)
-
-
-class ClaimReferralSerializer(serializers.Serializer):
-    code = serializers.CharField(max_length=32)
-    shift_id = serializers.IntegerField(required=False)
-    referral_event_id = serializers.IntegerField(required=False)
+if False:  # pragma: no cover - static analysis / IDE navigation only
+    from client_profile.domains.pills.serializers import ClaimReferralSerializer, CreateFriendReferralSerializer, CreateShiftReferralSerializer, PillBalanceSerializer, PillLedgerEntrySerializer, PillReferralCodeSerializer, PillReferralEventSerializer, PillRewardRuleSerializer  # noqa: F401
