@@ -29,6 +29,12 @@ BASE_TABLES = (
     "client_profile_membership", "client_profile_shift",
     "client_profile_shiftslot", "client_profile_shiftslotassignment",
 )
+# The attendance/kiosk models moved to the `attendance` app; its migration renames their tables to attendance_<model>.
+# A database may still be on either side of that rename, so presence is checked under both names.
+RENAMED_TABLES = {
+    "client_profile_" + name: "attendance_" + name
+    for name in ("kioskdevice", "pharmacyqrsession", "workerpin", "attendancesession", "provisionalattendance", "attendancecorrection")
+}
 
 
 def source_inventory():
@@ -70,7 +76,7 @@ def audit():
                 "SELECT table_name, column_name, data_type, is_nullable "
                 "FROM information_schema.columns WHERE table_schema = current_schema() "
                 "AND table_name = ANY(%s) ORDER BY table_name, ordinal_position",
-                [list(BASE_TABLES + NEW_TABLES)],
+                [list(BASE_TABLES + NEW_TABLES + tuple(RENAMED_TABLES.values()))],
             )
             columns = cursor.fetchall()
             cursor.execute(
@@ -79,7 +85,7 @@ def audit():
                 "JOIN pg_namespace n ON n.oid = c.relnamespace "
                 "WHERE n.nspname = current_schema() AND c.relname = ANY(%s) "
                 "ORDER BY c.relname, con.conname",
-                [list(BASE_TABLES + NEW_TABLES)],
+                [list(BASE_TABLES + NEW_TABLES + tuple(RENAMED_TABLES.values()))],
             )
             constraints = cursor.fetchall()
     finally:
@@ -97,7 +103,7 @@ def audit():
         ],
         "source_recovery_note": "Recover originals and verify squash/replacement history; names alone cannot reconstruct dependencies.",
         "roster_0044_recorded_applied": ("client_profile", MIGRATION_NAME) in applied,
-        "new_table_presence": {name: name in present for name in NEW_TABLES},
+        "new_table_presence": {name: name in present or RENAMED_TABLES.get(name) in present for name in NEW_TABLES},
         "columns": [dict(zip(("table", "column", "type", "nullable"), row)) for row in columns],
         "constraints": [dict(zip(("table", "name", "definition"), row)) for row in constraints],
     }

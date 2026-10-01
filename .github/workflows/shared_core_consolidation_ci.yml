@@ -194,6 +194,12 @@ jobs:
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
         run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
+      - name: Kernel and domain app tests
+        run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar --settings=core.contract_test_settings
+      - name: Public hub editorial and community contracts
+        env:
+          PUBLIC_COMMUNITY_ENABLED: "true"
+        run: python backend/manage.py test public_hub.test_editorial --settings=core.contract_test_settings
       - name: Attendance and kiosk contracts
         working-directory: backend
         run: |
