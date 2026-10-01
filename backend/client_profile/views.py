@@ -8754,17 +8754,6 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         post.refresh_from_db(fields=["like_count"])
         return Response({"liked": False, "like_count": post.like_count, "deleted": bool(deleted)})
 
-# Availability
-class UserAvailabilityViewSet(viewsets.ModelViewSet):
-    """API for users to manage their own availability slots."""
-    serializer_class = UserAvailabilitySerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return UserAvailability.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
 
 
@@ -10071,6 +10060,7 @@ class ChatParticipantView(generics.ListAPIView):
 _MOVED_LAZY = {
     "PillRewardsViewSet": "client_profile.domains.pills.views",
     "RatingViewSet": "client_profile.domains.ratings.views",
+    "UserAvailabilityViewSet": "client_profile.domains.availability.views",
 }
 
 def __getattr__(name):
@@ -10090,5 +10080,6 @@ def __dir__():
 
 
 if False:  # pragma: no cover - static analysis / IDE navigation only
+    from client_profile.domains.availability.views import UserAvailabilityViewSet  # noqa: F401
     from client_profile.domains.pills.views import PillRewardsViewSet  # noqa: F401
     from client_profile.domains.ratings.views import RatingViewSet  # noqa: F401

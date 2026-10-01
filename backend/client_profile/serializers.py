@@ -6934,16 +6934,6 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
             instance.save(update_fields=list(set(changed)))
         return instance
 
-# Availability
-class UserAvailabilitySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserAvailability
-        fields = [
-            'id', 'date', 'start_time', 'end_time',
-            'is_all_day', 'is_recurring', 'recurring_days',
-            'recurring_end_date', 'notify_new_shifts', 'notes'
-        ]
-        read_only_fields = ['id']
 
 
 
@@ -8614,6 +8604,7 @@ _MOVED_LAZY = {
     "RatingReadSerializer": "client_profile.domains.ratings.serializers",
     "RatingSummarySerializer": "client_profile.domains.ratings.serializers",
     "RatingWriteSerializer": "client_profile.domains.ratings.serializers",
+    "UserAvailabilitySerializer": "client_profile.domains.availability.serializers",
 }
 
 def __getattr__(name):
@@ -8633,5 +8624,6 @@ def __dir__():
 
 
 if False:  # pragma: no cover - static analysis / IDE navigation only
+    from client_profile.domains.availability.serializers import UserAvailabilitySerializer  # noqa: F401
     from client_profile.domains.pills.serializers import ClaimReferralSerializer, CreateFriendReferralSerializer, CreateShiftReferralSerializer, PillBalanceSerializer, PillLedgerEntrySerializer, PillReferralCodeSerializer, PillReferralEventSerializer, PillRewardRuleSerializer  # noqa: F401
     from client_profile.domains.ratings.serializers import MyRatingSerializer, PendingRatingsSerializer, RatingReadSerializer, RatingSummarySerializer, RatingWriteSerializer  # noqa: F401
