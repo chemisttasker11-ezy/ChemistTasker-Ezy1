@@ -3,11 +3,10 @@ from rest_framework import permissions, status, viewsets
 from client_profile.models import Chain, Membership, Organization, OwnerOnboarding, Pharmacy, PharmacyAdmin
 from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
-from django.core.exceptions import ValidationError
 from client_profile.domains.memberships.serializers import required_user_role_for_membership
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from client_profile.admin_helpers import (

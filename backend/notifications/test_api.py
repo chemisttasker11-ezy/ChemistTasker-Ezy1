@@ -67,13 +67,10 @@ class NotificationTests(TestCase):
         theirs.refresh_from_db()
         self.assertIsNone(theirs.read_at)
 
-    def test_mark_read_non_list_ids_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately: same shadowed-ValidationError cause as pills/claim
-        # (django's ValidationError is raised instead of DRF's), so this is a 500, not a 400.
-        c = client_for(self.user)
-        c.raise_request_exception = False
-        res = c.post(URL + "mark-read/", {"ids": "1"}, format="json")
-        self.assertEqual(res.status_code, 500)
+    def test_mark_read_rejects_ids_that_are_not_a_list(self):
+        res = client_for(self.user).post(URL + "mark-read/", {"ids": "1"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"ids": "Provide a list of notification IDs."})
 
 
 class DeviceTokenTests(TestCase):

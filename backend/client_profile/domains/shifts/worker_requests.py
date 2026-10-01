@@ -1,9 +1,8 @@
 """Worker shift requests (swap and cover) API."""
 from rest_framework import permissions, status, viewsets
 from client_profile.models import Pharmacy, PharmacyAdmin, Shift, ShiftSlot, WorkerShiftRequest
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability

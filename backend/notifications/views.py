@@ -7,9 +7,8 @@ log = logging.getLogger(__name__)
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
 from notifications.models import Notification
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.exceptions import NotAuthenticated
+from rest_framework.exceptions import NotAuthenticated, ValidationError
 from rest_framework.decorators import action
 from notifications.services import mark_notifications_read
 from users.models import DeviceToken

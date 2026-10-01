@@ -2,10 +2,9 @@
 from rest_framework import mixins, permissions, status, viewsets
 from client_profile.models import Membership, OwnerOnboarding, Pharmacy, PharmacyAdmin, PharmacyClaim
 from notifications.models import Notification
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.utils import timezone
 from client_profile.domains.common.helpers import clean_email, get_frontend_dashboard_url

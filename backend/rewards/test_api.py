@@ -82,14 +82,11 @@ class PillRewardsWriteTests(TestCase):
         res = client_for(self.owner).post(URL + "refer-shift/", {"shift_id": 999999}, format="json")
         self.assertEqual(res.status_code, 404)
 
-    def test_claim_with_unknown_code_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately: views.py raises django's ValidationError here (the name is
-        # shadowed by `from .models import *`), which DRF does not convert, so the client gets 500, not 400.
-        # If this starts returning 400, that is a behaviour change to review, not a refactor result.
-        client = client_for(self.outsider)
-        client.raise_request_exception = False
-        res = client.post(URL + "claim/", {"code": "NOPE-NOPE"}, format="json")
-        self.assertEqual(res.status_code, 500)
+    def test_claim_with_unknown_code_is_rejected(self):
+        res = client_for(self.outsider).post(URL + "claim/", {"code": "NOPE-NOPE"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "Referral code is invalid or inactive."})
+        self.assertFalse(PillReferralEvent.objects.filter(referred_user=self.outsider).exists())
 
     def test_pay_shift_requires_shift_id(self):
         res = client_for(self.owner).post(URL + "pay-shift/", {}, format="json")

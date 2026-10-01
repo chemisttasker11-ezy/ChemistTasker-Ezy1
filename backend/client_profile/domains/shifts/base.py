@@ -22,10 +22,9 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import SAFE_METHODS
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from client_profile.admin_helpers import (
@@ -625,10 +624,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
         next_visibility = allowed_tiers[target_index]
         if next_visibility == PUBLIC_LEVEL:
-            try:
-                enforce_public_shift_daily_limit(shift.pharmacy)
-            except ValidationError as exc:
-                raise ValidationError(exc.detail if hasattr(exc, 'detail') else exc.args[0])
+            enforce_public_shift_daily_limit(shift.pharmacy)
 
         visibility = self._apply_escalation(shift, allowed_tiers, target_index)
         return Response({'detail': f'Shift escalated to {visibility}.'}, status=status.HTTP_200_OK)

@@ -110,23 +110,18 @@ class ClaimDecisionTests(ClaimsBase):
         self.pharmacy.refresh_from_db()
         self.assertIsNone(self.pharmacy.organization_id)
 
-    def test_only_pending_claims_can_be_decided_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately (shadowed django ValidationError in views.py, see pills/claim):
-        # the intended 400 "Only pending claims can be updated." surfaces as a 500.
+    def test_only_pending_claims_can_be_decided(self):
         self.decide(self.owner, "REJECTED")
-        c = client_for(self.owner)
-        c.raise_request_exception = False
-        res = c.patch(f"{URL}{self.claim.id}/", {"status": "ACCEPTED"}, format="json")
-        self.assertEqual(res.status_code, 500)
+        res = client_for(self.owner).patch(f"{URL}{self.claim.id}/", {"status": "ACCEPTED"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "Only pending claims can be updated."})
         self.claim.refresh_from_db()
         self.assertEqual(self.claim.status, "REJECTED")
 
-    def test_invalid_status_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately: intended 400 "Status must be ACCEPTED or REJECTED." is a 500.
-        c = client_for(self.owner)
-        c.raise_request_exception = False
-        res = c.patch(f"{URL}{self.claim.id}/", {"status": "PENDING"}, format="json")
-        self.assertEqual(res.status_code, 500)
+    def test_invalid_status_is_rejected(self):
+        res = client_for(self.owner).patch(f"{URL}{self.claim.id}/", {"status": "PENDING"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"status": "Status must be ACCEPTED or REJECTED."})
         self.claim.refresh_from_db()
         self.assertEqual(self.claim.status, "PENDING")
 

@@ -14,11 +14,10 @@ from pharmacy_hub.models import PharmacyHubPost
 from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
 from client_profile.domains.shifts.serializers import ShiftSerializer
 from users.permissions import IsExplorer, IsOtherstaff, IsPharmacist, OrganizationRolePermission
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from client_profile.admin_helpers import pharmacies_user_admins
 from users.serializers import UserProfileSerializer
 from django.db.models import Q, Sum

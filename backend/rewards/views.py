@@ -2,7 +2,6 @@
 from rest_framework import status, viewsets
 from client_profile.models import Shift, ShiftOffer
 from rewards.models import PillLedgerEntry, PillReferralEvent, PillRewardRule
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -145,7 +144,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 award=user_is_referral_reward_eligible(request.user),
             )
         except RewardError as exc:
-            raise ValidationError({"detail": str(exc)})
+            raise DRFValidationError({"detail": str(exc)})
         return Response(PillReferralEventSerializer(event).data)
 
     @action(detail=False, methods=["post"], url_path="pay-shift")

@@ -140,11 +140,12 @@ class MessageEndpointTests(ChatBase):
         m = Message.objects.get(pk=self.msg_id)
         self.assertEqual((m.body, m.original_body, m.is_edited), ("edited", "original", True))
 
-    def test_edit_to_empty_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately: MessageViewSet.update raises the shadowed (django) ValidationError.
-        c = client_for(self.alice)
-        c.raise_request_exception = False
-        self.assertEqual(c.patch(f"{MESSAGES}{self.msg_id}/", {"body": ""}, format="json").status_code, 500)
+    def test_edit_to_empty_is_rejected_and_keeps_the_message(self):
+        res = client_for(self.alice).patch(f"{MESSAGES}{self.msg_id}/", {"body": ""}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"body": "Message body cannot be empty."})
+        m = Message.objects.get(pk=self.msg_id)
+        self.assertEqual((m.body, m.is_edited), ("original", False))
 
     def test_delete_is_a_soft_delete_by_the_sender_only(self):
         self.assertEqual(client_for(self.bob).delete(f"{MESSAGES}{self.msg_id}/").status_code, 403)

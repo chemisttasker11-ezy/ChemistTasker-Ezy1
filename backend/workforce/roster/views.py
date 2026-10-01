@@ -5,7 +5,6 @@ from workforce.models import RosterPeriod
 from client_profile.domains.memberships.serializers import MembershipSerializer
 from workforce.roster.serializers import RosterAssignmentSerializer
 from client_profile.domains.shifts.serializers import OpenShiftSerializer, ShiftSerializer
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -405,10 +404,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
         next_visibility = allowed_tiers[target_index]
         if next_visibility == PUBLIC_LEVEL:
-            try:
-                enforce_public_shift_daily_limit(shift.pharmacy)
-            except ValidationError as exc:
-                raise ValidationError(exc.detail if hasattr(exc, 'detail') else exc.args[0])
+            enforce_public_shift_daily_limit(shift.pharmacy)
 
         visibility = BaseShiftViewSet._apply_escalation(shift, allowed_tiers, target_index)
         detail_prefix = f'Shift escalated to {visibility}'.rstrip('.')

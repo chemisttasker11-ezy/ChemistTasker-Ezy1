@@ -8,10 +8,9 @@ from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.pagination import PageNumberPagination
 from client_profile.models import Membership, Pharmacy, PHARMACY_STAFF_EMPLOYMENT_TYPES, ShiftSlotAssignment
 from chat.models import Conversation, make_dm_key, Message, MessageReaction, Participant
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.decorators import action
 from client_profile.admin_helpers import CAPABILITY_MANAGE_COMMS, has_admin_capability
 from django.shortcuts import get_object_or_404
