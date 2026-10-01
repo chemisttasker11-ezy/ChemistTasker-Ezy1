@@ -106,7 +106,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     """
     Computes structured grid views for a roster week:
     - assignments: All assigned shifts in the period explicitly marked is_rostered=True.
-    - vacant_slots: Unassigned slots in the period.
+    - vacant_slots: Unassigned slots in the period (a marketplace booking, is_rostered=False, occupies its slot too).
     - staff_view: Grouped by worker with total hours, shift count, and daily assignments.
     - stacked_view: Grouped by date with chronological coverage bands.
     """
@@ -122,7 +122,13 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     )
     assignments_list = list(assignments_qs)
 
-    occupied = {(a.slot_id, a.slot_date or a.slot.date) for a in assignments_list}
+    occupied = set(
+        ShiftSlotAssignment.objects.filter(
+            shift__pharmacy=pharmacy,
+            slot_date__gte=week_start,
+            slot_date__lte=week_end,
+        ).values_list("slot_id", "slot_date")
+    )
     vacant_list = []
     from copy import copy
     from client_profile.domains.shifts.pricing import expand_shift_slots
