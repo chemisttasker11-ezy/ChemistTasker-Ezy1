@@ -17,18 +17,20 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterActionAudit,
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterTemplate,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
+from workforce.models import (
+    RosterAcknowledgement,
+    RosterActionAudit,
+    RosterPeriod,
+    RosterPublicationAudit,
+    RosterTemplate,
+)
 from talent.models import UserAvailability
-from client_profile.domains.roster.services import get_or_create_roster_period, publish_roster_period
+from workforce.roster.services import get_or_create_roster_period, publish_roster_period
 from attendance_tests.roster_fixtures import approved_workforce_leave
 
 User = get_user_model()

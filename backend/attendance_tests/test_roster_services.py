@@ -17,15 +17,13 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterPeriod,
-    RosterPublicationAudit,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit
 from talent.models import UserAvailability
-from client_profile.domains.roster.services import (
+from workforce.roster.services import (
     acknowledge_roster_period,
     get_or_create_roster_period,
     get_roster_acknowledgement_status,

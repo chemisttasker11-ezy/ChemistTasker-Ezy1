@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 import uuid
 from datetime import timedelta
-from client_profile.models.roster import RosterPeriod
+from workforce.models import RosterPeriod
 
 
 # Shift Model - Represents an available shift in a pharmacy
@@ -331,7 +331,7 @@ def _assert_roster_assignment_mutable(assignment):
 
 class ShiftSlot(models.Model):
     roster_period = models.ForeignKey(
-        "RosterPeriod", null=True, blank=True, on_delete=models.PROTECT,
+        "workforce.RosterPeriod", null=True, blank=True, on_delete=models.PROTECT,
         related_name="planned_slots",
         help_text="Explicit ownership of a roster slot, retained when it is vacant.",
     )

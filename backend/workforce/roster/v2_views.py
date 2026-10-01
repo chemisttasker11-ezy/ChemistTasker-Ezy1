@@ -1,14 +1,8 @@
 """Roster V2 API: periods, validation, publication, worker acknowledgement, copy/templates, bulk edits, swap and cover requests, action audits."""
-from client_profile.domains.roster.permissions import is_authorized_attendance_manager
-from client_profile.models import (
-    Pharmacy,
-    RosterActionAudit,
-    RosterPeriod,
-    RosterTemplate,
-    ShiftSlotAssignment,
-    WorkerShiftRequest,
-)
-from client_profile.domains.roster.services import (
+from workforce.roster.permissions import is_authorized_attendance_manager
+from client_profile.models import Pharmacy, ShiftSlotAssignment, WorkerShiftRequest
+from workforce.models import RosterActionAudit, RosterPeriod, RosterTemplate
+from workforce.roster.services import (
     acknowledge_roster_period,
     apply_roster_template,
     archive_roster_period,
@@ -25,7 +19,7 @@ from client_profile.domains.roster.services import (
     unpublish_roster_period,
     validate_roster_period,
 )
-from client_profile.domains.roster.worker_actions import (
+from workforce.roster.worker_actions import (
     approve_cover_replacement,
     approve_direct_swap,
     reject_worker_shift_request,
@@ -43,7 +37,9 @@ from rest_framework import permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from attendance.views import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class RosterPeriodDetailView(APIView):
@@ -293,7 +289,7 @@ class WorkerPublishedRosterView(APIView):
         end_date = request.query_params.get("end_date")
 
         from datetime import timedelta
-        from client_profile.models import RosterPeriod, RosterAcknowledgement
+        from workforce.models import RosterAcknowledgement, RosterPeriod
 
         shifts = get_worker_published_roster(request.user, start_date=start_date, end_date=end_date)
         period_ids = set()

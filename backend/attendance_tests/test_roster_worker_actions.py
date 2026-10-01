@@ -18,20 +18,22 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterActionAudit,
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterTemplate,
     Shift,
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
+from workforce.models import (
+    RosterAcknowledgement,
+    RosterActionAudit,
+    RosterPeriod,
+    RosterPublicationAudit,
+    RosterTemplate,
+)
 from attendance.models import AttendanceSession, ProvisionalAttendance
 from talent.models import UserAvailability
-from client_profile.domains.roster.worker_actions import (
+from workforce.roster.worker_actions import (
     approve_cover_replacement,
     approve_direct_swap,
     reject_worker_shift_request,

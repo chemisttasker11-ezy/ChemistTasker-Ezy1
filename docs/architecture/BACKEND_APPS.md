@@ -1,15 +1,16 @@
 # Backend apps
 
 `client_profile` used to hold every domain of the platform in one Django app (about 5,000 model lines and 10,500 view
-lines). It is now a smaller kernel plus nine apps that each own one domain. Public URLs, request/response shapes,
-Celery task names and WebSocket routes did not change: the frontends (Vite SPA, Next.js, Expo) and the shared-core SDK
-keep calling `/api/client-profile/...` and `/ws/...` exactly as before.
+lines). It is now a smaller kernel plus nine apps that each own one domain, and the roster joined the existing
+`workforce` app. Public URLs, request/response shapes, Celery task names and WebSocket routes did not change: the
+frontends (Vite SPA, Next.js, Expo) and the shared-core SDK keep calling `/api/client-profile/...` and `/ws/...`
+exactly as before.
 
 ## Apps and what they own
 
 | App | Owns | Tables (renamed from `client_profile_*`) | Routes (mounted under `/api/client-profile/`) |
 | --- | --- | --- | --- |
-| `client_profile` (kernel) | organisations, pharmacies, chains, memberships and applications, onboarding, shifts / offers / interests / leave / worker requests, roster, dashboards, shared permissions and helpers | `client_profile_*` (unchanged) | everything not listed below |
+| `client_profile` (kernel) | organisations, pharmacies, chains, memberships and applications, onboarding, shifts / offers / interests / leave / worker requests, dashboards, shared permissions and helpers | `client_profile_*` (unchanged) | everything not listed below |
 | `attendance` | kiosk devices and pairing, QR sessions, worker PINs, attendance sessions and events, offline kiosk events, provisional approvals, corrections | `attendance_*` (9) | `attendance/kiosk/**`, `attendance/worker/**`, `attendance/manager/**` |
 | `chat` | conversations, participants, messages, reactions, the room WebSocket consumer, chat signals | `chat_*` (4) | `rooms/**`, `messages/**`, `chat-participants/` |
 | `invoicing` | invoices and line items, invoice generation from shifts, PDF/e-mail | `invoicing_*` (2) | `invoices/**` |
@@ -19,13 +20,17 @@ keep calling `/api/client-profile/...` and `/ws/...` exactly as before.
 | `rewards` | pill rewards, referral codes and events, the ledger, the verified-onboarding signal | `rewards_*` (4) | `pill-rewards/**` |
 | `talent` | explorer posts and reactions, user availability | `talent_*` (3) | `explorer-posts/**`, `user-availability/**` |
 | `team_calendar` | calendar events, work notes, the calendar feed, their Celery tasks | `team_calendar_*` (4) | `calendar-events/**`, `work-notes/**`, `calendar-feed/**` |
+| `workforce` (existing app; the roster moved in) | roster periods, publication audits, acknowledgements, templates and action audits; the roster API (V1 viewsets, V2 period / publication / worker-request endpoints), services, validation, worker actions and revisions; besides its leave, timesheets and employment engagements | `workforce_rosterperiod`, `workforce_rosterpublicationaudit`, `workforce_rosteracknowledgement`, `workforce_rostertemplate`, `workforce_rosteractionaudit` (5) | `roster-owner/**`, `roster-worker/**`, `roster-shifts/**`, `roster/create-and-assign-shift/`, `attendance/roster/**` (and its own `workforce/**`) |
 
-`users`, `billing`, `workforce`, `worker_finance`, `marketplace`, `ethical_marketplace` and `public_hub` were already
-separate apps and are unchanged in ownership (see `DOMAIN_OWNERSHIP.md`).
+`users`, `billing`, `worker_finance`, `marketplace`, `ethical_marketplace` and `public_hub` were already separate apps
+and are unchanged in ownership (see `DOMAIN_OWNERSHIP.md`).
 
-The roster stays in the kernel on purpose: `ShiftSlot.roster_period` is a foreign key into the roster and the shift
-code guards published periods, so shifts and roster are one scheduling domain. Its code now lives together in
-`client_profile/domains/roster/` (views, V2 views, serializers, services, validation, worker actions, permissions).
+The roster belongs to `workforce`, its owner in `DOMAIN_OWNERSHIP.md`: the roster models sit in `workforce/models.py`
+next to the roster revisions, leave and timesheets they work with, and the code lives in `workforce/roster/`
+(`views.py`, `v2_views.py`, `serializers.py`, `services.py`, `validation.py`, `worker_actions.py`, `permissions.py`,
+`revisions.py`, `urls.py`). Shifts stay in the kernel: `ShiftSlot.roster_period` is a foreign key to
+`workforce.RosterPeriod` and the shift models refuse edits inside a published period. `workforce/models.py` imports
+no kernel module (its relations to pharmacies and shifts are string references), so the dependency has one direction.
 
 ## Layout of an app
 
@@ -57,10 +62,14 @@ Seams where the kernel reaches into a leaf app (each is a single, reviewed place
   (`router.registry.extend(...)`, so the API root listing, route order and `client_profile:` route names are
   unchanged) and includes the apps' explicit `path()` lists before the router.
 * the dashboards read invoices and hub posts; the upload-reference registry
-  (`domains/common/serializers.py`) lists chat and hub attachments; roster services read attendance facts (lazy
-  import); `client_profile/tasks.py` calls the rewards service after verification (lazy import); roster code reads
-  `talent.UserAvailability`.
-* `workforce` consumes attendance (timesheets, signals); `worker_finance` and `invoicing` share the invoice model.
+  (`domains/common/serializers.py`) lists chat and hub attachments; `client_profile/tasks.py` calls the rewards
+  service after verification (lazy import).
+* the kernel and `workforce` form the scheduling domain: the shift models guard published roster periods
+  (`workforce.RosterPeriod`), shift leave and engagement code call the workforce leave and engagement services, and a
+  worker request releases a rostered worker through `workforce.roster.worker_actions`; the roster code builds on the
+  kernel's shift models, serializers and pricing.
+* `workforce` consumes attendance (timesheets, signals; roster services read attendance facts) and roster code reads
+  `talent.UserAvailability`; `worker_finance` and `invoicing` share the invoice model.
 
 ## Conventions
 
@@ -85,8 +94,11 @@ Moving a model between apps must not touch data or the live schema, so a move is
    The new app registers the models under their old table names and re-labels the ContentType rows in place, so
    permissions, admin history and generic relations stay attached. Relations from other apps are re-pointed by a
    state-only migration in that app (`worker_finance.0007`, `workforce.0006`), which the move-out migration depends on.
-2. `<app>.0002_clean_table_and_index_names` renames the tables and indexes (`ALTER TABLE ... RENAME`,
-   `ALTER INDEX ... RENAME`: metadata only, no row is rewritten). It depends on the move-out migration, so it runs after
+   Moving into an existing app works the same way: `workforce.0007_move_roster_in` registers the roster models and
+   re-points the revision relations, `client_profile.0070_move_roster_out` re-points `ShiftSlot.roster_period`.
+2. `<app>.0002_clean_table_and_index_names` (for the roster `workforce.0008_clean_roster_table_and_index_names`)
+   renames the tables and indexes (`ALTER TABLE ... RENAME`, `ALTER INDEX ... RENAME`: metadata only, no row is
+   rewritten). It depends on the move-out migration, so it runs after
    every other migration that creates a foreign key to the old table name, whatever order the planner picks.
 
 Rules that keep this safe:

@@ -31,20 +31,22 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterActionAudit,
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterTemplate,
     Shift,
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
+from workforce.models import (
+    RosterAcknowledgement,
+    RosterActionAudit,
+    RosterPeriod,
+    RosterPublicationAudit,
+    RosterTemplate,
+)
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 from talent.models import UserAvailability
-from client_profile.domains.roster.services import (
+from workforce.roster.services import (
     apply_roster_template,
     bulk_edit_roster_period,
     copy_roster_week,
@@ -53,12 +55,8 @@ from client_profile.domains.roster.services import (
     get_roster_period_grid,
     publish_roster_period,
 )
-from client_profile.domains.roster.v2_views import (
-    RosterPeriodDetailView,
-    RosterPublishView,
-    RosterValidateView,
-)
-from client_profile.domains.roster.views import RosterWorkerViewSet
+from workforce.roster.v2_views import RosterPeriodDetailView, RosterPublishView, RosterValidateView
+from workforce.roster.views import RosterWorkerViewSet
 
 User = get_user_model()
 

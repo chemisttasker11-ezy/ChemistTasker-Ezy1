@@ -19,7 +19,7 @@ from attendance.approvals import (
     create_attendance_correction,
     reject_provisional_attendance,
 )
-from client_profile.domains.roster.permissions import is_authorized_attendance_manager
+from workforce.roster.permissions import is_authorized_attendance_manager
 from attendance.credentials import activate_kiosk_device, generate_signed_pharmacy_qr
 from attendance.transitions import clock_in, clock_out
 from attendance.views import (

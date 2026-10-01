@@ -13,7 +13,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from client_profile.models import Membership, Pharmacy, RosterPeriod
+from client_profile.models import Membership, Pharmacy
+from workforce.models import RosterPeriod
 from attendance.models import AttendanceSession
 from client_profile.timezone_utils import get_pharmacy_timezone
 
@@ -46,7 +47,7 @@ from .models import (
     WorkforceLeaveRequest,
 )
 from .permissions import can_manage_pharmacy, can_view_worker_timesheet, require_manage_pharmacy, require_manage_workforce_pharmacy
-from .roster import publish_period_command, serialize_workspace, validate_period_command
+from workforce.roster.revisions import publish_period_command, serialize_workspace, validate_period_command
 from .tasks import rebuild_timesheet_period_task, rebuild_timesheet_task
 from .timesheets import (
     add_comment,

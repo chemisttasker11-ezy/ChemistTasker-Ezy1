@@ -15,17 +15,14 @@ from client_profile.models import (
     LeaveRequest,
     Membership,
     Pharmacy,
-    RosterAcknowledgement,
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterTemplate,
     Shift,
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit, RosterTemplate
 from talent.models import UserAvailability
-from client_profile.domains.roster.permissions import is_authorized_attendance_manager
+from workforce.roster.permissions import is_authorized_attendance_manager
 from client_profile.domains.shifts.engagement import staff_assignment_defaults
 
 User = get_user_model()
@@ -273,7 +270,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
 
 
 def validate_roster_period(roster_period):
-    from client_profile.domains.roster.validation import worker_issues
+    from workforce.roster.validation import worker_issues
     assignments = list(get_roster_period_assignments(roster_period))
     errors, warnings = [], []
     for assignment in assignments:

@@ -1,3 +1,4 @@
+"""Roster revisions: optimistic-concurrency workspace, validation and publication commands layered over the roster periods."""
 from __future__ import annotations
 
 import hashlib
@@ -9,16 +10,13 @@ from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from client_profile.models import RosterPeriod, ShiftSlotAssignment
-from client_profile.domains.roster.services import (
-    get_roster_period_grid,
-    publish_roster_period,
-    validate_roster_period,
-)
-from client_profile.domains.roster.validation import work_interval
+from client_profile.models import ShiftSlotAssignment
+from workforce.models import RosterPeriod
+from workforce.roster.services import get_roster_period_grid, publish_roster_period, validate_roster_period
+from workforce.roster.validation import work_interval
 
-from .models import CoverageRequirement, RosterOperation, RosterRevisionState
-from .permissions import require_manage_pharmacy
+from workforce.models import CoverageRequirement, RosterOperation, RosterRevisionState
+from workforce.permissions import require_manage_pharmacy
 
 
 def _json_hash(payload) -> str:

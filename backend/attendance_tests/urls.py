@@ -30,8 +30,8 @@ from attendance.views import (
     WorkerUpdatePinView,
 )
 
-from client_profile.domains.roster.views import RosterOwnerViewSet, RosterShiftManageViewSet, RosterWorkerViewSet
-from client_profile.domains.roster.v2_views import (
+from workforce.roster.views import RosterOwnerViewSet, RosterShiftManageViewSet, RosterWorkerViewSet
+from workforce.roster.v2_views import (
     RosterAcknowledgementStatusView,
     RosterActionAuditListView,
     RosterArchiveView,

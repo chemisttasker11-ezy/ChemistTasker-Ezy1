@@ -26,7 +26,7 @@ from attendance.approvals import (
     get_pending_provisional_attendances,
     reject_provisional_attendance,
 )
-from client_profile.domains.roster.permissions import is_authorized_attendance_manager
+from workforce.roster.permissions import is_authorized_attendance_manager
 from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
@@ -50,7 +50,8 @@ from attendance.throttles import (
 )
 from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
 from attendance.protocol import sync_offline_batch
-from client_profile.models import Membership, Pharmacy, RosterAcknowledgement, RosterPublicationAudit, Shift
+from client_profile.models import Membership, Pharmacy, Shift
+from workforce.models import RosterAcknowledgement, RosterPublicationAudit
 from attendance.models import (
     AttendanceEvent,
     AttendanceSession,

@@ -51,11 +51,11 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterPeriod,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from workforce.models import RosterPeriod
 from attendance.models import (
     AttendanceCorrection,
     AttendanceEvent,
@@ -116,7 +116,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
                 "attendance_workerpin",
                 "attendance_pharmacyqrsession",
                 "attendance_kioskdevice",
-                "client_profile_rosterperiod",
+                "workforce_rosterperiod",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",

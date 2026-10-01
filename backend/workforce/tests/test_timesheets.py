@@ -17,11 +17,11 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterPeriod,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from workforce.models import RosterPeriod
 from attendance.models import AttendanceEvent, AttendanceSession
 from workforce.attendance_edits import append_missing_punch
 from workforce.leave_service import create_leave, decide_leave
@@ -31,7 +31,7 @@ from workforce.models import (
 from workforce.timesheets import build_timesheet, decide_check
 from workforce.views import WorkforceLeaveListCreateView
 from client_profile.domains.shifts.leave import LeaveRequestViewSet
-from client_profile.domains.roster.validation import worker_issues
+from workforce.roster.validation import worker_issues
 from users.models import OrganizationMembership
 
 

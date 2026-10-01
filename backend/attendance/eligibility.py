@@ -101,7 +101,7 @@ def is_draft_roster_assignment(assignment: ShiftSlotAssignment) -> bool:
         return False
 
     try:
-        from client_profile.models import RosterPeriod
+        from workforce.models import RosterPeriod
         draft_period = RosterPeriod.objects.filter(
             pharmacy=pharmacy,
             week_start=monday,

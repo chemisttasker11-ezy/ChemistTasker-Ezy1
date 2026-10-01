@@ -1,8 +1,9 @@
 """Roster API (V1): owner and manager roster views, shift assignment and the worker roster."""
 from rest_framework import permissions, status, viewsets
-from client_profile.models import Membership, Pharmacy, RosterPeriod, Shift, ShiftSlot, ShiftSlotAssignment
+from client_profile.models import Membership, Pharmacy, Shift, ShiftSlot, ShiftSlotAssignment
+from workforce.models import RosterPeriod
 from client_profile.domains.memberships.serializers import MembershipSerializer
-from client_profile.domains.roster.serializers import RosterAssignmentSerializer
+from workforce.roster.serializers import RosterAssignmentSerializer
 from client_profile.domains.shifts.serializers import OpenShiftSerializer, ShiftSerializer
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response

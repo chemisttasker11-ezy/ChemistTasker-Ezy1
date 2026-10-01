@@ -31,7 +31,7 @@ from django.utils import timezone
 
 from client_profile.models import Pharmacy, PharmacyAdmin, Shift, ShiftSlot, ShiftSlotAssignment
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
-from client_profile.domains.roster.permissions import is_authorized_attendance_manager
+from workforce.roster.permissions import is_authorized_attendance_manager
 
 
 def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:

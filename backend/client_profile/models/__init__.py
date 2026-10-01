@@ -55,13 +55,6 @@ from client_profile.models.memberships import (
     MembershipInviteLink,
     MembershipApplication,
 )
-from client_profile.models.roster import (
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterAcknowledgement,
-    RosterTemplate,
-    RosterActionAudit,
-)
 from client_profile.models.shifts import (
     Shift,
     ShiftDescriptionTemplate,

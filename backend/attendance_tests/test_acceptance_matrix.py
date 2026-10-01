@@ -29,7 +29,7 @@ from attendance.approvals import (
     get_effective_session_timeline,
     reject_provisional_attendance,
 )
-from client_profile.domains.roster.permissions import is_authorized_attendance_manager
+from workforce.roster.permissions import is_authorized_attendance_manager
 from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
@@ -47,16 +47,18 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterActionAudit,
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterTemplate,
     Shift,
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
     WorkerShiftRequest,
+)
+from workforce.models import (
+    RosterAcknowledgement,
+    RosterActionAudit,
+    RosterPeriod,
+    RosterPublicationAudit,
+    RosterTemplate,
 )
 from attendance.models import (
     AttendanceCorrection,
@@ -68,7 +70,7 @@ from attendance.models import (
     WorkerPIN,
 )
 from talent.models import UserAvailability
-from client_profile.domains.roster.services import (
+from workforce.roster.services import (
     acknowledge_roster_period,
     apply_roster_template,
     bulk_edit_roster_period,
@@ -82,7 +84,7 @@ from client_profile.domains.roster.services import (
     unpublish_roster_period,
     validate_roster_period,
 )
-from client_profile.domains.roster.worker_actions import (
+from workforce.roster.worker_actions import (
     approve_cover_replacement,
     approve_direct_swap,
     reject_worker_shift_request,
