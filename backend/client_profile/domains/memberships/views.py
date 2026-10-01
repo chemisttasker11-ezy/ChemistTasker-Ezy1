@@ -832,7 +832,7 @@ class MagicLinkInfoView(APIView):
     def get(self, request, token):
         try:
             link = MembershipInviteLink.objects.get(token=token)
-        except MembershipInviteLink.DoesNotExist:
+        except (MembershipInviteLink.DoesNotExist, DjangoValidationError):   # unknown token, or not a UUID at all
             return Response({'detail': 'Invalid link.'}, status=404)
         if not link.is_valid():
             return Response({'detail': 'Link expired or inactive.'}, status=410)
@@ -856,7 +856,7 @@ class SubmitMembershipApplication(APIView):
     def post(self, request, token):
         try:
             link = MembershipInviteLink.objects.get(token=token)
-        except MembershipInviteLink.DoesNotExist:
+        except (MembershipInviteLink.DoesNotExist, DjangoValidationError):   # unknown token, or not a UUID at all
             return Response({'detail': 'Invalid link.'}, status=404)
         if not link.is_valid():
             return Response({'detail': 'Link expired or inactive.'}, status=410)
