@@ -29,10 +29,7 @@ from client_profile.models import (
     WorkerShiftRequest,
 )
 from talent.models import UserAvailability
-from client_profile.roster_services import (
-    get_or_create_roster_period,
-    publish_roster_period,
-)
+from client_profile.domains.roster.services import get_or_create_roster_period, publish_roster_period
 
 User = get_user_model()
 

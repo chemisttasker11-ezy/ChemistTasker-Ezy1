@@ -26,7 +26,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from talent.models import UserAvailability
-from client_profile.roster_services import (
+from client_profile.domains.roster.services import (
     acknowledge_roster_period,
     get_or_create_roster_period,
     get_roster_acknowledgement_status,

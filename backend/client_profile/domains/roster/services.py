@@ -32,7 +32,7 @@ User = get_user_model()
 
 
 def refresh_assignment_rate(assignment):
-    from .services import get_locked_rate_for_slot
+    from client_profile.services import get_locked_rate_for_slot
     assignment.unit_rate, assignment.rate_reason = get_locked_rate_for_slot(
         assignment.slot, assignment.shift, assignment.user,
         override_date=assignment.slot_date or assignment.slot.date,
@@ -128,7 +128,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     occupied = {(a.slot_id, a.slot_date or a.slot.date) for a in assignments_list}
     vacant_list = []
     from copy import copy
-    from .services import expand_shift_slots
+    from client_profile.services import expand_shift_slots
     candidate_shifts = Shift.objects.filter(pharmacy=pharmacy, slots__date__lte=week_end).filter(
         Q(slots__date__gte=week_start) | Q(slots__is_recurring=True, slots__recurring_end_date__gte=week_start)
     ).distinct().prefetch_related("slots")
@@ -273,7 +273,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
 
 
 def validate_roster_period(roster_period):
-    from .roster_validation import worker_issues
+    from client_profile.domains.roster.validation import worker_issues
     assignments = list(get_roster_period_assignments(roster_period))
     errors, warnings = [], []
     for assignment in assignments:

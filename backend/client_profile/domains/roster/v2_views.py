@@ -8,7 +8,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
-from client_profile.roster_services import (
+from client_profile.domains.roster.services import (
     acknowledge_roster_period,
     apply_roster_template,
     archive_roster_period,
@@ -25,7 +25,7 @@ from client_profile.roster_services import (
     unpublish_roster_period,
     validate_roster_period,
 )
-from client_profile.roster_worker_actions import (
+from client_profile.domains.roster.worker_actions import (
     approve_cover_replacement,
     approve_direct_swap,
     reject_worker_shift_request,

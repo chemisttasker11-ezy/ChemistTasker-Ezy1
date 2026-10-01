@@ -36,7 +36,7 @@ def validate_worker_replacement_eligibility(
 ) -> bool:
     from django.contrib.auth import get_user_model
     from django.db import connection
-    from .roster_validation import worker_issues
+    from client_profile.domains.roster.validation import worker_issues
     if not target_user:
         raise ValidationError("Target worker is required.")
     if connection.in_atomic_block:
@@ -175,7 +175,7 @@ def approve_direct_swap(
         # Atomic transfer of assignment
         assignment.user = target_user
         assignment.save(update_fields=["user"])
-        from .roster_services import refresh_assignment_rate
+        from client_profile.domains.roster.services import refresh_assignment_rate
         refresh_assignment_rate(assignment)
 
         # Mark request approved
@@ -296,7 +296,7 @@ def approve_cover_replacement(
         # Atomic reassignment
         assignment.user = replacement_user
         assignment.save(update_fields=["user"])
-        from .roster_services import refresh_assignment_rate
+        from client_profile.domains.roster.services import refresh_assignment_rate
         refresh_assignment_rate(assignment)
 
         # Mark request approved
@@ -357,13 +357,13 @@ def release_worker_from_assignment(
 
             shift = assignment.shift
             # Explicit deletion of the filled slot assignment
-            from .roster_services import _protect_assignment_history
+            from client_profile.domains.roster.services import _protect_assignment_history
             _protect_assignment_history(assignment)
             assignment.delete()
             req.shift = None
 
         if shift and escalate_to_visibility:
-            from .utils import enforce_public_shift_daily_limit
+            from client_profile.utils import enforce_public_shift_daily_limit
             from client_profile.domains.shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
             from client_profile.domains.shifts.serializers import ShiftSerializer
             tiers = ShiftSerializer.build_allowed_tiers(shift.pharmacy)

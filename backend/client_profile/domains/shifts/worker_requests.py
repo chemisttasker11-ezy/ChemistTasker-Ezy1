@@ -236,7 +236,7 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
         
         # Check if this request is linked to an existing ShiftSlotAssignment
         if req.shift:
-            from client_profile.roster_worker_actions import release_worker_from_assignment
+            from client_profile.domains.roster.worker_actions import release_worker_from_assignment
             try:
                 release_worker_from_assignment(
                     req,

@@ -46,7 +46,7 @@ from client_profile.models import (
 from attendance.models import AttendanceSession, ProvisionalAttendance
 from talent.models import UserAvailability
 from users.models import OrganizationMembership
-from client_profile.roster_worker_actions import (
+from client_profile.domains.roster.worker_actions import (
     approve_cover_replacement,
     approve_direct_swap,
     reject_worker_shift_request,
