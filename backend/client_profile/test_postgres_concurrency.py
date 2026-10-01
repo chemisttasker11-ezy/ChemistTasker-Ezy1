@@ -21,7 +21,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from client_profile.domains.memberships.serializers import MembershipApplicationSerializer
-from client_profile.services import generate_invoice_from_shifts
+from client_profile.domains.invoices.services import generate_invoice_from_shifts
 
 
 User = get_user_model()

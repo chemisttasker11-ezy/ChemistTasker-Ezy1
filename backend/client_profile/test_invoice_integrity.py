@@ -19,7 +19,7 @@ from client_profile.models import (
 )
 from notifications.models import Notification
 from client_profile.domains.invoices.serializers import InvoiceSerializer
-from client_profile.services import generate_invoice_from_shifts
+from client_profile.domains.invoices.services import generate_invoice_from_shifts
 from client_profile.domains.invoices.views import InvoiceDetailView, send_invoice_email
 from worker_finance.views import ReceivedInvoiceViewSet
 from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision

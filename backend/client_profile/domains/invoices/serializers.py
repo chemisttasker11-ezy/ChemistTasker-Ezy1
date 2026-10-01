@@ -85,7 +85,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             item['invoice'] = invoice
             InvoiceLineItemSerializer().create(item)
 
-        from client_profile.services import recalculate_invoice_totals
+        from client_profile.domains.invoices.services import recalculate_invoice_totals
         invoice.refresh_from_db()
         return recalculate_invoice_totals(invoice)
 
@@ -116,5 +116,5 @@ class InvoiceSerializer(serializers.ModelSerializer):
                     item['invoice'] = instance
                     InvoiceLineItemSerializer().create(item)
 
-        from client_profile.services import recalculate_invoice_totals
+        from client_profile.domains.invoices.services import recalculate_invoice_totals
         return recalculate_invoice_totals(instance)

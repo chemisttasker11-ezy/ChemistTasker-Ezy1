@@ -12,7 +12,7 @@ from client_profile.admin_helpers import pharmacies_user_admins
 from django.shortcuts import get_object_or_404
 import json
 from django.db.models import F, Q
-from client_profile.services import (
+from client_profile.domains.invoices.services import (
     generate_invoice_from_shifts,
     generate_preview_invoice_lines,
     render_invoice_to_pdf,

@@ -35,7 +35,7 @@ from client_profile.domains.memberships.serializers import (
     MembershipApplicationSerializer,
 )
 from client_profile.domains.roster.serializers import RosterAssignmentSerializer
-from client_profile.services import validate_internal_invoice_shifts
+from client_profile.domains.invoices.services import validate_internal_invoice_shifts
 from client_profile.domains.memberships.views import MembershipApplicationViewSet, SubmitMembershipApplication
 from client_profile.domains.shifts.offers import ShiftOfferViewSet
 from client_profile.utils import finalize_shift_offer
