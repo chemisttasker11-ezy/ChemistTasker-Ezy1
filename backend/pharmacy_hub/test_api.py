@@ -5,7 +5,10 @@ public_hub / membership tests; this file pins the pharmacy-scope contract end to
 from django.test import TestCase
 
 from client_profile.models import Membership
-from pharmacy_hub.models import PharmacyHubComment, PharmacyHubPoll, PharmacyHubPost, PharmacyHubReaction
+from pharmacy_hub.models import (
+    PharmacyHubComment, PharmacyHubCommentReaction, PharmacyHubPoll, PharmacyHubPollReaction, PharmacyHubPost,
+    PharmacyHubReaction,
+)
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
 )
@@ -180,6 +183,22 @@ class HubReactionTests(HubBase):
         url = f"{POSTS}{pid}/reactions/"
         self.assertEqual(client_for(self.other_staff).post(url, {"reaction_type": "MEH"}, format="json").status_code, 400)
         self.assertEqual(client_for(self.outsider).post(url, {"reaction_type": "LIKE"}, format="json").status_code, 403)
+
+    def test_a_reaction_must_name_its_type_on_posts_comments_and_polls(self):
+        pid = self.make_post()
+        cid = client_for(self.other_staff).post(f"{POSTS}{pid}/comments/", {"body": "x"}, format="json").json()["id"]
+        poll_id = client_for(self.staff).post(
+            POLLS, {**self.scope, "question": "Lunch?", "option_labels": ["Pizza", "Salad"]}, format="json").json()["id"]
+        c = client_for(self.other_staff)
+        for url in (f"{POSTS}{pid}/reactions/", f"{POSTS}{pid}/comments/{cid}/reactions/", f"{POLLS}{poll_id}/reactions/"):
+            with self.subTest(url=url):
+                res = c.post(url, {}, format="json")
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json(), {"reaction_type": ["This field is required."]})
+        self.assertEqual(
+            (PharmacyHubReaction.objects.count(), PharmacyHubCommentReaction.objects.count(),
+             PharmacyHubPollReaction.objects.count()),
+            (0, 0, 0))
 
 
 class HubPollTests(HubBase):

@@ -1249,3 +1249,5 @@ class HubReactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PharmacyHubReaction
         fields = ["reaction_type"]
+        # the model default (LIKE) is for stored rows; a reaction request must say which reaction it is
+        extra_kwargs = {"reaction_type": {"required": True}}
