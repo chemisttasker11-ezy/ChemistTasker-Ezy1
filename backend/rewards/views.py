@@ -1,6 +1,7 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Pill rewards API: balance, rules, referral codes/events, claiming and paying for shifts with pills."""
 from rest_framework import status, viewsets
-from client_profile.models import PillLedgerEntry, PillReferralEvent, PillRewardRule, Shift, ShiftOffer
+from client_profile.models import Shift, ShiftOffer
+from rewards.models import PillLedgerEntry, PillReferralEvent, PillRewardRule
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
 from client_profile.utils import finalize_shift_offer, send_shift_payment_finalized_notifications
-from client_profile.rewards import (
+from rewards.services import (
     claim_referral_code,
     create_friend_referral,
     create_shift_referral,
@@ -24,7 +25,7 @@ from client_profile.rewards import (
     user_is_referral_reward_eligible,
 )
 from django.db import transaction
-from client_profile.domains.pills.serializers import (
+from rewards.serializers import (
     ClaimReferralSerializer,
     CreateFriendReferralSerializer,
     CreateShiftReferralSerializer,

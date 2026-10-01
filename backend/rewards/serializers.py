@@ -1,7 +1,7 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for the pill rewards API (balance, rules, ledger history, referrals)."""
 from rest_framework import serializers
-from client_profile.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
-from client_profile.rewards import get_pill_balance
+from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
+from rewards.services import get_pill_balance
 
 
 # Pills and Refferals

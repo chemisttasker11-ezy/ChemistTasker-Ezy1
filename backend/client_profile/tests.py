@@ -16,17 +16,16 @@ from client_profile.models import (
     OwnerOnboarding,
     PharmacistOnboarding,
     Pharmacy,
-    PillLedgerEntry,
-    PillReferralEvent,
     Shift,
     WorkerShiftRequest,
 )
-from client_profile.rewards import (
-    RewardError,
+from rewards.models import PillLedgerEntry, PillReferralEvent
+from rewards.services import (
     award_verified_referrals_for_user,
     claim_referral_code,
     get_or_create_referral_code,
     get_pill_balance,
+    RewardError,
     seed_default_reward_rules,
 )
 from client_profile.domains.onboarding.serializers import OwnerOnboardingV2Serializer

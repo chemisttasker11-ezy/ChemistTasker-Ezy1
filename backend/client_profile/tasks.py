@@ -891,7 +891,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     obj.verified = True
     obj.save(update_fields=['verified'])
     try:
-        from client_profile.rewards import award_verified_referrals_for_user
+        from rewards.services import award_verified_referrals_for_user
         transaction.on_commit(lambda user_id=obj.user_id: award_verified_referrals_for_user(get_user_model().objects.get(id=user_id)))
     except Exception:
         logger.exception("[FINAL EVALUATION] Failed to schedule pill referral award for pk=%s", object_pk)

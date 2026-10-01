@@ -1,4 +1,4 @@
-"""client_profile models: pills (split verbatim from client_profile/models.py)."""
+"""Pill rewards: reward rules, referral codes and events, and the append-only pill ledger."""
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -102,7 +102,7 @@ class PillReferralEvent(models.Model):
     )
     referral_type = models.CharField(max_length=16, choices=ReferralType.choices)
     shift = models.ForeignKey(
-        "Shift",
+        "client_profile.Shift",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -163,7 +163,7 @@ class PillLedgerEntry(models.Model):
         related_name="ledger_entries",
     )
     shift = models.ForeignKey(
-        "Shift",
+        "client_profile.Shift",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

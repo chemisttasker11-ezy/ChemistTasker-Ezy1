@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "worker_finance.apps.WorkerFinanceConfig",
     "attendance_tests.settings.AttendanceClientProfileConfig",
+    "rewards.apps.RewardsConfig",
 ]
 
 DATABASES = {
@@ -49,6 +50,7 @@ CACHES = {
 MIGRATION_MODULES = {
     "users": None,
     "client_profile": None,
+    "rewards": None,
     "worker_finance": None,
     "billing": None,
 }

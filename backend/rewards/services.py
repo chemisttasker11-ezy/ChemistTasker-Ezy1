@@ -1,3 +1,4 @@
+"""Pill rewards services: rule seeding, balances, referral creation/claiming/awarding and shift-post payments."""
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
@@ -6,13 +7,8 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from client_profile.models import (
-    PillLedgerEntry,
-    PillReferralCode,
-    PillReferralEvent,
-    PillRewardRule,
-    Shift,
-)
+from client_profile.models import Shift
+from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
 
 User = get_user_model()
 

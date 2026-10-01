@@ -97,12 +97,6 @@ from client_profile.models.shifts import (
     LeaveRequest,
     WorkerShiftRequest,
 )
-from client_profile.models.pills import (
-    PillRewardRule,
-    PillReferralCode,
-    PillReferralEvent,
-    PillLedgerEntry,
-)
 from client_profile.models.ratings import (
     Rating,
     RatingReport,

@@ -191,7 +191,7 @@ def _award_verified_referrals_after_commit(instance):
     def _award():
         try:
             from django.contrib.auth import get_user_model
-            from client_profile.rewards import award_verified_referrals_for_user
+            from rewards.services import award_verified_referrals_for_user
             user = get_user_model().objects.get(id=user_id)
             award_verified_referrals_for_user(user)
         except Exception:

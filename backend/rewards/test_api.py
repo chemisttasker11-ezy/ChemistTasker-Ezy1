@@ -1,7 +1,7 @@
 """Characterization of the Pills rewards API (/api/client-profile/pill-rewards/)."""
 from django.test import TestCase
 
-from client_profile.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule  # noqa: F401
+from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
 )
