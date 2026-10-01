@@ -1,5 +1,5 @@
 """Shift interests, rejections, saved shifts and offers."""
-from rest_framework import permissions, status, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from client_profile.models import (
     Shift,
     ShiftInterest,
@@ -152,7 +152,9 @@ class ShiftSavedViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ShiftOfferViewSet(viewsets.ModelViewSet):
+class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
+                        mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    # Offers are made by the shift's offer actions (every serializer field is read-only), so there is no create here.
     serializer_class = ShiftOfferSerializer
     permission_classes = [permissions.IsAuthenticated]
 
