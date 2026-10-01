@@ -15,16 +15,16 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.utils import timezone
 from client_profile.domains.shifts.pricing import expand_shift_slots
-from client_profile.utils import (
+from client_profile.domains.shifts.finalize import finalize_shift_offer
+from client_profile.domains.shifts.emails import (
     active_shift_url_for_user,
     build_offer_shift_details,
     build_roster_email_link,
     build_shift_email_context,
-    finalize_shift_offer,
     send_shift_payment_finalized_notifications,
-    user_work_role_label,
     worker_offer_url,
 )
+from client_profile.domains.common.labels import user_work_role_label
 from client_profile.domains.shifts.notifications import notify_shift_users
 from core.task_queue import async_task
 from client_profile.domains.common.access import Http400

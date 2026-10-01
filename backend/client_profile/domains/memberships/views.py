@@ -19,7 +19,8 @@ from client_profile.admin_helpers import CAPABILITY_MANAGE_STAFF, has_admin_capa
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from client_profile.utils import clean_email, membership_role_label
+from client_profile.domains.common.helpers import clean_email
+from client_profile.domains.common.labels import membership_role_label
 from notifications.services import notify_users
 from django.utils.crypto import get_random_string
 from django.contrib.auth.tokens import default_token_generator

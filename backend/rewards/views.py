@@ -11,7 +11,8 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from client_profile.utils import finalize_shift_offer, send_shift_payment_finalized_notifications
+from client_profile.domains.shifts.finalize import finalize_shift_offer
+from client_profile.domains.shifts.emails import send_shift_payment_finalized_notifications
 from rewards.services import (
     claim_referral_code,
     create_friend_referral,

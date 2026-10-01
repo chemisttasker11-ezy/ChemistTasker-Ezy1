@@ -37,16 +37,16 @@ from users.serializers import UserProfileSerializer
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
-from client_profile.utils import (
+from client_profile.domains.shifts.emails import (
     build_counter_offer_shift_details,
     build_offer_shift_details,
     build_shift_counter_offer_context,
     build_shift_email_context,
     build_shift_interest_context,
     build_shift_offer_context,
-    enforce_public_shift_daily_limit,
     worker_offer_url,
 )
+from client_profile.domains.shifts.limits import enforce_public_shift_daily_limit
 from client_profile.domains.shifts.notifications import notify_shift_managers, notify_shift_users
 from client_profile.domains.shifts.engagement import staff_assignment_defaults
 from core.task_queue import async_task

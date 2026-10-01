@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from notifications.services import notify_users
 from client_profile.timezone_utils import get_pharmacy_timezone
-from client_profile.utils import get_frontend_dashboard_url
+from client_profile.domains.common.helpers import get_frontend_dashboard_url
 from client_profile.models import Membership, Pharmacy, ShiftSlotAssignment
 from notifications.models import Notification
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee

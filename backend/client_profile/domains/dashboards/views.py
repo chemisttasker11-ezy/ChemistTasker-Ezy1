@@ -23,7 +23,7 @@ from client_profile.admin_helpers import pharmacies_user_admins
 from users.serializers import UserProfileSerializer
 from django.db.models import Q, Sum
 from django.utils import timezone
-from client_profile.utils import other_staff_role_label
+from client_profile.domains.common.labels import other_staff_role_label
 from datetime import date
 from datetime import timedelta
 from decimal import Decimal

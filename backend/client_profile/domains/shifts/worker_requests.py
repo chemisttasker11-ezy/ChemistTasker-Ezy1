@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from django.utils import timezone
-from client_profile.utils import build_roster_email_link
+from client_profile.domains.shifts.emails import build_roster_email_link
 from core.task_queue import async_task
 from datetime import date
 from client_profile.domains.common.access import _normalized_role_code, _otherstaff_onboarding_role

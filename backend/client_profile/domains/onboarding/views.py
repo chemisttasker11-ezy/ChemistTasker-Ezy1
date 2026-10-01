@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from client_profile.utils import get_frontend_dashboard_url
+from client_profile.domains.common.helpers import get_frontend_dashboard_url
 from core.task_queue import async_task
 from django.core.signing import BadSignature, TimestampSigner
 from django.contrib.contenttypes.models import ContentType

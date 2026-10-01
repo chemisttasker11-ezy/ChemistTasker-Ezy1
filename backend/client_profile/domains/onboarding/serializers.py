@@ -202,7 +202,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
 
         # Notify on any update to this onboarding (manual review required).
         if update_fields:
-            from client_profile.utils import notify_superuser_on_onboarding
+            from client_profile.domains.onboarding.emails import notify_superuser_on_onboarding
             try:
                 notify_superuser_on_onboarding(instance)
             except Exception:
@@ -610,7 +610,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             instance.save(update_fields=['submitted_for_verification'])
 
             # Local import avoids circular dependencies
-            from client_profile.utils import notify_superuser_on_onboarding
+            from client_profile.domains.onboarding.emails import notify_superuser_on_onboarding
             try:
                 notify_superuser_on_onboarding(instance)
             except Exception:
@@ -1088,7 +1088,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         On change for a pending referee -> reset confirmed/rejected + last_sent.
         On submit -> send referee emails (no final-eval). Scheduling happens in utils.
         """
-        from client_profile.utils import send_referee_emails  # local import to avoid cycles
+        from client_profile.domains.onboarding.emails import send_referee_emails
         update_fields = []
 
         def apply_ref(idx: int):
@@ -1677,7 +1677,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         if first_submit:
             instance.submitted_for_verification = True
             instance.save(update_fields=['submitted_for_verification'])
-            from client_profile.utils import notify_superuser_on_onboarding
+            from client_profile.domains.onboarding.emails import notify_superuser_on_onboarding
             try:
                 notify_superuser_on_onboarding(instance)
             except Exception:
@@ -2096,7 +2096,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- Referees TAB ----------------
     def _referees_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        from client_profile.utils import send_referee_emails
+        from client_profile.domains.onboarding.emails import send_referee_emails
         update_fields = []
 
         def apply_ref(idx: int):
@@ -2471,7 +2471,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
         if first_submit:
             instance.submitted_for_verification = True
             instance.save(update_fields=['submitted_for_verification'])
-            from client_profile.utils import notify_superuser_on_onboarding
+            from client_profile.domains.onboarding.emails import notify_superuser_on_onboarding
             try:
                 notify_superuser_on_onboarding(instance)
             except Exception:
@@ -2733,7 +2733,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
     # ---------------- Referees TAB ----------------
     def _referees_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
-        from client_profile.utils import send_referee_emails
+        from client_profile.domains.onboarding.emails import send_referee_emails
         update_fields = []
 
         def apply_ref(idx: int):

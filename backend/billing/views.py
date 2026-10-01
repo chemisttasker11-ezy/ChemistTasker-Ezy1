@@ -323,7 +323,7 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     If candidate_id/slot_id are provided, narrow the target set.
     """
     from client_profile.models import ShiftOffer
-    from client_profile.utils import finalize_shift_offer
+    from client_profile.domains.shifts.finalize import finalize_shift_offer
 
     offers = ShiftOffer.objects.filter(
         shift=shift,
@@ -599,7 +599,7 @@ def charge_shift_fulfillment(request, shift_id):
             return_offers=True,
         )
         from client_profile.models import ShiftOffer
-        from client_profile.utils import send_shift_payment_finalized_notifications
+        from client_profile.domains.shifts.emails import send_shift_payment_finalized_notifications
         has_pending_payment = ShiftOffer.objects.filter(
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -868,7 +868,9 @@ def _process_stripe_event(event):
                             offer_ids=metadata.get('offer_ids'),
                             return_offers=True,
                         )
-                        from client_profile.utils import send_shift_payment_finalized_notifications
+                        from client_profile.domains.shifts.emails import (
+                            send_shift_payment_finalized_notifications,
+                        )
                         from users.models import User
                         paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
                         send_shift_payment_finalized_notifications(

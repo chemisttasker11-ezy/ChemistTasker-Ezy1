@@ -8,7 +8,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from chat.models import Conversation, Message, Participant
 from chat.realtime import ROOM_GROUP_FMT, participant_can_receive_chat_updates
 from client_profile.models import Membership
-from client_profile.utils import sanitize_chat_text
+from chat.text import sanitize_chat_text
 
 log = logging.getLogger(__name__)
 

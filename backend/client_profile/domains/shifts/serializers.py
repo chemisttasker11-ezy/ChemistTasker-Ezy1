@@ -29,13 +29,13 @@ from client_profile.models import (
 from talent.models import UserAvailability
 from django.db import transaction
 from decimal import Decimal
-from client_profile.utils import (
+from client_profile.domains.shifts.emails import (
     build_offer_shift_details,
     build_shift_email_context,
     build_shift_offer_context,
-    enforce_public_shift_daily_limit,
     send_shift_updated_notifications,
 )
+from client_profile.domains.shifts.limits import enforce_public_shift_daily_limit
 from client_profile.domains.shifts.pricing import expand_shift_slots
 from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from client_profile.domains.shifts.notifications import notify_shift_users
@@ -49,7 +49,7 @@ from client_profile.domains.orgs.serializers import (
     PharmacySerializer,
     user_can_view_full_pharmacy,
 )
-from client_profile.utils import (
+from client_profile.domains.shifts.travel import (
     extract_suburb_from_travel_origin,
     extract_travel_origin_from_message,
     TRAVEL_ORIGIN_PREFIX,

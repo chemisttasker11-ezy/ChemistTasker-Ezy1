@@ -27,7 +27,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, F, Q
 from django.utils import timezone
 from client_profile.domains.shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
-from client_profile.utils import build_roster_email_link, build_shift_email_context
+from client_profile.domains.shifts.emails import build_roster_email_link, build_shift_email_context
 from django.conf import settings
 from core.task_queue import async_task
 from datetime import date

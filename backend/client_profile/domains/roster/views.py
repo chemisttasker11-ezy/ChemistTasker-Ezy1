@@ -20,7 +20,7 @@ from client_profile.admin_helpers import (
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from client_profile.domains.shifts.pricing import get_locked_rate_for_slot
-from client_profile.utils import enforce_public_shift_daily_limit
+from client_profile.domains.shifts.limits import enforce_public_shift_daily_limit
 from client_profile.domains.shifts.notifications import notify_shift_users
 from client_profile.domains.shifts.engagement import staff_assignment_defaults
 from datetime import date, datetime

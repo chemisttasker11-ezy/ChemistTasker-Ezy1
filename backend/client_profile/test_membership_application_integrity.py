@@ -38,7 +38,7 @@ from client_profile.domains.roster.serializers import RosterAssignmentSerializer
 from invoicing.services import validate_internal_invoice_shifts
 from client_profile.domains.memberships.views import MembershipApplicationViewSet, SubmitMembershipApplication
 from client_profile.domains.shifts.offers import ShiftOfferViewSet
-from client_profile.utils import finalize_shift_offer
+from client_profile.domains.shifts.finalize import finalize_shift_offer
 from workforce.models import Timesheet, TimesheetPeriod
 
 

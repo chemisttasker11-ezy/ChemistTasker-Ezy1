@@ -363,7 +363,7 @@ def release_worker_from_assignment(
             req.shift = None
 
         if shift and escalate_to_visibility:
-            from client_profile.utils import enforce_public_shift_daily_limit
+            from client_profile.domains.shifts.limits import enforce_public_shift_daily_limit
             from client_profile.domains.shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
             from client_profile.domains.shifts.serializers import ShiftSerializer
             tiers = ShiftSerializer.build_allowed_tiers(shift.pharmacy)
