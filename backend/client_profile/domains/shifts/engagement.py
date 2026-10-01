@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Membership, OtherStaffOnboarding, PharmacistOnboarding
+from client_profile.models import Membership, OtherStaffOnboarding, PharmacistOnboarding
 
 PHARMACY_STAFF_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
 PAYMENT_TFN = "TFN"
@@ -350,7 +350,7 @@ def _segment_rate_key(day_type, clock_time):
 
 
 def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
-    from client_profile.services import get_day_type
+    from client_profile.domains.shifts.pricing import get_day_type
 
     work_date = date.fromisoformat(str(occurrence["date"]))
     start_time = _parse_time(occurrence["start_time"])

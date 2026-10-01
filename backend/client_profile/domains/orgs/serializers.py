@@ -228,7 +228,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     _hours_day_names = _weekday_day_names + ("saturdays", "sundays", "public_holidays")
 
     def get_public_holiday_dates(self, obj):
-        from client_profile.services import PUBLIC_HOLIDAYS, _normalize_state_code
+        from client_profile.domains.shifts.pricing import _normalize_state_code, PUBLIC_HOLIDAYS
 
         state_code = _normalize_state_code(getattr(obj, "state", ""))
         return PUBLIC_HOLIDAYS.get(state_code, [])

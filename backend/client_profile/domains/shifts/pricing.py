@@ -1,3 +1,4 @@
+"""Shift pricing: award rates, public holidays, day types, slot expansion and locked rates."""
 import json
 from datetime import datetime, timedelta, date, time
 from decimal import Decimal

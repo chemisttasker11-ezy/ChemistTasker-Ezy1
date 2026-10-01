@@ -363,7 +363,7 @@ def _application_payment_profile_status(application):
             "missing_fields": ["worker_account", "onboarding", "payment_preference"],
         }
 
-    from client_profile.engagement_routing import worker_payment_profile_status
+    from client_profile.domains.shifts.engagement import worker_payment_profile_status
 
     status = worker_payment_profile_status(worker)
     return {

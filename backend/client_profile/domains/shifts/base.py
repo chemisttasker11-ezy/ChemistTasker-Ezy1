@@ -47,8 +47,8 @@ from client_profile.utils import (
     enforce_public_shift_daily_limit,
     worker_offer_url,
 )
-from client_profile.shift_notifications import notify_shift_managers, notify_shift_users
-from client_profile.engagement_routing import staff_assignment_defaults
+from client_profile.domains.shifts.notifications import notify_shift_managers, notify_shift_users
+from client_profile.domains.shifts.engagement import staff_assignment_defaults
 from core.task_queue import async_task
 from datetime import datetime
 from client_profile.domains.common.access import (

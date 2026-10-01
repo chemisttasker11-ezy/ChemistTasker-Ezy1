@@ -23,7 +23,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from notifications.models import Notification
-from client_profile.services import expand_shift_slots, get_locked_rate_for_slot
+from client_profile.domains.shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
 from client_profile.admin_helpers import is_admin_of
 
 MAX_PUBLIC_SHIFTS_PER_DAY = 10
@@ -380,7 +380,7 @@ def send_shift_not_selected_after_payment_notifications(*, shift, selected_offer
 
 
 def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, payment_method="payment"):
-    from client_profile.shift_notifications import notify_shift_users
+    from client_profile.domains.shifts.notifications import notify_shift_users
 
     finalized_offers = [offer for offer in offers if offer and getattr(offer, "user_id", None)]
     if not finalized_offers:

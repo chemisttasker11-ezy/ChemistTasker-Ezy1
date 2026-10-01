@@ -36,9 +36,9 @@ from client_profile.utils import (
     enforce_public_shift_daily_limit,
     send_shift_updated_notifications,
 )
-from client_profile.services import expand_shift_slots
+from client_profile.domains.shifts.pricing import expand_shift_slots
 from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
-from client_profile.shift_notifications import notify_shift_users
+from client_profile.domains.shifts.notifications import notify_shift_users
 from datetime import date, datetime, time, timedelta
 from django.utils import timezone
 from core.task_queue import async_task
@@ -1623,7 +1623,7 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
         )
         if not can_view:
             return None
-        from client_profile.engagement_routing import build_shift_engagement_terms
+        from client_profile.domains.shifts.engagement import build_shift_engagement_terms
         try:
             return build_shift_engagement_terms(shift=obj.shift, user=obj.user, offer=obj)
         except Exception as exc:

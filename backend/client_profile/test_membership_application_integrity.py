@@ -8,13 +8,13 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from client_profile.engagement_routing import (
+from client_profile.domains.shifts.engagement import (
+    build_shift_engagement_terms,
     PAYMENT_ABN,
     PAYMENT_TFN,
     SETTLEMENT_INVOICE,
     SETTLEMENT_PAYROLL,
     SETTLEMENT_TIMESHEET_ONLY,
-    build_shift_engagement_terms,
     staff_assignment_defaults,
 )
 from client_profile.models import (
@@ -490,8 +490,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         )
         return pharmacy, shift, offer, user
 
-    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
-    @patch("client_profile.engagement_routing._external_payment_profile")
+    @patch("client_profile.domains.shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.domains.shifts.engagement._external_payment_profile")
     def test_abn_external_shift_is_invoice_routed_with_frozen_agreed_rate(
         self,
         external_profile,
@@ -520,8 +520,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         self.assertTrue(terms["acceptance_required"])
         self.assertTrue(terms["super_review_required"])
 
-    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
-    @patch("client_profile.engagement_routing._external_payment_profile")
+    @patch("client_profile.domains.shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.domains.shifts.engagement._external_payment_profile")
     def test_tfn_external_shift_can_defer_payroll_setup_without_blocking_acceptance(
         self,
         external_profile,
@@ -555,8 +555,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         self.assertIn("tfn", terms["payroll_missing_fields"])
         self.assertTrue(terms["acceptance_required"])
 
-    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
-    @patch("client_profile.engagement_routing._external_payment_profile")
+    @patch("client_profile.domains.shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.domains.shifts.engagement._external_payment_profile")
     def test_tfn_external_shift_routes_to_payroll_when_profile_is_ready(
         self,
         external_profile,
@@ -583,8 +583,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         self.assertEqual(terms["payroll_setup_status"], "READY")
         self.assertFalse(terms["payroll_activation_required"])
 
-    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
-    @patch("client_profile.engagement_routing._external_payment_profile")
+    @patch("client_profile.domains.shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.domains.shifts.engagement._external_payment_profile")
     def test_other_staff_tfn_uses_onboarding_classification_and_owner_bonus(
         self,
         external_profile,
@@ -625,8 +625,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         self.assertEqual(occurrence["agreed_rate"], "40.83")
         self.assertEqual(terms["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
 
-    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
-    @patch("client_profile.engagement_routing._external_payment_profile")
+    @patch("client_profile.domains.shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.domains.shifts.engagement._external_payment_profile")
     def test_pharmacist_tfn_must_be_above_applicable_award_floor(
         self,
         external_profile,
@@ -651,8 +651,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         with self.assertRaises(ValidationError):
             build_shift_engagement_terms(shift=shift, user=user, offer=offer)
 
-    @patch("client_profile.engagement_routing.direct_pharmacy_staff_membership", return_value=None)
-    @patch("client_profile.engagement_routing._external_payment_profile")
+    @patch("client_profile.domains.shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
+    @patch("client_profile.domains.shifts.engagement._external_payment_profile")
     def test_tfn_external_shift_routes_to_timesheet_only_when_payroll_disabled(
         self,
         external_profile,

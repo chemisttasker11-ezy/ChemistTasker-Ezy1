@@ -26,7 +26,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, F, Q
 from django.utils import timezone
-from client_profile.services import expand_shift_slots, get_locked_rate_for_slot
+from client_profile.domains.shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
 from client_profile.utils import build_roster_email_link, build_shift_email_context
 from django.conf import settings
 from core.task_queue import async_task
@@ -960,7 +960,7 @@ class HistoryShiftViewSet(BaseShiftViewSet):
 class ShiftDetailViewSet(BaseShiftViewSet):
     @action(detail=False, methods=['post'], url_path='calculate-rates')
     def calculate_rates(self, request):
-        from client_profile.services import calculate_shift_rates
+        from client_profile.domains.shifts.pricing import calculate_shift_rates
         from types import SimpleNamespace
         from datetime import datetime as dt_cls
 

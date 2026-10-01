@@ -14,7 +14,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.utils import timezone
-from client_profile.services import expand_shift_slots
+from client_profile.domains.shifts.pricing import expand_shift_slots
 from client_profile.utils import (
     active_shift_url_for_user,
     build_offer_shift_details,
@@ -25,7 +25,7 @@ from client_profile.utils import (
     user_work_role_label,
     worker_offer_url,
 )
-from client_profile.shift_notifications import notify_shift_users
+from client_profile.domains.shifts.notifications import notify_shift_users
 from core.task_queue import async_task
 from client_profile.domains.common.access import Http400
 from django.db import transaction
@@ -346,7 +346,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
         if not shift.single_user_only and slot_obj is None:
             return Response({'detail': 'Offer is missing slot selection.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        from client_profile.engagement_routing import (
+        from client_profile.domains.shifts.engagement import (
             build_shift_engagement_terms,
             freeze_accepted_terms,
             require_acceptance_payload,
@@ -520,7 +520,7 @@ class ShiftOfferViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='activate-payroll')
     def activate_payroll(self, request, pk=None):
-        from client_profile.engagement_routing import (
+        from client_profile.domains.shifts.engagement import (
             KIND_SHIFT_EMPLOYMENT,
             PAYMENT_TFN,
             SETTLEMENT_PAYROLL,
