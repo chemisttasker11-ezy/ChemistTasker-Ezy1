@@ -7,7 +7,6 @@ from .views import (
     ConfirmedShiftViewSet,
     CreateShiftAndAssignView,
     ExplorerDashboard,
-    ExplorerOnboardingV2MeView,
     GenerateInvoiceView,
     HistoryShiftViewSet,
     invoice_pdf_view,
@@ -24,12 +23,9 @@ from .views import (
     OrganizationDashboardView,
     OrganizationViewSet,
     OtherStaffDashboard,
-    OtherStaffOnboardingV2MeView,
     OwnerDashboard,
     OwnerOnboardingClaim,
-    OwnerOnboardingV2MeView,
     PharmacistDashboard,
-    PharmacistOnboardingV2MeView,
     PharmacyAdminViewSet,
     PharmacyClaimViewSet,
     PharmacyViewSet,
@@ -37,8 +33,6 @@ from .views import (
     PublicJobBoardView,
     PublicOrganizationDetailView,
     PublicShiftViewSet,
-    RefereeRejectView,
-    RefereeSubmitResponseView,
     report_invoice_issue,
     RosterOwnerViewSet,
     RosterShiftManageViewSet,
@@ -53,6 +47,14 @@ from .views import (
     ShiftSavedViewSet,
     SubmitMembershipApplication,
     WorkerShiftRequestViewSet,
+)
+from .domains.onboarding.views import (
+    ExplorerOnboardingV2MeView,
+    OtherStaffOnboardingV2MeView,
+    OwnerOnboardingV2MeView,
+    PharmacistOnboardingV2MeView,
+    RefereeRejectView,
+    RefereeSubmitResponseView,
 )
 from .domains.availability.views import UserAvailabilityViewSet
 from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
