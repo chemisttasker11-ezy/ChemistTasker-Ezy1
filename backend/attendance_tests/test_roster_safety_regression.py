@@ -56,7 +56,11 @@ from client_profile.roster_services import (
     get_roster_period_grid,
     publish_roster_period,
 )
-from client_profile.attendance_views import RosterPeriodDetailView, RosterPublishView, RosterValidateView
+from client_profile.domains.roster.v2_views import (
+    RosterPeriodDetailView,
+    RosterPublishView,
+    RosterValidateView,
+)
 from client_profile.domains.roster.views import RosterWorkerViewSet
 
 User = get_user_model()
