@@ -250,7 +250,7 @@ class RatingViewSet(viewsets.GenericViewSet):
         # Pharmacies the user controls
         pharm_control = Pharmacy.objects.filter(
             Q(owner__user=user)
-            | Q(organization__organization_memberships__user=user, organization__organization_memberships__role="ORG_ADMIN")
+            | Q(organization__memberships__user=user, organization__memberships__role="ORG_ADMIN")
             | Q(admin_assignments__user=user, admin_assignments__is_active=True)
         ).distinct()
 

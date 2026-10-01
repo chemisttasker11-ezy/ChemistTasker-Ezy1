@@ -2,6 +2,8 @@
 from django.test import TestCase
 
 from ratings.models import Rating, RatingReport
+from client_profile.models import Organization, Pharmacy
+from users.models import OrganizationMembership
 from client_profile.characterization_support import (
     BASE, client_for, make_assignment, make_owner_with_pharmacy, make_staff_member, make_user,
 )
@@ -96,14 +98,30 @@ class RatingsReadTests(RatingsBase):
     def test_mine_requires_params(self):
         self.assertEqual(client_for(self.owner).get(URL + "mine/").status_code, 400)
 
-    def test_pending_currently_returns_500(self):
-        # KNOWN QUIRK, pinned deliberately: the view filters on `organization__organization_memberships__...`,
-        # which is not a valid lookup, so it raises FieldError for every authenticated user.
-        # A fix changes behaviour and belongs in its own reviewed change, not in a refactor.
-        from django.core.exceptions import FieldError
-        c = client_for(self.owner)
-        c.raise_request_exception = False
-        self.assertEqual(c.get(URL + "pending/").status_code, 500)
+
+class PendingRatingsTests(RatingsBase):
+    """GET ratings/pending/: whom the user can still rate (workers they managed, pharmacies they worked at)."""
+
+    def test_pending_lists_who_each_side_can_still_rate(self):
+        pending = lambda user: client_for(user).get(URL + "pending/").json()  # noqa: E731
+        self.assertEqual(pending(self.owner), {"workers_to_rate": [self.worker.id], "pharmacies_to_rate": []})
+        self.assertEqual(pending(self.worker), {"workers_to_rate": [], "pharmacies_to_rate": [self.pharmacy.id]})
+        self.assertEqual(pending(self.stranger), {"workers_to_rate": [], "pharmacies_to_rate": []})
+
+    def test_pending_drops_who_was_already_rated(self):
+        client_for(self.owner).post(URL, {"direction": O2W, "ratee_user": self.worker.id, "stars": 4}, format="json")
+        client_for(self.worker).post(URL, {"direction": W2P, "ratee_pharmacy": self.pharmacy.id, "stars": 2}, format="json")
+        self.assertEqual(client_for(self.owner).get(URL + "pending/").json()["workers_to_rate"], [])
+        self.assertEqual(client_for(self.worker).get(URL + "pending/").json()["pharmacies_to_rate"], [])
+
+    def test_pending_counts_the_org_admin_of_the_pharmacy_organization_only(self):
+        org = Organization.objects.create(name="Rating Group")
+        Pharmacy.objects.filter(pk=self.pharmacy.pk).update(organization=org)
+        admin, region_admin = make_user("ORG_STAFF"), make_user("ORG_STAFF")
+        OrganizationMembership.objects.create(user=admin, organization=org, role="ORG_ADMIN")
+        OrganizationMembership.objects.create(user=region_admin, organization=org, role="REGION_ADMIN")
+        self.assertEqual(client_for(admin).get(URL + "pending/").json()["workers_to_rate"], [self.worker.id])
+        self.assertEqual(client_for(region_admin).get(URL + "pending/").json()["workers_to_rate"], [])
 
 
 class RatingReportTests(RatingsBase):
