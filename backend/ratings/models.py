@@ -1,4 +1,4 @@
-"""client_profile models: ratings (split verbatim from client_profile/models.py)."""
+"""Ratings: one editable rating per owner->worker or worker->pharmacy relationship, plus moderation reports."""
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -34,7 +34,7 @@ class Rating(models.Model):
         db_index=True,
     )
     ratee_pharmacy = models.ForeignKey(
-        "Pharmacy",
+        "client_profile.Pharmacy",
         on_delete=models.CASCADE,
         related_name="ratings_received",
         null=True, blank=True,

@@ -6,8 +6,8 @@ from client_profile.models import (
     ExplorerPostReaction,
     OtherStaffOnboarding,
     PharmacistOnboarding,
-    Rating,
 )
+from ratings.models import Rating
 from django.db import models
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny

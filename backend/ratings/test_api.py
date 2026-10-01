@@ -1,7 +1,7 @@
 """Characterization of the Ratings API (/api/client-profile/ratings/)."""
 from django.test import TestCase
 
-from client_profile.models import Rating, RatingReport
+from ratings.models import Rating, RatingReport
 from client_profile.characterization_support import (
     BASE, client_for, make_assignment, make_owner_with_pharmacy, make_staff_member, make_user,
 )

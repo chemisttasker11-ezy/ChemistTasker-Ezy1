@@ -1,13 +1,14 @@
-"""Moved verbatim from client_profile/views.py (Stage 2 domain split). Behaviour is unchanged; client_profile/views.py re-exports these names."""
+"""Ratings API: create/update, list, summary, mine, pending and report endpoints."""
 from rest_framework import permissions, status, viewsets
-from client_profile.models import Pharmacy, PharmacyAdmin, Rating, ShiftSlotAssignment
+from client_profile.models import Pharmacy, PharmacyAdmin, ShiftSlotAssignment
+from ratings.models import Rating
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from client_profile.admin_helpers import is_admin_of
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from users.models import OrganizationMembership
-from client_profile.domains.ratings.serializers import (
+from ratings.serializers import (
     MyRatingSerializer,
     PendingRatingsSerializer,
     RatingReadSerializer,
@@ -289,7 +290,7 @@ class RatingViewSet(viewsets.GenericViewSet):
         One open report per reporter/rating is kept so repeated submissions update
         the reason instead of generating duplicate moderation work.
         """
-        from client_profile.models import RatingReport
+        from ratings.models import RatingReport
 
         rating = self.get_object()
         can_report = rating.ratee_user_id == request.user.id

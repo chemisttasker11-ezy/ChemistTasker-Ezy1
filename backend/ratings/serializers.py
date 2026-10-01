@@ -1,6 +1,6 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for the ratings API."""
 from rest_framework import serializers
-from client_profile.models import Rating
+from ratings.models import Rating
 
 
 #  Ratings  

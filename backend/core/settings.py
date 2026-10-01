@@ -151,6 +151,7 @@ INSTALLED_APPS = [
 
     # my apps
     "client_profile.apps.ClientProfileConfig",
+    "ratings.apps.RatingsConfig",
     "rewards.apps.RewardsConfig",
     "workforce.apps.WorkforceConfig",
     "worker_finance.apps.WorkerFinanceConfig",

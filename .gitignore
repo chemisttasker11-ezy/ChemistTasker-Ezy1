@@ -47,6 +47,8 @@ Security_Audit_Tracking.md
 !backend/worker_finance/migrations/*.py
 !backend/rewards/migrations/
 !backend/rewards/migrations/*.py
+!backend/ratings/migrations/
+!backend/ratings/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/

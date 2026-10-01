@@ -71,7 +71,6 @@ from .domains.availability.views import UserAvailabilityViewSet
 from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
 from .domains.explorer.views import ExplorerPostViewSet
 from .domains.notifications.views import DeviceTokenViewSet, NotificationViewSet
-from .domains.ratings.views import RatingViewSet
 from .calendar_views import (
     CalendarEventViewSet,
     CalendarFeedView,
@@ -137,6 +136,8 @@ from .attendance_views import (
     RosterActionAuditListView,
 )
 from rest_framework.routers import DefaultRouter
+from rewards.urls import router as rewards_router
+from ratings.urls import router as ratings_router
 
 
 router = DefaultRouter()
@@ -157,6 +158,7 @@ router.register(r'public-shifts',    PublicShiftViewSet,    basename='public-shi
 router.register(r'shift-description-templates', ShiftDescriptionTemplateViewSet, basename='shift-description-template')
 # My shifts by status for posters
 router.register(r'user-availability', UserAvailabilityViewSet, basename='user-availability')
+router.registry.extend(rewards_router.registry)   # rewards routes, declared in rewards/urls.py
 router.register(r'shifts/active',    ActiveShiftViewSet,    basename='active-shifts')
 router.register(r'shifts/confirmed', ConfirmedShiftViewSet, basename='confirmed-shifts')
 router.register(r'shifts/history',   HistoryShiftViewSet,   basename='history-shifts')
@@ -176,7 +178,7 @@ router.register(r'my-confirmed-shifts',MyConfirmedShiftsViewSet,basename='my-con
 router.register(r'my-history-shifts',MyHistoryShiftsViewSet,basename='my-history-shifts')
 router.register(r'leave-requests', LeaveRequestViewSet, basename='leaverequest')
 router.register(r"worker-shift-requests",WorkerShiftRequestViewSet,basename="worker-shift-requests")
-router.register(r'ratings', RatingViewSet, basename='rating')
+router.registry.extend(ratings_router.registry)   # ratings routes, declared in ratings/urls.py
 
 #chat app
 router.register(r'rooms', ConversationViewSet, basename='conversation')
@@ -267,8 +269,6 @@ urlpatterns = [
 
     path('messages/<int:message_id>/react/', MessageReactionView.as_view(), name='message-react'),
     path('chat-participants/', ChatParticipantView.as_view(), name='chat-participants-list'),
-
-
 
 
     path('hub/context/', HubContextView.as_view(), name='hub-context'),
@@ -367,6 +367,5 @@ urlpatterns = [
     path('attendance/roster/audits/', RosterActionAuditListView.as_view(), name='roster-action-audits'),
 
     # Include the API routes for CRUD operations
-    path('', include('rewards.urls')),
     path('', include(router.urls)),
 ]

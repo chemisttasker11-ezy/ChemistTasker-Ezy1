@@ -97,10 +97,6 @@ from client_profile.models.shifts import (
     LeaveRequest,
     WorkerShiftRequest,
 )
-from client_profile.models.ratings import (
-    Rating,
-    RatingReport,
-)
 from client_profile.models.invoices import (
     Invoice,
     InvoiceLineItem,
