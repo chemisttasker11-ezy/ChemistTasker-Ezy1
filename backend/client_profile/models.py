@@ -213,7 +213,7 @@ class OwnerOnboarding(models.Model):
     submitted_for_verification = models.BooleanField(default=False)
 
     organization        = models.ForeignKey(
-                             Organization,
+                             'client_profile.Organization',
                              on_delete=models.SET_NULL,
                              null=True,
                              blank=True,
