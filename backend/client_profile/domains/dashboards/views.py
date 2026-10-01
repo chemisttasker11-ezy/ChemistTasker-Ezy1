@@ -7,10 +7,10 @@ from client_profile.models import (
     Pharmacy,
     PHARMACY_STAFF_EMPLOYMENT_TYPES,
     PharmacyClaim,
-    PharmacyHubPost,
     Shift,
     ShiftProfileAccessAudit,
 )
+from pharmacy_hub.models import PharmacyHubPost
 from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
 from client_profile.domains.shifts.serializers import ShiftSerializer
 from users.permissions import IsExplorer, IsOtherstaff, IsPharmacist, OrganizationRolePermission

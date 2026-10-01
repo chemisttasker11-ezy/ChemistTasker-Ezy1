@@ -4,9 +4,8 @@ Group, organization and platform scopes share the same resolver and are exercise
 public_hub / membership tests; this file pins the pharmacy-scope contract end to end."""
 from django.test import TestCase
 
-from client_profile.models import (
-    Membership, PharmacyHubComment, PharmacyHubPoll, PharmacyHubPost, PharmacyHubReaction,
-)
+from client_profile.models import Membership
+from pharmacy_hub.models import PharmacyHubComment, PharmacyHubPoll, PharmacyHubPost, PharmacyHubReaction
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
 )

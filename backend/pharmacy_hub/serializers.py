@@ -1,4 +1,4 @@
-"""Moved verbatim from client_profile/serializers.py (Stage 2 domain split). Behaviour is unchanged; client_profile/serializers.py re-exports these names."""
+"""Serializers for the pharmacy hub API."""
 from rest_framework import serializers
 from client_profile.models import (
     Membership,
@@ -6,6 +6,8 @@ from client_profile.models import (
     OtherStaffOnboarding,
     Pharmacy,
     PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+from pharmacy_hub.models import (
     PharmacyCommunityGroup,
     PharmacyCommunityGroupMembership,
     PharmacyHubAttachment,

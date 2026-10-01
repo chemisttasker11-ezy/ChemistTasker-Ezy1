@@ -11,7 +11,7 @@ class HubMediaAccess(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, filename):
-        from client_profile.models import PharmacyHubAttachment
+        from pharmacy_hub.models import PharmacyHubAttachment
         from django.shortcuts import get_object_or_404
         item = get_object_or_404(PharmacyHubAttachment.objects.select_related('post'), file=f'pharmacy_hub/attachments/{filename}', post__deleted_at=None)
         post = item.post
@@ -20,7 +20,7 @@ class HubMediaAccess(APIView):
         if not public:
             if not request.user.is_authenticated:
                 raise Http404
-            from client_profile.hub.api import HubScopeResolver
+            from pharmacy_hub.views import HubScopeResolver
             try:
                 HubScopeResolver(request.user).from_post(post)
             except PermissionDenied:

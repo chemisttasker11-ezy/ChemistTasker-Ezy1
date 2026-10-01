@@ -8,8 +8,8 @@ from client_profile.models import (
     OwnerOnboarding,
     PharmacistOnboarding,
     Pharmacy,
-    PharmacyHubAttachment,
 )
+from pharmacy_hub.models import PharmacyHubAttachment
 from chat.models import Message
 from client_profile.file_validation import validate_upload_mapping
 

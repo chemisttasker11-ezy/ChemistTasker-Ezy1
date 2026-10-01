@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import ContentAdministrator, ContentAssignment, ContentInvitation, ContentRevision, Article
 from .editorial import publish_due
-from client_profile.models import PharmacyHubPost, PharmacyHubComment
+from pharmacy_hub.models import PharmacyHubComment, PharmacyHubPost
 
 
 def payload(title='A pharmacy perspective', slug='pharmacy-perspective'):
@@ -137,7 +137,8 @@ class EditorialTests(TestCase):
         self.assertEqual(self.api.get('/api/public-hub/community/').status_code, 404)
 
     def test_owner_and_staff_public_reads_never_expose_private_scopes(self):
-        from client_profile.models import Pharmacy, Organization, PharmacyCommunityGroup, PharmacyHubAttachment, PharmacyHubPoll
+        from client_profile.models import Organization, Pharmacy
+        from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyHubAttachment, PharmacyHubPoll
         pharmacy = Pharmacy.objects.create(name='Private pharmacy')
         organisation = Organization.objects.create(name='Private organisation')
         group = PharmacyCommunityGroup.objects.create(pharmacy=pharmacy, name='Internal staff', created_by=self.admin)
@@ -185,7 +186,7 @@ class EditorialTests(TestCase):
         self.assertEqual(client.post('/api/content/documents/', {'area':'blog','payload':payload(slug='second')}, format='json').status_code, 201)
 
     def test_membership_free_comment_cannot_be_edited_by_another_member(self):
-        from client_profile.hub.api import HubCommentViewSet
+        from pharmacy_hub.views import HubCommentViewSet
         from rest_framework.test import APIRequestFactory, force_authenticate
         post = PharmacyHubPost.objects.create(platform_hub='public', author_user=self.writer, body='Public')
         comment = PharmacyHubComment.objects.create(post=post, author_user=self.writer, body='My comment')
@@ -199,7 +200,7 @@ class EditorialTests(TestCase):
         self.assertIsNone(comment.deleted_at)
 
     def test_editorial_hub_post_cannot_bypass_review_through_member_api(self):
-        from client_profile.hub.api import HubPostViewSet
+        from pharmacy_hub.views import HubPostViewSet
         from rest_framework.test import APIRequestFactory, force_authenticate
         self.api.force_authenticate(self.admin)
         doc = self.create('hub:public').data
@@ -210,7 +211,7 @@ class EditorialTests(TestCase):
         self.assertEqual(response.status_code, 403, response.data)
 
     def test_role_hub_write_access_and_explorer(self):
-        from client_profile.hub.api import HubScopeResolver
+        from pharmacy_hub.views import HubScopeResolver
         from rest_framework.exceptions import PermissionDenied
         self.assertEqual(HubScopeResolver(self.writer).platform_scope('explorer')['platform_hub'], 'explorer')
         with self.assertRaises(PermissionDenied):

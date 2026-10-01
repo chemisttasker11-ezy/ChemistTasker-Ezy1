@@ -57,6 +57,8 @@ Security_Audit_Tracking.md
 !backend/notifications/migrations/*.py
 !backend/chat/migrations/
 !backend/chat/migrations/*.py
+!backend/pharmacy_hub/migrations/
+!backend/pharmacy_hub/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/

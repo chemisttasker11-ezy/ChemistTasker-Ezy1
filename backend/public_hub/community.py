@@ -19,7 +19,7 @@ def ensure_public():
 
 
 def posts():
-    from client_profile.models import PharmacyHubPost
+    from pharmacy_hub.models import PharmacyHubPost
     ensure_public()
     return PharmacyHubPost.objects.filter(platform_hub__in=HUBS, pharmacy=None, organization=None,
         community_group=None, deleted_at=None).select_related('author_user', 'author_membership__user').prefetch_related('attachments')
@@ -148,7 +148,7 @@ class Attachment(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, pk):
-        from client_profile.models import PharmacyHubAttachment
+        from pharmacy_hub.models import PharmacyHubAttachment
         item = get_object_or_404(PharmacyHubAttachment, pk=pk, post__in=posts())
         try:
             media_type = mimetypes.guess_type(item.file.name)[0] or 'application/octet-stream'
@@ -166,7 +166,7 @@ class PollList(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, hub):
-        from client_profile.models import PharmacyHubPoll
+        from pharmacy_hub.models import PharmacyHubPoll
         ensure_public()
         if hub not in HUBS:
             raise Http404

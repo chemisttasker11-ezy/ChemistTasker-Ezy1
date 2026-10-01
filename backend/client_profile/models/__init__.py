@@ -55,22 +55,6 @@ from client_profile.models.memberships import (
     MembershipInviteLink,
     MembershipApplication,
 )
-from client_profile.models.hub import (
-    PharmacyCommunityGroup,
-    PharmacyCommunityGroupMembership,
-    PharmacyHubPost,
-    PharmacyHubPostMention,
-    PharmacyHubComment,
-    HubReactionType,
-    PharmacyHubCommentReaction,
-    PharmacyHubReaction,
-    PharmacyHubAttachment,
-    PharmacyHubPoll,
-    PharmacyHubPollOption,
-    PharmacyHubPollVote,
-    PharmacyHubPollComment,
-    PharmacyHubPollReaction,
-)
 from client_profile.models.roster import (
     RosterPeriod,
     RosterPublicationAudit,

@@ -141,7 +141,7 @@ class DocumentAction(ContentView):
                 doc.article.status = 'archived'
                 doc.article.save(update_fields=['status', 'updated_at'])
             if doc.hub_post_id:
-                from client_profile.models import PharmacyHubPost
+                from pharmacy_hub.models import PharmacyHubPost
                 PharmacyHubPost.objects.filter(pk=doc.hub_post_id, platform_hub=doc.area.removeprefix('hub:')).update(deleted_at=timezone.now())
             doc.archived = True
             if rev.status == 'scheduled':
@@ -301,7 +301,7 @@ class AuditLog(ContentView):
 
 class Moderation(ContentView):
     def get(self, request):
-        from client_profile.models import PharmacyHubPost
+        from pharmacy_hub.models import PharmacyHubPost
         areas = [area for area, role in capabilities(request.user)['areas'].items() if role == 'publisher']
         result = [{'id': r.pk, 'type': 'article', 'area': r.comment.article.kind,
                    'reason': r.reason, 'body': r.comment.body}
@@ -329,7 +329,7 @@ class Moderation(ContentView):
                 report.comment.hidden = True
                 report.comment.save(update_fields=['hidden', 'updated_at'])
         elif kind == 'hub':
-            from client_profile.models import PharmacyHubPost
+            from pharmacy_hub.models import PharmacyHubPost
             report = get_object_or_404(CommunityReport.objects.select_for_update(), pk=pk)
             post = get_object_or_404(PharmacyHubPost, pk=report.post_id, pharmacy=None, organization=None, community_group=None, platform_hub__isnull=False)
             area = f'hub:{post.platform_hub}'

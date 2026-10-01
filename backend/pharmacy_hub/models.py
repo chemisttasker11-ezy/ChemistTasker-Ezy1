@@ -1,4 +1,4 @@
-"""client_profile models: hub (split verbatim from client_profile/models.py)."""
+"""Pharmacy hub: community groups, posts, comments, reactions, polls and attachments shared inside pharmacies, organisations and the platform hubs."""
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
@@ -141,7 +141,7 @@ class PharmacyHubPost(models.Model):
         default=Visibility.NORMAL,
     )
     community_group = models.ForeignKey(
-        'client_profile.PharmacyCommunityGroup',
+        'pharmacy_hub.PharmacyCommunityGroup',
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -196,7 +196,6 @@ class PharmacyHubPost(models.Model):
     )
 
     class Meta:
-        db_table = "client_profile_pharmacyhubpost"
         ordering = ["-is_pinned", "-pinned_at", "-created_at"]
         indexes = [
             models.Index(fields=["pharmacy", "created_at"]),
@@ -334,7 +333,6 @@ class PharmacyHubPostMention(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "client_profile_pharmacyhubpostmention"
         unique_together = ("post", "membership")
 
     def __str__(self):

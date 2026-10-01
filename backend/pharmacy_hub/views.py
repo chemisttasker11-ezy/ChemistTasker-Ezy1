@@ -1,5 +1,4 @@
-"""Unified Pharmacy/Organization hub API views."""
-
+"""Pharmacy hub API: scope resolution, context, community groups, posts, polls, comments, reactions and pharmacy/organisation profiles."""
 import json
 import mimetypes
 from collections.abc import Mapping
@@ -23,27 +22,29 @@ from rest_framework.views import APIView
 from users.models import OrganizationMembership
 from notifications.services import notify_users
 
-from ..models import (
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+from client_profile.models import (
     Membership,
-    OtherStaffOnboarding,
     Organization,
+    OtherStaffOnboarding,
     Pharmacy,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
     PharmacyAdmin,
+)
+from pharmacy_hub.models import (
     PharmacyCommunityGroup,
     PharmacyCommunityGroupMembership,
     PharmacyHubAttachment,
     PharmacyHubComment,
     PharmacyHubCommentReaction,
-    PharmacyHubPost,
-    PharmacyHubReaction,
     PharmacyHubPoll,
     PharmacyHubPollComment,
     PharmacyHubPollOption,
     PharmacyHubPollReaction,
     PharmacyHubPollVote,
+    PharmacyHubPost,
+    PharmacyHubReaction,
 )
-from .serializers import (
+from pharmacy_hub.serializers import (
     HubCommentSerializer,
     HubCommunityGroupSerializer,
     HubOrganizationProfileSerializer,
@@ -55,7 +56,7 @@ from .serializers import (
     HubPostSerializer,
     HubReactionSerializer,
 )
-from ..file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
+from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 
 
 STAFF_GROUP_MEMBER_FILTER = Q(
