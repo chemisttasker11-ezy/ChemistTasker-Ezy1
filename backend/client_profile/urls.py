@@ -3,15 +3,11 @@ from django.urls import path, include
 from .views import (
     ActiveShiftViewSet,
     ChainViewSet,
-    ChatParticipantView,
     CommunityShiftViewSet,
     ConfirmedShiftViewSet,
-    ConversationViewSet,
     CreateShiftAndAssignView,
-    DeviceTokenViewSet,
     ExplorerDashboard,
     ExplorerOnboardingV2MeView,
-    ExplorerPostViewSet,
     GenerateInvoiceView,
     HistoryShiftViewSet,
     invoice_pdf_view,
@@ -22,12 +18,9 @@ from .views import (
     MembershipApplicationViewSet,
     MembershipInviteLinkViewSet,
     MembershipViewSet,
-    MessageReactionView,
-    MessageViewSet,
     MyConfirmedShiftsViewSet,
     MyHistoryShiftsViewSet,
     MyMembershipsViewSet,
-    NotificationViewSet,
     OrganizationDashboardView,
     OrganizationViewSet,
     OtherStaffDashboard,
@@ -40,12 +33,10 @@ from .views import (
     PharmacyAdminViewSet,
     PharmacyClaimViewSet,
     PharmacyViewSet,
-    PillRewardsViewSet,
     preview_invoice_lines,
     PublicJobBoardView,
     PublicOrganizationDetailView,
     PublicShiftViewSet,
-    RatingViewSet,
     RefereeRejectView,
     RefereeSubmitResponseView,
     report_invoice_issue,
@@ -61,9 +52,14 @@ from .views import (
     ShiftRejectionViewSet,
     ShiftSavedViewSet,
     SubmitMembershipApplication,
-    UserAvailabilityViewSet,
     WorkerShiftRequestViewSet,
 )
+from .domains.availability.views import UserAvailabilityViewSet
+from .domains.chat.views import ChatParticipantView, ConversationViewSet, MessageReactionView, MessageViewSet
+from .domains.explorer.views import ExplorerPostViewSet
+from .domains.notifications.views import DeviceTokenViewSet, NotificationViewSet
+from .domains.pills.views import PillRewardsViewSet
+from .domains.ratings.views import RatingViewSet
 from .calendar_views import (
     CalendarEventViewSet,
     CalendarFeedView,
