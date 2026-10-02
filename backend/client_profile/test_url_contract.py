@@ -3,8 +3,8 @@ from django.test import SimpleTestCase
 from client_profile.urls import router
 
 
-class ClientProfileRouterContractTests(SimpleTestCase):
-    """The DRF API-root registration order is a compatibility contract inherited from main."""
+class ClientProfileKernelRouterContractTests(SimpleTestCase):
+    """client_profile declares only the routes for domains it still owns."""
 
     expected_prefixes = [
         "organizations",
@@ -18,15 +18,10 @@ class ClientProfileRouterContractTests(SimpleTestCase):
         "community-shifts",
         "public-shifts",
         "shift-description-templates",
-        "user-availability",
-        "pill-rewards",
         "shifts/active",
         "shifts/confirmed",
         "shifts/history",
         "shifts",
-        "roster-owner",
-        "roster-worker",
-        "roster-shifts",
         "shift-interests",
         "shift-rejections",
         "shift-saved",
@@ -35,17 +30,11 @@ class ClientProfileRouterContractTests(SimpleTestCase):
         "my-history-shifts",
         "leave-requests",
         "worker-shift-requests",
-        "ratings",
-        "rooms",
         "my-memberships",
-        "messages",
-        "notifications",
-        "device-tokens",
-        "explorer-posts",
-        "calendar-events",
-        "work-notes",
-        "calendar-feed",
     ]
 
-    def test_router_registration_order_matches_main(self):
-        self.assertEqual([prefix for prefix, _viewset, _basename in router.registry], self.expected_prefixes)
+    def test_kernel_router_contains_only_kernel_owned_routes(self):
+        self.assertEqual(
+            [prefix for prefix, _viewset, _basename in router.registry],
+            self.expected_prefixes,
+        )
