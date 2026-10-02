@@ -5,11 +5,13 @@ User = get_user_model()
 
 
 from rest_framework import serializers
-from client_profile.models import Membership, MembershipApplication, MembershipInviteLink, PharmacyAdmin
+from memberships.models import Membership, MembershipApplication, MembershipInviteLink
+from client_profile.models import PharmacyAdmin
 from users.serializers import UserProfileSerializer
 from datetime import date, datetime
 from django.utils import timezone
-from client_profile.domains.common.serializers import _chat_member_identity, clean_email
+from users.presentation import _chat_member_identity
+from client_profile.domains.common.serializers import clean_email
 from client_profile.domains.orgs.serializers import PharmacySerializer
 
 
