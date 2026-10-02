@@ -1,6 +1,7 @@
 """Invoice API: list, detail, generation from shifts, preview, PDF, email and issue reports."""
 from rest_framework import generics, permissions, status
-from client_profile.models import Pharmacy, Shift
+from organizations.models import Pharmacy
+from shifts.models import Shift
 from invoicing.models import Invoice
 from notifications.models import Notification
 from rest_framework.response import Response

@@ -50,7 +50,9 @@ from attendance.throttles import (
 )
 from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
 from attendance.protocol import sync_offline_batch
-from client_profile.models import Membership, Pharmacy, Shift
+from memberships.models import Membership
+from organizations.models import Pharmacy
+from shifts.models import Shift
 from workforce.models import RosterAcknowledgement, RosterPublicationAudit
 from attendance.models import (
     AttendanceEvent,
@@ -148,7 +150,7 @@ class KioskRequestPairingCodeView(APIView):
     def get(self, request):
         from django.db.models import Q
         from users.models import OrganizationMembership
-        from client_profile.models import PharmacyAdmin
+        from organizations.models import PharmacyAdmin
 
         pharmacies = Pharmacy.objects.select_related("owner").order_by("name", "pk")
         if not request.user.is_superuser:

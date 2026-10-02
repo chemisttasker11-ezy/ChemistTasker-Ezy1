@@ -1,6 +1,8 @@
 """Invoice generation: preview and create invoices from accepted shifts, recalculate totals, render the PDF."""
 import json
-from client_profile.models import OtherStaffOnboarding, PharmacistOnboarding, Pharmacy, ShiftSlotAssignment
+from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
+from organizations.models import Pharmacy
+from shifts.models import ShiftSlotAssignment
 from invoicing.models import Invoice, InvoiceLineItem
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError

@@ -29,7 +29,8 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from client_profile.models import Pharmacy, PharmacyAdmin, Shift, ShiftSlot, ShiftSlotAssignment
+from organizations.models import Pharmacy, PharmacyAdmin
+from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 from workforce.roster.permissions import is_authorized_attendance_manager
 
