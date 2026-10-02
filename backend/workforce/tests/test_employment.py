@@ -1,3 +1,6 @@
+"""Award rates, employment terms, employment-engagement payloads, workforce permissions and the engagement API.
+
+This module was workforce/tests.py, which the workforce/tests/ package shadowed: its tests never ran."""
 from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,12 +13,12 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.models import Membership, Pharmacy
 
-from .award_rates import classification_options, resolve_award_schedule
-from .employment_terms import correspondence_profile, normalise_part_time_pattern
-from .employment_engagement_service import build_employment_engagement_payload
-from .models import EmploymentEngagement
-from .permissions import can_manage_roster_pharmacy, can_manage_workforce_pharmacy
-from .views import EmploymentEngagementListCreateView
+from workforce.award_rates import classification_options, resolve_award_schedule
+from workforce.employment_terms import correspondence_profile, normalise_part_time_pattern
+from workforce.employment_engagement_service import build_employment_engagement_payload
+from workforce.models import EmploymentEngagement
+from workforce.permissions import can_manage_roster_pharmacy, can_manage_workforce_pharmacy
+from workforce.views import EmploymentEngagementListCreateView
 
 
 class PharmacyAwardResolverTests(SimpleTestCase):
@@ -324,7 +327,7 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
             )
 
     @patch("workforce.employment_engagement_service.membership_date_of_birth", return_value=None)
-    def test_above_award_cannot_undercut_award_summary_floor(self):
+    def test_above_award_cannot_undercut_award_summary_floor(self, _mock_dob):
         membership = self._membership()
         with self.assertRaises(ValidationError):
             build_employment_engagement_payload(
@@ -340,7 +343,7 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
             )
 
     @patch("workforce.employment_engagement_service.membership_date_of_birth", return_value=None)
-    def test_above_award_requires_at_least_one_rate_above_the_floor(self):
+    def test_above_award_requires_at_least_one_rate_above_the_floor(self, _mock_dob):
         membership = self._membership()
         with self.assertRaises(ValidationError):
             build_employment_engagement_payload(
@@ -356,7 +359,7 @@ class EmploymentEngagementPayloadTests(SimpleTestCase):
             )
 
     @patch("workforce.employment_engagement_service.membership_date_of_birth", return_value=None)
-    def test_above_award_snapshot_keeps_penalty_and_overtime_floors(self):
+    def test_above_award_snapshot_keeps_penalty_and_overtime_floors(self, _mock_dob):
         membership = self._membership()
         payload = build_employment_engagement_payload(
             {
