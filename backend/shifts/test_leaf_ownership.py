@@ -11,4 +11,4 @@ class ShiftLeafImplementationOwnershipTests(SimpleTestCase):
         self.assertIs(legacy_pricing.get_locked_rate_for_slot, pricing.get_locked_rate_for_slot)
         self.assertIs(legacy_pricing._resolve_shift_bounds, pricing._resolve_shift_bounds)
         self.assertIs(legacy_limits.enforce_public_shift_daily_limit, limits.enforce_public_shift_daily_limit)
-        self.assertIs(legacy_travel.normalize_suburb, travel.normalize_suburb)
+        self.assertIs(legacy_travel.extract_suburb_from_travel_origin, travel.extract_suburb_from_travel_origin)
