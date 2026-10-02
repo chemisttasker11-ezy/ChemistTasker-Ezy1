@@ -280,7 +280,7 @@ jobs:
               echo "::error file=$candidate::Released migration files are immutable; add a new migration instead."
               violation=1
             fi
-          done < <(git diff --name-only --diff-filter=MD "$SHARED_CORE_AUDIT_BASE"...HEAD -- backend)
+          done < <(git diff --name-status --diff-filter=MDR "$SHARED_CORE_AUDIT_BASE"...HEAD -- backend | cut -f2)
           test "$violation" -eq 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
