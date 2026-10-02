@@ -53,11 +53,7 @@ class ClientProfileRouterContractTests(SimpleTestCase):
         "chains",
         "pharmacies",
         "pharmacy-claims",
-        "memberships",
         "pharmacy-admins",
-        "membership-invite-links",
-        "membership-applications",
-        "my-memberships",
     ]
 
     def test_public_router_registration_order_matches_main(self):
