@@ -15,6 +15,11 @@ from team_calendar.urls import router as team_calendar_router
 from notifications.urls import router as notifications_router
 from chat.urls import messages_router as chat_messages_router, rooms_router as chat_rooms_router
 from workforce.roster.urls import router as workforce_roster_router
+from shifts.urls import (
+    discovery_router as shift_discovery_router,
+    engagement_router as shift_engagement_router,
+    lifecycle_router as shift_lifecycle_router,
+)
 
 
 router = DefaultRouter()
@@ -31,39 +36,19 @@ for prefix in [
     'pharmacy-admins',
     'membership-invite-links',
     'membership-applications',
-    'community-shifts',
-    'public-shifts',
-    'shift-description-templates',
 ]:
     viewset, basename = kernel[prefix]
     router.register(prefix, viewset, basename=basename)
 
+router.registry.extend(shift_discovery_router.registry)
 router.registry.extend(talent_availability_router.registry)
 router.registry.extend(rewards_router.registry)
 
-for prefix in [
-    'shifts/active',
-    'shifts/confirmed',
-    'shifts/history',
-    'shifts',
-]:
-    viewset, basename = kernel[prefix]
-    router.register(prefix, viewset, basename=basename)
+router.registry.extend(shift_lifecycle_router.registry)
 
 router.registry.extend(workforce_roster_router.registry)
 
-for prefix in [
-    'shift-interests',
-    'shift-rejections',
-    'shift-saved',
-    'shift-offers',
-    'my-confirmed-shifts',
-    'my-history-shifts',
-    'leave-requests',
-    'worker-shift-requests',
-]:
-    viewset, basename = kernel[prefix]
-    router.register(prefix, viewset, basename=basename)
+router.registry.extend(shift_engagement_router.registry)
 
 router.registry.extend(ratings_router.registry)
 router.registry.extend(chat_rooms_router.registry)
@@ -80,6 +65,7 @@ router.registry.extend(team_calendar_router.registry)
 urlpatterns = [
     path('workforce/', include('workforce.urls')),
     path('', include('client_profile.urls')),
+    path('', include('shifts.urls')),
     path('', include('chat.urls')),
     path('', include('pharmacy_hub.urls')),
     path('', include('invoicing.urls')),
