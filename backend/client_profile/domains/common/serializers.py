@@ -12,7 +12,7 @@ from client_profile.models import (
 from pharmacy_hub.models import PharmacyHubAttachment
 from chat.models import Message
 from core.file_validation import validate_upload_mapping
-from chat.identity import (
+from users.presentation import (
     _build_absolute_media_url,
     _chat_member_identity,
     _resolve_user_profile_photo,

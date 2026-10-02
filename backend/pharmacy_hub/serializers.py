@@ -22,12 +22,12 @@ from pharmacy_hub.models import (
 )
 from django.db import transaction
 from core.file_validation import IMAGE_UPLOAD_POLICY
-from client_profile.domains.common.serializers import (
+from users.presentation import (
     _build_absolute_media_url,
     _chat_member_identity,
     _resolve_user_profile_photo,
-    UploadValidationMixin,
 )
+from client_profile.domains.common.serializers import UploadValidationMixin
 
 
 def _serialize_user_summary(user, request):
