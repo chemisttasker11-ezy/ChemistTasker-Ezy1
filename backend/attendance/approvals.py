@@ -104,7 +104,7 @@ def approve_provisional_attendance(
             raise ValidationError("Cannot approve an open attendance session. Worker must clock out first.")
 
         # Determine shift schedule details from actual worked times in pharmacy timezone
-        from client_profile.domains.orgs.timezone import get_pharmacy_timezone
+        from organizations.timezone import get_pharmacy_timezone
 
         tz = get_pharmacy_timezone(destination_pharmacy)
         local_started_at = session.started_at.astimezone(tz)

@@ -14,7 +14,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from notifications.services import notify_users
-from client_profile.domains.orgs.timezone import get_pharmacy_timezone
+from organizations.timezone import get_pharmacy_timezone
 from users.navigation import get_frontend_dashboard_url
 from client_profile.models import Membership, Pharmacy, ShiftSlotAssignment
 from notifications.models import Notification

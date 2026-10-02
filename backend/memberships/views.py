@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
-from client_profile.domains.orgs.access import CAPABILITY_MANAGE_STAFF, has_admin_capability, pharmacies_user_admins
+from organizations.access import CAPABILITY_MANAGE_STAFF, has_admin_capability, pharmacies_user_admins
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
@@ -27,7 +27,7 @@ from django.utils.encoding import force_bytes
 from django.conf import settings
 from core.task_queue import async_task
 from datetime import date
-from client_profile.domains.orgs.access import _collect_org_access_scope, _get_org_pharmacies_queryset
+from organizations.access import _collect_org_access_scope, _get_org_pharmacies_queryset
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from datetime import timedelta
