@@ -220,7 +220,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
         my_part = self._get_my_participant(obj)
         if obj.pharmacy_id:
             try:
-                from client_profile.admin_helpers import has_admin_capability, CAPABILITY_MANAGE_COMMS
+                from client_profile.domains.orgs.access import has_admin_capability, CAPABILITY_MANAGE_COMMS
                 return has_admin_capability(user, obj.pharmacy, CAPABILITY_MANAGE_COMMS)
             except Exception:
                 return False
@@ -244,7 +244,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
             return True
         if obj.pharmacy_id:
             try:
-                from client_profile.admin_helpers import has_admin_capability, CAPABILITY_MANAGE_COMMS
+                from client_profile.domains.orgs.access import has_admin_capability, CAPABILITY_MANAGE_COMMS
                 return has_admin_capability(user, obj.pharmacy, CAPABILITY_MANAGE_COMMS)
             except Exception:
                 return False

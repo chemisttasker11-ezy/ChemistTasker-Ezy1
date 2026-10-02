@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.decorators import action
-from client_profile.admin_helpers import CAPABILITY_MANAGE_COMMS, has_admin_capability
+from client_profile.domains.orgs.access import CAPABILITY_MANAGE_COMMS, has_admin_capability
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone

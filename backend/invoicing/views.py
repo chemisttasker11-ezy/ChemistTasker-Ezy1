@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import api_view, permission_classes
-from client_profile.admin_helpers import pharmacies_user_admins
+from client_profile.domains.orgs.access import pharmacies_user_admins
 from django.shortcuts import get_object_or_404
 import json
 from django.db.models import F, Q

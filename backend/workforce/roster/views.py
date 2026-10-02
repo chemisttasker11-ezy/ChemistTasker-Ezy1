@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
-from client_profile.admin_helpers import (
+from client_profile.domains.orgs.access import (
     CAPABILITY_MANAGE_ROSTER,
     has_admin_capability,
     is_any_admin,
