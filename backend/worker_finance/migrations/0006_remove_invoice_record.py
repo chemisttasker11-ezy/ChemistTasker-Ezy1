@@ -2,18 +2,8 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
-def _invoicing_model(apps, name):
-    # Invoice and InvoiceLineItem now live in the invoicing app (state-only move, see invoicing.0001_initial). Depending on
-    # where this migration lands in the plan, the migration state knows them under either label; the invoicing label, when
-    # present, always carries the table name that currently exists in the database.
-    try:
-        return apps.get_model("invoicing", name)
-    except LookupError:
-        return apps.get_model("client_profile", name)
-
-
 def create_legacy_revisions(apps, schema_editor):
-    Invoice = _invoicing_model(apps, "Invoice")
+    Invoice = apps.get_model("client_profile", "Invoice")
     InvoiceRevision = apps.get_model("worker_finance", "InvoiceRevision")
     for invoice in Invoice.objects.filter(legacy_snapshot=True).iterator():
         InvoiceRevision.objects.get_or_create(

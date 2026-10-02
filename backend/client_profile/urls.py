@@ -55,10 +55,10 @@ from .domains.onboarding.views import (
 from rest_framework.routers import DefaultRouter
 from rewards.urls import router as rewards_router
 from ratings.urls import router as ratings_router
-from talent.urls import router as talent_router
+from talent.urls import availability_router as talent_availability_router, explorer_router as talent_explorer_router
 from team_calendar.urls import router as team_calendar_router
 from notifications.urls import router as notifications_router
-from chat.urls import router as chat_router
+from chat.urls import messages_router as chat_messages_router, rooms_router as chat_rooms_router
 from workforce.roster.urls import router as workforce_roster_router
 
 
@@ -78,7 +78,7 @@ router.register(r'membership-applications', MembershipApplicationViewSet, basena
 router.register(r'community-shifts', CommunityShiftViewSet, basename='community-shifts')
 router.register(r'public-shifts',    PublicShiftViewSet,    basename='public-shifts')
 router.register(r'shift-description-templates', ShiftDescriptionTemplateViewSet, basename='shift-description-template')
-router.registry.extend(talent_router.registry)   # talent routes, declared in talent/urls.py
+router.registry.extend(talent_availability_router.registry)   # legacy position of user-availability
 router.registry.extend(rewards_router.registry)   # rewards routes, declared in rewards/urls.py
 # My shifts by status for posters
 router.register(r'shifts/active',    ActiveShiftViewSet,    basename='active-shifts')
@@ -100,9 +100,11 @@ router.register(r'leave-requests', LeaveRequestViewSet, basename='leaverequest')
 router.register(r"worker-shift-requests",WorkerShiftRequestViewSet,basename="worker-shift-requests")
 router.registry.extend(ratings_router.registry)   # ratings routes, declared in ratings/urls.py
 
-router.registry.extend(chat_router.registry)   # chat routes, declared in chat/urls.py
+router.registry.extend(chat_rooms_router.registry)   # legacy position of rooms
 router.register(r'my-memberships', MyMembershipsViewSet, basename='my-memberships')
+router.registry.extend(chat_messages_router.registry)   # legacy position of messages
 router.registry.extend(notifications_router.registry)   # notifications routes, declared in notifications/urls.py
+router.registry.extend(talent_explorer_router.registry)   # legacy position of explorer-posts
 
 router.registry.extend(team_calendar_router.registry)   # team_calendar routes, declared in team_calendar/urls.py
 

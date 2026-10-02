@@ -4,9 +4,19 @@ from talent.views.availability import UserAvailabilityViewSet
 from talent.views.explorer import ExplorerPostViewSet
 
 
-router = DefaultRouter()
-router.include_root_view = False   # the API root view is provided once, by client_profile's router
-router.register(r'user-availability', UserAvailabilityViewSet, basename='user-availability')
-router.register(r'explorer-posts', ExplorerPostViewSet, basename='explorer-post')
+availability_router = DefaultRouter()
+availability_router.include_root_view = False
+availability_router.register(r'user-availability', UserAvailabilityViewSet, basename='user-availability')
 
-urlpatterns = []   # routes are declared on `router`; client_profile's router adopts them
+explorer_router = DefaultRouter()
+explorer_router.include_root_view = False
+explorer_router.register(r'explorer-posts', ExplorerPostViewSet, basename='explorer-post')
+
+# Combined router remains available for app-local consumers; client_profile mounts the
+# two registries separately to preserve the legacy API-root ordering exactly.
+router = DefaultRouter()
+router.include_root_view = False
+router.registry.extend(availability_router.registry)
+router.registry.extend(explorer_router.registry)
+
+urlpatterns = []   # routes are declared on the routers; client_profile adopts them

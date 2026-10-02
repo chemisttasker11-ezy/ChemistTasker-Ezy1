@@ -36,6 +36,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('client_profile', '0060_owner_marketplace_identity'),
+        ('worker_finance', '0006_remove_invoice_record'),
         ('contenttypes', '0002_remove_content_type_name'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
