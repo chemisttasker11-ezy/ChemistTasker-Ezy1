@@ -394,24 +394,24 @@ class WorkforceCapabilityPermissionTests(SimpleTestCase):
             owner=SimpleNamespace(user_id=99),
         )
 
-    @patch("client_profile.domains.orgs.access.can_manage_roster", return_value=False)
-    @patch("client_profile.domains.orgs.access.can_manage_staff", return_value=True)
+    @patch("organizations.access.can_manage_roster", return_value=False)
+    @patch("organizations.access.can_manage_staff", return_value=True)
     def test_manage_staff_can_manage_employment_without_roster_access(self, _staff, _roster):
         user = self._user()
         pharmacy = self._pharmacy()
         self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
         self.assertFalse(can_manage_roster_pharmacy(user, pharmacy))
 
-    @patch("client_profile.domains.orgs.access.can_manage_roster", return_value=True)
-    @patch("client_profile.domains.orgs.access.can_manage_staff", return_value=False)
+    @patch("organizations.access.can_manage_roster", return_value=True)
+    @patch("organizations.access.can_manage_staff", return_value=False)
     def test_manage_roster_preserves_existing_workforce_access(self, _staff, _roster):
         user = self._user()
         pharmacy = self._pharmacy()
         self.assertTrue(can_manage_roster_pharmacy(user, pharmacy))
         self.assertTrue(can_manage_workforce_pharmacy(user, pharmacy))
 
-    @patch("client_profile.domains.orgs.access.can_manage_roster", return_value=False)
-    @patch("client_profile.domains.orgs.access.can_manage_staff", return_value=False)
+    @patch("organizations.access.can_manage_roster", return_value=False)
+    @patch("organizations.access.can_manage_staff", return_value=False)
     @patch("workforce.permissions._org_has_capability")
     def test_org_staff_scope_does_not_grant_roster_scope(self, org_capability, _staff, _roster):
         from users.org_roles import OrgCapability
