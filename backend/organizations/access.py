@@ -5,7 +5,7 @@ from typing import Iterable, Optional
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
 
-from client_profile.models import PharmacyAdmin, Pharmacy
+from organizations.models import PharmacyAdmin, Pharmacy
 from users.org_roles import membership_capabilities, membership_visible_pharmacy_ids, OrgCapability
 
 

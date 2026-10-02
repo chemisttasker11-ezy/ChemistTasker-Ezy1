@@ -1,7 +1,7 @@
 """Serializers for organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
-from client_profile.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
+from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
 from users.models import OrganizationMembership
 from users.serializers import UserProfileSerializer
 from django.db import transaction

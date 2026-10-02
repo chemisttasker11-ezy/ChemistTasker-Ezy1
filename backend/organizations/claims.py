@@ -1,6 +1,8 @@
 """Ownership claims: owner onboarding claims and pharmacy claim review."""
 from rest_framework import mixins, permissions, status, viewsets
-from client_profile.models import Membership, OwnerOnboarding, Pharmacy, PharmacyAdmin, PharmacyClaim
+from memberships.models import Membership
+from organizations.models import Pharmacy, PharmacyAdmin, PharmacyClaim
+from client_profile.models import OwnerOnboarding
 from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView

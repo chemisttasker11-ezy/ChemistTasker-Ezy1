@@ -1,6 +1,8 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
 from rest_framework import permissions, status, viewsets
-from client_profile.models import Chain, Membership, Organization, OwnerOnboarding, Pharmacy, PharmacyAdmin
+from memberships.models import Membership
+from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
+from client_profile.models import OwnerOnboarding
 from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
 from memberships.serializers import required_user_role_for_membership
