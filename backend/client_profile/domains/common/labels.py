@@ -1,5 +1,6 @@
 """Display labels of staff roles."""
-from client_profile.models import Membership, OtherStaffOnboarding
+from client_profile.models import OtherStaffOnboarding
+from memberships.labels import membership_role_label
 
 
 OTHER_STAFF_ROLE_LABELS = {
@@ -36,7 +37,3 @@ def user_work_role_label(user, fallback="candidate"):
     return fallback
 
 
-def membership_role_label(role):
-    if not role:
-        return ""
-    return dict(Membership.ROLE_CHOICES).get(role, other_staff_role_label(role, str(role).replace("_", " ").title()))
