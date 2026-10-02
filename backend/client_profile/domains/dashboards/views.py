@@ -12,14 +12,14 @@ from client_profile.models import (
 from invoicing.models import Invoice
 from invoicing.navigation import invoice_action_url
 from pharmacy_hub.models import PharmacyHubPost
-from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
+from organizations.serializers import PharmacyClaimSerializer
 from shifts.serializers import ShiftSerializer
 from users.permissions import IsExplorer, IsOtherstaff, IsPharmacist, OrganizationRolePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from client_profile.admin_helpers import pharmacies_user_admins
+from organizations.access import pharmacies_user_admins
 from users.serializers import UserProfileSerializer
 from django.db.models import Q, Sum
 from django.utils import timezone

@@ -27,7 +27,7 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework.exceptions import NotFound, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
-from client_profile.domains.orgs.access import (
+from organizations.access import (
     CAPABILITY_MANAGE_ROSTER,
     has_admin_capability,
     pharmacies_user_admins,
