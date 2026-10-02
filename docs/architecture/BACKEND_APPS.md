@@ -88,7 +88,7 @@ Seams where the kernel reaches into a leaf app (each is a single, reviewed place
 
 ## Database and migrations
 
-Moving a model between apps must not touch data or the live schema, so a move is two steps:
+Moving a model between apps must not touch data or the live schema, so a move is three steps:
 
 1. `<app>.0001_initial` and `client_profile.<N>_move_<app>_out` are **state only** (`SeparateDatabaseAndState`, no SQL).
    The new app registers the models under their old table names and re-labels the ContentType rows in place, so
@@ -98,12 +98,19 @@ Moving a model between apps must not touch data or the live schema, so a move is
    re-points the revision relations, `client_profile.0070_move_roster_out` re-points `ShiftSlot.roster_period`.
 2. `<app>.0002_clean_table_and_index_names` (for the roster `workforce.0008_clean_roster_table_and_index_names`)
    renames the tables and indexes (`ALTER TABLE ... RENAME`, `ALTER INDEX ... RENAME`: metadata only, no row is
-   rewritten). It depends on the move-out migration, so it runs after
-   every other migration that creates a foreign key to the old table name, whatever order the planner picks.
+   rewritten). It depends on the move-out migration, so it runs after every other migration that creates a foreign
+   key to the old table name, whatever order the planner picks.
+3. `<app>.0003_clean_constraint_names` (`workforce.0009_clean_roster_constraint_names`) renames what PostgreSQL keeps
+   when a table is renamed: the primary key, identity sequence, foreign-key, unique, check and index names built
+   from the old table name, including the foreign keys of other apps' tables that point at the moved tables. It uses
+   `core.migration_operations.RenameDatabaseNames`: an explicit old-to-new list, PostgreSQL only, each rename only
+   when the old name exists and the new one is free, reversible. Fresh and upgraded databases end with exactly the
+   names of a database created from the models, and rolling back restores the old names.
 
 Rules that keep this safe:
 
 * never add a dependency to an already applied migration (it makes Django refuse to migrate existing databases);
+* `core.migration_operations` is imported by migrations: keep `RenameDatabaseNames` importable at that path;
 * data migrations of other apps that look moved models up (`worker_finance.0005/0006`) try the new app label first and
   fall back to the old one, so a fresh `migrate` works in any plan order;
 * callables referenced from historical migrations stay importable at their old path
