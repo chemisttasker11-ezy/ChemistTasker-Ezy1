@@ -4,7 +4,7 @@ from client_profile.models import Membership, Pharmacy, Shift, ShiftSlot, ShiftS
 from workforce.models import RosterPeriod
 from client_profile.domains.memberships.serializers import MembershipSerializer
 from workforce.roster.serializers import RosterAssignmentSerializer
-from client_profile.domains.shifts.serializers import OpenShiftSerializer, ShiftSerializer
+from shifts.serializers import OpenShiftSerializer, ShiftSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -19,15 +19,15 @@ from client_profile.domains.orgs.access import (
 )
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
-from client_profile.domains.shifts.pricing import get_locked_rate_for_slot
-from client_profile.domains.shifts.limits import enforce_public_shift_daily_limit
-from client_profile.domains.shifts.notifications import notify_shift_users
-from client_profile.domains.shifts.engagement import staff_assignment_defaults
+from shifts.pricing import get_locked_rate_for_slot
+from shifts.limits import enforce_public_shift_daily_limit
+from shifts.notifications import notify_shift_users
+from shifts.engagement import staff_assignment_defaults
 from datetime import date, datetime
 from django.db import transaction
 from datetime import timedelta
 from users.models import OrganizationMembership, User
-from client_profile.domains.shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
+from shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
 
 
 # Roster
