@@ -42,7 +42,7 @@ urlpatterns = [
     path('api/client-profile/invoices/<int:pk>/', finance_legacy.detail),
     path('api/client-profile/invoices/<int:invoice_id>/pdf/', finance_legacy.pdf),
     path('api/client-profile/invoices/<int:invoice_id>/send/', finance_legacy.send),
-    path('api/client-profile/', include(('client_profile.urls', 'client_profile'), namespace='client_profile')),
+    path('api/client-profile/', include(('core.client_profile_api_urls', 'client_profile'), namespace='client_profile')),
     path('api/billing/', include('billing.urls', namespace='billing')),
     path('api/account/', DeleteAccountView.as_view(), name='delete-account'),
 ]
