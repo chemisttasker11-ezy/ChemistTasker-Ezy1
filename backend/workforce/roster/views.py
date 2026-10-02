@@ -371,14 +371,12 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
     def escalate(self, request, pk=None):
         """
         Escalate a roster-managed shift while clearing any existing assignments.
+        The request is validated first: a refused escalation leaves the assignments in place.
         """
         shift = self.get_object()
 
         if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-
-        # Clear all existing assignments before escalating
-        shift.slot_assignments.all().delete()
 
         allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
         if not allowed_tiers:
@@ -406,7 +404,12 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         if next_visibility == PUBLIC_LEVEL:
             enforce_public_shift_daily_limit(shift.pharmacy)
 
-        visibility = BaseShiftViewSet._apply_escalation(shift, allowed_tiers, target_index)
+        try:
+            with transaction.atomic():   # the assignments are cleared together with the escalation, or not at all
+                shift.slot_assignments.all().delete()
+                visibility = BaseShiftViewSet._apply_escalation(shift, allowed_tiers, target_index)
+        except DjangoValidationError as exc:   # e.g. the shift belongs to a published roster
+            raise DRFValidationError(getattr(exc, "message_dict", {"detail": exc.messages})) from exc
         detail_prefix = f'Shift escalated to {visibility}'.rstrip('.')
         return Response({'detail': f'{detail_prefix} and is now unassigned.'}, status=status.HTTP_200_OK)
 
