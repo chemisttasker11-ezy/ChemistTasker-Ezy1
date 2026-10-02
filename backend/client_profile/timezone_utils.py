@@ -1,18 +1,8 @@
-from __future__ import annotations
+"""Backward-compatible pharmacy timezone helper.
 
-from zoneinfo import ZoneInfo
+New domain code should import from `client_profile.domains.orgs.timezone`.
+This facade preserves the historical import path for external/internal callers.
+"""
+from client_profile.domains.orgs.timezone import get_pharmacy_timezone
 
-from django.utils import timezone
-
-
-def get_pharmacy_timezone(pharmacy) -> ZoneInfo:
-    """
-    Return a tzinfo for a pharmacy's IANA timezone, falling back to default TZ.
-    """
-    tz_name = getattr(pharmacy, "timezone", None) or ""
-    if tz_name:
-        try:
-            return ZoneInfo(tz_name)
-        except Exception:
-            pass
-    return timezone.get_default_timezone()
+__all__ = ["get_pharmacy_timezone"]

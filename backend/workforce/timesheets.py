@@ -15,7 +15,7 @@ from client_profile.models import Membership, Pharmacy, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceEvent, AttendanceSession, ProvisionalAttendance
 from workforce.roster.validation import work_interval
-from client_profile.timezone_utils import get_pharmacy_timezone
+from client_profile.domains.orgs.timezone import get_pharmacy_timezone
 
 from .employment_terms import correspondence_profile
 from .models import (
