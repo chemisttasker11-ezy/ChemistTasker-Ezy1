@@ -1,12 +1,8 @@
 """Serializers for the pharmacy hub API."""
 from rest_framework import serializers
-from client_profile.models import (
-    Membership,
-    Organization,
-    OtherStaffOnboarding,
-    Pharmacy,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-)
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from onboarding.models import OtherStaffOnboarding
+from organizations.models import Organization, Pharmacy
 from pharmacy_hub.models import (
     PharmacyCommunityGroup,
     PharmacyCommunityGroupMembership,

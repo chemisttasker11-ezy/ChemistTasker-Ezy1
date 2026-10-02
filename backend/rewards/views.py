@@ -1,6 +1,6 @@
 """Pill rewards API: balance, rules, referral codes/events, claiming and paying for shifts with pills."""
 from rest_framework import status, viewsets
-from client_profile.models import Shift, ShiftOffer
+from shifts.models import Shift, ShiftOffer
 from rewards.models import PillLedgerEntry, PillReferralEvent, PillRewardRule
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated

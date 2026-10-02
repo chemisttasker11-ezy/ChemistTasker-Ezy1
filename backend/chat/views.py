@@ -6,7 +6,9 @@ log = logging.getLogger(__name__)
 
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.pagination import PageNumberPagination
-from client_profile.models import Membership, Pharmacy, PHARMACY_STAFF_EMPLOYMENT_TYPES, ShiftSlotAssignment
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from organizations.models import Pharmacy
+from shifts.models import ShiftSlotAssignment
 from chat.models import Conversation, make_dm_key, Message, MessageReaction, Participant
 from rest_framework.response import Response
 from rest_framework.views import APIView
