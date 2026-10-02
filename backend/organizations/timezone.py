@@ -1,11 +1,16 @@
-"""Backward-compatible organization-domain facade during ownership transition."""
-from client_profile.domains.orgs import timezone as _legacy
-from client_profile.domains.orgs.timezone import *  # noqa: F401,F403
+from __future__ import annotations
+
+from zoneinfo import ZoneInfo
+
+from django.utils import timezone
 
 
-def __getattr__(name):
-    return getattr(_legacy, name)
-
-
-def __dir__():
-    return sorted(set(globals()) | set(dir(_legacy)))
+def get_pharmacy_timezone(pharmacy) -> ZoneInfo:
+    """Return the pharmacy IANA timezone, falling back to Django's default timezone."""
+    tz_name = getattr(pharmacy, "timezone", None) or ""
+    if tz_name:
+        try:
+            return ZoneInfo(tz_name)
+        except Exception:
+            pass
+    return timezone.get_default_timezone()

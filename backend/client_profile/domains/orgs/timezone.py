@@ -1,16 +1,11 @@
-from __future__ import annotations
-
-from zoneinfo import ZoneInfo
-
-from django.utils import timezone
+"""Backward-compatible facade for organizations.timezone."""
+from organizations import timezone as _impl
+from organizations.timezone import *  # noqa: F401,F403
 
 
-def get_pharmacy_timezone(pharmacy) -> ZoneInfo:
-    """Return the pharmacy IANA timezone, falling back to Django's default timezone."""
-    tz_name = getattr(pharmacy, "timezone", None) or ""
-    if tz_name:
-        try:
-            return ZoneInfo(tz_name)
-        except Exception:
-            pass
-    return timezone.get_default_timezone()
+def __getattr__(name):
+    return getattr(_impl, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_impl)))
