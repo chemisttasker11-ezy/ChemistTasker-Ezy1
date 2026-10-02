@@ -11,7 +11,7 @@ from users.serializers import UserProfileSerializer
 from datetime import date, datetime
 from django.utils import timezone
 from users.presentation import _chat_member_identity
-from client_profile.domains.common.serializers import clean_email
+from users.normalization import normalize_email as clean_email
 from organizations.serializers import PharmacySerializer
 
 
