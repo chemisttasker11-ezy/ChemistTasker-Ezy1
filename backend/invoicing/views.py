@@ -263,22 +263,10 @@ def send_invoice_email(request, invoice_id):
         invoice.status = 'sent'
         invoice.save(update_fields=['status'])
 
-        # If this invoice belongs to the new finance workspace, record the
-        # legacy send against the current revision without locking future edits.
-        from worker_finance.models import Delivery
-        record = Invoice.objects.select_for_update().get(pk=invoice.pk)
-        if record.request_key is not None:
-            Delivery.objects.get_or_create(
-                invoice=record,
-                version=record.version,
-                defaults={
-                    'recipient': to_email,
-                    'status': 'legacy_queued',
-                },
-            )
-            from worker_finance.services import record_revision_state
-            record.refresh_from_db()
-            record_revision_state(record)
+        # If this invoice belongs to the finance workspace, record the
+        # legacy send against the current revision through the explicit bridge.
+        from worker_finance.invoice_bridge import record_legacy_invoice_send
+        record_legacy_invoice_send(invoice, to_email)
 
     return Response({"status": "sent"})
 
