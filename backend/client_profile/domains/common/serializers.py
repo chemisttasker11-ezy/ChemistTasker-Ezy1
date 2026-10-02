@@ -12,20 +12,13 @@ from client_profile.models import (
 from pharmacy_hub.models import PharmacyHubAttachment
 from chat.models import Message
 from core.file_validation import validate_upload_mapping
+from core.serializer_mixins import UploadValidationMixin
 from users.presentation import (
     _build_absolute_media_url,
     _chat_member_identity,
     _resolve_user_profile_photo,
     _split_chat_display_name,
 )
-
-
-class UploadValidationMixin:
-    upload_validation_map = {}
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        return validate_upload_mapping(attrs, self.upload_validation_map)
 
 
 def verification_fields_changed(instance, validated_data, fields):

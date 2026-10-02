@@ -27,7 +27,7 @@ from users.presentation import (
     _chat_member_identity,
     _resolve_user_profile_photo,
 )
-from client_profile.domains.common.serializers import UploadValidationMixin
+from core.serializer_mixins import UploadValidationMixin
 
 
 def _serialize_user_summary(user, request):
