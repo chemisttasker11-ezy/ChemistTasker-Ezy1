@@ -83,8 +83,13 @@ Seams where the kernel reaches into a leaf app (each is a single, reviewed place
   `core/asgi.py`.
 * **Celery**: task names are a persistent contract and are pinned with `name=`. Moving a task to an app only changes
   `CELERY_IMPORTS`; `team_calendar` keeps the names `client_profile.calendar_tasks.*`.
+* **Errors**: a view rejects a request with `rest_framework.exceptions.ValidationError` (HTTP 400). Models and domain
+  services raise django's `ValidationError`; a view that calls them imports it as `DjangoValidationError` and converts
+  it. DRF turns any other exception, django's `ValidationError` included, into an HTTP 500. Query parameters are
+  parsed before use, so a malformed value is a 400 as well.
 * **Tests** live next to the code. The isolated SQLite harnesses (`attendance_tests/`, `worker_finance/tests/`) list
   the apps they need as models-only stub configs (no signals); add a new app there when kernel code imports its models.
+  An app has either `tests.py` or a `tests/` package, never both (the package hides the module).
 
 ## Database and migrations
 
@@ -116,11 +121,3 @@ Rules that keep this safe:
 * callables referenced from historical migrations stay importable at their old path
   (`client_profile.models.chat_upload_path`, `hub_attachment_upload_path`, `client_profile.fields.EncryptedTextField`);
 * the repository ignores every `migrations/` folder except an allow-list in `.gitignore`: a new app must be added there.
-
-## Known product bugs (frozen, not fixed by the split)
-
-They are pinned by `KNOWN QUIRK` tests so a later, reviewed change can fix them deliberately: DRF-shadowed
-`ValidationError` returns HTTP 500 instead of 400 in a few views (pill claim, notification mark-read, message edit,
-two pharmacy-claim decisions), `chains/` (GET and POST), `hub/polls/{id}/reactions/`, `hub/posts/{id}/comments/{id}/reactions/`,
-`hub/posts/{id}/reactions/`, `magic/memberships/{token}/` and `.../apply/`, `ratings/pending/`, `shift-offers/` (POST)
-and a malformed date in the calendar feed also fail with HTTP 500.
