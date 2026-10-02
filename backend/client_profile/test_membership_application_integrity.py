@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from client_profile.domains.shifts.engagement import (
+from shifts.engagement import (
     build_shift_engagement_terms,
     PAYMENT_ABN,
     PAYMENT_TFN,
@@ -17,10 +17,8 @@ from client_profile.domains.shifts.engagement import (
     SETTLEMENT_TIMESHEET_ONLY,
     staff_assignment_defaults,
 )
+from memberships.models import Membership, MembershipApplication, MembershipInviteLink
 from client_profile.models import (
-    Membership,
-    MembershipApplication,
-    MembershipInviteLink,
     OtherStaffOnboarding,
     PharmacistOnboarding,
     OwnerOnboarding,
@@ -30,15 +28,15 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from client_profile.domains.memberships.serializers import (
+from memberships.serializers import (
     MembershipApplicationReviewSerializer,
     MembershipApplicationSerializer,
 )
 from workforce.roster.serializers import RosterAssignmentSerializer
 from invoicing.services import validate_internal_invoice_shifts
-from client_profile.domains.memberships.views import MembershipApplicationViewSet, SubmitMembershipApplication
-from client_profile.domains.shifts.offers import ShiftOfferViewSet
-from client_profile.domains.shifts.finalize import finalize_shift_offer
+from memberships.views import MembershipApplicationViewSet, SubmitMembershipApplication
+from shifts.offers import ShiftOfferViewSet
+from shifts.finalize import finalize_shift_offer
 from workforce.models import Timesheet, TimesheetPeriod
 
 
@@ -160,7 +158,7 @@ class MembershipApplicationIntegrityTests(TestCase):
         )
         force_authenticate(request, user=self.manager)
 
-        with patch("client_profile.domains.memberships.views.async_task") as queued:
+        with patch("memberships.views.async_task") as queued:
             with self.captureOnCommitCallbacks(execute=True):
                 response = MembershipApplicationViewSet.as_view({"patch": "partial_update"})(
                     request,
@@ -189,7 +187,7 @@ class MembershipApplicationIntegrityTests(TestCase):
         )
 
         with patch(
-            "client_profile.domains.memberships.views.async_task",
+            "memberships.views.async_task",
             side_effect=ConnectionError("notification queue unavailable"),
         ):
             with self.captureOnCommitCallbacks(execute=True):
