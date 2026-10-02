@@ -10,6 +10,7 @@ from client_profile.models import (
     ShiftProfileAccessAudit,
 )
 from invoicing.models import Invoice
+from invoicing.navigation import invoice_action_url
 from pharmacy_hub.models import PharmacyHubPost
 from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
 from client_profile.domains.shifts.serializers import ShiftSerializer
@@ -211,21 +212,8 @@ def _dashboard_shift_action_url(shift, dashboard_role):
 
 
 def _dashboard_invoice_action_url(invoice, dashboard_role):
-    if not invoice:
-        return ""
-    role = str(dashboard_role or "").lower()
-    if role == "pharmacist":
-        return f"/dashboard/pharmacist/invoice/{invoice.id}"
-    if role == "otherstaff":
-        return f"/dashboard/otherstaff/invoice/{invoice.id}"
-    if role == "organization":
-        return f"/dashboard/organization/invoice/{invoice.id}"
-    if role == "owner":
-        return f"/dashboard/owner/invoice/{invoice.id}"
-    if role == "admin":
-        pharmacy_id = getattr(invoice, "pharmacy_id", None)
-        return f"/dashboard/admin/{pharmacy_id}/invoice/{invoice.id}" if pharmacy_id else ""
-    return ""
+    """Compatibility wrapper; new code should use invoicing.navigation.invoice_action_url."""
+    return invoice_action_url(invoice, dashboard_role)
 
 
 def _dashboard_hub_action_url(post):

@@ -24,7 +24,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from invoicing.serializers import InvoiceSerializer
 from client_profile.domains.common.access import _get_org_pharmacies_queryset
-from client_profile.domains.dashboards.views import _dashboard_invoice_action_url
+from invoicing.navigation import invoice_action_url
 
 
 # Invoices
@@ -310,7 +310,7 @@ def report_invoice_issue(request, invoice_id):
         title=f"Issue reported on invoice #{invoice.id}",
         body=body,
         notification_type=Notification.Type.ALERT,
-        action_url=_dashboard_invoice_action_url(invoice, None),
+        action_url=invoice_action_url(invoice, None),
         payload={
             "kind": "invoice_issue",
             "invoice_id": invoice.id,
