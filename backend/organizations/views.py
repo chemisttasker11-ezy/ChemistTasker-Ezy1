@@ -2,7 +2,7 @@
 from rest_framework import permissions, status, viewsets
 from memberships.models import Membership
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
-from client_profile.models import OwnerOnboarding
+from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
 from memberships.serializers import required_user_role_for_membership

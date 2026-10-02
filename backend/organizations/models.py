@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from client_profile.models.common import _unique_upload_path
-from client_profile.models.onboarding import OwnerOnboarding
+from onboarding.models import OwnerOnboarding
 
 
 def organization_cover_upload_path(instance, filename):

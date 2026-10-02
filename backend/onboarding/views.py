@@ -1,6 +1,6 @@
 """Onboarding API: per-role onboarding profiles, referee responses and verification triggers."""
 from rest_framework import generics, permissions
-from client_profile.models import (
+from onboarding.models import (
     ExplorerOnboarding,
     OtherStaffOnboarding,
     OwnerOnboarding,

@@ -21,7 +21,7 @@ def _load_skills_catalog():
 
 
 from rest_framework import serializers
-from client_profile.models import (
+from onboarding.models import (
     ExplorerOnboarding,
     OtherStaffOnboarding,
     OwnerOnboarding,

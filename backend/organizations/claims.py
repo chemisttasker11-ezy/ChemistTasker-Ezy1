@@ -2,7 +2,7 @@
 from rest_framework import mixins, permissions, status, viewsets
 from memberships.models import Membership
 from organizations.models import Pharmacy, PharmacyAdmin, PharmacyClaim
-from client_profile.models import OwnerOnboarding
+from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView
