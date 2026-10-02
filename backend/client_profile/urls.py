@@ -22,7 +22,7 @@ from .domains.shifts.browse import (
     ConfirmedShiftViewSet,
     HistoryShiftViewSet,
     MyConfirmedShiftsViewSet,
-    MyHistoryShiftViewSet if False else MyHistoryShiftsViewSet,
+    MyHistoryShiftsViewSet,
     PublicJobBoardView,
     PublicShiftViewSet,
     SharedShiftDetailView,
