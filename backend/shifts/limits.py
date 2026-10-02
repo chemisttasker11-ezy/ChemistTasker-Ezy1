@@ -1,11 +1,29 @@
-"""Shift-domain facade for the legacy implementation module."""
-from client_profile.domains.shifts import limits as _legacy
-from client_profile.domains.shifts.limits import *  # noqa: F401,F403
+"""Limits on public shift posting."""
+from client_profile.models import Shift
+from django.db.models import Q
+from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 
-def __getattr__(name):
-    return getattr(_legacy, name)
+MAX_PUBLIC_SHIFTS_PER_DAY = 10
 
 
-def __dir__():
-    return sorted(set(globals()) | set(dir(_legacy)))
+def enforce_public_shift_daily_limit(pharmacy, *, max_per_day: int = MAX_PUBLIC_SHIFTS_PER_DAY, on_date=None):
+    """
+    Ensure the given pharmacy has not already published the daily quota of public shifts.
+    Counts shifts that became public today either via creation (created_at) or escalation timestamps.
+    """
+    target_date = on_date or timezone.localdate()
+
+    platform_shifts_today = Shift.objects.filter(
+        pharmacy=pharmacy,
+        visibility='PLATFORM',
+    ).filter(
+        Q(escalate_to_platform__date=target_date) |
+        Q(escalate_to_platform__isnull=True, created_at__date=target_date)
+    ).count()
+
+    if platform_shifts_today >= max_per_day:
+        raise ValidationError({
+            'detail': f'Maximum of {max_per_day} public shifts per day reached for {pharmacy.name}.'
+        })
