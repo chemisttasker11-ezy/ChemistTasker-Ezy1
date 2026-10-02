@@ -27,10 +27,6 @@ class InvoiceBridgeTests(SimpleTestCase):
         record.refresh_from_db = Mock()
         manager = Mock()
         manager.select_for_update.return_value.get.return_value = record
-        invoice_class = SimpleNamespace(objects=manager)
-        invoice = SimpleNamespace(pk=5, __class__=invoice_class)
-
-        # SimpleNamespace cannot override __class__; use a tiny dynamic type instead.
         class InvoiceStub:
             objects = manager
 
