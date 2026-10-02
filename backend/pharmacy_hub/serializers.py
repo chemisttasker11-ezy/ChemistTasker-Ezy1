@@ -21,7 +21,7 @@ from pharmacy_hub.models import (
     PharmacyHubReaction,
 )
 from django.db import transaction
-from client_profile.file_validation import IMAGE_UPLOAD_POLICY
+from core.file_validation import IMAGE_UPLOAD_POLICY
 from client_profile.domains.common.serializers import (
     _build_absolute_media_url,
     _chat_member_identity,

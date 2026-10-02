@@ -8,7 +8,7 @@ from django.db import transaction
 from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from core.task_queue import async_task
 from client_profile.domains.common.serializers import RemoveOldFilesMixin, UploadValidationMixin
-from client_profile.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
+from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 
 
 # === Onboardings ===

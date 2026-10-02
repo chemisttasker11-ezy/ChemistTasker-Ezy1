@@ -11,7 +11,7 @@ from client_profile.models import (
 )
 from pharmacy_hub.models import PharmacyHubAttachment
 from chat.models import Message
-from client_profile.file_validation import validate_upload_mapping
+from core.file_validation import validate_upload_mapping
 
 
 class UploadValidationMixin:

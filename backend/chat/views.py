@@ -18,7 +18,7 @@ from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from chat.text import sanitize_chat_text
 from chat.realtime import broadcast_message_badge, broadcast_message_read
-from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
+from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from datetime import date
 from django.db import transaction
 from users.models import OrganizationMembership, User
