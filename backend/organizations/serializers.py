@@ -7,7 +7,7 @@ from users.serializers import UserProfileSerializer
 from django.db import transaction
 from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from core.task_queue import async_task
-from client_profile.domains.common.serializers import RemoveOldFilesMixin
+from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 
