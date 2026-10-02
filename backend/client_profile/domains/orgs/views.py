@@ -25,9 +25,9 @@ from core.task_queue import async_task
 from client_profile.tasks import _parse_abn_html_fields, abn_lookup
 from client_profile.domains.common.access import (
     _count_active_memberships,
-    _get_org_pharmacies_queryset,
     MAX_ACTIVE_PHARMACY_MEMBERSHIPS,
 )
+from client_profile.domains.orgs.access import _get_org_pharmacies_queryset
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from users.models import OrganizationMembership, User
