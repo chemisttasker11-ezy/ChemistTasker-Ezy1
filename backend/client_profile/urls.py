@@ -16,14 +16,6 @@ from .domains.dashboards.views import (
     OwnerDashboard,
     PharmacistDashboard,
 )
-from .domains.orgs.claims import OwnerOnboardingClaim, PharmacyClaimViewSet
-from .domains.orgs.views import (
-    ChainViewSet,
-    OrganizationViewSet,
-    PharmacyAdminViewSet,
-    PharmacyViewSet,
-    PublicOrganizationDetailView,
-)
 from .domains.onboarding.views import (
     ExplorerOnboardingV2MeView,
     OtherStaffOnboardingV2MeView,
@@ -37,11 +29,6 @@ from .domains.onboarding.views import (
 router = DefaultRouter()
 router.include_root_view = False
 
-router.register(r'organizations', OrganizationViewSet, basename='organization')
-router.register(r'chains', ChainViewSet, basename='chain')
-router.register(r'pharmacies', PharmacyViewSet)
-router.register(r'pharmacy-claims', PharmacyClaimViewSet, basename='pharmacy-claim')
-router.register(r'pharmacy-admins', PharmacyAdminViewSet, basename='pharmacy-admin')
 
 
 urlpatterns = [
@@ -51,12 +38,10 @@ urlpatterns = [
     path('explorer/onboarding/me/', ExplorerOnboardingV2MeView.as_view(), name='explorer-onboarding-me'),
     path('onboarding/submit-reference/<str:token>/', RefereeSubmitResponseView.as_view(), name='submit-referee-response'),
     path('onboarding/referee-reject/<str:token>/', RefereeRejectView.as_view(), name='referee-reject'),
-    path('organizations/public/<slug:slug>/', PublicOrganizationDetailView.as_view(), name='organization-public-detail'),
     path('dashboard/organization/', OrganizationDashboardView.as_view(), name='organization-dashboard'),
     path('dashboard/organization/<int:organization_pk>/', OrganizationDashboardView.as_view(), name='organization-dashboard-detail'),
     path('dashboard/owner/', OwnerDashboard.as_view()),
     path('dashboard/pharmacist/', PharmacistDashboard.as_view()),
     path('dashboard/otherstaff/', OtherStaffDashboard.as_view()),
     path('dashboard/explorer/', ExplorerDashboard.as_view()),
-    path('owner-onboarding/claim/', OwnerOnboardingClaim.as_view(), name='owneronboarding-claim'),
 ]

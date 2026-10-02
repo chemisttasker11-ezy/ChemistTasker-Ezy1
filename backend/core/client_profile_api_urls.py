@@ -7,7 +7,6 @@ the `client_profile:` namespace used by all ChemistTasker clients.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from client_profile.urls import router as client_profile_router
 from rewards.urls import router as rewards_router
 from ratings.urls import router as ratings_router
 from talent.urls import availability_router as talent_availability_router, explorer_router as talent_explorer_router
@@ -25,27 +24,18 @@ from memberships.urls import (
     membership_router,
     self_router as membership_self_router,
 )
+from organizations.urls import (
+    admin_router as organization_admin_router,
+    primary_router as organization_primary_router,
+)
 
 
 router = DefaultRouter()
 
 # Preserve the exact historical DRF API-root registration order.
-kernel = {prefix: (viewset, basename) for prefix, viewset, basename in client_profile_router.registry}
-
-for prefix in [
-    'organizations',
-    'chains',
-    'pharmacies',
-    'pharmacy-claims',
-]:
-    viewset, basename = kernel[prefix]
-    router.register(prefix, viewset, basename=basename)
-
+router.registry.extend(organization_primary_router.registry)
 router.registry.extend(membership_router.registry)
-
-viewset, basename = kernel['pharmacy-admins']
-router.register('pharmacy-admins', viewset, basename=basename)
-
+router.registry.extend(organization_admin_router.registry)
 router.registry.extend(membership_intake_router.registry)
 
 router.registry.extend(shift_discovery_router.registry)
@@ -72,6 +62,7 @@ router.registry.extend(team_calendar_router.registry)
 urlpatterns = [
     path('workforce/', include('workforce.urls')),
     path('', include('client_profile.urls')),
+    path('', include('organizations.urls')),
     path('', include('memberships.urls')),
     path('', include('shifts.urls')),
     path('', include('chat.urls')),
