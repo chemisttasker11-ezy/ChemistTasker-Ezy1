@@ -7,7 +7,7 @@ User = get_user_model()
 from rest_framework import serializers
 from client_profile.models import Membership
 from chat.models import Conversation, Message, MessageReaction, Participant
-from client_profile.domains.common.serializers import _chat_member_identity
+from chat.identity import _chat_member_identity
 
 
 # --- Chat Serializers --------------------------------------------------------
