@@ -470,17 +470,31 @@ class FetchInstanceContractTests(SimpleTestCase):
         model.objects.get.return_value = "object"
         self.assertEqual(fetch(model, 3, max_retries=2, sleep_sec=0), "object")
 
-    def test_missing_object_raises_type_error_from_the_logging_call(self):
-        # CURRENT BEHAVIOUR (known defect, fixed separately): logger.error(..., file=sys.stderr) raises TypeError on
-        # the first miss, so the retry loop never retries.
+    def model(self, side_effect):
         from django.core.exceptions import ObjectDoesNotExist
 
-        fetch = impl("client_profile.tasks.verify_abn_task", "fetch_instance_with_retries")
+        class Missing(ObjectDoesNotExist):
+            pass
+
         model = mock.Mock()
-        model.objects.get.side_effect = ObjectDoesNotExist
-        with self.assertRaises(TypeError):
-            fetch(model, 3, max_retries=2, sleep_sec=0)
-        self.assertEqual(model.objects.get.call_count, 1)
+        model.DoesNotExist = Missing
+        model.objects.get.side_effect = [Missing() if item is None else item for item in side_effect]
+        return model
+
+    def test_object_that_appears_late_is_returned_after_retries(self):
+        fetch = impl("client_profile.tasks.verify_abn_task", "fetch_instance_with_retries")
+        model = self.model([None, None, "object"])
+        with self.assertLogs(fetch.__module__, level="WARNING") as logs:
+            self.assertEqual(fetch(model, 3, max_retries=5, sleep_sec=0), "object")
+        self.assertEqual(model.objects.get.call_count, 3)
+        self.assertEqual(len(logs.records), 2)
+
+    def test_object_that_never_appears_raises_does_not_exist_after_max_retries(self):
+        fetch = impl("client_profile.tasks.verify_abn_task", "fetch_instance_with_retries")
+        model = self.model([None, None, None])
+        with self.assertLogs(fetch.__module__, level="WARNING"), self.assertRaises(model.DoesNotExist):
+            fetch(model, 3, max_retries=3, sleep_sec=0)
+        self.assertEqual(model.objects.get.call_count, 3)
 
 
 class DocumentVerificationContractTests(SimpleTestCase):
