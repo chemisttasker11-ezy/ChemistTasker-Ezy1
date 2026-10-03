@@ -84,13 +84,14 @@ def verify_filefield_task(
     else:
         local_path = get_local_file_or_download(file_obj)
         if not local_path or not os.path.exists(local_path):
-            failure_note = f"Could not obtain file for OCR: {local_path}."
+            # the note is shown to the user: never a server path
+            failure_note = "Could not obtain the uploaded file for OCR."
             logger.info(f"[verify_filefield_task] {failure_note}")
         else:
             converted_path = None
             try:
                 ocr_path, converted_path = ocr_input_path_for_file(local_path)
-                logger.info(f"[verify_filefield_task] Sending OCR input path to Azure: {ocr_path}")
+                logger.info("[verify_filefield_task] Sending the document to Azure OCR pk=%s field=%s", object_pk, file_field)
                 ocr_data = azure_ocr(ocr_path)
                 lines = ocr_data.get("lines", [])
                 text = " ".join(lines)
@@ -98,7 +99,7 @@ def verify_filefield_task(
 
                 if is_name_match:
                     is_verified = True
-                    logger.info(f"[verify_filefield_task] Name match result: {is_name_match} (first={first_name}, last={last_name})")
+                    logger.info("[verify_filefield_task] Name match result: %s pk=%s field=%s", is_name_match, object_pk, file_field)
                 else:
                     failure_note = f"Name mismatch found in your uploaded document"
                     logger.info(f"[verify_filefield_task] {failure_note}")
@@ -126,7 +127,7 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
     that only happens when the user confirms in the UI.
     """
     note_field = kwargs.get('note_field')
-    logger.info(f"[VERIFY ABN TASK] model={model_name}, pk={object_pk}, abn={abn_number}")
+    logger.info("[VERIFY ABN TASK] model=%s pk=%s", model_name, object_pk)
 
     Model = apps.get_model("client_profile", model_name)
     obj = fetch_instance_with_retries(Model, object_pk)
@@ -169,7 +170,7 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
 @shared_task(name="client_profile.tasks.verify_ahpra_task", queue="ocr")
 def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name, email, **kwargs):
     full_ahpra_number = f"PHA000{ahpra_number}"
-    logger.info(f"[AHPRA TASK] Constructed full AHPRA number for lookup: {full_ahpra_number}")
+    logger.info("[AHPRA TASK] Starting AHPRA lookup model=%s pk=%s", model_name, object_pk)
     # --- END OF CHANGE ---
 
     Model = apps.get_model("client_profile", model_name)
@@ -178,7 +179,7 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     # This logic correctly compares the incoming numeric-only `ahpra_number` 
     # with the numeric-only number stored on the object, so it doesn't need to change.
     if (obj.ahpra_number or '').strip().lower() == ahpra_number.strip().lower() and obj.ahpra_verification_note:
-        logger.info(f"[AHPRA TASK] SKIPPING: Verification for pk={object_pk} with number {ahpra_number} already has a result.")
+        logger.info("[AHPRA TASK] SKIPPING: verification for pk=%s already has a result for this number.", object_pk)
         return # Exit immediately
 
     # If we are here, it means it's a new AHPRA number or the first attempt.
@@ -204,7 +205,10 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     finally:
         if os.path.exists(output_html):
             os.remove(output_html)
-    logger.info(f"[verify_ahpra_task] Parsed: {ahpra_data}")
+    logger.info(
+        "[verify_ahpra_task] Parsed register page pk=%s type=%s status=%s has_expiry=%s", object_pk,
+        ahpra_data.get("registration_type"), ahpra_data.get("registration_status"), bool(ahpra_data.get("expiry_date")),
+    )
 
     practitioner_name = ahpra_data.get("practitioner_name", "")
     registration_type = (ahpra_data.get("registration_type") or "").strip()
@@ -212,7 +216,7 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     expiry_date_str = ahpra_data.get("expiry_date", "")
 
     is_name_match = simple_name_match(practitioner_name, first_name, last_name)
-    logger.info(f"[verify_ahpra_task] Name match: {is_name_match} (expected={first_name} {last_name}, found={practitioner_name})")
+    logger.info("[verify_ahpra_task] Name match: %s pk=%s", is_name_match, object_pk)
 
     note = ""
     expiry_date = None

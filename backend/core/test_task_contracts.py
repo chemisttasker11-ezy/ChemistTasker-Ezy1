@@ -959,3 +959,81 @@ class VerificationArtifactTests(SimpleTestCase):
             target.abn_verification_note,
             "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you.",
         )
+
+
+class VerificationLogPrivacyTests(SimpleTestCase):
+    """Operator logs carry identifiers (model, pk, field, result, error type), not personal data or paths."""
+
+    SENSITIVE = ("Ann", "Lee", "Someone Else", "1234567", "51824753556", "/tmp/", "doc-path", "SECRET")
+
+    def assert_clean(self, logs):
+        text = " ".join(logs.output)
+        for value in self.SENSITIVE:
+            self.assertNotIn(value, text)
+
+    def test_document_verification_logs_and_note_hold_no_paths_or_names(self):
+        import tempfile
+
+        name = "client_profile.tasks.verify_filefield_task"
+        with tempfile.NamedTemporaryFile(prefix="doc-path-", suffix=".png", delete=False) as handle:
+            path = handle.name
+        target = SimpleNamespace(
+            user=SimpleNamespace(first_name="Ann", last_name="Lee", email="ann@example.com"),
+            government_id="file", gov_id_verified=None, gov_id_verification_note="", save=mock.Mock(),
+        )
+        with patch_impl(
+            name,
+            apps=SimpleNamespace(get_model=lambda label, model: mock.Mock()),
+            fetch_instance_with_retries=lambda model, pk: target,
+            get_local_file_or_download=lambda field: path,
+            azure_ocr=lambda p: {"lines": ["ANN LEE"]},
+        ), self.assertLogs("onboarding", level="DEBUG") as logs:
+            task(name).run("PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "a@x.test", "gov_id_verified",
+                           note_field="gov_id_verification_note")
+        self.assert_clean(logs)
+
+        target.gov_id_verification_note = ""
+        with patch_impl(
+            name,
+            apps=SimpleNamespace(get_model=lambda label, model: mock.Mock()),
+            fetch_instance_with_retries=lambda model, pk: target,
+            get_local_file_or_download=lambda field: "/tmp/doc-path-missing.png",
+        ), self.assertLogs("onboarding", level="DEBUG") as logs:
+            task(name).run("PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "a@x.test", "gov_id_verified",
+                           note_field="gov_id_verification_note")
+        self.assert_clean(logs)
+        self.assertEqual(target.gov_id_verification_note, "Could not obtain the uploaded file for OCR.")
+
+    def test_ahpra_verification_logs_hold_no_names_or_numbers(self):
+        name = "client_profile.tasks.verify_ahpra_task"
+        target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
+        parsed = {"practitioner_name": "Someone Else", "registration_type": "General",
+                  "registration_status": "Registered", "expiry_date": "30/11/2099"}
+        with patch_impl(
+            name,
+            fetch_instance_with_retries=lambda model, pk: target,
+            ahpra_lookup=lambda number, path, api_key=None: path,
+            parse_ahpra_html=lambda path: parsed,
+            _update_ahpra_fields=mock.Mock(),
+        ), self.assertLogs("onboarding", level="DEBUG") as logs:
+            task(name).run("PharmacistOnboarding", 5, "1234567", "Ann", "Lee", "a@x.test")
+        self.assert_clean(logs)
+
+    def test_ahpra_result_save_does_not_log_the_note(self):
+        update = impl("client_profile.tasks.verify_ahpra_task", "_update_ahpra_fields")
+        target = SimpleNamespace(save=mock.Mock())
+        model = mock.Mock()
+        with mock.patch.dict(update.__globals__, {
+            "apps": SimpleNamespace(get_model=lambda label, name: model),
+            "fetch_instance_with_retries": lambda m, pk: target,
+        }), self.assertLogs("onboarding", level="DEBUG") as logs:
+            update("PharmacistOnboarding", 5, False, "AHPRA name mismatch: 'Ann Lee' vs 'Someone Else'")
+        self.assert_clean(logs)
+
+    def test_abn_lookup_logs_hold_no_abn_or_provider_detail(self):
+        from core.integrations.abr import abn_lookup
+
+        with mock.patch("requests.get", side_effect=OSError("https://abr.example/?id=51824753556 SECRET")), \
+                self.assertLogs("core.integrations.abr", level="DEBUG") as logs:
+            abn_lookup("51824753556")
+        self.assert_clean(logs)

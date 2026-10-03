@@ -48,7 +48,7 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
     # --- START OF FIX: Add a retry loop ---
     max_retries = 3
     for attempt in range(max_retries):
-        logger.info(f"[ahpra_lookup] Requesting ScrapingBee for: {ahpra_number} (Attempt {attempt + 1}/{max_retries})")
+        logger.info("[ahpra_lookup] Requesting ScrapingBee (attempt %s/%s)", attempt + 1, max_retries)
         try:
             response = client.get(url, params=params)
             
@@ -138,4 +138,4 @@ def _update_ahpra_fields(model_name, object_pk, verified, note, reg_type=None, r
         "ahpra_verified", "ahpra_verification_note",
         "ahpra_registration_type", "ahpra_registration_status", "ahpra_expiry_date"
     ])
-    logger.info(f"[AHPRA TASK] Saved verification note for {model_name} pk={object_pk}: {note}")
+    logger.info("[AHPRA TASK] Saved verification result for %s pk=%s verified=%s", model_name, object_pk, verified)

@@ -17,15 +17,15 @@ def get_local_file_or_download(filefield):
         return None
     try:
         if hasattr(filefield, "path") and os.path.exists(filefield.path):
-            logger.info(f"[get_local_file_or_download] Using local path: {filefield.path}")
+            logger.info("[get_local_file_or_download] Using the local media file")
             return filefield.path
     except Exception as e:
-        logger.info(f"[get_local_file_or_download] Could not access .path: {e}")
+        logger.info("[get_local_file_or_download] No local path (error_type=%s); downloading", type(e).__name__)
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=Path(filefield.name).suffix)
     with default_storage.open(filefield.name, "rb") as remote_file:
         shutil.copyfileobj(remote_file, temp_file)
     temp_file.close()
-    logger.info(f"[get_local_file_or_download] Downloaded to temp: {temp_file.name}")
+    logger.info("[get_local_file_or_download] Downloaded to a temporary file")
     return temp_file.name
 
 
@@ -45,7 +45,7 @@ def pdf_first_page_to_png(pdf_path):
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
         temp_file.close()
         pix.save(temp_file.name)
-        logger.info(f"[pdf_first_page_to_png] Converted first PDF page to: {temp_file.name}")
+        logger.info("[pdf_first_page_to_png] Converted the first PDF page to a temporary PNG")
         return temp_file.name
     finally:
         doc.close()
@@ -58,16 +58,16 @@ def is_pdf_file(local_path):
         if header == b"%PDF-":
             return True
     except Exception as e:
-        logger.info(f"[is_pdf_file] Could not inspect file header for {local_path}: {e}")
+        logger.info("[is_pdf_file] Could not inspect the file header (error_type=%s)", type(e).__name__)
     return str(local_path).lower().endswith(".pdf")
 
 
 def ocr_input_path_for_file(local_path):
     if is_pdf_file(local_path):
-        logger.info(f"[ocr_input_path_for_file] PDF detected, converting before OCR: {local_path}")
+        logger.info("[ocr_input_path_for_file] PDF detected, converting before OCR")
         converted_path = pdf_first_page_to_png(local_path)
         return converted_path, converted_path
-    logger.info(f"[ocr_input_path_for_file] Image input detected, sending directly to OCR: {local_path}")
+    logger.info("[ocr_input_path_for_file] Image input detected, sending directly to OCR")
     return local_path, None
 
 
@@ -94,5 +94,5 @@ def azure_ocr(file_path):
         for block in result.read.blocks:
             for line in block.lines:
                 lines.append(line.text)
-    logger.info(f"[azure_ocr] OCR done for {file_path}, found {len(lines)} lines.")
+    logger.info("[azure_ocr] OCR done, found %s lines.", len(lines))
     return {"lines": lines}
