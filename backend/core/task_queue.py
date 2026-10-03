@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import Lock
 from typing import Any
 
 from celery import current_app
@@ -10,6 +11,8 @@ from django.utils import timezone
 CELERY_TASK_ALIASES = {
     "users.tasks.send_async_email": "users.tasks.send_email_task",
 }
+
+_TASK_REGISTRY_LOAD_LOCK = Lock()
 
 def _celery_options(q_options: dict[str, Any] | None) -> dict[str, Any]:
     if not q_options:
@@ -33,7 +36,16 @@ def registered_task_name(name: str) -> str:
     task_name = CELERY_TASK_ALIASES.get(name, name)
     if task_name in current_app.tasks:
         return task_name
-    current_app.loader.import_default_modules()
+
+    # Celery 5.5 autodiscovery uses a process-global race-protection flag, not a
+    # lock. Two concurrent first web requests can therefore make the second
+    # caller skip autodiscovery and observe a partially populated registry.
+    # Serialize the miss path and re-check after acquiring the lock so only one
+    # request performs the initial import pass.
+    with _TASK_REGISTRY_LOAD_LOCK:
+        if task_name not in current_app.tasks:
+            current_app.loader.import_default_modules()
+
     if task_name in current_app.tasks:
         return task_name
     raise LookupError(f"Celery task is not registered: {task_name}")

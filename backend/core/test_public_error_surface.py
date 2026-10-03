@@ -184,7 +184,8 @@ class ShiftRatePreviewErrorSurfaceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data[0], {"error": "Unable to calculate the rate for this slot.", "rate": "0.00"})
         self.assertEqual(response.data[1], {"error": "Invalid slot payload", "rate": "0.00"})
-        self.assertIn("does not match format", response.data[2]["error"])  # the user's own input error stays useful
+        self.assertEqual(response.data[2]["error"], "Invalid date format, use YYYY-MM-DD")
+        self.assertNotIn("does not match format", response.data[2]["error"])
         assert_no_internal_detail(self, response)
 
     def test_pricing_value_error_is_not_treated_as_user_date_error(self):

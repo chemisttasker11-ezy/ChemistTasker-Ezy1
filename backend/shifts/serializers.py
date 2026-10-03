@@ -61,12 +61,17 @@ from shifts.travel import (
     extract_travel_origin_from_message,
     TRAVEL_ORIGIN_PREFIX,
 )
+from shifts.assignment import OFFER_EXPIRY_HOURS  # noqa: F401  (historical import path)
+from shifts.announcements import SHIFT_EMAIL_RECIPIENT_CAP  # noqa: F401  (historical import path)
+from shifts.posting import (
+    ensure_escalation_stamps,
+    normalize_money_value,
+    normalize_slots_payload,
+    post_shift,
+    revise_shift,
+)
+from shifts.travel import haversine_km
 
-
-OFFER_EXPIRY_HOURS = 48
-
-
-SHIFT_EMAIL_RECIPIENT_CAP = 50
 
 
 class ShiftDescriptionTemplateSerializer(serializers.ModelSerializer):
@@ -341,14 +346,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         return None
 
     def _haversine_km(self, lat1, lon1, lat2, lon2):
-        r = 6371.0
-        phi1 = math.radians(lat1)
-        phi2 = math.radians(lat2)
-        d_phi = math.radians(lat2 - lat1)
-        d_lambda = math.radians(lon2 - lon1)
-        a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        return r * c
+        return haversine_km(lat1, lon1, lat2, lon2)
 
     def get_ui_distance_km(self, obj):
         request = self.context.get('request')
@@ -374,612 +372,20 @@ class ShiftSerializer(serializers.ModelSerializer):
     def get_allowed_escalation_levels(self, obj) -> list[str]:
         return self.build_allowed_tiers(obj.pharmacy)
 
-    @staticmethod
-    def _ensure_escalation_stamps(shift, allowed_tiers, target_index):
-        field_map = ESCALATION_FIELD_MAP
-        stamp_time = timezone.now()
-        for idx in range(1, target_index + 1):
-            if idx >= len(allowed_tiers):
-                break
-            tier = allowed_tiers[idx]
-            field = field_map.get(tier)
-            if field and not getattr(shift, field):
-                setattr(shift, field, stamp_time)
+    # Historical entry point: owned by shifts.posting.
+    _ensure_escalation_stamps = staticmethod(ensure_escalation_stamps)
 
-    @staticmethod
-    def _normalize_money_value(value, *, field_name, slot_index):
-        if value in (None, ''):
-            return None
-        try:
-            return Decimal(str(value)).quantize(Decimal('0.01'))
-        except Exception:
-            raise serializers.ValidationError({
-                'slots': [f"Slot #{slot_index} has an invalid {field_name}."]
-            })
+    # Historical entry points: owned by shifts.posting.
+    _normalize_money_value = staticmethod(normalize_money_value)
 
     def _normalize_slots_payload(self, slots_data):
-        normalized = []
-        for idx, raw_slot in enumerate(slots_data, start=1):
-            slot = dict(raw_slot)
-            recurring_days = slot.get('recurring_days') or []
-            slot['recurring_days'] = sorted({int(day) for day in recurring_days if day is not None})
-            slot['rate'] = self._normalize_money_value(slot.get('rate'), field_name='rate', slot_index=idx)
-
-            if slot.get('is_recurring'):
-                if not slot['recurring_days']:
-                    raise serializers.ValidationError({
-                        'slots': [f"Recurring slot #{idx} must include at least one weekday."]
-                    })
-                slot['recurring_end_date'] = slot.get('recurring_end_date') or slot['date']
-            else:
-                slot['recurring_days'] = []
-                slot['recurring_end_date'] = None
-
-            normalized.append(slot)
-        return normalized
+        return normalize_slots_payload(slots_data)
 
     def _initial_slots_payload(self):
         initial_data = getattr(self, 'initial_data', {}) or {}
         if 'slots' not in initial_data:
             return None
         return initial_data.get('slots') or []
-
-    def _sync_pharmacy_rate_defaults(self, pharmacy, *, shift=None, request_data=None):
-        if not pharmacy:
-            return
-
-        request_data = request_data or {}
-
-        def get_request_value(*keys):
-            for key in keys:
-                if key in request_data:
-                    return request_data.get(key)
-            return None
-
-        def to_decimal_or_none(value):
-            if value in (None, ''):
-                return None
-            try:
-                return Decimal(str(value))
-            except Exception:
-                return None
-
-        next_rate_type = (
-            get_request_value('rate_type', 'rateType')
-            or getattr(shift, 'rate_type', None)
-            or getattr(pharmacy, 'default_rate_type', None)
-            or 'FLEXIBLE'
-        )
-        pharmacy.default_rate_type = next_rate_type
-
-        pharmacy.rate_weekday = to_decimal_or_none(get_request_value('rate_weekday', 'rateWeekday'))
-        pharmacy.rate_saturday = to_decimal_or_none(get_request_value('rate_saturday', 'rateSaturday'))
-        pharmacy.rate_sunday = to_decimal_or_none(get_request_value('rate_sunday', 'rateSunday'))
-        pharmacy.rate_public_holiday = to_decimal_or_none(get_request_value('rate_public_holiday', 'ratePublicHoliday'))
-        pharmacy.rate_early_morning = to_decimal_or_none(get_request_value('rate_early_morning', 'rateEarlyMorning'))
-        pharmacy.rate_late_night = to_decimal_or_none(get_request_value('rate_late_night', 'rateLateNight'))
-
-        fixed_rate_value = (
-            get_request_value('fixed_rate', 'fixedRate', 'hourly_rate', 'hourlyRate')
-            or getattr(shift, 'fixed_rate', None)
-            or pharmacy.rate_weekday
-        )
-        pharmacy.default_fixed_rate = (
-            to_decimal_or_none(fixed_rate_value)
-            if next_rate_type == 'FIXED'
-            else None
-        )
-
-        pharmacy.save(update_fields=[
-            'default_rate_type',
-            'default_fixed_rate',
-            'rate_weekday',
-            'rate_saturday',
-            'rate_sunday',
-            'rate_public_holiday',
-            'rate_early_morning',
-            'rate_late_night',
-        ])
-
-    def _collect_membership_users(self, shift, pharmacy_ids, employment_types):
-        qs = Membership.objects.filter(
-            pharmacy_id__in=pharmacy_ids,
-            role=shift.role_needed,
-            employment_type__in=employment_types,
-            is_active=True,
-            user__is_active=True,
-        ).select_related("user")
-        users = []
-        for membership in qs:
-            user = membership.user
-            if not user or not user.email:
-                continue
-            if shift.created_by_id and user.id == shift.created_by_id:
-                continue
-            users.append(user)
-        return users
-
-    @staticmethod
-    def _format_slot_date(value):
-        if not value:
-            return None
-        if isinstance(value, date):
-            parsed = value
-        elif isinstance(value, datetime):
-            parsed = value.date()
-        elif isinstance(value, str):
-            try:
-                parsed = datetime.strptime(value, "%Y-%m-%d").date()
-            except ValueError:
-                try:
-                    parsed = datetime.fromisoformat(value).date()
-                except ValueError:
-                    return value
-        else:
-            return str(value)
-        return parsed.strftime("%d %B, %Y").lstrip("0")
-
-    @staticmethod
-    def _format_slot_time(value):
-        if not value:
-            return None
-        if isinstance(value, time):
-            parsed = value
-        elif isinstance(value, datetime):
-            parsed = value.time()
-        elif isinstance(value, str):
-            parsed = None
-            for fmt in ("%H:%M:%S", "%H:%M"):
-                try:
-                    parsed = datetime.strptime(value, fmt).time()
-                    break
-                except ValueError:
-                    continue
-            if parsed is None:
-                return value
-        else:
-            return str(value)
-        return parsed.strftime("%I:%M %p").lstrip("0")
-
-    @staticmethod
-    def _format_money(value):
-        if value is None or value == "":
-            return None
-        try:
-            amount = Decimal(str(value))
-        except Exception:
-            return None
-        formatted = f"{amount:.2f}".rstrip("0").rstrip(".")
-        return f"${formatted}"
-
-    def _get_pharmacy_display_name(self, shift, user):
-        pharmacy = getattr(shift, "pharmacy", None)
-        if not pharmacy:
-            return "Pharmacy"
-        if shift.post_anonymously and not user_can_view_full_pharmacy(user, pharmacy):
-            suburb = getattr(pharmacy, "suburb", None)
-            return f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
-        return pharmacy.name
-
-    def _get_location_line_for_email(self, shift, user):
-        pharmacy = getattr(shift, "pharmacy", None)
-        if not pharmacy:
-            return None
-        anonymize = shift.post_anonymously and not user_can_view_full_pharmacy(user, pharmacy)
-        if anonymize:
-            parts = [
-                getattr(pharmacy, "suburb", None),
-                getattr(pharmacy, "state", None),
-                getattr(pharmacy, "postcode", None),
-            ]
-        else:
-            parts = [
-                getattr(pharmacy, "street_address", None),
-                getattr(pharmacy, "suburb", None),
-                getattr(pharmacy, "state", None),
-                getattr(pharmacy, "postcode", None),
-            ]
-        return ", ".join(part for part in parts if part) or None
-
-    def _build_shift_email_slot_meta(self, shift, slot_entries, *, user=None):
-        first_slot = slot_entries[0] if slot_entries else {}
-        slot_date = first_slot.get('date') if isinstance(first_slot, dict) else None
-        slot_start = first_slot.get('start_time') if isinstance(first_slot, dict) else None
-        slot_end = first_slot.get('end_time') if isinstance(first_slot, dict) else None
-        slot_summary = None
-        if slot_date and slot_start and slot_end:
-            slot_summary = f"{self._format_slot_date(slot_date)} — {self._format_slot_time(slot_start)} to {self._format_slot_time(slot_end)}"
-
-        slot_lines = []
-        slot_cards = []
-        for slot in slot_entries or []:
-            if not isinstance(slot, dict):
-                continue
-            date_text = self._format_slot_date(slot.get('date'))
-            start_text = self._format_slot_time(slot.get('start_time'))
-            end_text = self._format_slot_time(slot.get('end_time'))
-            if date_text and start_text and end_text:
-                rate_value = slot.get("rate")
-                rate_text = f"{self._format_money(rate_value)}/hr" if rate_value not in (None, "") else None
-                slot_cards.append({
-                    "date": date_text,
-                    "time": f"{start_text} - {end_text}",
-                    "rate": rate_text,
-                    "line": f"{date_text} - {start_text} to {end_text}{f' - {rate_text}' if rate_text else ''}",
-                })
-                slot_lines.append(f"{date_text} — {start_text} to {end_text}")
-        max_slots_in_email = 6
-        slots_display = slot_lines[:max_slots_in_email]
-        slots_display_details = slot_cards[:max_slots_in_email]
-        slots_extra_count = max(0, len(slot_lines) - len(slots_display))
-
-        location_line = self._get_location_line_for_email(shift, user)
-
-        rate_summary = None
-        min_annual = getattr(shift, "min_annual_salary", None)
-        max_annual = getattr(shift, "max_annual_salary", None)
-        min_hourly = getattr(shift, "min_hourly_rate", None)
-        max_hourly = getattr(shift, "max_hourly_rate", None)
-        fixed_rate = getattr(shift, "fixed_rate", None)
-        slot_rates = [
-            Decimal(str(s.get("rate")))
-            for s in slot_entries or []
-            if isinstance(s, dict) and s.get("rate") not in (None, "")
-        ]
-        if min_annual or max_annual:
-            min_display = self._format_money(min_annual)
-            max_display = self._format_money(max_annual)
-            if min_display and max_display:
-                rate_summary = f"{min_display}–{max_display} package"
-            else:
-                rate_summary = f"{min_display or max_display} package"
-        elif fixed_rate:
-            rate_summary = f"{self._format_money(fixed_rate)}/hr"
-        elif min_hourly or max_hourly:
-            min_display = self._format_money(min_hourly)
-            max_display = self._format_money(max_hourly)
-            if min_display and max_display:
-                rate_summary = f"{min_display}–{max_display}/hr"
-            else:
-                rate_summary = f"{min_display or max_display}/hr"
-        elif slot_rates:
-            min_rate = min(slot_rates)
-            max_rate = max(slot_rates)
-            if min_rate == max_rate:
-                rate_summary = f"{self._format_money(min_rate)}/hr"
-            else:
-                rate_summary = f"{self._format_money(min_rate)}–{self._format_money(max_rate)}/hr"
-
-        return {
-            "slot_summary": slot_summary,
-            "slot_date": slot_date,
-            "slot_start": slot_start,
-            "slot_end": slot_end,
-            "slots_display": slots_display,
-            "slots_display_details": slots_display_details,
-            "slots_extra_count": slots_extra_count,
-            "location_line": location_line,
-            "rate_summary": rate_summary,
-        }
-
-    @staticmethod
-    def _role_matches_shift(user_role, shift_role):
-        if shift_role == "PHARMACIST":
-            return user_role == "PHARMACIST"
-        if shift_role in ["ASSISTANT", "TECHNICIAN", "INTERN", "STUDENT"]:
-            return user_role == "OTHER_STAFF"
-        if shift_role == "EXPLORER":
-            return user_role == "EXPLORER"
-        return False
-
-    @staticmethod
-    def _availability_matches_slot(availability, slot_date, slot_start, slot_end):
-        if not slot_date or not slot_start or not slot_end:
-            return False
-        if availability.is_recurring:
-            if availability.date and slot_date < availability.date:
-                return False
-            if availability.recurring_end_date and slot_date > availability.recurring_end_date:
-                return False
-            mapped_days = [int(day) for day in (availability.recurring_days or [])]
-            if not mapped_days:
-                return False
-            adjusted_weekday = (slot_date.weekday() + 1) % 7
-            if adjusted_weekday not in mapped_days:
-                return False
-        else:
-            if slot_date != availability.date:
-                return False
-
-        if availability.is_all_day:
-            return True
-        if availability.start_time is None or availability.end_time is None:
-            return False
-        return availability.start_time <= slot_end and availability.end_time >= slot_start
-
-    def _load_user_travel_prefs(self, user_ids_by_role):
-        prefs = {}
-        pharm_ids = user_ids_by_role.get("PHARMACIST") or []
-        other_ids = user_ids_by_role.get("OTHER_STAFF") or []
-        explorer_ids = user_ids_by_role.get("EXPLORER") or []
-
-        if pharm_ids:
-            for row in PharmacistOnboarding.objects.filter(user_id__in=pharm_ids).values(
-                "user_id", "latitude", "longitude", "open_to_travel", "travel_states", "coverage_radius_km"
-            ):
-                prefs[row["user_id"]] = row
-
-        if other_ids:
-            for row in OtherStaffOnboarding.objects.filter(user_id__in=other_ids).values(
-                "user_id", "latitude", "longitude", "open_to_travel", "travel_states", "coverage_radius_km"
-            ):
-                prefs[row["user_id"]] = row
-
-        if explorer_ids:
-            for row in ExplorerOnboarding.objects.filter(user_id__in=explorer_ids).values(
-                "user_id", "latitude", "longitude", "open_to_travel", "travel_states", "coverage_radius_km"
-            ):
-                prefs[row["user_id"]] = row
-
-        return prefs
-
-    def _user_can_travel_to_shift(self, pref_row, shift):
-        if not pref_row or not shift or not shift.pharmacy:
-            return False
-        if pref_row.get("open_to_travel"):
-            travel_states = pref_row.get("travel_states") or []
-            if not travel_states:
-                return False
-            pharmacy_state = getattr(shift.pharmacy, "state", None)
-            if not pharmacy_state:
-                return False
-            normalized = {str(s).strip().upper() for s in travel_states if str(s).strip()}
-            return pharmacy_state.strip().upper() in normalized
-        user_lat = pref_row.get("latitude")
-        user_lon = pref_row.get("longitude")
-        pharm_lat = getattr(shift.pharmacy, "latitude", None)
-        pharm_lon = getattr(shift.pharmacy, "longitude", None)
-        if user_lat is None or user_lon is None or pharm_lat is None or pharm_lon is None:
-            return False
-        radius_km = pref_row.get("coverage_radius_km")
-        if radius_km is None:
-            return False
-        distance = self._haversine_km(float(user_lat), float(user_lon), float(pharm_lat), float(pharm_lon))
-        return distance <= float(radius_km)
-
-    def _send_posted_shift_notifications(
-        self,
-        shift,
-        slots_data,
-        *,
-        notify_pharmacy_staff=False,
-        notify_favorite_staff=False,
-        notify_chain_members=False,
-    ):
-        visibility_rules = {
-            'FULL_PART_TIME': {'notify_pharmacy_staff'},
-            'LOCUM_CASUAL': {'notify_pharmacy_staff', 'notify_favorite_staff'},
-            'OWNER_CHAIN': {'notify_pharmacy_staff', 'notify_favorite_staff', 'notify_chain_members'},
-            'ORG_CHAIN': {'notify_pharmacy_staff', 'notify_favorite_staff', 'notify_chain_members'},
-            'PLATFORM': {'notify_pharmacy_staff', 'notify_favorite_staff', 'notify_chain_members'},
-        }
-        allowed = set(visibility_rules.get(shift.visibility, set()))
-        if getattr(shift, "post_anonymously", False):
-            anonymous_rules = {
-                'FULL_PART_TIME': {'notify_pharmacy_staff'},
-                'LOCUM_CASUAL': {'notify_favorite_staff'},
-                'OWNER_CHAIN': {'notify_chain_members'},
-                'ORG_CHAIN': {'notify_chain_members'},
-                'PLATFORM': set(),
-            }
-            allowed &= anonymous_rules.get(shift.visibility, set())
-        if not allowed:
-            return
-
-        if not notify_pharmacy_staff:
-            allowed.discard('notify_pharmacy_staff')
-        if not notify_favorite_staff:
-            allowed.discard('notify_favorite_staff')
-        if not notify_chain_members:
-            allowed.discard('notify_chain_members')
-
-        if not allowed:
-            return
-
-        staff_types = {'FULL_TIME', 'PART_TIME', 'CASUAL'}
-        favorite_types = {'LOCUM', 'SHIFT_HERO'}
-        recipient_map = {}
-
-        if 'notify_pharmacy_staff' in allowed:
-            users = self._collect_membership_users(shift, [shift.pharmacy_id], staff_types)
-            for user in users:
-                recipient_map[user.id] = user
-
-        if 'notify_favorite_staff' in allowed:
-            users = self._collect_membership_users(shift, [shift.pharmacy_id], favorite_types)
-            for user in users:
-                recipient_map[user.id] = user
-
-        if 'notify_chain_members' in allowed:
-            if shift.pharmacy and shift.pharmacy.owner_id:
-                chain_pharmacy_ids = list(
-                    Chain.objects.filter(
-                        owner_id=shift.pharmacy.owner_id,
-                        pharmacies=shift.pharmacy,
-                        is_active=True,
-                    ).values_list('pharmacies__id', flat=True)
-                )
-            else:
-                chain_pharmacy_ids = []
-            if chain_pharmacy_ids:
-                users = self._collect_membership_users(
-                    shift,
-                    chain_pharmacy_ids,
-                    staff_types | favorite_types,
-                )
-                for user in users:
-                    recipient_map[user.id] = user
-
-        if not recipient_map:
-            return
-
-        recipients = sorted(recipient_map.values(), key=lambda user: user.id)
-        if len(recipients) > SHIFT_EMAIL_RECIPIENT_CAP:
-            logger.warning(
-                "Shift %s posted notification recipient cap hit: sending %s of %s recipients.",
-                shift.id,
-                SHIFT_EMAIL_RECIPIENT_CAP,
-                len(recipients),
-            )
-            recipients = recipients[:SHIFT_EMAIL_RECIPIENT_CAP]
-
-        for user in recipients:
-            ctx = build_shift_email_context(shift, user=user)
-            pharmacy_display_name = self._get_pharmacy_display_name(shift, user)
-            slot_meta = self._build_shift_email_slot_meta(shift, slots_data, user=user)
-            ctx.update({
-                "pharmacy_name": pharmacy_display_name,
-                "role_label": shift.get_role_needed_display(),
-                "employment_type_label": shift.get_employment_type_display(),
-                **slot_meta,
-            })
-            notification_payload = {
-                "title": "New shift available",
-                "body": f"{ctx['role_label']} shift at {pharmacy_display_name}.",
-                "type": "shift",
-                "action_url": ctx.get("shift_link"),
-                "payload": {"shift_id": shift.id},
-                "user_ids": [user.id],
-            }
-            async_task(
-                'users.tasks.send_async_email',
-                subject=f"New {ctx['role_label']} shift at {pharmacy_display_name}",
-                recipient_list=[user.email],
-                template_name="emails/shift_posted.html",
-                context=ctx,
-                text_template="emails/shift_posted.txt",
-                notification=notification_payload,
-            )
-
-    def _send_availability_match_notifications(self, shift):
-        if shift.visibility != "PLATFORM":
-            return
-        slot_entries = expand_shift_slots(shift)
-        if not slot_entries:
-            return
-
-        today = timezone.localdate()
-        slot_entries = [entry for entry in slot_entries if entry.get("date") and entry["date"] >= today]
-        if not slot_entries:
-            return
-        slot_entries = sorted(
-            slot_entries,
-            key=lambda entry: (entry.get("date") or date.max, entry.get("start_time") or time.min),
-        )
-
-        max_entries = 180
-        if len(slot_entries) > max_entries:
-            slot_entries = slot_entries[:max_entries]
-
-        user_availabilities = (
-            UserAvailability.objects.filter(notify_new_shifts=True, user__is_active=True)
-            .select_related("user")
-        )
-        if shift.created_by_id:
-            user_availabilities = user_availabilities.exclude(user_id=shift.created_by_id)
-        if not user_availabilities.exists():
-            return
-
-        user_availability_map = {}
-        user_ids_by_role = {"PHARMACIST": set(), "OTHER_STAFF": set(), "EXPLORER": set()}
-        for availability in user_availabilities:
-            user = availability.user
-            if not user or not self._role_matches_shift(getattr(user, "role", None), shift.role_needed):
-                continue
-            user_availability_map.setdefault(user.id, []).append(availability)
-            if user.role in user_ids_by_role:
-                user_ids_by_role[user.role].add(user.id)
-
-        if not user_availability_map:
-            return
-
-        prefs = self._load_user_travel_prefs(
-            {role: list(ids) for role, ids in user_ids_by_role.items() if ids}
-        )
-
-        slot_meta_entries = [
-            {
-                "date": entry.get("date"),
-                "start_time": entry.get("start_time"),
-                "end_time": entry.get("end_time"),
-                "rate": getattr(entry.get("slot"), "rate", None) if entry.get("slot") else None,
-            }
-            for entry in slot_entries
-        ]
-        sent_count = 0
-        skipped_by_cap = 0
-        for user_id, availabilities in sorted(user_availability_map.items()):
-            if sent_count >= SHIFT_EMAIL_RECIPIENT_CAP:
-                skipped_by_cap += 1
-                continue
-            user = availabilities[0].user
-            if not user or not user.email:
-                continue
-            pref_row = prefs.get(user_id)
-            if not self._user_can_travel_to_shift(pref_row, shift):
-                continue
-
-            matched = False
-            for availability in availabilities:
-                for entry in slot_entries:
-                    if self._availability_matches_slot(
-                        availability,
-                        entry.get("date"),
-                        entry.get("start_time"),
-                        entry.get("end_time"),
-                    ):
-                        matched = True
-                        break
-                if matched:
-                    break
-
-            if not matched:
-                continue
-
-            ctx = build_shift_email_context(shift, user=user, role=user.role.lower())
-            pharmacy_display_name = self._get_pharmacy_display_name(shift, user)
-            slot_meta = self._build_shift_email_slot_meta(shift, slot_meta_entries, user=user)
-            ctx.update({
-                "pharmacy_name": pharmacy_display_name,
-                "role_label": shift.get_role_needed_display(),
-                "employment_type_label": shift.get_employment_type_display(),
-                **slot_meta,
-            })
-            notification_payload = {
-                "title": "Shift match found",
-                "body": f"A {ctx['role_label']} shift matches your availability.",
-                "type": "shift",
-                "action_url": ctx.get("shift_link"),
-                "payload": {"shift_id": shift.id},
-                "user_ids": [user.id],
-            }
-            async_task(
-                'users.tasks.send_async_email',
-                subject=f"New {ctx['role_label']} shift that matches your availability",
-                recipient_list=[user.email],
-                template_name="emails/shift_availability_match.html",
-                context=ctx,
-                text_template="emails/shift_availability_match.txt",
-                notification=notification_payload,
-            )
-            sent_count += 1
-
-        if skipped_by_cap:
-            logger.warning(
-                "Shift %s availability notification recipient cap hit: skipped at least %s matching users.",
-                shift.id,
-                skipped_by_cap,
-            )
 
     def create(self, validated_data):
         notify_pharmacy_staff = validated_data.pop('notify_pharmacy_staff', False)
@@ -990,35 +396,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         if slots_payload is None:
             raise serializers.ValidationError({'slots': 'This field is required.'})
         slots_data = self._normalize_slots_payload(slots_payload)
-        user        = self.context['request'].user
-        pharmacy    = validated_data['pharmacy']
-        rate_type   = validated_data.get('rate_type')
-        employment_type = validated_data.get('employment_type')
-
-        # Default fixed_rate from pharmacy defaults when rate_type=FIXED and not provided
-        if rate_type == 'FIXED' and not validated_data.get('fixed_rate'):
-            default_fixed = getattr(pharmacy, 'default_fixed_rate', None)
-            weekday_rate = getattr(pharmacy, 'rate_weekday', None)
-            slot_rate = next((slot.get('rate') for slot in slots_data if slot.get('rate') is not None), None)
-            validated_data['fixed_rate'] = default_fixed or weekday_rate or slot_rate or Decimal('0.00')
-
-        # Default flexible timing for FT/PT if not provided
-        if employment_type in ['FULL_TIME', 'PART_TIME'] and 'flexible_timing' not in validated_data:
-            validated_data['flexible_timing'] = True
-
-        # Default payment preference for locum shifts if missing
-        if not validated_data.get('payment_preference'):
-            if employment_type == 'LOCUM':
-                req = self.context.get('request')
-                from_payload = None
-                if req and hasattr(req, 'data'):
-                    from_payload = req.data.get('payment_preference') or req.data.get('paymentPreference')
-                validated_data['payment_preference'] = from_payload or 'ABN'
-            elif employment_type in ['FULL_TIME', 'PART_TIME']:
-                validated_data['payment_preference'] = 'TFN'
 
         # Build the correct path
-        allowed_tiers = self.build_allowed_tiers(pharmacy)
+        allowed_tiers = self.build_allowed_tiers(validated_data['pharmacy'])
 
         # Ensure the front-end’s choice is valid
         chosen = validated_data.get('visibility')
@@ -1027,103 +407,26 @@ class ShiftSerializer(serializers.ModelSerializer):
                 'visibility': f"Invalid choice; must be one of {allowed_tiers}"
             })
 
-        if chosen == 'PLATFORM':
-            enforce_public_shift_daily_limit(pharmacy)
-            if not validated_data.get('escalate_to_platform'):
-                validated_data['escalate_to_platform'] = timezone.now()
-
-        # Index of that choice becomes the escalation_level
-        validated_data['escalation_level'] = allowed_tiers.index(chosen)
-        validated_data['created_by']       = user
-
-        with transaction.atomic():
-            shift = Shift.objects.create(**validated_data)
-            for slot in slots_data:
-                ShiftSlot.objects.create(shift=shift, **slot)
-            transaction.on_commit(
-                lambda: self._send_posted_shift_notifications(
-                    shift,
-                    slots_data,
-                    notify_pharmacy_staff=notify_pharmacy_staff,
-                    notify_favorite_staff=notify_favorite_staff,
-                    notify_chain_members=notify_chain_members,
-                )
-            )
-            transaction.on_commit(lambda: self._send_availability_match_notifications(shift))
-            if apply_rates_to_pharmacy and validated_data.get('role_needed') == 'PHARMACIST':
-                self._sync_pharmacy_rate_defaults(
-                    pharmacy,
-                    shift=shift,
-                    request_data=getattr(self.context.get('request'), 'data', {}),
-                )
-
-            dedicated_user = getattr(shift, 'dedicated_user', None)
-            if dedicated_user:
-                offers = []
-                now = timezone.now()
-                if shift.single_user_only or not shift.slots.exists():
-                    offers.append(ShiftOffer.objects.create(
-                        shift=shift,
-                        slot=None,
-                        user=dedicated_user,
-                        offered_slot_date=None,
-                        offered_start_time=None,
-                        offered_end_time=None,
-                        offered_rate=shift.fixed_rate or shift.max_hourly_rate or shift.min_hourly_rate,
-                        expires_at=now + timedelta(hours=OFFER_EXPIRY_HOURS),
-                    ))
-                else:
-                    for slot in shift.slots.all():
-                        offers.append(ShiftOffer.objects.create(
-                            shift=shift,
-                            slot=slot,
-                            user=dedicated_user,
-                            offered_slot_date=slot.date,
-                            offered_start_time=slot.start_time,
-                            offered_end_time=slot.end_time,
-                            offered_rate=slot.rate,
-                            expires_at=now + timedelta(hours=OFFER_EXPIRY_HOURS),
-                        ))
-
-                if offers and dedicated_user.email:
-                    offer_for_email = offers[0]
-                    def _send_offer_email():
-                        ctx = build_shift_offer_context(
-                            shift,
-                            offer_for_email,
-                            recipient=dedicated_user,
-                            ignore_slot_filter=True,
-                        )
-                        offer_details = build_offer_shift_details(shift, offer_for_email)
-                        ctx.update(offer_details)
-                        notify_shift_users(
-                            [dedicated_user],
-                            shift=shift,
-                            title="Shift offer received",
-                            body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
-                            kind="shift_offer_received",
-                            payload={"offer_id": offer_for_email.id, **offer_details},
-                        )
-                        async_task(
-                            'users.tasks.send_async_email',
-                            subject="You have a new shift offer",
-                            recipient_list=[dedicated_user.email],
-                            template_name="emails/shift_offer.html",
-                            context=ctx,
-                            text_template="emails/shift_offer.txt",
-                            suppress_auto_notification=True,
-                        )
-
-                    transaction.on_commit(_send_offer_email)
-
-        return shift
+        request = self.context.get('request')
+        return post_shift(
+            validated_data=validated_data,
+            slots_data=slots_data,
+            created_by=self.context['request'].user,
+            allowed_tiers=allowed_tiers,
+            request_data=request.data if request and hasattr(request, 'data') else None,
+            rate_request_data=getattr(request, 'data', {}),
+            notify_pharmacy_staff=notify_pharmacy_staff,
+            notify_favorite_staff=notify_favorite_staff,
+            notify_chain_members=notify_chain_members,
+            apply_rates_to_pharmacy=apply_rates_to_pharmacy,
+        )
 
     def update(self, instance, validated_data):
         validated_data.pop('notify_pharmacy_staff', None)
         validated_data.pop('notify_favorite_staff', None)
         validated_data.pop('notify_chain_members', None)
         apply_rates_to_pharmacy = validated_data.pop('apply_rates_to_pharmacy', False)
-        # If visibility is changing, recalc escalation_level
+        allowed_tiers = None
         if 'visibility' in validated_data:
             allowed_tiers = self.build_allowed_tiers(instance.pharmacy)
             new_vis = validated_data['visibility']
@@ -1131,35 +434,14 @@ class ShiftSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'visibility': f"Invalid choice; must be one of {allowed_tiers}"
                 })
-            target_index = allowed_tiers.index(new_vis)
-            instance.escalation_level = target_index
-            if new_vis == 'PLATFORM' and not validated_data.get('escalate_to_platform') and not instance.escalate_to_platform:
-                validated_data['escalate_to_platform'] = timezone.now()
-            self._ensure_escalation_stamps(instance, allowed_tiers, target_index)
-
-        # Apply other fields
-        for attr, val in validated_data.items():
-            if attr != 'slots':
-                setattr(instance, attr, val)
-        instance.save()
-
-        slots_payload = self._initial_slots_payload()
-
-        # Replace slots if provided
-        if slots_payload is not None:
-            instance.slots.all().delete()
-            for slot in self._normalize_slots_payload(slots_payload):
-                ShiftSlot.objects.create(shift=instance, **slot)
-
-        if apply_rates_to_pharmacy and instance.role_needed == 'PHARMACIST':
-            self._sync_pharmacy_rate_defaults(
-                instance.pharmacy,
-                shift=instance,
-                request_data=getattr(self.context.get('request'), 'data', {}),
-            )
-
-        transaction.on_commit(lambda: send_shift_updated_notifications(instance))
-        return instance
+        return revise_shift(
+            instance,
+            validated_data,
+            allowed_tiers=allowed_tiers,
+            slots_payload=self._initial_slots_payload(),
+            rate_request_data=getattr(self.context.get('request'), 'data', {}),
+            apply_rates_to_pharmacy=apply_rates_to_pharmacy,
+        )
 
     def get_slots(self, obj): # NEW METHOD
         """
