@@ -46,17 +46,16 @@ LEGACY_TASKS = {
     "client_profile.tasks.email_membership_application_submitted": (
         "(app_id: int)", "notifications", "notifications", "notifications",
     ),
-    # CURRENT BEHAVIOUR: no CELERY_TASK_ROUTES entry, so a by-name dispatch (core.task_queue.async_task ->
-    # send_task) lands on CELERY_TASK_DEFAULT_QUEUE ("default"), not on the decorator's "notifications" queue.
-    # Both queues are consumed by the worker; the mismatch is characterised here and changed only deliberately.
+    # A by-name dispatch (core.task_queue.async_task -> send_task) ignores the decorator queue; an explicit
+    # CELERY_TASK_ROUTES entry keeps review_updated/rejected on "notifications" like submitted/approved.
     "client_profile.tasks.email_membership_application_review_updated": (
-        "(app_id: int, changes: list[dict] | None = None)", "notifications", "default", "notifications",
+        "(app_id: int, changes: list[dict] | None = None)", "notifications", "notifications", "notifications",
     ),
     "client_profile.tasks.email_membership_application_approved": (
         "(app_id: int)", "notifications", "notifications", "notifications",
     ),
     "client_profile.tasks.email_membership_application_rejected": (
-        "(app_id: int)", "notifications", "default", "notifications",
+        "(app_id: int)", "notifications", "notifications", "notifications",
     ),
 }
 

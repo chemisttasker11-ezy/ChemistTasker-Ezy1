@@ -111,9 +111,8 @@ queues, effective routes, beat entries and Redis reminder key formats, and fails
 | `client_profile.calendar_tasks.*` (3) | calendar | `team_calendar.tasks` |
 
 Note on routing: a by-name dispatch (`core.task_queue.async_task` → `send_task`) ignores the decorator queue and uses
-CELERY_TASK_ROUTES or CELERY_TASK_DEFAULT_QUEUE. `email_membership_application_review_updated` and `_rejected` have no
-route, so they run on `default`, not `notifications`. Both queues are consumed; the contract test pins this until it
-is changed deliberately.
+CELERY_TASK_ROUTES or CELERY_TASK_DEFAULT_QUEUE. Every membership-application e-mail therefore has an explicit route to
+`notifications`, and the contract test pins the effective route of each deployed name.
 
 ## Non-import references to the kernel
 
