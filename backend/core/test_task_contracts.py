@@ -179,6 +179,19 @@ class TaskIdentityContractTests(SimpleTestCase):
             self.assertEqual(routed(name), by_name, f"{name} via send_task")
             self.assertEqual(routed(name, task(name)), by_object, f"{name} via apply_async")
 
+    def test_every_route_pattern_routes_a_registered_task(self):
+        """A CELERY_TASK_ROUTES key that matches no registered task is dead configuration."""
+        from fnmatch import fnmatchcase
+
+        from django.conf import settings
+
+        reserved = {"billing.tasks.*": "the billing queue every worker consumes, reserved for billing tasks"}
+        registered = [name for name in celery_app().tasks if not name.startswith("celery.")]
+        for pattern in settings.CELERY_TASK_ROUTES:
+            if pattern in reserved:
+                continue
+            self.assertTrue(any(fnmatchcase(name, pattern) for name in registered), pattern)
+
     def test_beat_entries_are_unchanged(self):
         beat = celery_app().conf.beat_schedule
         self.assertEqual(
