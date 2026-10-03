@@ -1,10 +1,11 @@
 """AHPRA register lookup (ScrapingBee), parsing and persistence of the AHPRA verification result."""
 import logging
-import os
 import time
 
 from bs4 import BeautifulSoup
 from django.apps import apps
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from scrapingbee import ScrapingBeeClient
 
 from onboarding.verification.support import fetch_instance_with_retries
@@ -16,8 +17,10 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
     """
     Scrape AHPRA using ScrapingBee with retries and better error handling.
     """
-    api_key = api_key or os.environ.get("SCRAPINGBEE_API_KEY")
-    assert api_key, "SCRAPINGBEE_API_KEY must be set in environment or passed in"
+    api_key = api_key or settings.SCRAPINGBEE_API_KEY
+    if not api_key:
+        # explicit: an assert would be stripped under `python -O`
+        raise ImproperlyConfigured("SCRAPINGBEE_API_KEY is not configured")
     client = ScrapingBeeClient(api_key=api_key)
 
     url = "https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx"

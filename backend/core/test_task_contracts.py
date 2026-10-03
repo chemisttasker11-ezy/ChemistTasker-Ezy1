@@ -836,3 +836,27 @@ class VerificationConfigurationTests(SimpleTestCase):
         with tempfile.NamedTemporaryFile(suffix=".png") as image, mock.patch.dict(sys.modules, fake_modules):
             self.assertEqual(azure_ocr(image.name), {"lines": []})
         client_cls.assert_called_once_with(endpoint="https://ocr.example.test", credential="credential:settings-key")
+
+    @override_settings(SCRAPINGBEE_API_KEY="")
+    def test_missing_scrapingbee_key_is_an_explicit_configuration_error(self):
+        # an assert would vanish under `python -O`; configuration errors must not depend on it
+        from django.core.exceptions import ImproperlyConfigured
+
+        ahpra_lookup = impl("client_profile.tasks.verify_ahpra_task", "ahpra_lookup")
+        with self.assertRaises(ImproperlyConfigured):
+            ahpra_lookup("PHA0001234567", "/tmp/unused.html")
+
+    @override_settings(SCRAPINGBEE_API_KEY="")
+    def test_missing_scrapingbee_key_keeps_the_sanitized_note(self):
+        name = "client_profile.tasks.verify_ahpra_task"
+        target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
+        with patch_impl(
+            name,
+            fetch_instance_with_retries=lambda model, pk: target,
+            save_output_file=lambda *args: "/tmp/unused.html",
+            _update_ahpra_fields=mock.Mock(),
+        ), self.assertLogs(task(name).run.__module__, level="ERROR") as logs:
+            task(name).run("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
+            update = task(name).run.__globals__["_update_ahpra_fields"]
+        self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
+        self.assertIn("error_type=ImproperlyConfigured", " ".join(logs.output))
