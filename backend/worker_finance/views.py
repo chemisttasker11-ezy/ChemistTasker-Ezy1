@@ -23,8 +23,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from django.apps import apps
-Invoice = apps.get_model('client_profile', 'Invoice')
-Notification = apps.get_model('client_profile', 'Notification')
+Invoice = apps.get_model('invoicing', 'Invoice')
+Notification = apps.get_model('notifications', 'Notification')
 from .calculations import CalculationError, expense_gst_credit, shift_hours, ZERO
 from .models import Customer, CatalogueItem, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
 from .serializers import CustomerSerializer, ItemSerializer, InvoiceInput, ExpenseSerializer, MoneyField
@@ -328,7 +328,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def _managed_pharmacies(self, user):
         # Local import avoids a module import cycle while reusing the same
         # pharmacy object-level authorization boundary as roster/shift tools.
-        from client_profile.views import BaseShiftViewSet
+        from client_profile.domains.shifts.base import BaseShiftViewSet
         return BaseShiftViewSet._managed_pharmacies(user)
 
     def queryset(self, request):

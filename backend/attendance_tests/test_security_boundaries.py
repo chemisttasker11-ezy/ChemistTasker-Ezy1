@@ -13,14 +13,12 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.test import override_settings
 
-from client_profile.attendance_credentials import _count_security_attempt
-from client_profile.models import Conversation, ExplorerPost, Message
-from client_profile.serializers import (
-    ExplorerPostReadSerializer,
-    MessageSerializer,
-    PublicExplorerPostReadSerializer,
-)
-from client_profile.views import MessageViewSet
+from attendance.credentials import _count_security_attempt
+from chat.models import Conversation, Message
+from talent.models import ExplorerPost
+from chat.serializers import MessageSerializer
+from talent.serializers.explorer import ExplorerPostReadSerializer, PublicExplorerPostReadSerializer
+from chat.views import MessageViewSet
 from users.models import User
 from users.jwt_ws import JWTAuthMiddleware
 
@@ -84,7 +82,7 @@ class SecurityBoundaryTests(unittest.TestCase):
         message.attachment.storage = storage
         view = MessageViewSet()
         view.get_object = Mock(return_value=message)
-        with patch("client_profile.views.get_channel_layer") as get_layer, patch("client_profile.views.async_to_sync") as as_sync:
+        with patch("chat.views.get_channel_layer") as get_layer, patch("chat.views.async_to_sync") as as_sync:
             response = view.destroy(SimpleNamespace(user=object()))
         self.assertEqual(response.status_code, 204)
         self.assertTrue(message.is_deleted)

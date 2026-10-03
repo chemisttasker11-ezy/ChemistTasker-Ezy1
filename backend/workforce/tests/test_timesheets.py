@@ -11,19 +11,18 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.models import (
-    AttendanceEvent,
-    AttendanceSession,
     LeaveRequest,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterPeriod,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
 )
+from workforce.models import RosterPeriod
+from attendance.models import AttendanceEvent, AttendanceSession
 from workforce.attendance_edits import append_missing_punch
 from workforce.leave_service import create_leave, decide_leave
 from workforce.models import (
@@ -31,8 +30,8 @@ from workforce.models import (
 )
 from workforce.timesheets import build_timesheet, decide_check
 from workforce.views import WorkforceLeaveListCreateView
-from client_profile.views import LeaveRequestViewSet
-from client_profile.roster_validation import worker_issues
+from client_profile.domains.shifts.leave import LeaveRequestViewSet
+from workforce.roster.validation import worker_issues
 from users.models import OrganizationMembership
 
 

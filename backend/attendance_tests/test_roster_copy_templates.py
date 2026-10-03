@@ -20,16 +20,13 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterPeriod,
-    RosterPublicationAudit,
-    RosterTemplate,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
 )
-from client_profile.roster_services import (
+from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit, RosterTemplate
+from talent.models import UserAvailability
+from workforce.roster.services import (
     apply_roster_template,
     bulk_edit_roster_period,
     copy_roster_week,
@@ -92,6 +89,7 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
         Membership.objects.create(
             user=self.intern,
@@ -99,6 +97,7 @@ class RosterCopyTemplatesBulkTests(unittest.TestCase):
             role="INTERN",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         # Standard test week: Monday 2026-10-05

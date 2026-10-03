@@ -81,7 +81,7 @@ def publish(document, revision, actor):
         article.save()
         document.article = article
     else:
-        from client_profile.models import PharmacyHubPost
+        from pharmacy_hub.models import PharmacyHubPost
         hub = document.area.split(':', 1)[1]
         post = PharmacyHubPost.objects.filter(pk=document.hub_post_id, platform_hub=hub, pharmacy=None, organization=None, community_group=None).first() if document.hub_post_id else None
         if document.hub_post_id and not post:

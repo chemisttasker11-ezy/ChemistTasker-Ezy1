@@ -5,9 +5,15 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from client_profile.models import Organization, OwnerOnboarding, Pharmacy, RosterPeriod
+from client_profile.models import Organization, OwnerOnboarding, Pharmacy
+from workforce.models import RosterPeriod
 from workforce.models import RosterOperation, RosterRevisionState
-from workforce.roster import get_revision_state, publish_period_command, validate_revision, warning_key
+from workforce.roster.revisions import (
+    get_revision_state,
+    publish_period_command,
+    validate_revision,
+    warning_key,
+)
 
 
 class RosterRevisionTests(TestCase):

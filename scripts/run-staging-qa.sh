@@ -84,7 +84,7 @@ backend_run python manage.py makemigrations --check --dry-run --settings=core.co
 backend_run python manage.py test users.tests billing.tests --settings=core.contract_test_settings
 backend_run python manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
 backend_run python manage.py test public_hub.tests --settings=public_hub.test_settings
-backend_run python manage.py test client_profile.test_membership_application_integrity client_profile.test_invoice_integrity --settings=core.contract_test_settings
+backend_run python manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
 backend_run python manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
 backend_run python manage.py test worker_finance.tests --settings=worker_finance.tests.settings
 

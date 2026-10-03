@@ -21,8 +21,8 @@ from .models import (
     Payment,
 )
 
-Invoice = apps.get_model("client_profile", "Invoice")
-InvoiceLineItem = apps.get_model("client_profile", "InvoiceLineItem")
+Invoice = apps.get_model("invoicing", "Invoice")
+InvoiceLineItem = apps.get_model("invoicing", "InvoiceLineItem")
 ShiftSlotAssignment = apps.get_model("client_profile", "ShiftSlotAssignment")
 PharmacistOnboarding = apps.get_model("client_profile", "PharmacistOnboarding")
 OtherStaffOnboarding = apps.get_model("client_profile", "OtherStaffOnboarding")

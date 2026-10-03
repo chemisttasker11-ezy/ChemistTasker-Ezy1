@@ -149,8 +149,17 @@ INSTALLED_APPS = [
     # Azure blob
     'storages',
 
-    # my apps
+    # Project apps: the client_profile kernel, the apps split out of it (alphabetical), then workforce and finance
     "client_profile.apps.ClientProfileConfig",
+    "attendance.apps.AttendanceConfig",
+    "chat.apps.ChatConfig",
+    "invoicing.apps.InvoicingConfig",
+    "notifications.apps.NotificationsConfig",
+    "pharmacy_hub.apps.PharmacyHubConfig",
+    "ratings.apps.RatingsConfig",
+    "rewards.apps.RewardsConfig",
+    "talent.apps.TalentConfig",
+    "team_calendar.apps.TeamCalendarConfig",
     "workforce.apps.WorkforceConfig",
     "worker_finance.apps.WorkerFinanceConfig",
 
@@ -197,7 +206,7 @@ CELERY_TASK_TRACK_STARTED = env.bool("CELERY_TASK_TRACK_STARTED", default=True)
 CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
 CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
 CELERY_ACCEPT_CONTENT = _clean_env_list("CELERY_ACCEPT_CONTENT", default=["json"])
-CELERY_IMPORTS = ("client_profile.calendar_tasks", "marketplace.tasks", "ethical_marketplace.tasks", "workforce.tasks")
+CELERY_IMPORTS = ("team_calendar.tasks", "marketplace.tasks", "ethical_marketplace.tasks", "workforce.tasks")
 EMAIL_TASK_RATE_LIMIT = env("EMAIL_TASK_RATE_LIMIT", default="30/m")
 
 # Marketplace capabilities are independently reversible. Public reads are safe to
@@ -565,6 +574,10 @@ LOGGING = {
         },
     }
 }
+
+# Apps split out of client_profile keep the logging behaviour their code had there (console, level from APP_LOG_LEVEL).
+for _app in ("attendance", "chat", "invoicing", "notifications", "pharmacy_hub", "ratings", "rewards", "talent", "team_calendar", "workforce"):
+    LOGGING['loggers'][_app] = dict(LOGGING['loggers']['client_profile'])
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

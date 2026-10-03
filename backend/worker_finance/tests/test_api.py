@@ -17,7 +17,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from worker_finance.models import Customer, CatalogueItem, InvoiceRevision, Payment
-Invoice = apps.get_model('client_profile', 'Invoice')
+Invoice = apps.get_model('invoicing', 'Invoice')
 
 BASE = '/api/client-profile/finance/'
 

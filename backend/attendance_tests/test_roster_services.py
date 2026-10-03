@@ -13,20 +13,17 @@ from django.db import connection
 from django.utils import timezone
 
 from client_profile.models import (
-    LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterPeriod,
-    RosterPublicationAudit,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
 )
-from client_profile.roster_services import (
+from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit
+from talent.models import UserAvailability
+from workforce.roster.services import (
     acknowledge_roster_period,
     get_or_create_roster_period,
     get_roster_acknowledgement_status,
@@ -36,6 +33,7 @@ from client_profile.roster_services import (
     unpublish_roster_period,
     validate_roster_period,
 )
+from attendance_tests.roster_fixtures import approved_workforce_leave
 
 User = get_user_model()
 
@@ -71,6 +69,7 @@ class RosterServicesTests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.assistant = User.objects.create(username="assist_bob", email="bob@pharmacy.com", role="ASSISTANT")
@@ -80,6 +79,7 @@ class RosterServicesTests(unittest.TestCase):
             role="ASSISTANT",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         # A Monday date
@@ -195,12 +195,7 @@ class RosterServicesTests(unittest.TestCase):
         )
 
         # Approved leave on that day
-        LeaveRequest.objects.create(
-            slot_assignment=assignment,
-            user=self.pharmacist,
-            leave_type="ANNUAL",
-            status="APPROVED",
-        )
+        approved_workforce_leave(user=self.pharmacist, pharmacy=self.pharmacy, day=self.monday)
 
         validation = validate_roster_period(period)
         self.assertFalse(validation["is_valid"])

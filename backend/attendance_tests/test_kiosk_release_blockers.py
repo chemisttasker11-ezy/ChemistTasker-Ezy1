@@ -15,14 +15,14 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
-from client_profile.attendance_credentials import (
-    WORKER_PIN_OTP_CACHE_PREFIX,
+from attendance.credentials import (
     _pairing_recovery_message,
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_kiosk_pairing_code,
     redeem_kiosk_pairing_code,
     send_worker_pin_setup_code,
+    WORKER_PIN_OTP_CACHE_PREFIX,
 )
 from client_profile.models import Membership, Organization, OwnerOnboarding, Pharmacy
 from attendance_tests.roster_schema import clear_schema, create_schema, drop_schema

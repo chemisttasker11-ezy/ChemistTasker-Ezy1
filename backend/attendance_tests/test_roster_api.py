@@ -17,18 +17,13 @@ from client_profile.models import (
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    RosterAcknowledgement,
-    RosterPeriod,
-    RosterPublicationAudit,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
-    UserAvailability,
 )
-from client_profile.roster_services import (
-    get_or_create_roster_period,
-    publish_roster_period,
-)
+from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit
+from talent.models import UserAvailability
+from workforce.roster.services import get_or_create_roster_period, publish_roster_period
 
 User = get_user_model()
 
@@ -66,6 +61,7 @@ class RosterAPITests(unittest.TestCase):
             role="PHARMACIST",
             status=Membership.Status.ACCEPTED,
             is_active=True,
+            employment_type="FULL_TIME",
         )
 
         self.monday = date(2026, 9, 21)

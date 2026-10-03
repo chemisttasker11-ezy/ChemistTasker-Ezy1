@@ -5,7 +5,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from client_profile.models import Pharmacy
-from client_profile.attendance_credentials import activate_kiosk_device
+from attendance.credentials import activate_kiosk_device
 
 assert settings.SETTINGS_MODULE == "attendance_tests.runtime_settings"
 assert settings.DATABASES["default"]["NAME"].startswith("chemisttasker_kiosk_test_")

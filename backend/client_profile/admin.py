@@ -1,7 +1,28 @@
 from django.contrib import admin
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import *
+from .models import (
+    Chain,
+    ExplorerOnboarding,
+    Membership,
+    MembershipApplication,
+    Organization,
+    OtherStaffOnboarding,
+    OwnerOnboarding,
+    PharmacistOnboarding,
+    Pharmacy,
+    PharmacyAdmin,
+    RefereeResponse,
+    Shift,
+    ShiftCounterOffer,
+    ShiftCounterOfferSlot,
+    ShiftInterest,
+    ShiftOffer,
+    ShiftRejection,
+    ShiftSlot,
+    ShiftSlotAssignment,
+    WorkerShiftRequest,
+)
 
 
 class RoleScopedOnboardingAdminMixin:
@@ -382,71 +403,6 @@ class ShiftAdmin(admin.ModelAdmin):
     search_fields = ['pharmacy__name','role_needed']
 
 
-@admin.register(PillRewardRule)
-class PillRewardRuleAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "event_type", "audience", "pill_amount", "is_active", "starts_at", "ends_at")
-    list_editable = ("pill_amount", "is_active")
-    list_filter = ("event_type", "audience", "is_active")
-    search_fields = ("code", "name", "description")
-    readonly_fields = ("created_at", "updated_at")
-    fieldsets = (
-        ("Rule", {
-            "fields": ("code", "name", "description"),
-            "description": "Use readable codes such as friend-referral-login, shift-referral-login, and shift-post-cost.",
-        }),
-        ("Pill Rate", {
-            "fields": ("event_type", "audience", "pill_amount", "is_active"),
-            "description": "For earn rules this is how many pills are awarded. For spend rules this is how many pills are deducted.",
-        }),
-        ("Schedule", {
-            "fields": ("starts_at", "ends_at", "metadata"),
-        }),
-        ("Audit", {
-            "fields": ("created_at", "updated_at"),
-        }),
-    )
-    actions = ("activate_rules", "deactivate_rules", "seed_default_rules")
-
-    @admin.action(description="Activate selected reward rules")
-    def activate_rules(self, request, queryset):
-        queryset.update(is_active=True)
-
-    @admin.action(description="Deactivate selected reward rules")
-    def deactivate_rules(self, request, queryset):
-        queryset.update(is_active=False)
-
-    @admin.action(description="Create missing default pill reward rules")
-    def seed_default_rules(self, request, queryset):
-        from client_profile.rewards import seed_default_reward_rules
-        seed_default_reward_rules()
-
-
-@admin.register(PillReferralCode)
-class PillReferralCodeAdmin(admin.ModelAdmin):
-    list_display = ("code", "user", "is_active", "created_at")
-    list_filter = ("is_active",)
-    search_fields = ("code", "user__email", "user__username")
-    readonly_fields = ("created_at", "updated_at")
-
-
-@admin.register(PillReferralEvent)
-class PillReferralEventAdmin(admin.ModelAdmin):
-    list_display = ("id", "referral_type", "status", "referrer", "referred_user", "referred_email", "shift", "created_at")
-    list_filter = ("referral_type", "status", "created_at")
-    search_fields = ("id", "referrer__email", "referred_user__email", "referred_email", "referral_code__code", "shift__id")
-    readonly_fields = ("created_at", "updated_at", "claimed_at", "awarded_at", "metadata")
-    autocomplete_fields = ("referrer", "referred_user", "referral_code", "shift")
-
-
-@admin.register(PillLedgerEntry)
-class PillLedgerEntryAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "entry_type", "source", "delta", "balance_after", "rule", "created_at")
-    list_filter = ("entry_type", "source", "created_at")
-    search_fields = ("user__email", "description", "idempotency_key", "rule__code")
-    readonly_fields = ("user", "rule", "referral_event", "shift", "entry_type", "source", "delta", "balance_after", "description", "idempotency_key", "metadata", "created_at")
-    autocomplete_fields = ("user", "rule", "referral_event", "shift")
-
-
 @admin.register(ShiftSlotAssignment)
 class ShiftSlotAssignmentAdmin(admin.ModelAdmin):
     list_display = ('id','shift','slot','user','assigned_at')
@@ -465,35 +421,12 @@ class ShiftRejectionAdmin(admin.ModelAdmin):
     list_filter  = ('slot','shift')
     search_fields = ('user__username','shift__pharmacy__name')
 
-class InvoiceLineItemInline(admin.TabularInline):
-    model = InvoiceLineItem
-    extra = 0
-    fields = (
-        'category_code','unit','description',
-        'quantity','unit_price','discount','total',
-        'gst_applicable','super_applicable','is_manual'
-    )
-    readonly_fields = ('total',)
-
-@admin.register(Invoice)
-class InvoiceAdmin(admin.ModelAdmin):
-    list_display = (
-        'id','user','status','invoice_date',
-        'due_date','total'
-    )
-    list_filter  = ('status','gst_registered')
-    inlines      = [InvoiceLineItemInline]
-    readonly_fields = ('subtotal','gst_amount','super_amount','total')
-
-admin.site.register(ExplorerPost)
 
 admin.site.register(WorkerShiftRequest)
 
 admin.site.register(RefereeResponse)
 
 admin.site.register(MembershipApplication)
-
-admin.site.register(Message)
 
 
 class ShiftCounterOfferSlotInline(admin.TabularInline):
@@ -555,162 +488,5 @@ class ShiftOfferAdmin(admin.ModelAdmin):
         return getattr(obj.shift.pharmacy, 'name', None)
 
     pharmacy_name.short_description = "Pharmacy"
-
-
-@admin.register(Rating)
-class RatingAdmin(admin.ModelAdmin):
-    list_display = (
-        'id',
-        'direction',
-        'rater_user',
-        'ratee_user',
-        'ratee_pharmacy',
-        'stars',
-        'updated_at',
-    )
-    list_filter = (
-        'direction',
-        'stars',
-        'created_at',
-        'updated_at',
-    )
-    search_fields = (
-        'rater_user__email',
-        'rater_user__username',
-        'ratee_user__email',
-        'ratee_user__username',
-        'ratee_pharmacy__name',
-        'comment',
-    )
-    autocomplete_fields = (
-        'rater_user',
-        'ratee_user',
-        'ratee_pharmacy',
-    )
-    readonly_fields = (
-        'created_at',
-        'updated_at',
-    )
-    fieldsets = (
-        (
-            'Rating',
-            {
-                'fields': (
-                    'direction',
-                    'stars',
-                    'comment',
-                )
-            },
-        ),
-        (
-            'People',
-            {
-                'fields': (
-                    'rater_user',
-                    'ratee_user',
-                    'ratee_pharmacy',
-                )
-            },
-        ),
-        (
-            'Audit',
-            {
-                'fields': (
-                    'created_at',
-                    'updated_at',
-                )
-            },
-        ),
-    )
-
-
-@admin.register(PharmacyHubPost)
-class PharmacyHubPostAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "scope_display",
-        "author_membership",
-        "visibility",
-        "comment_count",
-        "created_at",
-        "is_pinned",
-    )
-    list_filter = ("visibility", "is_pinned", "pharmacy", "organization", "community_group")
-    search_fields = (
-        "body",
-        "author_membership__user__email",
-        "pharmacy__name",
-        "organization__name",
-    )
-    readonly_fields = ("comment_count", "reaction_summary", "created_at", "updated_at")
-    fieldsets = (
-        (
-            "Scope",
-            {
-                "fields": (
-                    "pharmacy",
-                    "organization",
-                    "community_group",
-                )
-            },
-        ),
-        (
-            "Content",
-            {
-                "fields": (
-                    "author_membership",
-                    "body",
-                    "visibility",
-                    "allow_comments",
-                )
-            },
-        ),
-        (
-            "Status",
-            {
-                "fields": (
-                    "is_pinned",
-                    "pinned_at",
-                    "pinned_by",
-                    "comment_count",
-                    "reaction_summary",
-                    "created_at",
-                    "updated_at",
-                )
-            },
-        ),
-    )
-    def scope_display(self, obj):
-        if obj.community_group:
-            return f"Group: {obj.community_group}"
-        if obj.pharmacy:
-            return f"Pharmacy: {obj.pharmacy}"
-        if obj.organization:
-            return f"Organization: {obj.organization}"
-        return "Unknown"
-
-    scope_display.short_description = "Scope"
-
-
-@admin.register(PharmacyHubComment)
-class PharmacyHubCommentAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "post",
-        "author_membership",
-        "parent_comment",
-        "created_at",
-        "deleted_flag",
-    )
-    list_filter = ("deleted_at", "post__pharmacy", "post__organization", "post__community_group")
-    search_fields = ("body", "author_membership__user__email", "post__body")
-    readonly_fields = ("created_at", "updated_at")
-
-    def deleted_flag(self, obj):
-        return bool(obj.deleted_at)
-
-    deleted_flag.boolean = True
-    deleted_flag.short_description = "Deleted"
-
 
 

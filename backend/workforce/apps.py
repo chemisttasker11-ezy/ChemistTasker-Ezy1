@@ -6,6 +6,5 @@ class WorkforceConfig(AppConfig):
     name = "workforce"
 
     def ready(self):
-        # Keep workforce invalidation outside client_profile.signals so the existing
-        # chat/onboarding signal module is not made more fragile.
+        # Workforce connects its own receivers; each app owns the signals it reacts with.
         from . import signals  # noqa: F401

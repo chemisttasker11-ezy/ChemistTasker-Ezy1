@@ -2,7 +2,7 @@
 
 This document maps TypeScript types in `shared-core/src/types.ts` to Django serializers.
 
-## Source: `backend/client_profile/serializers.py`
+## Source: `backend/client_profile/domains/*/serializers.py` (kernel) and the serializers of the apps split out of it
 
 ### Pharmacy Types (lines 2951-3025)
 
@@ -96,7 +96,7 @@ interface Shift {
 
 ---
 
-### Hub Post Types (from `backend/client_profile/hub/api.py`)
+### Hub Post Types (from `backend/pharmacy_hub/serializers.py`)
 
 **Django Serializer Fields:**
 ```python
@@ -196,7 +196,7 @@ interface HubTaggedMember {
 
 ---
 
-### Conversation/Room Types (from `backend/client_profile/views.py` lines 5854-6049)
+### Conversation/Room Types (from `backend/chat/serializers.py`)
 
 **Django Serializer Fields:**
 ```python

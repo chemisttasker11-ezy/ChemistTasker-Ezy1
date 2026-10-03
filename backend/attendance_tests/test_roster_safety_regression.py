@@ -25,29 +25,28 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
     LeaveRequest,
     Membership,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    ProvisionalAttendance,
+    Shift,
+    ShiftOffer,
+    ShiftSlot,
+    ShiftSlotAssignment,
+    WorkerShiftRequest,
+)
+from workforce.models import (
     RosterAcknowledgement,
     RosterActionAudit,
     RosterPeriod,
     RosterPublicationAudit,
     RosterTemplate,
-    Shift,
-    ShiftOffer,
-    ShiftSlot,
-    ShiftSlotAssignment,
-    UserAvailability,
-    WorkerShiftRequest,
 )
-from client_profile.roster_services import (
+from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
+from talent.models import UserAvailability
+from workforce.roster.services import (
     apply_roster_template,
     bulk_edit_roster_period,
     copy_roster_week,
@@ -56,8 +55,8 @@ from client_profile.roster_services import (
     get_roster_period_grid,
     publish_roster_period,
 )
-from client_profile.attendance_views import RosterPeriodDetailView, RosterPublishView, RosterValidateView
-from client_profile.views import RosterWorkerViewSet
+from workforce.roster.v2_views import RosterPeriodDetailView, RosterPublishView, RosterValidateView
+from workforce.roster.views import RosterWorkerViewSet
 
 User = get_user_model()
 
@@ -144,6 +143,7 @@ class RosterSafetyRegressionTests(unittest.TestCase):
             status=Membership.Status.ACCEPTED,
             is_active=True,
             role="PHARMACIST",
+            employment_type="FULL_TIME",
         )
 
         today = date.today()

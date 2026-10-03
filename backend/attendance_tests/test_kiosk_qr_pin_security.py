@@ -28,7 +28,7 @@ from rest_framework.test import APIClient
 
 User = get_user_model()
 
-from client_profile.attendance_credentials import (
+from attendance.credentials import (
     activate_kiosk_device,
     authenticate_kiosk_device,
     generate_signed_pharmacy_qr,
@@ -36,38 +36,33 @@ from client_profile.attendance_credentials import (
     set_worker_personal_code,
     verify_kiosk_worker_pin,
 )
-from client_profile.attendance_eligibility import (
-    EligibilityType,
-    is_draft_roster_assignment,
-    resolve_attendance_eligibility,
-)
-from client_profile.attendance_throttles import (
+from attendance.eligibility import EligibilityType, is_draft_roster_assignment, resolve_attendance_eligibility
+from attendance.throttles import (
     KioskPINRateThrottle,
     KioskQRRateThrottle,
     WorkerClockInThrottle,
     WorkerClockOutThrottle,
 )
-from client_profile.attendance_views import (
-    KioskPinClockView,
-    KioskQRView,
-)
+from attendance.views import KioskPinClockView, KioskQRView
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
-    RosterPeriod,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from workforce.models import RosterPeriod
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
     WorkerPIN,
 )
 
@@ -114,14 +109,14 @@ class KioskQrPinSecurityTests(unittest.TestCase):
     def _clean_tables(self):
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_attendancecorrection",
-                "client_profile_provisionalattendance",
-                "client_profile_attendanceevent",
-                "client_profile_attendancesession",
-                "client_profile_workerpin",
-                "client_profile_pharmacyqrsession",
-                "client_profile_kioskdevice",
-                "client_profile_rosterperiod",
+                "attendance_attendancecorrection",
+                "attendance_provisionalattendance",
+                "attendance_attendanceevent",
+                "attendance_attendancesession",
+                "attendance_workerpin",
+                "attendance_pharmacyqrsession",
+                "attendance_kioskdevice",
+                "workforce_rosterperiod",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",

@@ -19,37 +19,33 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.utils import timezone
 
-from client_profile.attendance_approvals import (
+from attendance.approvals import (
     approve_provisional_attendance,
     create_attendance_correction,
     get_effective_session_timeline,
     get_pending_provisional_attendances,
     reject_provisional_attendance,
 )
-from client_profile.attendance_credentials import (
-    activate_kiosk_device,
-    generate_signed_pharmacy_qr,
-)
-from client_profile.attendance_transitions import (
-    clock_in,
-    clock_out,
-)
+from attendance.credentials import activate_kiosk_device, generate_signed_pharmacy_qr
+from attendance.transitions import clock_in, clock_out
 from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
     Chain,
-    KioskDevice,
     Membership,
     Organization,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
-    PharmacyQRSession,
-    ProvisionalAttendance,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from attendance.models import (
+    AttendanceCorrection,
+    AttendanceEvent,
+    AttendanceSession,
+    KioskDevice,
+    PharmacyQRSession,
+    ProvisionalAttendance,
     WorkerPIN,
 )
 
@@ -174,13 +170,13 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def tearDown(self):
         with connection.cursor() as cursor:
             for table in (
-                "client_profile_attendancecorrection",
-                "client_profile_provisionalattendance",
-                "client_profile_attendanceevent",
-                "client_profile_attendancesession",
-                "client_profile_workerpin",
-                "client_profile_pharmacyqrsession",
-                "client_profile_kioskdevice",
+                "attendance_attendancecorrection",
+                "attendance_provisionalattendance",
+                "attendance_attendanceevent",
+                "attendance_attendancesession",
+                "attendance_workerpin",
+                "attendance_pharmacyqrsession",
+                "attendance_kioskdevice",
                 "client_profile_shiftslotassignment",
                 "client_profile_shiftslot",
                 "client_profile_shift",

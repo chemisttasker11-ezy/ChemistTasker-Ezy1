@@ -10,17 +10,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from client_profile.attendance_approvals import get_effective_session_timeline
-from client_profile.models import (
-    AttendanceEvent,
-    AttendanceSession,
-    Membership,
-    Pharmacy,
-    ProvisionalAttendance,
-    RosterPeriod,
-    ShiftSlotAssignment,
-)
-from client_profile.roster_validation import work_interval
+from attendance.approvals import get_effective_session_timeline
+from client_profile.models import Membership, Pharmacy, ShiftSlotAssignment
+from workforce.models import RosterPeriod
+from attendance.models import AttendanceEvent, AttendanceSession, ProvisionalAttendance
+from workforce.roster.validation import work_interval
 from client_profile.timezone_utils import get_pharmacy_timezone
 
 from .employment_terms import correspondence_profile

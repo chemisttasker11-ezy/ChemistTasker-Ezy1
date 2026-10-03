@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens      import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
 from client_profile.models import Organization
-from client_profile.rewards import RewardError, claim_referral_code
+from rewards.services import claim_referral_code, RewardError
 from .models import OrganizationMembership, ContactMessage
 import secrets
 from django.utils import timezone

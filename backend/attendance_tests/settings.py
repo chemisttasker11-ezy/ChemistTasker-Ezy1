@@ -14,6 +14,27 @@ class AttendanceClientProfileConfig(AppConfig):
     name = "client_profile"
     label = "client_profile"
 
+
+class AttendanceChatConfig(AppConfig):
+    """Load the chat models without connecting the production signal receivers."""
+
+    name = "chat"
+    label = "chat"
+
+
+class AttendanceWorkforceConfig(AppConfig):
+    """Load the workforce models (timesheets, leave, roster revisions) without connecting its signal receivers."""
+
+    name = "workforce"
+    label = "workforce"
+
+
+class AttendanceRewardsConfig(AppConfig):
+    """Load the rewards models without connecting the production signal receivers."""
+
+    name = "rewards"
+    label = "rewards"
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "attendance-tests-only-never-production"
 DEBUG = False
@@ -29,6 +50,16 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "worker_finance.apps.WorkerFinanceConfig",
     "attendance_tests.settings.AttendanceClientProfileConfig",
+    "attendance.apps.AttendanceConfig",
+    "invoicing.apps.InvoicingConfig",
+    "pharmacy_hub.apps.PharmacyHubConfig",
+    "attendance_tests.settings.AttendanceChatConfig",
+    "notifications.apps.NotificationsConfig",
+    "team_calendar.apps.TeamCalendarConfig",
+    "talent.apps.TalentConfig",
+    "ratings.apps.RatingsConfig",
+    "attendance_tests.settings.AttendanceRewardsConfig",
+    "attendance_tests.settings.AttendanceWorkforceConfig",
 ]
 
 DATABASES = {
@@ -49,6 +80,16 @@ CACHES = {
 MIGRATION_MODULES = {
     "users": None,
     "client_profile": None,
+    "attendance": None,
+    "invoicing": None,
+    "pharmacy_hub": None,
+    "chat": None,
+    "notifications": None,
+    "team_calendar": None,
+    "talent": None,
+    "ratings": None,
+    "rewards": None,
+    "workforce": None,
     "worker_finance": None,
     "billing": None,
 }

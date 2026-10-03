@@ -32,7 +32,7 @@ def _dispatch_notification(notification_payload, recipients, subject):
         logger.warning("notification payload must be a dict, got %s", type(notification_payload))
         return
     try:
-        from client_profile.notifications import notify_users
+        from notifications.services import notify_users
 
         User = get_user_model()
         user_ids = notification_payload.get("user_ids") or []

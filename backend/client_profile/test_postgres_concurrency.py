@@ -10,8 +10,6 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 from client_profile.models import (
-    Invoice,
-    InvoiceLineItem,
     MembershipApplication,
     MembershipInviteLink,
     OtherStaffOnboarding,
@@ -20,8 +18,9 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from client_profile.serializers import MembershipApplicationSerializer
-from client_profile.services import generate_invoice_from_shifts
+from invoicing.models import Invoice, InvoiceLineItem
+from client_profile.domains.memberships.serializers import MembershipApplicationSerializer
+from invoicing.services import generate_invoice_from_shifts
 
 
 User = get_user_model()

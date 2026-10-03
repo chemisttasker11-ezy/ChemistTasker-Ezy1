@@ -45,6 +45,24 @@ Security_Audit_Tracking.md
 !backend/ethical_marketplace/migrations/*.py
 !backend/worker_finance/migrations/
 !backend/worker_finance/migrations/*.py
+!backend/rewards/migrations/
+!backend/rewards/migrations/*.py
+!backend/ratings/migrations/
+!backend/ratings/migrations/*.py
+!backend/talent/migrations/
+!backend/talent/migrations/*.py
+!backend/team_calendar/migrations/
+!backend/team_calendar/migrations/*.py
+!backend/notifications/migrations/
+!backend/notifications/migrations/*.py
+!backend/chat/migrations/
+!backend/chat/migrations/*.py
+!backend/pharmacy_hub/migrations/
+!backend/pharmacy_hub/migrations/*.py
+!backend/invoicing/migrations/
+!backend/invoicing/migrations/*.py
+!backend/attendance/migrations/
+!backend/attendance/migrations/*.py
 
 # Management scripts (if you want to keep these local)
 management/

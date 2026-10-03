@@ -193,7 +193,13 @@ jobs:
       - name: Public content contracts
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
-        run: python backend/manage.py test client_profile.test_membership_application_integrity client_profile.test_invoice_integrity --settings=core.contract_test_settings
+        run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
+      - name: Kernel and domain app tests
+        run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar --settings=core.contract_test_settings
+      - name: Public hub editorial and community contracts
+        env:
+          PUBLIC_COMMUNITY_ENABLED: "true"
+        run: python backend/manage.py test public_hub.test_editorial --settings=core.contract_test_settings
       - name: Attendance and kiosk contracts
         working-directory: backend
         run: |
@@ -260,6 +266,22 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Released migration immutability
+        shell: bash
+        run: |
+          if [ -z "$SHARED_CORE_AUDIT_BASE" ] || ! git cat-file -e "$SHARED_CORE_AUDIT_BASE^{commit}" 2>/dev/null; then
+            echo "No usable comparison base; skipping released-migration immutability check."
+            exit 0
+          fi
+          violation=0
+          while read -r candidate; do
+            [[ "$candidate" == backend/*/migrations/*.py ]] || continue
+            if git cat-file -e "$SHARED_CORE_AUDIT_BASE:$candidate" 2>/dev/null; then
+              echo "::error file=$candidate::Released migration files are immutable; add a new migration instead."
+              violation=1
+            fi
+          done < <(git diff --name-status --diff-filter=MDR "$SHARED_CORE_AUDIT_BASE"...HEAD -- backend | cut -f2)
+          test "$violation" -eq 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"

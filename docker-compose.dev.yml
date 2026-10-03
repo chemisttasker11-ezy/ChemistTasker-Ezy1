@@ -88,6 +88,15 @@ services:
     volumes:
       - ./backend/billing:/app/billing
       - ./backend/client_profile:/app/client_profile
+      - ./backend/attendance:/app/attendance
+      - ./backend/chat:/app/chat
+      - ./backend/invoicing:/app/invoicing
+      - ./backend/notifications:/app/notifications
+      - ./backend/pharmacy_hub:/app/pharmacy_hub
+      - ./backend/ratings:/app/ratings
+      - ./backend/rewards:/app/rewards
+      - ./backend/talent:/app/talent
+      - ./backend/team_calendar:/app/team_calendar
       - ./backend/core:/app/core
       - ./backend/ethical_marketplace:/app/ethical_marketplace
       - ./backend/marketplace:/app/marketplace
@@ -140,6 +149,15 @@ services:
     volumes:
       - ./backend/billing:/app/billing
       - ./backend/client_profile:/app/client_profile
+      - ./backend/attendance:/app/attendance
+      - ./backend/chat:/app/chat
+      - ./backend/invoicing:/app/invoicing
+      - ./backend/notifications:/app/notifications
+      - ./backend/pharmacy_hub:/app/pharmacy_hub
+      - ./backend/ratings:/app/ratings
+      - ./backend/rewards:/app/rewards
+      - ./backend/talent:/app/talent
+      - ./backend/team_calendar:/app/team_calendar
       - ./backend/core:/app/core
       - ./backend/ethical_marketplace:/app/ethical_marketplace
       - ./backend/marketplace:/app/marketplace
@@ -183,6 +201,15 @@ services:
     volumes:
       - ./backend/billing:/app/billing
       - ./backend/client_profile:/app/client_profile
+      - ./backend/attendance:/app/attendance
+      - ./backend/chat:/app/chat
+      - ./backend/invoicing:/app/invoicing
+      - ./backend/notifications:/app/notifications
+      - ./backend/pharmacy_hub:/app/pharmacy_hub
+      - ./backend/ratings:/app/ratings
+      - ./backend/rewards:/app/rewards
+      - ./backend/talent:/app/talent
+      - ./backend/team_calendar:/app/team_calendar
       - ./backend/core:/app/core
       - ./backend/ethical_marketplace:/app/ethical_marketplace
       - ./backend/marketplace:/app/marketplace

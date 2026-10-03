@@ -7,19 +7,12 @@ from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
-from client_profile.models import (
-    AttendanceCorrection,
-    AttendanceEvent,
-    AttendanceSession,
-    ProvisionalAttendance,
-    RosterPeriod,
-    Shift,
-    ShiftSlot,
-    ShiftSlotAssignment,
-)
+from client_profile.models import Shift, ShiftSlot, ShiftSlotAssignment
+from workforce.models import RosterPeriod
+from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 
 from .models import MembershipWorkSettings, Timesheet, TimesheetPeriod, WorkforceLeaveRequest
-from .roster import bump_for_assignment, bump_roster_revision
+from workforce.roster.revisions import bump_for_assignment, bump_roster_revision
 from .tasks import rebuild_timesheet_task
 
 log = logging.getLogger("workforce.signals")

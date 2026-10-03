@@ -9,7 +9,7 @@ from django.utils.dateparse import parse_datetime
 
 from client_profile.models import Membership, PharmacyAdmin, ShiftSlotAssignment
 from client_profile.timezone_utils import get_pharmacy_timezone
-from client_profile.utils import build_roster_email_link
+from client_profile.domains.shifts.emails import build_roster_email_link
 from core.task_queue import async_task
 from users.models import OrganizationMembership
 
