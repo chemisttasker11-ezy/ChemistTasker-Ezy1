@@ -182,6 +182,27 @@ class ShiftListingMatrixTests(ShiftListingFixture):
             with self.subTest(endpoint=endpoint):
                 self.assertEqual(actual[endpoint], EXPECTED[endpoint])
 
+    def test_rate_preview_invalid_date_uses_stable_public_error(self):
+        response = client_for(self.owner).post(
+            f"{API}shifts/calculate-rates/",
+            {
+                "pharmacy_id": self.pharmacy.id,
+                "role": "PHARMACIST",
+                "slots": [{
+                    "date": "definitely-not-a-date",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                }],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(
+            response.data,
+            [{"error": "Invalid date format, use YYYY-MM-DD", "rate": "0.00"}],
+        )
+        self.assertNotIn("time data", str(response.data))
+
     def test_shared_shift_link(self):
         public = self.shifts["public"]
         response = client_for(None).get(f"{API}view-shared-shift/?token={public.share_token}")
