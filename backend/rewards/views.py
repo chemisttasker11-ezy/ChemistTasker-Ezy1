@@ -10,8 +10,8 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from client_profile.domains.shifts.finalize import finalize_shift_offer
-from client_profile.domains.shifts.emails import send_shift_payment_finalized_notifications
+from shifts.finalize import finalize_shift_offer
+from shifts.emails import send_shift_payment_finalized_notifications
 from rewards.services import (
     claim_referral_code,
     create_friend_referral,
@@ -35,7 +35,7 @@ from rewards.serializers import (
     PillReferralEventSerializer,
     PillRewardRuleSerializer,
 )
-from client_profile.domains.shifts.base import BaseShiftViewSet
+from shifts.base import BaseShiftViewSet
 
 
 class PillRewardsViewSet(viewsets.GenericViewSet):

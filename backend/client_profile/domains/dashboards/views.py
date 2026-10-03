@@ -13,7 +13,7 @@ from invoicing.models import Invoice
 from invoicing.navigation import invoice_action_url
 from pharmacy_hub.models import PharmacyHubPost
 from client_profile.domains.orgs.serializers import PharmacyClaimSerializer
-from client_profile.domains.shifts.serializers import ShiftSerializer
+from shifts.serializers import ShiftSerializer
 from users.permissions import IsExplorer, IsOtherstaff, IsPharmacist, OrganizationRolePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -29,7 +29,7 @@ from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 from users.org_roles import membership_visible_pharmacy_ids
-from client_profile.domains.shifts.base import _shift_roles_visible_to_user, COMMUNITY_LEVELS
+from shifts.base import _shift_roles_visible_to_user, COMMUNITY_LEVELS
 
 
 # Dashboards

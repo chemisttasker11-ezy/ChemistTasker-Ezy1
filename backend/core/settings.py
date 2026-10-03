@@ -158,6 +158,7 @@ INSTALLED_APPS = [
     "pharmacy_hub.apps.PharmacyHubConfig",
     "ratings.apps.RatingsConfig",
     "rewards.apps.RewardsConfig",
+    "shifts.apps.ShiftsConfig",
     "talent.apps.TalentConfig",
     "team_calendar.apps.TeamCalendarConfig",
     "workforce.apps.WorkforceConfig",

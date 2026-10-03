@@ -32,7 +32,7 @@ from chat.serializers import (
     MessageSerializer,
     ShiftContactSerializer,
 )
-from client_profile.domains.shifts.base import BaseShiftViewSet
+from shifts.base import BaseShiftViewSet
 
 
 class ChatMessagePagination(PageNumberPagination):

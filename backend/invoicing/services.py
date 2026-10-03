@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.template.loader import render_to_string
 from weasyprint import HTML
-from client_profile.domains.shifts.pricing import _decimal_hours, _resolve_shift_bounds
+from shifts.pricing import _decimal_hours, _resolve_shift_bounds
 
 
 INVOICE_SETTLEMENT_CHANNEL = "INVOICE"

@@ -23,13 +23,13 @@ from client_profile.models import (
 from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit, RosterTemplate
 from talent.models import UserAvailability
 from workforce.roster.permissions import is_authorized_attendance_manager
-from client_profile.domains.shifts.engagement import staff_assignment_defaults
+from shifts.engagement import staff_assignment_defaults
 
 User = get_user_model()
 
 
 def refresh_assignment_rate(assignment):
-    from client_profile.domains.shifts.pricing import get_locked_rate_for_slot
+    from shifts.pricing import get_locked_rate_for_slot
     assignment.unit_rate, assignment.rate_reason = get_locked_rate_for_slot(
         assignment.slot, assignment.shift, assignment.user,
         override_date=assignment.slot_date or assignment.slot.date,
@@ -131,7 +131,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     )
     vacant_list = []
     from copy import copy
-    from client_profile.domains.shifts.pricing import expand_shift_slots
+    from shifts.pricing import expand_shift_slots
     candidate_shifts = Shift.objects.filter(pharmacy=pharmacy, slots__date__lte=week_end).filter(
         Q(slots__date__gte=week_start) | Q(slots__is_recurring=True, slots__recurring_end_date__gte=week_start)
     ).distinct().prefetch_related("slots")

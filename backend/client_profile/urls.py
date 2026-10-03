@@ -16,27 +16,6 @@ from .domains.dashboards.views import (
     OwnerDashboard,
     PharmacistDashboard,
 )
-from .domains.shifts.browse import (
-    ActiveShiftViewSet,
-    CommunityShiftViewSet,
-    ConfirmedShiftViewSet,
-    HistoryShiftViewSet,
-    MyConfirmedShiftsViewSet,
-    MyHistoryShiftsViewSet,
-    PublicJobBoardView,
-    PublicShiftViewSet,
-    SharedShiftDetailView,
-    ShiftDescriptionTemplateViewSet,
-    ShiftDetailViewSet,
-)
-from .domains.shifts.leave import LeaveRequestViewSet
-from .domains.shifts.offers import (
-    ShiftInterestViewSet,
-    ShiftOfferViewSet,
-    ShiftRejectionViewSet,
-    ShiftSavedViewSet,
-)
-from .domains.shifts.worker_requests import WorkerShiftRequestViewSet
 from .domains.memberships.views import (
     MagicLinkInfoView,
     MembershipApplicationViewSet,
@@ -75,21 +54,6 @@ router.register(r'pharmacy-admins', PharmacyAdminViewSet, basename='pharmacy-adm
 router.register(r'membership-invite-links', MembershipInviteLinkViewSet, basename='membership-invite-link')
 router.register(r'membership-applications', MembershipApplicationViewSet, basename='membership-application')
 
-router.register(r'community-shifts', CommunityShiftViewSet, basename='community-shifts')
-router.register(r'public-shifts', PublicShiftViewSet, basename='public-shifts')
-router.register(r'shift-description-templates', ShiftDescriptionTemplateViewSet, basename='shift-description-template')
-router.register(r'shifts/active', ActiveShiftViewSet, basename='active-shifts')
-router.register(r'shifts/confirmed', ConfirmedShiftViewSet, basename='confirmed-shifts')
-router.register(r'shifts/history', HistoryShiftViewSet, basename='history-shifts')
-router.register(r'shifts', ShiftDetailViewSet, basename='shift')
-router.register(r'shift-interests', ShiftInterestViewSet, basename='shift-interests')
-router.register(r'shift-rejections', ShiftRejectionViewSet, basename='shift-rejections')
-router.register(r'shift-saved', ShiftSavedViewSet, basename='shift-saved')
-router.register(r'shift-offers', ShiftOfferViewSet, basename='shift-offers')
-router.register(r'my-confirmed-shifts', MyConfirmedShiftsViewSet, basename='my-confirmed-shifts')
-router.register(r'my-history-shifts', MyHistoryShiftsViewSet, basename='my-history-shifts')
-router.register(r'leave-requests', LeaveRequestViewSet, basename='leaverequest')
-router.register(r'worker-shift-requests', WorkerShiftRequestViewSet, basename='worker-shift-requests')
 router.register(r'my-memberships', MyMembershipsViewSet, basename='my-memberships')
 
 
@@ -110,6 +74,4 @@ urlpatterns = [
     path('dashboard/otherstaff/', OtherStaffDashboard.as_view()),
     path('dashboard/explorer/', ExplorerDashboard.as_view()),
     path('owner-onboarding/claim/', OwnerOnboardingClaim.as_view(), name='owneronboarding-claim'),
-    path('public-job-board/', PublicJobBoardView.as_view(), name='public-job-board'),
-    path('view-shared-shift/', SharedShiftDetailView.as_view(), name='view-shared-shift'),
 ]
