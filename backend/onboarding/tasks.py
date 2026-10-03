@@ -574,12 +574,21 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
                 _final_evaluation_reminder_key(model_name, object_pk),
                 timeout=int(REMINDER_DELAY.total_seconds()) + 3600,
             )
-            final_evaluation.apply_async(
-                args=(model_name, object_pk),
-                kwargs={'is_reminder': True},
-                eta=timezone.now() + REMINDER_DELAY,
-                queue="default",
-            )
+            try:
+                final_evaluation.apply_async(
+                    args=(model_name, object_pk),
+                    kwargs={'is_reminder': True},
+                    eta=timezone.now() + REMINDER_DELAY,
+                    queue="default",
+                )
+            except Exception:
+                # the marker means "a reminder is queued"; without the task it would block every later reminder
+                _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
+                logger.exception(
+                    "[FINAL EVALUATION] 48-hour reminder enqueue failed; marker removed model=%s pk=%s",
+                    model_name, object_pk,
+                )
+                raise
             logger.info(f"[FINAL EVALUATION] Scheduled next referee check for pk={object_pk} at {(timezone.now() + REMINDER_DELAY).isoformat()}.")
         else:
             logger.info(f"[FINAL EVALUATION] Future referee reminder already exists for pk={object_pk}; leaving it in place.")

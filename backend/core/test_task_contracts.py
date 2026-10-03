@@ -345,12 +345,13 @@ class ReminderMarkerContractTests(SimpleTestCase):
 class FinalEvaluationContractTests(SimpleTestCase):
     TASK = "client_profile.tasks.final_evaluation"
 
-    def run_task(self, obj, *, marker=False, **kwargs):
+    def run_task(self, obj, *, marker=False, enqueue_error=None, **kwargs):
         model = mock.Mock()
         model.objects.get.return_value = obj
         model.DoesNotExist = Exception
         fake_apps = SimpleNamespace(get_model=lambda label, name: model)
         calls = SimpleNamespace(set=[], delete=[], sent=[])
+        self.calls = calls  # readable when the task raises
         final_evaluation = task(self.TASK)
         with mock.patch("django.apps.apps", fake_apps), \
                 patch_impl(
@@ -363,7 +364,7 @@ class FinalEvaluationContractTests(SimpleTestCase):
                 ), \
                 mock.patch("core.task_queue.async_task") as async_task, \
                 mock.patch("onboarding.emails.send_referee_emails") as referee_emails, \
-                mock.patch.object(final_evaluation, "apply_async") as apply_async:
+                mock.patch.object(final_evaluation, "apply_async", side_effect=enqueue_error) as apply_async:
             final_evaluation.run("PharmacistOnboarding", 5, **kwargs)
         return calls, async_task, referee_emails, apply_async
 
@@ -402,6 +403,14 @@ class FinalEvaluationContractTests(SimpleTestCase):
         apply_async.assert_called_once()
         self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"is_reminder": True})
         obj.save.assert_called_once_with(update_fields=["verified"])
+
+    def test_failed_48_hour_enqueue_removes_the_marker_and_propagates(self):
+        obj = self.pharmacist(referee2_confirmed=False)
+        with self.assertLogs(task(self.TASK).run.__module__, level="ERROR"), self.assertRaises(ConnectionError):
+            self.run_task(obj, enqueue_error=ConnectionError("broker down"))
+        key = "celery:final-evaluation-reminder:PharmacistOnboarding:5"
+        self.assertEqual(self.calls.set, [(key, 48 * 3600 + 3600)])
+        self.assertEqual(self.calls.delete, [key])
 
     def test_reminder_run_without_marker_is_skipped(self):
         obj = self.pharmacist(referee2_confirmed=False)
