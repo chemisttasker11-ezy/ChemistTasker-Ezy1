@@ -342,15 +342,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         slot_id = request.data.get('slot_id')
 
 
-        # --- 1. Visibility check ---
-        is_eligible = self.get_queryset().filter(pk=shift.pk).exists()
-        if not is_eligible:
-            return _claim_refused(
-                request, shift, "not_eligible_visibility",
-                "You do not have permission to perform this action.", "shift_not_visible",
-            )
-
-        # --- 2. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
+        # --- 1. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
         membership = Membership.objects.filter(
             user=user,
             pharmacy=shift.pharmacy,
@@ -362,10 +354,21 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 request, shift, "not_member",
                 "You must be an active member of this pharmacy to claim this shift.", "shift_claim_not_member",
             )
-        # --- 3. Tier eligibility ---
+
+        # --- 2. Revalidate current visibility after fetching the membership row ---
+        # get_object() already scoped the initial lookup through get_queryset(), but the membership can change between
+        # that query and this claim. Re-run the canonical queryset here rather than duplicating its tier rules.
+        is_eligible = self.get_queryset().filter(pk=shift.pk).exists()
+        if not is_eligible:
+            return _claim_refused(
+                request, shift, "not_eligible_visibility",
+                "You do not have permission to perform this action.", "shift_not_visible",
+            )
+
+        # --- 3. Tier handling ---
         # The community queryset already admits only the eligible tiers for FULL_PART_TIME and LOCUM_CASUAL shifts
         # (shifts/test_claim_eligibility.py). Locum and shift-hero members must take the offer path instead.
-        if membership and membership.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
+        if membership.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
             return Response(
                 {
                     "detail": (
