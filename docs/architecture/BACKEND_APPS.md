@@ -10,7 +10,7 @@ exactly as before.
 
 | App | Owns | Tables (renamed from `client_profile_*`) | Routes (mounted under `/api/client-profile/`) |
 | --- | --- | --- | --- |
-| `client_profile` (compatibility kernel) | the `client_profile` app label of the organisation, membership, onboarding and shift models (their code is owned by `organizations`, `memberships`, `onboarding`, `shifts`), historical import paths, the deployed verification / reminder / membership-e-mail Celery tasks, callables referenced by migrations; see `BACKEND_DOMAIN_DEPENDENCIES.md` | `client_profile_*` (unchanged) | everything not listed below |
+| `client_profile` (compatibility kernel) | the `client_profile` app label of the organisation, membership, onboarding and shift models (their code is owned by `organizations`, `memberships`, `onboarding`, `shifts`), historical import paths and deployed Celery task names (the implementations live in the owning apps), callables referenced by migrations; see `BACKEND_DOMAIN_DEPENDENCIES.md` | `client_profile_*` (unchanged) | everything not listed below |
 | `attendance` | kiosk devices and pairing, QR sessions, worker PINs, attendance sessions and events, offline kiosk events, provisional approvals, corrections | `attendance_*` (9) | `attendance/kiosk/**`, `attendance/worker/**`, `attendance/manager/**` |
 | `chat` | conversations, participants, messages, reactions, the room WebSocket consumer, chat signals | `chat_*` (4) | `rooms/**`, `messages/**`, `chat-participants/` |
 | `invoicing` | invoices and line items, invoice generation from shifts, PDF/e-mail | `invoicing_*` (2) | `invoices/**` |
@@ -63,7 +63,7 @@ Seams where the kernel reaches into a leaf app (each is a single, reviewed place
   (`router.registry.extend(...)`, so the API root listing, route order and `client_profile:` route names are
   unchanged) and includes the apps' explicit `path()` lists before the router.
 * the dashboards read invoices and hub posts; the upload-reference registry
-  (`domains/common/serializers.py`) lists chat and hub attachments; `client_profile/tasks.py` calls the rewards
+  (`domains/common/serializers.py`) lists chat and hub attachments; `onboarding/tasks.py` (`final_evaluation`) calls the rewards
   service after verification (lazy import).
 * the kernel and `workforce` form the scheduling domain: the shift models guard published roster periods
   (`workforce.RosterPeriod`), shift leave and engagement code call the workforce leave and engagement services, and a

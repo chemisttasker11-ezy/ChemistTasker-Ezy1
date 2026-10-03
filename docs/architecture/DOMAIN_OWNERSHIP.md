@@ -7,7 +7,7 @@ This document defines the canonical owner for each backend and shared-client dom
 | Authentication, account, OTP, session | `users` | `shared-core/domains/auth` (target) | Keep browser/mobile auth contracts compatible. |
 | Organizations, pharmacies, admin scope | `organizations` | shared-core named operations | Models keep the `client_profile` app label and tables; relabelling is a separate database change (`BACKEND_APPS.md`). |
 | Pharmacy membership and applications | `memberships` | shared-core named operations | Same label rule as above. |
-| Worker and owner onboarding, verification | `onboarding` (verification Celery tasks still implemented in `client_profile/tasks.py` under their deployed names) | shared-core named operations | Same label rule as above. |
+| Worker and owner onboarding, verification | `onboarding` (the verification Celery tasks keep their deployed `client_profile.tasks.*` names) | shared-core named operations | Same label rule as above. |
 | Shift marketplace and offers | `shifts` | `shared-core` shift operations | Preserve existing URLs and response shapes. Shift models refuse edits inside a published roster period (`ShiftSlot.roster_period` points to `workforce.RosterPeriod`). |
 | Roster, leave, timesheets, attendance-derived workforce data | `workforce` (roster models in `workforce/models.py`; roster V1/V2 API, services, validation and worker actions in `workforce/roster/`) | workforce APIs in shared-core | Roster routes keep their `/api/client-profile/` paths and `client_profile:` route names (declared in `workforce/roster/urls.py`); new workflow logic belongs in `workforce`. |
 | Attendance and kiosk | `attendance` | kiosk/attendance operations in shared-core | Kiosk protocol and credentials are security-sensitive: positive and negative tests for every change. |
@@ -21,7 +21,7 @@ This document defines the canonical owner for each backend and shared-client dom
 | Notifications and device tokens | `notifications` | notification adapter in shared-core | Platform service: every app may call `notify_users`; depends on `users` only. |
 | Authenticated pharmacy hub (community) | `pharmacy_hub` | hub operations in shared-core | `public_hub` reads hub posts for the public community pages. |
 | Ratings | `ratings` | ratings operations in shared-core | |
-| Pill rewards and referrals | `rewards` | rewards operations in shared-core | Awards run from `rewards/signals.py` and a lazy call in `client_profile/tasks.py`. |
+| Pill rewards and referrals | `rewards` | rewards operations in shared-core | Awards run from `rewards/signals.py` and a lazy call in `onboarding/tasks.py` (`final_evaluation`). |
 | Talent board and availability | `talent` | talent/availability operations in shared-core | Roster code reads `talent.UserAvailability`. |
 | Team calendar and work notes | `team_calendar` | calendar operations in shared-core | Celery task names stay `client_profile.calendar_tasks.*`. |
 
