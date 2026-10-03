@@ -24,7 +24,7 @@ from django.utils import timezone
 from memberships.labels import membership_role_label
 from django.conf import settings
 from core.task_queue import async_task
-from client_profile.tasks import _parse_abn_html_fields, abn_lookup
+from core.integrations.abr import _parse_abn_html_fields, abn_lookup
 from memberships.serializers import (
     _count_active_memberships,
     MAX_ACTIVE_PHARMACY_MEMBERSHIPS,

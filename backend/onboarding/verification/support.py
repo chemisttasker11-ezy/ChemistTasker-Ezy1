@@ -1,0 +1,48 @@
+"""Shared runtime support of the verification tasks: environment, diagnostic output files, delayed object reads.
+
+Moved unchanged from client_profile/tasks.py. Reading the dev env file and creating `verification_outputs/` at
+import time are known side effects, kept here for the behaviour-preserving move and removed in a separate change.
+"""
+import logging
+import os
+import sys
+import time
+from pathlib import Path
+
+from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
+from environ import Env
+
+logger = logging.getLogger(__name__)
+
+# ==== ENV SETUP ====
+BASE_DIR = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parent.parent.parent))
+ENV_PATH = BASE_DIR.parent / "env" / "backend.dev.env"
+env = Env()
+if os.environ.get("APP_ENV", "local").lower() in {"local", "dev", "development"} and ENV_PATH.exists():
+    env.read_env(str(ENV_PATH))
+    logger.info(f"[ENV] Loaded environment variables from {ENV_PATH}")
+else:
+    logger.info("[ENV] Using system environment.")
+
+# ==== OUTPUTS DIRECTORY ====
+OUTPUT_DIR = BASE_DIR / "verification_outputs"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+logger.info(f"[SETUP] Output files will be saved to {OUTPUT_DIR}")
+
+
+def fetch_instance_with_retries(model, pk, max_retries=10, sleep_sec=0.4):
+    for i in range(max_retries):
+        try:
+            return model.objects.get(pk=pk)
+        except ObjectDoesNotExist:
+            logger.error(f"[fetch_instance_with_retries] Not found pk={pk}, try {i+1}/{max_retries}", file=sys.stderr)
+            time.sleep(sleep_sec)
+    raise model.DoesNotExist(f"Object with pk={pk} not found after {max_retries} tries")
+
+
+def save_output_file(task_name, object_pk, extension="json"):
+    out_path = OUTPUT_DIR / f"{task_name}_{object_pk}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.{extension}"
+    logger.info(f"[save_output_file] Will write output to: {out_path}")
+    return str(out_path)
