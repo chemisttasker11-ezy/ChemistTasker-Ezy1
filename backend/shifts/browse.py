@@ -342,113 +342,91 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         slot_id = request.data.get('slot_id')
 
 
-        # --- 1. Visibility check ---
-        is_eligible = self.get_queryset().filter(pk=shift.pk).exists()
-        if not is_eligible:
-            return _claim_refused(
-                request, shift, "not_eligible_visibility",
-                "You do not have permission to perform this action.", "shift_not_visible",
-            )
-
-        # --- 2. Membership verification ---
-        all_memberships = list(
-            Membership.objects.filter(user=user, is_active=True)
-            .values('pharmacy_id', 'role', 'employment_type', 'is_active')
-        )
-
-        is_member_of_pharmacy = Membership.objects.filter(
-            user=user,
-            pharmacy=shift.pharmacy,
-            is_active=True
-        ).exists()
-
-        if not is_member_of_pharmacy:
-            return _claim_refused(
-                request, shift, "not_member",
-                "You must be an active member of this pharmacy to claim this shift.", "shift_claim_not_member",
-            )
-
-        membership = Membership.objects.filter(
-            user=user, pharmacy=shift.pharmacy, is_active=True
-        ).first()
-        # --- 3. Tier eligibility check ---
-        allowed_ftpt = {'FULL_TIME', 'PART_TIME', 'CASUAL'}
-        allowed_locum = {'LOCUM', 'SHIFT_HERO'}
-
-        if membership and membership.employment_type in allowed_locum:
-            return Response(
-                {
-                    "detail": (
-                        "Locum and Shift Hero workers must express interest and accept the final shift offer "
-                        "so ABN/TFN engagement terms are recorded before assignment."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if shift.visibility == 'FULL_PART_TIME':
-            ok = membership and membership.employment_type in allowed_ftpt
-            if not ok:
-                return _claim_refused(
-                    request, shift, "tier_mismatch",
-                    "Only full/part-time/casual pharmacy members can claim this shift.", "shift_claim_tier_mismatch",
-                    employment_type=getattr(membership, 'employment_type', None), visibility=shift.visibility,
-                )
-        elif shift.visibility == 'LOCUM_CASUAL':
-            allowed_for_shift = allowed_locum
-            if not getattr(shift, "post_anonymously", False):
-                allowed_for_shift = allowed_locum | allowed_ftpt
-            ok = membership and membership.employment_type in allowed_for_shift
-            if not ok:
-                return _claim_refused(
-                    request, shift, "tier_mismatch",
-                    "Only eligible pharmacy members can claim this shift.", "shift_claim_tier_mismatch",
-                    employment_type=getattr(membership, 'employment_type', None), visibility=shift.visibility,
-                )
-
-        # --- 4. Role match check ---
-        user_role = getattr(user, 'role', None)
-        onboarding_role = None
-
-        if user_role == 'OTHER_STAFF':
-            try:
-                onboarding = OtherStaffOnboarding.objects.get(user=user)
-                onboarding_role = onboarding.role_type
-            except OtherStaffOnboarding.DoesNotExist:
-                return _claim_refused(
-                    request, shift, "no_otherstaff_onboarding",
-                    "Cannot determine your specific role. Please complete your onboarding.",
-                    "shift_claim_onboarding_incomplete",
-                )
-
-        effective_user_role = _normalized_role_code(onboarding_role or user_role)
-        if not _user_can_perform_shift_role(user, shift.role_needed):
-            return _claim_refused(
-                request, shift, "role_mismatch",
-                f"This shift requires a {shift.role_needed}, but your role is {effective_user_role}.",
-                "shift_claim_role_mismatch",
-            )
-
-        # --- 5. Check if shift already taken ---
-        any_assigned = ShiftSlotAssignment.objects.filter(shift=shift).exists()
-        if any_assigned:
-            return Response({"detail": "This shift is no longer available."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # --- 6. Slot selection ---
-        if shift.single_user_only:
-            slots_to_claim = list(shift.slots.all())
-        elif slot_id:
-            slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift)
-            slots_to_claim = [slot]
-        else:
-            slots_to_claim = list(shift.slots.all())
-
-        if not slots_to_claim:
-            return Response({"detail": "No valid slots found to claim for this shift."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # --- 7. Create assignments ---
-        assignment_ids = []
+        # Keep the direct membership snapshot stable through visibility revalidation and assignment.
+        # The community queryset remains the single owner of tier eligibility; the row lock prevents a concurrent
+        # membership update from making that queryset and the favorite-worker handling observe different tiers.
         with transaction.atomic():
+            # --- 1. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
+            membership = Membership.objects.select_for_update().filter(
+                user=user,
+                pharmacy=shift.pharmacy,
+                is_active=True,
+            ).first()
+
+            if not membership:
+                return _claim_refused(
+                    request, shift, "not_member",
+                    "You must be an active member of this pharmacy to claim this shift.", "shift_claim_not_member",
+                )
+
+            # --- 2. Revalidate visibility using the locked membership state ---
+            # get_object() already scoped the initial lookup through get_queryset(); this second check protects the
+            # mutation path against membership changes between the initial lookup and the claim.
+            is_eligible = self.get_queryset().filter(pk=shift.pk).exists()
+            if not is_eligible:
+                return _claim_refused(
+                    request, shift, "not_eligible_visibility",
+                    "You do not have permission to perform this action.", "shift_not_visible",
+                )
+
+            # --- 3. Tier handling ---
+            # Locum and shift-hero members use the offer path. No duplicate visibility-tier matrix lives here.
+            if membership.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
+                return Response(
+                    {
+                        "detail": (
+                            "Locum and Shift Hero workers must express interest and accept the final shift offer "
+                            "so ABN/TFN engagement terms are recorded before assignment."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # --- 4. Role match check ---
+            user_role = getattr(user, 'role', None)
+            onboarding_role = None
+
+            if user_role == 'OTHER_STAFF':
+                try:
+                    onboarding = OtherStaffOnboarding.objects.get(user=user)
+                    onboarding_role = onboarding.role_type
+                except OtherStaffOnboarding.DoesNotExist:
+                    return _claim_refused(
+                        request, shift, "no_otherstaff_onboarding",
+                        "Cannot determine your specific role. Please complete your onboarding.",
+                        "shift_claim_onboarding_incomplete",
+                    )
+
+            effective_user_role = _normalized_role_code(onboarding_role or user_role)
+            if not _user_can_perform_shift_role(user, shift.role_needed):
+                return _claim_refused(
+                    request, shift, "role_mismatch",
+                    f"This shift requires a {shift.role_needed}, but your role is {effective_user_role}.",
+                    "shift_claim_role_mismatch",
+                )
+
+            # --- 5. Check if shift already taken ---
+            any_assigned = ShiftSlotAssignment.objects.filter(shift=shift).exists()
+            if any_assigned:
+                return Response({"detail": "This shift is no longer available."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # --- 6. Slot selection ---
+            if shift.single_user_only:
+                slots_to_claim = list(shift.slots.all())
+            elif slot_id:
+                slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift)
+                slots_to_claim = [slot]
+            else:
+                slots_to_claim = list(shift.slots.all())
+
+            if not slots_to_claim:
+                return Response(
+                    {"detail": "No valid slots found to claim for this shift."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # --- 7. Create assignments ---
+            assignment_ids = []
             for slot in slots_to_claim:
                 taken = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot.date).exists()
                 if taken:
