@@ -837,7 +837,7 @@ class DeferredPayrollActivationTests(TestCase):
         force_authenticate(request, user=self.manager)
         view = ShiftOfferViewSet.as_view({"post": "activate_payroll"})
         with patch(
-            "client_profile.domains.shifts.base.BaseShiftViewSet._user_can_manage_pharmacy",
+            "shifts.offers.user_can_manage_pharmacy",
             return_value=True,
         ):
             return view(request, pk=self.offer.id)
@@ -913,7 +913,7 @@ class DeferredPayrollActivationTests(TestCase):
         force_authenticate(request, user=self.manager)
         view = ShiftOfferViewSet.as_view({"post": "activate_payroll"})
         with patch(
-            "client_profile.domains.shifts.base.BaseShiftViewSet._user_can_manage_pharmacy",
+            "shifts.offers.user_can_manage_pharmacy",
             return_value=True,
         ):
             response = view(request, pk=offer.id)
