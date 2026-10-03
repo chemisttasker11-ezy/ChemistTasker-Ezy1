@@ -134,5 +134,13 @@ class TimesheetStateMachineTests(TestCase):
         self.timesheet.refresh_from_db()
         with self.assertRaisesMessage(ValidationError, "Locked periods cannot be approved again."):
             approve_timesheet(self.timesheet, self.owner, revision.revision_number)
+        with self.assertRaisesMessage(ValidationError, "Locked periods cannot be submitted again."):
+            submit_timesheet(self.timesheet, self.worker, revision.revision_number)
+        self.timesheet.refresh_from_db()
+        self.assertEqual(
+            self.timesheet.status,
+            Timesheet.Status.APPROVED,
+            "a locked manifest must not be invalidated by a later worker submission",
+        )
         with self.assertRaisesMessage(ValidationError, "cannot be reopened in place"):
             reopen_timesheet(self.timesheet, self.owner, "late fix")
