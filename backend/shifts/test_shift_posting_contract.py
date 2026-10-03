@@ -260,6 +260,22 @@ class ShiftEditTests(ShiftPostingFixture):
         self.assertEqual([(e["template"], e["to"]) for e in sent], [("emails/shift_updated.html", (interested.email,))])
         self.assertEqual(Notification.objects.filter(user=interested, title="Shift updated: Posting Pharmacy").count(), 1)
 
+    def test_an_invalid_slot_in_an_edit_changes_nothing(self):
+        # Regression: the edit used to save the shift's fields before validating the new slots, so a 400 for a bad
+        # slot still left the other fields changed.
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            refused = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "description": "Changed",
+                "slots": [{"date": str(DAY), "start_time": "09:00", "end_time": "17:00", "rate": "abc"}],
+            }, format="json")
+        self.assertEqual((refused.status_code, str(refused.data["slots"][0])), (400, "Slot #1 has an invalid rate."))
+        shift.refresh_from_db()
+        self.assertEqual(shift.description, "Cover")
+        self.assertEqual(ShiftSlot.objects.filter(shift=shift).count(), 2)
+        self.assertEqual(sent, [])
+
     def test_edit_without_slots_keeps_them_and_rejects_bad_visibility(self):
         response, _ = self.post_shift()
         shift = Shift.objects.get(pk=response.data["id"])

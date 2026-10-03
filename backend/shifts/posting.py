@@ -140,35 +140,38 @@ def revise_shift(
     """Apply a validated edit: recalculate the escalation level when the visibility changes (`allowed_tiers` must
     contain it), replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
     announce the update after commit."""
-    # If visibility is changing, recalc escalation_level
-    if 'visibility' in validated_data:
-        new_vis = validated_data['visibility']
-        target_index = allowed_tiers.index(new_vis)
-        instance.escalation_level = target_index
-        if new_vis == 'PLATFORM' and not validated_data.get('escalate_to_platform') and not instance.escalate_to_platform:
-            validated_data['escalate_to_platform'] = timezone.now()
-        ensure_escalation_stamps(instance, allowed_tiers, target_index)
+    # Validate the new slots before changing anything, and apply the whole edit atomically.
+    slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
+    with transaction.atomic():
+        # If visibility is changing, recalc escalation_level
+        if 'visibility' in validated_data:
+            new_vis = validated_data['visibility']
+            target_index = allowed_tiers.index(new_vis)
+            instance.escalation_level = target_index
+            if new_vis == 'PLATFORM' and not validated_data.get('escalate_to_platform') and not instance.escalate_to_platform:
+                validated_data['escalate_to_platform'] = timezone.now()
+            ensure_escalation_stamps(instance, allowed_tiers, target_index)
 
-    # Apply other fields
-    for attr, val in validated_data.items():
-        if attr != 'slots':
-            setattr(instance, attr, val)
-    instance.save()
+        # Apply other fields
+        for attr, val in validated_data.items():
+            if attr != 'slots':
+                setattr(instance, attr, val)
+        instance.save()
 
-    # Replace slots if provided
-    if slots_payload is not None:
-        instance.slots.all().delete()
-        for slot in normalize_slots_payload(slots_payload):
-            ShiftSlot.objects.create(shift=instance, **slot)
+        # Replace slots if provided
+        if slots_data is not None:
+            instance.slots.all().delete()
+            for slot in slots_data:
+                ShiftSlot.objects.create(shift=instance, **slot)
 
-    if apply_rates_to_pharmacy and instance.role_needed == 'PHARMACIST':
-        sync_pharmacy_rate_defaults(
-            instance.pharmacy,
-            shift=instance,
-            request_data=rate_request_data,
-        )
+        if apply_rates_to_pharmacy and instance.role_needed == 'PHARMACIST':
+            sync_pharmacy_rate_defaults(
+                instance.pharmacy,
+                shift=instance,
+                request_data=rate_request_data,
+            )
 
-    transaction.on_commit(lambda: send_shift_updated_notifications(instance))
+        transaction.on_commit(lambda: send_shift_updated_notifications(instance))
     return instance
 
 
