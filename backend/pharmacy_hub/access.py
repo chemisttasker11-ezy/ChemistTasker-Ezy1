@@ -4,6 +4,7 @@ public_hub) uses for pharmacy, group, organization and platform scopes."""
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from users.models import OrganizationMembership
+from users.org_roles import OrgCapability, membership_capabilities, membership_visible_pharmacy_ids
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from onboarding.models import OtherStaffOnboarding
 from organizations.models import Organization, Pharmacy, PharmacyAdmin
@@ -38,6 +39,28 @@ CHEMISTTASKER_HUB_DEFINITIONS = {
         "audience_type": "STAFF",
     },
 }
+
+
+def _org_hub_memberships(user, organization_id=None):
+    """Yield canonical hub-management scope for the user's organization memberships.
+
+    Hub administration follows the same capability model as the rest of the backend:
+    MANAGE_COMMS grants hub-management capability, while VIEW_ALL_PHARMACIES or the
+    membership's explicit pharmacy assignments determine where that capability applies.
+    Unknown/legacy roles therefore grant no implicit hub authority.
+    """
+    qs = OrganizationMembership.objects.filter(user=user)
+    if organization_id is not None:
+        qs = qs.filter(organization_id=organization_id)
+    qs = qs.select_related("organization").prefetch_related("pharmacies")
+
+    for membership in qs:
+        capabilities = membership_capabilities(membership)
+        if OrgCapability.MANAGE_COMMS not in capabilities:
+            continue
+        full_access = OrgCapability.VIEW_ALL_PHARMACIES in capabilities
+        visible_ids = set() if full_access else set(membership_visible_pharmacy_ids(membership))
+        yield membership, full_access, visible_ids
 
 
 def get_user_chemisttasker_hubs(user):
@@ -120,18 +143,19 @@ def get_user_pharmacy_permissions(user):
             }
         )
 
-    org_admin_org_ids = set(
-        OrganizationMembership.objects.filter(
-            user=user,
-            role__in=HubScopeResolver.org_admin_roles,
-        ).values_list("organization_id", flat=True)
-    )
-    if org_admin_org_ids:
-        admin_pharmacies = (
-            Pharmacy.objects.filter(organization_id__in=org_admin_org_ids)
-            .select_related("organization", "owner__user")
-        )
-        for pharmacy in admin_pharmacies:
+    org_admin_org_ids = set()
+    for org_membership, full_access, visible_ids in _org_hub_memberships(user):
+        if full_access:
+            org_admin_org_ids.add(org_membership.organization_id)
+            admin_pharmacies = Pharmacy.objects.filter(
+                organization_id=org_membership.organization_id
+            )
+        elif visible_ids:
+            admin_pharmacies = Pharmacy.objects.filter(id__in=visible_ids)
+        else:
+            continue
+
+        for pharmacy in admin_pharmacies.select_related("organization", "owner__user"):
             pharmacies[pharmacy.id] = pharmacy
             entry = ensure_entry(pharmacy.id)
             entry.update(
@@ -140,7 +164,7 @@ def get_user_pharmacy_permissions(user):
                     "can_manage_profile": True,
                     "can_create_group": True,
                     "has_admin_permissions": True,
-                    "is_org_admin": True,
+                    "is_org_admin": bool(full_access),
                 }
             )
 
@@ -148,8 +172,8 @@ def get_user_pharmacy_permissions(user):
 
 
 class HubScopeResolver:
-    org_access_roles = ("ORG_ADMIN", "REGION_ADMIN", "SHIFT_MANAGER")
-    # Only true organization admins should be treated as org admins
+    # Kept for compatibility/introspection only; authorization below is capability-based.
+    org_access_roles = ("ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN")
     org_admin_roles = ("ORG_ADMIN",)
 
     def __init__(self, user):
@@ -168,17 +192,21 @@ class HubScopeResolver:
             .first()
         )
         is_owner = bool(pharmacy.owner and pharmacy.owner.user_id == self.user.id)
-        org_admin = False
+        org_membership = None
+        full_org_admin = False
         if pharmacy.organization_id:
-            org_admin = OrganizationMembership.objects.filter(
-                user=self.user,
-                organization_id=pharmacy.organization_id,
-                role__in=self.org_access_roles,
-            ).exists()
-        if not any([membership, is_owner, org_admin]):
+            for candidate, full_access, visible_ids in _org_hub_memberships(
+                self.user,
+                pharmacy.organization_id,
+            ):
+                if full_access or pharmacy.id in visible_ids:
+                    org_membership = candidate
+                    full_org_admin = full_access
+                    break
+        if not any([membership, is_owner, org_membership]):
             raise PermissionDenied("You do not have access to this pharmacy hub.")
         has_admin = bool(
-            org_admin
+            org_membership
             or is_owner
             or (membership and membership.is_pharmacy_admin)
         )
@@ -191,7 +219,7 @@ class HubScopeResolver:
             "has_admin_permissions": has_admin,
             "has_group_admin_permissions": False,
             "is_owner": is_owner,
-            "is_org_admin": org_admin,
+            "is_org_admin": full_org_admin,
         }
 
     def group_scope(self, group_id, group=None):
@@ -275,11 +303,13 @@ class HubScopeResolver:
             organization=organization,
             owner__user_id=self.user.id,
         ).exists()
-        org_admin = OrganizationMembership.objects.filter(
-            user=self.user,
-            organization=organization,
-            role__in=self.org_access_roles,
-        ).exists()
+        org_admin = any(
+            full_access
+            for _org_membership, full_access, _visible_ids in _org_hub_memberships(
+                self.user,
+                organization.id,
+            )
+        )
         if not any([membership, is_owner, org_admin]):
             raise PermissionDenied("You do not have access to this organization hub.")
         has_admin = bool(
@@ -441,17 +471,23 @@ class HubScopeResolver:
             membership = self._activate_or_create_membership(owned_pharmacy)
             scope["request_membership"] = membership
             return membership
-        org_admin_pharmacy = (
-            Pharmacy.objects.filter(
-                organization__memberships__user=self.user,
-                organization__memberships__role__in=self.org_access_roles,
-            )
-            .select_related("organization")
-            .order_by("id")
-            .first()
-        )
-        if org_admin_pharmacy:
-            membership = self._activate_or_create_membership(org_admin_pharmacy)
-            scope["request_membership"] = membership
-            return membership
+        for org_membership, full_access, visible_ids in _org_hub_memberships(self.user):
+            if full_access:
+                org_admin_pharmacy = (
+                    Pharmacy.objects.filter(organization_id=org_membership.organization_id)
+                    .select_related("organization")
+                    .order_by("id")
+                    .first()
+                )
+            else:
+                org_admin_pharmacy = (
+                    Pharmacy.objects.filter(id__in=visible_ids)
+                    .select_related("organization")
+                    .order_by("id")
+                    .first()
+                )
+            if org_admin_pharmacy:
+                membership = self._activate_or_create_membership(org_admin_pharmacy)
+                scope["request_membership"] = membership
+                return membership
         raise PermissionDenied("Join a pharmacy before posting in ChemistTasker Hub.")
