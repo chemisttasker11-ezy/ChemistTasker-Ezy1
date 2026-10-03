@@ -51,10 +51,10 @@ import uuid
 from users.models import OrganizationMembership, User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import (
-    _log_shift_profile_access,
     _matching_shift_slot_exists,
     BaseShiftViewSet,
 )
+from shifts.candidates import _log_shift_profile_access
 from shifts.escalation import COMMUNITY_LEVELS, PUBLIC_LEVEL
 from shifts.serializers import (
     MyShiftSerializer,
