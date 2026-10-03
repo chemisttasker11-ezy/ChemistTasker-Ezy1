@@ -11,7 +11,7 @@ from organizations.access import (
     pharmacies_user_admins,
 )
 from organizations.models import Pharmacy
-from users.models import OrganizationMembership
+from users.org_roles import OrgCapability, membership_capabilities, membership_visible_pharmacy_ids
 
 
 def visible_memberships(user, query_params):
@@ -147,18 +147,32 @@ def visible_invite_links(user, query_params):
 
 
 def visible_applications(user, query_params):
-    """Applications visible through any of the user's independent management scopes.
+    """Applications visible through any independent staff-management scope.
 
-    Organization administration, pharmacy ownership and pharmacy-level manage-staff
-    authority are additive. Holding one scope must not hide applications that are
-    visible through another.
+    Organization management, pharmacy ownership and pharmacy-level MANAGE_STAFF
+    authority are additive. Scoped organization roles only see their assigned
+    pharmacies; full organization admins see the whole organization.
     """
-    org_ids = list(
-        OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').values_list('organization_id', flat=True)
-    )
     visible_pharmacies = Pharmacy.objects.none()
-    if org_ids:
-        visible_pharmacies |= Pharmacy.objects.filter(organization_id__in=org_ids)
+
+    full_org_ids = set()
+    scoped_pharmacy_ids = set()
+    for org_membership in user.organization_memberships.prefetch_related("pharmacies"):
+        caps = membership_capabilities(org_membership)
+        if not (
+            OrgCapability.MANAGE_STAFF in caps
+            or OrgCapability.MANAGE_ADMINS in caps
+        ):
+            continue
+        if OrgCapability.VIEW_ALL_PHARMACIES in caps:
+            full_org_ids.add(org_membership.organization_id)
+        else:
+            scoped_pharmacy_ids.update(membership_visible_pharmacy_ids(org_membership))
+
+    if full_org_ids:
+        visible_pharmacies |= Pharmacy.objects.filter(organization_id__in=full_org_ids)
+    if scoped_pharmacy_ids:
+        visible_pharmacies |= Pharmacy.objects.filter(id__in=scoped_pharmacy_ids)
 
     try:
         owner = OwnerOnboarding.objects.get(user=user)
