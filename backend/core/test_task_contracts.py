@@ -1003,6 +1003,48 @@ class VerificationArtifactTests(SimpleTestCase):
         self.assertFalse(os.path.exists(created[0]), "partial PDF-render temp files must be removed on failure")
         doc.close.assert_called_once()
 
+    def test_abn_verification_discards_stale_result_if_number_changes_during_lookup(self):
+        name = "client_profile.tasks.verify_abn_task"
+        started = SimpleNamespace(
+            abn="11111111111",
+            abn_verified=True,
+            abn_entity_confirmed=False,
+            abn_verification_note="old",
+            save=mock.Mock(),
+        )
+        current = SimpleNamespace(
+            abn="51824753556",
+            abn_verified=False,
+            abn_entity_confirmed=False,
+            abn_verification_note="",
+            abn_entity_name=None,
+            abn_entity_type=None,
+            abn_status=None,
+            abn_gst_registered=None,
+            abn_gst_from=None,
+            abn_gst_to=None,
+            abn_last_checked=None,
+            save=mock.Mock(),
+        )
+        seen = iter([started, current])
+        overrides = {
+            "fetch_instance_with_retries": lambda model, pk: next(seen),
+            "abn_lookup": lambda abn: ("OLD ABN PTY LTD", ABR_HTML),
+        }
+        with patch_impl(name, **overrides), self.assertLogs("onboarding.tasks", level="INFO"):
+            task(name).run(
+                "PharmacistOnboarding",
+                1,
+                "11111111111",
+                "Ann",
+                "Lee",
+                "a@example.com",
+                note_field="abn_verification_note",
+            )
+        current.save.assert_not_called()
+        self.assertIsNone(current.abn_entity_name)
+        self.assertEqual(current.abn, "51824753556")
+
     def test_abn_verification_persists_fields_and_writes_no_artifacts(self):
         # The ABR page and a JSON copy of the parsed fields were written to verification_outputs/ after the fields were
         # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.
