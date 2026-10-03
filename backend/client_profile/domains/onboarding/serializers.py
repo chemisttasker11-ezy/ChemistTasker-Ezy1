@@ -33,7 +33,7 @@ import os
 import json
 from django.utils.text import slugify
 from django.core.files.storage import default_storage
-from client_profile.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, validate_uploaded_file
+from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, validate_uploaded_file
 from client_profile.domains.common.serializers import (
     _build_absolute_media_url,
     _delete_file_if_unreferenced,

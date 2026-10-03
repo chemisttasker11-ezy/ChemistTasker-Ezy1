@@ -12,13 +12,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.decorators import action
-from client_profile.admin_helpers import CAPABILITY_MANAGE_COMMS, has_admin_capability
+from client_profile.domains.orgs.access import CAPABILITY_MANAGE_COMMS, has_admin_capability
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from chat.text import sanitize_chat_text
 from chat.realtime import broadcast_message_badge, broadcast_message_read
-from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
+from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from datetime import date
 from django.db import transaction
 from users.models import OrganizationMembership, User

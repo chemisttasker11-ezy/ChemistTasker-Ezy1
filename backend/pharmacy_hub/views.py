@@ -56,7 +56,7 @@ from pharmacy_hub.serializers import (
     HubPostSerializer,
     HubReactionSerializer,
 )
-from client_profile.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
+from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 
 
 STAFF_GROUP_MEMBER_FILTER = Q(

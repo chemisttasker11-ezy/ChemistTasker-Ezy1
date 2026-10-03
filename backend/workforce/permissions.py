@@ -38,7 +38,7 @@ def _org_has_capability(user, pharmacy, capability: str) -> bool:
 def can_manage_roster_pharmacy(user, pharmacy) -> bool:
     if _is_owner_or_superuser(user, pharmacy):
         return True
-    from client_profile.admin_helpers import can_manage_roster
+    from client_profile.domains.orgs.access import can_manage_roster
     from users.org_roles import OrgCapability
 
     return bool(
@@ -50,7 +50,7 @@ def can_manage_roster_pharmacy(user, pharmacy) -> bool:
 def can_manage_staff_pharmacy(user, pharmacy) -> bool:
     if _is_owner_or_superuser(user, pharmacy):
         return True
-    from client_profile.admin_helpers import can_manage_staff
+    from client_profile.domains.orgs.access import can_manage_staff
     from users.org_roles import OrgCapability
 
     return bool(

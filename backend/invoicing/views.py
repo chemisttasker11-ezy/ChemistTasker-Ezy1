@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import api_view, permission_classes
-from client_profile.admin_helpers import pharmacies_user_admins
+from client_profile.domains.orgs.access import pharmacies_user_admins
 from django.shortcuts import get_object_or_404
 import json
 from django.db.models import F, Q
@@ -23,8 +23,8 @@ from core.task_queue import async_task
 from django.db import transaction
 from django.http import HttpResponse
 from invoicing.serializers import InvoiceSerializer
-from client_profile.domains.common.access import _get_org_pharmacies_queryset
-from client_profile.domains.dashboards.views import _dashboard_invoice_action_url
+from client_profile.domains.orgs.access import _get_org_pharmacies_queryset
+from invoicing.navigation import invoice_action_url
 
 
 # Invoices
@@ -263,22 +263,10 @@ def send_invoice_email(request, invoice_id):
         invoice.status = 'sent'
         invoice.save(update_fields=['status'])
 
-        # If this invoice belongs to the new finance workspace, record the
-        # legacy send against the current revision without locking future edits.
-        from worker_finance.models import Delivery
-        record = Invoice.objects.select_for_update().get(pk=invoice.pk)
-        if record.request_key is not None:
-            Delivery.objects.get_or_create(
-                invoice=record,
-                version=record.version,
-                defaults={
-                    'recipient': to_email,
-                    'status': 'legacy_queued',
-                },
-            )
-            from worker_finance.services import record_revision_state
-            record.refresh_from_db()
-            record_revision_state(record)
+        # If this invoice belongs to the finance workspace, record the
+        # legacy send against the current revision through the explicit bridge.
+        from worker_finance.invoice_bridge import record_legacy_invoice_send
+        record_legacy_invoice_send(invoice, to_email)
 
     return Response({"status": "sent"})
 
@@ -310,7 +298,7 @@ def report_invoice_issue(request, invoice_id):
         title=f"Issue reported on invoice #{invoice.id}",
         body=body,
         notification_type=Notification.Type.ALERT,
-        action_url=_dashboard_invoice_action_url(invoice, None),
+        action_url=invoice_action_url(invoice, None),
         payload={
             "kind": "invoice_issue",
             "invoice_id": invoice.id,

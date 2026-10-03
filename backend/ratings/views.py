@@ -4,7 +4,7 @@ from client_profile.models import Pharmacy, PharmacyAdmin, ShiftSlotAssignment
 from ratings.models import Rating
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from client_profile.admin_helpers import is_admin_of
+from client_profile.domains.orgs.access import is_admin_of
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from users.models import OrganizationMembership
