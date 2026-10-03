@@ -298,6 +298,18 @@ class ReminderMarkerContractTests(SimpleTestCase):
             schedule("PharmacistOnboarding", 7, 1)
         self.assertEqual(redis_client.set.call_args.kwargs["ex"], 48 * 3600 + 3600)
 
+    def test_failed_enqueue_removes_the_marker_and_propagates(self):
+        # SET NX + enqueue behave as one operation: a marker without a queued task would block every later schedule
+        schedule = impl(self.TASK, "schedule_referee_reminder")
+        redis_client = mock.Mock()
+        redis_client.set.return_value = True
+        with mock.patch.dict(schedule.__globals__, {"_reminder_redis": lambda: redis_client}), \
+                mock.patch.object(task(self.TASK), "apply_async", side_effect=ConnectionError("broker down")), \
+                self.assertLogs(schedule.__module__, level="ERROR"), \
+                self.assertRaises(ConnectionError):
+            schedule("PharmacistOnboarding", 7, 1)
+        redis_client.delete.assert_called_once_with("celery:referee-reminder:PharmacistOnboarding:7:1")
+
     def test_existing_marker_prevents_a_second_enqueue(self):
         schedule = impl(self.TASK, "schedule_referee_reminder")
         redis_client = mock.Mock()
