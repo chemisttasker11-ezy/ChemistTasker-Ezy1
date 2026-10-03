@@ -7,6 +7,7 @@ implementation moves to its owning app. Known defects are pinned as they are (``
 by a dedicated behaviour-fix commit.
 """
 import inspect
+import unittest
 from datetime import date, datetime, time, timedelta
 from datetime import timezone as dt_timezone
 from types import SimpleNamespace
@@ -141,6 +142,26 @@ class TaskIdentityContractTests(SimpleTestCase):
                             declared.setdefault(keyword.value.value, []).append(f"{rel}:{node.lineno}")
         self.assertTrue(set(LEGACY_TASKS) <= set(declared))
         self.assertEqual({name: where for name, where in declared.items() if len(where) > 1}, {})
+
+    def test_verification_pipeline_is_dispatched_only_by_itself(self):
+        # CURRENT BEHAVIOUR (product decision, not a defect): run_all_verifications / final_evaluation are a retained,
+        # supported pipeline, but no user flow dispatches them. In particular a manual AHPRA change (admin or onboarding
+        # serializer) does not enqueue final_evaluation. Wiring a dispatcher in is a separate, deliberate change.
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        names = {"client_profile.tasks.run_all_verifications", "client_profile.tasks.final_evaluation"}
+        sites = set()
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if isinstance(node, ast_module.Constant) and node.value in names:
+                    sites.add(rel)
+                elif isinstance(node, ast_module.Attribute) and node.attr in {"delay", "apply_async", "s", "si"}:
+                    if ast_module.unparse(node.value) in {"final_evaluation", "run_all_verifications"}:
+                        sites.add(rel)
+        # the pipeline schedules itself; settings only route the names
+        self.assertEqual(sites, {"onboarding/tasks.py", "core/settings.py"})
 
     def test_signatures_are_unchanged(self):
         for name, (signature, *_queues) in LEGACY_TASKS.items():
@@ -375,6 +396,54 @@ class FinalEvaluationContractTests(SimpleTestCase):
         _calls, _async_task, emails, apply_async = self.run_task(obj, is_reminder=True, marker=False)
         emails.assert_not_called()
         apply_async.assert_not_called()
+
+    # --- Target behaviour of the supported pipeline (C-H1). Marked expectedFailure until the fix commit lands. ---
+    # State first, then a bounded 20-second re-check loop (retry_count advances), and a limit that stops ONLY that
+    # loop: the 48-hour referee reminder marker survives, and a profile that completes on the last run still gets a
+    # final state.
+
+    @unittest.expectedFailure
+    def test_target_quick_recheck_advances_retry_count(self):
+        for current in (0, 5, 15):  # re-check while retry_count <= 15 (same boundary as the old > 15 guard)
+            obj = self.pharmacist(ahpra_verified=False)
+            _calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=current)
+            apply_async.assert_called_once()
+            self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"retry_count": current + 1})
+            self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
+
+    @unittest.expectedFailure
+    def test_target_limit_stops_only_the_quick_loop(self):
+        obj = self.pharmacist(ahpra_verified=False)
+        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
+        apply_async.assert_not_called()
+        self.assertEqual(calls.delete, [])  # nothing cancelled: the profile is still pending
+
+    @unittest.expectedFailure
+    def test_target_limit_keeps_the_48_hour_reminder(self):
+        obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
+        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16, marker=True)
+        self.assertEqual(calls.delete, [])
+        apply_async.assert_not_called()  # marker exists: no second reminder, and the quick loop is over
+
+    @unittest.expectedFailure
+    def test_target_state_is_evaluated_before_the_limit(self):
+        obj = self.pharmacist()  # everything verified by the time this late run executes
+        with mock.patch("django.db.transaction.on_commit"):
+            calls, async_task, _emails, _apply_async = self.run_task(obj, retry_count=16)
+        self.assertTrue(obj.verified)
+        self.assertEqual(calls.sent, ["verified"])
+
+        obj = self.pharmacist(gov_id_verified=False, gov_id_verification_note="Name mismatch")
+        calls, _async_task, _emails, _apply_async = self.run_task(obj, retry_count=16)
+        self.assertEqual(calls.sent, ["failed"])
+
+    @unittest.expectedFailure
+    def test_target_reminder_run_starts_its_own_bounded_loop(self):
+        obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
+        calls, _async_task, emails, apply_async = self.run_task(obj, is_reminder=True, marker=True)
+        emails.assert_called_once()
+        quick = [c for c in apply_async.call_args_list if c.kwargs.get("kwargs", {}).get("retry_count") is not None]
+        self.assertEqual([c.kwargs["kwargs"] for c in quick], [{"retry_count": 1}])
 
     def test_failed_check_marks_unverified_and_notifies_once(self):
         obj = self.pharmacist(gov_id_verified=False, gov_id_verification_note="Name mismatch")
