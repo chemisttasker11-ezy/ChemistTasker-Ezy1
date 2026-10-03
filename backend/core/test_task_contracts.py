@@ -969,6 +969,40 @@ class VerificationArtifactTests(SimpleTestCase):
         self.assertEqual(len(created), 1)
         self.assertFalse(os.path.exists(created[0]), "partial identity-document temp files must be removed on failure")
 
+    def test_failed_pdf_render_removes_partial_temp_png(self):
+        import os
+        import sys
+        import tempfile
+
+        from onboarding.verification import documents
+
+        created = []
+        real_named_temporary_file = tempfile.NamedTemporaryFile
+
+        def tracked_temp_file(*args, **kwargs):
+            handle = real_named_temporary_file(*args, **kwargs)
+            created.append(handle.name)
+            return handle
+
+        class Pixmap:
+            def save(self, path):
+                with open(path, "wb") as handle:
+                    handle.write(b"partial-render")
+                raise RuntimeError("render failed")
+
+        page = SimpleNamespace(get_pixmap=lambda **kwargs: Pixmap())
+        doc = SimpleNamespace(page_count=1, load_page=lambda index: page, close=mock.Mock())
+        fake_fitz = SimpleNamespace(open=lambda path: doc, Matrix=lambda x, y: "matrix")
+
+        with mock.patch.dict(sys.modules, {"fitz": fake_fitz}), \
+                mock.patch.object(documents.tempfile, "NamedTemporaryFile", side_effect=tracked_temp_file), \
+                self.assertRaises(RuntimeError):
+            documents.pdf_first_page_to_png("/tmp/source.pdf")
+
+        self.assertEqual(len(created), 1)
+        self.assertFalse(os.path.exists(created[0]), "partial PDF-render temp files must be removed on failure")
+        doc.close.assert_called_once()
+
     def test_abn_verification_persists_fields_and_writes_no_artifacts(self):
         # The ABR page and a JSON copy of the parsed fields were written to verification_outputs/ after the fields were
         # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.
