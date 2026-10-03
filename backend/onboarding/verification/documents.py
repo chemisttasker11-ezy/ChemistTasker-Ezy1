@@ -30,16 +30,20 @@ def get_local_file_or_download(filefield):
         temp_name = temp_file.name
         try:
             temp_file.close()
-        finally:
-            try:
-                os.remove(temp_name)
-            except FileNotFoundError:
-                pass
-            except OSError as cleanup_error:
-                logger.warning(
-                    "[get_local_file_or_download] Failed to remove partial temp file (error_type=%s)",
-                    type(cleanup_error).__name__,
-                )
+        except Exception as cleanup_error:
+            logger.warning(
+                "[get_local_file_or_download] Failed to close partial temp file (error_type=%s)",
+                type(cleanup_error).__name__,
+            )
+        try:
+            os.remove(temp_name)
+        except FileNotFoundError:
+            pass
+        except OSError as cleanup_error:
+            logger.warning(
+                "[get_local_file_or_download] Failed to remove partial temp file (error_type=%s)",
+                type(cleanup_error).__name__,
+            )
         raise
     logger.info("[get_local_file_or_download] Downloaded to a temporary file")
     return temp_file.name
