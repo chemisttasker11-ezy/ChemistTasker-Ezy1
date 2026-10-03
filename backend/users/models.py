@@ -2,7 +2,7 @@
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-from client_profile.models import Organization, PharmacyAdmin
+from organizations.models import Organization, PharmacyAdmin
 
 class CustomUserManager(BaseUserManager):
     use_in_migrations = True

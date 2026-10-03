@@ -3,13 +3,38 @@ from django.db import models
 from django.conf import settings
 import uuid
 from django.utils import timezone
-from client_profile.models.common import (
-    PHARMACIST_AWARD_LEVEL_CHOICES,
-    OTHERSTAFF_CLASSIFICATION_CHOICES,
-    INTERN_HALF_CHOICES,
-    STUDENT_YEAR_CHOICES,
-)
-from client_profile.models.orgs import PharmacyAdmin
+from organizations.models import PharmacyAdmin
+
+
+# Award classification choices of a membership. `client_profile.models.common` re-exports them under the same names.
+PHARMACIST_AWARD_LEVEL_CHOICES = [
+    ('PHARMACIST', 'Pharmacist'),
+    ('EXPERIENCED_PHARMACIST', 'Experienced Pharmacist'),
+    ('PHARMACIST_IN_CHARGE', 'Pharmacist In Charge'),
+    ('PHARMACIST_MANAGER', 'Pharmacist Manager'),
+]
+
+
+OTHERSTAFF_CLASSIFICATION_CHOICES = [
+    ('LEVEL_1', 'Level 1'),
+    ('LEVEL_2', 'Level 2'),
+    ('LEVEL_3', 'Level 3'),
+    ('LEVEL_4', 'Level 4'),
+]
+
+
+INTERN_HALF_CHOICES = [
+    ('FIRST_HALF', 'First Half'),
+    ('SECOND_HALF', 'Second Half'),
+]
+
+
+STUDENT_YEAR_CHOICES = [
+    ('YEAR_1', 'Year 1'),
+    ('YEAR_2', 'Year 2'),
+    ('YEAR_3', 'Year 3'),
+    ('YEAR_4', 'Year 4'),
+]
 
 
 # Membership Model - Manages the user roles within each pharmacy

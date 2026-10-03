@@ -1,5 +1,5 @@
 """Limits on public shift posting."""
-from client_profile.models import Shift
+from shifts.models import Shift
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError

@@ -1,12 +1,13 @@
 """Shift e-mails and links: contexts for offer, counter-offer and interest e-mails, worker dashboard URLs and the payment/update notifications."""
-from client_profile.admin_helpers import is_admin_of
-from client_profile.domains.common.labels import user_work_role_label
+from organizations.access import is_admin_of
+from users.role_labels import user_work_role_label
 from shifts.pricing import expand_shift_slots
 from shifts.travel import (
     extract_suburb_from_travel_origin,
     extract_travel_origin_from_message,
 )
-from client_profile.models import Membership, ShiftCounterOffer, ShiftInterest, ShiftOffer
+from memberships.models import Membership
+from shifts.models import ShiftCounterOffer, ShiftInterest, ShiftOffer
 from core.task_queue import async_task
 from datetime import date, datetime, time
 from decimal import Decimal

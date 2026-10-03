@@ -1,6 +1,6 @@
 """Shift interests, rejections, saved shifts and offers."""
 from rest_framework import mixins, permissions, status, viewsets
-from client_profile.models import (
+from shifts.models import (
     Shift,
     ShiftInterest,
     ShiftOffer,
@@ -24,10 +24,10 @@ from shifts.emails import (
     send_shift_payment_finalized_notifications,
     worker_offer_url,
 )
-from client_profile.domains.common.labels import user_work_role_label
+from users.role_labels import user_work_role_label
 from shifts.notifications import notify_shift_users
 from core.task_queue import async_task
-from client_profile.domains.common.access import Http400
+from shifts.access import Http400
 from django.db import transaction
 from decimal import Decimal
 from shifts.base import BaseShiftViewSet, SHIFT_OFFER_BUZZ_COOLDOWN

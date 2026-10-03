@@ -1,12 +1,14 @@
 # ChemistTasker Domain Ownership
 
-This document defines the canonical owner for each backend and shared-client domain. New features should extend the owning domain rather than adding more responsibility to the `client_profile` kernel. `BACKEND_APPS.md` describes the apps split out of `client_profile`, their layout, dependency rules and the migration procedure.
+This document defines the canonical owner for each backend and shared-client domain. New features should extend the owning domain rather than adding more responsibility to the `client_profile` kernel, which is a compatibility kernel only (enforced by `core/test_backend_ownership_boundaries.py`). `BACKEND_APPS.md` describes the apps split out of `client_profile`, their layout and the migration procedure; `BACKEND_DOMAIN_DEPENDENCIES.md` is the dependency map.
 
 | Domain | Canonical backend owner | Shared client owner | Migration rule |
 | --- | --- | --- | --- |
 | Authentication, account, OTP, session | `users` | `shared-core/domains/auth` (target) | Keep browser/mobile auth contracts compatible. |
-| Organizations, pharmacy membership, admin scope | `client_profile` (kernel: `domains/orgs`, `domains/memberships`, `domains/onboarding`) | shared-core named operations | Stays in the kernel. Models move only with the state-only procedure in `BACKEND_APPS.md`. |
-| Shift marketplace and offers | `client_profile` (kernel: `domains/shifts`) | `shared-core` shift operations | Preserve existing URLs and response shapes. Shift models refuse edits inside a published roster period (`ShiftSlot.roster_period` points to `workforce.RosterPeriod`). |
+| Organizations, pharmacies, admin scope | `organizations` | shared-core named operations | Models keep the `client_profile` app label and tables; relabelling is a separate database change (`BACKEND_APPS.md`). |
+| Pharmacy membership and applications | `memberships` | shared-core named operations | Same label rule as above. |
+| Worker and owner onboarding, verification | `onboarding` (verification Celery tasks still implemented in `client_profile/tasks.py` under their deployed names) | shared-core named operations | Same label rule as above. |
+| Shift marketplace and offers | `shifts` | `shared-core` shift operations | Preserve existing URLs and response shapes. Shift models refuse edits inside a published roster period (`ShiftSlot.roster_period` points to `workforce.RosterPeriod`). |
 | Roster, leave, timesheets, attendance-derived workforce data | `workforce` (roster models in `workforce/models.py`; roster V1/V2 API, services, validation and worker actions in `workforce/roster/`) | workforce APIs in shared-core | Roster routes keep their `/api/client-profile/` paths and `client_profile:` route names (declared in `workforce/roster/urls.py`); new workflow logic belongs in `workforce`. |
 | Attendance and kiosk | `attendance` | kiosk/attendance operations in shared-core | Kiosk protocol and credentials are security-sensitive: positive and negative tests for every change. |
 | Invoices (model, generation from shifts, PDF/e-mail) | `invoicing` | invoice operations in shared-core | `invoicing.Invoice` is shared with `worker_finance` (revisions, payments, deliveries). |

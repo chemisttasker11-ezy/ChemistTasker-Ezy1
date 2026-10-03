@@ -25,12 +25,16 @@ import zoneinfo
 from django.db.models import Q
 from django.utils import timezone
 
-from client_profile.models import (
+from organizations.models import (
     Chain,
+    Pharmacy,
+)
+from memberships.models import (
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
     Membership,
-    Pharmacy,
     PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+from shifts.models import (
     ShiftSlotAssignment,
 )
 from attendance.models import ProvisionalAttendance

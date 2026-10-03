@@ -6,7 +6,7 @@ User = get_user_model()
 
 from rest_framework import serializers
 from memberships.models import Membership, MembershipApplication, MembershipInviteLink
-from client_profile.models import PharmacyAdmin
+from organizations.models import PharmacyAdmin
 from users.serializers import UserProfileSerializer
 from datetime import date, datetime
 from django.utils import timezone

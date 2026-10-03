@@ -13,14 +13,18 @@ from django.db import transaction
 from django.utils import timezone
 
 from workforce.roster.permissions import is_authorized_attendance_manager
-from client_profile.models import (
+from shifts.models import (
     LeaveRequest,
-    Membership,
-    Pharmacy,
     Shift,
     ShiftSlot,
     ShiftSlotAssignment,
     WorkerShiftRequest,
+)
+from memberships.models import (
+    Membership,
+)
+from organizations.models import (
+    Pharmacy,
 )
 from workforce.models import RosterActionAudit
 
@@ -363,9 +367,9 @@ def release_worker_from_assignment(
             req.shift = None
 
         if shift and escalate_to_visibility:
-            from client_profile.domains.shifts.limits import enforce_public_shift_daily_limit
-            from client_profile.domains.shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
-            from client_profile.domains.shifts.serializers import ShiftSerializer
+            from shifts.limits import enforce_public_shift_daily_limit
+            from shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
+            from shifts.serializers import ShiftSerializer
             tiers = ShiftSerializer.build_allowed_tiers(shift.pharmacy)
             if escalate_to_visibility not in tiers:
                 raise ValidationError("Invalid escalation visibility for this pharmacy.")

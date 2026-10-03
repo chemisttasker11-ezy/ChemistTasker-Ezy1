@@ -10,7 +10,7 @@ exactly as before.
 
 | App | Owns | Tables (renamed from `client_profile_*`) | Routes (mounted under `/api/client-profile/`) |
 | --- | --- | --- | --- |
-| `client_profile` (kernel) | organisations, pharmacies, chains, memberships and applications, onboarding, shifts / offers / interests / leave / worker requests, dashboards, shared permissions and helpers | `client_profile_*` (unchanged) | everything not listed below |
+| `client_profile` (compatibility kernel) | the `client_profile` app label of the organisation, membership, onboarding and shift models (their code is owned by `organizations`, `memberships`, `onboarding`, `shifts`), historical import paths, the deployed verification / reminder / membership-e-mail Celery tasks, callables referenced by migrations; see `BACKEND_DOMAIN_DEPENDENCIES.md` | `client_profile_*` (unchanged) | everything not listed below |
 | `attendance` | kiosk devices and pairing, QR sessions, worker PINs, attendance sessions and events, offline kiosk events, provisional approvals, corrections | `attendance_*` (9) | `attendance/kiosk/**`, `attendance/worker/**`, `attendance/manager/**` |
 | `chat` | conversations, participants, messages, reactions, the room WebSocket consumer, chat signals | `chat_*` (4) | `rooms/**`, `messages/**`, `chat-participants/` |
 | `invoicing` | invoices and line items, invoice generation from shifts, PDF/e-mail | `invoicing_*` (2) | `invoices/**` |
@@ -50,8 +50,9 @@ The kernel keeps one package per domain under `client_profile/domains/<domain>/`
 
 ## Dependency rules
 
-* Leaf apps depend on the kernel (`client_profile`), `users` and `notifications`, never the other way round, with the
-  seams below as the only exceptions. Leaf apps do not import each other except where listed.
+* Runtime code imports a name from the app that owns it, never from the `client_profile` compatibility kernel (the few
+  justified exceptions are listed, with reasons, in `core/test_backend_ownership_boundaries.py`). The kernel only
+  shrinks, and no new pair of apps may import each other. `BACKEND_DOMAIN_DEPENDENCIES.md` is the map.
 * `notifications` depends on `users` only; every app may call `notifications.services.notify_users`.
 * Imports are explicit and absolute. There are no star imports and no re-export shims: import a name from the module
   that defines it.

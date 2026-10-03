@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from client_profile.models import Pharmacy
+from organizations.models import Pharmacy
 from .models import EthicalImportBatch, EthicalProductIdentifier, EthicalStagingRow, EthicalStockLot, EthicalStockMovement
 from .policy import evaluate_ethical_access
 from .serializers import EthicalListingSerializer

@@ -5,7 +5,7 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from client_profile.models import (
+from onboarding.models import (
     ExplorerOnboarding,
     OtherStaffOnboarding,
     OwnerOnboarding,

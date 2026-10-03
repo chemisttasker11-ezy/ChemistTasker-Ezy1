@@ -200,7 +200,7 @@ jobs:
       - name: Kernel and domain app tests
         run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
-        run: python backend/manage.py test shifts memberships organizations onboarding dashboards core.test_client_profile_api_composition core.test_shift_domain_contract core.test_membership_domain_contract core.test_organization_domain_contract core.test_onboarding_domain_contract core.test_dashboard_read_model_contract core.test_client_profile_common_contract core.test_kernel_utility_ownership core.test_operational_model_import_ownership core.test_promoted_model_import_ownership core.test_serializer_lifecycle_ownership --settings=core.contract_test_settings
+        run: python backend/manage.py test shifts memberships organizations onboarding dashboards core.test_client_profile_api_composition core.test_shift_domain_contract core.test_membership_domain_contract core.test_organization_domain_contract core.test_onboarding_domain_contract core.test_dashboard_read_model_contract core.test_client_profile_common_contract core.test_kernel_utility_ownership core.test_operational_model_import_ownership core.test_promoted_model_import_ownership core.test_serializer_lifecycle_ownership core.test_backend_ownership_boundaries --settings=core.contract_test_settings
       - name: Public hub editorial and community contracts
         env:
           PUBLIC_COMMUNITY_ENABLED: "true"

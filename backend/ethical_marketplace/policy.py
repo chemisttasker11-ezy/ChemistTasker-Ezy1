@@ -2,7 +2,8 @@ from dataclasses import asdict, dataclass, field
 
 from django.utils import timezone
 
-from client_profile.models import OwnerOnboarding, Pharmacy, PharmacyAdmin
+from onboarding.models import OwnerOnboarding
+from organizations.models import Pharmacy, PharmacyAdmin
 from marketplace.policy import evaluate_marketplace_access, owns_pharmacy
 from .models import EthicalJurisdictionPolicy, EthicalPharmacyApproval, EthicalPharmacyGrant, EthicalProfessionalAccess
 

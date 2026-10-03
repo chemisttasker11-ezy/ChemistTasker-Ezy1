@@ -10,7 +10,7 @@ from django.dispatch import receiver
 from chat.models import Conversation, Message, Participant
 from chat.realtime import ROOM_GROUP_FMT, broadcast_message_badge, participant_can_receive_chat_updates
 from chat.serializers import MessageSerializer
-from client_profile.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from notifications.models import Notification
 from notifications.services import notify_users
 

@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 from django.apps import apps
 from django.db.models import Q
 
-from client_profile.models import Membership, ShiftSlotAssignment
+from memberships.models import Membership
+from shifts.models import ShiftSlotAssignment
 from talent.models import UserAvailability
-from client_profile.timezone_utils import get_pharmacy_timezone
+from organizations.timezone import get_pharmacy_timezone
 
 
 def work_interval(pharmacy, work_date, start_time, end_time):
@@ -38,7 +39,7 @@ def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclu
     roles = {m.role for m in memberships}
     matches = role in roles or getattr(worker, "role", "") == role
     if not matches and getattr(worker, "role", "") == "OTHER_STAFF":
-        from client_profile.domains.shifts.base import NON_INTERN_OTHER_STAFF_SHIFT_ROLES
+        from shifts.base import NON_INTERN_OTHER_STAFF_SHIFT_ROLES
         matches = role in NON_INTERN_OTHER_STAFF_SHIFT_ROLES and bool(roles.intersection(NON_INTERN_OTHER_STAFF_SHIFT_ROLES))
     if not matches:
         error("ROLE_MISMATCH", f"Worker {name} role does not match required role {role}.", required_role=role)

@@ -5,8 +5,9 @@ User = get_user_model()
 
 
 from rest_framework import serializers
-from client_profile.models import Membership, Shift, ShiftSlotAssignment
-from client_profile.domains.shifts.serializers import ShiftSerializer, ShiftSlotSerializer
+from memberships.models import Membership
+from shifts.models import Shift, ShiftSlotAssignment
+from shifts.serializers import ShiftSerializer, ShiftSlotSerializer
 
 
 # === Rosters ===

@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from client_profile.models import Pharmacy
+from organizations.models import Pharmacy
 from .models import (ListingEscalationStep, MarketplaceAuditEvent, MarketplaceCategory, MarketplaceExchange,
                      MarketplaceCatalogueProduct, MarketplaceExchangeParticipant, MarketplaceImage, MarketplaceInternalTransfer, MarketplaceListing, MarketplaceMessage,
                      MarketplaceReport, MarketplaceRequestReceipt, MarketplaceSavedListing, MarketplaceTermsAcceptance)

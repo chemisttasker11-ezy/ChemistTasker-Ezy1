@@ -5,8 +5,17 @@ from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+# Historical migrations serialise this field by its client_profile.fields path, so it stays defined there.
 from client_profile.fields import EncryptedTextField
-from client_profile.models.common import GENDER_CHOICES, _unique_upload_path
+from core.uploads import unique_upload_path as _unique_upload_path
+
+
+# `client_profile.models.common` re-exports this under the same name.
+GENDER_CHOICES = [
+    ("MALE", "Male"),
+    ("FEMALE", "Female"),
+    ("PREFER_NOT_TO_SAY", "Prefer not to say"),
+]
 
 
 def onboarding_upload_path(instance, filename, folder):

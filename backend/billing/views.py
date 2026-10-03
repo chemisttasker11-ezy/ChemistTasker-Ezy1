@@ -83,7 +83,7 @@ def _extra_seat_return_urls(account, platform='web'):
 
 
 def _shift_dashboard_context(user, pharmacy):
-    from client_profile.models import PharmacyAdmin
+    from organizations.models import PharmacyAdmin
     from users.models import OrganizationMembership
 
     organization_id = getattr(pharmacy, 'organization_id', None)
@@ -259,7 +259,7 @@ def _serialize_subscription(subscription):
 def _current_account_for_user(user, pharmacy_id=None):
     pharmacy = None
     if pharmacy_id:
-        from client_profile.models import Pharmacy
+        from organizations.models import Pharmacy
         pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
         if not user_can_manage_billing_for_pharmacy(user, pharmacy):
             return None, None, Response({'error': 'Not authorized to manage billing for this pharmacy.'}, status=status.HTTP_403_FORBIDDEN)
@@ -322,8 +322,8 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
     """
-    from client_profile.models import ShiftOffer
-    from client_profile.domains.shifts.finalize import finalize_shift_offer
+    from shifts.models import ShiftOffer
+    from shifts.finalize import finalize_shift_offer
 
     offers = ShiftOffer.objects.filter(
         shift=shift,
@@ -550,7 +550,7 @@ def charge_shift_fulfillment(request, shift_id):
     Generates a checkout session for the fulfillment fee.
     """
     user = request.user
-    from client_profile.models import Shift
+    from shifts.models import Shift
 
     shift = get_object_or_404(Shift, id=shift_id)
 
@@ -568,7 +568,7 @@ def charge_shift_fulfillment(request, shift_id):
     offer_ids = _normalize_offer_ids(request.data.get('offer_ids') or request.data.get('offerIds'), request.data.get('offer_id') or request.data.get('offerId'))
 
     if offer_ids:
-        from client_profile.models import ShiftOffer
+        from shifts.models import ShiftOffer
         selected_offers = list(ShiftOffer.objects.filter(
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -580,7 +580,7 @@ def charge_shift_fulfillment(request, shift_id):
         if len(selected_slot_ids) != len(set(selected_slot_ids)):
             return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
     elif slot_ids:
-        from client_profile.models import ShiftOffer
+        from shifts.models import ShiftOffer
         matching_count = ShiftOffer.objects.filter(
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -598,8 +598,8 @@ def charge_shift_fulfillment(request, shift_id):
             offer_ids=offer_ids,
             return_offers=True,
         )
-        from client_profile.models import ShiftOffer
-        from client_profile.domains.shifts.emails import send_shift_payment_finalized_notifications
+        from shifts.models import ShiftOffer
+        from shifts.emails import send_shift_payment_finalized_notifications
         has_pending_payment = ShiftOffer.objects.filter(
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -702,7 +702,7 @@ def charge_penalty(request, shift_id):
     Because the amount is dynamic, we use price_data.
     """
     user = request.user
-    from client_profile.models import Shift, ShiftSlotAssignment
+    from shifts.models import Shift, ShiftSlotAssignment
     from django.utils import timezone
     
     shift = get_object_or_404(Shift, id=shift_id)
@@ -857,7 +857,7 @@ def _process_stripe_event(event):
 
                 # Mark shift paid, then finalize pending offers waiting on payment.
                 try:
-                    from client_profile.models import Shift as ShiftModel
+                    from shifts.models import Shift as ShiftModel
                     shift_obj = ShiftModel.objects.filter(id=shift_id).first()
                     if shift_obj:
                         finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
@@ -868,7 +868,7 @@ def _process_stripe_event(event):
                             offer_ids=metadata.get('offer_ids'),
                             return_offers=True,
                         )
-                        from client_profile.domains.shifts.emails import (
+                        from shifts.emails import (
                             send_shift_payment_finalized_notifications,
                         )
                         from users.models import User
@@ -879,7 +879,7 @@ def _process_stripe_event(event):
                             paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
                             payment_method='stripe',
                         )
-                        from client_profile.models import ShiftOffer
+                        from shifts.models import ShiftOffer
                         has_pending_payment = ShiftOffer.objects.filter(
                             shift=shift_obj,
                             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,

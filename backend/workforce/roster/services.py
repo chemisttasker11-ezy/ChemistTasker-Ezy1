@@ -11,14 +11,18 @@ from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from client_profile.models import (
+from shifts.models import (
     LeaveRequest,
-    Membership,
-    Pharmacy,
     Shift,
     ShiftOffer,
     ShiftSlot,
     ShiftSlotAssignment,
+)
+from memberships.models import (
+    Membership,
+)
+from organizations.models import (
+    Pharmacy,
 )
 from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit, RosterTemplate
 from talent.models import UserAvailability

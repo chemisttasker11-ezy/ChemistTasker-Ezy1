@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, MutableMapping, Sequence
 
-from client_profile.models import PharmacyAdmin
+from organizations.models import PharmacyAdmin
 
 
 class OrgCapability:
@@ -243,7 +243,7 @@ def membership_capabilities(membership) -> set[str]:
 
 
 def membership_visible_pharmacies(membership):
-    from client_profile.models import Pharmacy  # Local import to avoid circular loading
+    from organizations.models import Pharmacy  # Local import to avoid circular loading
 
     if not membership:
         return Pharmacy.objects.none()

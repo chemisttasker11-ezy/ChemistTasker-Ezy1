@@ -1,6 +1,7 @@
 """Roster V2 API: periods, validation, publication, worker acknowledgement, copy/templates, bulk edits, swap and cover requests, action audits."""
 from workforce.roster.permissions import is_authorized_attendance_manager
-from client_profile.models import Pharmacy, ShiftSlotAssignment, WorkerShiftRequest
+from organizations.models import Pharmacy
+from shifts.models import ShiftSlotAssignment, WorkerShiftRequest
 from workforce.models import RosterActionAudit, RosterPeriod, RosterTemplate
 from workforce.roster.services import (
     acknowledge_roster_period,
