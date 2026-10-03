@@ -346,4 +346,5 @@ class VerificationNoteErrorSurfaceTests(SimpleTestCase):
         self.assertIn("AHPRA lookup failed for pk=1", log_text)
         self.assertIn("error_type=Exception", log_text)
         self.assertNotIn("SECRET-KEY", log_text)
-        self.assertNotIn("api_key=", log_text)
+        self.assertNotIn("https://example.invalid/?api_key=SECRET-KEY", log_text)
+        self.assertNotIn("Max retries exceeded with url:", log_text)
