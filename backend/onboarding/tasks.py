@@ -4,7 +4,6 @@ Every task keeps its deployed name (`client_profile.tasks.*`), queue and signatu
 messages address tasks by these names. `client_profile.tasks` re-exports these objects; it does not register them
 again.
 """
-import json
 import logging
 import os
 import tempfile
@@ -35,7 +34,7 @@ from onboarding.verification.reminders import (
     cancel_referee_reminder,
     schedule_referee_reminder,
 )
-from onboarding.verification.support import env, fetch_instance_with_retries, save_output_file
+from onboarding.verification.support import fetch_instance_with_retries
 from users.normalization import sanitize_email_text as clean_email
 
 logger = logging.getLogger(__name__)
@@ -60,12 +59,10 @@ def verify_filefield_task(
     last_name  = last_name  or getattr(obj.user, "last_name", "")  or ""
     email      = email      or getattr(obj.user, "email", "")      or ""
 
-    # --- THIS IS THE FIX ---
     # If a verification note already exists, the task has already run.
     if note_field and getattr(obj, note_field, None):
         logger.info(f"[FILEFIELD TASK] SKIPPING: Verification for pk={object_pk}, field={file_field} already has a result.")
         return # Exit immediately
-    # --- END OF FIX ---
 
     # Reset fields before running
     setattr(obj, verification_field, False)
@@ -85,13 +82,14 @@ def verify_filefield_task(
     else:
         local_path = get_local_file_or_download(file_obj)
         if not local_path or not os.path.exists(local_path):
-            failure_note = f"Could not obtain file for OCR: {local_path}."
+            # the note is shown to the user: never a server path
+            failure_note = "Could not obtain the uploaded file for OCR."
             logger.info(f"[verify_filefield_task] {failure_note}")
         else:
             converted_path = None
             try:
                 ocr_path, converted_path = ocr_input_path_for_file(local_path)
-                logger.info(f"[verify_filefield_task] Sending OCR input path to Azure: {ocr_path}")
+                logger.info("[verify_filefield_task] Sending the document to Azure OCR pk=%s field=%s", object_pk, file_field)
                 ocr_data = azure_ocr(ocr_path)
                 lines = ocr_data.get("lines", [])
                 text = " ".join(lines)
@@ -99,7 +97,7 @@ def verify_filefield_task(
 
                 if is_name_match:
                     is_verified = True
-                    logger.info(f"[verify_filefield_task] Name match result: {is_name_match} (first={first_name}, last={last_name})")
+                    logger.info("[verify_filefield_task] Name match result: %s pk=%s field=%s", is_name_match, object_pk, file_field)
                 else:
                     failure_note = f"Name mismatch found in your uploaded document"
                     logger.info(f"[verify_filefield_task] {failure_note}")
@@ -127,7 +125,7 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
     that only happens when the user confirms in the UI.
     """
     note_field = kwargs.get('note_field')
-    logger.info(f"[VERIFY ABN TASK] model={model_name}, pk={object_pk}, abn={abn_number}")
+    logger.info("[VERIFY ABN TASK] model=%s pk=%s", model_name, object_pk)
 
     Model = apps.get_model("client_profile", model_name)
     obj = fetch_instance_with_retries(Model, object_pk)
@@ -166,29 +164,11 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
         setattr(obj, note_field, note[:255]); updates.append(note_field)
     obj.save(update_fields=list({f for f in updates if hasattr(obj, f)}))
 
-    # artifacts
-    out_html = save_output_file("abn_html", object_pk, "html")
-    with open(out_html, "w", encoding="utf-8") as f:
-        f.write(html if html else "No HTML captured.")
-    out_json = save_output_file("abn", object_pk, "json")
-    with open(out_json, "w", encoding="utf-8") as f:
-        json.dump({
-            "abn_input": abn_number,
-            "entity_name": obj.abn_entity_name,
-            "entity_type": obj.abn_entity_type,
-            "abn_status": obj.abn_status,
-            "abn_gst_registered": obj.abn_gst_registered,
-            "abn_gst_from": (obj.abn_gst_from.isoformat() if obj.abn_gst_from else None),
-            "abn_gst_to": (obj.abn_gst_to.isoformat() if obj.abn_gst_to else None),
-            "note": getattr(obj, note_field, None) if note_field else None,
-        }, f, indent=2)
-
 
 @shared_task(name="client_profile.tasks.verify_ahpra_task", queue="ocr")
 def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name, email, **kwargs):
     full_ahpra_number = f"PHA000{ahpra_number}"
-    logger.info(f"[AHPRA TASK] Constructed full AHPRA number for lookup: {full_ahpra_number}")
-    # --- END OF CHANGE ---
+    logger.info("[AHPRA TASK] Starting AHPRA lookup model=%s pk=%s", model_name, object_pk)
 
     Model = apps.get_model("client_profile", model_name)
     obj = fetch_instance_with_retries(Model, object_pk)
@@ -196,7 +176,7 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     # This logic correctly compares the incoming numeric-only `ahpra_number` 
     # with the numeric-only number stored on the object, so it doesn't need to change.
     if (obj.ahpra_number or '').strip().lower() == ahpra_number.strip().lower() and obj.ahpra_verification_note:
-        logger.info(f"[AHPRA TASK] SKIPPING: Verification for pk={object_pk} with number {ahpra_number} already has a result.")
+        logger.info("[AHPRA TASK] SKIPPING: verification for pk=%s already has a result for this number.", object_pk)
         return # Exit immediately
 
     # If we are here, it means it's a new AHPRA number or the first attempt.
@@ -205,19 +185,27 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     obj.ahpra_verification_note = ""
     obj.save(update_fields=['ahpra_verified', 'ahpra_verification_note'])
 
-    output_html = save_output_file("ahpra_html", object_pk, "html")
+    # The provider page is only needed between the fetch and the parse: a temporary file, removed in every case.
+    handle, output_html = tempfile.mkstemp(prefix="ahpra_", suffix=".html")
+    os.close(handle)
     try:
-        # Use the newly constructed full AHPRA number for the lookup
-        ahpra_lookup(full_ahpra_number, output_html, api_key=env("SCRAPINGBEE_API_KEY"))
-    except Exception as exc:
-        # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
-        logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
-        _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
-        return
+        try:
+            # Use the newly constructed full AHPRA number for the lookup
+            ahpra_lookup(full_ahpra_number, output_html, api_key=settings.SCRAPINGBEE_API_KEY)
+        except Exception as exc:
+            # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
+            logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
+            _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
+            return
 
-
-    ahpra_data = parse_ahpra_html(output_html)
-    logger.info(f"[verify_ahpra_task] Parsed: {ahpra_data}")
+        ahpra_data = parse_ahpra_html(output_html)
+    finally:
+        if os.path.exists(output_html):
+            os.remove(output_html)
+    logger.info(
+        "[verify_ahpra_task] Parsed register page pk=%s type=%s status=%s has_expiry=%s", object_pk,
+        ahpra_data.get("registration_type"), ahpra_data.get("registration_status"), bool(ahpra_data.get("expiry_date")),
+    )
 
     practitioner_name = ahpra_data.get("practitioner_name", "")
     registration_type = (ahpra_data.get("registration_type") or "").strip()
@@ -225,7 +213,7 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     expiry_date_str = ahpra_data.get("expiry_date", "")
 
     is_name_match = simple_name_match(practitioner_name, first_name, last_name)
-    logger.info(f"[verify_ahpra_task] Name match: {is_name_match} (expected={first_name} {last_name}, found={practitioner_name})")
+    logger.info("[verify_ahpra_task] Name match: %s pk=%s", is_name_match, object_pk)
 
     note = ""
     expiry_date = None
@@ -311,7 +299,6 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     signer = TimestampSigner()
     token = signer.sign(f"{model_name}:{pk}:{ref_idx}")
 
-    # ✅ NEW: include role in the querystring
     query = urlencode({
         "candidate_name": obj.user.get_full_name(),
         "position_applied_for": get_candidate_role(obj),
@@ -339,7 +326,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
         },
     )
 
-    # Re-schedule this referee only (keep your dev interval)
+    # Re-schedule this referee only
     _marker_delete(key)
     schedule_referee_reminder(model_name, pk, ref_idx)
 
@@ -347,7 +334,8 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
 @shared_task(name="client_profile.tasks.run_all_verifications", queue="default")
 def run_all_verifications(model_name, object_pk, is_create=False):
     """
-    MODIFIED: This orchestrator now also sends the initial admin notification.
+    Notify the admins once, dispatch the automated verifications for the profile type, send the initial referee
+    requests, and schedule final_evaluation. AHPRA is verified manually, not here.
     """
     from django.apps import apps
     from django.utils import timezone
@@ -373,18 +361,14 @@ def run_all_verifications(model_name, object_pk, is_create=False):
 
     # --- 1. Trigger all automated verification tasks (ABN, AHPRA, Files) ---
     if model_name_lower == 'pharmacistonboarding':
-        # NOTE: AHPRA verification is handled manually to avoid automated scraping.
-        # if obj.ahpra_number:
-        #     async_task('client_profile.tasks.verify_ahpra_task', model_name, object_pk, obj.ahpra_number, user.first_name, user.last_name, user.email, q_options={'timeout': 300})
+        # AHPRA is verified manually (no automated scraping).
         if obj.payment_preference == "ABN" and obj.abn:
             async_task('client_profile.tasks.verify_abn_task', model_name, object_pk, obj.abn, user.first_name, user.last_name, user.email, note_field='abn_verification_note')
         if obj.government_id:
             async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'government_id', user.first_name, user.last_name, user.email, 'gov_id_verified', note_field='gov_id_verification_note')
 
     elif model_name_lower == 'owneronboarding':
-        # NOTE: AHPRA verification is handled manually to avoid automated scraping.
-        # if obj.role == "PHARMACIST" and obj.ahpra_number:
-        #     async_task('client_profile.tasks.verify_ahpra_task', model_name, object_pk, obj.ahpra_number, user.first_name, user.last_name, user.email, q_options={'timeout': 300})
+        # AHPRA is verified manually (no automated scraping).
         pass
 
     elif model_name_lower == 'otherstaffonboarding':
@@ -435,7 +419,8 @@ def run_all_verifications(model_name, object_pk, is_create=False):
 @shared_task(name="client_profile.tasks.final_evaluation", queue="default")
 def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     """
-    REVISED: This task now correctly handles all states and cleans up scheduled tasks.
+    Evaluate the profile's verification state: failed or verified are final (notify once, cancel reminders);
+    otherwise keep one 48-hour future evaluation and, while automated checks run, a bounded 20-second re-check.
     """
     from django.apps import apps
     from django.utils import timezone
@@ -463,7 +448,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
-    # Build required checks (unchanged)
+    # Build required checks
     required_checks = []
     model_name_lower = model_name.lower()
 
@@ -500,7 +485,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     elif model_name_lower == 'exploreronboarding':
         required_checks.append('gov_id')
 
-    # Evaluate checks (unchanged)
+    # Evaluate checks
     has_failed_check, is_pending_check, failure_reasons = False, False, []
     for check in required_checks:
         verified_flag = f"{check}_verified"
@@ -514,7 +499,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
             elif not is_verified and not note:
                 is_pending_check = True
 
-    # Referee requirements (unchanged)
+    # Referee requirements
     referees_needed = model_name_lower in ['pharmacistonboarding', 'otherstaffonboarding', 'exploreronboarding']
     is_pending_referee = False
     if referees_needed:
@@ -525,7 +510,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
             elif not getattr(obj, f"referee{idx}_confirmed", False):
                 is_pending_referee = True
 
-    # Failed state (unchanged)
+    # Failed state
     if has_failed_check:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} has FAILED. Reason(s): {failure_reasons}")
         obj.verified = False
@@ -552,7 +537,6 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     def _has_future_reminder(model_name, object_pk):
         return _marker_get(_final_evaluation_reminder_key(model_name, object_pk))
 
-    # Debug timing: 0.1h (~6 min). Use 48 for production.
     REMINDER_DELAY = timedelta(hours=48)
     # Quick re-check loop for automated checks that are still running. It is bounded: a run re-checks while
     # retry_count <= MAX_QUICK_RECHECK_COUNT; past that only this loop stops. The profile is still pending, so no
@@ -628,7 +612,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         schedule_quick_recheck()
         return
 
-    # Success state (unchanged)
+    # Success state
     logger.info(f"[FINAL EVALUATION] pk={object_pk} has been successfully VERIFIED.")
     obj.verified = True
     obj.save(update_fields=['verified'])

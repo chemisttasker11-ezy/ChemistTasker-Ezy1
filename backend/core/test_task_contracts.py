@@ -801,3 +801,305 @@ class ShiftReminderContractTests(TestCase):
         self.assertEqual(kwargs["template_name"], "emails/shift_reminder.html")
         self.assertEqual(kwargs["subject"], f"Reminder: Your upcoming shift at {self.pharmacy.name}")
         self.assertEqual(kwargs["context"]["slot_time"], "2026-01-05 23:45–23:59")
+
+
+class VerificationConfigurationTests(SimpleTestCase):
+    def test_only_settings_read_environment_files(self):
+        # Django settings own the environment; importing a task module must not reread .env files.
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        readers = set()
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if isinstance(node, ast_module.Call) and ast_module.unparse(node.func).endswith("read_env"):
+                    readers.add(rel)
+                if isinstance(node, ast_module.ImportFrom) and node.module == "environ":
+                    readers.add(rel)
+        self.assertEqual(readers, {"core/settings.py"})
+
+    def test_importing_shipped_modules_writes_no_files(self):
+        # importing a module (web, worker, beat, management command, test runner) must not create filesystem state
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        writers = {"makedirs", "mkdir", "write_text", "write_bytes", "touch"}
+
+        def opens_for_writing(call):
+            mode = call.args[1] if len(call.args) > 1 else next((k.value for k in call.keywords if k.arg == "mode"), None)
+            return isinstance(mode, ast_module.Constant) and any(flag in str(mode.value) for flag in "wax+")
+
+        offenders = []
+        for rel, _path, tree in runtime_files():
+            for statement in tree.body:
+                if isinstance(statement, (ast_module.FunctionDef, ast_module.AsyncFunctionDef, ast_module.ClassDef)):
+                    continue
+                for node in ast_module.walk(statement):
+                    if not isinstance(node, ast_module.Call):
+                        continue
+                    called = ast_module.unparse(node.func).rsplit(".", 1)[-1]
+                    if called in writers or (called == "open" and opens_for_writing(node)):
+                        offenders.append(f"{rel}:{node.lineno}")
+        self.assertEqual(offenders, [])
+
+    @override_settings(AZURE_OCR_ENDPOINT="https://ocr.example.test", AZURE_OCR_KEY="settings-key")
+    def test_ocr_client_is_configured_from_settings(self):
+        import sys
+        import tempfile
+
+        azure_ocr = impl("client_profile.tasks.verify_filefield_task", "azure_ocr")
+        client_cls = mock.Mock()
+        client_cls.return_value.analyze.return_value = SimpleNamespace(read=None)
+        credential = mock.Mock(side_effect=lambda key: f"credential:{key}")
+        fake_modules = {
+            "azure.ai.vision.imageanalysis": SimpleNamespace(ImageAnalysisClient=client_cls),
+            "azure.ai.vision.imageanalysis.models": SimpleNamespace(VisualFeatures=SimpleNamespace(READ="READ")),
+            "azure.core.credentials": SimpleNamespace(AzureKeyCredential=credential),
+        }
+        with tempfile.NamedTemporaryFile(suffix=".png") as image, mock.patch.dict(sys.modules, fake_modules):
+            self.assertEqual(azure_ocr(image.name), {"lines": []})
+        client_cls.assert_called_once_with(endpoint="https://ocr.example.test", credential="credential:settings-key")
+
+    @override_settings(SCRAPINGBEE_API_KEY="")
+    def test_missing_scrapingbee_key_is_an_explicit_configuration_error(self):
+        # an assert would vanish under `python -O`; configuration errors must not depend on it
+        from django.core.exceptions import ImproperlyConfigured
+
+        ahpra_lookup = impl("client_profile.tasks.verify_ahpra_task", "ahpra_lookup")
+        with self.assertRaises(ImproperlyConfigured):
+            ahpra_lookup("PHA0001234567", "/tmp/unused.html")
+
+    @override_settings(SCRAPINGBEE_API_KEY="")
+    def test_missing_scrapingbee_key_keeps_the_sanitized_note(self):
+        name = "client_profile.tasks.verify_ahpra_task"
+        target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
+        with patch_impl(
+            name,
+            fetch_instance_with_retries=lambda model, pk: target,
+            _update_ahpra_fields=mock.Mock(),
+        ), self.assertLogs(task(name).run.__module__, level="ERROR") as logs:
+            task(name).run("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
+            update = task(name).run.__globals__["_update_ahpra_fields"]
+        self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
+        self.assertIn("error_type=ImproperlyConfigured", " ".join(logs.output))
+
+
+class VerificationArtifactTests(SimpleTestCase):
+    AHPRA = "client_profile.tasks.verify_ahpra_task"
+    PAGE = (
+        '<div class="practitioner-detail-header"><h2 class="practitioner-name">Ann Lee</h2>'
+        '<div class="reg-types"><span>General</span></div></div>'
+        '<div class="practitioner-detail-body"><div class="practitioner-detail-section"><div class="section-row">'
+        '<div class="field-title">Registration status</div><div class="field-entry">Registered</div></div>'
+        '<div class="section-row"><div class="field-title">Expiry Date</div><div class="field-entry">30/11/2099</div>'
+        '</div></div></div>'
+    )
+
+    def run_ahpra(self, lookup):
+        import os
+
+        target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
+        update = mock.Mock()
+        seen = []
+
+        def fake_lookup(number, path, api_key=None):
+            seen.append(path)
+            return lookup(path)
+
+        with patch_impl(
+            self.AHPRA,
+            fetch_instance_with_retries=lambda model, pk: target,
+            ahpra_lookup=fake_lookup,
+            _update_ahpra_fields=update,
+        ):
+            task(self.AHPRA).run("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
+        self.assertEqual(len(seen), 1)
+        self.assertFalse(os.path.exists(seen[0]), "the provider page must not outlive the task")
+        return update
+
+    def test_ahpra_page_is_parsed_from_a_temporary_file_that_is_removed(self):
+        def write(path):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(self.PAGE)
+            return path
+
+        update = self.run_ahpra(write)
+        self.assertEqual(update.call_args.args[2:4], (True, "AHPRA registration is valid and current."))
+
+    def test_temporary_file_is_removed_when_the_lookup_fails(self):
+        def fail(path):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("partial")
+            raise RuntimeError("provider down")
+
+        update = self.run_ahpra(fail)
+        self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
+
+    def test_failed_remote_document_download_removes_partial_temp_file(self):
+        import contextlib
+        import io
+        import os
+        import tempfile
+
+        from onboarding.verification import documents
+
+        created = []
+        real_named_temporary_file = tempfile.NamedTemporaryFile
+
+        def tracked_temp_file(*args, **kwargs):
+            handle = real_named_temporary_file(*args, **kwargs)
+            created.append(handle.name)
+            return handle
+
+        def fail_after_partial_copy(_source, destination):
+            destination.write(b"partial-sensitive-document")
+            destination.flush()
+            raise OSError("storage stream failed")
+
+        filefield = SimpleNamespace(name="private-id.pdf")
+        with mock.patch.object(documents.tempfile, "NamedTemporaryFile", side_effect=tracked_temp_file), \
+                mock.patch.object(documents.default_storage, "open",
+                                  return_value=contextlib.nullcontext(io.BytesIO(b"source"))), \
+                mock.patch.object(documents.shutil, "copyfileobj", side_effect=fail_after_partial_copy), \
+                self.assertRaises(OSError):
+            documents.get_local_file_or_download(filefield)
+
+        self.assertEqual(len(created), 1)
+        self.assertFalse(os.path.exists(created[0]), "partial identity-document temp files must be removed on failure")
+
+    def test_failed_pdf_render_removes_partial_temp_png(self):
+        import os
+        import sys
+        import tempfile
+
+        from onboarding.verification import documents
+
+        created = []
+        real_named_temporary_file = tempfile.NamedTemporaryFile
+
+        def tracked_temp_file(*args, **kwargs):
+            handle = real_named_temporary_file(*args, **kwargs)
+            created.append(handle.name)
+            return handle
+
+        class Pixmap:
+            def save(self, path):
+                with open(path, "wb") as handle:
+                    handle.write(b"partial-render")
+                raise RuntimeError("render failed")
+
+        page = SimpleNamespace(get_pixmap=lambda **kwargs: Pixmap())
+        doc = SimpleNamespace(page_count=1, load_page=lambda index: page, close=mock.Mock())
+        fake_fitz = SimpleNamespace(open=lambda path: doc, Matrix=lambda x, y: "matrix")
+
+        with mock.patch.dict(sys.modules, {"fitz": fake_fitz}), \
+                mock.patch.object(documents.tempfile, "NamedTemporaryFile", side_effect=tracked_temp_file), \
+                self.assertRaises(RuntimeError):
+            documents.pdf_first_page_to_png("/tmp/source.pdf")
+
+        self.assertEqual(len(created), 1)
+        self.assertFalse(os.path.exists(created[0]), "partial PDF-render temp files must be removed on failure")
+        doc.close.assert_called_once()
+
+    def test_abn_verification_persists_fields_and_writes_no_artifacts(self):
+        # The ABR page and a JSON copy of the parsed fields were written to verification_outputs/ after the fields were
+        # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.
+        name = "client_profile.tasks.verify_abn_task"
+        target = SimpleNamespace(
+            abn_verified=False, abn_entity_confirmed=False, abn_verification_note="",
+            abn_entity_name="", abn_entity_type="", abn_status="", abn_gst_registered=None,
+            abn_gst_from=None, abn_gst_to=None, abn_last_checked=None, save=mock.Mock(),
+        )
+        overrides = {
+            "fetch_instance_with_retries": lambda model, pk: target,
+            "abn_lookup": lambda abn: ("EXAMPLE PHARMACY PTY LTD", ABR_HTML),
+        }
+        with patch_impl(name, **overrides), mock.patch("builtins.open", side_effect=AssertionError("file opened")):
+            task(name).run("PharmacistOnboarding", 1, "51824753556", "Ann", "Lee", "a@example.com",
+                           note_field="abn_verification_note")
+        self.assertEqual(target.abn_entity_name, "EXAMPLE PHARMACY PTY LTD")
+        self.assertEqual(target.abn_gst_from, date(2023, 9, 1))
+        self.assertEqual(
+            target.abn_verification_note,
+            "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you.",
+        )
+
+
+class VerificationLogPrivacyTests(SimpleTestCase):
+    """Operator logs carry identifiers (model, pk, field, result, error type), not personal data or paths."""
+
+    SENSITIVE = ("Ann", "Lee", "Someone Else", "1234567", "51824753556", "/tmp/", "doc-path", "SECRET")
+
+    def assert_clean(self, logs):
+        text = " ".join(logs.output)
+        for value in self.SENSITIVE:
+            self.assertNotIn(value, text)
+
+    def test_document_verification_logs_and_note_hold_no_paths_or_names(self):
+        import tempfile
+
+        name = "client_profile.tasks.verify_filefield_task"
+        with tempfile.NamedTemporaryFile(prefix="doc-path-", suffix=".png", delete=False) as handle:
+            path = handle.name
+        target = SimpleNamespace(
+            user=SimpleNamespace(first_name="Ann", last_name="Lee", email="ann@example.com"),
+            government_id="file", gov_id_verified=None, gov_id_verification_note="", save=mock.Mock(),
+        )
+        with patch_impl(
+            name,
+            apps=SimpleNamespace(get_model=lambda label, model: mock.Mock()),
+            fetch_instance_with_retries=lambda model, pk: target,
+            get_local_file_or_download=lambda field: path,
+            azure_ocr=lambda p: {"lines": ["ANN LEE"]},
+        ), self.assertLogs("onboarding", level="DEBUG") as logs:
+            task(name).run("PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "a@x.test", "gov_id_verified",
+                           note_field="gov_id_verification_note")
+        self.assert_clean(logs)
+
+        target.gov_id_verification_note = ""
+        with patch_impl(
+            name,
+            apps=SimpleNamespace(get_model=lambda label, model: mock.Mock()),
+            fetch_instance_with_retries=lambda model, pk: target,
+            get_local_file_or_download=lambda field: "/tmp/doc-path-missing.png",
+        ), self.assertLogs("onboarding", level="DEBUG") as logs:
+            task(name).run("PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "a@x.test", "gov_id_verified",
+                           note_field="gov_id_verification_note")
+        self.assert_clean(logs)
+        self.assertEqual(target.gov_id_verification_note, "Could not obtain the uploaded file for OCR.")
+
+    def test_ahpra_verification_logs_hold_no_names_or_numbers(self):
+        name = "client_profile.tasks.verify_ahpra_task"
+        target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
+        parsed = {"practitioner_name": "Someone Else", "registration_type": "General",
+                  "registration_status": "Registered", "expiry_date": "30/11/2099"}
+        with patch_impl(
+            name,
+            fetch_instance_with_retries=lambda model, pk: target,
+            ahpra_lookup=lambda number, path, api_key=None: path,
+            parse_ahpra_html=lambda path: parsed,
+            _update_ahpra_fields=mock.Mock(),
+        ), self.assertLogs("onboarding", level="DEBUG") as logs:
+            task(name).run("PharmacistOnboarding", 5, "1234567", "Ann", "Lee", "a@x.test")
+        self.assert_clean(logs)
+
+    def test_ahpra_result_save_does_not_log_the_note(self):
+        update = impl("client_profile.tasks.verify_ahpra_task", "_update_ahpra_fields")
+        target = SimpleNamespace(save=mock.Mock())
+        model = mock.Mock()
+        with mock.patch.dict(update.__globals__, {
+            "apps": SimpleNamespace(get_model=lambda label, name: model),
+            "fetch_instance_with_retries": lambda m, pk: target,
+        }), self.assertLogs("onboarding", level="DEBUG") as logs:
+            update("PharmacistOnboarding", 5, False, "AHPRA name mismatch: 'Ann Lee' vs 'Someone Else'")
+        self.assert_clean(logs)
+
+    def test_abn_lookup_logs_hold_no_abn_or_provider_detail(self):
+        from core.integrations.abr import abn_lookup
+
+        with mock.patch("requests.get", side_effect=OSError("https://abr.example/?id=51824753556 SECRET")), \
+                self.assertLogs("core.integrations.abr", level="DEBUG") as logs:
+            abn_lookup("51824753556")
+        self.assert_clean(logs)

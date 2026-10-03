@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 def abn_lookup(abn_number: str):
     url = f"https://abr.business.gov.au/ABN/View?id={abn_number}"
-    logger.info(f"[abn_lookup] Fetching {url}")
+    logger.info("[abn_lookup] Fetching the ABR record")
     try:
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
     except Exception as e:
-        logger.info(f"[abn_lookup] Error fetching ABN: {e}")
+        logger.info("[abn_lookup] Error fetching the ABR record (error_type=%s)", type(e).__name__)
         return "", None
 
     soup = BeautifulSoup(resp.text, "html.parser")

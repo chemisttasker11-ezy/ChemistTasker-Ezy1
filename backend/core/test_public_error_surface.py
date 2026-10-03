@@ -334,7 +334,6 @@ class VerificationNoteErrorSurfaceTests(SimpleTestCase):
         target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
         failure = Exception("HTTPSConnectionPool: Max retries exceeded with url: /api/v1/?api_key=SECRET-KEY&url=x")
         with mock.patch.object(tasks, "fetch_instance_with_retries", return_value=target), \
-                mock.patch.object(tasks, "save_output_file", return_value="/tmp/ahpra.html"), \
                 mock.patch.object(tasks, "ahpra_lookup", side_effect=failure), \
                 mock.patch.object(tasks, "_update_ahpra_fields") as update, \
                 self.assertLogs("onboarding.tasks", level="ERROR") as logs:
