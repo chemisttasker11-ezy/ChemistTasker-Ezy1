@@ -73,13 +73,34 @@ def user_can_change_membership(user, membership):
 
 
 def user_can_decide_applications(user, pharmacy):
-    """An ORG_ADMIN of the pharmacy's organization, the owner, or a pharmacy admin with the manage-staff capability.
-    (Narrower than who may invite: organization roles with only invite rights cannot approve or reject.)"""
-    is_org_admin = OrganizationMembership.objects.filter(
-        user=user,
-        role='ORG_ADMIN',
-        organization_id=pharmacy.organization_id,
-    ).exists()
-    is_owner = Pharmacy.objects.filter(id=pharmacy.id, owner__user=user).exists()
-    can_manage_staff = has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_STAFF)
-    return is_org_admin or is_owner or can_manage_staff
+    """Who may approve or reject applications for this pharmacy.
+
+    This follows the canonical staff-management authority: the pharmacy owner,
+    a pharmacy admin with MANAGE_STAFF, or an organization role with
+    MANAGE_STAFF / MANAGE_ADMINS whose pharmacy scope includes this pharmacy.
+    """
+    if not user or not getattr(user, "is_authenticated", False) or not pharmacy:
+        return False
+
+    if Pharmacy.objects.filter(id=pharmacy.id, owner__user=user).exists():
+        return True
+
+    if has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_STAFF):
+        return True
+
+    org_memberships = user.organization_memberships.filter(
+        organization_id=pharmacy.organization_id
+    ).prefetch_related("pharmacies")
+    for membership in org_memberships:
+        caps = membership_capabilities(membership)
+        if not (
+            OrgCapability.MANAGE_STAFF in caps
+            or OrgCapability.MANAGE_ADMINS in caps
+        ):
+            continue
+        if OrgCapability.VIEW_ALL_PHARMACIES in caps:
+            return True
+        if pharmacy.id in membership_visible_pharmacy_ids(membership):
+            return True
+
+    return False
