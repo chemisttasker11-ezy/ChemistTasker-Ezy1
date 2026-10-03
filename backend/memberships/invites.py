@@ -57,7 +57,7 @@ def create_membership_invite(data, inviter, *, request=None):
         try:
             pharmacy = (
                 Pharmacy.objects
-                .select_for_update()
+                .select_for_update(of=("self",))
                 .select_related("owner__user")
                 .get(id=pharmacy_id)
             )
