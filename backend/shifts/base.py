@@ -59,6 +59,8 @@ from shifts.escalation import (  # noqa: F401  (COMMUNITY_LEVELS, PUBLIC_LEVEL, 
     PUBLIC_LEVEL,
     apply_escalation,
     auto_escalate_due_shifts,
+    escalate_shift,
+    issue_share_token,
     resolve_current_index,
 )
 from shifts.assignment import (  # noqa: F401  (OFFER_EXPIRY_HOURS, _slot_locked_for_shift_offer: historical import path)
@@ -184,29 +186,9 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if not allowed_tiers:
             return Response({'detail': 'No escalation tiers available for this pharmacy.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        current_index = self._resolve_current_index(shift, allowed_tiers)
-
-        target_visibility = request.data.get('target_visibility')
-        if target_visibility:
-            if target_visibility not in allowed_tiers:
-                return Response(
-                    {'detail': f"Invalid target_visibility. Must be one of {allowed_tiers}."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            target_index = allowed_tiers.index(target_visibility)
-        else:
-            target_index = current_index + 1
-
-        if target_index <= current_index:
-            return Response({'detail': 'Shift is already at or above that visibility level.'}, status=status.HTTP_400_BAD_REQUEST)
-        if target_index >= len(allowed_tiers):
-            return Response({'detail': 'Already at the highest escalation level.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        next_visibility = allowed_tiers[target_index]
-        if next_visibility == PUBLIC_LEVEL:
-            enforce_public_shift_daily_limit(shift.pharmacy)
-
-        visibility = self._apply_escalation(shift, allowed_tiers, target_index)
+        visibility = escalate_shift(
+            shift, allowed_tiers=allowed_tiers, target_visibility=request.data.get('target_visibility'),
+        )
         return Response({'detail': f'Shift escalated to {visibility}.'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
@@ -400,18 +382,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='generate-share-link')
     def generate_share_link(self, request, pk=None):
         shift = self.get_object()
-
-        # ✅ SECURITY: Only allow sharing if shift is public
-        if shift.visibility != 'PLATFORM':
-            return Response(
-                {'detail': 'You must escalate this shift to platform level before it can be shared.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        shift.share_token = uuid.uuid4()
-        shift.save(update_fields=['share_token'])
-
-        return Response({'share_token': str(shift.share_token)})
+        return Response({'share_token': str(issue_share_token(shift))})
 
     @action(detail=True, methods=['post'], url_path='manual-assign')
     def manual_assign(self, request, pk=None):
