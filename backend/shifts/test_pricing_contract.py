@@ -80,3 +80,58 @@ EXPECTED_ASSISTANT_DAYTIME = {  # casual first-level assistant, 09:00-17:00, NSW
     date(2026, 2, 1): "46.46",  # Sunday
     date(2026, 1, 26): "66.38",  # public holiday (Australia Day)
 }
+
+
+class PricingDataLoaderTests(SimpleTestCase):
+    def tearDown(self):
+        from shifts import pricing_data
+
+        pricing_data.reset_cache()
+
+    def test_data_lives_in_the_shifts_app_and_loads_once(self):
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        self.assertEqual(pricing_data.DATA_DIR.parent.name, "shifts")
+        pricing_data.reset_cache()
+        with mock.patch.object(pricing_data, "_read_json", wraps=pricing_data._read_json) as read:
+            pricing_data.award_rates()
+            pricing_data.award_rates()
+            pricing_data.public_holidays()
+        self.assertEqual(read.call_count, 2)
+
+    def test_missing_or_corrupt_files_raise_a_named_error(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        with tempfile.TemporaryDirectory() as folder:
+            corrupt = Path(folder) / "award_rates_casual_first_level.json"
+            corrupt.write_text("{not json", encoding="utf-8")
+            with mock.patch.object(pricing_data, "AWARD_RATES_FILE", corrupt):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "award_rates_casual_first_level.json"):
+                    pricing_data.award_rates()
+            missing = Path(folder) / "public_holidays.json"
+            with mock.patch.object(pricing_data, "PUBLIC_HOLIDAYS_FILE", missing):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "public_holidays.json"):
+                    pricing_data.public_holidays()
+
+    def test_malformed_structure_is_rejected(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "award_rates_casual_first_level.json"
+            bad.write_text('{"ASSISTANT": {"LEVEL_1": {"permanent": {}}}}', encoding="utf-8")
+            with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "no casual rates"):
+                    pricing_data.award_rates()

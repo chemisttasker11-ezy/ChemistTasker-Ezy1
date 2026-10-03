@@ -229,10 +229,11 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     _hours_day_names = _weekday_day_names + ("saturdays", "sundays", "public_holidays")
 
     def get_public_holiday_dates(self, obj):
-        from shifts.pricing import _normalize_state_code, PUBLIC_HOLIDAYS
+        from shifts.pricing import _normalize_state_code
+        from shifts.pricing_data import public_holidays
 
         state_code = _normalize_state_code(getattr(obj, "state", ""))
-        return PUBLIC_HOLIDAYS.get(state_code, [])
+        return public_holidays().get(state_code, [])
 
     def _apply_weekday_hours_compat(self, attrs):
         weekday_start = attrs.get("weekdays_start", serializers.empty)

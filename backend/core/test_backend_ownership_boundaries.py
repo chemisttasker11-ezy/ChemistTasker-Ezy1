@@ -152,10 +152,6 @@ ALLOWED_STRING_REFERENCES = {
     "client_profile.urls": "the kernel URLconf, included by core.client_profile_api_urls",
     "client_profile.notifications.*": "historical Celery route pattern (CELERY_TASK_ROUTES)",
     "client_profile.tasks.verify_*": "Celery route pattern of the verification tasks (CELERY_TASK_ROUTES)",
-    "client_profile/data/public_holidays.json": "pricing data file still stored in the kernel directory",
-    "client_profile/data/updated_award_rates_casual_first_level_correct_mapping.json": (
-        "pricing data file still stored in the kernel directory"
-    ),
 }
 
 # Deployed Celery task names. Workers, beat entries and queued messages address tasks by these strings.

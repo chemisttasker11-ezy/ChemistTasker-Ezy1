@@ -1,18 +1,12 @@
 """Shift pricing: award rates, public holidays, day types, slot expansion and locked rates."""
-import json
 from datetime import datetime, timedelta, date, time
 from decimal import Decimal
-from pathlib import Path
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from onboarding.models import PharmacistOnboarding
 from shifts.models import Shift
 from memberships.models import Membership
+from shifts.pricing_data import award_rates, public_holidays
 
-# Load static JSON data
-BASE_DIR = Path(settings.BASE_DIR)
-AWARD_RATES = json.load(open(BASE_DIR / 'client_profile/data/updated_award_rates_casual_first_level_correct_mapping.json'))
-PUBLIC_HOLIDAYS = json.load(open(BASE_DIR / 'client_profile/data/public_holidays.json'))
 
 EARLY_MORNING_END = time(8, 0)
 LATE_NIGHT_START = time(19, 0)
@@ -54,7 +48,7 @@ def is_public_holiday(slot_date, state):
     state_code = _normalize_state_code(state)
     if not state_code:
         return False
-    return str(slot_date) in PUBLIC_HOLIDAYS.get(state_code, [])
+    return str(slot_date) in public_holidays().get(state_code, [])
 
 
 def get_day_type(slot_date, state):
@@ -183,7 +177,7 @@ def _resolve_pharmacist_rate_key(day_type, time_bucket, rate_preference):
 
 
 def _resolve_award_role_key(role_needed):
-    if role_needed == 'TECHNICIAN' and 'TECHNICIAN' not in AWARD_RATES:
+    if role_needed == 'TECHNICIAN' and 'TECHNICIAN' not in award_rates():
         return 'ASSISTANT'
     return role_needed
 
@@ -193,7 +187,7 @@ def _get_first_level_award_profile(role_needed):
     classification_key = FIRST_LEVEL_CLASSIFICATIONS.get(role_needed)
     if not classification_key:
         return None, None, None
-    return role_key, classification_key, AWARD_RATES.get(role_key, {}).get(classification_key, {}).get('casual')
+    return role_key, classification_key, award_rates().get(role_key, {}).get(classification_key, {}).get('casual')
 
 
 def _get_award_rate_for_segment(role_needed, day_type, time_bucket):
