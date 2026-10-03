@@ -334,10 +334,9 @@ class MyMembershipTests(MembershipFixture):
         self.assertEqual((membership.status, membership.is_active), (Membership.Status.ACCEPTED, True))
         self.assertIsNotNone(membership.responded_at)
         self.assertEqual(work["emails"], [("emails/membership_invitation_response.html", (self.owner.email,))])
-        # CURRENT BEHAVIOUR (bug): the owner gets the alert twice, once from notify_users and once as the automatic
-        # notification of the response e-mail (sent without suppress_auto_notification).
+        # Regression: the response e-mail used to create a second, identical in-app alert on top of notify_users.
         titles = list(Notification.objects.filter(user=self.owner).values_list("title", flat=True))
-        self.assertEqual(titles, [f"{worker.get_full_name()} accepted {self.pharmacy.name}"] * 2)
+        self.assertEqual(titles, [f"{worker.get_full_name()} accepted {self.pharmacy.name}"])
 
         response, work = self.call(worker, "post", f"my-memberships/{membership.id}/quit/")
         self.assertEqual((response.status_code, response.data), (200, {"status": "left"}))

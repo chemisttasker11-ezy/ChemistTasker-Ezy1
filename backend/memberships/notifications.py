@@ -169,6 +169,7 @@ def _notify_membership_response(membership, response_status):
             recipient_list=[recipient.email],
             template_name="emails/membership_invitation_response.html",
             text_template="emails/membership_invitation_response.txt",
+            suppress_auto_notification=True,  # the in-app alert was sent above with notify_users
             context={
                 "worker_name": worker_name,
                 "worker_email": worker.email,
