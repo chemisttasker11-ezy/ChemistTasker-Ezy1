@@ -33,13 +33,7 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework.exceptions import NotFound, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
-from organizations.access import (
-    CAPABILITY_MANAGE_ROSTER,
-    has_admin_capability,
-    managed_pharmacies,
-    pharmacies_user_admins,
-    user_can_manage_pharmacy,
-)
+from organizations.access import managed_pharmacies, user_can_manage_pharmacy
 from users.serializers import UserProfileSerializer
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
@@ -78,7 +72,7 @@ from shifts.access import (  # noqa: F401  (role rules re-exported at their hist
 from datetime import timedelta
 from decimal import Decimal
 import uuid
-from users.models import OrganizationMembership, User
+from users.models import User
 from shifts.serializers import (
     ShiftCounterOfferSerializer,
     ShiftInterestSerializer,
