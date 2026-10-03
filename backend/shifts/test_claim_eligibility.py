@@ -39,6 +39,46 @@ class ClaimEligibilityTests(TestCase):
         claimed = ShiftSlotAssignment.objects.filter(shift=shift, user=worker).exists()
         return response, claimed
 
+    def test_tier_change_after_initial_visibility_is_rechecked_before_claim(self):
+        worker = make_user("PHARMACIST")
+        membership = Membership.objects.create(
+            user=worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="LOCUM",
+            status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST", employment_type="LOCUM",
+            visibility="LOCUM_CASUAL", post_anonymously=True,
+        )
+        ShiftSlot.objects.create(
+            shift=shift, date=date.today() + timedelta(days=7), start_time=time(9, 0), end_time=time(17, 0)
+        )
+
+        real_filter = Membership.objects.filter
+        changed = False
+
+        def filter_after_visibility(*args, **kwargs):
+            nonlocal changed
+            if (
+                not changed
+                and kwargs.get("user") == worker
+                and kwargs.get("pharmacy") == self.pharmacy
+                and kwargs.get("is_active") is True
+            ):
+                Membership._base_manager.filter(pk=membership.pk).update(employment_type="PART_TIME")
+                changed = True
+            return real_filter(*args, **kwargs)
+
+        with mock.patch.object(Membership.objects, "filter", side_effect=filter_after_visibility), \
+                mock.patch("shifts.browse.async_task"):
+            response = client_for(worker).post(
+                f"{API}community-shifts/{shift.id}/claim-shift/", {}, format="json"
+            )
+
+        self.assertTrue(changed)
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(response.data["code"], "shift_not_visible")
+        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift, user=worker).exists())
+
     def test_the_claim_tier_sets_are_the_visibility_tier_sets(self):
         self.assertEqual(set(PHARMACY_STAFF_EMPLOYMENT_TYPES), {"FULL_TIME", "PART_TIME", "CASUAL"})
         self.assertEqual(set(FAVORITE_STAFF_EMPLOYMENT_TYPES), {"LOCUM", "SHIFT_HERO"})
