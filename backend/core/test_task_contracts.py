@@ -937,6 +937,38 @@ class VerificationArtifactTests(SimpleTestCase):
         update = self.run_ahpra(fail)
         self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
 
+    def test_failed_remote_document_download_removes_partial_temp_file(self):
+        import contextlib
+        import io
+        import os
+        import tempfile
+
+        from onboarding.verification import documents
+
+        created = []
+        real_named_temporary_file = tempfile.NamedTemporaryFile
+
+        def tracked_temp_file(*args, **kwargs):
+            handle = real_named_temporary_file(*args, **kwargs)
+            created.append(handle.name)
+            return handle
+
+        def fail_after_partial_copy(_source, destination):
+            destination.write(b"partial-sensitive-document")
+            destination.flush()
+            raise OSError("storage stream failed")
+
+        filefield = SimpleNamespace(name="private-id.pdf")
+        with mock.patch.object(documents.tempfile, "NamedTemporaryFile", side_effect=tracked_temp_file), \
+                mock.patch.object(documents.default_storage, "open",
+                                  return_value=contextlib.nullcontext(io.BytesIO(b"source"))), \
+                mock.patch.object(documents.shutil, "copyfileobj", side_effect=fail_after_partial_copy), \
+                self.assertRaises(OSError):
+            documents.get_local_file_or_download(filefield)
+
+        self.assertEqual(len(created), 1)
+        self.assertFalse(os.path.exists(created[0]), "partial identity-document temp files must be removed on failure")
+
     def test_abn_verification_persists_fields_and_writes_no_artifacts(self):
         # The ABR page and a JSON copy of the parsed fields were written to verification_outputs/ after the fields were
         # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.
