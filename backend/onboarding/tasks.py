@@ -130,6 +130,16 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
     Model = apps.get_model("client_profile", model_name)
     obj = fetch_instance_with_retries(Model, object_pk)
 
+    expected_abn = (abn_number or "").strip()
+    current_abn = (getattr(obj, "abn", "") or "").strip()
+    if current_abn != expected_abn:
+        logger.info(
+            "[VERIFY ABN TASK] stale task skipped before lookup model=%s pk=%s",
+            model_name,
+            object_pk,
+        )
+        return
+
     # mark as not-verified every run (user confirmation will flip it)
     obj.abn_verified = False
     if note_field and hasattr(obj, note_field):
@@ -139,6 +149,19 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
         obj.save(update_fields=["abn_verified"])
 
     legal_name, html = abn_lookup(abn_number)
+
+    # The ABN may have changed while the external lookup was in flight.
+    # Re-read current state and discard stale provider results rather than
+    # overwriting the newer ABN's verification snapshot.
+    obj = fetch_instance_with_retries(Model, object_pk)
+    if (getattr(obj, "abn", "") or "").strip() != expected_abn:
+        logger.info(
+            "[VERIFY ABN TASK] stale task result discarded model=%s pk=%s",
+            model_name,
+            object_pk,
+        )
+        return
+
     parsed = _parse_abn_html_fields(html or "")
 
     obj.abn_entity_name  = parsed.get("entity_name") or legal_name or ""
