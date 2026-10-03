@@ -38,13 +38,15 @@ from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, va
 from core.numbers import coerce_float_6 as q6
 from core.serializer_lifecycle import (
     _delete_file_if_unreferenced,
-    _file_has_changed,
-    _should_clear_flag,
     _update_locked_user_fields,
 )
 from core.serializer_mixins import UploadValidationMixin
 from users.normalization import normalize_email as clean_email
 from users.presentation import _build_absolute_media_url
+from onboarding.services.identity import apply_identity_tab
+from onboarding.services.payment import apply_payment_tab, masked_tfn
+from onboarding.services.profile import apply_profile_photo, apply_profile_tab
+from onboarding.services.referees import apply_referees_tab
 
 
 def _required_cert_skill_codes(role_key: str) -> set[str]:
@@ -137,7 +139,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
         submit = bool(validated_data.pop("submitted_for_verification", False))
 
         if tab == "identity":
-            return PharmacistOnboardingV2Serializer._identity_tab(self, instance, validated_data, submit)
+            return apply_identity_tab(instance, validated_data, submit)
         if tab != "basic":
             tab = "basic"
 
@@ -152,26 +154,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
         if user_data:
             _update_locked_user_fields(instance.user, user_data)
 
-        clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
-        if "profile_photo" in vdata or clear_photo:
-            new_photo = vdata.pop("profile_photo", None)
-            old_photo = getattr(instance, "profile_photo", None)
-            if new_photo is None and clear_photo:
-                if old_photo:
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = None
-                update_fields.append("profile_photo")
-            elif new_photo is not None:
-                if old_photo and _file_has_changed(new_photo, old_photo):
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = new_photo
-                update_fields.append("profile_photo")
+        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
 
         direct_fields = ["gender", "role", "chain_pharmacy", "number_of_pharmacies", "ahpra_number"]
         role_changed = "role" in vdata and vdata.get("role") != instance.role
@@ -479,14 +462,8 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- representation helpers ----------------
     def get_tfn_masked(self, obj):
-        """
-        Never expose raw TFN back to the client.
-        TFNs are stored through the encrypted `tfn_number` field and masked on output.
-        """
-        tfn = getattr(obj, 'tfn_number', '') or ''
-        if not tfn:
-            return ''
-        return f'*** *** {tfn[-3:]}'
+        """Never expose the raw TFN: it is stored encrypted and only a masked form is returned."""
+        return masked_tfn(obj)
 
     def _files_by_skill(self):
         """
@@ -644,26 +621,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         if user_data:
             _update_locked_user_fields(instance.user, user_data)
 
-        clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
-        if "profile_photo" in vdata or clear_photo:
-            new_photo = vdata.pop("profile_photo", None)
-            old_photo = getattr(instance, "profile_photo", None)
-            if new_photo is None and clear_photo:
-                if old_photo:
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = None
-                update_fields.append("profile_photo")
-            elif new_photo is not None:
-                if old_photo and _file_has_changed(new_photo, old_photo):
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = new_photo
-                update_fields.append("profile_photo")
+        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
 
         # helper to compare file names safely
         def _fname(f):
@@ -781,381 +739,16 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
 
     # ---------------- Identity TAB (new) ----------------
-    def _identity_tab(self, instance: PharmacistOnboarding, vdata: dict, submit: bool):
-        """
-        Handles:
-        - government_id_type (dropdown)
-        - government_id (primary file)
-        - identity_secondary_file (secondary file for paired docs)
-        - identity_meta (JSON with per-type fields)
-        Normalises per document type and validates on submit.
-        """
-        update_fields = []
-
-        # helper to compare file names safely
-        def _fname(f):
-            return getattr(f, 'name', None) if f else None
-
-        # Track changes to drive verification resets
-        type_changed = False
-        gov_id_changed = False
-        sec_changed = False
-        meta_changed = False
-
-        # --- type (dropdown) – optional
-        if 'government_id_type' in vdata:
-            new_type = vdata.get('government_id_type')
-            type_changed = (new_type != getattr(instance, 'government_id_type'))
-            instance.government_id_type = new_type
-            update_fields.append('government_id_type')
-
-            # If switching to a type that doesn't need a secondary file, clear it
-            if new_type in ('DRIVER_LICENSE', 'AUS_PASSPORT', 'AGE_PROOF'):
-                old_sec = getattr(instance, 'identity_secondary_file', None)
-                if old_sec:
-                    try:
-                        _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception:
-                        pass
-                    instance.identity_secondary_file = None
-                    update_fields.append('identity_secondary_file')
-                    sec_changed = True
-
-            # If type changes and no new meta provided, wipe old meta to avoid stale keys
-            if 'identity_meta' not in vdata:
-                instance.identity_meta = {}
-                update_fields.append('identity_meta')
-                meta_changed = True
-
-        # --- primary file handling (replace / clear)
-        if 'government_id' in vdata:
-            new_file = vdata.get('government_id')
-            old_file = getattr(instance, 'government_id', None)
-            gov_id_changed = (_fname(new_file) != _fname(old_file))
-
-            if new_file is None:
-                if old_file:
-                    try:
-                        _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.government_id = None
-                update_fields.append('government_id')
-            else:
-                if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                    try:
-                        _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.government_id = new_file
-                update_fields.append('government_id')
-
-        # --- secondary file handling (replace / clear)
-        if 'identity_secondary_file' in vdata:
-            new_sec = vdata.get('identity_secondary_file')  # may be file or None
-            old_sec = getattr(instance, 'identity_secondary_file', None)
-            sec_changed = (_fname(new_sec) != _fname(old_sec))
-
-            if new_sec is None:
-                if old_sec:
-                    try:
-                        _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.identity_secondary_file = None
-                update_fields.append('identity_secondary_file')
-            else:
-                if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
-                    try:
-                        _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.identity_secondary_file = new_sec
-                update_fields.append('identity_secondary_file')
-
-        # --- identity_meta (JSON) – normalise per document type
-        if 'identity_meta' in vdata:
-            incoming_meta = vdata.get('identity_meta') or {}
-            meta = dict(incoming_meta)  # shallow copy
-            doc_type = getattr(instance, 'government_id_type')
-
-            if doc_type == 'DRIVER_LICENSE':
-                keep = {'state', 'expiry'}
-                meta = {k: v for k, v in meta.items() if k in keep}
-
-            elif doc_type == 'VISA':
-                # Visa + Overseas passport (secondary file)
-                keep = {'visa_type_number', 'valid_to', 'passport_country', 'passport_expiry'}
-                meta = {k: v for k, v in meta.items() if k in keep}
-
-            elif doc_type == 'AUS_PASSPORT':
-                keep = {'expiry'}
-                meta = {k: v for k, v in meta.items() if k in keep}
-                meta['country'] = 'Australia'
-
-            elif doc_type == 'OTHER_PASSPORT':
-                # Overseas passport + Visa (secondary file)
-                keep = {'country', 'expiry', 'visa_type_number', 'valid_to'}
-                meta = {k: v for k, v in meta.items() if k in keep}
-
-            elif doc_type == 'AGE_PROOF':
-                keep = {'state', 'expiry'}
-                meta = {k: v for k, v in meta.items() if k in keep}
-
-            # Detect change
-            if meta != (instance.identity_meta or {}):
-                instance.identity_meta = meta
-                update_fields.append('identity_meta')
-                meta_changed = True
-
-        # --- reset verification flags if any relevant identity input changed
-        if gov_id_changed or sec_changed or type_changed or meta_changed:
-            instance.gov_id_verified = False
-            instance.gov_id_verification_note = ""
-            update_fields += ['gov_id_verified', 'gov_id_verification_note']
-
-        # Owner identity is a separate marketplace gate; do not revoke an
-        # approved owner profile or unrelated dashboard access on submission.
-        if submit and not isinstance(instance, OwnerOnboarding):
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # --- Validate on submit (per type)
-        if submit:
-            errors = {}
-            doc_type = getattr(instance, 'government_id_type')
-            meta_now = getattr(instance, 'identity_meta') or {}
-
-            if not doc_type:
-                errors['government_id_type'] = ['Select a document type.']
-
-            # Primary file required for all types
-            if not getattr(instance, 'government_id', None):
-                errors['government_id'] = ['This file is required.']
-
-            if doc_type == 'DRIVER_LICENSE':
-                if not meta_now.get('state'):  errors['identity_meta.state'] = ['Required.']
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-
-            elif doc_type == 'VISA':
-                if not meta_now.get('visa_type_number'):  errors['identity_meta.visa_type_number'] = ['Required.']
-                if not meta_now.get('valid_to'):         errors['identity_meta.valid_to'] = ['Required.']
-                if not getattr(instance, 'identity_secondary_file', None):
-                    errors['identity_secondary_file'] = ['Overseas passport file is required with a Visa.']
-                if not meta_now.get('passport_country'): errors['identity_meta.passport_country'] = ['Required.']
-                if not meta_now.get('passport_expiry'):  errors['identity_meta.passport_expiry'] = ['Required.']
-
-            elif doc_type == 'AUS_PASSPORT':
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-                # country forced to Australia in normalisation
-
-            elif doc_type == 'OTHER_PASSPORT':
-                if not meta_now.get('country'): errors['identity_meta.country'] = ['Required.']
-                if not meta_now.get('expiry'):  errors['identity_meta.expiry'] = ['Required.']
-                if not getattr(instance, 'identity_secondary_file', None):
-                    errors['identity_secondary_file'] = ['Visa file is required with an Overseas passport.']
-                if not meta_now.get('visa_type_number'): errors['identity_meta.visa_type_number'] = ['Required.']
-                if not meta_now.get('valid_to'):         errors['identity_meta.valid_to'] = ['Required.']
-
-            elif doc_type == 'AGE_PROOF':
-                if not meta_now.get('state'):  errors['identity_meta.state'] = ['Required.']
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-
-            if errors:
-                raise serializers.ValidationError(errors)
-
-            # On submit: schedule verification task if needed (primary file)
-            if instance.government_id and (gov_id_changed or type_changed or meta_changed or not instance.gov_id_verified):
-                async_task(
-                    'client_profile.tasks.verify_filefield_task',
-                    instance._meta.model_name, instance.pk,
-                    'government_id',
-                    instance.user.first_name or '',
-                    instance.user.last_name or '',
-                    instance.user.email or '',
-                    verification_field='gov_id_verified',
-                    note_field='gov_id_verification_note',
-                )
-
-        # Recompute final verified gate on every pass
-        return instance
+    def _identity_tab(self, instance, vdata: dict, submit: bool):
+        return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Payment TAB ----------------
-    def _payment_tab(self, instance: PharmacistOnboarding, vdata: dict, submit: bool):
-        """
-        Payment fields only. No GST file in V2.
-        - ABN: task scrapes ABR fields; user must confirm => abn_verified=True
-        - TFN: store through encrypted model field `tfn_number`, show only tfn_masked on reads
-        - When pref=TFN and submit=True -> TFN + super_* are required
-        """
-        payment_fields = [
-            'payment_preference', 'abn', 'gst_registered',
-            'super_fund_name', 'super_usi', 'super_member_number',
-            'abn_entity_confirmed',
-        ]
-        update_fields: list[str] = []
-
-        # normalize pref for logic below
-        pref_in = (vdata.get('payment_preference') or instance.payment_preference or '').upper()
-
-        # 1) regular writes
-        for f in payment_fields:
-            if f in vdata:
-                setattr(instance, f, vdata[f])
-                update_fields.append(f)
-
-        # 2) TFN payload – client sends "tfn" (source='tfn_number'), DRF puts it in vdata['tfn_number']
-        if 'tfn_number' in vdata:
-            instance.tfn_number = (vdata['tfn_number'] or '').strip()
-            update_fields.append('tfn_number')
-
-        # 3) if ABN changed -> reset verification + confirmation
-        abn_changed = ('abn' in vdata) and (vdata.get('abn') != getattr(instance, 'abn'))
-        if abn_changed:
-            instance.abn_verified = False
-            instance.abn_entity_confirmed = False
-            instance.abn_verification_note = ""
-            update_fields += ['abn_verified', 'abn_entity_confirmed', 'abn_verification_note']
-
-        # 4) confirmation gate: only user confirmation can set abn_verified=True
-        if 'abn_entity_confirmed' in vdata:
-            confirmed = bool(vdata['abn_entity_confirmed'])
-            if confirmed and instance.abn_entity_name:   # must have scraped data to confirm
-                instance.abn_verified = True
-                if not instance.abn_verification_note:
-                    instance.abn_verification_note = 'User confirmed ABN entity details.'
-                update_fields += ['abn_verified', 'abn_verification_note']
-            else:
-                if instance.abn_verified:
-                    instance.abn_verified = False
-                    update_fields.append('abn_verified')
-
-        # 5) optional sync of boolean gst_registered from ABR result if client didn’t send it
-        if 'gst_registered' not in vdata:
-            if instance.abn_gst_registered is True and not instance.gst_registered:
-                instance.gst_registered = True
-                update_fields.append('gst_registered')
-
-        # 6) TFN validation: when submitting TFN path, enforce super_* required
-        if submit and (pref_in or instance.payment_preference):
-            pref_effective = (pref_in or instance.payment_preference or '').upper()
-            if pref_effective == 'TFN':
-                errors = {}
-                if not instance.tfn_number:
-                    errors['tfn'] = ['TFN is required.']
-                if not instance.super_fund_name:
-                    errors['super_fund_name'] = ['Super fund name is required for TFN.']
-                if not instance.super_usi:
-                    errors['super_usi'] = ['USI is required for TFN.']
-                if not instance.super_member_number:
-                    errors['super_member_number'] = ['Member number is required for TFN.']
-                if errors:
-                    raise serializers.ValidationError(errors)
-
-        # 7) submitting this tab keeps the whole profile unverified until all tabs pass
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # 8) run ABN task on submit (TFN has no task)
-        if submit:
-            pref_effective = (pref_in or instance.payment_preference or '').upper()
-            if pref_effective == 'ABN' and instance.abn:
-                async_task(
-                    'client_profile.tasks.verify_abn_task',
-                    instance._meta.model_name,
-                    instance.pk,
-                    instance.abn,
-                    instance.user.first_name or '',
-                    instance.user.last_name or '',
-                    instance.user.email or '',
-                    note_field='abn_verification_note',  # task will only fill ABR fields + note
-                )
-        return instance
+    def _payment_tab(self, instance, vdata: dict, submit: bool):
+        return apply_payment_tab(instance, vdata, submit)
 
     # ---------------- Referees TAB ----------------
     def _referees_tab(self, instance, vdata: dict, submit: bool):
-        """
-        Two referees are required on submit.
-        Required per referee: name, relation, workplace, email.
-        If referee is already confirmed -> ignore edits (lock).
-        On change for a pending referee -> reset confirmed/rejected + last_sent.
-        On submit -> send referee emails (no final-eval). Scheduling happens in utils.
-        """
-        from onboarding.emails import send_referee_emails
-        update_fields = []
-
-        def apply_ref(idx: int):
-            prefix = f"referee{idx}_"
-            locked = bool(getattr(instance, f"{prefix}confirmed", False))
-
-            incoming = {
-                'name': vdata.get(f"{prefix}name", getattr(instance, f"{prefix}name")),
-                'relation': vdata.get(f"{prefix}relation", getattr(instance, f"{prefix}relation")),
-                'email': clean_email(vdata.get(f"{prefix}email", getattr(instance, f"{prefix}email"))),
-                'workplace': vdata.get(f"{prefix}workplace", getattr(instance, f"{prefix}workplace")),
-            }
-
-            if locked:
-                return
-
-            changed = False
-            for key in ['name', 'relation', 'email', 'workplace']:
-                field = f"{prefix}{key}"
-                if field in vdata and getattr(instance, field) != incoming[key]:
-                    setattr(instance, field, incoming[key])
-                    update_fields.append(field)
-                    changed = True
-
-            if changed:
-                if getattr(instance, f"{prefix}confirmed", False):
-                    setattr(instance, f"{prefix}confirmed", False)
-                    update_fields.append(f"{prefix}confirmed")
-                if getattr(instance, f"{prefix}rejected", False):
-                    setattr(instance, f"{prefix}rejected", False)
-                    update_fields.append(f"{prefix}rejected")
-                if getattr(instance, f"{prefix}last_sent", None) is not None:
-                    setattr(instance, f"{prefix}last_sent", None)
-                    update_fields.append(f"{prefix}last_sent")
-
-        apply_ref(1)
-        apply_ref(2)
-
-        if submit:
-            errors = {}
-            for idx in [1, 2]:
-                prefix = f"referee{idx}_"
-                name = getattr(instance, f"{prefix}name")
-                relation = getattr(instance, f"{prefix}relation")
-                email = getattr(instance, f"{prefix}email")
-                workplace = getattr(instance, f"{prefix}workplace")
-                if not name:
-                    errors[prefix + 'name'] = ['Required.']
-                if not relation:
-                    errors[prefix + 'relation'] = ['Required.']
-                if not email:
-                    errors[prefix + 'email'] = ['Required.']
-                if not workplace:
-                    errors[prefix + 'workplace'] = ['Required.']
-            if errors:
-                raise serializers.ValidationError(errors)
-
-            if not instance.verified:
-                instance.verified = False
-                update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        if submit:
-            send_referee_emails(instance, is_reminder=False)  # schedules per-ref inside
-        return instance
+        return apply_referees_tab(instance, vdata, submit)
 
     # ---------------- Skills tab ----------------
     def _skills_tab(self, instance, vdata: dict, submit: bool):
@@ -1293,52 +886,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- Profile tab ----------------
     def _profile_tab(self, instance, vdata: dict, submit: bool):
-        """
-        Profile tab: resume file + short note (short_bio).
-        Behavior:
-        - If a new resume is uploaded, delete the old file first (Azure + dev parity).
-        - If resume is explicitly set to None, delete existing file.
-        - short_bio is plain text, optional.
-        """
-        update_fields = []
-
-        # Handle short_bio (optional)
-        if 'short_bio' in vdata:
-            instance.short_bio = vdata['short_bio']
-            update_fields.append('short_bio')
-
-        # Handle resume
-        if 'resume' in vdata:
-            new_file = vdata['resume']  # may be a file object or None
-            old_file = getattr(instance, 'resume', None)
-
-            if new_file is None:
-                # explicit clear
-                if old_file:
-                    _delete_file_if_unreferenced(old_file, current_instance=instance)  # Azure/local safe
-                instance.resume = None
-                update_fields.append('resume')
-            else:
-                # replace file: delete old first to mimic overwrite behavior everywhere
-                if old_file:
-                    try:
-                        # delete only if name differs (optional; safe to always delete)
-                        if getattr(old_file, 'name', None) != getattr(new_file, 'name', None):
-                            _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception:
-                        # swallow storage deletion errors to avoid blocking user save
-                        pass
-                instance.resume = new_file
-                update_fields.append('resume')
-
-        # Submit does not auto-verify anything here; keep profile unverified until all tabs pass
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-        return instance
+        return apply_profile_tab(instance, vdata, submit)
 
 
 class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
@@ -1544,10 +1092,8 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- representation helpers ----------------
     def get_tfn_masked(self, obj):
-        tfn = getattr(obj, 'tfn_number', '') or ''
-        if not tfn:
-            return ''
-        return f'*** *** {tfn[-3:]}'  # never expose full TFN
+        """Never expose the raw TFN: it is stored encrypted and only a masked form is returned."""
+        return masked_tfn(obj)
 
     def _files_by_skill(self):
         req = self.context.get("request")
@@ -1709,26 +1255,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
         update_fields = []
 
-        clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
-        if "profile_photo" in vdata or clear_photo:
-            new_photo = vdata.pop("profile_photo", None)
-            old_photo = getattr(instance, "profile_photo", None)
-            if new_photo is None and clear_photo:
-                if old_photo:
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = None
-                update_fields.append("profile_photo")
-            elif new_photo is not None:
-                if old_photo and _file_has_changed(new_photo, old_photo):
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = new_photo
-                update_fields.append("profile_photo")
+        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
 
         # regular writes for basic fields (address + dob)
         direct_fields = [
@@ -1758,167 +1285,8 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return instance
 
     # ---------------- Identity TAB ----------------
-    def _identity_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        update_fields = []
-
-        def _fname(f):
-            return getattr(f, 'name', None) if f else None
-
-        # track changes
-        type_changed = False
-        gov_id_changed = False
-        sec_changed = False
-        meta_changed = False
-
-        # type
-        if 'government_id_type' in vdata:
-            new_type = vdata.get('government_id_type')
-            type_changed = (new_type != getattr(instance, 'government_id_type'))
-            instance.government_id_type = new_type
-            update_fields.append('government_id_type')
-
-            # wipe secondary doc when not needed
-            if new_type in ('DRIVER_LICENSE', 'AUS_PASSPORT', 'AGE_PROOF'):
-                old_sec = getattr(instance, 'identity_secondary_file', None)
-                if old_sec:
-                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception: pass
-                instance.identity_secondary_file = None
-                update_fields.append('identity_secondary_file')
-                sec_changed = True
-
-            # clear stale meta if not provided
-            if 'identity_meta' not in vdata:
-                instance.identity_meta = {}
-                update_fields.append('identity_meta')
-                meta_changed = True
-
-        # primary file
-        if 'government_id' in vdata:
-            new_file = vdata.get('government_id')
-            old_file = getattr(instance, 'government_id', None)
-            gov_id_changed = (_fname(new_file) != _fname(old_file))
-            if new_file is None:
-                if old_file:
-                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception: pass
-                instance.government_id = None
-                update_fields.append('government_id')
-            else:
-                if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception: pass
-                instance.government_id = new_file
-                update_fields.append('government_id')
-
-        # secondary file
-        if 'identity_secondary_file' in vdata:
-            new_sec = vdata.get('identity_secondary_file')
-            old_sec = getattr(instance, 'identity_secondary_file', None)
-            sec_changed = (_fname(new_sec) != _fname(old_sec)) or sec_changed
-            if new_sec is None:
-                if old_sec:
-                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception: pass
-                instance.identity_secondary_file = None
-                update_fields.append('identity_secondary_file')
-            else:
-                if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
-                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception: pass
-                instance.identity_secondary_file = new_sec
-                update_fields.append('identity_secondary_file')
-
-        # identity_meta normalisation per type
-        if 'identity_meta' in vdata:
-            incoming_meta = vdata.get('identity_meta') or {}
-            meta = dict(incoming_meta)
-            doc_type = getattr(instance, 'government_id_type')
-
-            if doc_type == 'DRIVER_LICENSE':
-                meta = {k: v for k, v in meta.items() if k in {'state','expiry'}}
-
-            elif doc_type == 'VISA':
-                meta = {k: v for k, v in meta.items() if k in {'visa_type_number','valid_to','passport_country','passport_expiry'}}
-
-            elif doc_type == 'AUS_PASSPORT':
-                meta = {k: v for k, v in meta.items() if k in {'expiry'}}
-                meta['country'] = 'Australia'
-
-            elif doc_type == 'OTHER_PASSPORT':
-                meta = {k: v for k, v in meta.items() if k in {'country','expiry','visa_type_number','valid_to'}}
-
-            elif doc_type == 'AGE_PROOF':
-                meta = {k: v for k, v in meta.items() if k in {'state','expiry'}}
-
-            if meta != (instance.identity_meta or {}):
-                instance.identity_meta = meta
-                update_fields.append('identity_meta')
-                meta_changed = True
-
-        # reset verification if any identity input changed
-        if gov_id_changed or sec_changed or type_changed or meta_changed:
-            instance.gov_id_verified = False
-            instance.gov_id_verification_note = ""
-            update_fields += ['gov_id_verified', 'gov_id_verification_note']
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # Validate on submit
-        if submit:
-            errors = {}
-            doc_type = getattr(instance, 'government_id_type')
-            meta_now = getattr(instance, 'identity_meta') or {}
-
-            if not doc_type:
-                errors['government_id_type'] = ['Select a document type.']
-            if not getattr(instance, 'government_id', None):
-                errors['government_id'] = ['This file is required.']
-
-            if doc_type == 'DRIVER_LICENSE':
-                if not meta_now.get('state'):  errors['identity_meta.state'] = ['Required.']
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-            elif doc_type == 'VISA':
-                if not meta_now.get('visa_type_number'):  errors['identity_meta.visa_type_number'] = ['Required.']
-                if not meta_now.get('valid_to'):         errors['identity_meta.valid_to'] = ['Required.']
-                if not getattr(instance, 'identity_secondary_file', None):
-                    errors['identity_secondary_file'] = ['Overseas passport file is required with a Visa.']
-                if not meta_now.get('passport_country'): errors['identity_meta.passport_country'] = ['Required.']
-                if not meta_now.get('passport_expiry'):  errors['identity_meta.passport_expiry'] = ['Required.']
-            elif doc_type == 'AUS_PASSPORT':
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-            elif doc_type == 'OTHER_PASSPORT':
-                if not meta_now.get('country'): errors['identity_meta.country'] = ['Required.']
-                if not meta_now.get('expiry'):  errors['identity_meta.expiry'] = ['Required.']
-                if not getattr(instance, 'identity_secondary_file', None):
-                    errors['identity_secondary_file'] = ['Visa file is required with an Overseas passport.']
-                if not meta_now.get('visa_type_number'): errors['identity_meta.visa_type_number'] = ['Required.']
-                if not meta_now.get('valid_to'):         errors['identity_meta.valid_to'] = ['Required.']
-            elif doc_type == 'AGE_PROOF':
-                if not meta_now.get('state'):  errors['identity_meta.state'] = ['Required.']
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-
-            if errors:
-                raise serializers.ValidationError(errors)
-
-            # schedule verification task if needed
-            if instance.government_id and (gov_id_changed or type_changed or meta_changed or not instance.gov_id_verified):
-                async_task(
-                    'client_profile.tasks.verify_filefield_task',
-                    instance._meta.model_name, instance.pk,
-                    'government_id',
-                    instance.user.first_name or '',
-                    instance.user.last_name or '',
-                    instance.user.email or '',
-                    verification_field='gov_id_verified',
-                    note_field='gov_id_verification_note',
-                )
-        return instance
+    def _identity_tab(self, instance, vdata: dict, submit: bool):
+        return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Regulatory TAB ----------------
     def _regulatory_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
@@ -2009,151 +1377,12 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return instance
 
     # ---------------- Payment TAB ----------------
-    def _payment_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        payment_fields = [
-            'payment_preference','abn','gst_registered',
-            'super_fund_name','super_usi','super_member_number',
-            'abn_entity_confirmed',
-        ]
-        update_fields: list[str] = []
-        pref_in = (vdata.get('payment_preference') or instance.payment_preference or '').upper()
-
-        # regular writes
-        for f in payment_fields:
-            if f in vdata:
-                setattr(instance, f, vdata[f])
-                update_fields.append(f)
-
-        # TFN
-        if 'tfn_number' in vdata:
-            instance.tfn_number = (vdata['tfn_number'] or '').strip()
-            update_fields.append('tfn_number')
-
-        # ABN changed -> reset
-        abn_changed = ('abn' in vdata) and (vdata.get('abn') != getattr(instance, 'abn'))
-        if abn_changed:
-            instance.abn_verified = False
-            instance.abn_entity_confirmed = False
-            instance.abn_verification_note = ""
-            update_fields += ['abn_verified','abn_entity_confirmed','abn_verification_note']
-
-        # confirmation gate
-        if 'abn_entity_confirmed' in vdata:
-            confirmed = bool(vdata['abn_entity_confirmed'])
-            if confirmed and instance.abn_entity_name:
-                instance.abn_verified = True
-                if not instance.abn_verification_note:
-                    instance.abn_verification_note = 'User confirmed ABN entity details.'
-                update_fields += ['abn_verified','abn_verification_note']
-            else:
-                if instance.abn_verified:
-                    instance.abn_verified = False
-                    update_fields.append('abn_verified')
-
-        # optional sync gst_registered from ABR
-        if 'gst_registered' not in vdata:
-            if instance.abn_gst_registered is True and not instance.gst_registered:
-                instance.gst_registered = True
-                update_fields.append('gst_registered')
-
-        # TFN path validation on submit
-        if submit and (pref_in or instance.payment_preference):
-            pref_effective = (pref_in or instance.payment_preference or '').upper()
-            if pref_effective == 'TFN':
-                errors = {}
-                if not instance.tfn_number:
-                    errors['tfn'] = ['TFN is required.']
-                if not instance.super_fund_name:
-                    errors['super_fund_name'] = ['Super fund name is required for TFN.']
-                if not instance.super_usi:
-                    errors['super_usi'] = ['USI is required for TFN.']
-                if not instance.super_member_number:
-                    errors['super_member_number'] = ['Member number is required for TFN.']
-                if errors:
-                    raise serializers.ValidationError(errors)
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # run ABN task on submit
-        if submit:
-            pref_effective = (pref_in or instance.payment_preference or '').upper()
-            if pref_effective == 'ABN' and instance.abn:
-                async_task(
-                    'client_profile.tasks.verify_abn_task',
-                    instance._meta.model_name, instance.pk,
-                    instance.abn,
-                    instance.user.first_name or '',
-                    instance.user.last_name or '',
-                    instance.user.email or '',
-                    note_field='abn_verification_note',
-                )
-        return instance
+    def _payment_tab(self, instance, vdata: dict, submit: bool):
+        return apply_payment_tab(instance, vdata, submit)
 
     # ---------------- Referees TAB ----------------
-    def _referees_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        from onboarding.emails import send_referee_emails
-        update_fields = []
-
-        def apply_ref(idx: int):
-            prefix = f"referee{idx}_"
-            locked = bool(getattr(instance, f"{prefix}confirmed", False))
-
-            incoming = {
-                'name': vdata.get(f"{prefix}name", getattr(instance, f"{prefix}name")),
-                'relation': vdata.get(f"{prefix}relation", getattr(instance, f"{prefix}relation")),
-                'email': clean_email(vdata.get(f"{prefix}email", getattr(instance, f"{prefix}email"))),
-                'workplace': vdata.get(f"{prefix}workplace", getattr(instance, f"{prefix}workplace")),
-            }
-            if locked:
-                return
-
-            changed = False
-            for key in ['name','relation','email','workplace']:
-                field = f"{prefix}{key}"
-                if field in vdata and getattr(instance, field) != incoming[key]:
-                    setattr(instance, field, incoming[key])
-                    update_fields.append(field)
-                    changed = True
-
-            if changed:
-                for flag in ['confirmed','rejected']:
-                    f = f"{prefix}{flag}"
-                    if getattr(instance, f, False):
-                        setattr(instance, f, False)
-                        update_fields.append(f)
-                last = f"{prefix}last_sent"
-                if getattr(instance, last, None) is not None:
-                    setattr(instance, last, None)
-                    update_fields.append(last)
-
-        apply_ref(1)
-        apply_ref(2)
-
-        if submit:
-            errors = {}
-            for idx in [1,2]:
-                prefix = f"referee{idx}_"
-                if not getattr(instance, f"{prefix}name"):       errors[prefix+'name'] = ['Required.']
-                if not getattr(instance, f"{prefix}relation"):   errors[prefix+'relation'] = ['Required.']
-                if not getattr(instance, f"{prefix}email"):      errors[prefix+'email'] = ['Required.']
-                if not getattr(instance, f"{prefix}workplace"):  errors[prefix+'workplace'] = ['Required.']
-            if errors:
-                raise serializers.ValidationError(errors)
-            if not instance.verified:
-                instance.verified = False
-                update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        if submit:
-            send_referee_emails(instance, is_reminder=False)
-        return instance
+    def _referees_tab(self, instance, vdata: dict, submit: bool):
+        return apply_referees_tab(instance, vdata, submit)
 
     # ---------------- Skills TAB ----------------
     def _skills_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
@@ -2238,37 +1467,8 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return instance
 
     # ---------------- Profile TAB ----------------
-    def _profile_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        update_fields = []
-        if 'short_bio' in vdata:
-            instance.short_bio = vdata['short_bio']
-            update_fields.append('short_bio')
-
-        if 'resume' in vdata:
-            new_file = vdata['resume']
-            old_file = getattr(instance, 'resume', None)
-            if new_file is None:
-                if old_file:
-                    _delete_file_if_unreferenced(old_file, current_instance=instance)
-                instance.resume = None
-                update_fields.append('resume')
-            else:
-                if old_file:
-                    try:
-                        if getattr(old_file, 'name', None) != getattr(new_file, 'name', None):
-                            _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.resume = new_file
-                update_fields.append('resume')
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-        return instance
+    def _profile_tab(self, instance, vdata: dict, submit: bool):
+        return apply_profile_tab(instance, vdata, submit)
 
     # ---------------- read-only summary for UI ----------------
     def get_skill_certificates(self, obj):
@@ -2499,26 +1699,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
         update_fields = []
 
-        clear_photo = _should_clear_flag(self.initial_data, "profile_photo_clear")
-        if "profile_photo" in vdata or clear_photo:
-            new_photo = vdata.pop("profile_photo", None)
-            old_photo = getattr(instance, "profile_photo", None)
-            if new_photo is None and clear_photo:
-                if old_photo:
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = None
-                update_fields.append("profile_photo")
-            elif new_photo is not None:
-                if old_photo and _file_has_changed(new_photo, old_photo):
-                    try:
-                        _delete_file_if_unreferenced(old_photo, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.profile_photo = new_photo
-                update_fields.append("profile_photo")
+        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
 
         # role + address
         direct_fields = [
@@ -2547,163 +1728,8 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
         return instance
 
     # ---------------- Identity TAB (identical behavior) ----------------
-    def _identity_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
-        update_fields = []
-
-        def _fname(f):
-            return getattr(f, 'name', None) if f else None
-
-        type_changed = False
-        gov_id_changed = False
-        sec_changed = False
-        meta_changed = False
-
-        # type
-        if 'government_id_type' in vdata:
-            new_type = vdata.get('government_id_type')
-            type_changed = (new_type != getattr(instance, 'government_id_type'))
-            instance.government_id_type = new_type
-            update_fields.append('government_id_type')
-
-            # clear secondary when not needed
-            if new_type in ('DRIVER_LICENSE', 'AUS_PASSPORT', 'AGE_PROOF'):
-                old_sec = getattr(instance, 'identity_secondary_file', None)
-                if old_sec:
-                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception: pass
-                instance.identity_secondary_file = None
-                update_fields.append('identity_secondary_file')
-                sec_changed = True
-
-            # clear stale meta if not provided
-            if 'identity_meta' not in vdata:
-                instance.identity_meta = {}
-                update_fields.append('identity_meta')
-                meta_changed = True
-
-        # primary file
-        if 'government_id' in vdata:
-            new_file = vdata.get('government_id')
-            old_file = getattr(instance, 'government_id', None)
-            gov_id_changed = (_fname(new_file) != _fname(old_file))
-            if new_file is None:
-                if old_file:
-                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception: pass
-                instance.government_id = None
-                update_fields.append('government_id')
-            else:
-                if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception: pass
-                instance.government_id = new_file
-                update_fields.append('government_id')
-
-        # secondary file
-        if 'identity_secondary_file' in vdata:
-            new_sec = vdata.get('identity_secondary_file')
-            old_sec = getattr(instance, 'identity_secondary_file', None)
-            sec_changed = (_fname(new_sec) != _fname(old_sec)) or sec_changed
-            if new_sec is None:
-                if old_sec:
-                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception: pass
-                instance.identity_secondary_file = None
-                update_fields.append('identity_secondary_file')
-            else:
-                if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
-                    try: _delete_file_if_unreferenced(old_sec, current_instance=instance)
-                    except Exception: pass
-                instance.identity_secondary_file = new_sec
-                update_fields.append('identity_secondary_file')
-
-        # meta normalization
-        if 'identity_meta' in vdata:
-            incoming = vdata.get('identity_meta') or {}
-            meta = dict(incoming)
-            doc_type = getattr(instance, 'government_id_type')
-
-            if doc_type == 'DRIVER_LICENSE':
-                meta = {k: v for k, v in meta.items() if k in {'state','expiry'}}
-            elif doc_type == 'VISA':
-                meta = {k: v for k, v in meta.items() if k in {'visa_type_number','valid_to','passport_country','passport_expiry'}}
-            elif doc_type == 'AUS_PASSPORT':
-                meta = {k: v for k, v in meta.items() if k in {'expiry'}}
-                meta['country'] = 'Australia'
-            elif doc_type == 'OTHER_PASSPORT':
-                meta = {k: v for k, v in meta.items() if k in {'country','expiry','visa_type_number','valid_to'}}
-            elif doc_type == 'AGE_PROOF':
-                meta = {k: v for k, v in meta.items() if k in {'state','expiry'}}
-
-            if meta != (instance.identity_meta or {}):
-                instance.identity_meta = meta
-                update_fields.append('identity_meta')
-                meta_changed = True
-
-        # reset verification
-        if gov_id_changed or sec_changed or type_changed or meta_changed:
-            instance.gov_id_verified = False
-            instance.gov_id_verification_note = ""
-            update_fields += ['gov_id_verified','gov_id_verification_note']
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # validate + schedule on submit
-        if submit:
-            errors = {}
-            doc_type = getattr(instance, 'government_id_type')
-            meta_now = getattr(instance, 'identity_meta') or {}
-
-            if not doc_type:
-                errors['government_id_type'] = ['Select a document type.']
-            if not getattr(instance, 'government_id', None):
-                errors['government_id'] = ['This file is required.']
-
-            if doc_type == 'DRIVER_LICENSE':
-                if not meta_now.get('state'):  errors['identity_meta.state'] = ['Required.']
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-            elif doc_type == 'VISA':
-                if not meta_now.get('visa_type_number'):  errors['identity_meta.visa_type_number'] = ['Required.']
-                if not meta_now.get('valid_to'):         errors['identity_meta.valid_to'] = ['Required.']
-                if not getattr(instance, 'identity_secondary_file', None):
-                    errors['identity_secondary_file'] = ['Overseas passport file is required with a Visa.']
-                if not meta_now.get('passport_country'): errors['identity_meta.passport_country'] = ['Required.']
-                if not meta_now.get('passport_expiry'):  errors['identity_meta.passport_expiry'] = ['Required.']
-            elif doc_type == 'AUS_PASSPORT':
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-            elif doc_type == 'OTHER_PASSPORT':
-                if not meta_now.get('country'): errors['identity_meta.country'] = ['Required.']
-                if not meta_now.get('expiry'):  errors['identity_meta.expiry'] = ['Required.']
-                if not getattr(instance, 'identity_secondary_file', None):
-                    errors['identity_secondary_file'] = ['Visa file is required with an Overseas passport.']
-                if not meta_now.get('visa_type_number'): errors['identity_meta.visa_type_number'] = ['Required.']
-                if not meta_now.get('valid_to'):         errors['identity_meta.valid_to'] = ['Required.']
-            elif doc_type == 'AGE_PROOF':
-                if not meta_now.get('state'):  errors['identity_meta.state'] = ['Required.']
-                if not meta_now.get('expiry'): errors['identity_meta.expiry'] = ['Required.']
-
-            if errors:
-                raise serializers.ValidationError(errors)
-
-            # schedule verification task
-            if instance.government_id and (gov_id_changed or type_changed or meta_changed or not instance.gov_id_verified):
-                from core.task_queue import async_task
-                async_task(
-                    'client_profile.tasks.verify_filefield_task',
-                    instance._meta.model_name, instance.pk,
-                    'government_id',
-                    instance.user.first_name or '',
-                    instance.user.last_name or '',
-                    instance.user.email or '',
-                    verification_field='gov_id_verified',
-                    note_field='gov_id_verification_note',
-                )
-        return instance
+    def _identity_tab(self, instance, vdata: dict, submit: bool):
+        return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Interests TAB ----------------
     def _interests_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
@@ -2732,95 +1758,12 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
         return instance
 
     # ---------------- Referees TAB ----------------
-    def _referees_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
-        from onboarding.emails import send_referee_emails
-        update_fields = []
-
-        def apply_ref(idx: int):
-            prefix = f"referee{idx}_"
-            locked = bool(getattr(instance, f"{prefix}confirmed", False))
-            incoming = {
-                'name': vdata.get(f"{prefix}name", getattr(instance, f"{prefix}name")),
-                'relation': vdata.get(f"{prefix}relation", getattr(instance, f"{prefix}relation")),
-                'email': clean_email(vdata.get(f"{prefix}email", getattr(instance, f"{prefix}email"))),
-                'workplace': vdata.get(f"{prefix}workplace", getattr(instance, f"{prefix}workplace")),
-            }
-            if locked:
-                return
-            changed = False
-            for key in ['name','relation','email','workplace']:
-                field = f"{prefix}{key}"
-                if field in vdata and getattr(instance, field) != incoming[key]:
-                    setattr(instance, field, incoming[key])
-                    update_fields.append(field)
-                    changed = True
-            if changed:
-                for flag in ['confirmed','rejected']:
-                    f = f"{prefix}{flag}"
-                    if getattr(instance, f, False):
-                        setattr(instance, f, False)
-                        update_fields.append(f)
-                last = f"{prefix}last_sent"
-                if getattr(instance, last, None) is not None:
-                    setattr(instance, last, None)
-                    update_fields.append(last)
-
-        apply_ref(1)
-        apply_ref(2)
-
-        if submit:
-            errors = {}
-            for idx in [1,2]:
-                prefix = f"referee{idx}_"
-                if not getattr(instance, f"{prefix}name"):       errors[prefix+'name'] = ['Required.']
-                if not getattr(instance, f"{prefix}relation"):   errors[prefix+'relation'] = ['Required.']
-                if not getattr(instance, f"{prefix}email"):      errors[prefix+'email'] = ['Required.']
-                if not getattr(instance, f"{prefix}workplace"):  errors[prefix+'workplace'] = ['Required.']
-            if errors:
-                raise serializers.ValidationError(errors)
-            if not instance.verified:
-                instance.verified = False
-                update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        if submit:
-            send_referee_emails(instance, is_reminder=False)
-        return instance
+    def _referees_tab(self, instance, vdata: dict, submit: bool):
+        return apply_referees_tab(instance, vdata, submit)
 
     # ---------------- Profile TAB ----------------
-    def _profile_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
-        update_fields = []
-        if 'short_bio' in vdata:
-            instance.short_bio = vdata['short_bio']
-            update_fields.append('short_bio')
-
-        if 'resume' in vdata:
-            new_file = vdata['resume']
-            old_file = getattr(instance, 'resume', None)
-            if new_file is None:
-                if old_file:
-                    _delete_file_if_unreferenced(old_file, current_instance=instance)
-                instance.resume = None
-                update_fields.append('resume')
-            else:
-                if old_file:
-                    try:
-                        if getattr(old_file, 'name', None) != getattr(new_file, 'name', None):
-                            _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception:
-                        pass
-                instance.resume = new_file
-                update_fields.append('resume')
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-        return instance
+    def _profile_tab(self, instance, vdata: dict, submit: bool):
+        return apply_profile_tab(instance, vdata, submit)
 
     def get_profile_photo_url(self, obj):
         return _build_absolute_media_url(self.context.get("request"), getattr(obj, "profile_photo", None))
