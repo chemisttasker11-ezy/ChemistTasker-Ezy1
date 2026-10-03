@@ -230,11 +230,7 @@ def verify_filefield_task(
             except Exception as exc:
                 # Keep traceback frames for operators without re-logging a possibly sensitive service exception value.
                 failure_note = "OCR processing failed."
-                logger.warning(
-                    "[verify_filefield_task] OCR processing failed error_type=%s",
-                    type(exc).__name__,
-                    exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__),
-                )
+                logger.warning("[verify_filefield_task] OCR processing failed error_type=%s", type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
             finally:
                 if converted_path and os.path.exists(converted_path):
                     os.remove(converted_path)
@@ -536,14 +532,8 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
         ahpra_lookup(full_ahpra_number, output_html, api_key=env("SCRAPINGBEE_API_KEY"))
     except Exception as exc:
         # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
-        note = "AHPRA lookup failed. Please try again later."
-        logger.error(
-            "[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s",
-            object_pk,
-            type(exc).__name__,
-            exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__),
-        )
-        _update_ahpra_fields(model_name, object_pk, False, note)
+        logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
+        _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
         return
 
 
