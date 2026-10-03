@@ -30,7 +30,8 @@ from core.task_queue import async_task
 from shifts.access import Http400
 from django.db import transaction
 from decimal import Decimal
-from shifts.base import BaseShiftViewSet, SHIFT_OFFER_BUZZ_COOLDOWN
+from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
+from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
 from shifts.serializers import (
     ShiftInterestSerializer,
     ShiftOfferSerializer,
@@ -55,7 +56,7 @@ class ShiftInterestViewSet(viewsets.ModelViewSet):
         shift_id = self.request.query_params.get('shift')
         if shift_id is not None:
             shift = get_object_or_404(Shift, pk=shift_id)
-            if BaseShiftViewSet._user_can_manage_pharmacy(self.request.user, shift.pharmacy):
+            if user_can_manage_pharmacy(self.request.user, shift.pharmacy):
                 qs = qs.filter(shift_id=shift_id)
             else:
                 qs = qs.filter(shift_id=shift_id, user=self.request.user)
@@ -105,7 +106,7 @@ class ShiftRejectionViewSet(viewsets.ModelViewSet):
         shift_id = self.request.query_params.get('shift')
         if shift_id is not None:
             shift = get_object_or_404(Shift, pk=shift_id)
-            if BaseShiftViewSet._user_can_manage_pharmacy(self.request.user, shift.pharmacy):
+            if user_can_manage_pharmacy(self.request.user, shift.pharmacy):
                 qs = qs.filter(shift_id=shift_id)
             else:
                 qs = qs.filter(shift_id=shift_id, user=self.request.user)
@@ -168,7 +169,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         if getattr(user, "role", None) in ["PHARMACIST", "OTHER_STAFF", "EXPLORER"]:
             return qs.filter(user=user)
 
-        managed = BaseShiftViewSet._managed_pharmacies(user)
+        managed = managed_pharmacies_for(user)
         return qs.filter(shift__pharmacy__in=managed)
 
     def list(self, request, *args, **kwargs):
@@ -252,7 +253,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                 .get(pk=pk)
             )
             shift = offer.shift
-            if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+            if not user_can_manage_pharmacy(request.user, shift.pharmacy):
                 return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
             if offer.status != ShiftOffer.Status.PENDING:
                 return Response({
@@ -537,7 +538,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                 .get(pk=pk)
             )
             shift = offer.shift
-            if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+            if not user_can_manage_pharmacy(request.user, shift.pharmacy):
                 return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
             if not getattr(shift.pharmacy, "use_chemisttasker_payroll", False):
                 return Response(

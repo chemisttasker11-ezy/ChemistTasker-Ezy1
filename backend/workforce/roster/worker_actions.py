@@ -368,14 +368,13 @@ def release_worker_from_assignment(
 
         if shift and escalate_to_visibility:
             from shifts.limits import enforce_public_shift_daily_limit
-            from shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
-            from shifts.serializers import ShiftSerializer
-            tiers = ShiftSerializer.build_allowed_tiers(shift.pharmacy)
+            from shifts.escalation import PUBLIC_LEVEL, allowed_tiers, apply_escalation
+            tiers = allowed_tiers(shift.pharmacy)
             if escalate_to_visibility not in tiers:
                 raise ValidationError("Invalid escalation visibility for this pharmacy.")
             if escalate_to_visibility == PUBLIC_LEVEL:
                 enforce_public_shift_daily_limit(shift.pharmacy)
-            BaseShiftViewSet._apply_escalation(shift, tiers, tiers.index(escalate_to_visibility))
+            apply_escalation(shift, tiers, tiers.index(escalate_to_visibility))
             # Released work now belongs to the established marketplace workflow.
             shift.slots.filter(roster_period__isnull=False).update(roster_period=None)
 

@@ -36,7 +36,9 @@ from rest_framework.decorators import action
 from organizations.access import (
     CAPABILITY_MANAGE_ROSTER,
     has_admin_capability,
+    managed_pharmacies,
     pharmacies_user_admins,
+    user_can_manage_pharmacy,
 )
 from users.serializers import UserProfileSerializer
 from django.shortcuts import get_object_or_404
@@ -51,15 +53,27 @@ from shifts.emails import (
     build_shift_offer_context,
     worker_offer_url,
 )
+from shifts.escalation import (  # noqa: F401  (COMMUNITY_LEVELS, PUBLIC_LEVEL, ESCALATION_FIELD_MAP: historical import path)
+    COMMUNITY_LEVELS,
+    ESCALATION_FIELD_MAP,
+    PUBLIC_LEVEL,
+    apply_escalation,
+    auto_escalate_due_shifts,
+    resolve_current_index,
+)
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
 from core.task_queue import async_task
 from datetime import datetime
-from shifts.access import (
+from shifts.access import (  # noqa: F401  (role rules re-exported at their historical path)
+    ALL_OTHER_STAFF_SHIFT_ROLES,
+    NON_INTERN_OTHER_STAFF_SHIFT_ROLES,
     _get_request_ip,
     _normalized_role_code,
     _otherstaff_onboarding_role,
+    _shift_roles_visible_to_user,
+    _user_can_perform_shift_role,
 )
 from datetime import timedelta
 from decimal import Decimal
@@ -72,32 +86,6 @@ from shifts.serializers import (
     ShiftSerializer,
     ShiftSlotSerializer,
 )
-
-
-NON_INTERN_OTHER_STAFF_SHIFT_ROLES = ("ASSISTANT", "TECHNICIAN", "STUDENT")
-
-
-ALL_OTHER_STAFF_SHIFT_ROLES = NON_INTERN_OTHER_STAFF_SHIFT_ROLES + ("INTERN",)
-
-
-def _shift_roles_visible_to_user(user):
-    top_role = _normalized_role_code(getattr(user, "role", None))
-    if top_role == "PHARMACIST":
-        return ["PHARMACIST"]
-    if top_role == "EXPLORER":
-        return ["EXPLORER"]
-    if top_role == "OTHER_STAFF":
-        staff_role = _otherstaff_onboarding_role(user)
-        if staff_role == "INTERN":
-            return ["INTERN"]
-        if staff_role in ALL_OTHER_STAFF_SHIFT_ROLES:
-            return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
-        return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
-    return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
-
-
-def _user_can_perform_shift_role(user, shift_role):
-    return _normalized_role_code(shift_role) in _shift_roles_visible_to_user(user)
 
 
 SHIFT_OFFER_BUZZ_COOLDOWN = timedelta(hours=1)
@@ -115,22 +103,7 @@ def _log_shift_profile_access(*, request, shift, candidate, action, slot=None):
     )
 
 
-# Shifts Mangment
-COMMUNITY_LEVELS = ['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN','ORG_CHAIN']
-
-
-PUBLIC_LEVEL = 'PLATFORM'
-
-
 OFFER_EXPIRY_HOURS = 48
-
-
-ESCALATION_FIELD_MAP = {
-    'LOCUM_CASUAL': 'escalate_to_locum_casual',
-    'OWNER_CHAIN': 'escalate_to_owner_chain',
-    'ORG_CHAIN': 'escalate_to_org_chain',
-    'PLATFORM': 'escalate_to_platform',
-}
 
 
 class BaseShiftViewSet(viewsets.ModelViewSet):
@@ -156,69 +129,14 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         else:
             pharmacy = self.get_object().pharmacy
 
-        if self._user_can_manage_pharmacy(user, pharmacy):
+        if user_can_manage_pharmacy(user, pharmacy):
             return
 
         self.permission_denied(request)
 
-    @staticmethod
-    def _user_can_manage_pharmacy(user, pharmacy):
-        if pharmacy.owner and getattr(pharmacy.owner, 'user', None) == user:
-            return True
-
-        if OrganizationMembership.objects.filter(
-            user=user,
-            role='ORG_ADMIN',
-            organization_id=pharmacy.organization_id
-        ).exists():
-            return True
-
-        if OrganizationMembership.objects.filter(
-            user=user,
-            role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
-            pharmacies=pharmacy,
-        ).exists():
-            return True
-
-        if has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER):
-            return True
-
-        return False
-
-    @staticmethod
-    def _managed_pharmacies(user):
-        """
-        Pharmacies the user can manage because they own them, are an org admin
-        over them, or hold an active PharmacyAdmin assignment.
-        """
-        if not user or not getattr(user, "is_authenticated", False):
-            return Pharmacy.objects.none()
-
-        pharmacies = Pharmacy.objects.none()
-
-        if hasattr(user, "owneronboarding"):
-            pharmacies |= Pharmacy.objects.filter(owner=user.owneronboarding)
-
-        org_ids = list(
-            OrganizationMembership.objects.filter(user=user, role="ORG_ADMIN").values_list(
-                "organization_id", flat=True
-            )
-        )
-        if org_ids:
-            pharmacies |= Pharmacy.objects.filter(
-                organization_id__in=org_ids
-            )
-
-        if user:
-            managed_admin_pharmacies = [
-                pharm.id
-                for pharm in pharmacies_user_admins(user)
-                if has_admin_capability(user, pharm, CAPABILITY_MANAGE_ROSTER)
-            ]
-            if managed_admin_pharmacies:
-                pharmacies |= Pharmacy.objects.filter(id__in=managed_admin_pharmacies)
-
-        return pharmacies.distinct()
+    # Historical entry points: the rules are owned by organizations.access.
+    _user_can_manage_pharmacy = staticmethod(user_can_manage_pharmacy)
+    _managed_pharmacies = staticmethod(managed_pharmacies)
 
     @staticmethod
     def _worker_role_for_shift(user):
@@ -254,74 +172,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         return qs
 
     def _auto_escalate_shifts(self, now):
-        date_filter = Q()
-        for field in ESCALATION_FIELD_MAP.values():
-            date_filter |= Q(**{f'{field}__lte': now})
+        auto_escalate_due_shifts(now, tiers_for=self.serializer_class.build_allowed_tiers)
 
-        if not date_filter:
-            return
-
-        candidates = Shift.objects.filter(
-            interests__isnull=True
-        ).filter(date_filter).select_related('pharmacy', 'pharmacy__owner', 'created_by')
-
-        for shift in candidates:
-            allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
-            if not allowed_tiers:
-                continue
-
-            current_index = self._resolve_current_index(shift, allowed_tiers)
-            target_index = current_index
-
-            for idx in range(current_index + 1, len(allowed_tiers)):
-                tier = allowed_tiers[idx]
-                field = ESCALATION_FIELD_MAP.get(tier)
-                if not field:
-                    continue
-                ts = getattr(shift, field)
-                if ts and ts <= now:
-                    target_index = idx
-
-            if target_index > current_index:
-                target_visibility = allowed_tiers[target_index]
-                if target_visibility == PUBLIC_LEVEL:
-                    try:
-                        enforce_public_shift_daily_limit(shift.pharmacy)
-                    except ValidationError:
-                        continue
-                self._apply_escalation(shift, allowed_tiers, target_index, stamp_missing=False)
-
-    @staticmethod
-    def _resolve_current_index(shift, allowed_tiers):
-        try:
-            return allowed_tiers.index(shift.visibility)
-        except ValueError:
-            idx = shift.escalation_level or 0
-            if idx < 0:
-                idx = 0
-            if idx >= len(allowed_tiers):
-                idx = len(allowed_tiers) - 1
-            return idx
-
-    @staticmethod
-    def _apply_escalation(shift, allowed_tiers, target_index, *, stamp_missing=True, timestamp=None):
-        target_visibility = allowed_tiers[target_index]
-        update_fields = ['visibility', 'escalation_level']
-        shift.visibility = target_visibility
-        shift.escalation_level = target_index
-
-        if stamp_missing:
-            stamp_time = timestamp or timezone.now()
-            for idx in range(1, target_index + 1):
-                tier = allowed_tiers[idx]
-                field = ESCALATION_FIELD_MAP.get(tier)
-                if field and not getattr(shift, field):
-                    setattr(shift, field, stamp_time)
-                    update_fields.append(field)
-
-        # Remove duplicates while preserving order
-        shift.save(update_fields=list(dict.fromkeys(update_fields)))
-        return target_visibility
+    # Historical entry points: escalation is owned by shifts.escalation.
+    _resolve_current_index = staticmethod(resolve_current_index)
+    _apply_escalation = staticmethod(apply_escalation)
 
     def _build_member_status_response(self, request, shift):
         # Retrieve the visibility parameter from the request query params.
@@ -603,7 +458,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         shift = self.get_object()
         user = request.user
 
-        if not self._user_can_manage_pharmacy(user, shift.pharmacy):
+        if not user_can_manage_pharmacy(user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
@@ -1089,7 +944,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             offers = visible_counter_offers_for_shift(
                 shift=shift,
                 user=request.user,
-                can_manage_pharmacy=self._user_can_manage_pharmacy(request.user, shift.pharmacy),
+                can_manage_pharmacy=user_can_manage_pharmacy(request.user, shift.pharmacy),
             )
             result[str(shift.id)] = ShiftCounterOfferSerializer(
                 offers,
@@ -1112,7 +967,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             offers = visible_counter_offers_for_shift(
                 shift=shift,
                 user=request.user,
-                can_manage_pharmacy=self._user_can_manage_pharmacy(request.user, shift.pharmacy),
+                can_manage_pharmacy=user_can_manage_pharmacy(request.user, shift.pharmacy),
             )
             serializer = ShiftCounterOfferSerializer(
                 offers,
@@ -1214,7 +1069,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/accept')
     def accept_counter_offer(self, request, pk=None, offer_id=None):
         shift = self.get_object()
-        if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         offer = get_object_or_404(ShiftCounterOffer, pk=offer_id, shift=shift)
@@ -1375,7 +1230,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/reject')
     def reject_counter_offer(self, request, pk=None, offer_id=None):
         shift = self.get_object()
-        if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         offer = get_object_or_404(ShiftCounterOffer, pk=offer_id, shift=shift)

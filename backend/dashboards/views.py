@@ -27,7 +27,8 @@ from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 from users.org_roles import membership_visible_pharmacy_ids
-from shifts.base import _shift_roles_visible_to_user, COMMUNITY_LEVELS
+from shifts.access import _shift_roles_visible_to_user
+from shifts.escalation import COMMUNITY_LEVELS
 
 
 # Dashboards

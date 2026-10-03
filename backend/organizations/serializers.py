@@ -5,7 +5,7 @@ from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, P
 from users.models import OrganizationMembership
 from users.serializers import UserProfileSerializer
 from django.db import transaction
-from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability, user_can_manage_pharmacy
 from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
@@ -38,35 +38,8 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
         return url
 
 
-def user_can_view_full_pharmacy(user, pharmacy) -> bool:
-    """
-    Mirrors BaseShiftViewSet._user_can_manage_pharmacy so serializers can reuse it.
-    """
-    if not user or not getattr(user, "is_authenticated", False) or pharmacy is None:
-        return False
-
-    owner = getattr(pharmacy, "owner", None)
-    if owner and getattr(owner, "user", None) == user:
-        return True
-
-    if OrganizationMembership.objects.filter(
-        user=user,
-        role='ORG_ADMIN',
-        organization_id=pharmacy.organization_id,
-    ).exists():
-        return True
-
-    if OrganizationMembership.objects.filter(
-        user=user,
-        role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
-        pharmacies=pharmacy,
-    ).exists():
-        return True
-
-    if has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER):
-        return True
-
-    return False
+# The full pharmacy details are visible to whoever manages the pharmacy: one rule, owned by organizations.access.
+user_can_view_full_pharmacy = user_can_manage_pharmacy
 
 
 def anonymize_pharmacy_detail(detail: dict | None) -> dict | None:
