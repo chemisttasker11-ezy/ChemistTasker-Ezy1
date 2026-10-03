@@ -7,7 +7,6 @@ implementation moves to its owning app. Known defects are pinned as they are (``
 by a dedicated behaviour-fix commit.
 """
 import inspect
-import unittest
 from datetime import date, datetime, time, timedelta
 from datetime import timezone as dt_timezone
 from types import SimpleNamespace
@@ -448,21 +447,15 @@ class FinalEvaluationContractTests(SimpleTestCase):
         obj.save = mock.Mock()
         return obj
 
-    def test_pending_automated_check_reschedules_in_20_seconds_without_retry_count(self):
+    def test_pending_automated_check_reschedules_in_20_seconds(self):
         obj = self.pharmacist(ahpra_verified=False)
         calls, async_task, _emails, apply_async = self.run_task(obj)
         apply_async.assert_called_once()
         self.assertEqual(apply_async.call_args.kwargs["args"], ("PharmacistOnboarding", 5))
-        # CURRENT BEHAVIOUR (known defect, fixed separately): the re-check does not pass retry_count + 1
-        self.assertNotIn("kwargs", apply_async.call_args.kwargs)
+        self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"retry_count": 1})
         self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
+        self.assertEqual(calls.delete, [])
         async_task.assert_not_called()
-
-    def test_retry_guard_stops_and_cancels_reminders(self):
-        obj = self.pharmacist(ahpra_verified=False)
-        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
-        apply_async.assert_not_called()
-        self.assertEqual(calls.delete, ["celery:final-evaluation-reminder:PharmacistOnboarding:5"])
 
     def test_pending_referee_schedules_one_48_hour_reminder(self):
         obj = self.pharmacist(referee2_confirmed=False)
@@ -486,12 +479,11 @@ class FinalEvaluationContractTests(SimpleTestCase):
         emails.assert_not_called()
         apply_async.assert_not_called()
 
-    # --- Target behaviour of the supported pipeline (C-H1). Marked expectedFailure until the fix commit lands. ---
+    # --- The supported pipeline's bounded loop (C-H1). ---
     # State first, then a bounded 20-second re-check loop (retry_count advances), and a limit that stops ONLY that
     # loop: the 48-hour referee reminder marker survives, and a profile that completes on the last run still gets a
     # final state.
 
-    @unittest.expectedFailure
     def test_target_quick_recheck_advances_retry_count(self):
         for current in (0, 5, 15):  # re-check while retry_count <= 15 (same boundary as the old > 15 guard)
             obj = self.pharmacist(ahpra_verified=False)
@@ -500,21 +492,18 @@ class FinalEvaluationContractTests(SimpleTestCase):
             self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"retry_count": current + 1})
             self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
 
-    @unittest.expectedFailure
     def test_target_limit_stops_only_the_quick_loop(self):
         obj = self.pharmacist(ahpra_verified=False)
         calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
         apply_async.assert_not_called()
         self.assertEqual(calls.delete, [])  # nothing cancelled: the profile is still pending
 
-    @unittest.expectedFailure
     def test_target_limit_keeps_the_48_hour_reminder(self):
         obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
         calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16, marker=True)
         self.assertEqual(calls.delete, [])
         apply_async.assert_not_called()  # marker exists: no second reminder, and the quick loop is over
 
-    @unittest.expectedFailure
     def test_target_state_is_evaluated_before_the_limit(self):
         obj = self.pharmacist()  # everything verified by the time this late run executes
         with mock.patch("django.db.transaction.on_commit"):
@@ -526,7 +515,6 @@ class FinalEvaluationContractTests(SimpleTestCase):
         calls, _async_task, _emails, _apply_async = self.run_task(obj, retry_count=16)
         self.assertEqual(calls.sent, ["failed"])
 
-    @unittest.expectedFailure
     def test_target_reminder_run_starts_its_own_bounded_loop(self):
         obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
         calls, _async_task, emails, apply_async = self.run_task(obj, is_reminder=True, marker=True)

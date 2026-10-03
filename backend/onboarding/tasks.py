@@ -463,12 +463,6 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
-    # Keep your retry guard
-    if retry_count > 15:
-        logger.error(f"[FINAL EVALUATION] Timed out waiting for automated tasks for {model_name} pk={object_pk}.")
-        cancel_pending_reminders()
-        return
-
     # Build required checks (unchanged)
     required_checks = []
     model_name_lower = model_name.lower()
@@ -560,8 +554,26 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
 
     # Debug timing: 0.1h (~6 min). Use 48 for production.
     REMINDER_DELAY = timedelta(hours=48)
-    # Keep your quick re-check loop, but schedule it properly
+    # Quick re-check loop for automated checks that are still running. It is bounded: a run re-checks while
+    # retry_count <= MAX_QUICK_RECHECK_COUNT; past that only this loop stops. The profile is still pending, so no
+    # reminder is cancelled, and a 48-hour reminder run starts a new bounded loop.
     RECHECK_DELAY = timedelta(seconds=20)
+    MAX_QUICK_RECHECK_COUNT = 15
+
+    def schedule_quick_recheck():
+        if retry_count > MAX_QUICK_RECHECK_COUNT:
+            logger.warning(
+                "[FINAL EVALUATION] Checks still pending after %s quick re-checks; quick loop stopped model=%s pk=%s "
+                "(a check such as manual AHPRA verification completes outside this loop)",
+                retry_count, model_name, object_pk,
+            )
+            return
+        final_evaluation.apply_async(
+            args=(model_name, object_pk),
+            kwargs={'retry_count': retry_count + 1},
+            eta=timezone.now() + RECHECK_DELAY,
+            queue="default",
+        )
 
     if is_pending_referee:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} is waiting for referee confirmation.")
@@ -599,23 +611,15 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         else:
             logger.info(f"[FINAL EVALUATION] Future referee reminder already exists for pk={object_pk}; leaving it in place.")
 
-        # If other automated checks are also pending, keep the quick re-check loop alive (properly delayed)
+        # If other automated checks are also pending, keep the quick re-check loop alive (bounded)
         if is_pending_check:
-            final_evaluation.apply_async(
-                args=(model_name, object_pk),
-                eta=timezone.now() + RECHECK_DELAY,
-                queue="default",
-            )
+            schedule_quick_recheck()
         return
 
     # Automated checks still pending (no referee pending) -> keep quick loop
     if is_pending_check:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} is waiting for automated tasks. Re-checking in 20s.")
-        final_evaluation.apply_async(
-            args=(model_name, object_pk),
-            eta=timezone.now() + RECHECK_DELAY,
-            queue="default",
-        )
+        schedule_quick_recheck()
         return
 
     # Success state (unchanged)
