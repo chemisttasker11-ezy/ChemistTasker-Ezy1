@@ -28,8 +28,7 @@ def _locked_timesheet_and_period(timesheet):
         .get(pk=timesheet.period_id)
     )
     locked_timesheet = (
-        Timesheet.objects.select_for_update()
-        .select_related("user", "membership")
+        Timesheet.objects.select_for_update(of=("self",))
         .get(pk=timesheet.pk)
     )
     locked_timesheet.period = period
