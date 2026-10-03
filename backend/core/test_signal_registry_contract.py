@@ -96,6 +96,61 @@ class SignalRegistryContractTests(SimpleTestCase):
                 self.assertEqual(leaf, "signals", row)
                 self.assertIn(app, apps_with_ready, row)
 
+    def test_signal_modules_have_no_import_time_work_beyond_registration(self):
+        """signals.py may declare receivers/constants, but must not query, dispatch or execute arbitrary calls on import."""
+
+        def call_name(call):
+            try:
+                return ast.unparse(call.func)
+            except Exception:
+                return ""
+
+        def executable_calls(statement):
+            # Function bodies run on signal delivery, not module import. Decorators,
+            # defaults and annotations do run at definition/import time and must be inspected.
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                nodes = [
+                    *statement.decorator_list,
+                    *statement.args.defaults,
+                    *[value for value in statement.args.kw_defaults if value is not None],
+                ]
+                if statement.returns is not None:
+                    nodes.append(statement.returns)
+                for arg in [*statement.args.posonlyargs, *statement.args.args, *statement.args.kwonlyargs]:
+                    if arg.annotation is not None:
+                        nodes.append(arg.annotation)
+                return [node for root in nodes for node in ast.walk(root) if isinstance(node, ast.Call)]
+            if isinstance(statement, ast.ClassDef):
+                nodes = [*statement.decorator_list, *statement.bases, *[keyword.value for keyword in statement.keywords]]
+                return [node for root in nodes for node in ast.walk(root) if isinstance(node, ast.Call)]
+            return [node for node in ast.walk(statement) if isinstance(node, ast.Call)]
+
+        hooks = list(ready_hooks())
+        for app, _node in hooks:
+            path = BACKEND / app / "signals.py"
+            self.assertTrue(path.is_file(), f"{app}.apps.ready imports signals but {path} is missing")
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            forbidden = []
+            for statement in tree.body:
+                for call in executable_calls(statement):
+                    name = call_name(call)
+                    # logging.getLogger only creates a logger object. @receiver(...)
+                    # only registers the declared receiver; neither may contain a
+                    # nested executable call in their arguments.
+                    if name in {"logging.getLogger", "receiver"}:
+                        nested = [
+                            child for child in ast.walk(call)
+                            if isinstance(child, ast.Call) and child is not call
+                        ]
+                        if not nested:
+                            continue
+                    forbidden.append(f"line {getattr(call, 'lineno', '?')}: {ast.unparse(call)}")
+            self.assertEqual(
+                forbidden,
+                [],
+                f"{app}.signals executes work at import time; move it into a receiver/service: {forbidden}",
+            )
+
     def test_ready_hooks_only_import_their_own_signals_module(self):
         hooks = list(ready_hooks())
         self.assertTrue(hooks)
