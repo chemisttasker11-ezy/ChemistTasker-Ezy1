@@ -23,6 +23,14 @@ def _celery_options(q_options: dict[str, Any] | None) -> dict[str, Any]:
     return options
 
 
+def registered_task_name(name: str) -> str:
+    """The registered Celery task name for `name` (after aliases), or LookupError when Celery does not know it."""
+    task_name = CELERY_TASK_ALIASES.get(name, name)
+    if task_name in current_app.tasks:
+        return task_name
+    raise LookupError(f"Celery task is not registered: {task_name}")
+
+
 def async_task(func, *args, **kwargs):
     q_options = kwargs.pop("q_options", None)
     options = _celery_options(q_options)
@@ -71,10 +79,7 @@ def async_task(func, *args, **kwargs):
                 transaction.on_commit(
                     lambda: _dispatch_notification(notification, recipients, subject)
                 )
-        if task_name in current_app.tasks:
-            return current_app.send_task(task_name, args=args, kwargs=kwargs, **options)
-
-        raise LookupError(f"Celery task is not registered: {task_name}")
+        return current_app.send_task(registered_task_name(task_name), args=args, kwargs=kwargs, **options)
 
     if hasattr(func, "apply_async"):
         return func.apply_async(args=args, kwargs=kwargs, **options)
