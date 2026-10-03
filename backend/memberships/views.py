@@ -44,6 +44,9 @@ from memberships.serializers import (
     MembershipSerializer,
     required_user_role_for_membership,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _user_can_invite_members_to_pharmacy(user, pharmacy):
@@ -428,6 +431,8 @@ class MembershipViewSet(viewsets.ModelViewSet):
         """
         Helper to create or invite a user as a membership and send emails.
         Returns: (membership_instance, None) if successful, (None, error_message) if not.
+        A failure after a write (e.g. a new user account) rolls this invite's atomic block back, so nothing of a
+        failed invite is committed; unexpected errors are logged and reported with a stable message.
         """
         try:
             email_raw = (data.get('email') or data.get('user_email') or '').strip().lower()
@@ -486,10 +491,13 @@ class MembershipViewSet(viewsets.ModelViewSet):
                         is_otp_verified=False,
                     )
                     user_created = True
-                except Exception as e:
-                    import traceback
-                    traceback.print_exc()
-                    return None, f'Failed to create user: {str(e)}'
+                except Exception:
+                    logger.exception(
+                        "Membership invite: user creation failed (inviter_id=%s pharmacy_id=%s)",
+                        getattr(inviter, "id", None), pharmacy_id,
+                    )
+                    transaction.set_rollback(True)
+                    return None, 'Failed to create the user account for this invitation.'
             else:
                 required_user_role = required_user_role_for_membership(role)
                 if required_user_role and user.role != required_user_role:
@@ -567,6 +575,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
                     force_update_fields.append('updated_at')
                     membership.save(update_fields=force_update_fields)
             except serializers.ValidationError as e:
+                transaction.set_rollback(True)
                 detail = e.detail
                 if isinstance(detail, dict):
                     for messages in detail.values():
@@ -575,10 +584,13 @@ class MembershipViewSet(viewsets.ModelViewSet):
                         if isinstance(messages, str):
                             return None, messages
                 return None, str(detail)
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                return None, f'Failed to create membership: {str(e)}'
+            except Exception:
+                logger.exception(
+                    "Membership invite: membership creation failed (inviter_id=%s pharmacy_id=%s)",
+                    getattr(inviter, "id", None), pharmacy_id,
+                )
+                transaction.set_rollback(True)
+                return None, 'Failed to create the membership.'
             # --- END OF THE FIX ---
 
             # Prepare and send email
@@ -656,18 +668,21 @@ class MembershipViewSet(viewsets.ModelViewSet):
                     ))
 
 
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
+            except Exception:
                 # Don't return error here - membership was created successfully
                 # Just log the email error but continue
+                logger.exception(
+                    "Membership invite: invitation email could not be queued (membership_id=%s)", membership.id
+                )
 
             return membership, None
             
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return None, f'Unexpected error: {str(e)}'
+        except Exception:
+            logger.exception(
+                "Membership invite failed unexpectedly (inviter_id=%s)", getattr(inviter, "id", None)
+            )
+            transaction.set_rollback(True)
+            return None, 'Unable to process this invitation.'
 
 
     # --- Single Invite (scoped to target pharmacy) ---
