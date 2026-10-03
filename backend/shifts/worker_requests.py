@@ -244,7 +244,8 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
                     escalate_to_visibility="LOCUM_CASUAL",
                 )
             except DjangoValidationError as e:
-                return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                # the rule's own messages, not the Python repr of the error (str(e) is "['...']")
+                return Response({"detail": "; ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
             # Preserve backward-compatible status
             req.status = "AUTO_PUBLISHED"
