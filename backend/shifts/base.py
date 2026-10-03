@@ -66,10 +66,14 @@ from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
 from core.task_queue import async_task
 from datetime import datetime
-from shifts.access import (
+from shifts.access import (  # noqa: F401  (role rules re-exported at their historical path)
+    ALL_OTHER_STAFF_SHIFT_ROLES,
+    NON_INTERN_OTHER_STAFF_SHIFT_ROLES,
     _get_request_ip,
     _normalized_role_code,
     _otherstaff_onboarding_role,
+    _shift_roles_visible_to_user,
+    _user_can_perform_shift_role,
 )
 from datetime import timedelta
 from decimal import Decimal
@@ -82,32 +86,6 @@ from shifts.serializers import (
     ShiftSerializer,
     ShiftSlotSerializer,
 )
-
-
-NON_INTERN_OTHER_STAFF_SHIFT_ROLES = ("ASSISTANT", "TECHNICIAN", "STUDENT")
-
-
-ALL_OTHER_STAFF_SHIFT_ROLES = NON_INTERN_OTHER_STAFF_SHIFT_ROLES + ("INTERN",)
-
-
-def _shift_roles_visible_to_user(user):
-    top_role = _normalized_role_code(getattr(user, "role", None))
-    if top_role == "PHARMACIST":
-        return ["PHARMACIST"]
-    if top_role == "EXPLORER":
-        return ["EXPLORER"]
-    if top_role == "OTHER_STAFF":
-        staff_role = _otherstaff_onboarding_role(user)
-        if staff_role == "INTERN":
-            return ["INTERN"]
-        if staff_role in ALL_OTHER_STAFF_SHIFT_ROLES:
-            return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
-        return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
-    return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
-
-
-def _user_can_perform_shift_role(user, shift_role):
-    return _normalized_role_code(shift_role) in _shift_roles_visible_to_user(user)
 
 
 SHIFT_OFFER_BUZZ_COOLDOWN = timedelta(hours=1)

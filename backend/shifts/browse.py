@@ -39,7 +39,12 @@ from django.conf import settings
 from core.task_queue import async_task
 from datetime import date
 from zoneinfo import ZoneInfo
-from shifts.access import _normalized_role_code, IsPharmacistOrOtherStaff
+from shifts.access import (
+    IsPharmacistOrOtherStaff,
+    _normalized_role_code,
+    _shift_roles_visible_to_user,
+    _user_can_perform_shift_role,
+)
 from django.db import transaction
 from decimal import Decimal
 import uuid
@@ -48,12 +53,9 @@ from organizations.access import managed_pharmacies as managed_pharmacies_for, u
 from shifts.base import (
     _log_shift_profile_access,
     _matching_shift_slot_exists,
-    _shift_roles_visible_to_user,
-    _user_can_perform_shift_role,
     BaseShiftViewSet,
-    COMMUNITY_LEVELS,
-    PUBLIC_LEVEL,
 )
+from shifts.escalation import COMMUNITY_LEVELS, PUBLIC_LEVEL
 from shifts.serializers import (
     MyShiftSerializer,
     SharedShiftSerializer,

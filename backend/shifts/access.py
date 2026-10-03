@@ -1,4 +1,7 @@
-"""Request and role helpers used by the shift views. `client_profile.domains.common.access` re-exports them."""
+"""Request and role helpers of the shift domain: which shift roles a worker may see and take, request metadata.
+
+`client_profile.domains.common.access` and `shifts.base` re-export them at their historical paths.
+"""
 from rest_framework import permissions, status
 from rest_framework.exceptions import APIException
 
@@ -46,3 +49,29 @@ class IsPharmacistOrOtherStaff(permissions.BasePermission):
             request.user.is_authenticated and
             request.user.role in ('PHARMACIST', 'OTHER_STAFF')
         )
+
+
+NON_INTERN_OTHER_STAFF_SHIFT_ROLES = ("ASSISTANT", "TECHNICIAN", "STUDENT")
+
+
+ALL_OTHER_STAFF_SHIFT_ROLES = NON_INTERN_OTHER_STAFF_SHIFT_ROLES + ("INTERN",)
+
+
+def _shift_roles_visible_to_user(user):
+    top_role = _normalized_role_code(getattr(user, "role", None))
+    if top_role == "PHARMACIST":
+        return ["PHARMACIST"]
+    if top_role == "EXPLORER":
+        return ["EXPLORER"]
+    if top_role == "OTHER_STAFF":
+        staff_role = _otherstaff_onboarding_role(user)
+        if staff_role == "INTERN":
+            return ["INTERN"]
+        if staff_role in ALL_OTHER_STAFF_SHIFT_ROLES:
+            return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
+        return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
+    return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
+
+
+def _user_can_perform_shift_role(user, shift_role):
+    return _normalized_role_code(shift_role) in _shift_roles_visible_to_user(user)

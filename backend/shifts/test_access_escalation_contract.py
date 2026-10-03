@@ -145,3 +145,23 @@ class EscalationRuleTests(TestCase):
         for shift, expected in ((due, "LOCUM_CASUAL"), (not_due, "FULL_PART_TIME"), (with_interest, "FULL_PART_TIME")):
             shift.refresh_from_db()
             self.assertEqual(shift.visibility, expected)
+
+
+class CanonicalOwnerIdentityTests(TestCase):
+    """The historical entry points are the canonical rules themselves, not copies."""
+
+    def test_historical_paths_resolve_to_the_owners(self):
+        from organizations import access as organization_access
+        from shifts import access as shift_access
+        from shifts import base, escalation, serializers
+
+        self.assertIs(BaseShiftViewSet._user_can_manage_pharmacy, organization_access.user_can_manage_pharmacy)
+        self.assertIs(BaseShiftViewSet._managed_pharmacies, organization_access.managed_pharmacies)
+        self.assertIs(user_can_view_full_pharmacy, organization_access.user_can_manage_pharmacy)
+        self.assertIs(BaseShiftViewSet._resolve_current_index, escalation.resolve_current_index)
+        self.assertIs(BaseShiftViewSet._apply_escalation, escalation.apply_escalation)
+        self.assertIs(serializers.ShiftSerializer.build_allowed_tiers, escalation.allowed_tiers)
+        self.assertIs(base.PUBLIC_LEVEL, escalation.PUBLIC_LEVEL)
+        self.assertIs(base.COMMUNITY_LEVELS, escalation.COMMUNITY_LEVELS)
+        self.assertIs(base._shift_roles_visible_to_user, shift_access._shift_roles_visible_to_user)
+        self.assertIs(base.NON_INTERN_OTHER_STAFF_SHIFT_ROLES, shift_access.NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
