@@ -105,8 +105,10 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
     - `skills`: list of codes (string or JSON array)
     - Per-skill certificate upload (must exist if the skill is selected)
     - `years_experience`: simple string bucket stored on the model
+
+    Storage mutations happen only after certificate validation. Superseded files
+    are deleted only after the new DB pointer is saved.
     """
-    # 1) Parse skills array (accept JSON string or list)
     raw = initial_data.get("skills", vdata.get("skills", []))
     if isinstance(raw, str):
         try:
@@ -116,65 +118,76 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
     else:
         skills = list(raw or [])
 
-    # 2) Years of experience (optional)
     yrs = initial_data.get("years_experience", vdata.get("years_experience", None)) if track_years_experience else None
     if yrs is not None:
-        # store as plain string; keep legacy buckets (e.g. '', '0-1', '1-2', '2-3', '3-5', '5+')
         instance.years_experience = (yrs or "").strip()
 
-    cert_map = dict(instance.skill_certificates or {})  # latest file per skill
+    original_cert_map = dict(instance.skill_certificates or {})
+    cert_map = dict(original_cert_map)
     user_id = instance.user_id
 
-    # 3) If a skill was unchecked, remove its stored certificate (unless keeping history)
+    # Work out which persisted certificates remain logically available without
+    # mutating storage. An upload for a selected skill also satisfies the
+    # certificate requirement before it is written.
     if not keep_history:
-        removed = [code for code in list(cert_map.keys()) if code not in skills]
-        for code in removed:
-            old_path = (cert_map.get(code) or {}).get("path")
-            if old_path:
-                try:
-                    default_storage.delete(old_path)
-                except Exception:
-                    pass
-            cert_map.pop(code, None)
+        for code in list(cert_map):
+            if code not in skills:
+                cert_map.pop(code, None)
 
-    # 4) Save any uploaded files for checked skills
-    for code, f in uploads.items():
-        if code in skills and f:
-            # remember old path (if any)
-            old_path = (cert_map.get(code) or {}).get("path")
-
-            # save new file (keeps historical versions if you change _save_skill_file to do so)
-            saved = save_skill_file(user_id, code, f)
-
-            # delete old file unless keeping history
-            if old_path and not keep_history:
-                try:
-                    default_storage.delete(old_path)
-                except Exception:
-                    pass
-
-            # record new pointer
-            cert_map[code] = {
-                "path": saved,
-                "uploaded_at": timezone.now().isoformat(),
-            }
-
-    # 5) Validation: only skills that require certificates must have one
+    uploaded_codes = {code for code, file_obj in uploads.items() if code in skills and file_obj}
     required_codes = _required_cert_skill_codes(role_key)
-    missing = [code for code in skills if code in required_codes and code not in cert_map]
+    missing = [
+        code for code in skills
+        if code in required_codes and code not in cert_map and code not in uploaded_codes
+    ]
     if missing:
         raise serializers.ValidationError(
             {"skills": f"{missing_message}{', '.join(missing)}"}
         )
 
-    # 6) Persist changes
-    instance.skills = skills
-    instance.skill_certificates = cert_map
+    newly_saved_paths = []
+    old_paths_to_delete = []
+    try:
+        # Persist replacement uploads only after validation has succeeded.
+        for code, file_obj in uploads.items():
+            if code not in skills or not file_obj:
+                continue
+            old_path = (cert_map.get(code) or {}).get("path")
+            saved = save_skill_file(user_id, code, file_obj)
+            newly_saved_paths.append(saved)
+            cert_map[code] = {
+                "path": saved,
+                "uploaded_at": timezone.now().isoformat(),
+            }
+            if old_path and not keep_history and old_path != saved:
+                old_paths_to_delete.append(old_path)
 
-    # Save only the changed fields; include years_experience if we set it above
-    update_fields = ["skills", "skill_certificates"]
-    if yrs is not None:
-        update_fields.append("years_experience")
+        if not keep_history:
+            for code, meta in original_cert_map.items():
+                if code not in skills:
+                    old_path = (meta or {}).get("path")
+                    if old_path:
+                        old_paths_to_delete.append(old_path)
 
-    instance.save(update_fields=update_fields)
+        instance.skills = skills
+        instance.skill_certificates = cert_map
+        update_fields = ["skills", "skill_certificates"]
+        if yrs is not None:
+            update_fields.append("years_experience")
+        instance.save(update_fields=update_fields)
+    except Exception:
+        # The old DB pointers remain authoritative if persistence failed.
+        for path in newly_saved_paths:
+            try:
+                default_storage.delete(path)
+            except Exception:
+                pass
+        raise
+
+    for path in dict.fromkeys(old_paths_to_delete):
+        try:
+            default_storage.delete(path)
+        except Exception:
+            pass
+
     return instance
