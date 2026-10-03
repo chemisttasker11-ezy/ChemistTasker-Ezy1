@@ -147,8 +147,6 @@ ALLOWED_LEGACY_IMPORTS = {
     ),
     ("onboarding/emails.py", "client_profile.tasks"): ({"schedule_referee_reminder"}, TASK_MODULE_REASON),
     ("onboarding/views.py", "client_profile.tasks"): ({"cancel_referee_reminder"}, TASK_MODULE_REASON),
-    ("organizations/views.py", "client_profile.tasks"): ({"abn_lookup", "_parse_abn_html_fields"}, TASK_MODULE_REASON),
-    ("worker_finance/views.py", "client_profile.tasks"): ({"abn_lookup", "_parse_abn_html_fields"}, TASK_MODULE_REASON),
     ("core/websocket_testing.py", "client_profile.characterization_support"): (
         {"make_owner_with_pharmacy", "make_staff_member", "make_user"},
         "test-support factories shared by the chat and notifications WebSocket tests",
@@ -199,7 +197,6 @@ ALLOWED_MUTUAL_APP_PAIRS = {
     ("chat", "core"),
     ("client_profile", "core"),
     ("client_profile", "onboarding"),
-    ("client_profile", "organizations"),
     ("core", "memberships"),
     ("core", "onboarding"),
     ("core", "organizations"),
@@ -216,7 +213,7 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 2215
+KERNEL_CODE_LINE_CEILING = 2151
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
@@ -281,10 +278,9 @@ KERNEL_DEFINITIONS = {
     "client_profile/tasks.py": {
         "BASE_DIR", "ENV_PATH", "OUTPUT_DIR", "REFEREE_REMINDER_HOURS", "REMINDER_FUNC", "User",
         "_final_evaluation_reminder_key", "_frontend_base_url", "_manage_detail_url_for_role",
-        "_manage_path_for_role", "_marker_delete", "_marker_get", "_marker_set", "_parse_abn_html_fields",
-        "_referee_reminder_key", "_rem_args", "_reminder_redis", "_update_ahpra_fields", "abn_lookup",
-        "ahpra_lookup", "azure_ocr", "cancel_all_referee_reminders", "cancel_referee_reminder",
-        "email_membership_application_approved", "email_membership_application_rejected",
+        "_manage_path_for_role", "_marker_delete", "_marker_get", "_marker_set", "_referee_reminder_key", "_rem_args",
+        "_reminder_redis", "_update_ahpra_fields", "ahpra_lookup", "azure_ocr", "cancel_all_referee_reminders",
+        "cancel_referee_reminder", "email_membership_application_approved", "email_membership_application_rejected",
         "email_membership_application_review_updated", "email_membership_application_submitted", "env",
         "fetch_instance_with_retries", "final_evaluation", "get_local_file_or_download", "is_pdf_file", "logger",
         "mark_notification_sent", "notification_already_sent", "ocr_input_path_for_file", "parse_ahpra_html",
