@@ -40,6 +40,30 @@ class ClaimEligibilityTests(TestCase):
         claimed = ShiftSlotAssignment.objects.filter(shift=shift, user=worker).exists()
         return response, claimed
 
+    def test_claim_locks_the_direct_membership_through_authorization(self):
+        worker = make_user("PHARMACIST")
+        Membership.objects.create(
+            user=worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST", employment_type="LOCUM",
+            visibility="FULL_PART_TIME", post_anonymously=False,
+        )
+        ShiftSlot.objects.create(
+            shift=shift, date=date.today() + timedelta(days=7), start_time=time(9, 0), end_time=time(17, 0)
+        )
+
+        with mock.patch.object(
+            Membership.objects, "select_for_update", wraps=Membership.objects.select_for_update
+        ) as locked, mock.patch("shifts.browse.async_task"):
+            response = client_for(worker).post(
+                f"{API}community-shifts/{shift.id}/claim-shift/", {}, format="json"
+            )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        locked.assert_called_once_with()
+
     def test_tier_change_after_initial_visibility_is_rechecked_before_claim(self):
         worker = make_user("PHARMACIST")
         membership = Membership.objects.create(
