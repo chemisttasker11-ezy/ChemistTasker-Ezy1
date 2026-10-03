@@ -337,6 +337,27 @@ class ApplicationDecisionTests(MembershipFixture):
         self.assertEqual(response.status_code, 400)
         self.assertIn("payment_profile", response.data)
 
+    def test_org_admin_visibility_keeps_separately_owned_pharmacies(self):
+        app = self.application()
+
+        other_org = Organization.objects.create(name="Other Org", slug="other-org-members")
+        _, other_pharmacy = make_owner_with_pharmacy("Other Org Pharmacy")
+        other_pharmacy.organization = other_org
+        other_pharmacy.save(update_fields=["organization"])
+        OrganizationMembership.objects.create(
+            user=self.owner,
+            organization=other_org,
+            role="ORG_ADMIN",
+        )
+
+        response, _ = self.call(self.owner, "get", "membership-applications/")
+        rows = response.data["results"] if isinstance(response.data, dict) else response.data
+        self.assertIn(
+            app.id,
+            {row["id"] for row in rows},
+            "organization administration must not hide applications for a separately owned pharmacy",
+        )
+
     def test_who_sees_applications(self):
         app = self.application()
         org_admin = self.org_admin()
