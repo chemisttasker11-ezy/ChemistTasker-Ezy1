@@ -10,6 +10,7 @@ from contextlib import ExitStack, contextmanager
 from decimal import Decimal
 from unittest import mock
 
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -24,7 +25,7 @@ STORAGES = {
 }
 PDF = b"%PDF-1.7\nsynthetic-test-content"
 CATALOG = {
-    "pharmacist": {"clinical_services": [{"code": "VAX", "requires_certificate": True}, {"code": "DAA"}]},
+    "pharmacist": {"clinical_services": [{"code": "VAX", "requires_certificate": True}, {"code": "SECOND", "requires_certificate": True}, {"code": "DAA"}]},
     "otherstaff": {"dispense_software": [{"code": "FRED", "requires_certificate": True}]},
 }
 ROLES = {
@@ -206,6 +207,39 @@ class SkillsTabTests(RoleTabFixture):
                 self.assertEqual((obj.skills, obj.skill_certificates), (["OTHER"], {}))
                 self.assertFalse(default_storage.exists(path))
 
+    def test_failed_skills_validation_preserves_old_certificate_and_cleans_new_upload(self):
+        user, obj, url = self.onboarding("pharmacist")
+        response, _ = self.patch(
+            user,
+            url,
+            {"tab": "skills", "skills": '["VAX"]', "skill_files[VAX]": pdf("old.pdf")},
+            multipart=True,
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        obj.refresh_from_db()
+        old_path = obj.skill_certificates["VAX"]["path"]
+        self.assertTrue(default_storage.exists(old_path))
+
+        response, _ = self.patch(
+            user,
+            url,
+            {
+                "tab": "skills",
+                "skills": '["VAX", "SECOND"]',
+                "skill_files[VAX]": pdf("replacement.pdf"),
+            },
+            multipart=True,
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("SECOND", str(response.data["skills"]))
+
+        obj.refresh_from_db()
+        self.assertEqual(obj.skill_certificates["VAX"]["path"], old_path)
+        self.assertTrue(default_storage.exists(old_path))
+        folder = f"skill_certs/{user.id}/VAX/"
+        _dirs, files = default_storage.listdir(folder)
+        self.assertEqual(files, [old_path.rsplit("/", 1)[-1]], "failed validation must not orphan the replacement upload")
+
     def test_other_staff_years_of_experience(self):
         user, obj, url = self.onboarding("otherstaff")
         response, _ = self.patch(user, url, {"tab": "skills", "skills": [], "years_experience": " 2-3 "})
@@ -261,6 +295,30 @@ class RoleSpecificTabTests(RoleTabFixture):
             ("otherstaffonboarding", obj.pk, "certificate", user.first_name, user.last_name, user.email),
             {"verification_field": "certificate_verified", "note_field": "certificate_verification_note"},
         )])
+
+    def test_failed_regulatory_validation_preserves_replaced_file(self):
+        user, obj, url = self.onboarding("otherstaff", role_type="INTERN")
+        obj.ahpra_proof.save("old-ahpra.pdf", ContentFile(PDF), save=True)
+        obj.refresh_from_db()
+        old_path = obj.ahpra_proof.name
+        self.assertTrue(default_storage.exists(old_path))
+
+        response, _ = self.patch(
+            user,
+            url,
+            {
+                "tab": "regulatory",
+                "ahpra_proof": pdf("replacement-ahpra.pdf"),
+                "submitted_for_verification": True,
+            },
+            multipart=True,
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("hours_proof", response.data)
+
+        obj.refresh_from_db()
+        self.assertEqual(obj.ahpra_proof.name, old_path)
+        self.assertTrue(default_storage.exists(old_path), "failed validation must not delete the persisted document")
 
     def test_explorer_interests(self):
         user, obj, url = self.onboarding("explorer", verified=True)
