@@ -150,7 +150,6 @@ ALLOWED_LEGACY_IMPORTS = {
 ALLOWED_STRING_REFERENCES = {
     "client_profile.apps.ClientProfileConfig": "INSTALLED_APPS entry of the kernel app",
     "client_profile.urls": "the kernel URLconf, included by core.client_profile_api_urls",
-    "client_profile.notifications.*": "historical Celery route pattern (CELERY_TASK_ROUTES)",
     "client_profile.tasks.verify_*": "Celery route pattern of the verification tasks (CELERY_TASK_ROUTES)",
 }
 
