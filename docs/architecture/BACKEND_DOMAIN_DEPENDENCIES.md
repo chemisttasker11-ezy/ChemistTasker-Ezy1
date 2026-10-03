@@ -39,7 +39,7 @@ change, made only through the procedure in `BACKEND_APPS.md`, in its own change.
 | `organizations` | `Organization`, `Pharmacy`, `PharmacyClaim`, `PharmacyAdmin`, `Chain` (label `client_profile`) | `organizations.models`, `organizations.access` (admin capabilities, org scope), `organizations.timezone`, `organizations.claims`, `organizations.serializers` | `onboarding`, `memberships`, `users`, `notifications`, `core` | `client_profile.models[.orgs]`, `client_profile.admin_helpers`, `client_profile.timezone_utils`, `client_profile.domains.orgs.*` |
 | `memberships` | `Membership`, `MembershipInviteLink`, `MembershipApplication` (label `client_profile`); the award classification choices | `memberships.models`, `memberships.serializers` (incl. the active-membership limit), `memberships.labels`, `memberships.tasks` and `memberships.notifications` (application e-mails) | `organizations`, `onboarding`, `users`, `notifications`, `core` | `client_profile.models[.memberships]`, `client_profile.domains.memberships.*`, `client_profile.domains.common.labels` |
 | `onboarding` | `OwnerOnboarding`, `PharmacistOnboarding`, `OtherStaffOnboarding`, `ExplorerOnboarding`, `RefereeResponse`, `OnboardingNotification` (label `client_profile`); `GENDER_CHOICES` | `onboarding.models`, `onboarding.serializers`, `onboarding.emails`, `onboarding.tasks` (verification, orchestration and referee-reminder Celery tasks), `onboarding.verification.*` | `users`, `core`; kernel: `client_profile.fields` (allowed) | `client_profile.models[.onboarding]`, `client_profile.domains.onboarding.*` |
-| `shifts` | `Shift`, `ShiftSlot`, `ShiftSlotAssignment`, `ShiftInterest`, `ShiftRejection`, `ShiftOffer`, `ShiftCounterOffer[Slot]`, `ShiftSaved`, `ShiftDescriptionTemplate`, `ShiftProfileAccessAudit`, `LeaveRequest`, `WorkerShiftRequest` (label `client_profile`) | `shifts.models`, `shifts.base`, `shifts.serializers`, `shifts.pricing`, `shifts.emails`, `shifts.access` (role and request helpers), `shifts.tasks` (shift reminders), … | `organizations`, `memberships`, `onboarding`, `users`, `notifications`, `talent`, `workforce` (`RosterPeriod`), `core` | `client_profile.models[.shifts]`, `client_profile.domains.shifts.*`, `client_profile.domains.common.access` |
+| `shifts` | `Shift`, `ShiftSlot`, `ShiftSlotAssignment`, `ShiftInterest`, `ShiftRejection`, `ShiftOffer`, `ShiftCounterOffer[Slot]`, `ShiftSaved`, `ShiftDescriptionTemplate`, `ShiftProfileAccessAudit`, `LeaveRequest`, `WorkerShiftRequest` (label `client_profile`) | `shifts.models`, `shifts.base`, `shifts.serializers`, `shifts.pricing`, `shifts.emails`, `shifts.access` (role and request helpers), `shifts.tasks` (shift reminders), … | `organizations`, `memberships`, `onboarding`, `users`, `notifications`, `talent`, `core` | `client_profile.models[.shifts]`, `client_profile.domains.shifts.*`, `client_profile.domains.common.access` |
 | `workforce` | roster, leave, timesheets, employment engagements (label `workforce`) | `workforce.roster.*`, `workforce.*_service` | `shifts`, `organizations`, `memberships`, `onboarding`, `attendance`, `talent`, `users`, `core` | — |
 | `attendance` | kiosk, sessions, events, approvals (label `attendance`) | `attendance.*` | `organizations`, `memberships`, `shifts`, `workforce` | — |
 | `dashboards` | no models (read model) | `dashboards.views` | `shifts`, `organizations`, `memberships`, `invoicing`, `pharmacy_hub`, `users` | `client_profile.domains.dashboards.*` |
@@ -65,15 +65,22 @@ choices and upload helpers those modules need now live with their owners (`membe
 Before this change, `users`, `shifts` and `memberships` each formed a pair with `client_profile`. Pointing imports at
 the real owners shows what those pairs were:
 
-* `users ↔ organizations/memberships/shifts/onboarding`: `users` holds both the identity models and the account API,
-  which reads organisations, memberships and shifts.
+* `users ↔ organizations/memberships`: `users` holds both the identity models and the account, organisation and
+  session APIs, which read organisations and memberships; memberships link users to pharmacies and organisations.
 * `memberships ↔ organizations`
-* `client_profile ↔ onboarding/core`: the kernel facade imports its owners, and `onboarding.models` uses
-  `client_profile.fields` (migration-bound). The `client_profile ↔ organizations` pair is gone since organizations
-  stopped importing the ABR helpers through the kernel.
-* `shifts ↔ workforce`: `Shift` slots point at `RosterPeriod`, and the roster builds on shifts.
-* `attendance ↔ workforce`
-* `core ↔ *`: settings, URLs and shared utilities.
+* `client_profile ↔ onboarding`: the kernel facade imports its owners, and `onboarding.models` uses
+  `client_profile.fields` (migration-bound).
+* `attendance ↔ workforce`: attendance approvals use the roster-management capability (one authorisation contract for
+  roster, attendance and workforce routes), and workforce timesheets read attendance sessions.
+* `core ↔ chat/memberships/organizations/shifts/users/workforce`: `core` is the composition root (URLconfs, ASGI,
+  WebSocket routing, sitemap) as well as the shared utility package.
+
+Resolved by importing at call time where the reverse direction was a single lookup (plan §57):
+`shifts ↔ workforce` (the published-roster guard in `shifts.models` reads `RosterPeriod` when it runs, which also
+removes a load-order cycle between the two model modules), `core ↔ onboarding/pharmacy_hub` (the upload-reference
+registry in `core.serializer_lifecycle` reads the domain models when it is consulted), `client_profile ↔ core` (the
+WebSocket test helpers load the kernel factories when they build actors), `users ↔ onboarding` and `users ↔ shifts`
+(a role label and the referral-shift lookup).
 
 The model modules themselves import acyclically. These pairs are listed in `ALLOWED_MUTUAL_APP_PAIRS`. A new pair
 fails CI, and a resolved pair must be removed from the list.
