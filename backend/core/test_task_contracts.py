@@ -1050,6 +1050,7 @@ class VerificationArtifactTests(SimpleTestCase):
         # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.
         name = "client_profile.tasks.verify_abn_task"
         target = SimpleNamespace(
+            abn="51824753556",
             abn_verified=False, abn_entity_confirmed=False, abn_verification_note="",
             abn_entity_name="", abn_entity_type="", abn_status="", abn_gst_registered=None,
             abn_gst_from=None, abn_gst_to=None, abn_last_checked=None, save=mock.Mock(),
