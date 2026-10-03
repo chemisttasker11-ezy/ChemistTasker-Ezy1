@@ -1070,15 +1070,22 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                     results.append({"error": "Invalid slot payload", "rate": "0.00"})
                     continue
 
-                s_date = dt_cls.strptime(slot_date_raw, '%Y-%m-%d').date()
+                try:
+                    s_date = dt_cls.strptime(slot_date_raw, '%Y-%m-%d').date()
+                except ValueError as exc:
+                    # This is the caller's input error, so the parser message is safe and useful.
+                    results.append({"error": str(exc), "rate": "0.00"})
+                    continue
 
-                rate, meta = calculate_shift_rates(mock_shift, s_date, s_start, s_end)
-                results.append({"rate": str(rate), "meta": meta})
-            except ValueError as e:
-                # an unparseable slot date: the parser's message names the expected format
-                results.append({"error": str(e), "rate": "0.00"})
+                try:
+                    rate, meta = calculate_shift_rates(mock_shift, s_date, s_start, s_end)
+                    results.append({"rate": str(rate), "meta": meta})
+                except Exception:
+                    # Pricing internals (including ValueError details) are never part of the public contract.
+                    logger.exception("Shift rate preview failed for a slot")
+                    results.append({"error": "Unable to calculate the rate for this slot.", "rate": "0.00"})
             except Exception:
-                logger.exception("Shift rate preview failed for a slot")
+                logger.exception("Shift rate preview failed while preparing a slot")
                 results.append({"error": "Unable to calculate the rate for this slot.", "rate": "0.00"})
 
         return Response(results)
