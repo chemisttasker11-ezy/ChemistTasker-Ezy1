@@ -36,12 +36,23 @@ def apply_payment_tab(instance, vdata: dict, submit: bool):
         instance.tfn_number = (vdata['tfn_number'] or '').strip()
         update_fields.append('tfn_number')
 
-    # 3) if ABN changed -> reset verification + confirmation
+    # 3) if ABN changed -> reset verification, confirmation and every fact scraped for the old ABN
     if abn_changed:
         instance.abn_verified = False
         instance.abn_entity_confirmed = False
         instance.abn_verification_note = ""
-        update_fields += ['abn_verified', 'abn_entity_confirmed', 'abn_verification_note']
+        instance.abn_entity_name = None
+        instance.abn_entity_type = None
+        instance.abn_status = None
+        instance.abn_gst_registered = None
+        instance.abn_gst_from = None
+        instance.abn_gst_to = None
+        instance.abn_last_checked = None
+        update_fields += [
+            'abn_verified', 'abn_entity_confirmed', 'abn_verification_note',
+            'abn_entity_name', 'abn_entity_type', 'abn_status',
+            'abn_gst_registered', 'abn_gst_from', 'abn_gst_to', 'abn_last_checked',
+        ]
 
     # 4) confirmation gate: only user confirmation can set abn_verified=True
     if 'abn_entity_confirmed' in vdata:

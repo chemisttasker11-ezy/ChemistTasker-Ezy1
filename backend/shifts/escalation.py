@@ -4,11 +4,14 @@ FULL_PART_TIME -> LOCUM_CASUAL -> [OWNER_CHAIN if the pharmacy is in one of its 
 [ORG_CHAIN if the pharmacy belongs to an organization] -> PLATFORM. A shift escalates manually (owner action, roster)
 or automatically when an escalate_to_* timestamp is due and nobody has expressed interest yet.
 """
+import uuid
+
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from organizations.models import Chain
+from shifts.access import ShiftActionRefused
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.models import Shift
 
@@ -115,3 +118,38 @@ def auto_escalate_due_shifts(now, tiers_for=allowed_tiers):
                 except ValidationError:
                     continue
             apply_escalation(shift, tiers, target_index, stamp_missing=False)
+
+
+def escalate_shift(shift, *, allowed_tiers, target_visibility=None):
+    """A manager widening a shift's visibility: to `target_visibility`, or one tier up. Going public counts against
+    the pharmacy's daily public-shift limit. Returns the new visibility."""
+    current_index = resolve_current_index(shift, allowed_tiers)
+
+    if target_visibility:
+        if target_visibility not in allowed_tiers:
+            raise ShiftActionRefused(f"Invalid target_visibility. Must be one of {allowed_tiers}.")
+        target_index = allowed_tiers.index(target_visibility)
+    else:
+        target_index = current_index + 1
+
+    if target_index <= current_index:
+        raise ShiftActionRefused('Shift is already at or above that visibility level.')
+    if target_index >= len(allowed_tiers):
+        raise ShiftActionRefused('Already at the highest escalation level.')
+
+    next_visibility = allowed_tiers[target_index]
+    if next_visibility == PUBLIC_LEVEL:
+        enforce_public_shift_daily_limit(shift.pharmacy)
+
+    return apply_escalation(shift, allowed_tiers, target_index)
+
+
+def issue_share_token(shift):
+    """A fresh public share token for a platform-visible shift (the previous link stops working)."""
+    # Only platform-visible shifts can be shared.
+    if shift.visibility != 'PLATFORM':
+        raise ShiftActionRefused('You must escalate this shift to platform level before it can be shared.')
+
+    shift.share_token = uuid.uuid4()
+    shift.save(update_fields=['share_token'])
+    return shift.share_token

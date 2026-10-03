@@ -14,6 +14,15 @@ class Http400(APIException):
     default_code = 'bad_request'
 
 
+class ShiftActionRefused(APIException):
+    """A shift service refusing an action. The response body is `{"detail": detail}` (or `detail` itself when it is
+    a dict), with the given status, exactly as the views used to build it by hand."""
+
+    def __init__(self, detail, status_code=status.HTTP_400_BAD_REQUEST):
+        super().__init__(detail)
+        self.status_code = status_code
+
+
 def _normalized_role_code(value):
     raw = str(value or "").strip().upper().replace("-", "_").replace(" ", "_")
     if raw in {"PHARMACY_ASSISTANT", "ASSISTANT"}:

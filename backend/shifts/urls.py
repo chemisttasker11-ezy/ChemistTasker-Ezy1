@@ -7,18 +7,14 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from shifts.browse import (
-    ActiveShiftViewSet,
     CommunityShiftViewSet,
-    ConfirmedShiftViewSet,
-    HistoryShiftViewSet,
-    MyConfirmedShiftsViewSet,
-    MyHistoryShiftsViewSet,
     PublicJobBoardView,
     PublicShiftViewSet,
     SharedShiftDetailView,
-    ShiftDescriptionTemplateViewSet,
-    ShiftDetailViewSet,
 )
+from shifts.description_templates import ShiftDescriptionTemplateViewSet
+from shifts.lifecycle import ActiveShiftViewSet, ConfirmedShiftViewSet, HistoryShiftViewSet, ShiftDetailViewSet
+from shifts.my_shifts import MyConfirmedShiftsViewSet, MyHistoryShiftsViewSet
 from shifts.leave import LeaveRequestViewSet
 from shifts.offers import (
     ShiftInterestViewSet,
