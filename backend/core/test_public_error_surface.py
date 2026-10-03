@@ -187,6 +187,22 @@ class ShiftRatePreviewErrorSurfaceTests(TestCase):
         self.assertIn("does not match format", response.data[2]["error"])  # the user's own input error stays useful
         assert_no_internal_detail(self, response)
 
+    def test_pricing_value_error_is_not_treated_as_user_date_error(self):
+        owner, pharmacy = make_owner_with_pharmacy()
+        slots = [{"date": "2026-01-05", "startTime": "09:00", "endTime": "17:00"}]
+        with mock.patch(
+            "shifts.pricing.calculate_shift_rates",
+            side_effect=ValueError("SECRET-internal award mapping is invalid"),
+        ), self.assertLogs("shifts.browse", level="ERROR"):
+            response = client_for(owner).post(
+                f"{API}shifts/calculate-rates/",
+                {"pharmacy": pharmacy.id, "role": "PHARMACIST", "slots": slots},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0], {"error": "Unable to calculate the rate for this slot.", "rate": "0.00"})
+        assert_no_internal_detail(self, response)
+
 
 class MembershipInviteErrorSurfaceTests(TestCase):
     def setUp(self):
@@ -304,8 +320,10 @@ class VerificationNoteErrorSurfaceTests(SimpleTestCase):
         with mock.patch.object(tasks, "fetch_instance_with_retries", return_value=target), \
                 mock.patch.object(tasks, "save_output_file", return_value="/tmp/ahpra.html"), \
                 mock.patch.object(tasks, "ahpra_lookup", side_effect=failure), \
-                mock.patch.object(tasks, "_update_ahpra_fields") as update:
+                mock.patch.object(tasks, "_update_ahpra_fields") as update, \
+                self.assertLogs("client_profile.tasks", level="ERROR") as logs:
             tasks.verify_ahpra_task("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
         update.assert_called_once()
         note = update.call_args.args[3]
         self.assertEqual(note, "AHPRA lookup failed. Please try again later.")
+        self.assertIn("AHPRA lookup failed for pk=1", " ".join(logs.output))
