@@ -7,6 +7,7 @@ import utc from 'dayjs/plugin/utc';
 import { useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../../../constants/api';
 import { fetchWsTicket } from '../../../../utils/tokenService';
+import { buildWsUrl } from '../../../../utils/wsUrl';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { ChatRoom, ChatMessage, MemberCache, CachedMember } from './types';
 import { ChatSidebar } from './ChatSidebar';
@@ -70,15 +71,8 @@ const useIsMobile = (breakpoint = 768) => {
 
 const BACKEND_MEDIA_URL = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
 
-const makeWsTicketUrl = (path: string, ticket: string) => {
-  const base = API_BASE_URL || window.location.origin;
-  const url = new URL(path, base);
-  url.protocol = url.protocol.replace('http', 'ws');
-  if (ticket) {
-    url.searchParams.set('ticket', ticket);
-  }
-  return url.toString();
-};
+const makeWsTicketUrl = (path: string, ticket: string) =>
+  buildWsUrl(path, API_BASE_URL, window.location.origin, ticket);
 
 type ChatPageProps = {
   initialFilter?: 'all' | 'group' | 'dm' | 'shift';

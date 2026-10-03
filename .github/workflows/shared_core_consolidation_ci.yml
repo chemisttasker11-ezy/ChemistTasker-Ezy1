@@ -97,6 +97,9 @@ jobs:
       - name: Cross-frontend auth flow tests
         run: node --test scripts/auth-flow.test.mjs
         working-directory: frontend_web
+      - name: WebSocket URL tests
+        run: node --test scripts/ws-url.test.mjs
+        working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
         working-directory: frontend_web
