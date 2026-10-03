@@ -221,7 +221,7 @@ RECORDED = {'context': {'admin_member': {'groups': ['Night team'],
                        'pharmacy': [201, 200],
                        'platform_pharmacist': [403, 403],
                        'platform_public': [403, 403]}},
- 'profiles': {'admin_member': [200, 200],
+ 'profiles': {'admin_member': [200, 403],
               'explorer': [403, 403],
               'intern': [403, 403],
               'locum': [403, 403],
@@ -373,6 +373,25 @@ class ResolverAndPermissionTests(HubFixture):
             admin_count,
             "hub posting must not promote a scoped org role to PharmacyAdmin",
         )
+
+    def test_pharmacy_admin_does_not_become_organization_admin(self):
+        Resolver = resolver_class()
+        scope = Resolver(self.users["admin_member"]).organization_scope(self.org.id)
+        self.assertFalse(scope["has_admin_permissions"])
+        self.assertFalse(scope["is_org_admin"])
+
+        pharmacy = client_for(self.users["admin_member"]).patch(
+            HUB + f"pharmacies/{self.pharmacy.id}/profile/",
+            {"about": "pharmacy-admin-change"},
+            format="multipart",
+        )
+        organization = client_for(self.users["admin_member"]).patch(
+            HUB + f"organizations/{self.org.id}/profile/",
+            {"about": "must-not-change"},
+            format="multipart",
+        )
+        self.assertEqual(pharmacy.status_code, 200, pharmacy.content)
+        self.assertEqual(organization.status_code, 403, organization.content)
 
     def test_permission_map_behind_the_context(self):
         get_permissions = permissions_function()
