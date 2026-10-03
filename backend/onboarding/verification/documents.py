@@ -22,9 +22,25 @@ def get_local_file_or_download(filefield):
     except Exception as e:
         logger.info("[get_local_file_or_download] No local path (error_type=%s); downloading", type(e).__name__)
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=Path(filefield.name).suffix)
-    with default_storage.open(filefield.name, "rb") as remote_file:
-        shutil.copyfileobj(remote_file, temp_file)
-    temp_file.close()
+    try:
+        with default_storage.open(filefield.name, "rb") as remote_file:
+            shutil.copyfileobj(remote_file, temp_file)
+        temp_file.close()
+    except Exception:
+        temp_name = temp_file.name
+        try:
+            temp_file.close()
+        finally:
+            try:
+                os.remove(temp_name)
+            except FileNotFoundError:
+                pass
+            except OSError as cleanup_error:
+                logger.warning(
+                    "[get_local_file_or_download] Failed to remove partial temp file (error_type=%s)",
+                    type(cleanup_error).__name__,
+                )
+        raise
     logger.info("[get_local_file_or_download] Downloaded to a temporary file")
     return temp_file.name
 
