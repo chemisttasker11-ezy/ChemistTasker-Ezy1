@@ -34,6 +34,16 @@ jobs:
       - name: Install Chromium
         working-directory: frontend_web/e2e
         run: npx playwright install --with-deps chromium
+      - name: Verify Chromium runtime
+        working-directory: frontend_web/e2e
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          console.log(`Chromium ${await browser.version()} launched successfully`);
+          await browser.close();
+          NODE
       - name: Run Vite Playwright suite
         working-directory: frontend_web/e2e
         run: npm test

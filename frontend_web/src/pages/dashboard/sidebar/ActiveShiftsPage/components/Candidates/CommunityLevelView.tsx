@@ -86,7 +86,7 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
                         bgcolor: '#ECFDF5',
                         color: '#065F46',
                         border: '1px solid #A7F3D0',
-                        boxShadow: '0 10px 22px rgba(16,185,129,.14)',
+                        boxShadow: 'none',
                         fontWeight: 950,
                         '& .MuiChip-icon': {
                             color: '#059669',
@@ -104,9 +104,10 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
                 sx={{
                     display: 'grid',
                     gridTemplateColumns: {
-                        xs: 'repeat(2, minmax(0, 1fr))',
+                        xs: 'minmax(0, 1fr)',
                         sm: 'repeat(2, minmax(0, 1fr))',
-                        lg: 'repeat(4, minmax(230px, 1fr))',
+                        lg: 'repeat(2, minmax(0, 1fr))',
+                        xl: 'repeat(4, minmax(0, 1fr))',
                     },
                     gap: { xs: 1.25, sm: 2 },
                     alignItems: 'stretch',

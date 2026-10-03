@@ -1,14 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
     Container,
+    Alert,
     Typography,
     Box,
-    CircularProgress,
     Snackbar,
     Stack,
     IconButton,
     Button,
-    ThemeProvider,
     Pagination,
     useTheme,
     Dialog,
@@ -19,7 +18,7 @@ import {
 import {
     Close as X,
 } from '@mui/icons-material';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '../../../../utils/apiClient';
 import {
     Shift,
@@ -62,7 +61,8 @@ import {
 } from './types';
 
 // Theme
-import { customTheme } from './theme';
+import { ShiftEmptyState, ShiftListLoading, ShiftListToolbar, ShiftLoadError, ShiftSectionHeading } from '../../shiftCenter/ShiftJourneyUI';
+import { getShiftSearchText } from '@chemisttasker/shared-core';
 
 import {
     ACTIVE_SHIFT_SLOT_SEEN_KEY_PREFIX,
@@ -80,17 +80,33 @@ type ActiveShiftsPageProps = {
     title?: string;
 };
 
-const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Active Shifts' }) => {
+const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Posted shifts' }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const outerTheme = useTheme();
     const isDarkMode = outerTheme.palette.mode === 'dark';
     const { user, activePersona, activeAdminPharmacyId } = useAuth();
-    const selectedPharmacyId = null; // TODO: Get from proper context
     const scopedPharmacyId =
         activePersona === 'admin' && typeof activeAdminPharmacyId === 'number'
             ? activeAdminPharmacyId
             : null;
+    const [searchParams, setSearchParams] = useSearchParams();
+    const search = searchParams.get('q') ?? '';
+    const audience = searchParams.get('audience') ?? 'all';
+    const updateFilter = (key: string, value: string) => {
+        setPage(1);
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            if (value && value !== 'all') next.set(key, value); else next.delete(key);
+            return next;
+        }, { replace: true });
+    };
+    const selectedPharmacyId = scopedPharmacyId;
+    const postPath = scopedPharmacyId != null ? `/dashboard/admin/${scopedPharmacyId}/post-shift` : location.pathname.startsWith('/dashboard/organization') ? '/dashboard/organization/post-shift' : '/dashboard/owner/post-shift';
+    const [postNotice, setPostNotice] = useState<string | null>(location.state?.shiftNotice ?? null);
+    React.useEffect(() => {
+        if (location.state?.shiftNotice) navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }, [location.state, location.pathname, location.search, navigate]);
     const routeParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
     const routeShiftId = toFiniteNumber(routeParams.get('shift_id')) ?? shiftId;
     const routeSlotId = toFiniteNumber(routeParams.get('slot_id'));
@@ -146,7 +162,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     );
 
     // Data hooks
-    const { shifts, setShifts, loading: shiftsLoading, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId: routeShiftId });
+    const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId: routeShiftId });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
     const lastNotificationNavigationRef = React.useRef<string | null>(null);
 
@@ -234,6 +250,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const {
         counterOffersByShift,
         counterOffersLoadingByShift,
+        counterOffersErrorByShift,
         loadCounterOffers,
         acceptOffer,
         rejectOffer,
@@ -932,14 +949,15 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     ]);
 
     const orderedShifts = useMemo(() => {
-        const list = [...shifts];
+        const list = shifts.filter((shift) => getShiftSearchText(shift).includes(search.trim().toLowerCase()) &&
+            (audience === 'all' || (audience === 'direct' ? isDedicatedShift(shift) : !isDedicatedShift(shift) && shift.visibility === audience)));
         list.sort((a, b) => {
             const aDedicated = isDedicatedShift(a) ? 1 : 0;
             const bDedicated = isDedicatedShift(b) ? 1 : 0;
             return bDedicated - aDedicated;
         });
         return list;
-    }, [shifts, isDedicatedShift]);
+    }, [shifts, isDedicatedShift, search, audience]);
     const pageCount = Math.ceil(orderedShifts.length / itemsPerPage);
     const visibleShifts = useMemo(
         () => orderedShifts.slice((page - 1) * itemsPerPage, page * itemsPerPage),
@@ -952,32 +970,19 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         }
     }, [page, pageCount]);
 
-    if (shiftsLoading) {
-        return (
-            <Container maxWidth="xl" sx={{ py: 4, overflowX: 'hidden' }}>
-                <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-                    <CircularProgress />
-                </Box>
-            </Container>
-        );
-    }
-
     return (
-        <ThemeProvider theme={customTheme}>
-            <Container maxWidth="xl" sx={{ py: 4, overflowX: 'hidden' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
-                        {title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
-                        Manage and track your live shifts
-                    </Typography>
-                </Box>
-
-                {shifts.length === 0 ? (
-                    <Typography variant="body1" color="text.secondary">
-                        No active shifts found.
-                    </Typography>
+        <Container maxWidth="xl" sx={{ py: 3, minWidth: 0 }}>
+            <ShiftSectionHeading title={title} description="Review candidate responses, track the current audience and fill your remaining slots. A post with some assigned slots can also appear in Confirmed."
+                action={<Button onClick={() => void loadShifts()} disabled={shiftsLoading}>Refresh</Button>} />
+            {postNotice && <Alert severity="success" onClose={() => setPostNotice(null)} sx={{ mb: 2 }}>{postNotice}</Alert>}
+            {shiftsError && <ShiftLoadError onRetry={() => void loadShifts()} />}
+            {shiftsLoading ? <ShiftListLoading /> : shiftsError ? null : <>
+                {shifts.length > 0 && <ShiftListToolbar search={search} onSearch={(value) => updateFilter('q', value)}
+                    audience={audience} onAudience={(value) => updateFilter('audience', value)} count={orderedShifts.length} total={shifts.length} />}
+                {orderedShifts.length === 0 ? (
+                    <ShiftEmptyState filtered={shifts.length > 0} onReset={() => { setPage(1); setSearchParams((previous) => { const next = new URLSearchParams(previous); next.delete('q'); next.delete('audience'); return next; }, { replace: true }); }}
+                        title="No shifts waiting for cover" description="Post a shift to start finding the right person. Confirmed assignments remain in the Confirmed tab."
+                        actionPath={postPath} actionLabel="Post a shift" />
                 ) : (
                     <Stack spacing={2.5}>
                         {visibleShifts.map((shift, idx) => {
@@ -1004,6 +1009,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                         tabData,
                                         counterOffersByShift,
                                         counterOffersLoadingByShift,
+                                        counterOffersErrorByShift,
                                     }}
                                     state={{
                                         expandedShifts,
@@ -1032,6 +1038,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                         handleEscalate,
                                         loadTabDataForShift,
                                         loadShifts,
+                                        loadCounterOffers,
                                         handleRevealInterest,
                                         handleSlotSelection,
                                         handleReviewOffer,
@@ -1058,6 +1065,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     </Stack>
                 )}
 
+            </>}
                 {/* Dialogs */}
                 <DeleteConfirmDialog
                     open={deleteConfirmDialog.open}
@@ -1114,7 +1122,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     onClose={() => setSnackbarOpen(false)}
                     message={snackbarMessage}
                     action={
-                        <IconButton size="small" color="inherit" onClick={() => setSnackbarOpen(false)}>
+                        <IconButton size="small" aria-label="Dismiss notification" color="inherit" onClick={() => setSnackbarOpen(false)}>
                             <X />
                         </IconButton>
                     }
@@ -1147,7 +1155,6 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     </DialogActions>
                 </Dialog>
             </Container>
-        </ThemeProvider>
     );
 };
 

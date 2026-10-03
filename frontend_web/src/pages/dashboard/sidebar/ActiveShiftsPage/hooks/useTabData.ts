@@ -11,7 +11,7 @@ import { deriveLevelSequence, getCurrentLevelKey, PUBLIC_LEVEL_KEY } from '../ut
 
 export function useTabData(
     shifts: Shift[],
-    selectedLevelByShift: Record<number, EscalationLevelKey>,
+    _selectedLevelByShift: Record<number, EscalationLevelKey>,
     getTabKey: (shiftId: number, levelKey: EscalationLevelKey) => string
 ) {
     const [tabData, setTabData] = useState<Record<string, TabDataState>>({});
@@ -44,16 +44,8 @@ export function useTabData(
                 // Community/other levels: member status by slot
                 const membersBySlotEntries = await Promise.all(
                     (shift.slots || []).map(async slot => {
-                        try {
-                            const members = await fetchShiftMemberStatus(shift.id, {
-                                slotId: slot.id,
-                                visibility: levelKey,
-                            });
-                            return [slot.id, members] as const;
-                        } catch (error) {
-                            console.error(`Failed to load members for shift ${shift.id} slot ${slot.id}`, error);
-                            return [slot.id, [] as ShiftMemberStatus[]] as const;
-                        }
+                        const members = await fetchShiftMemberStatus(shift.id, { slotId: slot.id, visibility: levelKey });
+                        return [slot.id, members] as const;
                     })
                 );
 
@@ -74,7 +66,7 @@ export function useTabData(
                 }));
             } catch (error) {
                 console.error('Failed to load tab data', error);
-                setTabData(prev => ({ ...prev, [key]: { loading: false } }));
+                setTabData(prev => ({ ...prev, [key]: { loading: false, error: 'Candidate responses could not be loaded.' } }));
             }
         },
         [getTabKey]
@@ -82,7 +74,7 @@ export function useTabData(
 
     useEffect(() => {
         shifts.forEach(shift => {
-            const currentLevel = selectedLevelByShift[shift.id] || (shift as any).visibility || PUBLIC_LEVEL_KEY;
+            const currentLevel = getCurrentLevelKey(shift);
             const viewableLevels = deriveLevelSequence(
                 getCurrentLevelKey(shift),
                 (shift as any).allowedEscalationLevels,
@@ -93,7 +85,7 @@ export function useTabData(
             ]);
             levelsToLoad.forEach(level => loadTabDataForShift(shift, level));
         });
-    }, [shifts, selectedLevelByShift, loadTabDataForShift]);
+    }, [shifts, loadTabDataForShift]);
 
     return { tabData, setTabData, loadTabDataForShift };
 }

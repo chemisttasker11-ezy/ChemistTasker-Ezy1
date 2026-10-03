@@ -25,6 +25,7 @@ import {
   viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { ShiftLoadError, ShiftSectionHeading } from '../shiftCenter/ShiftJourneyUI';
 
 type DeferredPayrollOffer = {
   id: number;
@@ -51,6 +52,8 @@ export default function ConfirmedShiftsPage() {
       : null;
 
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
   const [loadingShifts, setLoadingShifts] = useState(true);
   const [deferredPayrollOffers, setDeferredPayrollOffers] = useState<DeferredPayrollOffer[]>([]);
   const [activatingPayrollOfferId, setActivatingPayrollOfferId] = useState<number | null>(null);
@@ -63,6 +66,8 @@ export default function ConfirmedShiftsPage() {
   });
 
   useEffect(() => {
+    let active = true;
+    setLoadError(false);
     setLoadingShifts(true);
     fetchConfirmedShifts()
       .then((data) => {
@@ -74,11 +79,12 @@ export default function ConfirmedShiftsPage() {
                 return Number(targetId ?? NaN) === scopedPharmacyId;
               })
             : data;
-        setShifts(filtered);
+        if (active) setShifts(filtered);
       })
-      .catch(() => setSnackbar({ open: true, msg: 'Failed to load confirmed shifts' }))
-      .finally(() => setLoadingShifts(false));
-  }, [scopedPharmacyId]);
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoadingShifts(false); });
+    return () => { active = false; };
+  }, [scopedPharmacyId, reloadVersion]);
 
   useEffect(() => {
     let active = true;
@@ -159,14 +165,8 @@ export default function ConfirmedShiftsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
-          Confirmed Shifts
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
-          Review booked shifts and assigned chemists
-        </Typography>
-      </Box>
+      <ShiftSectionHeading title="Confirmed shifts" description="View upcoming assignments, team member details and any remaining payroll setup." />
+      {loadError && <ShiftLoadError onRetry={() => setReloadVersion((value) => value + 1)} />}
 
       {deferredPayrollOffers.length > 0 && (
         <Stack spacing={1.5} sx={{ mb: 3 }}>
@@ -212,14 +212,14 @@ export default function ConfirmedShiftsPage() {
         </Stack>
       )}
 
-      <OwnerAssignedShiftBoard
+      {!loadError && <OwnerAssignedShiftBoard
         title="Confirmed Shifts"
         shifts={shifts}
         loading={loadingShifts}
         emptyText="No confirmed shifts available."
         mode="confirmed"
         onViewAssigned={openProfile}
-      />
+      />}
 
       <Snackbar
         open={snackbar.open}
@@ -227,7 +227,7 @@ export default function ConfirmedShiftsPage() {
         onClose={closeSnackbar}
         message={snackbar.msg}
         action={
-          <IconButton size="small" onClick={closeSnackbar} color="inherit">
+          <IconButton size="small" aria-label="Dismiss notification" onClick={closeSnackbar} color="inherit">
             <CloseIcon fontSize="small" />
           </IconButton>
         }

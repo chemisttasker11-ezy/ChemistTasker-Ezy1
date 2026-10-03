@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Shift, fetchActiveShifts, fetchPosterShiftDetailService } from '@chemisttasker/shared-core';
 
 interface UseShiftsDataParams {
@@ -6,36 +6,45 @@ interface UseShiftsDataParams {
     shiftId?: number | null;
 }
 
-export function useShiftsData({ selectedPharmacyId: _selectedPharmacyId, shiftId }: UseShiftsDataParams) {
+export function useShiftsData({ selectedPharmacyId, shiftId }: UseShiftsDataParams) {
     const [shifts, setShifts] = useState<Shift[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const requestVersion = useRef(0);
 
     const loadShifts = useCallback(async () => {
+        const version = ++requestVersion.current;
         setLoading(true);
+        setError(false);
         try {
+            let data: Shift[];
             if (shiftId != null) {
                 const detail = await fetchPosterShiftDetailService(shiftId);
-                setShifts(detail ? [detail] : []);
+                data = detail ? [detail] : [];
             } else {
-                const data = await fetchActiveShifts();
-                setShifts(data || []);
+                data = await fetchActiveShifts();
             }
+            if (version !== requestVersion.current) return;
+            setShifts((data || []).filter((shift) => selectedPharmacyId == null ||
+                Number(shift.pharmacyDetail?.id ?? shift.pharmacyId ?? shift.pharmacy) === selectedPharmacyId));
         } catch (error) {
             console.error('Failed to load active shifts', error);
-            setShifts([]);
+            if (version === requestVersion.current) setError(true);
         } finally {
-            setLoading(false);
+            if (version === requestVersion.current) setLoading(false);
         }
-    }, [shiftId]);
+    }, [shiftId, selectedPharmacyId]);
 
     useEffect(() => {
         loadShifts();
+        return () => { requestVersion.current += 1; };
     }, [loadShifts]);
 
     return {
         shifts,
         setShifts,
         loading,
+        error,
         loadShifts,
     };
 }
