@@ -48,13 +48,7 @@ class ClientProfileRouterContractTests(SimpleTestCase):
         "calendar-feed",
     ]
 
-    expected_kernel_prefixes = [
-        "organizations",
-        "chains",
-        "pharmacies",
-        "pharmacy-claims",
-        "pharmacy-admins",
-    ]
+    expected_kernel_prefixes = []
 
     def test_public_router_registration_order_matches_main(self):
         self.assertEqual(

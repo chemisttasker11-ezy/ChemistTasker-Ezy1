@@ -37,14 +37,14 @@ from shifts.emails import (
 )
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.pricing import expand_shift_slots
-from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from shifts.notifications import notify_shift_users
 from datetime import date, datetime, time, timedelta
 from django.utils import timezone
 from core.task_queue import async_task
 import math
 from client_profile.domains.common.serializers import _get_user_short_bio
-from client_profile.domains.orgs.serializers import (
+from organizations.serializers import (
     anonymize_pharmacy_detail,
     PharmacySerializer,
     user_can_view_full_pharmacy,

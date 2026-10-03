@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 from client_profile.models import Membership, Pharmacy
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceSession
-from client_profile.domains.orgs.timezone import get_pharmacy_timezone
+from organizations.timezone import get_pharmacy_timezone
 
 from .attendance_edits import append_missing_punch
 from .award_rates import (

@@ -3,7 +3,7 @@ from rest_framework import permissions, status
 from client_profile.models import Membership, OtherStaffOnboarding, Pharmacy
 from rest_framework.exceptions import APIException
 from users.org_roles import membership_capabilities, membership_visible_pharmacy_ids, OrgCapability
-from client_profile.domains.orgs.access import (
+from organizations.access import (
     _collect_org_access_scope,
     _get_org_pharmacies_queryset,
 )

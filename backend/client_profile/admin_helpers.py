@@ -1,10 +1,10 @@
 """Backward-compatible imports for pharmacy administration access helpers.
 
-New code should import from `client_profile.domains.orgs.access`. This module
+New code should import from `organizations.access`. This module
 remains as a stable compatibility facade for existing callers while the
 client_profile kernel is decomposed incrementally.
 """
-from client_profile.domains.orgs.access import (
+from organizations.access import (
     AdminCapability,
     CAPABILITY_MANAGE_ADMINS,
     CAPABILITY_MANAGE_COMMS,

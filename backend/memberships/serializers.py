@@ -12,7 +12,7 @@ from datetime import date, datetime
 from django.utils import timezone
 from users.presentation import _chat_member_identity
 from client_profile.domains.common.serializers import clean_email
-from client_profile.domains.orgs.serializers import PharmacySerializer
+from organizations.serializers import PharmacySerializer
 
 
 MAX_ACTIVE_PHARMACY_MEMBERSHIPS = 3

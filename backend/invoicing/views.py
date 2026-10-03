@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import api_view, permission_classes
-from client_profile.domains.orgs.access import pharmacies_user_admins
+from organizations.access import pharmacies_user_admins
 from django.shortcuts import get_object_or_404
 import json
 from django.db.models import F, Q
@@ -23,7 +23,7 @@ from core.task_queue import async_task
 from django.db import transaction
 from django.http import HttpResponse
 from invoicing.serializers import InvoiceSerializer
-from client_profile.domains.orgs.access import _get_org_pharmacies_queryset
+from organizations.access import _get_org_pharmacies_queryset
 from invoicing.navigation import invoice_action_url
 
 
