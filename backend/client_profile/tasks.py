@@ -533,7 +533,7 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     except Exception:
         # the note is shown to the user; the lookup error can carry the scraping-service request URL and its key
         note = "AHPRA lookup failed. Please try again later."
-        logger.warning("[verify_ahpra_task] AHPRA lookup failed for pk=%s", object_pk)
+        logger.exception("[verify_ahpra_task] AHPRA lookup failed for pk=%s", object_pk)
         _update_ahpra_fields(model_name, object_pk, False, note)
         return
 
