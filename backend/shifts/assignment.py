@@ -6,12 +6,13 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from core.task_queue import async_task
-from memberships.models import Membership
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from shifts.access import ShiftActionRefused
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import staff_assignment_defaults
@@ -133,9 +134,13 @@ def offer_shift(*, shift, candidate, slot_id):
 def roster_direct_staff(*, shift, candidate, assignments):
     """Roster a direct full-time, part-time or casual member onto the given {slot_id, slot_date} entries; entries
     missing either are skipped. Returns the response body."""
-    membership = Membership.objects.filter(user=candidate, pharmacy=shift.pharmacy).first()
+    membership = Membership.objects.filter(
+        user=candidate,
+        pharmacy=shift.pharmacy,
+        is_active=True,
+    ).first()
 
-    if not membership or membership.employment_type not in ['FULL_TIME', 'PART_TIME', 'CASUAL']:
+    if not membership or membership.employment_type not in PHARMACY_STAFF_EMPLOYMENT_TYPES:
         raise ShiftActionRefused(
             "Only direct full-time, part-time or casual pharmacy staff can be rostered here. "
             "Locum, Shift Hero and external workers must accept a shift offer."
@@ -143,42 +148,45 @@ def roster_direct_staff(*, shift, candidate, assignments):
 
     assignment_ids = []
 
-    for entry in assignments:
-        slot_id = entry.get('slot_id')
-        slot_date = entry.get('slot_date')
-        # Remove checks for start_time/end_time
+    # A submitted roster operation is one user action. If any requested slot is
+    # invalid or belongs to a published roster week, do not leave earlier slots
+    # from the same request persisted.
+    with transaction.atomic():
+        for entry in assignments:
+            slot_id = entry.get('slot_id')
+            slot_date = entry.get('slot_date')
 
-        if not slot_id or not slot_date:
-            continue  # Skip invalid
+            if not slot_id or not slot_date:
+                continue  # Preserve the historical skip semantics for incomplete entries.
 
-        slot = get_object_or_404(shift.slots, pk=slot_id)
-        try:
-            slot_date = date.fromisoformat(str(slot_date))
-        except ValueError:
-            raise ShiftActionRefused('Invalid slot_date format, use YYYY-MM-DD')
+            slot = get_object_or_404(shift.slots, pk=slot_id)
+            try:
+                slot_date = date.fromisoformat(str(slot_date))
+            except ValueError:
+                raise ShiftActionRefused('Invalid slot_date format, use YYYY-MM-DD')
 
-        try:
-            assignment_defaults = staff_assignment_defaults(
-                user=candidate,
-                pharmacy=shift.pharmacy,
-                work_date=slot_date,
-            )
-            # The published-roster guard on save refuses changes to a published roster week.
-            assn, _ = ShiftSlotAssignment.objects.update_or_create(
-                slot=slot,
-                slot_date=slot_date,
-                defaults={
-                    "shift": shift,
-                    "user": candidate,
-                    "unit_rate": Decimal('0.00'),
-                    "rate_reason": {"source": "Rostered manual assign"},
-                    "is_rostered": True,
-                    **assignment_defaults,
-                }
-            )
-        except DjangoValidationError as exc:
-            raise ShiftActionRefused(getattr(exc, "message_dict", {"detail": exc.messages}))
-        assignment_ids.append(assn.id)
+            try:
+                assignment_defaults = staff_assignment_defaults(
+                    user=candidate,
+                    pharmacy=shift.pharmacy,
+                    work_date=slot_date,
+                )
+                # The published-roster guard on save refuses changes to a published roster week.
+                assn, _ = ShiftSlotAssignment.objects.update_or_create(
+                    slot=slot,
+                    slot_date=slot_date,
+                    defaults={
+                        "shift": shift,
+                        "user": candidate,
+                        "unit_rate": Decimal('0.00'),
+                        "rate_reason": {"source": "Rostered manual assign"},
+                        "is_rostered": True,
+                        **assignment_defaults,
+                    }
+                )
+            except DjangoValidationError as exc:
+                raise ShiftActionRefused(getattr(exc, "message_dict", {"detail": exc.messages}))
+            assignment_ids.append(assn.id)
 
     if assignment_ids:
         notify_shift_users(
