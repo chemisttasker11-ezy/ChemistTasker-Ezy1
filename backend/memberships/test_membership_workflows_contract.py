@@ -218,6 +218,31 @@ class MembershipVisibilityTests(MembershipFixture):
                 response, _ = self.call(user, "patch", f"memberships/{membership.id}/", {"invited_name": label})
                 self.assertEqual(response.status_code, status_code, response.data)
 
+    def test_organization_filter_does_not_expand_an_ordinary_member_to_sibling_pharmacies(self):
+        member_user, own_membership = self.member(employment_type="FULL_TIME")
+        _, sibling = make_owner_with_pharmacy("Sibling Pharmacy")
+        sibling.organization = self.org
+        sibling.save(update_fields=["organization"])
+        _, sibling_membership = self.member(
+            pharmacy=sibling,
+            employment_type="FULL_TIME",
+        )
+
+        response, _ = self.call(
+            member_user,
+            "get",
+            f"memberships/?organization={self.org.id}",
+        )
+        rows = response.data["results"] if isinstance(response.data, dict) else response.data
+        ids = {row["id"] for row in rows}
+
+        self.assertIn(own_membership.id, ids)
+        self.assertNotIn(
+            sibling_membership.id,
+            ids,
+            "organization filtering must narrow the caller's authorized pharmacies, not widen them",
+        )
+
     def test_removing_a_member(self):
         _, membership = self.member()
         response, _ = self.call(self.owner, "delete", f"memberships/{membership.id}/")
