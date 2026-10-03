@@ -351,21 +351,17 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             )
 
         # --- 2. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
-        is_member_of_pharmacy = Membership.objects.filter(
+        membership = Membership.objects.filter(
             user=user,
             pharmacy=shift.pharmacy,
-            is_active=True
-        ).exists()
+            is_active=True,
+        ).first()
 
-        if not is_member_of_pharmacy:
+        if not membership:
             return _claim_refused(
                 request, shift, "not_member",
                 "You must be an active member of this pharmacy to claim this shift.", "shift_claim_not_member",
             )
-
-        membership = Membership.objects.filter(
-            user=user, pharmacy=shift.pharmacy, is_active=True
-        ).first()
         # --- 3. Tier eligibility ---
         # The community queryset already admits only the eligible tiers for FULL_PART_TIME and LOCUM_CASUAL shifts
         # (shifts/test_claim_eligibility.py). Locum and shift-hero members must take the offer path instead.
