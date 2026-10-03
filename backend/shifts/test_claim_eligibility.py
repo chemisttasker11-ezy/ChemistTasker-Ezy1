@@ -2,10 +2,10 @@
 
 The community queryset owns who can see (and therefore claim) a shift: a FULL_PART_TIME shift is visible to active
 full-time / part-time / casual members of its pharmacy; a LOCUM_CASUAL shift to active locum / shift-hero members and,
-unless it is posted anonymously, to active staff members. Membership is unique per (user, pharmacy). The claim fetches
-the current direct membership and then re-runs the canonical queryset before mutation, so a concurrent tier change
-cannot rely on stale visibility. Locum and shift-hero members are then refused with 400 because they must express
-interest and accept an offer. These tests drive the real endpoint through every tier/visibility/anonymity combination.
+unless it is posted anonymously, to active staff members. Membership is unique per (user, pharmacy). The claim locks the current direct membership row, re-runs the canonical
+queryset under that lock, and keeps the lock through assignment, so visibility and tier handling use one stable
+membership snapshot. Locum and shift-hero members are then refused with 400 because they must express interest and
+accept an offer. These tests drive the real endpoint through every tier/visibility/anonymity combination.
 """
 from datetime import date, time, timedelta
 from unittest import mock
@@ -64,7 +64,9 @@ class ClaimEligibilityTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         locked.assert_called_once_with()
 
-    def test_tier_change_after_initial_visibility_is_rechecked_before_claim(self):
+    def test_tier_change_after_initial_object_lookup_is_rechecked_before_claim(self):
+        from shifts.browse import CommunityShiftViewSet
+
         worker = make_user("PHARMACIST")
         membership = Membership.objects.create(
             user=worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="LOCUM",
@@ -78,22 +80,17 @@ class ClaimEligibilityTests(TestCase):
             shift=shift, date=date.today() + timedelta(days=7), start_time=time(9, 0), end_time=time(17, 0)
         )
 
-        real_filter = Membership.objects.filter
+        original_get_object = CommunityShiftViewSet.get_object
         changed = False
 
-        def filter_after_visibility(*args, **kwargs):
+        def get_object_then_change(view):
             nonlocal changed
-            if (
-                not changed
-                and kwargs.get("user") == worker
-                and kwargs.get("pharmacy") == self.pharmacy
-                and kwargs.get("is_active") is True
-            ):
-                Membership._base_manager.filter(pk=membership.pk).update(employment_type="PART_TIME")
-                changed = True
-            return real_filter(*args, **kwargs)
+            obj = original_get_object(view)
+            Membership._base_manager.filter(pk=membership.pk).update(employment_type="PART_TIME")
+            changed = True
+            return obj
 
-        with mock.patch.object(Membership.objects, "filter", side_effect=filter_after_visibility), \
+        with mock.patch.object(CommunityShiftViewSet, "get_object", get_object_then_change), \
                 mock.patch("shifts.browse.async_task"):
             response = client_for(worker).post(
                 f"{API}community-shifts/{shift.id}/claim-shift/", {}, format="json"
