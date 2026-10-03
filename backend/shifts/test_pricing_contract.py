@@ -121,6 +121,26 @@ class PricingDataLoaderTests(SimpleTestCase):
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "public_holidays.json"):
                     pricing_data.public_holidays()
 
+    def test_incomplete_award_table_is_rejected(self):
+        import json
+        import tempfile
+        from copy import deepcopy
+        from pathlib import Path
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        source = json.loads(pricing_data.AWARD_RATES_FILE.read_text(encoding="utf-8"))
+        missing = deepcopy(source)
+        del missing["ASSISTANT"]["LEVEL_1"]["casual"]["sunday"]
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "award_rates_casual_first_level.json"
+            bad.write_text(json.dumps(missing), encoding="utf-8")
+            with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "ASSISTANT/LEVEL_1.*sunday"):
+                    pricing_data.award_rates()
+
     def test_malformed_structure_is_rejected(self):
         import tempfile
         from pathlib import Path
