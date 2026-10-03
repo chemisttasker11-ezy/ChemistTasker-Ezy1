@@ -325,6 +325,30 @@ class ResolverAndPermissionTests(HubFixture):
             actual[label] = row
         self.check_recorded("resolver", actual)
 
+    def test_scoped_org_roles_cannot_escape_their_canonical_pharmacy_scope(self):
+        Resolver = resolver_class()
+
+        with self.assertRaises(PermissionDenied):
+            Resolver(self.users["region_admin"]).pharmacy_scope(self.pharmacy.id)
+        with self.assertRaises(PermissionDenied):
+            Resolver(self.users["shift_manager"]).pharmacy_scope(self.pharmacy.id)
+        with self.assertRaises(PermissionDenied):
+            Resolver(self.users["shift_manager"]).organization_scope(self.org.id)
+
+        region_membership = OrganizationMembership.objects.get(
+            user=self.users["region_admin"],
+            organization=self.org,
+        )
+        region_membership.pharmacies.add(self.pharmacy)
+
+        scoped = Resolver(self.users["region_admin"]).pharmacy_scope(self.pharmacy.id)
+        self.assertTrue(scoped["has_admin_permissions"])
+        self.assertFalse(scoped["is_org_admin"])
+        with self.assertRaises(PermissionDenied):
+            Resolver(self.users["region_admin"]).pharmacy_scope(self.sibling.id)
+        with self.assertRaises(PermissionDenied):
+            Resolver(self.users["region_admin"]).organization_scope(self.org.id)
+
     def test_permission_map_behind_the_context(self):
         get_permissions = permissions_function()
         actual = {}
