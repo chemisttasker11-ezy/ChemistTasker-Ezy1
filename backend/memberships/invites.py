@@ -79,7 +79,10 @@ def create_membership_invite(data, inviter, *, request=None):
             )
 
         # Find or create user
-        user = User.objects.filter(email__iexact=email).first()
+        # Serialize the cross-pharmacy active-membership cap on the worker row.
+        # Pharmacy locks alone do not coordinate two simultaneous invites to
+        # different pharmacies for the same existing user.
+        user = User.objects.select_for_update().filter(email__iexact=email).first()
         user_created = False
         
         if not user:
