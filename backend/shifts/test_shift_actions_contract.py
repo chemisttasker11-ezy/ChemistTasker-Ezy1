@@ -18,6 +18,7 @@ from client_profile.characterization_support import client_for, make_owner_with_
 from memberships.models import Membership
 from notifications.models import Notification
 from onboarding.models import PharmacistOnboarding
+from workforce.models import RosterPeriod
 from shifts.models import (
     Shift,
     ShiftCounterOffer,
@@ -484,18 +485,27 @@ class ShareAndEscalateTests(ShiftActionFixture):
 
 
 class ManualAssignTests(ShiftActionFixture):
-    def test_current_behaviour_a_json_slot_date_crashes_the_roster_guard(self):
-        # CURRENT BEHAVIOUR: the slot_date arrives as a string and is stored unparsed; the published-roster guard on
-        # ShiftSlotAssignment.save() calls .weekday() on it, so every manual assignment ends in a server error.
+    def test_malformed_slot_date_and_published_roster_are_refused(self):
+        # Regression: a JSON slot_date used to reach ShiftSlotAssignment.save() as a string and crash the
+        # published-roster guard, and a published roster week raised a server error instead of a refusal.
         staff = self.worker("FULL_TIME")
         shift = self.shift(single_user_only=False, slots=1)
         slot = shift.slots.get()
-        payload = {"user_id": staff.id, "assignments": [{"slot_id": slot.id, "slot_date": str(slot.date)}]}
-        with self.assertRaisesMessage(AttributeError, "'str' object has no attribute 'weekday'"):
-            self.post(self.owner, f"shifts/{shift.id}/manual-assign/", payload)
+        bad, _ = self.post(self.owner, f"shifts/{shift.id}/manual-assign/",
+                           {"user_id": staff.id, "assignments": [{"slot_id": slot.id, "slot_date": "10/10/2030"}]})
+        self.assertEqual((bad.status_code, bad.data["detail"]), (400, "Invalid slot_date format, use YYYY-MM-DD"))
+
+        RosterPeriod.objects.create(
+            pharmacy=self.pharmacy, week_start=slot.date - timedelta(days=slot.date.weekday()),
+            status=RosterPeriod.Status.PUBLISHED,
+        )
+        published, _ = self.post(self.owner, f"shifts/{shift.id}/manual-assign/",
+                                 {"user_id": staff.id, "assignments": [{"slot_id": slot.id, "slot_date": str(slot.date)}]})
+        self.assertEqual(published.status_code, 400)
+        self.assertIn("published roster", str(published.data))
         self.assertFalse(ShiftSlotAssignment.objects.exists())
 
-    def _test_direct_staff_are_rostered_and_notified(self):  # enabled by the slot_date fix
+    def test_direct_staff_are_rostered_and_notified(self):
         staff = self.worker("FULL_TIME")
         shift = self.shift(single_user_only=False, slots=2)
         first, second = shift.slots.order_by("id")

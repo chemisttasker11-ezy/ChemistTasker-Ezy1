@@ -2,7 +2,7 @@
 
 Refusals raise `ShiftActionRefused`, whose response body and status are those the views used to build by hand.
 """
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -152,6 +152,10 @@ def roster_direct_staff(*, shift, candidate, assignments):
             continue  # Skip invalid
 
         slot = get_object_or_404(shift.slots, pk=slot_id)
+        try:
+            slot_date = date.fromisoformat(str(slot_date))
+        except ValueError:
+            raise ShiftActionRefused('Invalid slot_date format, use YYYY-MM-DD')
 
         try:
             assignment_defaults = staff_assignment_defaults(
@@ -159,20 +163,21 @@ def roster_direct_staff(*, shift, candidate, assignments):
                 pharmacy=shift.pharmacy,
                 work_date=slot_date,
             )
+            # The published-roster guard on save refuses changes to a published roster week.
+            assn, _ = ShiftSlotAssignment.objects.update_or_create(
+                slot=slot,
+                slot_date=slot_date,
+                defaults={
+                    "shift": shift,
+                    "user": candidate,
+                    "unit_rate": Decimal('0.00'),
+                    "rate_reason": {"source": "Rostered manual assign"},
+                    "is_rostered": True,
+                    **assignment_defaults,
+                }
+            )
         except DjangoValidationError as exc:
             raise ShiftActionRefused(getattr(exc, "message_dict", {"detail": exc.messages}))
-        assn, _ = ShiftSlotAssignment.objects.update_or_create(
-            slot=slot,
-            slot_date=slot_date,
-            defaults={
-                "shift": shift,
-                "user": candidate,
-                "unit_rate": Decimal('0.00'),
-                "rate_reason": {"source": "Rostered manual assign"},
-                "is_rostered": True,
-                **assignment_defaults,
-            }
-        )
         assignment_ids.append(assn.id)
 
     if assignment_ids:
