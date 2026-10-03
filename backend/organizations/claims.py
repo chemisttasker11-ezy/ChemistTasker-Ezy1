@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.utils import timezone
-from client_profile.domains.common.helpers import clean_email
+from users.normalization import sanitize_email_text as clean_email
 from users.navigation import get_frontend_dashboard_url
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode

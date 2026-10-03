@@ -7,7 +7,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from client_profile.models import Shift
+from shifts.models import Shift
 from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
 
 User = get_user_model()

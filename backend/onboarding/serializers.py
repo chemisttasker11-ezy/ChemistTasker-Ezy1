@@ -35,16 +35,16 @@ import json
 from django.utils.text import slugify
 from django.core.files.storage import default_storage
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, validate_uploaded_file
-from client_profile.domains.common.serializers import (
-    _build_absolute_media_url,
+from core.numbers import coerce_float_6 as q6
+from core.serializer_lifecycle import (
     _delete_file_if_unreferenced,
     _file_has_changed,
     _should_clear_flag,
     _update_locked_user_fields,
-    clean_email,
-    q6,
-    UploadValidationMixin,
 )
+from core.serializer_mixins import UploadValidationMixin
+from users.normalization import normalize_email as clean_email
+from users.presentation import _build_absolute_media_url
 
 
 def _required_cert_skill_codes(role_key: str) -> set[str]:

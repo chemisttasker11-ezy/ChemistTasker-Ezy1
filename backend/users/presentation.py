@@ -60,3 +60,19 @@ def _chat_member_identity(user, request=None, membership=None):
         "email": getattr(user, "email", None),
         "profile_photo_url": _build_absolute_media_url(request, photo),
     }
+
+
+def _get_user_short_bio(user):
+    """
+    Retrieve the first non-empty short_bio from the user's onboarding profile(s),
+    falling back to any short_bio directly on the user if present.
+    """
+    if not user:
+        return None
+    for attr in ("pharmacistonboarding", "otherstaffonboarding", "exploreronboarding"):
+        profile = getattr(user, attr, None)
+        if profile:
+            bio = getattr(profile, "short_bio", None)
+            if bio:
+                return bio
+    return getattr(user, "short_bio", None)

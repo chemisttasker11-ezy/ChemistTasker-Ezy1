@@ -1,6 +1,7 @@
 """Ratings API: create/update, list, summary, mine, pending and report endpoints."""
 from rest_framework import permissions, status, viewsets
-from client_profile.models import Pharmacy, PharmacyAdmin, ShiftSlotAssignment
+from organizations.models import Pharmacy, PharmacyAdmin
+from shifts.models import ShiftSlotAssignment
 from ratings.models import Rating
 from rest_framework.response import Response
 from rest_framework.decorators import action

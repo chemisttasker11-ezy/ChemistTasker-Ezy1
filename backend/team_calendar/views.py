@@ -21,9 +21,11 @@ from users.org_roles import (
 )
 from users.models import OrganizationMembership
 
-from client_profile.domains.orgs.access import is_admin_of, pharmacies_user_admins
+from organizations.access import is_admin_of, pharmacies_user_admins
 from pharmacy_hub.views import HubScopeResolver
-from client_profile.models import Membership, OtherStaffOnboarding, PharmacistOnboarding, Pharmacy
+from memberships.models import Membership
+from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
+from organizations.models import Pharmacy
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
 from team_calendar.recurrence import expand_recurrence_dates

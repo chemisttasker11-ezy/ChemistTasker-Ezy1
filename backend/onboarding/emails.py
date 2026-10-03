@@ -1,8 +1,8 @@
 """Onboarding e-mails and notifications: referee requests, the superuser notice and name matching."""
 import difflib
 import re
-from client_profile.domains.common.helpers import clean_email
-from client_profile.domains.common.labels import other_staff_role_label
+from users.normalization import sanitize_email_text as clean_email
+from users.role_labels import other_staff_role_label
 from core.task_queue import async_task
 from django.conf import settings
 from django.contrib.auth import get_user_model

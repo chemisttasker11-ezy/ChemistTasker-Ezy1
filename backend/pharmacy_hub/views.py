@@ -22,14 +22,9 @@ from rest_framework.views import APIView
 from users.models import OrganizationMembership
 from notifications.services import notify_users
 
-from client_profile.models import (
-    Membership,
-    Organization,
-    OtherStaffOnboarding,
-    Pharmacy,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-    PharmacyAdmin,
-)
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from onboarding.models import OtherStaffOnboarding
+from organizations.models import Organization, Pharmacy, PharmacyAdmin
 from pharmacy_hub.models import (
     PharmacyCommunityGroup,
     PharmacyCommunityGroupMembership,
