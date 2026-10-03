@@ -886,7 +886,7 @@ class VerificationConfigurationTests(SimpleTestCase):
         self.assertIn("error_type=ImproperlyConfigured", " ".join(logs.output))
 
 
-class VerificationArtifactTests(SimpleTestCase):
+class VerificationArtifactTests(TestCase):
     AHPRA = "client_profile.tasks.verify_ahpra_task"
     PAGE = (
         '<div class="practitioner-detail-header"><h2 class="practitioner-name">Ann Lee</h2>'
