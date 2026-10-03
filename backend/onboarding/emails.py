@@ -1,5 +1,6 @@
 """Onboarding e-mails and notifications: referee requests, the superuser notice and name matching."""
 import difflib
+import logging
 import re
 from users.normalization import sanitize_email_text as clean_email
 from users.role_labels import other_staff_role_label
@@ -9,6 +10,8 @@ from django.contrib.auth import get_user_model
 from django.core.signing import TimestampSigner
 from django.utils import timezone
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 
 def get_candidate_role(obj) -> str:
@@ -102,7 +105,10 @@ def send_referee_emails(obj, is_reminder=False):
                 from onboarding.verification.reminders import schedule_referee_reminder
                 schedule_referee_reminder(obj._meta.model_name, obj.pk, idx)
             except Exception:
-                pass
+                # non-critical for this request: the e-mail is queued; the missing reminder must be visible
+                logger.exception(
+                    "[referee-reminder] Scheduling failed model=%s pk=%s ref_idx=%s", obj._meta.model_name, obj.pk, idx
+                )
 
     if update_fields:
         obj.save(update_fields=list(set(update_fields)))

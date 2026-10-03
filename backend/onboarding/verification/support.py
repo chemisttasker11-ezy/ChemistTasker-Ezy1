@@ -5,7 +5,6 @@ import time are known side effects, kept here for the behaviour-preserving move 
 """
 import logging
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -37,7 +36,7 @@ def fetch_instance_with_retries(model, pk, max_retries=10, sleep_sec=0.4):
         try:
             return model.objects.get(pk=pk)
         except ObjectDoesNotExist:
-            logger.error(f"[fetch_instance_with_retries] Not found pk={pk}, try {i+1}/{max_retries}", file=sys.stderr)
+            logger.warning("[fetch_instance_with_retries] Not found pk=%s, try %s/%s", pk, i + 1, max_retries)
             time.sleep(sleep_sec)
     raise model.DoesNotExist(f"Object with pk={pk} not found after {max_retries} tries")
 

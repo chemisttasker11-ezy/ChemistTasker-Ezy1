@@ -238,6 +238,8 @@ CELERY_TASK_ROUTES = {
     "client_profile.tasks.run_referee_reminder": {"queue": "notifications"},
     "client_profile.tasks.email_membership_application_submitted": {"queue": "notifications"},
     "client_profile.tasks.email_membership_application_approved": {"queue": "notifications"},
+    "client_profile.tasks.email_membership_application_review_updated": {"queue": "notifications"},
+    "client_profile.tasks.email_membership_application_rejected": {"queue": "notifications"},
     "client_profile.notifications.*": {"queue": "notifications"},
     "client_profile.tasks.verify_*": {"queue": "ocr"},
     "billing.tasks.*": {"queue": "billing"},

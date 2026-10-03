@@ -284,7 +284,13 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
         return
 
     Model = apps.get_model('client_profile', model_name)
-    obj = Model.objects.get(pk=pk)
+    try:
+        obj = Model.objects.get(pk=pk)
+    except Model.DoesNotExist:
+        # the profile was deleted after this ETA reminder was queued: nothing left to remind about
+        cancel_referee_reminder(model_name, pk, ref_idx)
+        logger.info("[referee-reminder] Profile gone; reminder dropped model=%s pk=%s ref_idx=%s", model_name, pk, ref_idx)
+        return
 
     confirmed = bool(getattr(obj, f'referee{ref_idx}_confirmed', False))
     rejected = bool(getattr(obj, f'referee{ref_idx}_rejected', False))
@@ -457,12 +463,6 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
-    # Keep your retry guard
-    if retry_count > 15:
-        logger.error(f"[FINAL EVALUATION] Timed out waiting for automated tasks for {model_name} pk={object_pk}.")
-        cancel_pending_reminders()
-        return
-
     # Build required checks (unchanged)
     required_checks = []
     model_name_lower = model_name.lower()
@@ -554,8 +554,50 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
 
     # Debug timing: 0.1h (~6 min). Use 48 for production.
     REMINDER_DELAY = timedelta(hours=48)
-    # Keep your quick re-check loop, but schedule it properly
+    # Quick re-check loop for automated checks that are still running. It is bounded: a run re-checks while
+    # retry_count <= MAX_QUICK_RECHECK_COUNT; past that only this loop stops. The profile is still pending, so no
+    # reminder is cancelled, and a 48-hour reminder run starts a new bounded loop.
     RECHECK_DELAY = timedelta(seconds=20)
+    MAX_QUICK_RECHECK_COUNT = 15
+
+    def ensure_future_evaluation():
+        if _has_future_reminder(model_name, object_pk):
+            return False
+        key = _final_evaluation_reminder_key(model_name, object_pk)
+        _marker_set(key, timeout=int(REMINDER_DELAY.total_seconds()) + 3600)
+        try:
+            final_evaluation.apply_async(
+                args=(model_name, object_pk),
+                kwargs={'is_reminder': True},
+                eta=timezone.now() + REMINDER_DELAY,
+                queue="default",
+            )
+        except Exception:
+            # the marker means "a future evaluation is queued"; without the task it would block later scheduling
+            _marker_delete(key)
+            logger.exception(
+                "[FINAL EVALUATION] 48-hour evaluation enqueue failed; marker removed model=%s pk=%s",
+                model_name, object_pk,
+            )
+            raise
+        return True
+
+    def schedule_quick_recheck():
+        if retry_count > MAX_QUICK_RECHECK_COUNT:
+            future_scheduled = ensure_future_evaluation()
+            logger.warning(
+                "[FINAL EVALUATION] Checks still pending after %s quick re-checks; quick loop stopped model=%s pk=%s "
+                "future_evaluation=%s",
+                retry_count, model_name, object_pk,
+                "scheduled" if future_scheduled else "already-queued",
+            )
+            return
+        final_evaluation.apply_async(
+            args=(model_name, object_pk),
+            kwargs={'retry_count': retry_count + 1},
+            eta=timezone.now() + RECHECK_DELAY,
+            queue="default",
+        )
 
     if is_pending_referee:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} is waiting for referee confirmation.")
@@ -568,39 +610,22 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
             send_referee_emails(obj, is_reminder=True)
 
         # IMPORTANT: Do NOT cancel here; only cancel in final states.
-        # Ensure exactly ONE future reminder exists
-        if not _has_future_reminder(model_name, object_pk):
-            _marker_set(
-                _final_evaluation_reminder_key(model_name, object_pk),
-                timeout=int(REMINDER_DELAY.total_seconds()) + 3600,
-            )
-            final_evaluation.apply_async(
-                args=(model_name, object_pk),
-                kwargs={'is_reminder': True},
-                eta=timezone.now() + REMINDER_DELAY,
-                queue="default",
-            )
+        # Ensure exactly ONE future evaluation exists. When a referee is still pending, that future run also sends
+        # the referee reminder; for manual-only pending checks it is simply the low-frequency evaluation wake-up.
+        if ensure_future_evaluation():
             logger.info(f"[FINAL EVALUATION] Scheduled next referee check for pk={object_pk} at {(timezone.now() + REMINDER_DELAY).isoformat()}.")
         else:
-            logger.info(f"[FINAL EVALUATION] Future referee reminder already exists for pk={object_pk}; leaving it in place.")
+            logger.info(f"[FINAL EVALUATION] Future evaluation already exists for pk={object_pk}; leaving it in place.")
 
-        # If other automated checks are also pending, keep the quick re-check loop alive (properly delayed)
+        # If other automated checks are also pending, keep the quick re-check loop alive (bounded)
         if is_pending_check:
-            final_evaluation.apply_async(
-                args=(model_name, object_pk),
-                eta=timezone.now() + RECHECK_DELAY,
-                queue="default",
-            )
+            schedule_quick_recheck()
         return
 
     # Automated checks still pending (no referee pending) -> keep quick loop
     if is_pending_check:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} is waiting for automated tasks. Re-checking in 20s.")
-        final_evaluation.apply_async(
-            args=(model_name, object_pk),
-            eta=timezone.now() + RECHECK_DELAY,
-            queue="default",
-        )
+        schedule_quick_recheck()
         return
 
     # Success state (unchanged)

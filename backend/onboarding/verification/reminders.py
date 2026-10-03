@@ -71,11 +71,19 @@ def schedule_referee_reminder(model_name: str, pk: int, ref_idx: int, hours: flo
         return
     from onboarding.tasks import run_referee_reminder  # the task module imports this module
 
-    run_referee_reminder.apply_async(
-        args=(model_name, pk, ref_idx),
-        eta=timezone.now() + timedelta(hours=delay),
-        queue="notifications",
-    )
+    try:
+        run_referee_reminder.apply_async(
+            args=(model_name, pk, ref_idx),
+            eta=timezone.now() + timedelta(hours=delay),
+            queue="notifications",
+        )
+    except Exception:
+        # the marker means "a reminder is queued"; without the task it would block every later schedule
+        _marker_delete(key)
+        logger.exception(
+            "[referee-reminder] Enqueue failed; marker removed model=%s pk=%s ref_idx=%s", model_name, pk, ref_idx
+        )
+        raise
 
 
 def cancel_referee_reminder(model_name: str, pk: int, ref_idx: int) -> int:

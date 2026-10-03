@@ -45,17 +45,16 @@ LEGACY_TASKS = {
     "client_profile.tasks.email_membership_application_submitted": (
         "(app_id: int)", "notifications", "notifications", "notifications",
     ),
-    # CURRENT BEHAVIOUR: no CELERY_TASK_ROUTES entry, so a by-name dispatch (core.task_queue.async_task ->
-    # send_task) lands on CELERY_TASK_DEFAULT_QUEUE ("default"), not on the decorator's "notifications" queue.
-    # Both queues are consumed by the worker; the mismatch is characterised here and changed only deliberately.
+    # A by-name dispatch (core.task_queue.async_task -> send_task) ignores the decorator queue; an explicit
+    # CELERY_TASK_ROUTES entry keeps review_updated/rejected on "notifications" like submitted/approved.
     "client_profile.tasks.email_membership_application_review_updated": (
-        "(app_id: int, changes: list[dict] | None = None)", "notifications", "default", "notifications",
+        "(app_id: int, changes: list[dict] | None = None)", "notifications", "notifications", "notifications",
     ),
     "client_profile.tasks.email_membership_application_approved": (
         "(app_id: int)", "notifications", "notifications", "notifications",
     ),
     "client_profile.tasks.email_membership_application_rejected": (
-        "(app_id: int)", "notifications", "default", "notifications",
+        "(app_id: int)", "notifications", "notifications", "notifications",
     ),
 }
 
@@ -141,6 +140,26 @@ class TaskIdentityContractTests(SimpleTestCase):
                             declared.setdefault(keyword.value.value, []).append(f"{rel}:{node.lineno}")
         self.assertTrue(set(LEGACY_TASKS) <= set(declared))
         self.assertEqual({name: where for name, where in declared.items() if len(where) > 1}, {})
+
+    def test_verification_pipeline_is_dispatched_only_by_itself(self):
+        # CURRENT BEHAVIOUR (product decision, not a defect): run_all_verifications / final_evaluation are a retained,
+        # supported pipeline, but no user flow dispatches them. In particular a manual AHPRA change (admin or onboarding
+        # serializer) does not enqueue final_evaluation. Wiring a dispatcher in is a separate, deliberate change.
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        names = {"client_profile.tasks.run_all_verifications", "client_profile.tasks.final_evaluation"}
+        sites = set()
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if isinstance(node, ast_module.Constant) and node.value in names:
+                    sites.add(rel)
+                elif isinstance(node, ast_module.Attribute) and node.attr in {"delay", "apply_async", "s", "si"}:
+                    if ast_module.unparse(node.value) in {"final_evaluation", "run_all_verifications"}:
+                        sites.add(rel)
+        # the pipeline schedules itself; settings only route the names
+        self.assertEqual(sites, {"onboarding/tasks.py", "core/settings.py"})
 
     def test_signatures_are_unchanged(self):
         for name, (signature, *_queues) in LEGACY_TASKS.items():
@@ -277,6 +296,18 @@ class ReminderMarkerContractTests(SimpleTestCase):
             schedule("PharmacistOnboarding", 7, 1)
         self.assertEqual(redis_client.set.call_args.kwargs["ex"], 48 * 3600 + 3600)
 
+    def test_failed_enqueue_removes_the_marker_and_propagates(self):
+        # SET NX + enqueue behave as one operation: a marker without a queued task would block every later schedule
+        schedule = impl(self.TASK, "schedule_referee_reminder")
+        redis_client = mock.Mock()
+        redis_client.set.return_value = True
+        with mock.patch.dict(schedule.__globals__, {"_reminder_redis": lambda: redis_client}), \
+                mock.patch.object(task(self.TASK), "apply_async", side_effect=ConnectionError("broker down")), \
+                self.assertLogs(schedule.__module__, level="ERROR"), \
+                self.assertRaises(ConnectionError):
+            schedule("PharmacistOnboarding", 7, 1)
+        redis_client.delete.assert_called_once_with("celery:referee-reminder:PharmacistOnboarding:7:1")
+
     def test_existing_marker_prevents_a_second_enqueue(self):
         schedule = impl(self.TASK, "schedule_referee_reminder")
         redis_client = mock.Mock()
@@ -303,6 +334,75 @@ class ReminderMarkerContractTests(SimpleTestCase):
             ],
         )
 
+    def test_scheduling_failure_while_sending_referee_emails_is_logged_not_raised(self):
+        # Reminders are non-critical for the request: the e-mails still go out and the profile is saved, but the
+        # failure is visible in the log instead of being swallowed.
+        from onboarding import emails
+
+        meta = SimpleNamespace(model_name="pharmacistonboarding")
+        obj = SimpleNamespace(
+            _meta=meta, pk=7,
+            user=SimpleNamespace(get_full_name=lambda: "Ann Lee", first_name="Ann", last_name="Lee", email="a@example.com"),
+            referee1_email="ref1@example.com", referee1_confirmed=False, referee1_rejected=False,
+            referee1_name="R1", referee1_workplace="W", referee1_relation="Manager",
+            referee2_email="", referee2_confirmed=False, referee2_rejected=False,
+            save=mock.Mock(),
+        )
+        with mock.patch.object(emails, "async_task") as sent, \
+                mock.patch("onboarding.verification.reminders.schedule_referee_reminder",
+                           side_effect=ConnectionError("broker down")), \
+                self.assertLogs("onboarding.emails", level="ERROR") as logs:
+            emails.send_referee_emails(obj)
+        sent.assert_called_once()
+        obj.save.assert_called_once()
+        self.assertIn("ref_idx=1", " ".join(logs.output))
+
+    def test_reminder_for_a_deleted_profile_is_a_terminal_no_op(self):
+        # an ETA reminder can run after the onboarding profile was deleted: clear the marker, log, finish successfully
+        from django.core.exceptions import ObjectDoesNotExist
+
+        class Missing(ObjectDoesNotExist):
+            pass
+
+        model = mock.Mock()
+        model.DoesNotExist = Missing
+        model.objects.get.side_effect = Missing()
+        deleted = []
+        run = task(self.TASK)
+        with patch_impl(
+            self.TASK,
+            apps=SimpleNamespace(get_model=lambda label, name: model),
+            _marker_get=lambda key: True,
+            _marker_delete=lambda key: deleted.append(key) or 1,
+            cancel_referee_reminder=lambda m, pk, idx: deleted.append(f"cancel:{m}:{pk}:{idx}") or 1,
+            async_task=mock.Mock(side_effect=AssertionError("no e-mail for a deleted profile")),
+        ), self.assertLogs(run.run.__module__, level="INFO") as logs:
+            self.assertIsNone(run.run("PharmacistOnboarding", 7, 2))
+        self.assertEqual(deleted, ["cancel:PharmacistOnboarding:7:2"])
+        self.assertIn("pk=7", " ".join(logs.output))
+
+    def test_reminder_calls_are_never_silently_swallowed(self):
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        reminder_calls = {"schedule_referee_reminder", "cancel_referee_reminder", "cancel_all_referee_reminders"}
+        offenders = []
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if not isinstance(node, ast_module.Try):
+                    continue
+                called = {
+                    ast_module.unparse(c.func).rsplit(".", 1)[-1]
+                    for statement in node.body for c in ast_module.walk(statement) if isinstance(c, ast_module.Call)
+                }
+                if not called & reminder_calls:
+                    continue
+                for handler in node.handlers:
+                    if all(isinstance(statement, ast_module.Pass) for statement in handler.body):
+                        offenders.append(f"{rel}:{handler.lineno}")
+        self.assertEqual(offenders, [])
+
     def test_synchronous_consumers_use_the_same_reminder_functions(self):
         from onboarding import views as onboarding_views
 
@@ -312,12 +412,13 @@ class ReminderMarkerContractTests(SimpleTestCase):
 class FinalEvaluationContractTests(SimpleTestCase):
     TASK = "client_profile.tasks.final_evaluation"
 
-    def run_task(self, obj, *, marker=False, **kwargs):
+    def run_task(self, obj, *, marker=False, enqueue_error=None, **kwargs):
         model = mock.Mock()
         model.objects.get.return_value = obj
         model.DoesNotExist = Exception
         fake_apps = SimpleNamespace(get_model=lambda label, name: model)
         calls = SimpleNamespace(set=[], delete=[], sent=[])
+        self.calls = calls  # readable when the task raises
         final_evaluation = task(self.TASK)
         with mock.patch("django.apps.apps", fake_apps), \
                 patch_impl(
@@ -330,7 +431,7 @@ class FinalEvaluationContractTests(SimpleTestCase):
                 ), \
                 mock.patch("core.task_queue.async_task") as async_task, \
                 mock.patch("onboarding.emails.send_referee_emails") as referee_emails, \
-                mock.patch.object(final_evaluation, "apply_async") as apply_async:
+                mock.patch.object(final_evaluation, "apply_async", side_effect=enqueue_error) as apply_async:
             final_evaluation.run("PharmacistOnboarding", 5, **kwargs)
         return calls, async_task, referee_emails, apply_async
 
@@ -346,21 +447,15 @@ class FinalEvaluationContractTests(SimpleTestCase):
         obj.save = mock.Mock()
         return obj
 
-    def test_pending_automated_check_reschedules_in_20_seconds_without_retry_count(self):
+    def test_pending_automated_check_reschedules_in_20_seconds(self):
         obj = self.pharmacist(ahpra_verified=False)
         calls, async_task, _emails, apply_async = self.run_task(obj)
         apply_async.assert_called_once()
         self.assertEqual(apply_async.call_args.kwargs["args"], ("PharmacistOnboarding", 5))
-        # CURRENT BEHAVIOUR (known defect, fixed separately): the re-check does not pass retry_count + 1
-        self.assertNotIn("kwargs", apply_async.call_args.kwargs)
+        self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"retry_count": 1})
         self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
+        self.assertEqual(calls.delete, [])
         async_task.assert_not_called()
-
-    def test_retry_guard_stops_and_cancels_reminders(self):
-        obj = self.pharmacist(ahpra_verified=False)
-        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
-        apply_async.assert_not_called()
-        self.assertEqual(calls.delete, ["celery:final-evaluation-reminder:PharmacistOnboarding:5"])
 
     def test_pending_referee_schedules_one_48_hour_reminder(self):
         obj = self.pharmacist(referee2_confirmed=False)
@@ -370,11 +465,75 @@ class FinalEvaluationContractTests(SimpleTestCase):
         self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"is_reminder": True})
         obj.save.assert_called_once_with(update_fields=["verified"])
 
+    def test_failed_48_hour_enqueue_removes_the_marker_and_propagates(self):
+        obj = self.pharmacist(referee2_confirmed=False)
+        with self.assertLogs(task(self.TASK).run.__module__, level="ERROR"), self.assertRaises(ConnectionError):
+            self.run_task(obj, enqueue_error=ConnectionError("broker down"))
+        key = "celery:final-evaluation-reminder:PharmacistOnboarding:5"
+        self.assertEqual(self.calls.set, [(key, 48 * 3600 + 3600)])
+        self.assertEqual(self.calls.delete, [key])
+
     def test_reminder_run_without_marker_is_skipped(self):
         obj = self.pharmacist(referee2_confirmed=False)
         _calls, _async_task, emails, apply_async = self.run_task(obj, is_reminder=True, marker=False)
         emails.assert_not_called()
         apply_async.assert_not_called()
+
+    # --- The supported pipeline's bounded loop (C-H1). ---
+    # State first, then a bounded 20-second re-check loop (retry_count advances), and a limit that stops ONLY that
+    # loop: the 48-hour referee reminder marker survives, and a profile that completes on the last run still gets a
+    # final state.
+
+    def test_target_quick_recheck_advances_retry_count(self):
+        for current in (0, 5, 15):  # re-check while retry_count <= 15 (same boundary as the old > 15 guard)
+            obj = self.pharmacist(ahpra_verified=False)
+            _calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=current)
+            apply_async.assert_called_once()
+            self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"retry_count": current + 1})
+            self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
+
+    def test_target_limit_stops_only_the_quick_loop(self):
+        obj = self.pharmacist(ahpra_verified=False)
+        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
+        quick = [c for c in apply_async.call_args_list if c.kwargs.get("kwargs", {}).get("retry_count") is not None]
+        self.assertEqual(quick, [])
+        self.assertEqual(calls.delete, [])  # nothing cancelled: the profile is still pending
+
+    def test_target_limit_preserves_eventual_evaluation_for_manual_only_pending_check(self):
+        # Owner pharmacists, and pharmacists whose referees are already complete, can wait on manual AHPRA with no
+        # existing 48-hour referee marker. Bounding the 20-second loop must not make that retained pipeline terminal.
+        obj = self.pharmacist(ahpra_verified=False)
+        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
+        key = "celery:final-evaluation-reminder:PharmacistOnboarding:5"
+        self.assertEqual(calls.set, [(key, 48 * 3600 + 3600)])
+        apply_async.assert_called_once()
+        self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"is_reminder": True})
+        self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
+        self.assertEqual(calls.delete, [])
+
+    def test_target_limit_keeps_the_48_hour_reminder(self):
+        obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
+        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16, marker=True)
+        self.assertEqual(calls.delete, [])
+        apply_async.assert_not_called()  # marker exists: no second reminder, and the quick loop is over
+
+    def test_target_state_is_evaluated_before_the_limit(self):
+        obj = self.pharmacist()  # everything verified by the time this late run executes
+        with mock.patch("django.db.transaction.on_commit"):
+            calls, async_task, _emails, _apply_async = self.run_task(obj, retry_count=16)
+        self.assertTrue(obj.verified)
+        self.assertEqual(calls.sent, ["verified"])
+
+        obj = self.pharmacist(gov_id_verified=False, gov_id_verification_note="Name mismatch")
+        calls, _async_task, _emails, _apply_async = self.run_task(obj, retry_count=16)
+        self.assertEqual(calls.sent, ["failed"])
+
+    def test_target_reminder_run_starts_its_own_bounded_loop(self):
+        obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
+        calls, _async_task, emails, apply_async = self.run_task(obj, is_reminder=True, marker=True)
+        emails.assert_called_once()
+        quick = [c for c in apply_async.call_args_list if c.kwargs.get("kwargs", {}).get("retry_count") is not None]
+        self.assertEqual([c.kwargs["kwargs"] for c in quick], [{"retry_count": 1}])
 
     def test_failed_check_marks_unverified_and_notifies_once(self):
         obj = self.pharmacist(gov_id_verified=False, gov_id_verification_note="Name mismatch")
@@ -401,17 +560,31 @@ class FetchInstanceContractTests(SimpleTestCase):
         model.objects.get.return_value = "object"
         self.assertEqual(fetch(model, 3, max_retries=2, sleep_sec=0), "object")
 
-    def test_missing_object_raises_type_error_from_the_logging_call(self):
-        # CURRENT BEHAVIOUR (known defect, fixed separately): logger.error(..., file=sys.stderr) raises TypeError on
-        # the first miss, so the retry loop never retries.
+    def model(self, side_effect):
         from django.core.exceptions import ObjectDoesNotExist
 
-        fetch = impl("client_profile.tasks.verify_abn_task", "fetch_instance_with_retries")
+        class Missing(ObjectDoesNotExist):
+            pass
+
         model = mock.Mock()
-        model.objects.get.side_effect = ObjectDoesNotExist
-        with self.assertRaises(TypeError):
-            fetch(model, 3, max_retries=2, sleep_sec=0)
-        self.assertEqual(model.objects.get.call_count, 1)
+        model.DoesNotExist = Missing
+        model.objects.get.side_effect = [Missing() if item is None else item for item in side_effect]
+        return model
+
+    def test_object_that_appears_late_is_returned_after_retries(self):
+        fetch = impl("client_profile.tasks.verify_abn_task", "fetch_instance_with_retries")
+        model = self.model([None, None, "object"])
+        with self.assertLogs(fetch.__module__, level="WARNING") as logs:
+            self.assertEqual(fetch(model, 3, max_retries=5, sleep_sec=0), "object")
+        self.assertEqual(model.objects.get.call_count, 3)
+        self.assertEqual(len(logs.records), 2)
+
+    def test_object_that_never_appears_raises_does_not_exist_after_max_retries(self):
+        fetch = impl("client_profile.tasks.verify_abn_task", "fetch_instance_with_retries")
+        model = self.model([None, None, None])
+        with self.assertLogs(fetch.__module__, level="WARNING"), self.assertRaises(model.DoesNotExist):
+            fetch(model, 3, max_retries=3, sleep_sec=0)
+        self.assertEqual(model.objects.get.call_count, 3)
 
 
 class DocumentVerificationContractTests(SimpleTestCase):

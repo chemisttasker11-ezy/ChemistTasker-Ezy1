@@ -1,4 +1,6 @@
 """Onboarding API: per-role onboarding profiles, referee responses and verification triggers."""
+import logging
+
 from rest_framework import generics, permissions
 from onboarding.models import (
     ExplorerOnboarding,
@@ -27,6 +29,8 @@ from onboarding.serializers import (
     PharmacistOnboardingV2Serializer,
     RefereeResponseSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RefereeSubmitResponseView(generics.CreateAPIView):
@@ -96,7 +100,9 @@ class RefereeSubmitResponseView(generics.CreateAPIView):
                 try:
                     cancel_referee_reminder(model_name, onboarding.pk, referee_index)
                 except Exception:
-                    pass
+                    logger.exception(
+                        "[referee-reminder] Cancel failed model=%s pk=%s ref_idx=%s", model_name, onboarding.pk, referee_index
+                    )
 
                 if changed_to_rejected:
                     # send AFTER COMMIT
@@ -135,7 +141,9 @@ class RefereeSubmitResponseView(generics.CreateAPIView):
                 try:
                     cancel_referee_reminder(model_name, onboarding.pk, referee_index)
                 except Exception:
-                    pass
+                    logger.exception(
+                        "[referee-reminder] Cancel failed model=%s pk=%s ref_idx=%s", model_name, onboarding.pk, referee_index
+                    )
 
 
 class RefereeRejectView(APIView):
@@ -185,7 +193,9 @@ class RefereeRejectView(APIView):
                 try:
                     cancel_referee_reminder(model_name, row.pk, idx)
                 except Exception:
-                    pass
+                    logger.exception(
+                        "[referee-reminder] Cancel failed model=%s pk=%s ref_idx=%s", model_name, row.pk, idx
+                    )
                 return Response({'success': True, 'message': 'Already declined.'}, status=200)
 
             # First time -> flip flags
@@ -197,7 +207,9 @@ class RefereeRejectView(APIView):
             try:
                 cancel_referee_reminder(model_name, row.pk, idx)
             except Exception:
-                pass
+                logger.exception(
+                    "[referee-reminder] Cancel failed model=%s pk=%s ref_idx=%s", model_name, row.pk, idx
+                )
 
             # Notify candidate exactly once (first transition only), after the DB commit
             context_payload = {
