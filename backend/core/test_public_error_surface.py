@@ -326,4 +326,8 @@ class VerificationNoteErrorSurfaceTests(SimpleTestCase):
         update.assert_called_once()
         note = update.call_args.args[3]
         self.assertEqual(note, "AHPRA lookup failed. Please try again later.")
-        self.assertIn("AHPRA lookup failed for pk=1", " ".join(logs.output))
+        log_text = " ".join(logs.output)
+        self.assertIn("AHPRA lookup failed for pk=1", log_text)
+        self.assertIn("error_type=Exception", log_text)
+        self.assertNotIn("SECRET-KEY", log_text)
+        self.assertNotIn("api_key=", log_text)
