@@ -59,10 +59,23 @@ def pdf_first_page_to_png(pdf_path):
         page = doc.load_page(0)
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        temp_name = temp_file.name
         temp_file.close()
-        pix.save(temp_file.name)
+        try:
+            pix.save(temp_name)
+        except Exception:
+            try:
+                os.remove(temp_name)
+            except FileNotFoundError:
+                pass
+            except OSError as cleanup_error:
+                logger.warning(
+                    "[pdf_first_page_to_png] Failed to remove partial temp PNG (error_type=%s)",
+                    type(cleanup_error).__name__,
+                )
+            raise
         logger.info("[pdf_first_page_to_png] Converted the first PDF page to a temporary PNG")
-        return temp_file.name
+        return temp_name
     finally:
         doc.close()
 
