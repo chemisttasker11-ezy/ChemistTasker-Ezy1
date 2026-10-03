@@ -395,13 +395,14 @@ MODEL_TABLES = {
 class LegacyImportBoundaryTests(SimpleTestCase):
     def test_runtime_code_outside_the_kernel_does_not_import_it(self):
         violations = []
-        seen = set()
+        seen = {}
         for rel, _path, tree in runtime_files():
             if is_kernel(rel):
                 continue
             for lineno, module, names in kernel_imports(tree):
-                allowed_names, _reason = ALLOWED_LEGACY_IMPORTS.get((rel, module), (set(), ""))
-                seen.add((rel, module))
+                key = (rel, module)
+                allowed_names, _reason = ALLOWED_LEGACY_IMPORTS.get(key, (set(), ""))
+                seen.setdefault(key, set()).update(names)
                 extra = sorted(names - allowed_names)
                 if extra:
                     violations.append(f"{rel}:{lineno} from {module} import {', '.join(extra)}")
@@ -411,7 +412,15 @@ class LegacyImportBoundaryTests(SimpleTestCase):
             "Import these names from their owning app (docs/architecture/BACKEND_DOMAIN_DEPENDENCIES.md), "
             "not from the client_profile compatibility kernel.",
         )
-        self.assertEqual(sorted(set(ALLOWED_LEGACY_IMPORTS) - seen), [], "stale ALLOWED_LEGACY_IMPORTS entries")
+        stale = {
+            key: {
+                "allowed": sorted(allowed_names),
+                "actually_imported": sorted(seen.get(key, set())),
+            }
+            for key, (allowed_names, _reason) in ALLOWED_LEGACY_IMPORTS.items()
+            if seen.get(key, set()) != allowed_names
+        }
+        self.assertEqual(stale, {}, "ALLOWED_LEGACY_IMPORTS must match the exact imports still required")
 
     def test_every_allowed_legacy_import_has_a_reason(self):
         for key, (names, reason) in ALLOWED_LEGACY_IMPORTS.items():
@@ -457,18 +466,26 @@ class KernelContractionRatchetTests(SimpleTestCase):
     def test_no_new_kernel_modules(self):
         modules = {rel for rel, _path, _tree in kernel_runtime_files()}
         self.assertEqual(
-            sorted(modules - set(KERNEL_DEFINITIONS)),
-            [],
-            "client_profile is a compatibility kernel: add new code to its owning app",
+            modules,
+            set(KERNEL_DEFINITIONS),
+            "client_profile module baseline must tighten whenever the compatibility kernel shrinks",
         )
 
     def test_no_new_kernel_definitions(self):
-        grown = {}
+        mismatches = {}
         for rel, _path, tree in kernel_runtime_files():
-            added = top_level_definitions(tree) - KERNEL_DEFINITIONS.get(rel, set())
-            if added:
-                grown[rel] = sorted(added)
-        self.assertEqual(grown, {}, "client_profile is a compatibility kernel: add new code to its owning app")
+            actual = top_level_definitions(tree)
+            expected = KERNEL_DEFINITIONS.get(rel, set())
+            if actual != expected:
+                mismatches[rel] = {
+                    "expected": sorted(expected),
+                    "actual": sorted(actual),
+                }
+        self.assertEqual(
+            mismatches,
+            {},
+            "client_profile definition baseline must tighten whenever the compatibility kernel shrinks",
+        )
 
     def test_kernel_defines_no_models(self):
         offenders = []
@@ -484,7 +501,11 @@ class KernelContractionRatchetTests(SimpleTestCase):
 
     def test_kernel_code_does_not_grow(self):
         total = sum(code_lines(path.read_text(encoding="utf-8"), tree) for _rel, path, tree in kernel_runtime_files())
-        self.assertLessEqual(total, KERNEL_CODE_LINE_CEILING, "client_profile runtime code grew")
+        self.assertEqual(
+            total,
+            KERNEL_CODE_LINE_CEILING,
+            "client_profile code-line baseline must tighten whenever the compatibility kernel shrinks",
+        )
 
 
 class IdentityPreservationTests(SimpleTestCase):
