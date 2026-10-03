@@ -37,7 +37,6 @@ from organizations.access import (
     CAPABILITY_MANAGE_ROSTER,
     has_admin_capability,
     managed_pharmacies,
-    managed_pharmacies as managed_pharmacies_for,
     pharmacies_user_admins,
     user_can_manage_pharmacy,
 )
@@ -53,6 +52,14 @@ from shifts.emails import (
     build_shift_interest_context,
     build_shift_offer_context,
     worker_offer_url,
+)
+from shifts.escalation import (  # noqa: F401  (COMMUNITY_LEVELS, PUBLIC_LEVEL, ESCALATION_FIELD_MAP: historical import path)
+    COMMUNITY_LEVELS,
+    ESCALATION_FIELD_MAP,
+    PUBLIC_LEVEL,
+    apply_escalation,
+    auto_escalate_due_shifts,
+    resolve_current_index,
 )
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
@@ -118,22 +125,7 @@ def _log_shift_profile_access(*, request, shift, candidate, action, slot=None):
     )
 
 
-# Shifts Mangment
-COMMUNITY_LEVELS = ['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN','ORG_CHAIN']
-
-
-PUBLIC_LEVEL = 'PLATFORM'
-
-
 OFFER_EXPIRY_HOURS = 48
-
-
-ESCALATION_FIELD_MAP = {
-    'LOCUM_CASUAL': 'escalate_to_locum_casual',
-    'OWNER_CHAIN': 'escalate_to_owner_chain',
-    'ORG_CHAIN': 'escalate_to_org_chain',
-    'PLATFORM': 'escalate_to_platform',
-}
 
 
 class BaseShiftViewSet(viewsets.ModelViewSet):
@@ -202,74 +194,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         return qs
 
     def _auto_escalate_shifts(self, now):
-        date_filter = Q()
-        for field in ESCALATION_FIELD_MAP.values():
-            date_filter |= Q(**{f'{field}__lte': now})
+        auto_escalate_due_shifts(now, tiers_for=self.serializer_class.build_allowed_tiers)
 
-        if not date_filter:
-            return
-
-        candidates = Shift.objects.filter(
-            interests__isnull=True
-        ).filter(date_filter).select_related('pharmacy', 'pharmacy__owner', 'created_by')
-
-        for shift in candidates:
-            allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
-            if not allowed_tiers:
-                continue
-
-            current_index = self._resolve_current_index(shift, allowed_tiers)
-            target_index = current_index
-
-            for idx in range(current_index + 1, len(allowed_tiers)):
-                tier = allowed_tiers[idx]
-                field = ESCALATION_FIELD_MAP.get(tier)
-                if not field:
-                    continue
-                ts = getattr(shift, field)
-                if ts and ts <= now:
-                    target_index = idx
-
-            if target_index > current_index:
-                target_visibility = allowed_tiers[target_index]
-                if target_visibility == PUBLIC_LEVEL:
-                    try:
-                        enforce_public_shift_daily_limit(shift.pharmacy)
-                    except ValidationError:
-                        continue
-                self._apply_escalation(shift, allowed_tiers, target_index, stamp_missing=False)
-
-    @staticmethod
-    def _resolve_current_index(shift, allowed_tiers):
-        try:
-            return allowed_tiers.index(shift.visibility)
-        except ValueError:
-            idx = shift.escalation_level or 0
-            if idx < 0:
-                idx = 0
-            if idx >= len(allowed_tiers):
-                idx = len(allowed_tiers) - 1
-            return idx
-
-    @staticmethod
-    def _apply_escalation(shift, allowed_tiers, target_index, *, stamp_missing=True, timestamp=None):
-        target_visibility = allowed_tiers[target_index]
-        update_fields = ['visibility', 'escalation_level']
-        shift.visibility = target_visibility
-        shift.escalation_level = target_index
-
-        if stamp_missing:
-            stamp_time = timestamp or timezone.now()
-            for idx in range(1, target_index + 1):
-                tier = allowed_tiers[idx]
-                field = ESCALATION_FIELD_MAP.get(tier)
-                if field and not getattr(shift, field):
-                    setattr(shift, field, stamp_time)
-                    update_fields.append(field)
-
-        # Remove duplicates while preserving order
-        shift.save(update_fields=list(dict.fromkeys(update_fields)))
-        return target_visibility
+    # Historical entry points: escalation is owned by shifts.escalation.
+    _resolve_current_index = staticmethod(resolve_current_index)
+    _apply_escalation = staticmethod(apply_escalation)
 
     def _build_member_status_response(self, request, shift):
         # Retrieve the visibility parameter from the request query params.

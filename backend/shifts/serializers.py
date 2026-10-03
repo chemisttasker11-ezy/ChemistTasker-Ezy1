@@ -41,6 +41,7 @@ from shifts.emails import (
     build_shift_offer_context,
     send_shift_updated_notifications,
 )
+from shifts.escalation import ESCALATION_FIELD_MAP, allowed_tiers
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.pricing import expand_shift_slots
 from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
@@ -366,26 +367,8 @@ class ShiftSerializer(serializers.ModelSerializer):
     def get_ui_is_urgent(self, obj):
         return bool(obj.is_urgent)
 
-    @staticmethod
-    def build_allowed_tiers(pharmacy):
-        """
-        Determine which escalation tiers are available for this pharmacy.
-        Chain escalation is only available when the pharmacy belongs to at least
-        one of the owner's chains. Organization escalation requires the pharmacy
-        to be claimed by an organization.
-        """
-        tiers = ['FULL_PART_TIME', 'LOCUM_CASUAL']
-
-        owner = getattr(pharmacy, 'owner', None)
-        if owner and Chain.objects.filter(owner=owner, pharmacies=pharmacy).exists():
-            tiers.append('OWNER_CHAIN')
-
-        if pharmacy.organization_id:
-            tiers.append('ORG_CHAIN')
-
-        tiers.append('PLATFORM')
-        return tiers
-
+    # owned by shifts.escalation
+    build_allowed_tiers = staticmethod(allowed_tiers)
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_allowed_escalation_levels(self, obj) -> list[str]:
@@ -393,12 +376,7 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _ensure_escalation_stamps(shift, allowed_tiers, target_index):
-        field_map = {
-            'LOCUM_CASUAL': 'escalate_to_locum_casual',
-            'OWNER_CHAIN': 'escalate_to_owner_chain',
-            'ORG_CHAIN': 'escalate_to_org_chain',
-            'PLATFORM': 'escalate_to_platform',
-        }
+        field_map = ESCALATION_FIELD_MAP
         stamp_time = timezone.now()
         for idx in range(1, target_index + 1):
             if idx >= len(allowed_tiers):

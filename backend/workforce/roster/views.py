@@ -30,7 +30,7 @@ from django.db import transaction
 from datetime import timedelta
 from users.models import OrganizationMembership, User
 from organizations.access import user_can_manage_pharmacy
-from shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
+from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
 
 
 # Roster
@@ -385,7 +385,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         if not allowed_tiers:
             return Response({'detail': 'No escalation tiers available for this pharmacy.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        current_index = BaseShiftViewSet._resolve_current_index(shift, allowed_tiers)
+        current_index = resolve_current_index(shift, allowed_tiers)
 
         target_visibility = request.data.get('target_visibility')
         if target_visibility:
@@ -410,7 +410,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():   # the assignments are cleared together with the escalation, or not at all
                 shift.slot_assignments.all().delete()
-                visibility = BaseShiftViewSet._apply_escalation(shift, allowed_tiers, target_index)
+                visibility = apply_escalation(shift, allowed_tiers, target_index)
         except DjangoValidationError as exc:   # e.g. the shift belongs to a published roster
             raise DRFValidationError(getattr(exc, "message_dict", {"detail": exc.messages})) from exc
         detail_prefix = f'Shift escalated to {visibility}'.rstrip('.')
