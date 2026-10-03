@@ -1,10 +1,19 @@
 """Submitting an onboarding for review: reading the submit flag of a tab save and recording the first submission
 (which e-mails the admins once)."""
+from rest_framework.fields import BooleanField
 
 
 def submit_requested(initial_data) -> bool:
-    """CURRENT BEHAVIOUR kept from the serializers: the raw request value's truthiness."""
-    return bool(initial_data.get('submitted_for_verification'))
+    """Whether a tab save asks for submission. Multipart forms send strings, so the flag is read with DRF's boolean
+    vocabulary ("false", "0", "no", ... are False); unknown values keep their truthiness."""
+    raw = initial_data.get('submitted_for_verification')
+    if raw in (None, ''):
+        return False
+    if raw in BooleanField.TRUE_VALUES:
+        return True
+    if raw in BooleanField.FALSE_VALUES:
+        return False
+    return bool(raw)
 
 
 def record_first_submission(instance, *, tab: str, submit: bool) -> None:

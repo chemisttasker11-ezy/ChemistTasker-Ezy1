@@ -114,17 +114,18 @@ class SubmissionTests(RoleTabFixture):
         self.assertTrue(obj.submitted_for_verification)
         self.assertEqual(len(work["emails"]), 1)
 
-    def test_current_behaviour_multipart_false_counts_as_a_submit(self):
-        # CURRENT BEHAVIOUR (bug): the role serializers read submitted_for_verification from the raw request, so the
-        # multipart string "false" is truthy and a plain save is treated as a submission.
+    def test_the_submit_flag_is_read_as_a_boolean(self):
+        # Regression: the role serializers took the raw request value's truthiness, so the multipart string "false"
+        # turned a plain save into a submission (and un-verified the profile).
         for label in ("pharmacist", "otherstaff", "explorer"):
-            with self.subTest(role=label):
-                user, obj, url = self.onboarding(label, verified=True)
-                response, work = self.patch(user, url, {"tab": "profile", "short_bio": "Hi",
-                                                        "submitted_for_verification": "false"}, multipart=True)
-                self.assertEqual(response.status_code, 200, response.data)
-                obj.refresh_from_db()
-                self.assertFalse(obj.verified)
+            for flag, submitted in (("false", False), ("0", False), ("true", True), ("1", True)):
+                with self.subTest(role=label, flag=flag):
+                    user, obj, url = self.onboarding(label, verified=True)
+                    response, _ = self.patch(user, url, {"tab": "profile", "short_bio": "Hi",
+                                                         "submitted_for_verification": flag}, multipart=True)
+                    self.assertEqual(response.status_code, 200, response.data)
+                    obj.refresh_from_db()
+                    self.assertEqual(obj.verified, not submitted)
 
     def test_owner_notifies_on_every_basic_save_and_resets_ahpra_on_change(self):
         user, obj, url = self.onboarding("owner", verified=True, ahpra_number="A1", ahpra_verified=True)
