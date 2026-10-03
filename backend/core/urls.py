@@ -1,3 +1,5 @@
+import logging
+
 from django.urls import path, include
 from users.views import DeleteAccountView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -13,14 +15,19 @@ from worker_finance import legacy as finance_legacy
 from public_hub.attachment_access import HubMediaAccess
 from public_hub.media import deny_raw_media
 
+logger = logging.getLogger(__name__)
+
+
 def health_check(request):
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
         return JsonResponse({'status': 'healthy'})
-    except Exception as exc:
-        return JsonResponse({'status': 'error', 'detail': str(exc)}, status=500)
+    except Exception:
+        # the database error names hosts and settings: it goes to the log, not to the (anonymous) caller
+        logger.exception("Health check: database query failed")
+        return JsonResponse({'status': 'error', 'detail': 'Database unavailable.'}, status=500)
 
 two_factor_patterns, two_factor_app_name = two_factor_urlpatterns
 two_factor_patterns = list(two_factor_patterns)

@@ -227,9 +227,10 @@ def verify_filefield_task(
                     failure_note = f"Name mismatch found in your uploaded document"
                     logger.info(f"[verify_filefield_task] {failure_note}")
 
-            except Exception as e:
-                failure_note = f"OCR processing failed: {e}."
-                logger.info(f"[verify_filefield_task] {failure_note}")
+            except Exception:
+                # the note is shown to the user: the exception (service URLs, internals) goes to the log only
+                failure_note = "OCR processing failed."
+                logger.warning("[verify_filefield_task] OCR processing failed", exc_info=True)
             finally:
                 if converted_path and os.path.exists(converted_path):
                     os.remove(converted_path)
@@ -529,8 +530,10 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     try:
         # Use the newly constructed full AHPRA number for the lookup
         ahpra_lookup(full_ahpra_number, output_html, api_key=env("SCRAPINGBEE_API_KEY"))
-    except Exception as e:
-        note = f"AHPRA lookup failed: {e}"
+    except Exception:
+        # the note is shown to the user; the lookup error can carry the scraping-service request URL and its key
+        note = "AHPRA lookup failed. Please try again later."
+        logger.warning("[verify_ahpra_task] AHPRA lookup failed for pk=%s", object_pk)
         _update_ahpra_fields(model_name, object_pk, False, note)
         return
 

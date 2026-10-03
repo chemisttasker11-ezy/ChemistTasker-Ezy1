@@ -137,7 +137,7 @@ class GenerateInvoiceView(APIView):
             if isinstance(line_items_raw, str):
                 try:
                     custom_lines = json.loads(line_items_raw)
-                except Exception as ex:
+                except ValueError as ex:  # json.JSONDecodeError: the message locates the syntax error in the input
                     return Response({'error': f'Invalid line_items: {ex}'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 custom_lines = line_items_raw
@@ -149,7 +149,7 @@ class GenerateInvoiceView(APIView):
             if isinstance(shift_ids_raw, str):
                 try:
                     shift_ids = json.loads(shift_ids_raw)
-                except Exception as ex:
+                except ValueError as ex:  # json.JSONDecodeError: the message locates the syntax error in the input
                     return Response({'error': f'Invalid shift_ids: {ex}'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 shift_ids = shift_ids_raw
