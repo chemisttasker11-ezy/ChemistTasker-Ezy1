@@ -390,76 +390,87 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return own_memberships(self.request.user)
 
-    def _get_owned_membership(self, pk):
-        return get_object_or_404(Membership, pk=pk, user=self.request.user)
+    def _get_owned_membership(self, pk, *, for_update=False):
+        queryset = Membership.objects
+        if for_update:
+            queryset = queryset.select_for_update()
+        return get_object_or_404(queryset, pk=pk, user=self.request.user)
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
-        membership = self._get_owned_membership(pk)
-        if membership.status != Membership.Status.PENDING:
-            return Response({'detail': 'Only pending invitations can be accepted.'}, status=status.HTTP_400_BAD_REQUEST)
-        active_count = _count_active_memberships(request.user, exclude_membership_id=membership.pk)
-        if active_count >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
-            return Response(
-                {'detail': f'You already belong to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'},
-                status=status.HTTP_400_BAD_REQUEST,
+        with transaction.atomic():
+            # One worker row coordinates the membership-cap check across every
+            # pharmacy. Lock it before the specific invite to give all writers
+            # the same user -> membership lock order.
+            User.objects.select_for_update().only("pk").get(pk=request.user.pk)
+            membership = self._get_owned_membership(pk, for_update=True)
+            if membership.status != Membership.Status.PENDING:
+                return Response({'detail': 'Only pending invitations can be accepted.'}, status=status.HTTP_400_BAD_REQUEST)
+            active_count = _count_active_memberships(request.user, exclude_membership_id=membership.pk)
+            if active_count >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
+                return Response(
+                    {'detail': f'You already belong to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            membership.status = Membership.Status.ACCEPTED
+            membership.is_active = True
+            membership.responded_at = timezone.now()
+            membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
+            PharmacyAdmin.objects.filter(membership=membership).update(
+                is_active=True,
+                updated_at=timezone.now(),
             )
-        membership.status = Membership.Status.ACCEPTED
-        membership.is_active = True
-        membership.responded_at = timezone.now()
-        membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
-        PharmacyAdmin.objects.filter(membership=membership).update(
-            is_active=True,
-            updated_at=timezone.now(),
-        )
-        transaction.on_commit(
-            lambda membership_id=membership.id: _notify_membership_response(
-                Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
-                Membership.Status.ACCEPTED,
+            transaction.on_commit(
+                lambda membership_id=membership.id: _notify_membership_response(
+                    Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
+                    Membership.Status.ACCEPTED,
+                )
             )
-        )
-        return Response(self.get_serializer(membership).data)
+            response_data = self.get_serializer(membership).data
+        return Response(response_data)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
-        membership = self._get_owned_membership(pk)
-        if membership.status != Membership.Status.PENDING:
-            return Response({'detail': 'Only pending invitations can be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
-        membership.status = Membership.Status.REJECTED
-        membership.is_active = False
-        membership.responded_at = timezone.now()
-        membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
-        PharmacyAdmin.objects.filter(membership=membership).update(
-            is_active=False,
-            updated_at=timezone.now(),
-        )
-        transaction.on_commit(
-            lambda membership_id=membership.id: _notify_membership_response(
-                Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
-                Membership.Status.REJECTED,
+        with transaction.atomic():
+            membership = self._get_owned_membership(pk, for_update=True)
+            if membership.status != Membership.Status.PENDING:
+                return Response({'detail': 'Only pending invitations can be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+            membership.status = Membership.Status.REJECTED
+            membership.is_active = False
+            membership.responded_at = timezone.now()
+            membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
+            PharmacyAdmin.objects.filter(membership=membership).update(
+                is_active=False,
+                updated_at=timezone.now(),
             )
-        )
+            transaction.on_commit(
+                lambda membership_id=membership.id: _notify_membership_response(
+                    Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
+                    Membership.Status.REJECTED,
+                )
+            )
         return Response({'status': 'rejected'})
 
     @action(detail=True, methods=['post'])
     def quit(self, request, pk=None):
-        membership = self._get_owned_membership(pk)
-        if membership.status != Membership.Status.ACCEPTED or not membership.is_active:
-            return Response({'detail': 'Only active memberships can be quit.'}, status=status.HTTP_400_BAD_REQUEST)
-        if membership.role == 'OWNER' or getattr(getattr(membership.pharmacy, 'owner', None), 'user_id', None) == request.user.id:
-            return Response({'detail': 'Pharmacy owners cannot quit their owner membership.'}, status=status.HTTP_400_BAD_REQUEST)
-        membership.status = Membership.Status.LEFT
-        membership.is_active = False
-        membership.responded_at = timezone.now()
-        membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
-        PharmacyAdmin.objects.filter(membership=membership).update(
-            is_active=False,
-            updated_at=timezone.now(),
-        )
-        transaction.on_commit(
-            lambda membership_id=membership.id: _notify_membership_response(
-                Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
-                Membership.Status.LEFT,
+        with transaction.atomic():
+            membership = self._get_owned_membership(pk, for_update=True)
+            if membership.status != Membership.Status.ACCEPTED or not membership.is_active:
+                return Response({'detail': 'Only active memberships can be quit.'}, status=status.HTTP_400_BAD_REQUEST)
+            if membership.role == 'OWNER' or getattr(getattr(membership.pharmacy, 'owner', None), 'user_id', None) == request.user.id:
+                return Response({'detail': 'Pharmacy owners cannot quit their owner membership.'}, status=status.HTTP_400_BAD_REQUEST)
+            membership.status = Membership.Status.LEFT
+            membership.is_active = False
+            membership.responded_at = timezone.now()
+            membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
+            PharmacyAdmin.objects.filter(membership=membership).update(
+                is_active=False,
+                updated_at=timezone.now(),
             )
-        )
+            transaction.on_commit(
+                lambda membership_id=membership.id: _notify_membership_response(
+                    Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
+                    Membership.Status.LEFT,
+                )
+            )
         return Response({'status': 'left'})
