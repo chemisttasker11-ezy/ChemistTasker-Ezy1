@@ -63,7 +63,7 @@ jsonschema-specifications==2024.10.1
 kombu==5.5.4
 msgpack==1.1.1
 multidict==6.4.4
-packaging==25.0
+packaging==26.3
 pillow==12.2.0
 phonenumbers==8.13.55
 propcache==0.3.2
