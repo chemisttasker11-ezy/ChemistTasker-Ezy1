@@ -1,5 +1,5 @@
-"""A manager looking at the candidates of a shift: revealing a candidate's profile (audited) and the member status
-list of a member-visibility shift.
+"""A manager looking at the workers of a shift: revealing a candidate's profile (audited), opening an assigned
+worker's profile (audited) and the member status list of a member-visibility shift.
 
 Refusals raise `ShiftActionRefused`, whose response body and status are those the views used to build by hand.
 """
@@ -427,3 +427,62 @@ def member_status(*, shift, requested_visibility, slot_id, slot_date, request):
         })
 
     return data
+
+
+def assigned_profile(*, request, shift, candidate, slot_id, slot):
+    """A manager opening the profile of a worker assigned to the shift (or to the given slot). Audited; unlike a
+    reveal it uses no quota and sends no e-mail. Returns the profile as the endpoint renders it."""
+    # Verify the user is actually assigned to this shift/slot
+    if shift.single_user_only:
+        if not ShiftSlotAssignment.objects.filter(shift=shift, user=candidate).exists():
+            raise ShiftActionRefused('User is not assigned to this shift.', status.HTTP_404_NOT_FOUND)
+    else:
+        if slot_id is None:
+            # If slot_id is not provided for a multi-slot shift, check if assigned to any slot of this shift
+            if not ShiftSlotAssignment.objects.filter(shift=shift, user=candidate).exists():
+                raise ShiftActionRefused('User is not assigned to any slot in this shift.', status.HTTP_404_NOT_FOUND)
+        else:
+            if not ShiftSlotAssignment.objects.filter(shift=shift, slot_id=slot_id, user=candidate).exists():
+                raise ShiftActionRefused('User is not assigned to this specific slot.', status.HTTP_404_NOT_FOUND)
+
+    _log_shift_profile_access(
+        request=request,
+        shift=shift,
+        candidate=candidate,
+        action=ShiftProfileAccessAudit.Action.VIEW_ASSIGNED_PROFILE,
+        slot=slot,
+    )
+
+    # Retrieve profile data without sending an email or consuming reveal quota
+    try:
+        po = PharmacistOnboarding.objects.get(user=candidate)
+        profile_data = {
+            'phone_number': candidate.mobile_number,
+            'short_bio': po.short_bio,
+            'resume': request.build_absolute_uri(po.resume.url) if po.resume else None,
+            'rate_preference': po.rate_preference or None,
+        }
+    except PharmacistOnboarding.DoesNotExist:
+        try:
+            os = OtherStaffOnboarding.objects.get(user=candidate)
+            profile_data = {
+                'phone_number': candidate.mobile_number,
+                'short_bio': os.short_bio,
+                'resume': request.build_absolute_uri(os.resume.url) if os.resume else None,
+            }
+        except OtherStaffOnboarding.DoesNotExist:
+            # Handle cases where user might not have a full onboarding profile yet
+            profile_data = {
+                'phone_number': None,
+                'short_bio': None,
+                'resume': None,
+                'rate_preference': None,
+            }
+
+    return {
+        'id': candidate.id,
+        'first_name': candidate.first_name,
+        'last_name': candidate.last_name,
+        'email': candidate.email,
+        **profile_data
+    }

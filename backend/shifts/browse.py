@@ -52,7 +52,7 @@ from users.models import OrganizationMembership, User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import BaseShiftViewSet
 from shifts.selectors import _matching_shift_slot_exists, shifts_managed_by
-from shifts.candidates import _log_shift_profile_access
+from shifts.candidates import _log_shift_profile_access, assigned_profile
 from shifts.escalation import COMMUNITY_LEVELS, PUBLIC_LEVEL
 from shifts.serializers import (
     MyShiftSerializer,
@@ -653,139 +653,32 @@ class ActiveShiftViewSet(BaseShiftViewSet):
             for shift in qs
             if self._has_open_active_occurrence(shift, now=now, today=today)
         ]
-        qs = Shift.objects.filter(id__in=open_ids).prefetch_related('slots', 'slot_assignments', 'offers')
-        try:
-            ids = list(qs.values_list('id', flat=True))
-            # print(
-            #     f"[ActiveShiftViewSet:get_queryset] user_id={getattr(user, 'id', None)} "
-            #     f"role={getattr(user, 'role', None)} total={len(ids)} ids={ids}"
-            # )
-        except Exception:
-            pass
-        return qs
+        return Shift.objects.filter(id__in=open_ids).prefetch_related('slots', 'slot_assignments', 'offers')
 
     @action(detail=True, methods=['get'])
     def member_status(self, request, pk=None):
         shift = self.get_object()
         return self._build_member_status_response(request, shift)
 
-        # Check if the shift is public-level; if so, this endpoint is not applicable.
-        # This check remains as it was.
-        if shift.visibility == PUBLIC_LEVEL:
-            return Response({'detail': 'Member status is not applicable for Public shifts via this endpoint. Please query /shift-interests directly for public interests.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Retrieve the visibility parameter from the request query params.
-        # This is the key change: use the requested visibility for filtering.
-        requested_visibility = request.query_params.get('visibility')
+class AssignedProfileActions:
+    """The view_assigned_profile action of the confirmed and history lists: a manager opens the profile of a worker
+    assigned to the shift (audited, no reveal quota, no e-mail)."""
 
-        # Fallback if requested_visibility is unexpectedly None, though the frontend should always provide it.
-        # In this case, we would use the shift's current visibility from the DB.
-        if not requested_visibility:
-            requested_visibility = shift.visibility
+    @action(detail=True, methods=['post'], url_path='view_assigned_profile')
+    def view_assigned_profile(self, request, pk=None):
+        shift = self.get_object()
+        user_id = request.data.get('user_id')
+        if user_id is None:
+            return Response({'detail': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-
-        slot_id_param = request.query_params.get('slot_id')
-        slot_date = request.query_params.get('slot_date')
-
-        slot_obj = None
-        if slot_id_param:
-            slot_obj = get_object_or_404(ShiftSlot, pk=slot_id_param, shift=shift)
-        elif not shift.single_user_only:
-            # For multi-slot shifts that are not single-user-only, a slot_id is required for specific status.
-            return Response({'detail': 'slot_id is required for multi-slot shifts via this endpoint.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        interests_query = ShiftInterest.objects.filter(shift=shift)
-        rejections_query = ShiftRejection.objects.filter(shift=shift)
-
-        if shift.single_user_only:
-            interests_query = interests_query.filter(slot__isnull=True)
-            rejections_query = rejections_query.filter(slot__isnull=True)
-        else: # Multi-slot (non-single_user_only)
-            interests_query = interests_query.filter(slot=slot_obj)
-            rejections_query = rejections_query.filter(slot=slot_obj)
-            if slot_obj and slot_obj.is_recurring and slot_date:
-                rejections_query = rejections_query.filter(slot_date=slot_date)
-
-        interested_user_ids = {i.user_id for i in interests_query}
-        rejected_user_ids = {r.user_id for r in rejections_query}
-
-        memberships_qs = Membership.objects.filter(
-            is_active=True,
-            role=shift.role_needed
-        ).select_related('user')
-
-        # Apply filtering based on the 'requested_visibility' from the query parameter
-        if requested_visibility == 'FULL_PART_TIME':
-            memberships_qs = memberships_qs.filter(
-                pharmacy=shift.pharmacy,
-                employment_type__in=['FULL_TIME', 'PART_TIME', 'CASUAL'],
-            )
-        elif requested_visibility == 'LOCUM_CASUAL':
-            memberships_qs = memberships_qs.filter(
-                pharmacy=shift.pharmacy,
-                employment_type__in=['LOCUM', 'SHIFT_HERO'],
-
-            )
-        elif requested_visibility == 'OWNER_CHAIN':
-            owner_pharmacies = Pharmacy.objects.filter(owner=shift.pharmacy.owner)
-            memberships_qs = memberships_qs.filter(
-                pharmacy__in=owner_pharmacies
-            )
-        elif requested_visibility == 'ORG_CHAIN':
-            org_pharmacies = Pharmacy.objects.filter(organization=shift.pharmacy.organization)
-            memberships_qs = memberships_qs.filter(
-                pharmacy__in=org_pharmacies
-            )
-        else:
-            # This 'else' branch handles cases where the requested_visibility
-            # doesn't match a specific membership filter (e.g., 'PLATFORM'
-            # which is handled by the early return, or an unexpected value).
-            # If no explicit membership type is needed for this visibility,
-            # it might return an empty queryset or a default set based on your business logic.
-            memberships_qs = Membership.objects.none() # Default to empty if no specific rule applies
-
-        data = []
-        for membership in memberships_qs.distinct():
-            user = membership.user
-            member_interaction_status = 'no_response'
-
-            display_name = membership.invited_name if membership.invited_name else user.get_full_name()
-
-            is_assigned = False
-            if shift.single_user_only:
-                is_assigned = ShiftSlotAssignment.objects.filter(
-                    user=user,
-                    shift=shift
-                ).exists()
-            else:
-                is_assigned = ShiftSlotAssignment.objects.filter(
-                    user=user,
-                    slot=slot_obj,
-                    **({'slot_date': slot_date} if slot_obj and slot_obj.is_recurring and slot_date else {})
-                ).exists()
-
-            if is_assigned:
-                member_interaction_status = 'accepted'
-            elif user.id in interested_user_ids:
-                # ✅ CHANGE THIS:
-                member_interaction_status = 'interested'
-            elif user.id in rejected_user_ids:
-                # ✅ CHANGE THIS:
-                member_interaction_status = 'rejected'
-
-            data.append({
-                'user_id': user.id,
-                'name': display_name,
-                'employment_type': membership.employment_type,
-                'role': membership.role,
-                'status': member_interaction_status,
-                'is_member': True
-            })
-
-        return Response(data)
+        candidate = get_object_or_404(User, pk=user_id)
+        slot_id = request.data.get('slot_id')
+        slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift) if slot_id is not None else None
+        return Response(assigned_profile(request=request, shift=shift, candidate=candidate, slot_id=slot_id, slot=slot))
 
 
-class ConfirmedShiftViewSet(BaseShiftViewSet):
+class ConfirmedShiftViewSet(AssignedProfileActions, BaseShiftViewSet):
     """Upcoming & in-progress shifts with at least one confirmed slot."""
     def get_queryset(self):
         user  = self.request.user
@@ -805,77 +698,8 @@ class ConfirmedShiftViewSet(BaseShiftViewSet):
 
         return qs
 
-    # Move this entire method OUTSIDE of get_queryset
-    @action(detail=True, methods=['post'], url_path='view_assigned_profile')
-    def view_assigned_profile(self, request, pk=None):
-        shift = self.get_object()
-        user_id = request.data.get('user_id')
-        if user_id is None:
-            return Response({'detail': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        candidate = get_object_or_404(User, pk=user_id)
-        slot_id = request.data.get('slot_id')
-        slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift) if slot_id is not None else None
-
-        # Verify the user is actually assigned to this shift/slot
-        if shift.single_user_only:
-            if not ShiftSlotAssignment.objects.filter(shift=shift, user=candidate).exists():
-                return Response({'detail': 'User is not assigned to this shift.'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            if slot_id is None:
-                # If slot_id is not provided for a multi-slot shift, check if assigned to any slot of this shift
-                if not ShiftSlotAssignment.objects.filter(shift=shift, user=candidate).exists():
-                    return Response({'detail': 'User is not assigned to any slot in this shift.'}, status=status.HTTP_404_NOT_FOUND)
-            else:
-                if not ShiftSlotAssignment.objects.filter(shift=shift, slot_id=slot_id, user=candidate).exists():
-                    return Response({'detail': 'User is not assigned to this specific slot.'}, status=status.HTTP_404_NOT_FOUND)
-
-        _log_shift_profile_access(
-            request=request,
-            shift=shift,
-            candidate=candidate,
-            action=ShiftProfileAccessAudit.Action.VIEW_ASSIGNED_PROFILE,
-            slot=slot,
-        )
-
-        # Retrieve profile data without sending an email
-        profile_data = {}
-        try:
-            po = PharmacistOnboarding.objects.get(user=candidate)
-            profile_data = {
-                'phone_number': candidate.mobile_number, 
-                'short_bio': po.short_bio,
-                'resume': request.build_absolute_uri(po.resume.url) if po.resume else None,
-                'rate_preference': po.rate_preference or None,
-            }
-        except PharmacistOnboarding.DoesNotExist:
-            try:
-                os = OtherStaffOnboarding.objects.get(user=candidate)
-                profile_data = {
-                    'phone_number': candidate.mobile_number,
-                    'short_bio': os.short_bio,
-                    'resume': request.build_absolute_uri(os.resume.url) if os.resume else None,
-                }
-            except OtherStaffOnboarding.DoesNotExist:
-                # Handle cases where user might not have a full onboarding profile yet
-                profile_data = {
-                    'phone_number': None,
-                    'short_bio': None,
-                    'resume': None,
-                    'rate_preference': None,
-                }
-
-
-        return Response({
-            'id': candidate.id,
-            'first_name': candidate.first_name,
-            'last_name': candidate.last_name,
-            'email': candidate.email,
-            **profile_data
-        })
-
-
-class HistoryShiftViewSet(BaseShiftViewSet):
+class HistoryShiftViewSet(AssignedProfileActions, BaseShiftViewSet):
     """History shifts for managed pharmacies."""
     def get_queryset(self):
         user = self.request.user
@@ -895,73 +719,6 @@ class HistoryShiftViewSet(BaseShiftViewSet):
         ).filter(has_history_slot=True)
 
         return qs
-
-
-    @action(detail=True, methods=['post'], url_path='view_assigned_profile')
-    def view_assigned_profile(self, request, pk=None):
-        shift = self.get_object()
-        user_id = request.data.get('user_id')
-        if user_id is None:
-            return Response({'detail': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        candidate = get_object_or_404(User, pk=user_id)
-        slot_id = request.data.get('slot_id')
-        slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift) if slot_id is not None else None
-
-        # Verify the user is actually assigned to this shift/slot
-        if shift.single_user_only:
-            if not ShiftSlotAssignment.objects.filter(shift=shift, user=candidate).exists():
-                return Response({'detail': 'User is not assigned to this shift.'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            if slot_id is None:
-                # If slot_id is not provided for a multi-slot shift, check if assigned to any slot of this shift
-                if not ShiftSlotAssignment.objects.filter(shift=shift, user=candidate).exists():
-                    return Response({'detail': 'User is not assigned to any slot in this shift.'}, status=status.HTTP_404_NOT_FOUND)
-            else:
-                if not ShiftSlotAssignment.objects.filter(shift=shift, slot_id=slot_id, user=candidate).exists():
-                    return Response({'detail': 'User is not assigned to this specific slot.'}, status=status.HTTP_404_NOT_FOUND)
-
-        _log_shift_profile_access(
-            request=request,
-            shift=shift,
-            candidate=candidate,
-            action=ShiftProfileAccessAudit.Action.VIEW_ASSIGNED_PROFILE,
-            slot=slot,
-        )
-
-        # Retrieve profile data without sending an email or consuming reveal quota
-        profile_data = {}
-        try:
-            po = PharmacistOnboarding.objects.get(user=candidate)
-            profile_data = {
-                'phone_number': candidate.mobile_number,
-                'short_bio': po.short_bio,
-                'resume': request.build_absolute_uri(po.resume.url) if po.resume else None,
-                'rate_preference': po.rate_preference or None,
-            }
-        except PharmacistOnboarding.DoesNotExist:
-            try:
-                os = OtherStaffOnboarding.objects.get(user=candidate)
-                profile_data = {
-                    'phone_number': candidate.mobile_number,
-                    'short_bio': os.short_bio,
-                    'resume': request.build_absolute_uri(os.resume.url) if os.resume else None,
-                }
-            except OtherStaffOnboarding.DoesNotExist:
-                profile_data = {
-                    'phone_number': None,
-                    'short_bio': None,
-                    'resume': None,
-                    'rate_preference': None,
-                }
-
-        return Response({
-            'id': candidate.id,
-            'first_name': candidate.first_name,
-            'last_name': candidate.last_name,
-            'email': candidate.email,
-            **profile_data
-        })
 
 
 class ShiftDetailViewSet(BaseShiftViewSet):
