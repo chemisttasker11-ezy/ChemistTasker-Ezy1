@@ -330,6 +330,28 @@ class ApplicationDecisionTests(MembershipFixture):
         again, _ = self.call(self.owner, "post", f"membership-applications/{app.id}/reject/")
         self.assertEqual((again.status_code, again.data["detail"]), (400, "Already rejected."))
 
+    def test_scoped_region_admin_can_see_and_decide_assigned_pharmacy_applications(self):
+        app = self.application()
+        region_admin = make_user("OWNER")
+        org_membership = OrganizationMembership.objects.create(
+            user=region_admin,
+            organization=self.org,
+            role="REGION_ADMIN",
+            region="Gold Coast",
+        )
+        org_membership.pharmacies.add(self.pharmacy)
+
+        listed, _ = self.call(region_admin, "get", "membership-applications/")
+        rows = listed.data["results"] if isinstance(listed.data, dict) else listed.data
+        self.assertIn(app.id, {row["id"] for row in rows})
+
+        approved, _ = self.call(
+            region_admin,
+            "post",
+            f"membership-applications/{app.id}/approve/",
+        )
+        self.assertEqual(approved.status_code, 200, approved.data)
+
     def test_staff_application_requires_the_tfn_pathway(self):
         app = self.application(category="FULL_PART_TIME", job_title="Pharmacist", email="staff@example.com",
                                mobile_number="0412000222")
