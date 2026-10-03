@@ -44,22 +44,30 @@ class ClaimEligibilityTests(TestCase):
         self.assertEqual(set(FAVORITE_STAFF_EMPLOYMENT_TYPES), {"LOCUM", "SHIFT_HERO"})
 
     def test_every_membership_and_visibility_combination(self):
-        expected = {
-            # (employment, visibility, anonymous): (status, code or None, claimed)
-            ("FULL_TIME", "FULL_PART_TIME", False): (201, None, True),
-            ("CASUAL", "FULL_PART_TIME", True): (201, None, True),
-            ("LOCUM", "FULL_PART_TIME", False): (403, "shift_not_accessible", False),
-            ("SHIFT_HERO", "FULL_PART_TIME", True): (403, "shift_not_accessible", False),
-            ("PART_TIME", "LOCUM_CASUAL", False): (201, None, True),
-            ("PART_TIME", "LOCUM_CASUAL", True): (403, "shift_not_accessible", False),
-            ("LOCUM", "LOCUM_CASUAL", False): (400, None, False),
-            ("SHIFT_HERO", "LOCUM_CASUAL", True): (400, None, False),
-        }
-        for (employment, visibility, anonymous), (status, code, claimed) in expected.items():
-            with self.subTest(employment=employment, visibility=visibility, anonymous=anonymous):
-                response, was_claimed = self.claim(employment, visibility, anonymous)
-                self.assertEqual(response.status_code, status, response.data)
-                self.assertEqual(was_claimed, claimed)
-                if code:
-                    self.assertEqual(response.data["code"], code)
-                self.assertNotEqual(response.data.get("code"), "shift_claim_tier_mismatch")
+        staff = set(PHARMACY_STAFF_EMPLOYMENT_TYPES)
+        favorites = set(FAVORITE_STAFF_EMPLOYMENT_TYPES)
+        employment_types = tuple(PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES)
+
+        for employment in employment_types:
+            for visibility in ("FULL_PART_TIME", "LOCUM_CASUAL"):
+                for anonymous in (False, True):
+                    with self.subTest(employment=employment, visibility=visibility, anonymous=anonymous):
+                        response, was_claimed = self.claim(employment, visibility, anonymous)
+
+                        if visibility == "FULL_PART_TIME":
+                            expected = (201, None, True) if employment in staff else (
+                                403, "shift_not_accessible", False
+                            )
+                        elif employment in favorites:
+                            expected = (400, None, False)
+                        elif anonymous:
+                            expected = (403, "shift_not_accessible", False)
+                        else:
+                            expected = (201, None, True)
+
+                        expected_status, expected_code, expected_claimed = expected
+                        self.assertEqual(response.status_code, expected_status, response.data)
+                        self.assertEqual(was_claimed, expected_claimed)
+                        if expected_code:
+                            self.assertEqual(response.data["code"], expected_code)
+                        self.assertNotEqual(response.data.get("code"), "shift_claim_tier_mismatch")
