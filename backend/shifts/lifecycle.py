@@ -261,9 +261,8 @@ class ShiftDetailViewSet(BaseShiftViewSet):
 
                 try:
                     s_date = dt_cls.strptime(slot_date_raw, '%Y-%m-%d').date()
-                except ValueError as exc:
-                    # This is the caller's input error, so the parser message is safe and useful.
-                    results.append({"error": str(exc), "rate": "0.00"})
+                except ValueError:
+                    results.append({"error": "Invalid date format, use YYYY-MM-DD", "rate": "0.00"})
                     continue
 
                 try:
