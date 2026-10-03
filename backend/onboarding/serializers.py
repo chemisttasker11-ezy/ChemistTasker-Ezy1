@@ -1,23 +1,4 @@
 """Serializers for the onboarding flows (owner, pharmacist, other staff, explorer) and referee responses."""
-from pathlib import Path
-
-
-_SKILLS_CATALOG_CACHE = None
-
-
-def _load_skills_catalog():
-    global _SKILLS_CATALOG_CACHE
-    if _SKILLS_CATALOG_CACHE is not None:
-        return _SKILLS_CATALOG_CACHE
-    from django.conf import settings
-    base_dir = settings.BASE_DIR.parent
-    catalog_path = base_dir / "shared-core" / "skills_catalog.json"
-    try:
-        with open(catalog_path, "r", encoding="utf-8") as f:
-            _SKILLS_CATALOG_CACHE = json.load(f)
-    except Exception:
-        _SKILLS_CATALOG_CACHE = {}
-    return _SKILLS_CATALOG_CACHE
 
 
 from rest_framework import serializers
@@ -28,36 +9,37 @@ from onboarding.models import (
     PharmacistOnboarding,
     RefereeResponse,
 )
-from django.utils import timezone
-from core.task_queue import async_task
-import os
-import json
-from django.utils.text import slugify
-from django.core.files.storage import default_storage
-from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY, validate_uploaded_file
-from core.numbers import coerce_float_6 as q6
-from core.serializer_lifecycle import (
-    _delete_file_if_unreferenced,
-    _update_locked_user_fields,
-)
+from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 from core.serializer_mixins import UploadValidationMixin
-from users.normalization import normalize_email as clean_email
 from users.presentation import _build_absolute_media_url
+from onboarding.services.basic import (
+    apply_explorer_basic_tab,
+    apply_otherstaff_basic_tab,
+    apply_owner_basic_tab,
+    apply_pharmacist_basic_tab,
+)
 from onboarding.services.identity import apply_identity_tab
+from onboarding.services.preferences import apply_interests_tab, apply_rate_tab
+from onboarding.services.progress import (
+    explorer_progress_percent,
+    otherstaff_progress_percent,
+    owner_progress_percent,
+    pharmacist_progress_percent,
+)
+from onboarding.services.regulatory import apply_regulatory_tab, required_documents_for_role
+from onboarding.services.skills import (  # noqa: F401  (_load_skills_catalog, _required_cert_skill_codes: historical path)
+    _load_skills_catalog,
+    _required_cert_skill_codes,
+    apply_skills_tab,
+    files_by_skill,
+    list_existing_skill_files,
+    save_skill_file,
+    skill_certificate_summary,
+)
+from onboarding.services.submission import record_first_submission, submit_requested
 from onboarding.services.payment import apply_payment_tab, masked_tfn
-from onboarding.services.profile import apply_profile_photo, apply_profile_tab
+from onboarding.services.profile import apply_profile_tab
 from onboarding.services.referees import apply_referees_tab
-
-
-def _required_cert_skill_codes(role_key: str) -> set[str]:
-    catalog = _load_skills_catalog()
-    role = (catalog or {}).get(role_key, {})
-    required = set()
-    for group_key in ("clinical_services", "dispense_software", "expanded_scope"):
-        for item in role.get(group_key, []) or []:
-            if item.get("requires_certificate"):
-                required.add(item.get("code"))
-    return {c for c in required if c}
 
 
 class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
@@ -147,85 +129,11 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
             return self._basic_tab(instance, validated_data, submit)
         return super().update(instance, validated_data)
 
-    def _basic_tab(self, instance: OwnerOnboarding, vdata: dict, submit: bool):
-        user_data = vdata.pop("user", {})
-        update_fields: list[str] = []
+    def _basic_tab(self, instance, vdata: dict, submit: bool):
+        return apply_owner_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
 
-        if user_data:
-            _update_locked_user_fields(instance.user, user_data)
-
-        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
-
-        direct_fields = ["gender", "role", "chain_pharmacy", "number_of_pharmacies", "ahpra_number"]
-        role_changed = "role" in vdata and vdata.get("role") != instance.role
-        ahpra_changed = "ahpra_number" in vdata and vdata.get("ahpra_number") != instance.ahpra_number
-
-        for field in direct_fields:
-            if field in vdata:
-                setattr(instance, field, vdata[field])
-                update_fields.append(field)
-
-        reset_ahpra = role_changed or ahpra_changed
-        if reset_ahpra:
-            instance.ahpra_verified = False
-            instance.ahpra_verification_note = ""
-            update_fields.extend(["ahpra_verified", "ahpra_verification_note"])
-
-        first_submit = submit and not instance.submitted_for_verification
-        if first_submit:
-            instance.submitted_for_verification = True
-            update_fields.append("submitted_for_verification")
-
-        if submit:
-            instance.verified = False
-            update_fields.append("verified")
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # Notify on any update to this onboarding (manual review required).
-        if update_fields:
-            from onboarding.emails import notify_superuser_on_onboarding
-            try:
-                notify_superuser_on_onboarding(instance)
-            except Exception:
-                pass
-
-        # NOTE: AHPRA verification is handled manually to avoid automated scraping.
-        # if submit and instance.role == "PHARMACIST":
-        #     should_verify_ahpra = bool(instance.ahpra_number) and (
-        #         ahpra_changed or not instance.ahpra_verified
-        #     )
-        #     if should_verify_ahpra:
-        #         async_task(
-        #             "client_profile.tasks.verify_ahpra_task",
-        #             instance._meta.model_name,
-        #             instance.pk,
-        #             instance.ahpra_number,
-        #             instance.user.first_name or "",
-        #             instance.user.last_name or "",
-        #             instance.user.email or "",
-        #         )
-
-        return instance
-
-    def get_progress_percent(self, obj: OwnerOnboarding):
-        user = getattr(obj, "user", None)
-        checks = [
-            bool(getattr(user, "username", None)),
-            bool(getattr(user, "first_name", None)),
-            bool(getattr(user, "last_name", None)),
-            bool(getattr(user, "mobile_number", None)),
-            bool(obj.role),
-            bool(getattr(obj, "number_of_pharmacies", None)),
-            bool(getattr(obj, "profile_photo")),
-        ]
-        if obj.role == "PHARMACIST":
-            checks.append(bool(obj.ahpra_number))
-            checks.append(bool(obj.ahpra_verified))
-
-        filled = sum(1 for flag in checks if flag)
-        return int(100 * filled / (len(checks) or 1))
+    def get_progress_percent(self, obj):
+        return owner_progress_percent(obj)
 
     def get_profile_photo_url(self, obj):
         return _build_absolute_media_url(self.context.get("request"), getattr(obj, "profile_photo", None))
@@ -466,133 +374,23 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return masked_tfn(obj)
 
     def _files_by_skill(self):
-        """
-        Accept files either as flat keys ('CBR') or nested 'skill_files[CBR]'.
-        """
-        req = self.context.get("request")
-        out = {}
-        if not req or not hasattr(req, "FILES"):
-            return out
-        for key, f in req.FILES.items():
-            if key.startswith("skill_files[") and key.endswith("]"):
-                code = key[len("skill_files["):-1]
-                out[code] = f
-            else:
-                out[key] = f
-        return out
+        return files_by_skill(self.context.get("request"))
 
     def _save_skill_file(self, user_id: int, code: str, uploaded_file):
-        """
-        Save to: skill_certs/<user_id>/<CODE>/<base>_<CODE>_<YYYYmmddHHMMSS>.<ext>
-        (keeps historical versions; no deletes)
-        """
-        validate_uploaded_file(uploaded_file, DOCUMENT_UPLOAD_POLICY, f"skill certificate {code}")
-        base, ext = os.path.splitext(uploaded_file.name or "certificate")
-        safe = slugify(base) or "certificate"
-        code_up = (code or "UNKNOWN").upper()
-        ts = timezone.now().strftime("%Y%m%d%H%M%S")
-        rel_path = f"skill_certs/{user_id}/{code_up}/{safe}_{code_up}_{ts}{ext.lower()}"
-        return default_storage.save(rel_path, uploaded_file)
+        return save_skill_file(user_id, code, uploaded_file)
 
     def _list_existing(self, user_id: int, code: str):
-        folder = f"skill_certs/{user_id}/{(code or 'UNKNOWN').upper()}/"
-        try:
-            _dirs, files = default_storage.listdir(folder)
-        except Exception:
-            return []
-        return sorted(folder + name for name in files)
+        return list_existing_skill_files(user_id, code)
 
     # -------- progress --------
     def get_progress_percent(self, obj):
-        user = getattr(obj, 'user', None)
-
-        def _filled_str(x):
-            return bool(x and str(x).strip())
-
-        checks = [
-            bool(getattr(user, 'username', None)),
-            bool(getattr(user, 'first_name', None)),
-            bool(getattr(user, 'last_name', None)),
-            bool(getattr(user, 'mobile_number', None)),
-            bool(getattr(obj, 'profile_photo', None)),
-            bool(obj.gov_id_verified),
-            bool(obj.ahpra_verified),
-            bool(getattr(obj, 'referee1_confirmed', False)),
-            bool(getattr(obj, 'referee2_confirmed', False)),
-        ]
-
-        # Address completeness counts as one unit
-        addr_ok = all([
-            _filled_str(getattr(obj, 'street_address', None)),
-            _filled_str(getattr(obj, 'suburb', None)),
-            _filled_str(getattr(obj, 'state', None)),
-            _filled_str(getattr(obj, 'postcode', None)),
-        ])
-        checks.append(addr_ok)
-
-        # Profile tab
-        checks.append(bool(getattr(obj, 'resume', None)))
-        checks.append(_filled_str(getattr(obj, 'short_bio', None)))
-
-        # Payment contribution
-        pref = (obj.payment_preference or '').upper()
-        if pref == 'ABN':
-            checks.append(bool(obj.abn) and bool(obj.abn_verified))
-        elif pref == 'TFN':
-            checks.append(bool(getattr(obj, 'tfn_number', None)))
-
-        # Rates contribution (all fields)
-        rp = getattr(obj, 'rate_preference', None) or {}
-        checks.append(_filled_str(rp.get('weekday')))
-        checks.append(_filled_str(rp.get('saturday')))
-        checks.append(_filled_str(rp.get('sunday')))
-        checks.append(_filled_str(rp.get('public_holiday')))
-        early_ok = bool(rp.get('early_morning_same_as_day')) or _filled_str(rp.get('early_morning'))
-        late_ok  = bool(rp.get('late_night_same_as_day'))   or _filled_str(rp.get('late_night'))
-        checks.append(early_ok)
-        checks.append(late_ok)
-
-        # ---------- NEW: flip overall verified here, based on your gate ----------
-        phone_ok = bool(getattr(user, 'is_mobile_verified', False))
-        gate_ok = (
-            bool(getattr(obj, 'referee1_confirmed', False)) and
-            bool(getattr(obj, 'referee2_confirmed', False)) and
-            bool(getattr(obj, 'ahpra_verified', False)) and
-            phone_ok
-        )
-        if gate_ok and not bool(getattr(obj, 'verified', False)):
-            try:
-                obj.verified = True
-                obj.save(update_fields=['verified'])
-                # print("[VERIFY DEBUG] progress flip -> verified=True", {"pk": obj.pk}, flush=True)
-            except Exception as e:
-                # print("[VERIFY DEBUG] progress flip failed", {"pk": obj.pk, "err": str(e)}, flush=True)
-                pass
-        # ------------------------------------------------------------------------
-
-        filled = sum(1 for x in checks if x)
-        total = len(checks) or 1
-        return int(100 * filled / total)
+        return pharmacist_progress_percent(obj)
 
     # -------- update --------
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
-        submit = bool(self.initial_data.get('submitted_for_verification'))
-
-        # --- Superuser notify: first-time submission gate (BASIC tab only) ---
-        first_submit = submit and (tab == 'basic') and not bool(getattr(instance, 'submitted_for_verification', False))
-        if first_submit:
-            # Persist first submission so we don't email again
-            instance.submitted_for_verification = True
-            instance.save(update_fields=['submitted_for_verification'])
-
-            # Local import avoids circular dependencies
-            from onboarding.emails import notify_superuser_on_onboarding
-            try:
-                notify_superuser_on_onboarding(instance)
-            except Exception:
-                # Never block user flow on email issues
-                pass
+        submit = submit_requested(self.initial_data)
+        record_first_submission(instance, tab=tab, submit=submit)
 
         if tab == 'basic':
             return self._basic_tab(instance, validated_data, submit)
@@ -612,127 +410,8 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return super().update(instance, validated_data)
 
     # ---------------- BASIC TAB ----------------
-    def _basic_tab(self, instance: PharmacistOnboarding, vdata: dict, submit: bool):
-        # nested user data
-        user_data = vdata.pop('user', {})
-
-        update_fields = []
-
-        if user_data:
-            _update_locked_user_fields(instance.user, user_data)
-
-        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
-
-        # helper to compare file names safely
-        def _fname(f):
-            return getattr(f, 'name', None) if f else None
-
-        # We will handle government_id explicitly (to delete old files safely),
-        # so do NOT include it in direct_fields.
-        direct_fields = [
-        'ahpra_number',
-        'street_address', 'suburb', 'state', 'postcode', 'google_place_id',
-        'open_to_travel', 'travel_states', 'coverage_radius_km',
-        'date_of_birth', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
-        ]
-
-        # Detect changes that affect verification flags
-        ahpra_changed = 'ahpra_number' in vdata and (vdata.get('ahpra_number') != getattr(instance, 'ahpra_number'))
-
-        # --- government_id: delete old file on replace or explicit clear ---
-        # gov_id_changed = False
-        # if 'government_id' in vdata:
-        #     new_file = vdata.get('government_id')  # may be a file object or None
-        #     old_file = getattr(instance, 'government_id', None)
-        #     gov_id_changed = (_fname(new_file) != _fname(old_file))
-
-        #     if new_file is None:
-        #         # explicit clear
-        #         if old_file:
-        #             try:
-        #                 _delete_file_if_unreferenced(old_file, current_instance=instance)   # Azure/local safe
-        #             except Exception:
-        #                 pass
-        #         instance.government_id = None
-        #         update_fields.append('government_id')
-        #     else:
-        #         # replacing: delete old first if it's different
-        #         if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-        #             try:
-        #                 _delete_file_if_unreferenced(old_file, current_instance=instance)
-        #             except Exception:
-        #                 pass
-        #         instance.government_id = new_file
-        #         update_fields.append('government_id')
-
-        # regular writes for other basic fields
-        for f in direct_fields:
-            if f in vdata:
-                setattr(instance, f, vdata[f])
-                update_fields.append(f)
-
-        # round/quantize lat/lon to 6 dp if provided
-        if 'latitude' in vdata:
-            instance.latitude = q6(vdata.get('latitude'))
-            update_fields.append('latitude')
-        if 'longitude' in vdata:
-            instance.longitude = q6(vdata.get('longitude'))
-            update_fields.append('longitude')
-
-        # reset only relevant flags when inputs changed
-        if ahpra_changed:
-            instance.ahpra_verified = False
-            instance.ahpra_verification_note = ""
-            update_fields += ['ahpra_verified', 'ahpra_verification_note']
-
-        # if gov_id_changed:
-        #     instance.gov_id_verified = False
-        #     instance.gov_id_verification_note = ""
-        #     update_fields += ['gov_id_verified', 'gov_id_verification_note']
-
-        # full profile remains unverified until all tabs pass
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # trigger ONLY the basic-tab tasks when submitting
-        if submit:
-            ahpra = vdata.get('ahpra_number', instance.ahpra_number)
-            # gov   = vdata.get('government_id', instance.government_id)
-            errors = {}
-            if not ahpra:
-                errors['ahpra_number'] = ['AHPRA number is required to submit.']
-            # if not gov:
-            #     errors['government_id'] = ['Government ID file is required to submit.']
-            if errors:
-                raise serializers.ValidationError(errors)
-
-            # NOTE: AHPRA verification is handled manually to avoid automated scraping.
-            # if instance.ahpra_number and (ahpra_changed or not instance.ahpra_verified):
-            #     async_task(
-            #         'client_profile.tasks.verify_ahpra_task',
-            #         instance._meta.model_name, instance.pk,
-            #         instance.ahpra_number, instance.user.first_name,
-            #         instance.user.last_name, instance.user.email,
-            #     )
-
-            # GOV ID: file changed OR not verified yet
-            # if instance.government_id and (gov_id_changed or not instance.gov_id_verified):
-            #     async_task(
-            #         'client_profile.tasks.verify_filefield_task',
-            #         instance._meta.model_name, instance.pk,
-            #         'government_id',
-            #         instance.user.first_name or '',
-            #         instance.user.last_name or '',
-            #         instance.user.email or '',
-            #         verification_field='gov_id_verified',
-            #         note_field='gov_id_verification_note',
-            #     )
-
-        return instance
+    def _basic_tab(self, instance, vdata: dict, submit: bool):
+        return apply_pharmacist_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
 
     def get_ahpra_years_since_first_registration(self, obj):
         return obj.ahpra_years_since_first_registration
@@ -752,137 +431,22 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- Skills tab ----------------
     def _skills_tab(self, instance, vdata: dict, submit: bool):
-        """
-        Rules:
-        - Checking a skill is optional.
-        - If a skill is checked, a certificate MUST exist (already saved or uploaded now).
-        - We store per-skill file metadata in instance.skill_certificates (JSON).
-        - This version deletes old files when replacing (and when a skill is unchecked) unless KEEP_SKILL_HISTORY=True.
-        """
-        # accept JSON string or list
-        raw = self.initial_data.get("skills", vdata.get("skills", []))
-        if isinstance(raw, str):
-            try:
-                skills = json.loads(raw)
-            except Exception:
-                raise serializers.ValidationError({"skills": "Must be a JSON array or list."})
-        else:
-            skills = list(raw or [])
-
-        uploads = self._files_by_skill()
-        cert_map = dict(instance.skill_certificates or {})
-        user_id = instance.user_id
-
-        # (A) If a skill was **unchecked/removed**, optionally delete its last stored file
-        if not getattr(self, "KEEP_SKILL_HISTORY", False):
-            removed_codes = [code for code in list(cert_map.keys()) if code not in skills]
-            for code in removed_codes:
-                old_path = (cert_map.get(code) or {}).get("path")
-                if old_path:
-                    try:
-                        default_storage.delete(old_path)  # works with Azure Blob via django-storages
-                    except Exception:
-                        pass
-                cert_map.pop(code, None)
-
-        # (B) Save any uploaded files for checked skills
-        #     Safe order: save the new file first; if it succeeds, delete the old one (if any).
-        for code, f in uploads.items():
-            if code in skills:
-                # remember old path (if any)
-                old_path = (cert_map.get(code) or {}).get("path")
-
-                # save new file
-                saved = self._save_skill_file(user_id, code, f)
-
-                # delete old file unless we're keeping history
-                if old_path and not getattr(self, "KEEP_SKILL_HISTORY", False):
-                    try:
-                        default_storage.delete(old_path)
-                    except Exception:
-                        # swallow storage deletion errors; user flow should not break
-                        pass
-
-                # point to the new file
-                cert_map[code] = {
-                    "path": saved,
-                    "uploaded_at": timezone.now().isoformat(),
-                }
-
-        # (C) Validation: only skills that require certificates must have one
-        required_codes = _required_cert_skill_codes("pharmacist")
-        missing = [code for code in skills if code in required_codes and code not in cert_map]
-        if missing:
-            raise serializers.ValidationError(
-                {"skills": f"Certificate required for checked skill(s): {', '.join(missing)}"}
-            )
-
-        # Persist
-        instance.skills = skills
-        instance.skill_certificates = cert_map
-        instance.save(update_fields=["skills", "skill_certificates"])
-        return instance
+        return apply_skills_tab(
+            instance, vdata, initial_data=self.initial_data, uploads=self._files_by_skill(), role_key="pharmacist",
+            missing_message="Certificate required for checked skill(s): ",
+            keep_history=getattr(self, "KEEP_SKILL_HISTORY", False),
+        )
 
     # --------------- read-only summary for UI ---------------
     def get_skill_certificates(self, obj):
-        """
-        Return latest file per skill (by name sort). If you want all versions, expand here.
-        """
-        data = []
-        for code, meta in (obj.skill_certificates or {}).items():
-            path = (meta or {}).get("path")
-            if not path:
-                continue
-            try:
-                url = default_storage.url(path)
-            except Exception:
-                url = None
-            data.append({"skill_code": code, "path": path, "url": url, "uploaded_at": meta.get("uploaded_at")})
-        # stable order
-        return sorted(data, key=lambda r: r["skill_code"])
+        return skill_certificate_summary(obj)
 
     def get_profile_photo_url(self, obj):
         return _build_absolute_media_url(self.context.get("request"), getattr(obj, "profile_photo", None))
 
     # ---------------- Rate tab ----------------
     def _rate_tab(self, instance, vdata: dict, submit: bool):
-        """
-        Stores rate_preference JSON.
-        Accepts stringified JSON or dict with keys:
-        weekday, saturday, sunday, public_holiday, early_morning, late_night (strings),
-        early_morning_same_as_day (bool), late_night_same_as_day (bool)
-        """
-        raw = self.initial_data.get('rate_preference', vdata.get('rate_preference'))
-        if raw is None:
-            # allow clearing: leave as-is if not provided
-            return instance
-
-        try:
-            rp = json.loads(raw) if isinstance(raw, str) else dict(raw)
-        except Exception:
-            raise serializers.ValidationError({"rate_preference": "Must be a JSON object."})
-
-        # Soft sanitize: ensure keys exist, store as strings/booleans
-        def to_s(x): return '' if x is None else str(x)
-        rp_norm = {
-            "weekday": to_s(rp.get("weekday")),
-            "saturday": to_s(rp.get("saturday")),
-            "sunday": to_s(rp.get("sunday")),
-            "public_holiday": to_s(rp.get("public_holiday")),
-            "early_morning": to_s(rp.get("early_morning")),
-            "late_night": to_s(rp.get("late_night")),
-            "early_morning_same_as_day": bool(rp.get("early_morning_same_as_day", False)),
-            "late_night_same_as_day": bool(rp.get("late_night_same_as_day", False)),
-        }
-
-        instance.rate_preference = rp_norm
-        if submit:
-            instance.verified = False  # stays unverified until all tabs pass
-            instance.save(update_fields=["rate_preference", "verified"])
-        else:
-            instance.save(update_fields=["rate_preference"])
-
-        return instance
+        return apply_rate_tab(instance, vdata, submit, initial_data=self.initial_data)
 
     # ---------------- Profile tab ----------------
     def _profile_tab(self, instance, vdata: dict, submit: bool):
@@ -1096,138 +660,27 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return masked_tfn(obj)
 
     def _files_by_skill(self):
-        req = self.context.get("request")
-        out = {}
-        if not req or not hasattr(req, "FILES"):
-            return out
-        for key, f in req.FILES.items():
-            if key.startswith("skill_files[") and key.endswith("]"):
-                code = key[len("skill_files["):-1]
-                out[code] = f
-            else:
-                out[key] = f
-        return out
+        return files_by_skill(self.context.get("request"))
 
     def _save_skill_file(self, user_id: int, code: str, uploaded_file):
-        validate_uploaded_file(uploaded_file, DOCUMENT_UPLOAD_POLICY, f"skill certificate {code}")
-        base, ext = os.path.splitext(uploaded_file.name or "certificate")
-        safe = slugify(base) or "certificate"
-        code_up = (code or "UNKNOWN").upper()
-        ts = timezone.now().strftime("%Y%m%d%H%M%S")
-        rel_path = f"skill_certs/{user_id}/{code_up}/{safe}_{code_up}_{ts}{ext.lower()}"
-        return default_storage.save(rel_path, uploaded_file)
+        return save_skill_file(user_id, code, uploaded_file)
 
     def _list_existing(self, user_id: int, code: str):
-        folder = f"skill_certs/{user_id}/{(code or 'UNKNOWN').upper()}/"
-        try:
-            _dirs, files = default_storage.listdir(folder)
-        except Exception:
-            return []
-        return sorted(folder + name for name in files)
+        return list_existing_skill_files(user_id, code)
 
     # -------- utility: regulatory requirements by role --------
     def _required_docs_for_role(self, instance):
-        """
-        Returns list of (field_name, verified_flag, note_field) tuples required for the selected role.
-        """
-        role = (instance.role_type or '').upper()
-        mapping = {
-            'INTERN': [
-                ('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note'),
-                ('hours_proof', 'hours_proof_verified', 'hours_proof_verification_note'),
-            ],
-            'TECHNICIAN': [
-                ('certificate', 'certificate_verified', 'certificate_verification_note'),
-            ],
-            'ASSISTANT': [
-                ('certificate', 'certificate_verified', 'certificate_verification_note'),
-            ],
-            'STUDENT': [
-                ('university_id', 'university_id_verified', 'university_id_verification_note'),
-            ],
-        }
-        return mapping.get(role, [])
+        return required_documents_for_role(instance)
 
     # -------- progress --------
     def get_progress_percent(self, obj):
-        user = getattr(obj, 'user', None)
-
-        def _filled_str(x):
-            return bool(x and str(x).strip())
-
-        checks = [
-            bool(getattr(user, 'username', None)),
-            bool(getattr(user, 'first_name', None)),
-            bool(getattr(user, 'last_name', None)),
-            bool(getattr(user, 'mobile_number', None)),
-            bool(getattr(obj, 'profile_photo', None)),
-            bool(obj.gov_id_verified),
-            bool(getattr(obj, 'referee1_confirmed', False)),
-            bool(getattr(obj, 'referee2_confirmed', False)),
-        ]
-
-        # Address completeness counts as one unit
-        addr_ok = all([
-            _filled_str(getattr(obj, 'street_address', None)),
-            _filled_str(getattr(obj, 'suburb', None)),
-            _filled_str(getattr(obj, 'state', None)),
-            _filled_str(getattr(obj, 'postcode', None)),
-        ])
-        checks.append(addr_ok)
-
-        # Profile tab
-        checks.append(bool(getattr(obj, 'resume', None)))
-        checks.append(_filled_str(getattr(obj, 'short_bio', None)))
-
-        # Payment contribution
-        pref = (obj.payment_preference or '').upper()
-        if pref == 'ABN':
-            checks.append(bool(obj.abn) and bool(obj.abn_verified))
-        elif pref == 'TFN':
-            checks.append(bool(getattr(obj, 'tfn_number', None)))
-
-        # Regulatory docs gate: all required docs for the role must be verified
-        req = self._required_docs_for_role(obj)
-        docs_ok = all(getattr(obj, verified_flag, False) for _, verified_flag, _ in req)
-        checks.append(docs_ok)
-
-        # Final verified flip (role-specific)
-        phone_ok = bool(getattr(user, 'is_mobile_verified', False))
-        gate_ok = (
-            bool(getattr(obj, 'referee1_confirmed', False)) and
-            bool(getattr(obj, 'referee2_confirmed', False)) and
-            bool(getattr(obj, 'gov_id_verified', False))   and
-            docs_ok and
-            phone_ok
-        )
-        if gate_ok and not bool(getattr(obj, 'verified', False)):
-            try:
-                obj.verified = True
-                obj.save(update_fields=['verified'])
-                # print("[VERIFY DEBUG] otherstaff progress flip -> verified=True", {"pk": obj.pk}, flush=True)
-            except Exception as e:
-                # print("[VERIFY DEBUG] otherstaff progress flip failed", {"pk": obj.pk, "err": str(e)}, flush=True)
-                pass
-
-        filled = sum(1 for x in checks if x)
-        total = len(checks) or 1
-        return int(100 * filled / total)
+        return otherstaff_progress_percent(obj)
 
     # ---------------- update router ----------------
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
-        submit = bool(self.initial_data.get('submitted_for_verification'))
-
-        # --- Superuser notify: first-time submission gate (BASIC tab only) ---
-        first_submit = submit and (tab == 'basic') and not bool(getattr(instance, 'submitted_for_verification', False))
-        if first_submit:
-            instance.submitted_for_verification = True
-            instance.save(update_fields=['submitted_for_verification'])
-            from onboarding.emails import notify_superuser_on_onboarding
-            try:
-                notify_superuser_on_onboarding(instance)
-            except Exception:
-                pass
+        submit = submit_requested(self.initial_data)
+        record_first_submission(instance, tab=tab, submit=submit)
 
         if tab == 'basic':
             return self._basic_tab(instance, validated_data, submit)
@@ -1247,134 +700,16 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return super().update(instance, validated_data)
 
     # ---------------- BASIC TAB ----------------
-    def _basic_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        # nested user data
-        user_data = vdata.pop('user', {})
-        if user_data:
-            _update_locked_user_fields(instance.user, user_data)
-
-        update_fields = []
-
-        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
-
-        # regular writes for basic fields (address + dob)
-        direct_fields = [
-            'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km','date_of_birth',
-            'gender','emergency_contact_number','emergency_contact_relation',
-            'role_type','classification_level','student_year','intern_half',  # allow role data in Basic if FE sends them early
-        ]
-        for f in direct_fields:
-            if f in vdata:
-                setattr(instance, f, vdata[f])
-                update_fields.append(f)
-
-        # lat/lon rounding to 6 dp
-        if 'latitude' in vdata:
-            instance.latitude = q6(vdata.get('latitude'))
-            update_fields.append('latitude')
-        if 'longitude' in vdata:
-            instance.longitude = q6(vdata.get('longitude'))
-            update_fields.append('longitude')
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-        return instance
+    def _basic_tab(self, instance, vdata: dict, submit: bool):
+        return apply_otherstaff_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
 
     # ---------------- Identity TAB ----------------
     def _identity_tab(self, instance, vdata: dict, submit: bool):
         return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Regulatory TAB ----------------
-    def _regulatory_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        """
-        Keeps your current role/subrole logic and per-role docs,
-        but runs per-field resets and schedules file verifications.
-        """
-        update_fields = []
-        file_fields = [
-            'ahpra_proof','hours_proof','certificate','university_id','cpr_certificate','s8_certificate'
-        ]
-
-        def _fname(f):
-            return getattr(f, 'name', None) if f else None
-
-        # role classification inputs
-        for f in ['role_type','classification_level','student_year','intern_half']:
-            if f in vdata:
-                if getattr(instance, f) != vdata[f]:
-                    setattr(instance, f, vdata[f])
-                    update_fields.append(f)
-
-        # Handle each file: replace/clear safely; reset its verified flag on change
-        def handle_file(field):
-            changed = False
-            if field in vdata:
-                new_file = vdata.get(field)  # may be file or None
-                old_file = getattr(instance, field, None)
-                changed = (_fname(new_file) != _fname(old_file))
-                if new_file is None:
-                    if old_file:
-                        try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                        except Exception: pass
-                    setattr(instance, field, None)
-                    update_fields.append(field)
-                else:
-                    if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                        try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                        except Exception: pass
-                    setattr(instance, field, new_file)
-                    update_fields.append(field)
-
-                # reset verification when changed
-                if changed:
-                    vflag = f"{field}_verified"
-                    vnote = f"{field}_verification_note"
-                    if hasattr(instance, vflag):
-                        setattr(instance, vflag, False)
-                        update_fields.append(vflag)
-                    if hasattr(instance, vnote):
-                        setattr(instance, vnote, "")
-                        update_fields.append(vnote)
-            return changed
-
-        changed_map = {f: handle_file(f) for f in file_fields}
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-            # Validate required per role
-            req = self._required_docs_for_role(instance)
-            errors = {}
-            for field, _, _ in req:
-                if not getattr(instance, field, None):
-                    errors[field] = ['This file is required for the selected role.']
-            if errors:
-                raise serializers.ValidationError(errors)
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-
-        # schedule verification tasks for any provided file that changed or is not verified
-        if submit:
-            for field, changed in changed_map.items():
-                vflag = f"{field}_verified"
-                if getattr(instance, field, None) and (changed or not getattr(instance, vflag, False)):
-                    async_task(
-                        'client_profile.tasks.verify_filefield_task',
-                        instance._meta.model_name, instance.pk,
-                        field,
-                        instance.user.first_name or '',
-                        instance.user.last_name or '',
-                        instance.user.email or '',
-                        verification_field=f"{field}_verified",
-                        note_field=f"{field}_verification_note",
-                    )
-        return instance
+    def _regulatory_tab(self, instance, vdata: dict, submit: bool):
+        return apply_regulatory_tab(instance, vdata, submit)
 
     # ---------------- Payment TAB ----------------
     def _payment_tab(self, instance, vdata: dict, submit: bool):
@@ -1385,86 +720,12 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return apply_referees_tab(instance, vdata, submit)
 
     # ---------------- Skills TAB ----------------
-    def _skills_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
-        """
-        Legacy-aligned Skills tab:
-        - `skills`: list of codes (string or JSON array)
-        - Per-skill certificate upload (must exist if the skill is selected)
-        - `years_experience`: simple string bucket stored on the model
-        """
-        # 1) Parse skills array (accept JSON string or list)
-        raw = self.initial_data.get("skills", vdata.get("skills", []))
-        if isinstance(raw, str):
-            try:
-                skills = json.loads(raw)
-            except Exception:
-                raise serializers.ValidationError({"skills": "Must be a JSON array or list."})
-        else:
-            skills = list(raw or [])
-
-        # 2) Years of experience (optional)
-        yrs = self.initial_data.get("years_experience", vdata.get("years_experience", None))
-        if yrs is not None:
-            # store as plain string; keep legacy buckets (e.g. '', '0-1', '1-2', '2-3', '3-5', '5+')
-            instance.years_experience = (yrs or "").strip()
-
-        uploads = self._files_by_skill()                    # accepts both flat keys and skill_files[CODE]
-        cert_map = dict(instance.skill_certificates or {})  # latest file per skill
-        user_id = instance.user_id
-
-        # 3) If a skill was unchecked, remove its stored certificate (unless keeping history)
-        if not getattr(self, "KEEP_SKILL_HISTORY", False):
-            removed = [code for code in list(cert_map.keys()) if code not in skills]
-            for code in removed:
-                old_path = (cert_map.get(code) or {}).get("path")
-                if old_path:
-                    try:
-                        default_storage.delete(old_path)
-                    except Exception:
-                        pass
-                cert_map.pop(code, None)
-
-        # 4) Save any uploaded files for checked skills
-        for code, f in uploads.items():
-            if code in skills and f:
-                # remember old path (if any)
-                old_path = (cert_map.get(code) or {}).get("path")
-
-                # save new file (keeps historical versions if you change _save_skill_file to do so)
-                saved = self._save_skill_file(user_id, code, f)
-
-                # delete old file unless keeping history
-                if old_path and not getattr(self, "KEEP_SKILL_HISTORY", False):
-                    try:
-                        default_storage.delete(old_path)
-                    except Exception:
-                        pass
-
-                # record new pointer
-                cert_map[code] = {
-                    "path": saved,
-                    "uploaded_at": timezone.now().isoformat(),
-                }
-
-        # 5) Validation: only skills that require certificates must have one
-        required_codes = _required_cert_skill_codes("otherstaff")
-        missing = [code for code in skills if code in required_codes and code not in cert_map]
-        if missing:
-            raise serializers.ValidationError(
-                {"skills": f"Certificate required for: {', '.join(missing)}"}
-            )
-
-        # 6) Persist changes
-        instance.skills = skills
-        instance.skill_certificates = cert_map
-
-        # Save only the changed fields; include years_experience if we set it above
-        update_fields = ["skills", "skill_certificates"]
-        if yrs is not None:
-            update_fields.append("years_experience")
-
-        instance.save(update_fields=update_fields)
-        return instance
+    def _skills_tab(self, instance, vdata: dict, submit: bool):
+        return apply_skills_tab(
+            instance, vdata, initial_data=self.initial_data, uploads=self._files_by_skill(), role_key="otherstaff",
+            missing_message="Certificate required for: ", track_years_experience=True,
+            keep_history=getattr(self, "KEEP_SKILL_HISTORY", False),
+        )
 
     # ---------------- Profile TAB ----------------
     def _profile_tab(self, instance, vdata: dict, submit: bool):
@@ -1472,17 +733,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- read-only summary for UI ----------------
     def get_skill_certificates(self, obj):
-        data = []
-        for code, meta in (obj.skill_certificates or {}).items():
-            path = (meta or {}).get("path")
-            if not path:
-                continue
-            try:
-                url = default_storage.url(path)
-            except Exception:
-                url = None
-            data.append({"skill_code": code, "path": path, "url": url, "uploaded_at": meta.get("uploaded_at")})
-        return sorted(data, key=lambda r: r["skill_code"])
+        return skill_certificate_summary(obj)
 
     def get_profile_photo_url(self, obj):
         return _build_absolute_media_url(self.context.get("request"), getattr(obj, "profile_photo", None))
@@ -1609,73 +860,13 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
     # ---------------- progress gate ----------------
     def get_progress_percent(self, obj):
-        user = getattr(obj, 'user', None)
-
-        def _filled_str(x):
-            return bool(x and str(x).strip())
-
-        checks = [
-            bool(getattr(user, 'username', None)),
-            bool(getattr(user, 'first_name', None)),
-            bool(getattr(user, 'last_name', None)),
-            bool(getattr(user, 'mobile_number', None)),
-            bool(getattr(obj, 'profile_photo', None)),
-            bool(obj.gov_id_verified),
-            bool(getattr(obj, 'referee1_confirmed', False)),
-            bool(getattr(obj, 'referee2_confirmed', False)),
-        ]
-
-        # Address as one unit
-        addr_ok = all([
-            _filled_str(getattr(obj, 'street_address', None)),
-            _filled_str(getattr(obj, 'suburb', None)),
-            _filled_str(getattr(obj, 'state', None)),
-            _filled_str(getattr(obj, 'postcode', None)),
-        ])
-        checks.append(addr_ok)
-
-        # Interests present?
-        interests_ok = bool(getattr(obj, 'interests', None))
-        checks.append(interests_ok)
-
-        # Profile
-        checks.append(bool(getattr(obj, 'resume', None)))
-        checks.append(_filled_str(getattr(obj, 'short_bio', None)))
-
-        # Final flip
-        phone_ok = bool(getattr(user, 'is_mobile_verified', False))
-        gate_ok = (
-            bool(getattr(obj, 'referee1_confirmed', False)) and
-            bool(getattr(obj, 'referee2_confirmed', False)) and
-            bool(getattr(obj, 'gov_id_verified', False))    and
-            phone_ok
-        )
-        if gate_ok and not bool(getattr(obj, 'verified', False)):
-            try:
-                obj.verified = True
-                obj.save(update_fields=['verified'])
-            except Exception:
-                pass
-
-        filled = sum(1 for x in checks if x)
-        total = len(checks) or 1
-        return int(100 * filled / total)
+        return explorer_progress_percent(obj)
 
     # ---------------- update router ----------------
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
-        submit = bool(self.initial_data.get('submitted_for_verification'))
-
-        # first-time submission notify (Basic only)
-        first_submit = submit and (tab == 'basic') and not bool(getattr(instance, 'submitted_for_verification', False))
-        if first_submit:
-            instance.submitted_for_verification = True
-            instance.save(update_fields=['submitted_for_verification'])
-            from onboarding.emails import notify_superuser_on_onboarding
-            try:
-                notify_superuser_on_onboarding(instance)
-            except Exception:
-                pass
+        submit = submit_requested(self.initial_data)
+        record_first_submission(instance, tab=tab, submit=submit)
 
         if tab == 'basic':
             return self._basic_tab(instance, validated_data, submit)
@@ -1691,71 +882,16 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
         return super().update(instance, validated_data)
 
     # ---------------- BASIC TAB ----------------
-    def _basic_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
-        # nested user data
-        user_data = vdata.pop('user', {})
-        if user_data:
-            _update_locked_user_fields(instance.user, user_data)
-
-        update_fields = []
-
-        apply_profile_photo(instance, vdata, self.initial_data, update_fields)
-
-        # role + address
-        direct_fields = [
-            'role_type','gender','emergency_contact_number','emergency_contact_relation',
-            'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km',
-        ]
-        for f in direct_fields:
-            if f in vdata:
-                setattr(instance, f, vdata[f])
-                update_fields.append(f)
-
-        # lat/lon rounding
-        if 'latitude' in vdata:
-            instance.latitude = q6(vdata.get('latitude'))
-            update_fields.append('latitude')
-        if 'longitude' in vdata:
-            instance.longitude = q6(vdata.get('longitude'))
-            update_fields.append('longitude')
-
-        if submit:
-            instance.verified = False
-            update_fields.append('verified')
-
-        if update_fields:
-            instance.save(update_fields=list(set(update_fields)))
-        return instance
+    def _basic_tab(self, instance, vdata: dict, submit: bool):
+        return apply_explorer_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
 
     # ---------------- Identity TAB (identical behavior) ----------------
     def _identity_tab(self, instance, vdata: dict, submit: bool):
         return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Interests TAB ----------------
-    def _interests_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):
-        """
-        Accepts list or JSON string.
-        Allowed (suggested) values: SHADOWING, VOLUNTEERING, PLACEMENT, JUNIOR_ASSISTANT
-        """
-        raw = self.initial_data.get('interests', vdata.get('interests'))
-        if raw is None:
-            return instance
-
-        if isinstance(raw, str):
-            try:
-                vals = json.loads(raw)
-            except Exception:
-                raise serializers.ValidationError({"interests": "Must be a JSON array or list."})
-        else:
-            vals = list(raw or [])
-
-        instance.interests = vals
-        if submit:
-            instance.verified = False
-            instance.save(update_fields=['interests','verified'])
-        else:
-            instance.save(update_fields=['interests'])
-        return instance
+    def _interests_tab(self, instance, vdata: dict, submit: bool):
+        return apply_interests_tab(instance, vdata, submit, initial_data=self.initial_data)
 
     # ---------------- Referees TAB ----------------
     def _referees_tab(self, instance, vdata: dict, submit: bool):
