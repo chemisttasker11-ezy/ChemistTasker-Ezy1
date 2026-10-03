@@ -312,11 +312,10 @@ class HubScopeResolver:
         )
         if not any([membership, is_owner, org_admin]):
             raise PermissionDenied("You do not have access to this organization hub.")
-        has_admin = bool(
-            org_admin
-            or is_owner
-            or (membership and membership.is_pharmacy_admin)
-        )
+        # A pharmacy-level admin may participate in the organization hub
+        # through their staff membership, but pharmacy-scoped authority does
+        # not grant organization-wide administration.
+        has_admin = bool(org_admin or is_owner)
         return {
             "scope_type": "organization",
             "organization": organization,
