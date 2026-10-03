@@ -81,6 +81,14 @@ def award_rates():
     if not isinstance(data, dict) or not data:
         raise PricingDataError(f"{AWARD_RATES_FILE.name}: expected a non-empty object of roles")
 
+    for role, classifications in data.items():
+        if not isinstance(classifications, dict) or not classifications:
+            raise PricingDataError(f"{AWARD_RATES_FILE.name}: role {role} must map classifications")
+        for classification, employment in classifications.items():
+            if not isinstance(employment, dict):
+                raise PricingDataError(f"{AWARD_RATES_FILE.name}: {role}/{classification} must map employment rates")
+            _validate_casual_table(role, classification, employment.get("casual"))
+
     for role, classification in REQUIRED_AWARD_CLASSIFICATIONS.items():
         classifications = data.get(role)
         if not isinstance(classifications, dict) or classification not in classifications:
@@ -91,14 +99,6 @@ def award_rates():
             classifications = data.get(role)
             if not isinstance(classifications, dict) or classification not in classifications:
                 raise PricingDataError(f"{AWARD_RATES_FILE.name}: missing {role}/{classification}")
-
-    for role, classifications in data.items():
-        if not isinstance(classifications, dict) or not classifications:
-            raise PricingDataError(f"{AWARD_RATES_FILE.name}: role {role} must map classifications")
-        for classification, employment in classifications.items():
-            if not isinstance(employment, dict):
-                raise PricingDataError(f"{AWARD_RATES_FILE.name}: {role}/{classification} must map employment rates")
-            _validate_casual_table(role, classification, employment.get("casual"))
 
     return data
 
