@@ -1026,9 +1026,9 @@ class VerificationArtifactTests(SimpleTestCase):
             abn_last_checked=None,
             save=mock.Mock(),
         )
-        seen = iter([started, current])
         overrides = {
-            "fetch_instance_with_retries": lambda model, pk: next(seen),
+            "fetch_instance_with_retries": lambda model, pk: started,
+            "_fetch_instance_for_update": lambda model, pk: current,
             "abn_lookup": lambda abn: ("OLD ABN PTY LTD", ABR_HTML),
         }
         with patch_impl(name, **overrides), self.assertLogs("onboarding.tasks", level="INFO"):
@@ -1057,6 +1057,7 @@ class VerificationArtifactTests(SimpleTestCase):
         )
         overrides = {
             "fetch_instance_with_retries": lambda model, pk: target,
+            "_fetch_instance_for_update": lambda model, pk: target,
             "abn_lookup": lambda abn: ("EXAMPLE PHARMACY PTY LTD", ABR_HTML),
         }
         with patch_impl(name, **overrides), mock.patch("builtins.open", side_effect=AssertionError("file opened")):
