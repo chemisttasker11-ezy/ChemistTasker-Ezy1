@@ -61,9 +61,7 @@ from shifts.travel import (
     extract_travel_origin_from_message,
     TRAVEL_ORIGIN_PREFIX,
 )
-
-
-OFFER_EXPIRY_HOURS = 48
+from shifts.assignment import OFFER_EXPIRY_HOURS
 
 
 SHIFT_EMAIL_RECIPIENT_CAP = 50
