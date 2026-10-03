@@ -339,12 +339,18 @@ def announce_posted_shift(
 
     if 'notify_chain_members' in allowed:
         if shift.pharmacy and shift.pharmacy.owner_id:
+            # Every pharmacy of the owner's active chains that include this pharmacy. The chains are selected
+            # first: reading pharmacies__id in the same query would reuse the filter's join and only return this
+            # pharmacy.
+            chain_ids = Chain.objects.filter(
+                owner_id=shift.pharmacy.owner_id,
+                pharmacies=shift.pharmacy,
+                is_active=True,
+            ).values_list('id', flat=True)
             chain_pharmacy_ids = list(
-                Chain.objects.filter(
-                    owner_id=shift.pharmacy.owner_id,
-                    pharmacies=shift.pharmacy,
-                    is_active=True,
-                ).values_list('pharmacies__id', flat=True)
+                Chain.pharmacies.through.objects.filter(chain_id__in=chain_ids)
+                .values_list('pharmacy_id', flat=True)
+                .distinct()
             )
         else:
             chain_pharmacy_ids = []

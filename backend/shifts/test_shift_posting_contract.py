@@ -123,20 +123,31 @@ class PostedShiftAnnouncementTests(ShiftPostingFixture):
                 self.assertEqual(response.status_code, 201, response.data)
                 self.assertEqual({e["to"][0] for e in sent if e["template"] == "emails/shift_posted.html"}, expected)
 
-    def test_current_behaviour_chain_announcement_reaches_only_the_shift_pharmacy(self):
-        # CURRENT BEHAVIOUR (bug): the chain query filters on the shift's pharmacy and reads pharmacies__id through the
-        # same join, so it only ever yields the shift's own pharmacy. Members of the other chain pharmacies are never
-        # e-mailed, while the shift pharmacy's own staff and favourites are, although the owner asked for chain only.
+    def test_chain_members_across_the_chain_are_emailed(self):
+        # Regression: the chain query used to yield only the shift's own pharmacy, so members of the other chain
+        # pharmacies were never e-mailed.
         _, sibling = make_owner_with_pharmacy("Sibling")
         sibling.owner = self.pharmacy.owner
         sibling.save(update_fields=["owner"])
+        _, outsider = make_owner_with_pharmacy("Outsider")
         chain = Chain.objects.create(owner=self.pharmacy.owner, name="Chain", is_active=True)
         chain.pharmacies.set([self.pharmacy, sibling])
-        self.member("LOCUM", pharmacy=sibling)
+        sibling_locum = self.member("LOCUM", pharmacy=sibling)
+        sibling_staff = self.member("CASUAL", pharmacy=sibling)
         own_staff = self.member("FULL_TIME")
+        self.member("LOCUM", pharmacy=outsider)
+        self.member("LOCUM", pharmacy=sibling, role="ASSISTANT", user_role="OTHER_STAFF")
         response, sent = self.post_shift(visibility="OWNER_CHAIN", notify_chain_members=True)
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual({e["to"][0] for e in sent if e["template"] == "emails/shift_posted.html"}, {own_staff.email})
+        self.assertEqual({e["to"][0] for e in sent if e["template"] == "emails/shift_posted.html"},
+                         {sibling_locum.email, sibling_staff.email, own_staff.email})
+
+        inactive = Chain.objects.create(owner=self.pharmacy.owner, name="Old", is_active=False)
+        _, old_member_pharmacy = make_owner_with_pharmacy("Old member")
+        inactive.pharmacies.set([self.pharmacy, old_member_pharmacy])
+        old_locum = self.member("LOCUM", pharmacy=old_member_pharmacy)
+        _, sent = self.post_shift(visibility="OWNER_CHAIN", notify_chain_members=True)
+        self.assertNotIn(old_locum.email, {e["to"][0] for e in sent})
 
 
 class AvailabilityMatchTests(ShiftPostingFixture):
