@@ -141,6 +141,73 @@ class PricingDataLoaderTests(SimpleTestCase):
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "ASSISTANT/LEVEL_1.*sunday"):
                     pricing_data.award_rates()
 
+    def test_nonnumeric_award_rate_is_rejected(self):
+        import json
+        import tempfile
+        from copy import deepcopy
+        from pathlib import Path
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        source = json.loads(pricing_data.AWARD_RATES_FILE.read_text(encoding="utf-8"))
+        invalid = deepcopy(source)
+        invalid["INTERN"]["FIRST_HALF"]["casual"]["early_morning"]["weekday"] = "not-a-rate"
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "award_rates_casual_first_level.json"
+            bad.write_text(json.dumps(invalid), encoding="utf-8")
+            with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "INTERN/FIRST_HALF.*early_morning.*weekday"):
+                    pricing_data.award_rates()
+
+    def test_required_award_role_is_rejected_when_missing(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        data = json.loads(pricing_data.AWARD_RATES_FILE.read_text(encoding="utf-8"))
+        del data["STUDENT"]
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "award_rates_casual_first_level.json"
+            bad.write_text(json.dumps(data), encoding="utf-8")
+            with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "STUDENT/YEAR_1"):
+                    pricing_data.award_rates()
+
+    def test_public_holidays_require_all_states_and_canonical_iso_dates(self):
+        import json
+        import tempfile
+        from copy import deepcopy
+        from pathlib import Path
+        from unittest import mock
+
+        from shifts import pricing_data
+
+        source = json.loads(pricing_data.PUBLIC_HOLIDAYS_FILE.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "public_holidays.json"
+
+            missing_state = deepcopy(source)
+            del missing_state["QLD"]
+            bad.write_text(json.dumps(missing_state), encoding="utf-8")
+            with mock.patch.object(pricing_data, "PUBLIC_HOLIDAYS_FILE", bad):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "QLD"):
+                    pricing_data.public_holidays()
+
+            invalid_date = deepcopy(source)
+            invalid_date["NSW"][0] = "2026/01/01"
+            bad.write_text(json.dumps(invalid_date), encoding="utf-8")
+            with mock.patch.object(pricing_data, "PUBLIC_HOLIDAYS_FILE", bad):
+                pricing_data.reset_cache()
+                with self.assertRaisesRegex(pricing_data.PricingDataError, "NSW.*2026/01/01"):
+                    pricing_data.public_holidays()
+
     def test_malformed_structure_is_rejected(self):
         import tempfile
         from pathlib import Path
