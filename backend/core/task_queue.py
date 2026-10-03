@@ -24,8 +24,16 @@ def _celery_options(q_options: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def registered_task_name(name: str) -> str:
-    """The registered Celery task name for `name` (after aliases), or LookupError when Celery does not know it."""
+    """The registered Celery task name for `name` (after aliases), or LookupError when Celery does not know it.
+
+    A web process only knows the tasks whose modules something has imported. Dispatching by name must not depend on
+    that, so on a miss the autodiscovered task modules are loaded (what a worker does at start-up) and the name is
+    looked up again.
+    """
     task_name = CELERY_TASK_ALIASES.get(name, name)
+    if task_name in current_app.tasks:
+        return task_name
+    current_app.loader.import_default_modules()
     if task_name in current_app.tasks:
         return task_name
     raise LookupError(f"Celery task is not registered: {task_name}")
