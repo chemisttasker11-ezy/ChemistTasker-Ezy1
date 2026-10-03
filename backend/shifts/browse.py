@@ -50,10 +50,8 @@ from decimal import Decimal
 import uuid
 from users.models import OrganizationMembership, User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
-from shifts.base import (
-    _matching_shift_slot_exists,
-    BaseShiftViewSet,
-)
+from shifts.base import BaseShiftViewSet
+from shifts.selectors import _matching_shift_slot_exists, shifts_managed_by
 from shifts.candidates import _log_shift_profile_access
 from shifts.escalation import COMMUNITY_LEVELS, PUBLIC_LEVEL
 from shifts.serializers import (
@@ -636,9 +634,7 @@ class ActiveShiftViewSet(BaseShiftViewSet):
 
         qs = super().get_queryset()
 
-        qs = qs.filter(
-            Q(created_by=user) | Q(pharmacy__in=managed_pharmacies_for(user))
-        )
+        qs = shifts_managed_by(qs, user)
 
         qs = qs.annotate(
             slot_count=Count('slots', distinct=True),
@@ -798,9 +794,7 @@ class ConfirmedShiftViewSet(BaseShiftViewSet):
 
         qs = super().get_queryset()
 
-        qs = qs.filter(
-            Q(created_by=user) | Q(pharmacy__in=managed_pharmacies_for(user))
-        )
+        qs = shifts_managed_by(qs, user)
         qs = qs.annotate(
             has_confirmed_slot=_matching_shift_slot_exists(
                 now=now,
@@ -890,9 +884,7 @@ class HistoryShiftViewSet(BaseShiftViewSet):
 
         qs = super().get_queryset()
 
-        qs = qs.filter(
-            Q(created_by=user) | Q(pharmacy__in=managed_pharmacies_for(user))
-        )
+        qs = shifts_managed_by(qs, user)
 
         qs = qs.annotate(
             has_history_slot=_matching_shift_slot_exists(
