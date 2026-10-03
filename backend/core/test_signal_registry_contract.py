@@ -122,7 +122,13 @@ class SignalRegistryContractTests(SimpleTestCase):
                 return [node for root in nodes for node in ast.walk(root) if isinstance(node, ast.Call)]
             if isinstance(statement, ast.ClassDef):
                 nodes = [*statement.decorator_list, *statement.bases, *[keyword.value for keyword in statement.keywords]]
-                return [node for root in nodes for node in ast.walk(root) if isinstance(node, ast.Call)]
+                calls = [node for root in nodes for node in ast.walk(root) if isinstance(node, ast.Call)]
+                # A class body executes immediately at import time; inspect its
+                # statements recursively while method/function bodies remain
+                # protected by the FunctionDef branch above.
+                for child in statement.body:
+                    calls.extend(executable_calls(child))
+                return calls
             return [node for node in ast.walk(statement) if isinstance(node, ast.Call)]
 
         hooks = list(ready_hooks())
