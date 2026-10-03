@@ -386,6 +386,21 @@ class HubScopeResolver:
         membership = scope.get("request_membership")
         if membership:
             return membership
+
+        # Scoped organization admins (for example a Region/Chief Admin with
+        # MANAGE_COMMS on an explicitly assigned pharmacy) already have
+        # authority through their OrganizationMembership. Hub models support a
+        # direct user author, so do not manufacture a PharmacyAdmin/Membership
+        # merely to obtain an author_membership FK; doing so would permanently
+        # widen their pharmacy privileges beyond the canonical org scope.
+        if (
+            scope["scope_type"] in {"pharmacy", "group"}
+            and scope.get("has_admin_permissions")
+            and not scope.get("is_owner")
+            and not scope.get("is_org_admin")
+        ):
+            return None
+
         if scope["scope_type"] in {"pharmacy", "group"}:
             return self._ensure_pharmacy_membership(scope)
         if scope["scope_type"] == "organization":
