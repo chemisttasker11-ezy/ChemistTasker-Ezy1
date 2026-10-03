@@ -349,6 +349,31 @@ class ResolverAndPermissionTests(HubFixture):
         with self.assertRaises(PermissionDenied):
             Resolver(self.users["region_admin"]).organization_scope(self.org.id)
 
+        membership_count = Membership.objects.filter(
+            user=self.users["region_admin"],
+            pharmacy=self.pharmacy,
+        ).count()
+        admin_count = PharmacyAdmin.objects.filter(
+            user=self.users["region_admin"],
+            pharmacy=self.pharmacy,
+        ).count()
+        created = client_for(self.users["region_admin"]).post(
+            HUB + "posts/",
+            {"scope": "pharmacy", "pharmacy_id": self.pharmacy.id, "body": "Scoped region update"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(
+            Membership.objects.filter(user=self.users["region_admin"], pharmacy=self.pharmacy).count(),
+            membership_count,
+            "hub posting must not manufacture a pharmacy membership for scoped org authority",
+        )
+        self.assertEqual(
+            PharmacyAdmin.objects.filter(user=self.users["region_admin"], pharmacy=self.pharmacy).count(),
+            admin_count,
+            "hub posting must not promote a scoped org role to PharmacyAdmin",
+        )
+
     def test_permission_map_behind_the_context(self):
         get_permissions = permissions_function()
         actual = {}
