@@ -61,6 +61,7 @@ from shifts.escalation import (  # noqa: F401  (COMMUNITY_LEVELS, PUBLIC_LEVEL, 
     auto_escalate_due_shifts,
     resolve_current_index,
 )
+from shifts.interest import express_interest, is_public_shift_member_access, reject_shift
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
@@ -145,22 +146,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             return _otherstaff_onboarding_role(user)
         return _normalized_role_code(role)
 
-    @staticmethod
-    def _is_public_shift_member_access(user, shift):
-        if not user or not getattr(user, "is_authenticated", False):
-            return False
-        if getattr(shift, "visibility", None) != PUBLIC_LEVEL:
-            return False
-        if getattr(shift, "post_anonymously", False):
-            return False
-        if not _user_can_perform_shift_role(user, getattr(shift, "role_needed", None)):
-            return False
-        return Membership.objects.filter(
-            user=user,
-            pharmacy=shift.pharmacy,
-            employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES,
-            is_active=True,
-        ).exists()
+    # Historical entry point: owned by shifts.interest.
+    _is_public_shift_member_access = staticmethod(is_public_shift_member_access)
 
     def get_queryset(self):
         now = timezone.now()
@@ -495,139 +482,15 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         shift = self.get_queryset().filter(pk=pk).distinct().first()
         if not shift:
             raise NotFound("Shift not found.")
-        user  = request.user
-
-        # 1) Onboarding required
-        if shift.visibility == PUBLIC_LEVEL and not self._is_public_shift_member_access(user, shift):
-            if user.role == 'PHARMACIST':
-                po = PharmacistOnboarding.objects.filter(user=user).first()
-                if not po:
-                    return Response(
-                        {'detail': 'Please complete your pharmacist onboarding before applying for public shifts.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                if not po.verified:
-                    return Response(
-                        {'detail': 'Your onboarding must be verified by admin before applying for public shifts.'},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            elif user.role == 'OTHER_STAFF':
-                os = OtherStaffOnboarding.objects.filter(user=user).first()
-                if not os:
-                    return Response(
-                        {'detail': 'Please complete your staff onboarding before applying for public shifts.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                if not os.verified:
-                    return Response(
-                        {'detail': 'Your onboarding must be verified by admin before applying for public shifts.'},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-
-
-        # 2) Interest logic
         slot_ids = request.data.get('slot_ids')
         if slot_ids is None:
             slot_ids = request.data.get('slotIds')
         slot_id = request.data.get('slot_id')
         if slot_id is None:
             slot_id = request.data.get('slotId')
-
-        if slot_ids is not None and not isinstance(slot_ids, list):
-            return Response({'detail': 'slot_ids must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        has_slot_payload = slot_ids is not None or slot_id is not None
-        raw_target_slot_ids = slot_ids if slot_ids is not None else ([slot_id] if slot_id is not None else [])
-        target_slot_ids = []
-        for value in raw_target_slot_ids:
-            if value in (None, ''):
-                continue
-            try:
-                target_slot_ids.append(int(value))
-            except (TypeError, ValueError):
-                return Response({'detail': f'Invalid slot_id: {value}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        interests = []
-        created_interests = []
-        if shift.single_user_only:
-            interest, created = ShiftInterest.objects.get_or_create(
-                shift=shift,
-                slot=None,
-                user=user
-            )
-            interests.append(interest)
-            if created:
-                created_interests.append(interest)
-        else:
-            if target_slot_ids:
-                slots = list(ShiftSlot.objects.filter(pk__in=target_slot_ids, shift=shift))
-                found_ids = {slot.id for slot in slots}
-                missing_ids = [value for value in target_slot_ids if value not in found_ids]
-                if missing_ids:
-                    return Response({'detail': f'Invalid slot_id(s): {missing_ids}'}, status=status.HTTP_400_BAD_REQUEST)
-            elif has_slot_payload:
-                return Response({'detail': 'slot_ids cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                slots = [None]
-
-            for slot in slots:
-                interest, created = ShiftInterest.objects.get_or_create(
-                    shift=shift,
-                    slot=slot,
-                    user=user
-                )
-                interests.append(interest)
-                if created:
-                    created_interests.append(interest)
-
-        if created_interests:
-            is_public = (shift.visibility == 'PLATFORM')
-            applicant_name = "A candidate" if is_public else (user.get_full_name() or user.email)
-            title = "New public shift interest" if is_public else "New member shift interest"
-            interest_details = build_offer_shift_details(shift, created_interests[0])
-            body = (
-                f"{applicant_name} expressed interest in "
-                f"{len(created_interests)} slot(s) at {shift.pharmacy.name}. {interest_details['shift_summary']}"
-            )
-            manager_recipients = notify_shift_managers(
-                shift,
-                title=title,
-                body=body,
-                kind="shift_interest",
-                payload={
-                    "interest_ids": [interest.id for interest in created_interests],
-                    "slot_ids": [interest.slot_id for interest in created_interests if interest.slot_id],
-                    "slot_id": next((interest.slot_id for interest in created_interests if interest.slot_id), None),
-                    **interest_details,
-                },
-            )
-            primary_email_recipient = shift.created_by or (manager_recipients[0] if manager_recipients else None)
-            ctx = build_shift_interest_context(shift, created_interests[0], recipient=primary_email_recipient)
-            interest_slots = []
-            for interest in created_interests:
-                slot = getattr(interest, "slot", None)
-                if slot:
-                    interest_slots.append({
-                        "date": slot.date.strftime("%d %B, %Y").lstrip("0"),
-                        "start_time": slot.start_time.strftime("%I:%M %p").lstrip("0"),
-                        "end_time": slot.end_time.strftime("%I:%M %p").lstrip("0"),
-                    })
-            if interest_slots:
-                ctx["slots"] = interest_slots
-
-            email_recipient = primary_email_recipient if primary_email_recipient and primary_email_recipient.email else None
-            if email_recipient:
-                email_kwargs = dict(
-                    subject=f"New interest in your shift at {shift.pharmacy.name}",
-                    recipient_list=[email_recipient.email],
-                    template_name="emails/shift_interest.html" if is_public else "emails/shift_member_interest.html",
-                    context=ctx,
-                    text_template="emails/shift_interest.txt" if is_public else "emails/shift_member_interest.txt",
-                    suppress_auto_notification=True,
-                )
-                async_task('users.tasks.send_async_email', **email_kwargs)
-
-        # 3) Serialize and return
+        interests, created_interests = express_interest(
+            shift=shift, user=request.user, slot_ids=slot_ids, slot_id=slot_id,
+        )
         serializer = (
             ShiftInterestSerializer(interests, many=True, context={'request': request})
             if len(interests) > 1
@@ -1273,117 +1136,20 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         shift = self.get_object()
-        user = request.user
         slot_ids = request.data.get('slot_ids')
         if slot_ids is None:
             slot_ids = request.data.get('slotIds')
         slot_id = request.data.get('slot_id')
         if slot_id is None:
             slot_id = request.data.get('slotId')
-        slot_date = request.data.get('slot_date')  # required if recurring
-
-        if slot_ids is not None and not isinstance(slot_ids, list):
-            return Response({'detail': 'slot_ids must be a list.'}, status=400)
-
-        raw_target_slot_ids = slot_ids if slot_ids is not None else ([slot_id] if slot_id is not None else [])
-        target_slot_ids = []
-        for value in raw_target_slot_ids:
-            try:
-                target_slot_ids.append(int(value))
-            except (TypeError, ValueError):
-                return Response({'detail': f'Invalid slot_id: {value}'}, status=400)
-
-        if not target_slot_ids:
-            # Treat an empty payload as "reject the whole shift". Single-user shifts
-            # store that as slot=None; multi-slot shifts expand to all concrete slots.
-            slots = [None] if shift.single_user_only else list(ShiftSlot.objects.filter(shift=shift))
-            if not slots:
-                return Response({'detail': 'No slots are available to reject.'}, status=400)
-        else:
-            slots = list(ShiftSlot.objects.filter(pk__in=target_slot_ids, shift=shift))
-            found_ids = {slot.id for slot in slots}
-            missing_ids = [value for value in target_slot_ids if value not in found_ids]
-            if missing_ids:
-                return Response({'detail': f'Invalid slot_id(s): {missing_ids}'}, status=400)
-
-        # Parse slot_date if provided (for recurring slots)
-        if slot_date:
-            try:
-                slot_date_obj = datetime.strptime(slot_date, "%Y-%m-%d").date()
-            except ValueError:
-                return Response({'detail': 'Invalid slot_date format, use YYYY-MM-DD'}, status=400)
-        else:
-            slot_date_obj = None
-
-        rejections = []
-        created_rejections = []
-        for slot in slots:
-            rejection, created = ShiftRejection.objects.get_or_create(
-                shift=shift,
-                slot=slot,
-                slot_date=slot_date_obj if slot is not None and slot.is_recurring else None,
-                user=user
-            )
-            rejections.append(rejection)
-            if created:
-                created_rejections.append(rejection)
-
+        rejections, created_rejections = reject_shift(
+            shift=shift,
+            user=request.user,
+            slot_ids=slot_ids,
+            slot_id=slot_id,
+            slot_date=request.data.get('slot_date'),  # required if recurring
+        )
         serializer = ShiftRejectionSerializer(rejections, many=True) if len(rejections) > 1 else ShiftRejectionSerializer(rejections[0])
-
-        # --- Send escalation prompt email if this is a new rejection ---
-        if created_rejections and shift.created_by and shift.created_by.email:
-            rejected_slots = []
-            for rejection in created_rejections:
-                slot = getattr(rejection, "slot", None)
-                if slot:
-                    rejected_slots.append({
-                        "date": slot.date.strftime("%d %B, %Y").lstrip("0"),
-                        "start_time": slot.start_time.strftime("%I:%M %p").lstrip("0"),
-                        "end_time": slot.end_time.strftime("%I:%M %p").lstrip("0"),
-                        "time_range": (
-                            f"{slot.start_time.strftime('%I:%M %p').lstrip('0')} - "
-                            f"{slot.end_time.strftime('%I:%M %p').lstrip('0')}"
-                        ),
-                    })
-            ctx = build_shift_email_context(
-                shift,
-                user=shift.created_by,
-                role=shift.created_by.role.lower(),
-                extra={
-                    "rejector_name": user.get_full_name() or user.email,
-                    "rejected_slots": rejected_slots,
-                }
-            )
-            ctx["escalation_message"] = (
-                f"{user.get_full_name() or user.email} has declined "
-                f"{len(created_rejections)} slot(s) on this shift."
-                "\n\nIf you need to reach a wider audience, you can escalate the shift to the platform with a single click—"
-                "making it visible to the entire ChemistTasker community. This can help you find the right fit, faster."
-            )
-
-            notification_payload = {
-                "title": f"Shift declined: {shift.pharmacy.name}",
-                "body": f"{user.get_full_name() or user.email} declined {len(created_rejections)} slot(s).",
-                "user_ids": [shift.created_by_id],
-                "payload": {
-                    "shift_id": shift.id,
-                    "rejection_ids": [rejection.id for rejection in created_rejections],
-                    "slot_ids": [rejection.slot_id for rejection in created_rejections if rejection.slot_id],
-                },
-            }
-            if ctx.get("shift_link"):
-                notification_payload["action_url"] = ctx["shift_link"]
-
-            async_task(
-                'users.tasks.send_async_email',
-                subject=f"Shift Update: {user.get_full_name() or user.email} has declined your shift",
-                recipient_list=[shift.created_by.email],
-                template_name="emails/shift_rejected.html",
-                context=ctx,
-                text_template="emails/shift_rejected.txt",
-                notification=notification_payload
-            )
-
         return Response(serializer.data, status=status.HTTP_201_CREATED if created_rejections else status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='generate-share-link')
