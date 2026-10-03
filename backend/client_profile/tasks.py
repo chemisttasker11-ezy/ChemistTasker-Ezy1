@@ -22,17 +22,21 @@ import dateutil.parser
 from bs4 import BeautifulSoup
 from scrapingbee import ScrapingBeeClient
 from users.tasks import send_async_email
-from client_profile.models import ShiftSlotAssignment, OnboardingNotification, MembershipApplication, Membership, Pharmacy, PharmacyAdmin
-from client_profile.timezone_utils import get_pharmacy_timezone
+from shifts.models import ShiftSlotAssignment
+from onboarding.models import OnboardingNotification
+from memberships.models import MembershipApplication, Membership
+from organizations.models import Pharmacy, PharmacyAdmin
+from organizations.timezone import get_pharmacy_timezone
 from django.contrib.contenttypes.models import ContentType
-from client_profile.domains.onboarding.emails import (
+from onboarding.emails import (
     get_candidate_role,
     send_referee_emails,
     simple_name_match,
 )
-from client_profile.domains.shifts.emails import build_shift_email_context
-from client_profile.domains.common.helpers import clean_email, get_frontend_dashboard_url
-from client_profile.domains.common.labels import membership_role_label
+from shifts.emails import build_shift_email_context
+from users.normalization import sanitize_email_text as clean_email
+from users.navigation import get_frontend_dashboard_url
+from memberships.labels import membership_role_label
 import logging
 import re
 from django.core.signing import TimestampSigner
@@ -618,7 +622,7 @@ def run_all_verifications(model_name, object_pk, is_create=False):
     from django.apps import apps
     from django.utils import timezone
     from datetime import timedelta
-    from client_profile.domains.onboarding.emails import notify_superuser_on_onboarding, send_referee_emails
+    from onboarding.emails import notify_superuser_on_onboarding, send_referee_emails
 
     Model = apps.get_model("client_profile", model_name)
     try:
@@ -722,8 +726,8 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     from django.apps import apps
     from django.utils import timezone
     from datetime import timedelta
-    from client_profile.domains.onboarding.emails import send_referee_emails
-    from client_profile.domains.common.helpers import get_frontend_dashboard_url
+    from onboarding.emails import send_referee_emails
+    from users.navigation import get_frontend_dashboard_url
     from django.contrib.contenttypes.models import ContentType
     from core.task_queue import async_task
     import logging

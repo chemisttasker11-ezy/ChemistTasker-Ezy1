@@ -4,7 +4,7 @@ Calendar and Work Notes serializers.
 from rest_framework import serializers
 from django.utils import timezone
 
-from client_profile.models import Membership
+from memberships.models import Membership
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee
 
 

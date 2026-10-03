@@ -13,7 +13,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from client_profile.models import Membership, Pharmacy
+from memberships.models import Membership
+from organizations.models import Pharmacy
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceSession
 from organizations.timezone import get_pharmacy_timezone

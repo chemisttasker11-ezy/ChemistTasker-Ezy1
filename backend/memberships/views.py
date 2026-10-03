@@ -1,10 +1,12 @@
 """Membership API: memberships, invite links, magic-link information, applications and a user's own memberships."""
 from rest_framework import permissions, serializers, status, viewsets
 from memberships.models import Membership, MembershipApplication, MembershipInviteLink
-from client_profile.models import (
+from onboarding.models import (
     OtherStaffOnboarding,
     OwnerOnboarding,
     PharmacistOnboarding,
+)
+from organizations.models import (
     Pharmacy,
     PharmacyAdmin,
 )

@@ -12,8 +12,9 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.throttling import ScopedRateThrottle
 from .models import OrganizationMembership, ContactMessage
-from client_profile.admin_helpers import admin_assignments_for
-from client_profile.models import Membership, Pharmacy
+from organizations.access import admin_assignments_for
+from memberships.models import Membership
+from organizations.models import Pharmacy
 from .serializers import InviteOrgUserSerializer, ContactMessageCreateSerializer
 from .permissions import OrganizationRolePermission
 from .org_roles import (
@@ -421,7 +422,7 @@ def verify_recaptcha(token):
     return result.get('success', False)
 
 def _delete_verification_docs_for_user(user):
-    from client_profile.models import PharmacistOnboarding, OtherStaffOnboarding, ExplorerOnboarding
+    from onboarding.models import PharmacistOnboarding, OtherStaffOnboarding, ExplorerOnboarding
 
     onboarding_configs = [
         (PharmacistOnboarding, ["government_id", "identity_secondary_file"]),
@@ -597,7 +598,7 @@ class VerifyOTPView(APIView):
 
         # Build memberships payload exactly like your serializers
         from .models import OrganizationMembership
-        from client_profile.models import Membership as PharmacyMembership
+        from memberships.models import Membership as PharmacyMembership
 
         org_memberships = OrganizationMembership.objects.filter(user=user)
         org_payload = [

@@ -5,14 +5,20 @@ log = logging.getLogger(__name__)
 
 
 from rest_framework import permissions, status, viewsets
-from client_profile.models import (
+from organizations.models import (
     Chain,
+    Pharmacy,
+)
+from memberships.models import (
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
     Membership,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+from onboarding.models import (
     OtherStaffOnboarding,
     PharmacistOnboarding,
-    Pharmacy,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+from shifts.models import (
     Shift,
     ShiftCounterOffer,
     ShiftInterest,
@@ -50,7 +56,7 @@ from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
 from core.task_queue import async_task
 from datetime import datetime
-from client_profile.domains.common.access import (
+from shifts.access import (
     _get_request_ip,
     _normalized_role_code,
     _otherstaff_onboarding_role,

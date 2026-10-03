@@ -8,12 +8,18 @@ User = get_user_model()
 
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
-from client_profile.models import (
+from organizations.models import (
     Chain,
+)
+from onboarding.models import (
     ExplorerOnboarding,
-    Membership,
     OtherStaffOnboarding,
     PharmacistOnboarding,
+)
+from memberships.models import (
+    Membership,
+)
+from shifts.models import (
     Shift,
     ShiftCounterOffer,
     ShiftCounterOfferSlot,
@@ -43,7 +49,7 @@ from datetime import date, datetime, time, timedelta
 from django.utils import timezone
 from core.task_queue import async_task
 import math
-from client_profile.domains.common.serializers import _get_user_short_bio
+from users.presentation import _get_user_short_bio
 from organizations.serializers import (
     anonymize_pharmacy_detail,
     PharmacySerializer,

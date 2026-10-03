@@ -1,7 +1,7 @@
 """Talent/explorer posts API: feeds, public feed, create/update/delete, views and reactions."""
 from rest_framework import permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
-from client_profile.models import OtherStaffOnboarding, PharmacistOnboarding
+from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from talent.models import ExplorerPost, ExplorerPostReaction
 from ratings.models import Rating
 from django.db import models

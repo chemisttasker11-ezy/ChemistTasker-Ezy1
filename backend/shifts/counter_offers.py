@@ -6,7 +6,7 @@ without moving models or changing endpoint contracts.
 
 from django.db.models import Count
 
-from client_profile.models import ShiftCounterOffer
+from shifts.models import ShiftCounterOffer
 
 
 def visible_counter_offers_for_shift(*, shift, user, can_manage_pharmacy: bool):

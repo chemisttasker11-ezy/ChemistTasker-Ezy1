@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from django.conf import settings
-from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from users.models import OrganizationMembership
 
 BILLING_STATE_PRE_LIVE = "PRE_LIVE"

@@ -1,6 +1,6 @@
 """Finalising an accepted shift offer: assignments, rates and notifications."""
 from shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
-from client_profile.models import ShiftOffer, ShiftSlotAssignment
+from shifts.models import ShiftOffer, ShiftSlotAssignment
 from decimal import Decimal
 from django.db import transaction
 from rest_framework.exceptions import ValidationError

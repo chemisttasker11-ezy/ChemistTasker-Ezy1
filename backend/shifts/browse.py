@@ -1,14 +1,20 @@
 """Shift browsing API: community, public, active, confirmed and history shift lists, details and description templates."""
 from rest_framework import generics, permissions, status, viewsets
-from client_profile.models import (
+from organizations.models import (
     Chain,
+    Pharmacy,
+)
+from memberships.models import (
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
     Membership,
+    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+from onboarding.models import (
     OtherStaffOnboarding,
     OwnerOnboarding,
     PharmacistOnboarding,
-    Pharmacy,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
+)
+from shifts.models import (
     Shift,
     ShiftDescriptionTemplate,
     ShiftInterest,
@@ -31,7 +37,7 @@ from django.conf import settings
 from core.task_queue import async_task
 from datetime import date
 from zoneinfo import ZoneInfo
-from client_profile.domains.common.access import _normalized_role_code, IsPharmacistOrOtherStaff
+from shifts.access import _normalized_role_code, IsPharmacistOrOtherStaff
 from django.db import transaction
 from decimal import Decimal
 import uuid

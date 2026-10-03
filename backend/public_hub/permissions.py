@@ -32,7 +32,7 @@ def member_hubs(user):
     role = getattr(user, 'role', '')
     own = {'OWNER': 'owner', 'PHARMACIST': 'pharmacist', 'EXPLORER': 'explorer'}.get(role)
     if role == 'OTHER_STAFF':
-        from client_profile.models import OtherStaffOnboarding
+        from onboarding.models import OtherStaffOnboarding
         subtype = OtherStaffOnboarding.objects.filter(user=user).values_list('role_type', flat=True).first()
         own = 'intern' if str(subtype).upper() == 'INTERN' else 'staff'
     return ['public'] + ([own] if own else [])

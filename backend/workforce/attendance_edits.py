@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from attendance.approvals import get_effective_session_timeline
 from attendance.models import AttendanceEvent, AttendanceSession
-from client_profile.timezone_utils import get_pharmacy_timezone
+from organizations.timezone import get_pharmacy_timezone
 
 from .models import ManagerAttendanceEventAudit, Timesheet, TimesheetPeriod
 from .permissions import require_manage_pharmacy

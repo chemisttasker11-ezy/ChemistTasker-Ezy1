@@ -1,6 +1,6 @@
 """Serializers for the talent/explorer posts API."""
 from rest_framework import serializers
-from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
+from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from talent.models import ExplorerPost, ExplorerPostReaction
 import uuid
 import json

@@ -2,7 +2,7 @@
 from django.db import models
 from django.conf import settings
 from client_profile.models.common import chat_upload_path
-from client_profile.models.memberships import Membership
+from memberships.models import Membership
 
 
 class Conversation(models.Model):

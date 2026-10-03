@@ -1,6 +1,6 @@
 """Chat realtime helpers: unread-message badges, read receipts and who may receive chat updates."""
 from typing import Optional
-from client_profile.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from chat.models import Message, Participant
 from notifications.services import _broadcast
 

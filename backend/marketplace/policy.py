@@ -2,7 +2,8 @@ from dataclasses import asdict, dataclass, field
 
 from django.utils import timezone
 
-from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, Pharmacy
+from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
+from organizations.models import Pharmacy
 from .models import IdentityVerification, MarketplaceRestriction, MarketplaceTermsAcceptance
 
 CURRENT_TERMS_VERSION = "2026-09"

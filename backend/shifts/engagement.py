@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from client_profile.models import Membership, OtherStaffOnboarding, PharmacistOnboarding
+from memberships.models import Membership
+from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 
 PHARMACY_STAFF_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
 PAYMENT_TFN = "TFN"

@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.http import HttpResponse
 from django.views.decorators.cache import cache_page
 
-from client_profile.models import Shift
+from shifts.models import Shift
 
 
 def _build_urlset(urls):

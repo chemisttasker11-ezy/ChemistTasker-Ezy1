@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
-from client_profile.models import Chain
+from organizations.models import Chain
 from .models import EthicalListing
 
 CIRCLE_ORDER = {EthicalListing.Circle.CHAIN_PHARMACIES:1, EthicalListing.Circle.ORGANISATION_OWNERS:2, EthicalListing.Circle.PLATFORM_OWNERS:3}

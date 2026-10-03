@@ -9,13 +9,15 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from rest_framework_simplejwt.tokens      import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
-from client_profile.models import Organization
+from organizations.models import Organization
 from rewards.services import claim_referral_code, RewardError
 from .models import OrganizationMembership, ContactMessage
 import secrets
 from django.utils import timezone
-from client_profile.models import Pharmacy, Membership as PharmacyMembership, Shift
-from client_profile.admin_helpers import admin_assignments_for
+from organizations.models import Pharmacy
+from memberships.models import Membership as PharmacyMembership
+from shifts.models import Shift
+from organizations.access import admin_assignments_for
 from .org_roles import (
     ADMIN_LEVEL_DEFINITIONS,
     ROLE_DEFINITIONS,

@@ -5,7 +5,9 @@ from decimal import Decimal
 from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from client_profile.models import PharmacistOnboarding, Shift, Membership
+from onboarding.models import PharmacistOnboarding
+from shifts.models import Shift
+from memberships.models import Membership
 
 # Load static JSON data
 BASE_DIR = Path(settings.BASE_DIR)

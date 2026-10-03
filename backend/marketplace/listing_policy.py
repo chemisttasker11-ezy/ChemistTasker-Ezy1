@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from client_profile.models import PharmacyAdmin
+from organizations.models import PharmacyAdmin
 
 from .models import MarketplaceCategory, MarketplaceListing
 from .policy import evaluate_marketplace_access, owns_pharmacy, resolved_role
@@ -91,7 +91,7 @@ def listing_options_for(user) -> dict:
     if access.can_trade_for_pharmacy:
         pharmacy = None
         if access.eligible_pharmacies:
-            from client_profile.models import Pharmacy
+            from organizations.models import Pharmacy
             pharmacy = Pharmacy.objects.filter(pk=access.eligible_pharmacies[0]["id"]).select_related("owner", "owner__user").first()
         if pharmacy:
             for category in categories:

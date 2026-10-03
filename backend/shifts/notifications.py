@@ -5,8 +5,8 @@ from typing import Iterable
 
 from users.models import OrganizationMembership
 
-from client_profile.admin_helpers import CAPABILITY_MANAGE_ROSTER, has_admin_capability
-from client_profile.models import PharmacyAdmin
+from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from organizations.models import PharmacyAdmin
 from notifications.services import notify_users
 
 log = logging.getLogger(__name__)

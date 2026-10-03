@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from client_profile.models import MembershipApplication, OtherStaffOnboarding, PharmacistOnboarding
+from memberships.models import MembershipApplication
+from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 
 from .award_rates import (
     AWARD_CODE,

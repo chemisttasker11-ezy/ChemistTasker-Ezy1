@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
-from client_profile.models import Shift, ShiftSlot, ShiftSlotAssignment
+from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 
@@ -39,7 +39,7 @@ def _enqueue(pharmacy_id, user_id, work_date):
 
 
 def _session_date(session):
-    from client_profile.timezone_utils import get_pharmacy_timezone
+    from organizations.timezone import get_pharmacy_timezone
     try:
         tz = get_pharmacy_timezone(session.pharmacy)
         return session.started_at.astimezone(tz).date()
@@ -157,7 +157,7 @@ def roster_shift_changed(sender, instance, **kwargs):
 @receiver(post_save, sender=WorkforceLeaveRequest)
 @receiver(post_delete, sender=WorkforceLeaveRequest)
 def workforce_leave_changed(sender, instance, **kwargs):
-    from client_profile.timezone_utils import get_pharmacy_timezone
+    from organizations.timezone import get_pharmacy_timezone
 
     try:
         tz = get_pharmacy_timezone(instance.pharmacy)

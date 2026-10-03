@@ -1,6 +1,6 @@
 """Leave requests on assigned shift slots."""
 from rest_framework import permissions, status, viewsets
-from client_profile.models import PharmacyAdmin
+from organizations.models import PharmacyAdmin
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied

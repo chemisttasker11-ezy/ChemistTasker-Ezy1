@@ -10,7 +10,7 @@ from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from client_profile.models import ShiftSlotAssignment
+from shifts.models import ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from workforce.roster.services import get_roster_period_grid, publish_roster_period, validate_roster_period
 from workforce.roster.validation import work_interval
