@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import Lock
 from typing import Any
 
 from celery import current_app
@@ -11,6 +12,8 @@ CELERY_TASK_ALIASES = {
     "users.tasks.send_async_email": "users.tasks.send_email_task",
 }
 
+_TASK_REGISTRY_LOAD_LOCK = Lock()
+
 def _celery_options(q_options: dict[str, Any] | None) -> dict[str, Any]:
     if not q_options:
         return {}
@@ -21,6 +24,31 @@ def _celery_options(q_options: dict[str, Any] | None) -> dict[str, Any]:
     if "timeout" in q_options:
         options["time_limit"] = q_options["timeout"]
     return options
+
+
+def registered_task_name(name: str) -> str:
+    """The registered Celery task name for `name` (after aliases), or LookupError when Celery does not know it.
+
+    A web process only knows the tasks whose modules something has imported. Dispatching by name must not depend on
+    that, so on a miss the autodiscovered task modules are loaded (what a worker does at start-up) and the name is
+    looked up again.
+    """
+    task_name = CELERY_TASK_ALIASES.get(name, name)
+    if task_name in current_app.tasks:
+        return task_name
+
+    # Celery 5.5 autodiscovery uses a process-global race-protection flag, not a
+    # lock. Two concurrent first web requests can therefore make the second
+    # caller skip autodiscovery and observe a partially populated registry.
+    # Serialize the miss path and re-check after acquiring the lock so only one
+    # request performs the initial import pass.
+    with _TASK_REGISTRY_LOAD_LOCK:
+        if task_name not in current_app.tasks:
+            current_app.loader.import_default_modules()
+
+    if task_name in current_app.tasks:
+        return task_name
+    raise LookupError(f"Celery task is not registered: {task_name}")
 
 
 def async_task(func, *args, **kwargs):
@@ -71,10 +99,7 @@ def async_task(func, *args, **kwargs):
                 transaction.on_commit(
                     lambda: _dispatch_notification(notification, recipients, subject)
                 )
-        if task_name in current_app.tasks:
-            return current_app.send_task(task_name, args=args, kwargs=kwargs, **options)
-
-        raise LookupError(f"Celery task is not registered: {task_name}")
+        return current_app.send_task(registered_task_name(task_name), args=args, kwargs=kwargs, **options)
 
     if hasattr(func, "apply_async"):
         return func.apply_async(args=args, kwargs=kwargs, **options)
