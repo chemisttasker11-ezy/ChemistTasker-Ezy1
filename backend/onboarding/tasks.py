@@ -205,18 +205,23 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     obj.ahpra_verification_note = ""
     obj.save(update_fields=['ahpra_verified', 'ahpra_verification_note'])
 
-    output_html = save_output_file("ahpra_html", object_pk, "html")
+    # The provider page is only needed between the fetch and the parse: a temporary file, removed in every case.
+    handle, output_html = tempfile.mkstemp(prefix="ahpra_", suffix=".html")
+    os.close(handle)
     try:
-        # Use the newly constructed full AHPRA number for the lookup
-        ahpra_lookup(full_ahpra_number, output_html, api_key=settings.SCRAPINGBEE_API_KEY)
-    except Exception as exc:
-        # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
-        logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
-        _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
-        return
+        try:
+            # Use the newly constructed full AHPRA number for the lookup
+            ahpra_lookup(full_ahpra_number, output_html, api_key=settings.SCRAPINGBEE_API_KEY)
+        except Exception as exc:
+            # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
+            logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
+            _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
+            return
 
-
-    ahpra_data = parse_ahpra_html(output_html)
+        ahpra_data = parse_ahpra_html(output_html)
+    finally:
+        if os.path.exists(output_html):
+            os.remove(output_html)
     logger.info(f"[verify_ahpra_task] Parsed: {ahpra_data}")
 
     practitioner_name = ahpra_data.get("practitioner_name", "")

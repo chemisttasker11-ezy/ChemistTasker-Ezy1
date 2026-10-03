@@ -860,3 +860,55 @@ class VerificationConfigurationTests(SimpleTestCase):
             update = task(name).run.__globals__["_update_ahpra_fields"]
         self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
         self.assertIn("error_type=ImproperlyConfigured", " ".join(logs.output))
+
+
+class VerificationArtifactTests(SimpleTestCase):
+    AHPRA = "client_profile.tasks.verify_ahpra_task"
+    PAGE = (
+        '<div class="practitioner-detail-header"><h2 class="practitioner-name">Ann Lee</h2>'
+        '<div class="reg-types"><span>General</span></div></div>'
+        '<div class="practitioner-detail-body"><div class="practitioner-detail-section"><div class="section-row">'
+        '<div class="field-title">Registration status</div><div class="field-entry">Registered</div></div>'
+        '<div class="section-row"><div class="field-title">Expiry Date</div><div class="field-entry">30/11/2099</div>'
+        '</div></div></div>'
+    )
+
+    def run_ahpra(self, lookup):
+        import os
+
+        target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
+        update = mock.Mock()
+        seen = []
+
+        def fake_lookup(number, path, api_key=None):
+            seen.append(path)
+            return lookup(path)
+
+        with patch_impl(
+            self.AHPRA,
+            fetch_instance_with_retries=lambda model, pk: target,
+            ahpra_lookup=fake_lookup,
+            _update_ahpra_fields=update,
+        ):
+            task(self.AHPRA).run("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
+        self.assertEqual(len(seen), 1)
+        self.assertFalse(os.path.exists(seen[0]), "the provider page must not outlive the task")
+        return update
+
+    def test_ahpra_page_is_parsed_from_a_temporary_file_that_is_removed(self):
+        def write(path):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(self.PAGE)
+            return path
+
+        update = self.run_ahpra(write)
+        self.assertEqual(update.call_args.args[2:4], (True, "AHPRA registration is valid and current."))
+
+    def test_temporary_file_is_removed_when_the_lookup_fails(self):
+        def fail(path):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("partial")
+            raise RuntimeError("provider down")
+
+        update = self.run_ahpra(fail)
+        self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
