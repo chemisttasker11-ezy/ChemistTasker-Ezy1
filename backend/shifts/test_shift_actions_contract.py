@@ -530,6 +530,55 @@ class ManualAssignTests(ShiftActionFixture):
         self.assertEqual(again.data["assignment_ids"], [assignment.id])
         self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)
 
+    def test_inactive_former_staff_cannot_be_manually_rostered(self):
+        staff = self.worker("FULL_TIME")
+        Membership.objects.filter(user=staff, pharmacy=self.pharmacy).update(
+            is_active=False,
+            status=Membership.Status.LEFT,
+        )
+        shift = self.shift(single_user_only=False, slots=1)
+        slot = shift.slots.get()
+        response, _ = self.post(
+            self.owner,
+            f"shifts/{shift.id}/manual-assign/",
+            {"user_id": staff.id, "assignments": [{"slot_id": slot.id, "slot_date": str(slot.date)}]},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.data["detail"].startswith(
+            "Only direct full-time, part-time or casual pharmacy staff"
+        ))
+        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+
+    def test_manual_assign_rolls_back_earlier_slots_when_a_later_slot_is_locked(self):
+        staff = self.worker("FULL_TIME")
+        shift = self.shift(single_user_only=False, slots=2)
+        first, second = shift.slots.order_by("id")
+        second.date = first.date + timedelta(days=7)
+        second.save(update_fields=["date"])
+
+        RosterPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            week_start=second.date - timedelta(days=second.date.weekday()),
+            status=RosterPeriod.Status.PUBLISHED,
+        )
+        response, _ = self.post(
+            self.owner,
+            f"shifts/{shift.id}/manual-assign/",
+            {
+                "user_id": staff.id,
+                "assignments": [
+                    {"slot_id": first.id, "slot_date": str(first.date)},
+                    {"slot_id": second.id, "slot_date": str(second.date)},
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("published roster", str(response.data))
+        self.assertFalse(
+            ShiftSlotAssignment.objects.filter(shift=shift).exists(),
+            "manual assignment must be all-or-nothing across the submitted slot list",
+        )
+
     def test_refusals(self):
         shift = self.shift(single_user_only=False, slots=1)
         locum = self.worker("LOCUM")
