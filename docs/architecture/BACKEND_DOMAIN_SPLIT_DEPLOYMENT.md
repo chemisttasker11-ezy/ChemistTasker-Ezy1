@@ -34,8 +34,16 @@ If rollback is required after the migrations ran:
 
 1. Keep old application processes stopped.
 2. Stop all new web, Daphne, Celery and scheduler processes.
-3. Run the Django migration rollback using the new release while its migration code is still present.
-4. Verify the old `client_profile_*` tables and ContentType labels are restored.
+3. Run the Django migration rollback using the new release while its migration code is still present, as one command:
+   `python backend/manage.py migrate rewards zero --noinput`.
+   `rewards.0001_initial` is the root of the split: unapplying it unapplies every later migration of the split
+   (`client_profile` 0061-0070, the promoted apps, `workforce` 0006-0009 and `worker_finance` 0007) in the same run,
+   so the ContentType rows are re-labelled back before Django's post-migrate step. Do not roll back with
+   `migrate client_profile 0060_owner_marketplace_identity` or app by app: that leaves `rewards.0001_initial`
+   applied, and post-migrate then creates duplicate `client_profile` ContentTypes for the rewards models while the
+   original rows (with their permissions, admin history and generic relations) stay labelled `rewards`.
+4. Verify the old `client_profile_*` tables and ContentType labels are restored, and that
+   `python backend/manage.py showmigrations` on the previous release lists no unapplied migration.
 5. Deploy the previous application release.
 6. Start the previous processes and run smoke tests.
 

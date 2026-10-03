@@ -97,6 +97,11 @@ services:
       - ./backend/rewards:/app/rewards
       - ./backend/talent:/app/talent
       - ./backend/team_calendar:/app/team_calendar
+      - ./backend/shifts:/app/shifts
+      - ./backend/memberships:/app/memberships
+      - ./backend/organizations:/app/organizations
+      - ./backend/onboarding:/app/onboarding
+      - ./backend/dashboards:/app/dashboards
       - ./backend/core:/app/core
       - ./backend/ethical_marketplace:/app/ethical_marketplace
       - ./backend/marketplace:/app/marketplace
@@ -158,6 +163,11 @@ services:
       - ./backend/rewards:/app/rewards
       - ./backend/talent:/app/talent
       - ./backend/team_calendar:/app/team_calendar
+      - ./backend/shifts:/app/shifts
+      - ./backend/memberships:/app/memberships
+      - ./backend/organizations:/app/organizations
+      - ./backend/onboarding:/app/onboarding
+      - ./backend/dashboards:/app/dashboards
       - ./backend/core:/app/core
       - ./backend/ethical_marketplace:/app/ethical_marketplace
       - ./backend/marketplace:/app/marketplace
@@ -210,6 +220,11 @@ services:
       - ./backend/rewards:/app/rewards
       - ./backend/talent:/app/talent
       - ./backend/team_calendar:/app/team_calendar
+      - ./backend/shifts:/app/shifts
+      - ./backend/memberships:/app/memberships
+      - ./backend/organizations:/app/organizations
+      - ./backend/onboarding:/app/onboarding
+      - ./backend/dashboards:/app/dashboards
       - ./backend/core:/app/core
       - ./backend/ethical_marketplace:/app/ethical_marketplace
       - ./backend/marketplace:/app/marketplace
