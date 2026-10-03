@@ -260,28 +260,6 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        # TEMP DEBUG - remove after investigation
-        try:
-            slots_qs = shift.slots.all()
-            unassigned_ids = [
-                s.id for s in slots_qs
-                if not ShiftSlotAssignment.objects.filter(slot=s).exists()
-            ]
-            # print({
-            #     "DBG": "accept_user",
-            #     "shift_id": shift.id,
-            #     "single_user_only": shift.single_user_only,
-            #     "slot_id_raw": request.data.get('slot_id'),
-            #     "slotId_raw": request.data.get('slotId'),
-            #     "slot_alt_raw": request.data.get('slot'),
-            #     "slot_id_normalized": slot_id,
-            #     "slots_count": slots_qs.count(),
-            #     "unassigned_ids": unassigned_ids,
-            #     "user_id": user_id,
-            # })
-        except Exception as e:
-            # print({"DBG": "accept_user_error", "error": str(e)})
-            pass
         # For multi-slot shifts, auto-pick when possible (prefer unassigned)
         if not shift.single_user_only and slot_id is None:
             slots_qs = shift.slots.all()
@@ -458,12 +436,6 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
         serializer = ShiftCounterOfferSerializer(data=request.data, context={'request': request, 'shift': shift})
         serializer.is_valid(raise_exception=True)
-        try:
-            # print(f"[counter_offers POST] shift={shift.id} user={getattr(request.user, 'id', None)} slots_payload={request.data.get('slots')}")
-            vd = getattr(serializer, 'validated_data', {})
-            # print(f"[counter_offers POST] validated slots count={len(vd.get('slots', []))} slots={vd.get('slots')}")
-        except Exception:
-            pass
         offer = serializer.save()
 
         # Ensure the user is marked as interested in the targeted slots (or shift-level) without triggering the
@@ -513,11 +485,6 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 suppress_auto_notification=True,
             )
         output = ShiftCounterOfferSerializer(offer, context={'request': request, 'shift': shift})
-        try:
-            # print(f"[counter_offers POST] saved slots={list(offer.slots.values('id','slot_id','slot_date','proposed_start_time','proposed_end_time','proposed_rate'))}")
-            pass
-        except Exception:
-            pass
         return Response(output.data, status=status.HTTP_201_CREATED)
 
     @staticmethod
@@ -558,25 +525,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        log.warning(
-            "[counter_offer_accept] shift_id=%s offer_id=%s slot_id=%s single_user_only=%s request_data=%s",
-            shift.id,
-            offer.id,
-            slot_id,
-            shift.single_user_only,
-            request.data,
-        )
-        log.warning(
-            "[counter_offer_accept] request_query=%s",
-            dict(request.query_params),
-        )
-
         offer_slot_ids = list(offer.slots.values_list('slot_id', flat=True))
-        log.warning(
-            "[counter_offer_accept] offer_slot_ids=%s offer_status=%s",
-            offer_slot_ids,
-            offer.status,
-        )
 
         if slot_id is None:
             if offer_slot_ids:
@@ -585,10 +534,6 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                     if not ShiftSlotAssignment.objects.filter(slot_id=sid).exists()
                 ]
                 slot_id = unassigned_offer_slots[0] if unassigned_offer_slots else offer_slot_ids[0]
-                log.warning(
-                    "[counter_offer_accept] auto-selected slot_id=%s from offer slots",
-                    slot_id,
-                )
 
         # Allow per-slot acceptance even if the offer was already accepted for another slot.
         if offer.status != ShiftCounterOffer.Status.PENDING and slot_id is None:

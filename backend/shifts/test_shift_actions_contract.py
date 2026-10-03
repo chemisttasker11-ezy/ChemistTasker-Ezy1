@@ -5,6 +5,7 @@ The tests drive the real endpoints and assert the response, the rows written, th
 e-mails queued. E-mails are captured at Celery's send_task, so the assertions hold wherever the code that queues them
 lives.
 """
+import logging
 from contextlib import contextmanager
 from datetime import date, time, timedelta
 from decimal import Decimal
@@ -353,6 +354,20 @@ class CounterOfferTests(ShiftActionFixture):
 
         rejected_after, _ = self.post(self.owner, f"shifts/{shift.id}/counter-offers/{counter.id}/reject/")
         self.assertEqual((rejected_after.status_code, rejected_after.data["detail"]), (400, "Counter offer is not pending."))
+
+    def test_accept_does_not_log_the_request_payload(self):
+        worker = self.worker()
+        shift = self.shift(single_user_only=False, slots=2, rate_type="FLEXIBLE")
+        slot = shift.slots.order_by("id").first()
+        self.submit(worker, shift, slot)
+        counter = ShiftCounterOffer.objects.get()
+        marker = "payload-marker-7f3a"
+        with mock.patch.object(logging.Logger, "_log") as emitted:
+            response, _ = self.post(self.owner, f"shifts/{shift.id}/counter-offers/{counter.id}/accept/",
+                                    {"note": marker})
+        self.assertEqual(response.status_code, 200)
+        logged = [str(call) for call in emitted.call_args_list if call.args and call.args[0] >= logging.WARNING]
+        self.assertFalse([line for line in logged if marker in line or "counter_offer_accept" in line], logged)
 
     def test_reject_and_refusals(self):
         worker = self.worker()
