@@ -819,6 +819,31 @@ class VerificationConfigurationTests(SimpleTestCase):
                     readers.add(rel)
         self.assertEqual(readers, {"core/settings.py"})
 
+    def test_importing_shipped_modules_writes_no_files(self):
+        # importing a module (web, worker, beat, management command, test runner) must not create filesystem state
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        writers = {"makedirs", "mkdir", "write_text", "write_bytes", "touch"}
+
+        def opens_for_writing(call):
+            mode = call.args[1] if len(call.args) > 1 else next((k.value for k in call.keywords if k.arg == "mode"), None)
+            return isinstance(mode, ast_module.Constant) and any(flag in str(mode.value) for flag in "wax+")
+
+        offenders = []
+        for rel, _path, tree in runtime_files():
+            for statement in tree.body:
+                if isinstance(statement, (ast_module.FunctionDef, ast_module.AsyncFunctionDef, ast_module.ClassDef)):
+                    continue
+                for node in ast_module.walk(statement):
+                    if not isinstance(node, ast_module.Call):
+                        continue
+                    called = ast_module.unparse(node.func).rsplit(".", 1)[-1]
+                    if called in writers or (called == "open" and opens_for_writing(node)):
+                        offenders.append(f"{rel}:{node.lineno}")
+        self.assertEqual(offenders, [])
+
     @override_settings(AZURE_OCR_ENDPOINT="https://ocr.example.test", AZURE_OCR_KEY="settings-key")
     def test_ocr_client_is_configured_from_settings(self):
         import sys
