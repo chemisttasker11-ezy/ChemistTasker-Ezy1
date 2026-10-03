@@ -20,7 +20,7 @@ class HubMediaAccess(APIView):
         if not public:
             if not request.user.is_authenticated:
                 raise Http404
-            from pharmacy_hub.views import HubScopeResolver
+            from pharmacy_hub.access import HubScopeResolver
             try:
                 HubScopeResolver(request.user).from_post(post)
             except PermissionDenied:
