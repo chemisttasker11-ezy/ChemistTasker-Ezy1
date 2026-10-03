@@ -36,6 +36,7 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     but runs per-field resets and schedules file verifications.
     """
     update_fields = []
+    old_files_to_delete = []
     file_fields = [
         'ahpra_proof','hours_proof','certificate','university_id','cpr_certificate','s8_certificate'
     ]
@@ -59,14 +60,12 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
             changed = (_fname(new_file) != _fname(old_file))
             if new_file is None:
                 if old_file:
-                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception: pass
+                    old_files_to_delete.append(old_file)
                 setattr(instance, field, None)
                 update_fields.append(field)
             else:
                 if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
-                    try: _delete_file_if_unreferenced(old_file, current_instance=instance)
-                    except Exception: pass
+                    old_files_to_delete.append(old_file)
                 setattr(instance, field, new_file)
                 update_fields.append(field)
 
@@ -99,6 +98,15 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))
+
+    # Storage deletion is deliberately after validation and the successful DB
+    # write. A rejected submit must never leave the persisted row pointing at
+    # a file that has already been deleted.
+    for old_file in old_files_to_delete:
+        try:
+            _delete_file_if_unreferenced(old_file, current_instance=instance)
+        except Exception:
+            pass
 
     # schedule verification tasks for any provided file that changed or is not verified
     if submit:
