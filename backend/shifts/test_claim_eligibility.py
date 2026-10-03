@@ -1,10 +1,11 @@
 """The effective eligibility rule of the community claim-shift endpoint.
 
-The community queryset decides who can see (and therefore claim) a shift: a FULL_PART_TIME shift is visible to active
+The community queryset owns who can see (and therefore claim) a shift: a FULL_PART_TIME shift is visible to active
 full-time / part-time / casual members of its pharmacy; a LOCUM_CASUAL shift to active locum / shift-hero members and,
-unless it is posted anonymously, to active staff members. Membership is unique per (user, pharmacy), so the claim sees
-the same membership row the queryset matched. Locum and shift-hero members are refused with 400 before any tier check
-(they must express interest and accept an offer). These tests drive the real endpoint through every combination.
+unless it is posted anonymously, to active staff members. Membership is unique per (user, pharmacy). The claim fetches
+the current direct membership and then re-runs the canonical queryset before mutation, so a concurrent tier change
+cannot rely on stale visibility. Locum and shift-hero members are then refused with 400 because they must express
+interest and accept an offer. These tests drive the real endpoint through every tier/visibility/anonymity combination.
 """
 from datetime import date, time, timedelta
 from unittest import mock
