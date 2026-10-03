@@ -21,6 +21,61 @@ from django.test import SimpleTestCase
 BACKEND = Path(settings.BASE_DIR)
 DISPATCHERS = {"async_task", "send_task"}
 
+CONCURRENT_CHILD = r"""
+import json, os, sys, threading, time
+import django
+django.setup()
+from django.urls import get_resolver
+get_resolver().url_patterns
+from celery import current_app
+from celery.loaders import base as celery_loader_base
+from core.task_queue import registered_task_name
+
+names = json.loads(sys.argv[1])
+for name in names:
+    current_app.tasks.pop(name, None)
+
+original_find_related_module = celery_loader_base.find_related_module
+first_import_started = threading.Event()
+release_first_import = threading.Event()
+gate = threading.Lock()
+state = {"blocked_once": False}
+
+def slow_first_task_lookup(package, related_name):
+    with gate:
+        should_block = not state["blocked_once"]
+        if should_block:
+            state["blocked_once"] = True
+    if should_block:
+        first_import_started.set()
+        if not release_first_import.wait(timeout=10):
+            raise RuntimeError("timed out waiting to release first autodiscovery")
+    return original_find_related_module(package, related_name)
+
+celery_loader_base.find_related_module = slow_first_task_lookup
+errors = []
+
+def resolve(name):
+    try:
+        registered_task_name(name)
+    except Exception as exc:
+        errors.append(f"{name}:{type(exc).__name__}:{exc}")
+
+first = threading.Thread(target=resolve, args=(names[0],))
+second = threading.Thread(target=resolve, args=(names[1],))
+first.start()
+if not first_import_started.wait(timeout=10):
+    raise RuntimeError("first autodiscovery never started")
+second.start()
+time.sleep(0.2)
+release_first_import.set()
+first.join(timeout=20)
+second.join(timeout=20)
+if first.is_alive() or second.is_alive():
+    raise RuntimeError("concurrent registry resolution did not finish")
+print(json.dumps(errors))
+"""
+
 CHILD = r"""
 import json, os, sys
 import django
@@ -79,3 +134,17 @@ class TaskDispatchRegistrationTests(SimpleTestCase):
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
         missing = json.loads(result.stdout.strip().splitlines()[-1])
         self.assertEqual(missing, [], "task names dispatched by the web code that a web process cannot resolve")
+
+    def test_concurrent_first_dispatches_do_not_race_task_autodiscovery(self):
+        names = [
+            "client_profile.tasks.verify_filefield_task",
+            "client_profile.tasks.email_membership_application_submitted",
+        ]
+        env = {**os.environ, "DJANGO_SETTINGS_MODULE": os.environ.get("DJANGO_SETTINGS_MODULE", "core.settings")}
+        result = subprocess.run(
+            [sys.executable, "-c", CONCURRENT_CHILD, json.dumps(names)],
+            cwd=BACKEND, env=env, capture_output=True, text=True, timeout=180,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        errors = json.loads(result.stdout.strip().splitlines()[-1])
+        self.assertEqual(errors, [], "concurrent first task dispatches must not observe a partial Celery registry")
