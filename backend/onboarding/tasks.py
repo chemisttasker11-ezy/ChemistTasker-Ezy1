@@ -9,17 +9,29 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+from urllib.parse import urlencode
 
 import dateutil.parser
 from celery import shared_task
 from django.apps import apps
+from django.conf import settings
+from django.core.signing import TimestampSigner
 from django.utils import timezone
 
 from core.integrations.abr import _parse_abn_html_fields, abn_lookup
-from onboarding.emails import simple_name_match
+from core.task_queue import async_task
+from onboarding.emails import get_candidate_role, simple_name_match
 from onboarding.verification.ahpra import _update_ahpra_fields, ahpra_lookup, parse_ahpra_html
 from onboarding.verification.documents import azure_ocr, get_local_file_or_download, ocr_input_path_for_file
+from onboarding.verification.reminders import (
+    _marker_delete,
+    _marker_get,
+    _referee_reminder_key,
+    cancel_referee_reminder,
+    schedule_referee_reminder,
+)
 from onboarding.verification.support import env, fetch_instance_with_retries, save_output_file
+from users.normalization import sanitize_email_text as clean_email
 
 logger = logging.getLogger(__name__)
 
@@ -253,3 +265,69 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
         model_name, object_pk, is_verified, note,
         reg_type=registration_type, reg_status=registration_status, expiry_date=expiry_date
     )
+
+
+@shared_task(name="client_profile.tasks.run_referee_reminder", queue="notifications")
+def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
+    """
+    Runs for ONE referee (ref_idx). If that referee is confirmed/rejected now,
+    cancel and stop. Otherwise send reminder to that referee only
+    and re-schedule only that referee.
+    """
+    key = _referee_reminder_key(model_name, pk, ref_idx)
+    if not _marker_get(key):
+        return
+
+    Model = apps.get_model('client_profile', model_name)
+    obj = Model.objects.get(pk=pk)
+
+    confirmed = bool(getattr(obj, f'referee{ref_idx}_confirmed', False))
+    rejected = bool(getattr(obj, f'referee{ref_idx}_rejected', False))
+    if confirmed or rejected:
+        cancel_referee_reminder(model_name, pk, ref_idx)
+        return
+
+    # Build the single-ref reminder email
+    email_raw = getattr(obj, f'referee{ref_idx}_email', None)
+    name = getattr(obj, f'referee{ref_idx}_name', '')
+    relation = getattr(obj, f'referee{ref_idx}_relation', '')
+    workplace = getattr(obj, f'referee{ref_idx}_workplace', '')
+    email = clean_email(email_raw)
+    if not email:
+        cancel_referee_reminder(model_name, pk, ref_idx)
+        return
+
+    signer = TimestampSigner()
+    token = signer.sign(f"{model_name}:{pk}:{ref_idx}")
+
+    # ✅ NEW: include role in the querystring
+    query = urlencode({
+        "candidate_name": obj.user.get_full_name(),
+        "position_applied_for": get_candidate_role(obj),
+    })
+    confirm_url = f"{settings.FRONTEND_BASE_URL}/referee/questionnaire/{token}?{query}"
+    reject_url = f"{settings.FRONTEND_BASE_URL}/onboarding/referee-reject/{token}"
+
+    async_task(
+        'users.tasks.send_async_email',
+        subject=f"Gentle Reminder: Reference Request for {obj.user.get_full_name()}",
+        recipient_list=[email],
+        template_name="emails/referee_reminder.html",
+        text_template="emails/referee_reminder.txt",
+        context={
+            "referee_name": name,
+            "referee_relation": relation,
+            "referee_workplace": workplace,
+            "candidate_name": obj.user.get_full_name(),
+            "candidate_first_name": obj.user.first_name,
+            "candidate_last_name": obj.user.last_name,
+            "confirm_url": confirm_url,
+            "reject_url": reject_url,
+            # (optional if your template wants to render it)
+            "position_applied_for": get_candidate_role(obj),
+        },
+    )
+
+    # Re-schedule this referee only (keep your dev interval)
+    _marker_delete(key)
+    schedule_referee_reminder(model_name, pk, ref_idx)

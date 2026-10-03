@@ -126,11 +126,6 @@ def module_level_app_edges():
     return edges
 
 
-TASK_MODULE_REASON = (
-    "the implementation stays in client_profile/tasks.py beside the Celery tasks registered under their deployed "
-    "client_profile.tasks.* names until that module is decomposed in its own change"
-)
-
 # (file, module) -> (names, reason). Keep this list short and every reason specific.
 ALLOWED_LEGACY_IMPORTS = {
     ("chat/models.py", "client_profile.models.common"): (
@@ -145,8 +140,6 @@ ALLOWED_LEGACY_IMPORTS = {
         {"EncryptedTextField"},
         "migrations deconstruct the field by its client_profile.fields path; moving it would generate migrations",
     ),
-    ("onboarding/emails.py", "client_profile.tasks"): ({"schedule_referee_reminder"}, TASK_MODULE_REASON),
-    ("onboarding/views.py", "client_profile.tasks"): ({"cancel_referee_reminder"}, TASK_MODULE_REASON),
     ("core/websocket_testing.py", "client_profile.characterization_support"): (
         {"make_owner_with_pharmacy", "make_staff_member", "make_user"},
         "test-support factories shared by the chat and notifications WebSocket tests",
@@ -213,7 +206,7 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 1768
+KERNEL_CODE_LINE_CEILING = 1681
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
@@ -276,13 +269,11 @@ KERNEL_DEFINITIONS = {
     "client_profile/models/orgs.py": set(),
     "client_profile/models/shifts.py": set(),
     "client_profile/tasks.py": {
-        "REFEREE_REMINDER_HOURS", "REMINDER_FUNC", "User", "_final_evaluation_reminder_key", "_frontend_base_url",
-        "_manage_detail_url_for_role", "_manage_path_for_role", "_marker_delete", "_marker_get", "_marker_set",
-        "_referee_reminder_key", "_rem_args", "_reminder_redis", "cancel_all_referee_reminders",
-        "cancel_referee_reminder", "email_membership_application_approved", "email_membership_application_rejected",
+        "User", "_frontend_base_url", "_manage_detail_url_for_role", "_manage_path_for_role",
+        "email_membership_application_approved", "email_membership_application_rejected",
         "email_membership_application_review_updated", "email_membership_application_submitted", "final_evaluation",
         "logger", "mark_notification_sent", "notification_already_sent", "run_all_verifications",
-        "run_referee_reminder", "schedule_referee_reminder", "send_shift_reminders",
+        "send_shift_reminders",
     },
     "client_profile/timezone_utils.py": set(),
     "client_profile/urls.py": {"router", "urlpatterns"},

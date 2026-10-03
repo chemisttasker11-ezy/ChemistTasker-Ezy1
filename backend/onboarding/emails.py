@@ -99,7 +99,7 @@ def send_referee_emails(obj, is_reminder=False):
 
             # Schedule THIS referee's reminder (initial)
             try:
-                from client_profile.tasks import schedule_referee_reminder
+                from onboarding.verification.reminders import schedule_referee_reminder
                 schedule_referee_reminder(obj._meta.model_name, obj.pk, idx)
             except Exception:
                 pass

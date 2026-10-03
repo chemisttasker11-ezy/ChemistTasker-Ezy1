@@ -17,7 +17,7 @@ from core.task_queue import async_task
 from django.core.signing import BadSignature, TimestampSigner
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
-from client_profile.tasks import cancel_referee_reminder
+from onboarding.verification.reminders import cancel_referee_reminder
 from django.db import IntegrityError, transaction
 from datetime import timedelta
 from onboarding.serializers import (

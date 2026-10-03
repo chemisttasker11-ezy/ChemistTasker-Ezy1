@@ -1,5 +1,4 @@
 from datetime import timedelta, datetime
-from urllib.parse import urlencode
 from django.apps import apps
 from django.conf import settings
 from django.db import transaction
@@ -8,7 +7,6 @@ from django.utils import timezone
 from celery import shared_task
 from core.integrations.abr import _parse_abn_html_fields, abn_lookup  # noqa: F401  (historical public import path)
 from core.task_queue import async_task
-import redis
 from users.tasks import send_async_email
 from shifts.models import ShiftSlotAssignment
 from onboarding.models import OnboardingNotification
@@ -16,18 +14,27 @@ from memberships.models import MembershipApplication, Membership
 from organizations.models import Pharmacy, PharmacyAdmin
 from organizations.timezone import get_pharmacy_timezone
 from django.contrib.contenttypes.models import ContentType
-from onboarding.emails import (
-    get_candidate_role,
-    send_referee_emails,
+from onboarding.emails import send_referee_emails
+from onboarding.tasks import (  # noqa: F401  (deployed task objects)
+    run_referee_reminder,
+    verify_abn_task,
+    verify_ahpra_task,
+    verify_filefield_task,
 )
-from onboarding.tasks import verify_abn_task, verify_ahpra_task, verify_filefield_task  # noqa: F401  (deployed task objects)
+from onboarding.verification.reminders import (  # noqa: F401  (historical public import path)
+    _final_evaluation_reminder_key,
+    _marker_delete,
+    _marker_get,
+    _marker_set,
+    cancel_all_referee_reminders,
+    cancel_referee_reminder,
+    schedule_referee_reminder,
+)
 from shifts.emails import build_shift_email_context
-from users.normalization import sanitize_email_text as clean_email
 from users.navigation import get_frontend_dashboard_url
 from memberships.labels import membership_role_label
 import logging
 import re
-from django.core.signing import TimestampSigner
 from django.contrib.auth import get_user_model
 from django.template.defaultfilters import date as datefilter
 from users.models import OrganizationMembership
@@ -420,145 +427,6 @@ def send_shift_reminders():
             total_sent += 1
 
     logger.info(f"[send_shift_reminders] Completed sending reminders. Sent {total_sent} emails.")
-
-
-# ========== Referee Reminder (Scheduled) ==========
-REFEREE_REMINDER_HOURS: float = float(getattr(settings, "REFEREE_REMINDER_HOURS", 48))
-
-REMINDER_FUNC = 'client_profile.tasks.run_referee_reminder'
-
-
-def _rem_args(model_name: str, pk: int, ref_idx: int) -> str:
-    return f"'{model_name}',{pk},{ref_idx}"
-
-
-def _referee_reminder_key(model_name: str, pk: int, ref_idx: int) -> str:
-    return f"celery:referee-reminder:{model_name}:{pk}:{ref_idx}"
-
-
-def _final_evaluation_reminder_key(model_name: str, pk: int) -> str:
-    return f"celery:final-evaluation-reminder:{model_name}:{pk}"
-
-
-def _reminder_redis():
-    return redis.from_url(getattr(settings, "CELERY_BROKER_URL", getattr(settings, "REDIS_URL", "redis://127.0.0.1:6379/0")))
-
-
-def _marker_get(key: str) -> bool:
-    try:
-        return bool(_reminder_redis().get(key))
-    except Exception:
-        logger.exception("[reminder-marker] Failed to read marker %s", key)
-        return False
-
-
-def _marker_set(key: str, timeout: int, *, nx: bool = False) -> bool:
-    try:
-        return bool(_reminder_redis().set(key, "1", ex=timeout, nx=nx))
-    except Exception:
-        logger.exception("[reminder-marker] Failed to set marker %s", key)
-        raise
-
-
-def _marker_delete(key: str) -> int:
-    try:
-        return int(_reminder_redis().delete(key) or 0)
-    except Exception:
-        logger.exception("[reminder-marker] Failed to delete marker %s", key)
-        return 0
-
-
-def schedule_referee_reminder(model_name: str, pk: int, ref_idx: int, hours: float | None = None) -> None:
-    """
-    Create a ONE-OFF Celery ETA task for a single referee.
-    To test, pass hours=0.1 etc.
-    """
-    delay = REFEREE_REMINDER_HOURS if hours is None else float(hours)
-    delay_seconds = max(1, int(delay * 3600))
-    key = _referee_reminder_key(model_name, pk, ref_idx)
-    if not _marker_set(key, timeout=delay_seconds + 3600, nx=True):
-        return
-    run_referee_reminder.apply_async(
-        args=(model_name, pk, ref_idx),
-        eta=timezone.now() + timedelta(hours=delay),
-        queue="notifications",
-    )
-
-
-def cancel_referee_reminder(model_name: str, pk: int, ref_idx: int) -> int:
-    return _marker_delete(_referee_reminder_key(model_name, pk, ref_idx))
-
-
-def cancel_all_referee_reminders(model_name: str, pk: int) -> int:
-    deleted = 0
-    for ref_idx in (1, 2):
-        deleted += cancel_referee_reminder(model_name, pk, ref_idx)
-    return deleted
-
-@shared_task(name="client_profile.tasks.run_referee_reminder", queue="notifications")
-def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
-    """
-    Runs for ONE referee (ref_idx). If that referee is confirmed/rejected now,
-    cancel and stop. Otherwise send reminder to that referee only
-    and re-schedule only that referee.
-    """
-    key = _referee_reminder_key(model_name, pk, ref_idx)
-    if not _marker_get(key):
-        return
-
-    Model = apps.get_model('client_profile', model_name)
-    obj = Model.objects.get(pk=pk)
-
-    confirmed = bool(getattr(obj, f'referee{ref_idx}_confirmed', False))
-    rejected = bool(getattr(obj, f'referee{ref_idx}_rejected', False))
-    if confirmed or rejected:
-        cancel_referee_reminder(model_name, pk, ref_idx)
-        return
-
-    # Build the single-ref reminder email
-    email_raw = getattr(obj, f'referee{ref_idx}_email', None)
-    name = getattr(obj, f'referee{ref_idx}_name', '')
-    relation = getattr(obj, f'referee{ref_idx}_relation', '')
-    workplace = getattr(obj, f'referee{ref_idx}_workplace', '')
-    email = clean_email(email_raw)
-    if not email:
-        cancel_referee_reminder(model_name, pk, ref_idx)
-        return
-
-    signer = TimestampSigner()
-    token = signer.sign(f"{model_name}:{pk}:{ref_idx}")
-
-    # ✅ NEW: include role in the querystring
-    query = urlencode({
-        "candidate_name": obj.user.get_full_name(),
-        "position_applied_for": get_candidate_role(obj),
-    })
-    confirm_url = f"{settings.FRONTEND_BASE_URL}/referee/questionnaire/{token}?{query}"
-    reject_url = f"{settings.FRONTEND_BASE_URL}/onboarding/referee-reject/{token}"
-
-    async_task(
-        'users.tasks.send_async_email',
-        subject=f"Gentle Reminder: Reference Request for {obj.user.get_full_name()}",
-        recipient_list=[email],
-        template_name="emails/referee_reminder.html",
-        text_template="emails/referee_reminder.txt",
-        context={
-            "referee_name": name,
-            "referee_relation": relation,
-            "referee_workplace": workplace,
-            "candidate_name": obj.user.get_full_name(),
-            "candidate_first_name": obj.user.first_name,
-            "candidate_last_name": obj.user.last_name,
-            "confirm_url": confirm_url,
-            "reject_url": reject_url,
-            # (optional if your template wants to render it)
-            "position_applied_for": get_candidate_role(obj),
-        },
-    )
-
-    # Re-schedule this referee only (keep your dev interval)
-    _marker_delete(key)
-    schedule_referee_reminder(model_name, pk, ref_idx)
 
 
 # ========== Magic link membership model tasks ==========
