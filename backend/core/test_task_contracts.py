@@ -359,6 +359,30 @@ class ReminderMarkerContractTests(SimpleTestCase):
         obj.save.assert_called_once()
         self.assertIn("ref_idx=1", " ".join(logs.output))
 
+    def test_reminder_for_a_deleted_profile_is_a_terminal_no_op(self):
+        # an ETA reminder can run after the onboarding profile was deleted: clear the marker, log, finish successfully
+        from django.core.exceptions import ObjectDoesNotExist
+
+        class Missing(ObjectDoesNotExist):
+            pass
+
+        model = mock.Mock()
+        model.DoesNotExist = Missing
+        model.objects.get.side_effect = Missing()
+        deleted = []
+        run = task(self.TASK)
+        with patch_impl(
+            self.TASK,
+            apps=SimpleNamespace(get_model=lambda label, name: model),
+            _marker_get=lambda key: True,
+            _marker_delete=lambda key: deleted.append(key) or 1,
+            cancel_referee_reminder=lambda m, pk, idx: deleted.append(f"cancel:{m}:{pk}:{idx}") or 1,
+            async_task=mock.Mock(side_effect=AssertionError("no e-mail for a deleted profile")),
+        ), self.assertLogs(run.run.__module__, level="INFO") as logs:
+            self.assertIsNone(run.run("PharmacistOnboarding", 7, 2))
+        self.assertEqual(deleted, ["cancel:PharmacistOnboarding:7:2"])
+        self.assertIn("pk=7", " ".join(logs.output))
+
     def test_reminder_calls_are_never_silently_swallowed(self):
         import ast as ast_module
 

@@ -284,7 +284,13 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
         return
 
     Model = apps.get_model('client_profile', model_name)
-    obj = Model.objects.get(pk=pk)
+    try:
+        obj = Model.objects.get(pk=pk)
+    except Model.DoesNotExist:
+        # the profile was deleted after this ETA reminder was queued: nothing left to remind about
+        cancel_referee_reminder(model_name, pk, ref_idx)
+        logger.info("[referee-reminder] Profile gone; reminder dropped model=%s pk=%s ref_idx=%s", model_name, pk, ref_idx)
+        return
 
     confirmed = bool(getattr(obj, f'referee{ref_idx}_confirmed', False))
     rejected = bool(getattr(obj, f'referee{ref_idx}_rejected', False))
