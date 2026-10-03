@@ -853,7 +853,6 @@ class VerificationConfigurationTests(SimpleTestCase):
         with patch_impl(
             name,
             fetch_instance_with_retries=lambda model, pk: target,
-            save_output_file=lambda *args: "/tmp/unused.html",
             _update_ahpra_fields=mock.Mock(),
         ), self.assertLogs(task(name).run.__module__, level="ERROR") as logs:
             task(name).run("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
@@ -912,3 +911,26 @@ class VerificationArtifactTests(SimpleTestCase):
 
         update = self.run_ahpra(fail)
         self.assertEqual(update.call_args.args[3], "AHPRA lookup failed. Please try again later.")
+
+    def test_abn_verification_persists_fields_and_writes_no_artifacts(self):
+        # The ABR page and a JSON copy of the parsed fields were written to verification_outputs/ after the fields were
+        # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.
+        name = "client_profile.tasks.verify_abn_task"
+        target = SimpleNamespace(
+            abn_verified=False, abn_entity_confirmed=False, abn_verification_note="",
+            abn_entity_name="", abn_entity_type="", abn_status="", abn_gst_registered=None,
+            abn_gst_from=None, abn_gst_to=None, abn_last_checked=None, save=mock.Mock(),
+        )
+        overrides = {
+            "fetch_instance_with_retries": lambda model, pk: target,
+            "abn_lookup": lambda abn: ("EXAMPLE PHARMACY PTY LTD", ABR_HTML),
+        }
+        with patch_impl(name, **overrides), mock.patch("builtins.open", side_effect=AssertionError("file opened")):
+            task(name).run("PharmacistOnboarding", 1, "51824753556", "Ann", "Lee", "a@example.com",
+                           note_field="abn_verification_note")
+        self.assertEqual(target.abn_entity_name, "EXAMPLE PHARMACY PTY LTD")
+        self.assertEqual(target.abn_gst_from, date(2023, 9, 1))
+        self.assertEqual(
+            target.abn_verification_note,
+            "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you.",
+        )

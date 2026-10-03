@@ -4,7 +4,6 @@ Every task keeps its deployed name (`client_profile.tasks.*`), queue and signatu
 messages address tasks by these names. `client_profile.tasks` re-exports these objects; it does not register them
 again.
 """
-import json
 import logging
 import os
 import tempfile
@@ -35,7 +34,7 @@ from onboarding.verification.reminders import (
     cancel_referee_reminder,
     schedule_referee_reminder,
 )
-from onboarding.verification.support import fetch_instance_with_retries, save_output_file
+from onboarding.verification.support import fetch_instance_with_retries
 from users.normalization import sanitize_email_text as clean_email
 
 logger = logging.getLogger(__name__)
@@ -165,23 +164,6 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
     if note_field and hasattr(obj, note_field):
         setattr(obj, note_field, note[:255]); updates.append(note_field)
     obj.save(update_fields=list({f for f in updates if hasattr(obj, f)}))
-
-    # artifacts
-    out_html = save_output_file("abn_html", object_pk, "html")
-    with open(out_html, "w", encoding="utf-8") as f:
-        f.write(html if html else "No HTML captured.")
-    out_json = save_output_file("abn", object_pk, "json")
-    with open(out_json, "w", encoding="utf-8") as f:
-        json.dump({
-            "abn_input": abn_number,
-            "entity_name": obj.abn_entity_name,
-            "entity_type": obj.abn_entity_type,
-            "abn_status": obj.abn_status,
-            "abn_gst_registered": obj.abn_gst_registered,
-            "abn_gst_from": (obj.abn_gst_from.isoformat() if obj.abn_gst_from else None),
-            "abn_gst_to": (obj.abn_gst_to.isoformat() if obj.abn_gst_to else None),
-            "note": getattr(obj, note_field, None) if note_field else None,
-        }, f, indent=2)
 
 
 @shared_task(name="client_profile.tasks.verify_ahpra_task", queue="ocr")
