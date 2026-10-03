@@ -336,6 +336,51 @@ class ReminderMarkerContractTests(SimpleTestCase):
             ],
         )
 
+    def test_scheduling_failure_while_sending_referee_emails_is_logged_not_raised(self):
+        # Reminders are non-critical for the request: the e-mails still go out and the profile is saved, but the
+        # failure is visible in the log instead of being swallowed.
+        from onboarding import emails
+
+        meta = SimpleNamespace(model_name="pharmacistonboarding")
+        obj = SimpleNamespace(
+            _meta=meta, pk=7,
+            user=SimpleNamespace(get_full_name=lambda: "Ann Lee", first_name="Ann", last_name="Lee", email="a@example.com"),
+            referee1_email="ref1@example.com", referee1_confirmed=False, referee1_rejected=False,
+            referee1_name="R1", referee1_workplace="W", referee1_relation="Manager",
+            referee2_email="", referee2_confirmed=False, referee2_rejected=False,
+            save=mock.Mock(),
+        )
+        with mock.patch.object(emails, "async_task") as sent, \
+                mock.patch("onboarding.verification.reminders.schedule_referee_reminder",
+                           side_effect=ConnectionError("broker down")), \
+                self.assertLogs("onboarding.emails", level="ERROR") as logs:
+            emails.send_referee_emails(obj)
+        sent.assert_called_once()
+        obj.save.assert_called_once()
+        self.assertIn("ref_idx=1", " ".join(logs.output))
+
+    def test_reminder_calls_are_never_silently_swallowed(self):
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        reminder_calls = {"schedule_referee_reminder", "cancel_referee_reminder", "cancel_all_referee_reminders"}
+        offenders = []
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if not isinstance(node, ast_module.Try):
+                    continue
+                called = {
+                    ast_module.unparse(c.func).rsplit(".", 1)[-1]
+                    for statement in node.body for c in ast_module.walk(statement) if isinstance(c, ast_module.Call)
+                }
+                if not called & reminder_calls:
+                    continue
+                for handler in node.handlers:
+                    if all(isinstance(statement, ast_module.Pass) for statement in handler.body):
+                        offenders.append(f"{rel}:{handler.lineno}")
+        self.assertEqual(offenders, [])
+
     def test_synchronous_consumers_use_the_same_reminder_functions(self):
         from onboarding import views as onboarding_views
 
