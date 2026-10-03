@@ -350,12 +350,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 "You do not have permission to perform this action.", "shift_not_visible",
             )
 
-        # --- 2. Membership verification ---
-        all_memberships = list(
-            Membership.objects.filter(user=user, is_active=True)
-            .values('pharmacy_id', 'role', 'employment_type', 'is_active')
-        )
-
+        # --- 2. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
         is_member_of_pharmacy = Membership.objects.filter(
             user=user,
             pharmacy=shift.pharmacy,
@@ -371,11 +366,10 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         membership = Membership.objects.filter(
             user=user, pharmacy=shift.pharmacy, is_active=True
         ).first()
-        # --- 3. Tier eligibility check ---
-        allowed_ftpt = {'FULL_TIME', 'PART_TIME', 'CASUAL'}
-        allowed_locum = {'LOCUM', 'SHIFT_HERO'}
-
-        if membership and membership.employment_type in allowed_locum:
+        # --- 3. Tier eligibility ---
+        # The community queryset already admits only the eligible tiers for FULL_PART_TIME and LOCUM_CASUAL shifts
+        # (shifts/test_claim_eligibility.py). Locum and shift-hero members must take the offer path instead.
+        if membership and membership.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES:
             return Response(
                 {
                     "detail": (
@@ -385,26 +379,6 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        if shift.visibility == 'FULL_PART_TIME':
-            ok = membership and membership.employment_type in allowed_ftpt
-            if not ok:
-                return _claim_refused(
-                    request, shift, "tier_mismatch",
-                    "Only full/part-time/casual pharmacy members can claim this shift.", "shift_claim_tier_mismatch",
-                    employment_type=getattr(membership, 'employment_type', None), visibility=shift.visibility,
-                )
-        elif shift.visibility == 'LOCUM_CASUAL':
-            allowed_for_shift = allowed_locum
-            if not getattr(shift, "post_anonymously", False):
-                allowed_for_shift = allowed_locum | allowed_ftpt
-            ok = membership and membership.employment_type in allowed_for_shift
-            if not ok:
-                return _claim_refused(
-                    request, shift, "tier_mismatch",
-                    "Only eligible pharmacy members can claim this shift.", "shift_claim_tier_mismatch",
-                    employment_type=getattr(membership, 'employment_type', None), visibility=shift.visibility,
-                )
 
         # --- 4. Role match check ---
         user_role = getattr(user, 'role', None)
