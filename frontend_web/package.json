@@ -42,7 +42,7 @@
     "canvas-confetti": "^1.9.3",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
-    "framer-motion": "^12.15.0",
+    "framer-motion": "^13.4.0",
     "jwt-decode": "^4.0.0",
     "minimal-shared": "^1.0.8",
     "moment": "^2.30.1",
