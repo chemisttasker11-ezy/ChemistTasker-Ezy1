@@ -147,20 +147,26 @@ def visible_invite_links(user, query_params):
 
 
 def visible_applications(user, query_params):
-    """Applications of the pharmacies of the organizations where the user is ORG_ADMIN, otherwise of the pharmacies
-    they own, plus pharmacies where they hold the manage-staff capability; newest first."""
-    # visible pharmacies same as above
+    """Applications visible through any of the user's independent management scopes.
+
+    Organization administration, pharmacy ownership and pharmacy-level manage-staff
+    authority are additive. Holding one scope must not hide applications that are
+    visible through another.
+    """
     org_ids = list(
         OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').values_list('organization_id', flat=True)
     )
+    visible_pharmacies = Pharmacy.objects.none()
     if org_ids:
-        visible_pharmacies = Pharmacy.objects.filter(organization_id__in=org_ids)
-    else:
-        try:
-            owner = OwnerOnboarding.objects.get(user=user)
-            visible_pharmacies = Pharmacy.objects.filter(owner=owner)
-        except OwnerOnboarding.DoesNotExist:
-            visible_pharmacies = Pharmacy.objects.none()
+        visible_pharmacies |= Pharmacy.objects.filter(organization_id__in=org_ids)
+
+    try:
+        owner = OwnerOnboarding.objects.get(user=user)
+    except OwnerOnboarding.DoesNotExist:
+        owner = None
+    if owner is not None:
+        visible_pharmacies |= Pharmacy.objects.filter(owner=owner)
+
     admin_staff_ids = [
         pharm.id
         for pharm in pharmacies_user_admins(user)
@@ -168,6 +174,7 @@ def visible_applications(user, query_params):
     ]
     if admin_staff_ids:
         visible_pharmacies |= Pharmacy.objects.filter(id__in=admin_staff_ids)
+
     visible_pharmacies = visible_pharmacies.distinct()
     qs = MembershipApplication.objects.filter(pharmacy__in=visible_pharmacies).order_by('-submitted_at')
     status_q = query_params.get('status')
