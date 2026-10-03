@@ -32,8 +32,9 @@ from celery.loaders import base as celery_loader_base
 from core.task_queue import registered_task_name
 
 names = json.loads(sys.argv[1])
-for name in names:
-    current_app.tasks.pop(name, None)
+already_registered = [name for name in names if name in current_app.tasks]
+if already_registered:
+    raise RuntimeError(f"web-like process unexpectedly pre-registered test tasks: {already_registered}")
 
 original_find_related_module = celery_loader_base.find_related_module
 first_import_started = threading.Event()
