@@ -62,6 +62,7 @@ router.registry.extend(team_calendar_router.registry)
 urlpatterns = [
     path('workforce/', include('workforce.urls')),
     path('', include('client_profile.urls')),
+    path('', include('onboarding.urls')),
     path('', include('organizations.urls')),
     path('', include('memberships.urls')),
     path('', include('shifts.urls')),
