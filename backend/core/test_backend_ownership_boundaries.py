@@ -182,23 +182,21 @@ LEGACY_CELERY_TASKS = {
 # Pairs of apps that already import each other at module level: mostly `users` (identity models plus the account API,
 # which reads organisations, memberships and shifts) and `core` (settings, URLs, shared utilities). New pairs fail.
 ALLOWED_MUTUAL_APP_PAIRS = {
+    # attendance approvals use the roster-management capability; workforce timesheets read attendance sessions
     ("attendance", "workforce"),
+    # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
     ("chat", "core"),
-    ("client_profile", "core"),
-    ("client_profile", "onboarding"),
     ("core", "memberships"),
-    ("core", "onboarding"),
     ("core", "organizations"),
-    ("core", "pharmacy_hub"),
     ("core", "shifts"),
     ("core", "users"),
     ("core", "workforce"),
+    # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
+    ("client_profile", "onboarding"),
+    # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them
     ("memberships", "organizations"),
     ("memberships", "users"),
-    ("onboarding", "users"),
     ("organizations", "users"),
-    ("shifts", "users"),
-    ("shifts", "workforce"),
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
