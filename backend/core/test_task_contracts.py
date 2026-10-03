@@ -801,3 +801,38 @@ class ShiftReminderContractTests(TestCase):
         self.assertEqual(kwargs["template_name"], "emails/shift_reminder.html")
         self.assertEqual(kwargs["subject"], f"Reminder: Your upcoming shift at {self.pharmacy.name}")
         self.assertEqual(kwargs["context"]["slot_time"], "2026-01-05 23:45–23:59")
+
+
+class VerificationConfigurationTests(SimpleTestCase):
+    def test_only_settings_read_environment_files(self):
+        # Django settings own the environment; importing a task module must not reread .env files.
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        readers = set()
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if isinstance(node, ast_module.Call) and ast_module.unparse(node.func).endswith("read_env"):
+                    readers.add(rel)
+                if isinstance(node, ast_module.ImportFrom) and node.module == "environ":
+                    readers.add(rel)
+        self.assertEqual(readers, {"core/settings.py"})
+
+    @override_settings(AZURE_OCR_ENDPOINT="https://ocr.example.test", AZURE_OCR_KEY="settings-key")
+    def test_ocr_client_is_configured_from_settings(self):
+        import sys
+        import tempfile
+
+        azure_ocr = impl("client_profile.tasks.verify_filefield_task", "azure_ocr")
+        client_cls = mock.Mock()
+        client_cls.return_value.analyze.return_value = SimpleNamespace(read=None)
+        credential = mock.Mock(side_effect=lambda key: f"credential:{key}")
+        fake_modules = {
+            "azure.ai.vision.imageanalysis": SimpleNamespace(ImageAnalysisClient=client_cls),
+            "azure.ai.vision.imageanalysis.models": SimpleNamespace(VisualFeatures=SimpleNamespace(READ="READ")),
+            "azure.core.credentials": SimpleNamespace(AzureKeyCredential=credential),
+        }
+        with tempfile.NamedTemporaryFile(suffix=".png") as image, mock.patch.dict(sys.modules, fake_modules):
+            self.assertEqual(azure_ocr(image.name), {"lines": []})
+        client_cls.assert_called_once_with(endpoint="https://ocr.example.test", credential="credential:settings-key")

@@ -5,9 +5,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from django.conf import settings
 from django.core.files.storage import default_storage
-
-from onboarding.verification.support import env
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +76,8 @@ def azure_ocr(file_path):
     from azure.ai.vision.imageanalysis import ImageAnalysisClient
     from azure.ai.vision.imageanalysis.models import VisualFeatures
     from azure.core.credentials import AzureKeyCredential
-    # Assumes env has already been loaded
-    endpoint = env("AZURE_OCR_ENDPOINT")
-    key = env("AZURE_OCR_KEY")
+    endpoint = settings.AZURE_OCR_ENDPOINT
+    key = settings.AZURE_OCR_KEY
     if not endpoint or not key:
         raise Exception("Missing AZURE_OCR_ENDPOINT or AZURE_OCR_KEY in env")
     client = ImageAnalysisClient(

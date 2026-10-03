@@ -35,7 +35,7 @@ from onboarding.verification.reminders import (
     cancel_referee_reminder,
     schedule_referee_reminder,
 )
-from onboarding.verification.support import env, fetch_instance_with_retries, save_output_file
+from onboarding.verification.support import fetch_instance_with_retries, save_output_file
 from users.normalization import sanitize_email_text as clean_email
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     output_html = save_output_file("ahpra_html", object_pk, "html")
     try:
         # Use the newly constructed full AHPRA number for the lookup
-        ahpra_lookup(full_ahpra_number, output_html, api_key=env("SCRAPINGBEE_API_KEY"))
+        ahpra_lookup(full_ahpra_number, output_html, api_key=settings.SCRAPINGBEE_API_KEY)
     except Exception as exc:
         # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
         logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))

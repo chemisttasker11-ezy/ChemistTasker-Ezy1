@@ -1,7 +1,6 @@
-"""Shared runtime support of the verification tasks: environment, diagnostic output files, delayed object reads.
+"""Shared runtime support of the verification tasks: diagnostic output files and delayed object reads.
 
-Moved unchanged from client_profile/tasks.py. Reading the dev env file and creating `verification_outputs/` at
-import time are known side effects, kept here for the behaviour-preserving move and removed in a separate change.
+Configuration (provider endpoints and keys) comes from django.conf.settings, which owns the environment.
 """
 import logging
 import os
@@ -11,19 +10,10 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
-from environ import Env
 
 logger = logging.getLogger(__name__)
 
-# ==== ENV SETUP ====
 BASE_DIR = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parent.parent.parent))
-ENV_PATH = BASE_DIR.parent / "env" / "backend.dev.env"
-env = Env()
-if os.environ.get("APP_ENV", "local").lower() in {"local", "dev", "development"} and ENV_PATH.exists():
-    env.read_env(str(ENV_PATH))
-    logger.info(f"[ENV] Loaded environment variables from {ENV_PATH}")
-else:
-    logger.info("[ENV] Using system environment.")
 
 # ==== OUTPUTS DIRECTORY ====
 OUTPUT_DIR = BASE_DIR / "verification_outputs"
