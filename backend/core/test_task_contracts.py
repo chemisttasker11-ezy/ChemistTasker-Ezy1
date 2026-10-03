@@ -498,6 +498,18 @@ class FinalEvaluationContractTests(SimpleTestCase):
         apply_async.assert_not_called()
         self.assertEqual(calls.delete, [])  # nothing cancelled: the profile is still pending
 
+    def test_target_limit_preserves_eventual_evaluation_for_manual_only_pending_check(self):
+        # Owner pharmacists, and pharmacists whose referees are already complete, can wait on manual AHPRA with no
+        # existing 48-hour referee marker. Bounding the 20-second loop must not make that retained pipeline terminal.
+        obj = self.pharmacist(ahpra_verified=False)
+        calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
+        key = "celery:final-evaluation-reminder:PharmacistOnboarding:5"
+        self.assertEqual(calls.set, [(key, 48 * 3600 + 3600)])
+        apply_async.assert_called_once()
+        self.assertEqual(apply_async.call_args.kwargs["kwargs"], {"is_reminder": True})
+        self.assertEqual(apply_async.call_args.kwargs["queue"], "default")
+        self.assertEqual(calls.delete, [])
+
     def test_target_limit_keeps_the_48_hour_reminder(self):
         obj = self.pharmacist(ahpra_verified=False, referee2_confirmed=False)
         calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16, marker=True)
