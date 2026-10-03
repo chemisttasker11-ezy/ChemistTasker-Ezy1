@@ -740,7 +740,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- Identity TAB (new) ----------------
     def _identity_tab(self, instance, vdata: dict, submit: bool):
-        return apply_identity_tab(instance, vdata, submit, legacy_secondary_tracking=False)
+        return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Payment TAB ----------------
     def _payment_tab(self, instance, vdata: dict, submit: bool):
@@ -1286,7 +1286,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- Identity TAB ----------------
     def _identity_tab(self, instance, vdata: dict, submit: bool):
-        return apply_identity_tab(instance, vdata, submit, legacy_secondary_tracking=True)
+        return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Regulatory TAB ----------------
     def _regulatory_tab(self, instance: OtherStaffOnboarding, vdata: dict, submit: bool):
@@ -1729,7 +1729,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
     # ---------------- Identity TAB (identical behavior) ----------------
     def _identity_tab(self, instance, vdata: dict, submit: bool):
-        return apply_identity_tab(instance, vdata, submit, legacy_secondary_tracking=True)
+        return apply_identity_tab(instance, vdata, submit)
 
     # ---------------- Interests TAB ----------------
     def _interests_tab(self, instance: ExplorerOnboarding, vdata: dict, submit: bool):

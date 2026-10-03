@@ -7,7 +7,7 @@ from core.task_queue import async_task
 from onboarding.models import OwnerOnboarding
 
 
-def apply_identity_tab(instance, vdata: dict, submit: bool, *, legacy_secondary_tracking: bool = False):
+def apply_identity_tab(instance, vdata: dict, submit: bool):
     """
     Handles:
     - government_id_type (dropdown)
@@ -38,13 +38,11 @@ def apply_identity_tab(instance, vdata: dict, submit: bool, *, legacy_secondary_
         # If switching to a type that doesn't need a secondary file, clear it
         if new_type in ('DRIVER_LICENSE', 'AUS_PASSPORT', 'AGE_PROOF'):
             old_sec = getattr(instance, 'identity_secondary_file', None)
-            had_secondary = bool(old_sec)  # deleting the file empties the FieldFile
-            if had_secondary:
+            if old_sec:
                 try:
                     _delete_file_if_unreferenced(old_sec, current_instance=instance)
                 except Exception:
                     pass
-            if had_secondary or legacy_secondary_tracking:
                 instance.identity_secondary_file = None
                 update_fields.append('identity_secondary_file')
                 sec_changed = True
@@ -82,7 +80,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool, *, legacy_secondary_
     if 'identity_secondary_file' in vdata:
         new_sec = vdata.get('identity_secondary_file')  # may be file or None
         old_sec = getattr(instance, 'identity_secondary_file', None)
-        sec_changed = (_fname(new_sec) != _fname(old_sec)) or (legacy_secondary_tracking and sec_changed)
+        sec_changed = (_fname(new_sec) != _fname(old_sec))
 
         if new_sec is None:
             if old_sec:

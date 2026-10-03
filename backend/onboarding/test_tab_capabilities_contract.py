@@ -118,12 +118,10 @@ class IdentityTabTests(TabFixture):
                 self.assertEqual((obj.government_id_type, obj.identity_meta, obj.gov_id_verified,
                                   obj.gov_id_verification_note), ("AGE_PROOF", {}, False, ""))
 
-    def test_current_behaviour_resaving_an_unchanged_identity(self):
-        # CURRENT BEHAVIOUR (bug for two roles): re-sending the same single-file type with unchanged meta keeps a
-        # verified ID for pharmacists and owners, but other staff and explorers are marked unverified (their copy
-        # treats "no secondary file to clear" as a change).
-        expected_verified = {"pharmacist": True, "owner": True, "otherstaff": False, "explorer": False}
-        for label, still_verified in expected_verified.items():
+    def test_resaving_an_unchanged_identity_keeps_it_verified(self):
+        # Regression: other staff and explorers had their verified ID reset when they re-sent the same single-file
+        # document type with unchanged details, because their copy treated "no secondary file to clear" as a change.
+        for label in ROLES:
             with self.subTest(role=label):
                 meta = {"state": "NSW", "expiry": "2030-01-01"}
                 user, obj, url = self.onboarding(label, government_id_type="DRIVER_LICENSE", gov_id_verified=True,
@@ -131,7 +129,7 @@ class IdentityTabTests(TabFixture):
                 response, _ = self.save_identity(user, url, government_id_type="DRIVER_LICENSE", identity_meta=meta)
                 self.assertEqual(response.status_code, 200, response.data)
                 obj.refresh_from_db()
-                self.assertEqual(obj.gov_id_verified, still_verified)
+                self.assertTrue(obj.gov_id_verified)
 
     def test_files_replace_clear_and_secondary_cleanup(self):
         for label in ROLES:
