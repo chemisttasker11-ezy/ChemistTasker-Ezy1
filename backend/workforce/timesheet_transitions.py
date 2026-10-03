@@ -23,7 +23,7 @@ def _locked_timesheet_and_period(timesheet):
     The caller must already be inside transaction.atomic().
     """
     period = (
-        TimesheetPeriod.objects.select_for_update()
+        TimesheetPeriod.objects.select_for_update(of=("self",))
         .select_related("pharmacy")
         .get(pk=timesheet.period_id)
     )
