@@ -495,7 +495,8 @@ class FinalEvaluationContractTests(SimpleTestCase):
     def test_target_limit_stops_only_the_quick_loop(self):
         obj = self.pharmacist(ahpra_verified=False)
         calls, _async_task, _emails, apply_async = self.run_task(obj, retry_count=16)
-        apply_async.assert_not_called()
+        quick = [c for c in apply_async.call_args_list if c.kwargs.get("kwargs", {}).get("retry_count") is not None]
+        self.assertEqual(quick, [])
         self.assertEqual(calls.delete, [])  # nothing cancelled: the profile is still pending
 
     def test_target_limit_preserves_eventual_evaluation_for_manual_only_pending_check(self):

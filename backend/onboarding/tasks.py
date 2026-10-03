@@ -560,12 +560,36 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     RECHECK_DELAY = timedelta(seconds=20)
     MAX_QUICK_RECHECK_COUNT = 15
 
+    def ensure_future_evaluation():
+        if _has_future_reminder(model_name, object_pk):
+            return False
+        key = _final_evaluation_reminder_key(model_name, object_pk)
+        _marker_set(key, timeout=int(REMINDER_DELAY.total_seconds()) + 3600)
+        try:
+            final_evaluation.apply_async(
+                args=(model_name, object_pk),
+                kwargs={'is_reminder': True},
+                eta=timezone.now() + REMINDER_DELAY,
+                queue="default",
+            )
+        except Exception:
+            # the marker means "a future evaluation is queued"; without the task it would block later scheduling
+            _marker_delete(key)
+            logger.exception(
+                "[FINAL EVALUATION] 48-hour evaluation enqueue failed; marker removed model=%s pk=%s",
+                model_name, object_pk,
+            )
+            raise
+        return True
+
     def schedule_quick_recheck():
         if retry_count > MAX_QUICK_RECHECK_COUNT:
+            future_scheduled = ensure_future_evaluation()
             logger.warning(
                 "[FINAL EVALUATION] Checks still pending after %s quick re-checks; quick loop stopped model=%s pk=%s "
-                "(a check such as manual AHPRA verification completes outside this loop)",
+                "future_evaluation=%s",
                 retry_count, model_name, object_pk,
+                "scheduled" if future_scheduled else "already-queued",
             )
             return
         final_evaluation.apply_async(
@@ -586,30 +610,12 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
             send_referee_emails(obj, is_reminder=True)
 
         # IMPORTANT: Do NOT cancel here; only cancel in final states.
-        # Ensure exactly ONE future reminder exists
-        if not _has_future_reminder(model_name, object_pk):
-            _marker_set(
-                _final_evaluation_reminder_key(model_name, object_pk),
-                timeout=int(REMINDER_DELAY.total_seconds()) + 3600,
-            )
-            try:
-                final_evaluation.apply_async(
-                    args=(model_name, object_pk),
-                    kwargs={'is_reminder': True},
-                    eta=timezone.now() + REMINDER_DELAY,
-                    queue="default",
-                )
-            except Exception:
-                # the marker means "a reminder is queued"; without the task it would block every later reminder
-                _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
-                logger.exception(
-                    "[FINAL EVALUATION] 48-hour reminder enqueue failed; marker removed model=%s pk=%s",
-                    model_name, object_pk,
-                )
-                raise
+        # Ensure exactly ONE future evaluation exists. When a referee is still pending, that future run also sends
+        # the referee reminder; for manual-only pending checks it is simply the low-frequency evaluation wake-up.
+        if ensure_future_evaluation():
             logger.info(f"[FINAL EVALUATION] Scheduled next referee check for pk={object_pk} at {(timezone.now() + REMINDER_DELAY).isoformat()}.")
         else:
-            logger.info(f"[FINAL EVALUATION] Future referee reminder already exists for pk={object_pk}; leaving it in place.")
+            logger.info(f"[FINAL EVALUATION] Future evaluation already exists for pk={object_pk}; leaving it in place.")
 
         # If other automated checks are also pending, keep the quick re-check loop alive (bounded)
         if is_pending_check:
