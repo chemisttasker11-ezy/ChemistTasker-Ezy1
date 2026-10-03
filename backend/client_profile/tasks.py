@@ -227,9 +227,10 @@ def verify_filefield_task(
                     failure_note = f"Name mismatch found in your uploaded document"
                     logger.info(f"[verify_filefield_task] {failure_note}")
 
-            except Exception as e:
-                failure_note = f"OCR processing failed: {e}."
-                logger.info(f"[verify_filefield_task] {failure_note}")
+            except Exception as exc:
+                # Keep traceback frames for operators without re-logging a possibly sensitive service exception value.
+                failure_note = "OCR processing failed."
+                logger.warning("[verify_filefield_task] OCR processing failed error_type=%s", type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
             finally:
                 if converted_path and os.path.exists(converted_path):
                     os.remove(converted_path)
@@ -443,7 +444,7 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
             # Check if the response from ScrapingBee itself is an error
             if response.status_code >= 400:
                 # This is a ScrapingBee error (e.g., 500, 403)
-                logger.info(f"[ahpra_lookup] ScrapingBee returned an error status: {response.status_code}. Content: {response.text[:200]}")
+                logger.warning("[ahpra_lookup] ScrapingBee returned error status=%s", response.status_code)
                 # If it's the last attempt, raise an exception to be caught by the task
                 if attempt == max_retries - 1:
                     raise Exception(f"An Error occured in during the verification of your AHPRA details")
@@ -458,11 +459,11 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
             logger.info(f"[ahpra_lookup] ScrapingBee request successful.")
             return output_html_path
 
-        except Exception as e:
-            logger.info(f"[ahpra_lookup] An exception occurred on attempt {attempt + 1}: {e}")
+        except Exception as exc:
+            logger.warning("[ahpra_lookup] attempt=%s/%s failed error_type=%s", attempt + 1, max_retries, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
             if attempt == max_retries - 1:
                 # If this was the last retry, re-raise the exception so the task fails gracefully
-                raise e
+                raise
             time.sleep(3 * (attempt + 1)) # Wait before retrying
 
 def parse_ahpra_html(html_file_path):
@@ -529,9 +530,10 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     try:
         # Use the newly constructed full AHPRA number for the lookup
         ahpra_lookup(full_ahpra_number, output_html, api_key=env("SCRAPINGBEE_API_KEY"))
-    except Exception as e:
-        note = f"AHPRA lookup failed: {e}"
-        _update_ahpra_fields(model_name, object_pk, False, note)
+    except Exception as exc:
+        # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
+        logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
+        _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
         return
 
 

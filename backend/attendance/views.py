@@ -1,14 +1,17 @@
 """Attendance and kiosk REST API: device activation and pairing, QR and PIN clocking, offline sync, worker clock actions and manager approvals."""
 import hashlib
+import logging
 from datetime import datetime, timedelta
 
 from django.conf import settings
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
+    ObjectDoesNotExist,
     PermissionDenied as DjangoPermissionDenied,
     ValidationError as DjangoValidationError,
 )
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -61,6 +64,14 @@ from attendance.models import (
     ProvisionalAttendance,
     WorkerPIN,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _unexpected_error_response(request, operation):
+    """A stable 400 for an unexpected failure: the exception and its traceback go to the log, never to the client."""
+    logger.exception("Attendance request failed: operation=%s path=%s", operation, request.path)
+    return Response({"error": f"Unable to {operation}. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def _get_kiosk_device_from_request(request, *, allow_revoked=False):
@@ -135,8 +146,8 @@ class KioskActivateView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "activate the kiosk")
 
 
 class KioskRequestPairingCodeView(APIView):
@@ -195,8 +206,8 @@ class KioskRequestPairingCodeView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "create a pairing code")
 
 
 class KioskPairWithCodeView(APIView):
@@ -239,8 +250,8 @@ class KioskPairWithCodeView(APIView):
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
             return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "pair the kiosk")
 
 
 class KioskOfflineSyncView(APIView):
@@ -447,8 +458,8 @@ class KioskQRView(APIView):
             })
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "generate the QR code")
 
 
 class KioskPinClockView(APIView):
@@ -532,8 +543,8 @@ class KioskPinClockView(APIView):
                 "error": msg,
                 "locked": is_locked,
             }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "record the clock action")
 
 
 class KioskWorkerPinStatusView(APIView):
@@ -596,8 +607,8 @@ class KioskWorkerPinStatusView(APIView):
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
             return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "check the worker PIN status")
 
 
 class KioskWorkerSetupPinView(APIView):
@@ -655,8 +666,8 @@ class KioskWorkerSetupPinView(APIView):
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
             return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "set up the worker PIN")
 
 
 class KioskActiveStaffView(APIView):
@@ -748,8 +759,8 @@ class KioskActiveStaffView(APIView):
 
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "load the active staff")
 
     def get(self, request):
         return self._get_response(request)
@@ -862,8 +873,10 @@ class KioskStaffBreakActionView(APIView):
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
             return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response({"error": "Worker not found."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "record the break")
 
 
 # ---------------------------------------------------------------------------
@@ -936,8 +949,8 @@ class WorkerClockInView(APIView):
             }, status=status.HTTP_201_CREATED)
         except (DjangoValidationError, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "clock in")
 
 
 class WorkerBreakStartView(APIView):
@@ -1007,8 +1020,8 @@ class WorkerClockOutView(APIView):
             })
         except (DjangoValidationError, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "clock out")
 
 
 class WorkerUpdatePinView(APIView):
@@ -1046,8 +1059,8 @@ class WorkerUpdatePinView(APIView):
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
             return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "update the PIN")
 
 
 # ---------------------------------------------------------------------------
@@ -1110,11 +1123,15 @@ class ManagerApproveAttendanceView(APIView):
 
         if not provisional_id:
             return Response({"error": "provisional_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            provisional_id = int(provisional_id)
+        except (TypeError, ValueError):
+            return Response({"error": "provisional_id must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             prov = approve_provisional_attendance(
                 manager_user=request.user,
-                provisional_id=int(provisional_id),
+                provisional_id=provisional_id,
                 reason=reason,
             )
             assignment = prov.backfill_assignment
@@ -1128,8 +1145,10 @@ class ManagerApproveAttendanceView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except (DjangoValidationError, ValidationError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except ObjectDoesNotExist:
+            return Response({"error": "Provisional attendance not found."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "approve the attendance")
 
 
 class ManagerRejectAttendanceView(APIView):
@@ -1146,11 +1165,15 @@ class ManagerRejectAttendanceView(APIView):
 
         if not provisional_id or not reason:
             return Response({"error": "provisional_id and reason are required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            provisional_id = int(provisional_id)
+        except (TypeError, ValueError):
+            return Response({"error": "provisional_id must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             provisional = reject_provisional_attendance(
                 manager_user=request.user,
-                provisional_id=int(provisional_id),
+                provisional_id=provisional_id,
                 reason=reason,
             )
             return Response({
@@ -1163,8 +1186,10 @@ class ManagerRejectAttendanceView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except (DjangoValidationError, ValidationError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except ObjectDoesNotExist:
+            return Response({"error": "Provisional attendance not found."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "reject the attendance")
 
 
 class ManagerCreateCorrectionView(APIView):
@@ -1191,9 +1216,14 @@ class ManagerCreateCorrectionView(APIView):
             corrected_dt = timezone.make_aware(corrected_dt, timezone.get_current_timezone())
 
         try:
+            event_id = int(event_id)
+        except (TypeError, ValueError):
+            return Response({"error": "event_id must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
             correction = create_attendance_correction(
                 manager_user=request.user,
-                event_id=int(event_id),
+                event_id=event_id,
                 corrected_timestamp=corrected_dt,
                 reason=reason,
             )
@@ -1208,8 +1238,10 @@ class ManagerCreateCorrectionView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except (DjangoValidationError, ValidationError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except ObjectDoesNotExist:
+            return Response({"error": "Attendance event not found."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return _unexpected_error_response(request, "create the correction")
 
 
 class ManagerSessionTimelineView(APIView):

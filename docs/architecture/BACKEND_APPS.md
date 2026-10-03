@@ -88,6 +88,11 @@ Seams where the kernel reaches into a leaf app (each is a single, reviewed place
   services raise django's `ValidationError`; a view that calls them imports it as `DjangoValidationError` and converts
   it. DRF turns any other exception, django's `ValidationError` included, into an HTTP 500. Query parameters are
   parsed before use, so a malformed value is a 400 as well.
+  An unexpected exception is never echoed to the client: a broad `except Exception` logs it with
+  `logger.exception(...)` (traceback in the logs, no `traceback.print_exc()`) and returns a stable message in the
+  endpoint's usual envelope and status; refusal details go to the log, not into the response (no debug markers).
+  Validation, permission and not-found errors keep their specific, user-correctable messages.
+  `core/test_public_error_surface.py` enforces this.
 * **Tests** live next to the code. The isolated SQLite harnesses (`attendance_tests/`, `worker_finance/tests/`) list
   the apps they need as models-only stub configs (no signals); add a new app there when kernel code imports its models.
   An app has either `tests.py` or a `tests/` package, never both (the package hides the module).

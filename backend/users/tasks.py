@@ -1,5 +1,4 @@
 import logging
-import traceback
 from email.mime.image import MIMEImage
 
 from celery import shared_task
@@ -169,7 +168,6 @@ def send_email_now(
         logger.info("Email sent successfully.")
     except Exception:
         logger.exception("Failed to send email.")
-        traceback.print_exc()
         raise
 
 

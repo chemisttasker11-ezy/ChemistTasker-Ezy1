@@ -1628,12 +1628,17 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
         )
         if not can_view:
             return None
+        from django.core.exceptions import ValidationError as DjangoValidationError
         from shifts.engagement import build_shift_engagement_terms
         try:
             return build_shift_engagement_terms(shift=obj.shift, user=obj.user, offer=obj)
-        except Exception as exc:
+        except (DjangoValidationError, serializers.ValidationError) as exc:
+            # the terms are blocked by a rule the worker or the pharmacy can fix: show which one
             detail = getattr(exc, 'message_dict', None) or getattr(exc, 'detail', None) or str(exc)
             return {'blocked': True, 'error': detail}
+        except Exception:
+            logger.exception("Engagement terms preview failed: offer_id=%s", obj.pk)
+            return {'blocked': True, 'error': 'Engagement terms are unavailable.'}
 
     class Meta:
         model = ShiftOffer

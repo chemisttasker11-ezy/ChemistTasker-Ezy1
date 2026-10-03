@@ -26,8 +26,10 @@ from shifts.models import (
 )
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied as DRFPermissionDenied, ValidationError
 from rest_framework.decorators import action
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, F, Q
 from django.utils import timezone
@@ -56,6 +58,21 @@ from shifts.serializers import (
     SharedShiftSerializer,
     ShiftDescriptionTemplateSerializer,
 )
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _claim_refused(request, shift, reason, detail, code, status_code=status.HTTP_403_FORBIDDEN, **context):
+    """Public response of a refused shift claim: a stable message and code. The internal reason goes to the log."""
+    logger.info(
+        "Shift claim refused: reason=%s user_id=%s shift_id=%s context=%s",
+        reason,
+        getattr(request.user, "id", None),
+        getattr(shift, "id", None),
+        context,
+    )
+    return Response({"detail": detail, "code": code}, status=status_code)
 
 
 class ShiftDescriptionTemplateViewSet(viewsets.ModelViewSet):
@@ -300,14 +317,25 @@ class CommunityShiftViewSet(BaseShiftViewSet):
     def claim_shift(self, request, pk=None):
         """
         Allows a worker to claim an open, unassigned community shift.
-        Deep debug version for permission tracing.
+        A refusal returns a stable `detail` and `code`; the internal reason is logged.
         """
 
         try:
             shift = self.get_object()
-        except Exception as e:
-            import traceback
-            return Response({"detail": f"get_object() failed: {e}"}, status=status.HTTP_403_FORBIDDEN)
+        except (Http404, DRFPermissionDenied, DjangoPermissionDenied):
+            return _claim_refused(
+                request, None, "shift_lookup_refused",
+                "You do not have permission to access this shift.", "shift_not_accessible",
+                shift_pk=pk,
+            )
+        except Exception:
+            logger.exception(
+                "Shift claim lookup failed: user_id=%s shift_pk=%s", getattr(request.user, "id", None), pk
+            )
+            return Response(
+                {"detail": "You do not have permission to access this shift.", "code": "shift_not_accessible"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
 
         user = request.user
@@ -317,9 +345,9 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         # --- 1. Visibility check ---
         is_eligible = self.get_queryset().filter(pk=shift.pk).exists()
         if not is_eligible:
-            return Response(
-                {"detail": "You do not have permission to perform this action. [DBG:NOT_ELIGIBLE_VIS]"},
-                status=status.HTTP_403_FORBIDDEN
+            return _claim_refused(
+                request, shift, "not_eligible_visibility",
+                "You do not have permission to perform this action.", "shift_not_visible",
             )
 
         # --- 2. Membership verification ---
@@ -335,9 +363,9 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         ).exists()
 
         if not is_member_of_pharmacy:
-            return Response(
-                {"detail": "You must be an active member of this pharmacy to claim this shift. [DBG:NOT_MEMBER]"},
-                status=status.HTTP_403_FORBIDDEN
+            return _claim_refused(
+                request, shift, "not_member",
+                "You must be an active member of this pharmacy to claim this shift.", "shift_claim_not_member",
             )
 
         membership = Membership.objects.filter(
@@ -361,9 +389,10 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         if shift.visibility == 'FULL_PART_TIME':
             ok = membership and membership.employment_type in allowed_ftpt
             if not ok:
-                return Response(
-                    {"detail": f"Only full/part-time/casual pharmacy members can claim this shift. [DBG:TIER_MISMATCH emp={getattr(membership,'employment_type',None)}]"},
-                    status=status.HTTP_403_FORBIDDEN
+                return _claim_refused(
+                    request, shift, "tier_mismatch",
+                    "Only full/part-time/casual pharmacy members can claim this shift.", "shift_claim_tier_mismatch",
+                    employment_type=getattr(membership, 'employment_type', None), visibility=shift.visibility,
                 )
         elif shift.visibility == 'LOCUM_CASUAL':
             allowed_for_shift = allowed_locum
@@ -371,31 +400,33 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 allowed_for_shift = allowed_locum | allowed_ftpt
             ok = membership and membership.employment_type in allowed_for_shift
             if not ok:
-                return Response(
-                    {"detail": f"Only eligible pharmacy members can claim this shift. [DBG:TIER_MISMATCH emp={getattr(membership,'employment_type',None)}]"},
-                    status=status.HTTP_403_FORBIDDEN
+                return _claim_refused(
+                    request, shift, "tier_mismatch",
+                    "Only eligible pharmacy members can claim this shift.", "shift_claim_tier_mismatch",
+                    employment_type=getattr(membership, 'employment_type', None), visibility=shift.visibility,
                 )
 
         # --- 4. Role match check ---
         user_role = getattr(user, 'role', None)
         onboarding_role = None
-        # print(f"[CLAIM_DBG] Step 4 - user.top_role={user_role}")
 
         if user_role == 'OTHER_STAFF':
             try:
                 onboarding = OtherStaffOnboarding.objects.get(user=user)
                 onboarding_role = onboarding.role_type
             except OtherStaffOnboarding.DoesNotExist:
-                return Response(
-                    {"detail": "Cannot determine your specific role. Please complete your onboarding. [DBG:NO_OTHERSTAFF_ONBOARDING]"},
-                    status=status.HTTP_403_FORBIDDEN
+                return _claim_refused(
+                    request, shift, "no_otherstaff_onboarding",
+                    "Cannot determine your specific role. Please complete your onboarding.",
+                    "shift_claim_onboarding_incomplete",
                 )
 
         effective_user_role = _normalized_role_code(onboarding_role or user_role)
         if not _user_can_perform_shift_role(user, shift.role_needed):
-            return Response(
-                {"detail": f"This shift requires a {shift.role_needed}, but your role is {effective_user_role}. [DBG:ROLE_MISMATCH]"},
-                status=status.HTTP_403_FORBIDDEN
+            return _claim_refused(
+                request, shift, "role_mismatch",
+                f"This shift requires a {shift.role_needed}, but your role is {effective_user_role}.",
+                "shift_claim_role_mismatch",
             )
 
         # --- 5. Check if shift already taken ---
@@ -463,10 +494,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                         "action_url": build_roster_email_link(shift.created_by, shift.pharmacy),
                     },
                 )
-                # print("[CLAIM_DBG] Step 8 - Notification queued")
-            except Exception as e:
-                # print(f"[CLAIM_DBG] Step 8 - Notification error={e}")
-                pass
+            except Exception:
+                logger.exception("Shift claim notification failed: shift_id=%s", shift.id)
 
 
         return Response({
@@ -1028,6 +1057,9 @@ class ShiftDetailViewSet(BaseShiftViewSet):
             return None
 
         for slot in data.get('slots', []) or []:
+            if not isinstance(slot, dict):
+                results.append({"error": "Invalid slot payload", "rate": "0.00"})
+                continue
             try:
                 slot_date_raw = slot.get('date')
                 start_raw = slot.get('startTime') or slot.get('start_time')
@@ -1038,12 +1070,23 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                     results.append({"error": "Invalid slot payload", "rate": "0.00"})
                     continue
 
-                s_date = dt_cls.strptime(slot_date_raw, '%Y-%m-%d').date()
+                try:
+                    s_date = dt_cls.strptime(slot_date_raw, '%Y-%m-%d').date()
+                except ValueError as exc:
+                    # This is the caller's input error, so the parser message is safe and useful.
+                    results.append({"error": str(exc), "rate": "0.00"})
+                    continue
 
-                rate, meta = calculate_shift_rates(mock_shift, s_date, s_start, s_end)
-                results.append({"rate": str(rate), "meta": meta})
-            except Exception as e:
-                results.append({"error": str(e), "rate": "0.00"})
+                try:
+                    rate, meta = calculate_shift_rates(mock_shift, s_date, s_start, s_end)
+                    results.append({"rate": str(rate), "meta": meta})
+                except Exception:
+                    # Pricing internals (including ValueError details) are never part of the public contract.
+                    logger.exception("Shift rate preview failed for a slot")
+                    results.append({"error": "Unable to calculate the rate for this slot.", "rate": "0.00"})
+            except Exception:
+                logger.exception("Shift rate preview failed while preparing a slot")
+                results.append({"error": "Unable to calculate the rate for this slot.", "rate": "0.00"})
 
         return Response(results)
 
