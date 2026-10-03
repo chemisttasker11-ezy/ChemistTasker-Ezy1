@@ -7,7 +7,8 @@ User = get_user_model()
 from rest_framework import serializers
 from memberships.models import Membership
 from shifts.models import Shift, ShiftSlotAssignment
-from shifts.serializers import ShiftSerializer, ShiftSlotSerializer
+from shifts.serializers import ShiftSlotSerializer
+from shifts.escalation import allowed_tiers
 
 
 # === Rosters ===
@@ -27,7 +28,7 @@ class RosterShiftDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'role_needed', 'pharmacy_name', 'visibility', 'allowed_escalation_levels']
 
     def get_allowed_escalation_levels(self, obj):
-        return ShiftSerializer.build_allowed_tiers(obj.pharmacy)
+        return allowed_tiers(obj.pharmacy)
 
 
 class RosterAssignmentSerializer(serializers.ModelSerializer):

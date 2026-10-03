@@ -13,12 +13,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
-from organizations.access import (
-    CAPABILITY_MANAGE_ROSTER,
-    has_admin_capability,
-    is_any_admin,
-    pharmacies_user_admins,
-)
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from shifts.pricing import get_locked_rate_for_slot
@@ -28,8 +22,8 @@ from shifts.engagement import staff_assignment_defaults
 from datetime import date, datetime
 from django.db import transaction
 from datetime import timedelta
-from users.models import OrganizationMembership, User
-from organizations.access import user_can_manage_pharmacy
+from users.models import User
+from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
 
 
@@ -47,23 +41,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         # may not have been marked is_rostered=True)
         qs = ShiftSlotAssignment.objects.all()
 
-        owned_pharmacies = Pharmacy.objects.none()
-        if hasattr(user, 'owneronboarding'):
-            owned_pharmacies |= Pharmacy.objects.filter(owner=user.owneronboarding)
-
-        org_pharmacies = Pharmacy.objects.none()
-        org_ids = list(
-            OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').values_list('organization', flat=True)
-        )
-        if org_ids:
-            org_pharmacies |= Pharmacy.objects.filter(organization_id__in=org_ids)
-
-        admin_pharmacies = Pharmacy.objects.filter(
-            admin_assignments__user=user,
-            admin_assignments__is_active=True
-        )  # + pharmacies where I'm Pharmacy Admin
-
-        controlled_pharmacies = (owned_pharmacies | org_pharmacies | admin_pharmacies).distinct()
+        controlled_pharmacies = managed_pharmacies_for(user)
         qs = qs.filter(
             shift__pharmacy__in=controlled_pharmacies
         ).select_related('shift__pharmacy', 'slot', 'user').prefetch_related(
@@ -102,23 +80,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         pharmacy_id = request.query_params.get('pharmacy_id')
         target_role = request.query_params.get('role')
 
-        controlled_pharmacies_query = Pharmacy.objects.none()
-        if hasattr(user, 'owneronboarding'):
-            controlled_pharmacies_query |= Pharmacy.objects.filter(owner=user.owneronboarding)
-
-        org_ids = list(
-            OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').values_list('organization', flat=True)
-        )
-        if org_ids:
-            controlled_pharmacies_query |= Pharmacy.objects.filter(organization_id__in=org_ids)
-        if is_any_admin(user):
-            scoped_admin_ids = [
-                pharm.id
-                for pharm in pharmacies_user_admins(user)
-                if has_admin_capability(user, pharm, CAPABILITY_MANAGE_ROSTER)
-            ]
-            if scoped_admin_ids:
-                controlled_pharmacies_query |= Pharmacy.objects.filter(id__in=scoped_admin_ids)
+        controlled_pharmacies_query = managed_pharmacies_for(user)
 
         qs = Membership.objects.filter(
             is_active=True,
@@ -143,22 +105,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # This logic is correct and remains unchanged
-        user = self.request.user
-        controlled_pharmacies = Pharmacy.objects.none()
-        admin_pharmacies = Pharmacy.objects.filter(
-            admin_assignments__user=user,
-            admin_assignments__is_active=True
-        )
-        controlled_pharmacies |= admin_pharmacies
-        if hasattr(user, 'owneronboarding'):
-            controlled_pharmacies |= Pharmacy.objects.filter(owner=user.owneronboarding)
-        org_ids = list(
-            OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').values_list('organization', flat=True)
-        )
-        if org_ids:
-            controlled_pharmacies |= Pharmacy.objects.filter(organization_id__in=org_ids)
-        return Shift.objects.filter(pharmacy__in=controlled_pharmacies)
+        return Shift.objects.filter(pharmacy__in=managed_pharmacies_for(self.request.user))
 
     def update(self, request, *args, **kwargs):
         """
@@ -297,19 +244,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Invalid date or time format. Use YYYY-MM-DD and HH:MM."}, status=status.HTTP_400_BAD_REQUEST)
 
         requesting_user = request.user
-        has_permission = False
-        if hasattr(requesting_user, 'owneronboarding') and pharmacy.owner == requesting_user.owneronboarding:
-            has_permission = True
-        elif OrganizationMembership.objects.filter(
-            user=requesting_user,
-            role='ORG_ADMIN',
-            organization_id=pharmacy.organization_id
-        ).exists():
-            has_permission = True
-        elif has_admin_capability(requesting_user, pharmacy, CAPABILITY_MANAGE_ROSTER):
-            has_permission = True
-
-        if not has_permission:
+        if not managed_pharmacies_for(requesting_user).filter(pk=pharmacy.pk).exists():
             return Response({'detail': 'Permission denied: Not authorized to create shifts for this pharmacy.'}, status=status.HTTP_403_FORBIDDEN)
 
         rate_kwargs = {
@@ -444,19 +379,7 @@ class CreateShiftAndAssignView(APIView):
             return Response({"detail": "Invalid date or time format. Use YYYY-MM-DD and HH:MM."}, status=status.HTTP_400_BAD_REQUEST)
 
         requesting_user = request.user
-        has_permission = False
-        if hasattr(requesting_user, 'owneronboarding') and pharmacy.owner == requesting_user.owneronboarding:
-            has_permission = True
-        elif OrganizationMembership.objects.filter(
-            user=requesting_user,
-            role='ORG_ADMIN',
-            organization_id=pharmacy.organization_id
-        ).exists():
-            has_permission = True
-        elif has_admin_capability(requesting_user, pharmacy, CAPABILITY_MANAGE_ROSTER):
-            has_permission = True
-
-        if not has_permission:
+        if not managed_pharmacies_for(requesting_user).filter(pk=pharmacy.pk).exists():
             return Response({'detail': 'Permission denied: Not authorized to create shifts for this pharmacy.'}, status=status.HTTP_403_FORBIDDEN)
 
         try:
