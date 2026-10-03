@@ -17,57 +17,84 @@ from workforce.timesheet_checks import _latest_revision, effective_open_checks
 from workforce.timesheet_core import _hash
 
 
+def _locked_timesheet_and_period(timesheet):
+    """Lock the period first, then this timesheet, so transitions serialize with period locking.
+
+    The caller must already be inside transaction.atomic().
+    """
+    period = (
+        TimesheetPeriod.objects.select_for_update()
+        .select_related("pharmacy")
+        .get(pk=timesheet.period_id)
+    )
+    locked_timesheet = (
+        Timesheet.objects.select_for_update()
+        .select_related("user", "membership")
+        .get(pk=timesheet.pk)
+    )
+    locked_timesheet.period = period
+    return locked_timesheet, period
+
+
 def submit_timesheet(timesheet, user, revision_number: int):
-    if timesheet.user_id != user.pk:
-        raise PermissionDenied("Workers can only submit their own timesheets.")
-    revision = _latest_revision(timesheet)
-    if not revision or revision.revision_number != int(revision_number):
-        raise ValidationError("Timesheet changed. Refresh before submitting.")
-    if timesheet.needs_rebuild:
-        raise ValidationError("Timesheet needs recalculation before submission.")
-    TimesheetApproval.objects.create(revision=revision, kind=TimesheetApproval.Kind.EMPLOYEE_SUBMIT, actor=user)
-    timesheet.status = Timesheet.Status.SUBMITTED
-    timesheet.save(update_fields=["status", "updated_at"])
-    return revision
+    with transaction.atomic():
+        timesheet, period = _locked_timesheet_and_period(timesheet)
+        if timesheet.user_id != user.pk:
+            raise PermissionDenied("Workers can only submit their own timesheets.")
+        if period.status == TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Locked periods cannot be submitted again.")
+        revision = _latest_revision(timesheet)
+        if not revision or revision.revision_number != int(revision_number):
+            raise ValidationError("Timesheet changed. Refresh before submitting.")
+        if timesheet.needs_rebuild:
+            raise ValidationError("Timesheet needs recalculation before submission.")
+        TimesheetApproval.objects.create(revision=revision, kind=TimesheetApproval.Kind.EMPLOYEE_SUBMIT, actor=user)
+        timesheet.status = Timesheet.Status.SUBMITTED
+        timesheet.save(update_fields=["status", "updated_at"])
+        return revision
 
 
 def approve_timesheet(timesheet, user, revision_number: int, *, reason=""):
-    require_manage_pharmacy(user, timesheet.period.pharmacy)
-    if timesheet.period.status == TimesheetPeriod.Status.LOCKED:
-        raise ValidationError("Locked periods cannot be approved again.")
-    revision = _latest_revision(timesheet)
-    if not revision or revision.revision_number != int(revision_number):
-        raise ValidationError("Timesheet changed. Refresh and review the current revision.")
-    if timesheet.needs_rebuild:
-        raise ValidationError("Timesheet needs recalculation before approval.")
-    blockers = [check for check in effective_open_checks(revision) if check.severity == TimesheetCheck.Severity.BLOCKER]
-    if blockers:
-        raise ValidationError({"code": "TIMESHEET_BLOCKERS", "check_ids": [check.pk for check in blockers]})
-    TimesheetApproval.objects.create(
-        revision=revision,
-        kind=TimesheetApproval.Kind.TIME_APPROVAL,
-        actor=user,
-        reason=(reason or "").strip(),
-    )
-    timesheet.status = Timesheet.Status.APPROVED
-    timesheet.reviewed_minutes = revision.worked_minutes
-    timesheet.save(update_fields=["status", "reviewed_minutes", "updated_at"])
-    return revision
+    with transaction.atomic():
+        timesheet, period = _locked_timesheet_and_period(timesheet)
+        require_manage_pharmacy(user, period.pharmacy)
+        if period.status == TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Locked periods cannot be approved again.")
+        revision = _latest_revision(timesheet)
+        if not revision or revision.revision_number != int(revision_number):
+            raise ValidationError("Timesheet changed. Refresh and review the current revision.")
+        if timesheet.needs_rebuild:
+            raise ValidationError("Timesheet needs recalculation before approval.")
+        blockers = [check for check in effective_open_checks(revision) if check.severity == TimesheetCheck.Severity.BLOCKER]
+        if blockers:
+            raise ValidationError({"code": "TIMESHEET_BLOCKERS", "check_ids": [check.pk for check in blockers]})
+        TimesheetApproval.objects.create(
+            revision=revision,
+            kind=TimesheetApproval.Kind.TIME_APPROVAL,
+            actor=user,
+            reason=(reason or "").strip(),
+        )
+        timesheet.status = Timesheet.Status.APPROVED
+        timesheet.reviewed_minutes = revision.worked_minutes
+        timesheet.save(update_fields=["status", "reviewed_minutes", "updated_at"])
+        return revision
 
 
 def reopen_timesheet(timesheet, user, reason: str):
-    require_manage_pharmacy(user, timesheet.period.pharmacy)
-    if timesheet.period.status == TimesheetPeriod.Status.LOCKED:
-        raise ValidationError("Locked periods require a later adjustment workflow; they cannot be reopened in place.")
-    revision = _latest_revision(timesheet)
-    if not revision:
-        raise ValidationError("Timesheet has no revision to reopen.")
-    if not (reason or "").strip():
-        raise ValidationError("A reason is required to reopen a timesheet.")
-    TimesheetApproval.objects.create(revision=revision, kind=TimesheetApproval.Kind.REOPEN, actor=user, reason=reason.strip())
-    timesheet.status = Timesheet.Status.REOPENED
-    timesheet.save(update_fields=["status", "updated_at"])
-    return revision
+    with transaction.atomic():
+        timesheet, period = _locked_timesheet_and_period(timesheet)
+        require_manage_pharmacy(user, period.pharmacy)
+        if period.status == TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Locked periods require a later adjustment workflow; they cannot be reopened in place.")
+        revision = _latest_revision(timesheet)
+        if not revision:
+            raise ValidationError("Timesheet has no revision to reopen.")
+        if not (reason or "").strip():
+            raise ValidationError("A reason is required to reopen a timesheet.")
+        TimesheetApproval.objects.create(revision=revision, kind=TimesheetApproval.Kind.REOPEN, actor=user, reason=reason.strip())
+        timesheet.status = Timesheet.Status.REOPENED
+        timesheet.save(update_fields=["status", "updated_at"])
+        return revision
 
 
 def decide_check(check, user, decision: str, reason: str):
