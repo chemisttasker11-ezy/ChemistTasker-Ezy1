@@ -1,4 +1,5 @@
 """Serializer/file lifecycle helpers shared across backend application layers."""
+from django.core.files.storage import default_storage
 from rest_framework import serializers
 
 from chat.models import Message
@@ -81,7 +82,12 @@ def _delete_file_if_unreferenced(file_field, *, current_instance=None):
             return False
 
     try:
-        file_field.delete(save=False)
+        # Delete the storage object, not the bound FieldFile. FieldFile.delete()
+        # also writes None back onto its model instance; when callers have just
+        # saved a replacement file that would erase the new in-memory pointer
+        # and can suppress follow-up work such as verification dispatch.
+        storage = getattr(file_field, "storage", None) or default_storage
+        storage.delete(name)
         return True
     except Exception:
         return False
