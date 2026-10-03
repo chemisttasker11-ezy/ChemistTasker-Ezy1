@@ -444,7 +444,7 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
             # Check if the response from ScrapingBee itself is an error
             if response.status_code >= 400:
                 # This is a ScrapingBee error (e.g., 500, 403)
-                logger.info(f"[ahpra_lookup] ScrapingBee returned an error status: {response.status_code}. Content: {response.text[:200]}")
+                logger.warning("[ahpra_lookup] ScrapingBee returned error status=%s", response.status_code)
                 # If it's the last attempt, raise an exception to be caught by the task
                 if attempt == max_retries - 1:
                     raise Exception(f"An Error occured in during the verification of your AHPRA details")
@@ -459,11 +459,11 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
             logger.info(f"[ahpra_lookup] ScrapingBee request successful.")
             return output_html_path
 
-        except Exception as e:
-            logger.info(f"[ahpra_lookup] An exception occurred on attempt {attempt + 1}: {e}")
+        except Exception as exc:
+            logger.warning("[ahpra_lookup] attempt=%s/%s failed error_type=%s", attempt + 1, max_retries, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
             if attempt == max_retries - 1:
                 # If this was the last retry, re-raise the exception so the task fails gracefully
-                raise e
+                raise
             time.sleep(3 * (attempt + 1)) # Wait before retrying
 
 def parse_ahpra_html(html_file_path):
