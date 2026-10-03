@@ -76,7 +76,7 @@
     "@vitejs/plugin-vue-jsx": "^5.1.5",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
-    "eslint": "^9.22.0",
+    "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
