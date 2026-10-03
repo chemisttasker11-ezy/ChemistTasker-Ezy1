@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connection, transaction
 from django.test import TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from client_profile.models import (
@@ -21,6 +22,9 @@ from client_profile.models import (
 from invoicing.models import Invoice, InvoiceLineItem
 from client_profile.domains.memberships.serializers import MembershipApplicationSerializer
 from invoicing.services import generate_invoice_from_shifts
+from memberships.invites import create_membership_invite
+from memberships.models import Membership
+from rest_framework.test import APIClient
 
 
 User = get_user_model()
@@ -99,6 +103,84 @@ class MembershipApplicationPostgresConcurrencyTests(TransactionTestCase):
             ).count(),
             1,
         )
+
+
+@POSTGRES_ONLY
+class MembershipLimitPostgresLockingTests(TransactionTestCase):
+    reset_sequences = True
+
+    def setUp(self):
+        self.worker = User.objects.create_user(
+            email="pg-membership-worker@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        self.owner = User.objects.create_user(
+            email="pg-membership-owner@example.com",
+            password="test-pass",
+            role="OWNER",
+        )
+        self.pharmacies = [Pharmacy.objects.create(name=f"PG Membership {index}") for index in range(4)]
+        for pharmacy in self.pharmacies[:2]:
+            Membership.objects.create(
+                user=self.worker,
+                pharmacy=pharmacy,
+                role="PHARMACIST",
+                employment_type="LOCUM",
+                status=Membership.Status.ACCEPTED,
+                is_active=True,
+            )
+        self.pending = Membership.objects.create(
+            user=self.worker,
+            pharmacy=self.pharmacies[2],
+            role="PHARMACIST",
+            employment_type="LOCUM",
+            status=Membership.Status.PENDING,
+            is_active=False,
+        )
+
+    def _for_update_positions(self, queries, table_name):
+        return [
+            index
+            for index, query in enumerate(queries)
+            if "FOR UPDATE" in query["sql"].upper() and table_name in query["sql"]
+        ]
+
+    def test_worker_accept_locks_user_and_membership_before_enforcing_limit(self):
+        client = APIClient()
+        client.force_authenticate(self.worker)
+        with CaptureQueriesContext(connection) as captured:
+            response = client.post(
+                f"/api/client-profile/my-memberships/{self.pending.pk}/accept/",
+                {},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200, response.data)
+        queries = list(captured.captured_queries)
+        user_locks = self._for_update_positions(queries, User._meta.db_table)
+        membership_locks = self._for_update_positions(queries, Membership._meta.db_table)
+        self.assertTrue(user_locks, "accept must lock the worker row to serialize the cross-pharmacy membership cap")
+        self.assertTrue(membership_locks, "accept must lock the pending membership before changing its state")
+        self.assertLess(user_locks[0], membership_locks[0], "lock order must be user then membership")
+
+    def test_immediate_invite_locks_existing_user_before_counting_active_memberships(self):
+        with CaptureQueriesContext(connection) as captured:
+            membership, error = create_membership_invite(
+                {
+                    "email": self.worker.email,
+                    "pharmacy": self.pharmacies[3].pk,
+                    "role": "PHARMACIST",
+                    "employment_type": "LOCUM",
+                    "activate_immediately": True,
+                },
+                inviter=self.owner,
+            )
+        self.assertIsNone(error)
+        self.assertIsNotNone(membership)
+        queries = list(captured.captured_queries)
+        user_locks = self._for_update_positions(queries, User._meta.db_table)
+        self.assertTrue(user_locks, "invite activation must share the worker-row lock used by self-acceptance")
+
 
 
 @POSTGRES_ONLY
