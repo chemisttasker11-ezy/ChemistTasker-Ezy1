@@ -102,6 +102,50 @@ class MembershipApplicationPostgresConcurrencyTests(TransactionTestCase):
 
 
 @POSTGRES_ONLY
+class TimesheetTransitionPostgresLockingTests(TransactionTestCase):
+    reset_sequences = True
+
+    def test_submit_locks_only_timesheet_with_nullable_membership(self):
+        worker = User.objects.create_user(
+            email="pg-timesheet-worker@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        owner = User.objects.create_user(
+            email="pg-timesheet-owner@example.com",
+            password="test-pass",
+            role="OWNER",
+        )
+        pharmacy = Pharmacy.objects.create(name="PG Timesheet Pharmacy")
+        period = TimesheetPeriod.objects.create(
+            pharmacy=pharmacy,
+            start_date=date(2026, 10, 5),
+            end_date=date(2026, 10, 11),
+            created_by=owner,
+        )
+        timesheet = Timesheet.objects.create(
+            period=period,
+            user=worker,
+            membership=None,
+            status=Timesheet.Status.READY,
+            needs_rebuild=False,
+        )
+        TimesheetRevision.objects.create(
+            timesheet=timesheet,
+            revision_number=1,
+            source_fingerprint="pg-lock-test",
+            snapshot={},
+        )
+
+        revision = submit_timesheet(timesheet, worker, 1)
+
+        self.assertEqual(revision.revision_number, 1)
+        timesheet.refresh_from_db()
+        self.assertEqual(timesheet.status, Timesheet.Status.SUBMITTED)
+
+
+
+@POSTGRES_ONLY
 class InvoicePostgresConcurrencyTests(TransactionTestCase):
     reset_sequences = True
 
