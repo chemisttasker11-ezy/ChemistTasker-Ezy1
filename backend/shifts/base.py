@@ -61,6 +61,12 @@ from shifts.escalation import (  # noqa: F401  (COMMUNITY_LEVELS, PUBLIC_LEVEL, 
     auto_escalate_due_shifts,
     resolve_current_index,
 )
+from shifts.assignment import (  # noqa: F401  (OFFER_EXPIRY_HOURS, _slot_locked_for_shift_offer: historical import path)
+    OFFER_EXPIRY_HOURS,
+    offer_shift,
+    roster_direct_staff,
+    slot_locked_for_shift_offer as _slot_locked_for_shift_offer,
+)
 from shifts.candidates import _log_shift_profile_access, member_status, reveal_candidate  # noqa: F401  (_log_shift_profile_access: historical import path)
 from shifts.interest import express_interest, is_public_shift_member_access, reject_shift
 from shifts.limits import enforce_public_shift_daily_limit
@@ -91,9 +97,6 @@ from shifts.serializers import (
 
 
 SHIFT_OFFER_BUZZ_COOLDOWN = timedelta(hours=1)
-
-
-OFFER_EXPIRY_HOURS = 48
 
 
 class BaseShiftViewSet(viewsets.ModelViewSet):
@@ -260,114 +263,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        # For multi-slot shifts, auto-pick when possible (prefer unassigned)
-        if not shift.single_user_only and slot_id is None:
-            slots_qs = shift.slots.all()
-            if slots_qs.count() == 1:
-                slot_id = slots_qs.first().id
-            else:
-                unassigned_ids = [
-                    s.id for s in slots_qs
-                    if not ShiftSlotAssignment.objects.filter(slot=s).exists()
-                ]
-                if len(unassigned_ids) == 1:
-                    slot_id = unassigned_ids[0]
-                elif unassigned_ids:
-                    slot_id = unassigned_ids[0]
-
-        # For multi-slot shifts, prefer an explicit slot_id; if still None after auto-pick, raise.
-        if not shift.single_user_only and slot_id is None:
-            return Response(
-                {'detail': 'slot_id is required for multi-slot shifts.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        slot_obj = None
-        if not shift.single_user_only and slot_id is not None:
-            slot_obj = get_object_or_404(shift.slots, pk=slot_id)
-            if _slot_locked_for_shift_offer(shift=shift, slot=slot_obj):
-                return Response({'detail': 'This slot is already locked or awaiting payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        elif shift.single_user_only:
-            locked_slot = next(
-                (slot for slot in shift.slots.all() if _slot_locked_for_shift_offer(shift=shift, slot=slot)),
-                None,
-            )
-            if locked_slot:
-                return Response({'detail': 'This shift is already locked or awaiting payment.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        now = timezone.now()
-        existing_offer = ShiftOffer.objects.filter(
-            shift=shift,
-            user=candidate,
-            slot=slot_obj,
-            status=ShiftOffer.Status.PENDING,
-        ).first()
-        if existing_offer and existing_offer.expires_at and existing_offer.expires_at <= now:
-            existing_offer.status = ShiftOffer.Status.EXPIRED
-            existing_offer.save(update_fields=["status", "updated_at"])
-            existing_offer = None
-
-        offered_slot_date = slot_obj.date if slot_obj else None
-        offered_start_time = slot_obj.start_time if slot_obj else None
-        offered_end_time = slot_obj.end_time if slot_obj else None
-        offered_rate = slot_obj.rate if slot_obj else (shift.fixed_rate or shift.max_hourly_rate or shift.min_hourly_rate)
-
-        if existing_offer:
-            existing_offer.offered_slot_date = offered_slot_date
-            existing_offer.offered_start_time = offered_start_time
-            existing_offer.offered_end_time = offered_end_time
-            existing_offer.offered_rate = offered_rate
-            existing_offer.save(update_fields=[
-                "offered_slot_date",
-                "offered_start_time",
-                "offered_end_time",
-                "offered_rate",
-                "updated_at",
-            ])
-            return Response({
-                'status': 'Offer is already pending candidate confirmation.',
-                'offer_id': existing_offer.id,
-                'worker_confirmation_required': True,
-            }, status=status.HTTP_200_OK)
-        else:
-            offer = ShiftOffer.objects.create(
-                shift=shift,
-                slot=slot_obj,
-                user=candidate,
-                offered_slot_date=offered_slot_date,
-                offered_start_time=offered_start_time,
-                offered_end_time=offered_end_time,
-                offered_rate=offered_rate,
-                expires_at=now + timedelta(hours=OFFER_EXPIRY_HOURS),
-            )
-
-        if candidate.email:
-            ctx = build_shift_offer_context(shift, offer, recipient=candidate)
-            offer_details = build_offer_shift_details(shift, offer)
-            ctx.update(offer_details)
-            notify_shift_users(
-                [candidate],
-                shift=shift,
-                title="Shift offer received",
-                body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
-                kind="shift_offer_received",
-                payload={"offer_id": offer.id, **offer_details},
-            )
-            async_task(
-                'users.tasks.send_async_email',
-                subject="You have a new shift offer",
-                recipient_list=[candidate.email],
-                template_name="emails/shift_offer.html",
-                context=ctx,
-                text_template="emails/shift_offer.txt",
-                suppress_auto_notification=True,
-            )
-
-        return Response({
-            'status': f'Offer sent to {candidate.get_full_name() or candidate.email}.',
-            'offer_id': offer.id,
-        }, status=status.HTTP_200_OK)
-
+        return Response(offer_shift(shift=shift, candidate=candidate, slot_id=slot_id), status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='counter-offers-batch')
     def counter_offers_batch(self, request):
@@ -743,69 +639,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             return Response({"detail": "user_id and assignments list are required."}, status=400)
 
         candidate = get_object_or_404(User, pk=user_id)
-        membership = Membership.objects.filter(user=candidate, pharmacy=shift.pharmacy).first()
+        return Response(roster_direct_staff(shift=shift, candidate=candidate, assignments=assignments), status=200)
 
-        if not membership or membership.employment_type not in ['FULL_TIME', 'PART_TIME', 'CASUAL']:
-            return Response({
-                "detail": (
-                    "Only direct full-time, part-time or casual pharmacy staff can be rostered here. "
-                    "Locum, Shift Hero and external workers must accept a shift offer."
-                )
-            }, status=400)
-
-        assignment_ids = []
-
-        for entry in assignments:
-            slot_id = entry.get('slot_id')
-            slot_date = entry.get('slot_date')
-            # Remove checks for start_time/end_time
-
-            if not slot_id or not slot_date:
-                continue  # Skip invalid
-
-            slot = get_object_or_404(shift.slots, pk=slot_id)
-
-            try:
-                assignment_defaults = staff_assignment_defaults(
-                    user=candidate,
-                    pharmacy=shift.pharmacy,
-                    work_date=slot_date,
-                )
-            except DjangoValidationError as exc:
-                return Response(
-                    getattr(exc, "message_dict", {"detail": exc.messages}),
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            assn, _ = ShiftSlotAssignment.objects.update_or_create(
-                slot=slot,
-                slot_date=slot_date,
-                defaults={
-                    "shift": shift,
-                    "user": candidate,
-                    "unit_rate": Decimal('0.00'),
-                    "rate_reason": {"source": "Rostered manual assign"},
-                    "is_rostered": True,
-                    **assignment_defaults,
-                }
-            )
-            assignment_ids.append(assn.id)
-
-        if assignment_ids:
-            notify_shift_users(
-                [candidate],
-                shift=shift,
-                title="Shift assigned",
-                body=f"You have been assigned {len(assignment_ids)} slot(s) at {shift.pharmacy.name}.",
-                kind="shift_assigned",
-                payload={
-                    "assignment_ids": assignment_ids,
-                },
-            )
-
-        return Response({
-            "detail": f"{len(assignment_ids)} slot(s) rostered for {candidate.get_full_name()}",
-            "assignment_ids": assignment_ids
-        }, status=200)
 
 
 def _future_or_current_slot_q(now, today):
@@ -876,27 +711,3 @@ def _matching_shift_slot_exists(*, now, today, assigned_user_id=None, state='act
 def _shift_has_past_slot_exists(*, now, today):
     slots = ShiftSlot.objects.filter(shift_id=OuterRef('pk')).filter(_past_slot_q(now, today))
     return Exists(slots)
-
-
-def _slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None):
-    if not slot:
-        return False
-    target_date = slot_date or getattr(slot, "date", None)
-    assignment_qs = ShiftSlotAssignment.objects.filter(shift=shift, slot=slot)
-    if target_date:
-        assignment_qs = assignment_qs.filter(slot_date=target_date)
-    if assignment_qs.exists():
-        return True
-    pending_qs = ShiftOffer.objects.filter(
-        shift=shift,
-        slot=slot,
-        status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-    )
-    if ignore_user is not None:
-        ignore_user_id = getattr(ignore_user, "id", ignore_user)
-        pending_qs = pending_qs.exclude(user_id=ignore_user_id)
-    if target_date:
-        pending_qs = pending_qs.filter(
-            Q(offered_slot_date=target_date) | Q(offered_slot_date__isnull=True)
-        )
-    return pending_qs.exists()
