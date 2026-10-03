@@ -29,6 +29,7 @@ from datetime import date, datetime
 from django.db import transaction
 from datetime import timedelta
 from users.models import OrganizationMembership, User
+from organizations.access import user_can_manage_pharmacy
 from shifts.base import BaseShiftViewSet, PUBLIC_LEVEL
 
 
@@ -377,7 +378,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         """
         shift = self.get_object()
 
-        if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)

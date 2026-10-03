@@ -328,8 +328,9 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def _managed_pharmacies(self, user):
         # Local import avoids a module import cycle while reusing the same
         # pharmacy object-level authorization boundary as roster/shift tools.
-        from shifts.base import BaseShiftViewSet
-        return BaseShiftViewSet._managed_pharmacies(user)
+        from organizations.access import managed_pharmacies as managed_pharmacies_for
+
+        return managed_pharmacies_for(user)
 
     def queryset(self, request):
         managed = self._managed_pharmacies(request.user)

@@ -44,6 +44,7 @@ from django.db import transaction
 from decimal import Decimal
 import uuid
 from users.models import OrganizationMembership, User
+from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import (
     _log_shift_profile_access,
     _matching_shift_slot_exists,
@@ -80,7 +81,7 @@ class ShiftDescriptionTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        managed = BaseShiftViewSet._managed_pharmacies(self.request.user)
+        managed = managed_pharmacies_for(self.request.user)
         qs = ShiftDescriptionTemplate.objects.filter(pharmacy__in=managed).select_related(
             'pharmacy',
             'created_by',
@@ -96,7 +97,7 @@ class ShiftDescriptionTemplateViewSet(viewsets.ModelViewSet):
 
     def _get_pharmacy(self, pharmacy_id):
         pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
-        if not BaseShiftViewSet._user_can_manage_pharmacy(self.request.user, pharmacy):
+        if not user_can_manage_pharmacy(self.request.user, pharmacy):
             self.permission_denied(self.request)
         return pharmacy
 
@@ -131,7 +132,7 @@ class ShiftDescriptionTemplateViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         pharmacy = serializer.validated_data.get('pharmacy', serializer.instance.pharmacy)
-        if not BaseShiftViewSet._user_can_manage_pharmacy(self.request.user, pharmacy):
+        if not user_can_manage_pharmacy(self.request.user, pharmacy):
             self.permission_denied(self.request)
         serializer.save(updated_by=self.request.user)
 
@@ -656,7 +657,7 @@ class ActiveShiftViewSet(BaseShiftViewSet):
         qs = super().get_queryset()
 
         qs = qs.filter(
-            Q(created_by=user) | Q(pharmacy__in=self._managed_pharmacies(user))
+            Q(created_by=user) | Q(pharmacy__in=managed_pharmacies_for(user))
         )
 
         qs = qs.annotate(
@@ -818,7 +819,7 @@ class ConfirmedShiftViewSet(BaseShiftViewSet):
         qs = super().get_queryset()
 
         qs = qs.filter(
-            Q(created_by=user) | Q(pharmacy__in=self._managed_pharmacies(user))
+            Q(created_by=user) | Q(pharmacy__in=managed_pharmacies_for(user))
         )
         qs = qs.annotate(
             has_confirmed_slot=_matching_shift_slot_exists(
@@ -910,7 +911,7 @@ class HistoryShiftViewSet(BaseShiftViewSet):
         qs = super().get_queryset()
 
         qs = qs.filter(
-            Q(created_by=user) | Q(pharmacy__in=self._managed_pharmacies(user))
+            Q(created_by=user) | Q(pharmacy__in=managed_pharmacies_for(user))
         )
 
         qs = qs.annotate(
@@ -1107,7 +1108,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         combined_filter |= Q(created_by=user)
 
         # 2. Shifts associated with pharmacies owned/managed by the user/their organization
-        managed_pharmacies = BaseShiftViewSet._managed_pharmacies(user)
+        managed_pharmacies = managed_pharmacies_for(user)
         if managed_pharmacies.exists():
             combined_filter |= Q(pharmacy__in=managed_pharmacies)
 

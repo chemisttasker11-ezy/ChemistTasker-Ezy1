@@ -34,7 +34,7 @@ from chat.serializers import (
     MessageSerializer,
     ShiftContactSerializer,
 )
-from shifts.base import BaseShiftViewSet
+from organizations.access import managed_pharmacies as managed_pharmacies_for
 
 
 class ChatMessagePagination(PageNumberPagination):
@@ -118,7 +118,7 @@ class ConversationViewSet(mixins.ListModelMixin,
         contacts = []
         seen = set()
 
-        managed_pharmacies = BaseShiftViewSet._managed_pharmacies(user)
+        managed_pharmacies = managed_pharmacies_for(user)
         managed_ids = list(managed_pharmacies.values_list('id', flat=True))
 
         if managed_ids:

@@ -123,3 +123,72 @@ def _get_org_pharmacies_queryset(user):
         qs = qs | Pharmacy.objects.filter(id__in=scoped_ids)
 
     return qs.distinct()
+
+
+def user_can_manage_pharmacy(user, pharmacy) -> bool:
+    """Who manages a pharmacy's shifts and sees its full details: the owner, an org admin of its organization, a
+    chief/region admin assigned to it, or a pharmacy admin with the roster capability."""
+    if not user or not getattr(user, "is_authenticated", False) or pharmacy is None:
+        return False
+
+    owner = getattr(pharmacy, "owner", None)
+    if owner and getattr(owner, "user", None) == user:
+        return True
+
+    from users.models import OrganizationMembership
+
+    if OrganizationMembership.objects.filter(
+        user=user,
+        role='ORG_ADMIN',
+        organization_id=pharmacy.organization_id,
+    ).exists():
+        return True
+
+    if OrganizationMembership.objects.filter(
+        user=user,
+        role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
+        pharmacies=pharmacy,
+    ).exists():
+        return True
+
+    if has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER):
+        return True
+
+    return False
+
+
+def managed_pharmacies(user):
+    """
+    Pharmacies the user can manage because they own them, are an org admin
+    over them, or hold an active PharmacyAdmin assignment.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return Pharmacy.objects.none()
+
+    from users.models import OrganizationMembership
+
+    pharmacies = Pharmacy.objects.none()
+
+    if hasattr(user, "owneronboarding"):
+        pharmacies |= Pharmacy.objects.filter(owner=user.owneronboarding)
+
+    org_ids = list(
+        OrganizationMembership.objects.filter(user=user, role="ORG_ADMIN").values_list(
+            "organization_id", flat=True
+        )
+    )
+    if org_ids:
+        pharmacies |= Pharmacy.objects.filter(
+            organization_id__in=org_ids
+        )
+
+    if user:
+        managed_admin_pharmacies = [
+            pharm.id
+            for pharm in pharmacies_user_admins(user)
+            if has_admin_capability(user, pharm, CAPABILITY_MANAGE_ROSTER)
+        ]
+        if managed_admin_pharmacies:
+            pharmacies |= Pharmacy.objects.filter(id__in=managed_admin_pharmacies)
+
+    return pharmacies.distinct()

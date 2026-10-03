@@ -36,7 +36,10 @@ from rest_framework.decorators import action
 from organizations.access import (
     CAPABILITY_MANAGE_ROSTER,
     has_admin_capability,
+    managed_pharmacies,
+    managed_pharmacies as managed_pharmacies_for,
     pharmacies_user_admins,
+    user_can_manage_pharmacy,
 )
 from users.serializers import UserProfileSerializer
 from django.shortcuts import get_object_or_404
@@ -156,69 +159,14 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         else:
             pharmacy = self.get_object().pharmacy
 
-        if self._user_can_manage_pharmacy(user, pharmacy):
+        if user_can_manage_pharmacy(user, pharmacy):
             return
 
         self.permission_denied(request)
 
-    @staticmethod
-    def _user_can_manage_pharmacy(user, pharmacy):
-        if pharmacy.owner and getattr(pharmacy.owner, 'user', None) == user:
-            return True
-
-        if OrganizationMembership.objects.filter(
-            user=user,
-            role='ORG_ADMIN',
-            organization_id=pharmacy.organization_id
-        ).exists():
-            return True
-
-        if OrganizationMembership.objects.filter(
-            user=user,
-            role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
-            pharmacies=pharmacy,
-        ).exists():
-            return True
-
-        if has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER):
-            return True
-
-        return False
-
-    @staticmethod
-    def _managed_pharmacies(user):
-        """
-        Pharmacies the user can manage because they own them, are an org admin
-        over them, or hold an active PharmacyAdmin assignment.
-        """
-        if not user or not getattr(user, "is_authenticated", False):
-            return Pharmacy.objects.none()
-
-        pharmacies = Pharmacy.objects.none()
-
-        if hasattr(user, "owneronboarding"):
-            pharmacies |= Pharmacy.objects.filter(owner=user.owneronboarding)
-
-        org_ids = list(
-            OrganizationMembership.objects.filter(user=user, role="ORG_ADMIN").values_list(
-                "organization_id", flat=True
-            )
-        )
-        if org_ids:
-            pharmacies |= Pharmacy.objects.filter(
-                organization_id__in=org_ids
-            )
-
-        if user:
-            managed_admin_pharmacies = [
-                pharm.id
-                for pharm in pharmacies_user_admins(user)
-                if has_admin_capability(user, pharm, CAPABILITY_MANAGE_ROSTER)
-            ]
-            if managed_admin_pharmacies:
-                pharmacies |= Pharmacy.objects.filter(id__in=managed_admin_pharmacies)
-
-        return pharmacies.distinct()
+    # Historical entry points: the rules are owned by organizations.access.
+    _user_can_manage_pharmacy = staticmethod(user_can_manage_pharmacy)
+    _managed_pharmacies = staticmethod(managed_pharmacies)
 
     @staticmethod
     def _worker_role_for_shift(user):
@@ -603,7 +551,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         shift = self.get_object()
         user = request.user
 
-        if not self._user_can_manage_pharmacy(user, shift.pharmacy):
+        if not user_can_manage_pharmacy(user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
@@ -1089,7 +1037,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             offers = visible_counter_offers_for_shift(
                 shift=shift,
                 user=request.user,
-                can_manage_pharmacy=self._user_can_manage_pharmacy(request.user, shift.pharmacy),
+                can_manage_pharmacy=user_can_manage_pharmacy(request.user, shift.pharmacy),
             )
             result[str(shift.id)] = ShiftCounterOfferSerializer(
                 offers,
@@ -1112,7 +1060,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             offers = visible_counter_offers_for_shift(
                 shift=shift,
                 user=request.user,
-                can_manage_pharmacy=self._user_can_manage_pharmacy(request.user, shift.pharmacy),
+                can_manage_pharmacy=user_can_manage_pharmacy(request.user, shift.pharmacy),
             )
             serializer = ShiftCounterOfferSerializer(
                 offers,
@@ -1214,7 +1162,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/accept')
     def accept_counter_offer(self, request, pk=None, offer_id=None):
         shift = self.get_object()
-        if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         offer = get_object_or_404(ShiftCounterOffer, pk=offer_id, shift=shift)
@@ -1375,7 +1323,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/reject')
     def reject_counter_offer(self, request, pk=None, offer_id=None):
         shift = self.get_object()
-        if not self._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         offer = get_object_or_404(ShiftCounterOffer, pk=offer_id, shift=shift)

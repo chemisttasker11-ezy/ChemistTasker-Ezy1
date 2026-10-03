@@ -35,7 +35,7 @@ from rewards.serializers import (
     PillReferralEventSerializer,
     PillRewardRuleSerializer,
 )
-from shifts.base import BaseShiftViewSet
+from organizations.access import user_can_manage_pharmacy
 
 
 class PillRewardsViewSet(viewsets.GenericViewSet):
@@ -119,7 +119,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
         serializer = CreateShiftReferralSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         shift = get_object_or_404(Shift.objects.select_related("pharmacy"), pk=serializer.validated_data["shift_id"])
-        if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             raise PermissionDenied("You do not have permission to create a referral link for this shift.")
         event = create_shift_referral(
             referrer=request.user,
@@ -153,7 +153,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
         if not shift_id:
             raise DRFValidationError({"shift_id": "This field is required."})
         shift = get_object_or_404(Shift.objects.select_related("pharmacy", "pharmacy__owner"), pk=shift_id)
-        if not BaseShiftViewSet._user_can_manage_pharmacy(request.user, shift.pharmacy):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             raise PermissionDenied("You do not have permission to pay for this shift.")
         if shift.payment_status == "PAID":
             return Response({
