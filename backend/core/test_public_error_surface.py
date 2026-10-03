@@ -312,6 +312,22 @@ class EngagementPreviewErrorSurfaceTests(SimpleTestCase):
 
 
 class VerificationNoteErrorSurfaceTests(SimpleTestCase):
+    def test_ahpra_provider_exception_is_redacted_in_logs(self):
+        from client_profile import tasks
+
+        failure = RuntimeError("provider failed https://example.invalid/?api_key=SECRET-KEY")
+        client = mock.Mock()
+        client.get.side_effect = failure
+        with mock.patch.object(tasks, "ScrapingBeeClient", return_value=client), \
+                mock.patch.object(tasks.time, "sleep"), \
+                self.assertLogs("client_profile.tasks", level="WARNING") as logs, \
+                self.assertRaises(RuntimeError):
+            tasks.ahpra_lookup("PHA0001234567", "/tmp/not-written.html", api_key="SECRET-KEY")
+        log_text = " ".join(logs.output)
+        self.assertIn("error_type=RuntimeError", log_text)
+        self.assertNotIn("SECRET-KEY", log_text)
+        self.assertNotIn("api_key=", log_text)
+
     def test_ahpra_lookup_error_is_not_stored_in_the_user_visible_note(self):
         from client_profile import tasks
 
