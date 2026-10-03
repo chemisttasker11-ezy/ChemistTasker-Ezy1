@@ -189,9 +189,9 @@ class IdentityTabTests(TabFixture):
 
 
 class PaymentTabTests(TabFixture):
-    def test_current_behaviour_a_new_abn_keeps_the_old_verification(self):
-        # CURRENT BEHAVIOUR (bug): the "ABN changed" check runs after the new ABN is written to the instance, so it
-        # never fires; a changed ABN keeps abn_verified, the entity confirmation and the old note.
+    def test_a_new_abn_clears_the_old_verification(self):
+        # Regression: the "ABN changed" check ran after the new ABN was written to the instance, so a changed ABN
+        # kept abn_verified, the entity confirmation and the note that belonged to the old ABN.
         for label in ("pharmacist", "otherstaff"):
             with self.subTest(role=label):
                 user, obj, url = self.onboarding(label, abn="11111111111", abn_verified=True,
@@ -202,7 +202,11 @@ class PaymentTabTests(TabFixture):
                 self.assertEqual(response.status_code, 200, response.data)
                 obj.refresh_from_db()
                 self.assertEqual((obj.abn, obj.abn_verified, obj.abn_entity_confirmed, obj.abn_verification_note),
-                                 ("51824753556", True, True, "ok"))
+                                 ("51824753556", False, False, ""))
+
+                response, _ = self.patch(user, url, {"tab": "payment", "abn": "51824753556"})
+                obj.refresh_from_db()
+                self.assertEqual(obj.abn_verification_note, "", "re-sending the same ABN is not a change")
 
     def test_abn_confirmation_gst_sync_and_submit(self):
         for label in ("pharmacist", "otherstaff"):

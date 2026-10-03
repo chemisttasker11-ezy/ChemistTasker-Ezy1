@@ -22,6 +22,9 @@ def apply_payment_tab(instance, vdata: dict, submit: bool):
     # normalize pref for logic below
     pref_in = (vdata.get('payment_preference') or instance.payment_preference or '').upper()
 
+    # compare with the stored ABN before the regular writes overwrite it
+    abn_changed = ('abn' in vdata) and (vdata.get('abn') != getattr(instance, 'abn'))
+
     # 1) regular writes
     for f in payment_fields:
         if f in vdata:
@@ -34,7 +37,6 @@ def apply_payment_tab(instance, vdata: dict, submit: bool):
         update_fields.append('tfn_number')
 
     # 3) if ABN changed -> reset verification + confirmation
-    abn_changed = ('abn' in vdata) and (vdata.get('abn') != getattr(instance, 'abn'))
     if abn_changed:
         instance.abn_verified = False
         instance.abn_entity_confirmed = False
