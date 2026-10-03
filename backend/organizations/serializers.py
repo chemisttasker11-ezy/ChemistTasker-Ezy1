@@ -2,10 +2,9 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
-from users.models import OrganizationMembership
 from users.serializers import UserProfileSerializer
 from django.db import transaction
-from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability, user_can_manage_pharmacy
+from organizations.access import user_can_manage_pharmacy
 from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
