@@ -213,7 +213,7 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 2151
+KERNEL_CODE_LINE_CEILING = 1768
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
@@ -276,17 +276,13 @@ KERNEL_DEFINITIONS = {
     "client_profile/models/orgs.py": set(),
     "client_profile/models/shifts.py": set(),
     "client_profile/tasks.py": {
-        "BASE_DIR", "ENV_PATH", "OUTPUT_DIR", "REFEREE_REMINDER_HOURS", "REMINDER_FUNC", "User",
-        "_final_evaluation_reminder_key", "_frontend_base_url", "_manage_detail_url_for_role",
-        "_manage_path_for_role", "_marker_delete", "_marker_get", "_marker_set", "_referee_reminder_key", "_rem_args",
-        "_reminder_redis", "_update_ahpra_fields", "ahpra_lookup", "azure_ocr", "cancel_all_referee_reminders",
+        "REFEREE_REMINDER_HOURS", "REMINDER_FUNC", "User", "_final_evaluation_reminder_key", "_frontend_base_url",
+        "_manage_detail_url_for_role", "_manage_path_for_role", "_marker_delete", "_marker_get", "_marker_set",
+        "_referee_reminder_key", "_rem_args", "_reminder_redis", "cancel_all_referee_reminders",
         "cancel_referee_reminder", "email_membership_application_approved", "email_membership_application_rejected",
-        "email_membership_application_review_updated", "email_membership_application_submitted", "env",
-        "fetch_instance_with_retries", "final_evaluation", "get_local_file_or_download", "is_pdf_file", "logger",
-        "mark_notification_sent", "notification_already_sent", "ocr_input_path_for_file", "parse_ahpra_html",
-        "pdf_first_page_to_png", "run_all_verifications", "run_referee_reminder", "save_output_file",
-        "schedule_referee_reminder", "send_shift_reminders", "verify_abn_task", "verify_ahpra_task",
-        "verify_filefield_task",
+        "email_membership_application_review_updated", "email_membership_application_submitted", "final_evaluation",
+        "logger", "mark_notification_sent", "notification_already_sent", "run_all_verifications",
+        "run_referee_reminder", "schedule_referee_reminder", "send_shift_reminders",
     },
     "client_profile/timezone_utils.py": set(),
     "client_profile/urls.py": {"router", "urlpatterns"},

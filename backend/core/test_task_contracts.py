@@ -121,6 +121,27 @@ class TaskIdentityContractTests(SimpleTestCase):
             functions.setdefault(app.tasks[name].run, []).append(name)
         self.assertTrue(all(len(names) == 1 for names in functions.values()))
 
+    def test_no_task_name_is_declared_twice_in_shipped_code(self):
+        # Celery keeps the last registration under a name silently; a compatibility wrapper registered under a
+        # canonical task's name would replace it depending on import order.
+        import ast as ast_module
+
+        from core.test_backend_ownership_boundaries import runtime_files
+
+        declared = {}
+        for rel, _path, tree in runtime_files():
+            for node in ast_module.walk(tree):
+                if not isinstance(node, (ast_module.FunctionDef, ast_module.AsyncFunctionDef)):
+                    continue
+                for decorator in node.decorator_list:
+                    if not isinstance(decorator, ast_module.Call):
+                        continue
+                    for keyword in decorator.keywords:
+                        if keyword.arg == "name" and isinstance(keyword.value, ast_module.Constant):
+                            declared.setdefault(keyword.value.value, []).append(f"{rel}:{node.lineno}")
+        self.assertTrue(set(LEGACY_TASKS) <= set(declared))
+        self.assertEqual({name: where for name, where in declared.items() if len(where) > 1}, {})
+
     def test_signatures_are_unchanged(self):
         for name, (signature, *_queues) in LEGACY_TASKS.items():
             self.assertEqual(str(inspect.signature(task(name).run)), signature, name)

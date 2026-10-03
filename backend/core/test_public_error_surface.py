@@ -313,14 +313,14 @@ class EngagementPreviewErrorSurfaceTests(SimpleTestCase):
 
 class VerificationNoteErrorSurfaceTests(SimpleTestCase):
     def test_ahpra_provider_exception_is_redacted_in_logs(self):
-        from client_profile import tasks
+        from onboarding.verification import ahpra as tasks  # owner of the AHPRA lookup
 
         failure = RuntimeError("provider failed https://example.invalid/?api_key=SECRET-KEY")
         client = mock.Mock()
         client.get.side_effect = failure
         with mock.patch.object(tasks, "ScrapingBeeClient", return_value=client), \
                 mock.patch.object(tasks.time, "sleep"), \
-                self.assertLogs("client_profile.tasks", level="WARNING") as logs, \
+                self.assertLogs("onboarding.verification.ahpra", level="WARNING") as logs, \
                 self.assertRaises(RuntimeError):
             tasks.ahpra_lookup("PHA0001234567", "/tmp/not-written.html", api_key="SECRET-KEY")
         log_text = " ".join(logs.output)
@@ -329,7 +329,7 @@ class VerificationNoteErrorSurfaceTests(SimpleTestCase):
         self.assertNotIn("api_key=", log_text)
 
     def test_ahpra_lookup_error_is_not_stored_in_the_user_visible_note(self):
-        from client_profile import tasks
+        from onboarding import tasks  # owner of the verify_ahpra_task implementation
 
         target = SimpleNamespace(ahpra_number="", ahpra_verification_note="", save=lambda **kwargs: None)
         failure = Exception("HTTPSConnectionPool: Max retries exceeded with url: /api/v1/?api_key=SECRET-KEY&url=x")
@@ -337,7 +337,7 @@ class VerificationNoteErrorSurfaceTests(SimpleTestCase):
                 mock.patch.object(tasks, "save_output_file", return_value="/tmp/ahpra.html"), \
                 mock.patch.object(tasks, "ahpra_lookup", side_effect=failure), \
                 mock.patch.object(tasks, "_update_ahpra_fields") as update, \
-                self.assertLogs("client_profile.tasks", level="ERROR") as logs:
+                self.assertLogs("onboarding.tasks", level="ERROR") as logs:
             tasks.verify_ahpra_task("PharmacistOnboarding", 1, "1234567", "Ann", "Lee", "ann@example.com")
         update.assert_called_once()
         note = update.call_args.args[3]
