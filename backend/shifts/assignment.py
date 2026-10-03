@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -220,3 +221,64 @@ def slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None
             Q(offered_slot_date=target_date) | Q(offered_slot_date__isnull=True)
         )
     return pending_qs.exists()
+
+
+def offer_dedicated_shift(shift, dedicated_user):
+    """A shift posted for one worker: offer them the whole shift (single-user or slotless) or each slot, and after
+    commit send one offer e-mail with its notification."""
+    offers = []
+    now = timezone.now()
+    if shift.single_user_only or not shift.slots.exists():
+        offers.append(ShiftOffer.objects.create(
+            shift=shift,
+            slot=None,
+            user=dedicated_user,
+            offered_slot_date=None,
+            offered_start_time=None,
+            offered_end_time=None,
+            offered_rate=shift.fixed_rate or shift.max_hourly_rate or shift.min_hourly_rate,
+            expires_at=now + timedelta(hours=OFFER_EXPIRY_HOURS),
+        ))
+    else:
+        for slot in shift.slots.all():
+            offers.append(ShiftOffer.objects.create(
+                shift=shift,
+                slot=slot,
+                user=dedicated_user,
+                offered_slot_date=slot.date,
+                offered_start_time=slot.start_time,
+                offered_end_time=slot.end_time,
+                offered_rate=slot.rate,
+                expires_at=now + timedelta(hours=OFFER_EXPIRY_HOURS),
+            ))
+
+    if offers and dedicated_user.email:
+        offer_for_email = offers[0]
+        def _send_offer_email():
+            ctx = build_shift_offer_context(
+                shift,
+                offer_for_email,
+                recipient=dedicated_user,
+                ignore_slot_filter=True,
+            )
+            offer_details = build_offer_shift_details(shift, offer_for_email)
+            ctx.update(offer_details)
+            notify_shift_users(
+                [dedicated_user],
+                shift=shift,
+                title="Shift offer received",
+                body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
+                kind="shift_offer_received",
+                payload={"offer_id": offer_for_email.id, **offer_details},
+            )
+            async_task(
+                'users.tasks.send_async_email',
+                subject="You have a new shift offer",
+                recipient_list=[dedicated_user.email],
+                template_name="emails/shift_offer.html",
+                context=ctx,
+                text_template="emails/shift_offer.txt",
+                suppress_auto_notification=True,
+            )
+
+        transaction.on_commit(_send_offer_email)
