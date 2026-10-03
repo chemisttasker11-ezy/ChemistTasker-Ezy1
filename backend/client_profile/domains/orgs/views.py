@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.db.models import Q
 from django.utils import timezone
-from client_profile.domains.common.labels import membership_role_label
+from memberships.labels import membership_role_label
 from django.conf import settings
 from core.task_queue import async_task
 from client_profile.tasks import _parse_abn_html_fields, abn_lookup

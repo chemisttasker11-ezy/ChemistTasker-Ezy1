@@ -16,14 +16,6 @@ from .domains.dashboards.views import (
     OwnerDashboard,
     PharmacistDashboard,
 )
-from .domains.memberships.views import (
-    MagicLinkInfoView,
-    MembershipApplicationViewSet,
-    MembershipInviteLinkViewSet,
-    MembershipViewSet,
-    MyMembershipsViewSet,
-    SubmitMembershipApplication,
-)
 from .domains.orgs.claims import OwnerOnboardingClaim, PharmacyClaimViewSet
 from .domains.orgs.views import (
     ChainViewSet,
@@ -49,12 +41,7 @@ router.register(r'organizations', OrganizationViewSet, basename='organization')
 router.register(r'chains', ChainViewSet, basename='chain')
 router.register(r'pharmacies', PharmacyViewSet)
 router.register(r'pharmacy-claims', PharmacyClaimViewSet, basename='pharmacy-claim')
-router.register(r'memberships', MembershipViewSet, basename='membership')
 router.register(r'pharmacy-admins', PharmacyAdminViewSet, basename='pharmacy-admin')
-router.register(r'membership-invite-links', MembershipInviteLinkViewSet, basename='membership-invite-link')
-router.register(r'membership-applications', MembershipApplicationViewSet, basename='membership-application')
-
-router.register(r'my-memberships', MyMembershipsViewSet, basename='my-memberships')
 
 
 urlpatterns = [
@@ -64,8 +51,6 @@ urlpatterns = [
     path('explorer/onboarding/me/', ExplorerOnboardingV2MeView.as_view(), name='explorer-onboarding-me'),
     path('onboarding/submit-reference/<str:token>/', RefereeSubmitResponseView.as_view(), name='submit-referee-response'),
     path('onboarding/referee-reject/<str:token>/', RefereeRejectView.as_view(), name='referee-reject'),
-    path('magic/memberships/<str:token>/', MagicLinkInfoView.as_view(), name='magic-membership-detail'),
-    path('magic/memberships/<str:token>/apply/', SubmitMembershipApplication.as_view(), name='magic-membership-apply'),
     path('organizations/public/<slug:slug>/', PublicOrganizationDetailView.as_view(), name='organization-public-detail'),
     path('dashboard/organization/', OrganizationDashboardView.as_view(), name='organization-dashboard'),
     path('dashboard/organization/<int:organization_pk>/', OrganizationDashboardView.as_view(), name='organization-dashboard-detail'),

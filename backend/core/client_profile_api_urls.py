@@ -20,6 +20,11 @@ from shifts.urls import (
     engagement_router as shift_engagement_router,
     lifecycle_router as shift_lifecycle_router,
 )
+from memberships.urls import (
+    intake_router as membership_intake_router,
+    membership_router,
+    self_router as membership_self_router,
+)
 
 
 router = DefaultRouter()
@@ -32,13 +37,16 @@ for prefix in [
     'chains',
     'pharmacies',
     'pharmacy-claims',
-    'memberships',
-    'pharmacy-admins',
-    'membership-invite-links',
-    'membership-applications',
 ]:
     viewset, basename = kernel[prefix]
     router.register(prefix, viewset, basename=basename)
+
+router.registry.extend(membership_router.registry)
+
+viewset, basename = kernel['pharmacy-admins']
+router.register('pharmacy-admins', viewset, basename=basename)
+
+router.registry.extend(membership_intake_router.registry)
 
 router.registry.extend(shift_discovery_router.registry)
 router.registry.extend(talent_availability_router.registry)
@@ -53,8 +61,7 @@ router.registry.extend(shift_engagement_router.registry)
 router.registry.extend(ratings_router.registry)
 router.registry.extend(chat_rooms_router.registry)
 
-viewset, basename = kernel['my-memberships']
-router.register('my-memberships', viewset, basename=basename)
+router.registry.extend(membership_self_router.registry)
 
 router.registry.extend(chat_messages_router.registry)
 router.registry.extend(notifications_router.registry)
@@ -65,6 +72,7 @@ router.registry.extend(team_calendar_router.registry)
 urlpatterns = [
     path('workforce/', include('workforce.urls')),
     path('', include('client_profile.urls')),
+    path('', include('memberships.urls')),
     path('', include('shifts.urls')),
     path('', include('chat.urls')),
     path('', include('pharmacy_hub.urls')),
