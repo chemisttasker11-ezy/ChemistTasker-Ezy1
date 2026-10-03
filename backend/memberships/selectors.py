@@ -109,51 +109,14 @@ def visible_memberships(user, query_params):
         except (TypeError, ValueError):
             qs = qs.none()
         else:
-            # Allow any org staff OR any pharmacy member whose pharmacy belongs to this org
-            is_org_staff = OrganizationMembership.objects.filter(
-                user=user, organization_id=organization_id_int
-            ).exists()
-            is_org_pharmacy_member = Membership.objects.filter(
-                user=user,
-                is_active=True,
-                status=Membership.Status.ACCEPTED,
-                pharmacy__organization_id=organization_id_int,
-            ).exists()
-            is_org_member = is_org_staff or is_org_pharmacy_member
-
-            if is_org_member:
-                # User is part of this org (staff or pharmacy member); show ALL members of ALL pharmacies in the org.
-                qs = (
-                    Membership.objects.filter(
-                        pharmacy__organization_id=organization_id_int,
-                    )
-                    .filter(
-                        Q(is_active=True, status=Membership.Status.ACCEPTED)
-                        | Q(status=Membership.Status.PENDING)
-                    )
-                    .select_related(
-                        "user",
-                        "invited_by",
-                        "pharmacy",
-                        "pharmacy__owner",
-                        "pharmacy__organization",
-                    )
-                    .prefetch_related(
-                        "pharmacy__chains",
-                        "pharmacy__claims",
-                    )
-                )
+            # Filtering must only narrow the caller's already-authorized
+            # pharmacy set. An ordinary member of one pharmacy in an
+            # organization must not gain visibility of sibling pharmacies just
+            # by supplying the organization query parameter.
+            if visible_pharmacies.filter(organization_id=organization_id_int).exists():
+                qs = qs.filter(pharmacy__organization_id=organization_id_int)
             else:
-                if organization_id_int in full_org_ids:
-                    qs = qs.filter(pharmacy__organization_id=organization_id_int)
-                elif organization_id_int in scoped_org_map:
-                    allowed_ids = scoped_org_map.get(organization_id_int, set())
-                    if allowed_ids:
-                        qs = qs.filter(pharmacy_id__in=allowed_ids)
-                    else:
-                        qs = qs.none()
-                else:
-                    qs = qs.none()
+                qs = qs.none()
 
     return qs.distinct()
 
