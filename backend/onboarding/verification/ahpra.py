@@ -45,7 +45,7 @@ def ahpra_lookup(ahpra_number, output_html_path, api_key=None):
         "window_height": 1200,
     }
 
-    # --- START OF FIX: Add a retry loop ---
+    # retry the provider up to three times with a growing pause
     max_retries = 3
     for attempt in range(max_retries):
         logger.info("[ahpra_lookup] Requesting ScrapingBee (attempt %s/%s)", attempt + 1, max_retries)

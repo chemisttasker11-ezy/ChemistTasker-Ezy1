@@ -16,13 +16,6 @@ logger = logging.getLogger(__name__)
 REFEREE_REMINDER_HOURS: float = float(getattr(settings, "REFEREE_REMINDER_HOURS", 48))
 
 
-REMINDER_FUNC = 'client_profile.tasks.run_referee_reminder'
-
-
-def _rem_args(model_name: str, pk: int, ref_idx: int) -> str:
-    return f"'{model_name}',{pk},{ref_idx}"
-
-
 def _referee_reminder_key(model_name: str, pk: int, ref_idx: int) -> str:
     return f"celery:referee-reminder:{model_name}:{pk}:{ref_idx}"
 

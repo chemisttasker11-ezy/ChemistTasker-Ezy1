@@ -59,12 +59,10 @@ def verify_filefield_task(
     last_name  = last_name  or getattr(obj.user, "last_name", "")  or ""
     email      = email      or getattr(obj.user, "email", "")      or ""
 
-    # --- THIS IS THE FIX ---
     # If a verification note already exists, the task has already run.
     if note_field and getattr(obj, note_field, None):
         logger.info(f"[FILEFIELD TASK] SKIPPING: Verification for pk={object_pk}, field={file_field} already has a result.")
         return # Exit immediately
-    # --- END OF FIX ---
 
     # Reset fields before running
     setattr(obj, verification_field, False)
@@ -171,7 +169,6 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
 def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name, email, **kwargs):
     full_ahpra_number = f"PHA000{ahpra_number}"
     logger.info("[AHPRA TASK] Starting AHPRA lookup model=%s pk=%s", model_name, object_pk)
-    # --- END OF CHANGE ---
 
     Model = apps.get_model("client_profile", model_name)
     obj = fetch_instance_with_retries(Model, object_pk)
@@ -302,7 +299,6 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     signer = TimestampSigner()
     token = signer.sign(f"{model_name}:{pk}:{ref_idx}")
 
-    # ✅ NEW: include role in the querystring
     query = urlencode({
         "candidate_name": obj.user.get_full_name(),
         "position_applied_for": get_candidate_role(obj),
@@ -330,7 +326,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
         },
     )
 
-    # Re-schedule this referee only (keep your dev interval)
+    # Re-schedule this referee only
     _marker_delete(key)
     schedule_referee_reminder(model_name, pk, ref_idx)
 
@@ -338,7 +334,8 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
 @shared_task(name="client_profile.tasks.run_all_verifications", queue="default")
 def run_all_verifications(model_name, object_pk, is_create=False):
     """
-    MODIFIED: This orchestrator now also sends the initial admin notification.
+    Notify the admins once, dispatch the automated verifications for the profile type, send the initial referee
+    requests, and schedule final_evaluation. AHPRA is verified manually, not here.
     """
     from django.apps import apps
     from django.utils import timezone
@@ -364,18 +361,14 @@ def run_all_verifications(model_name, object_pk, is_create=False):
 
     # --- 1. Trigger all automated verification tasks (ABN, AHPRA, Files) ---
     if model_name_lower == 'pharmacistonboarding':
-        # NOTE: AHPRA verification is handled manually to avoid automated scraping.
-        # if obj.ahpra_number:
-        #     async_task('client_profile.tasks.verify_ahpra_task', model_name, object_pk, obj.ahpra_number, user.first_name, user.last_name, user.email, q_options={'timeout': 300})
+        # AHPRA is verified manually (no automated scraping).
         if obj.payment_preference == "ABN" and obj.abn:
             async_task('client_profile.tasks.verify_abn_task', model_name, object_pk, obj.abn, user.first_name, user.last_name, user.email, note_field='abn_verification_note')
         if obj.government_id:
             async_task('client_profile.tasks.verify_filefield_task', model_name, object_pk, 'government_id', user.first_name, user.last_name, user.email, 'gov_id_verified', note_field='gov_id_verification_note')
 
     elif model_name_lower == 'owneronboarding':
-        # NOTE: AHPRA verification is handled manually to avoid automated scraping.
-        # if obj.role == "PHARMACIST" and obj.ahpra_number:
-        #     async_task('client_profile.tasks.verify_ahpra_task', model_name, object_pk, obj.ahpra_number, user.first_name, user.last_name, user.email, q_options={'timeout': 300})
+        # AHPRA is verified manually (no automated scraping).
         pass
 
     elif model_name_lower == 'otherstaffonboarding':
@@ -426,7 +419,8 @@ def run_all_verifications(model_name, object_pk, is_create=False):
 @shared_task(name="client_profile.tasks.final_evaluation", queue="default")
 def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     """
-    REVISED: This task now correctly handles all states and cleans up scheduled tasks.
+    Evaluate the profile's verification state: failed or verified are final (notify once, cancel reminders);
+    otherwise keep one 48-hour future evaluation and, while automated checks run, a bounded 20-second re-check.
     """
     from django.apps import apps
     from django.utils import timezone
@@ -454,7 +448,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
-    # Build required checks (unchanged)
+    # Build required checks
     required_checks = []
     model_name_lower = model_name.lower()
 
@@ -491,7 +485,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     elif model_name_lower == 'exploreronboarding':
         required_checks.append('gov_id')
 
-    # Evaluate checks (unchanged)
+    # Evaluate checks
     has_failed_check, is_pending_check, failure_reasons = False, False, []
     for check in required_checks:
         verified_flag = f"{check}_verified"
@@ -505,7 +499,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
             elif not is_verified and not note:
                 is_pending_check = True
 
-    # Referee requirements (unchanged)
+    # Referee requirements
     referees_needed = model_name_lower in ['pharmacistonboarding', 'otherstaffonboarding', 'exploreronboarding']
     is_pending_referee = False
     if referees_needed:
@@ -516,7 +510,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
             elif not getattr(obj, f"referee{idx}_confirmed", False):
                 is_pending_referee = True
 
-    # Failed state (unchanged)
+    # Failed state
     if has_failed_check:
         logger.info(f"[FINAL EVALUATION] pk={object_pk} has FAILED. Reason(s): {failure_reasons}")
         obj.verified = False
@@ -543,7 +537,6 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     def _has_future_reminder(model_name, object_pk):
         return _marker_get(_final_evaluation_reminder_key(model_name, object_pk))
 
-    # Debug timing: 0.1h (~6 min). Use 48 for production.
     REMINDER_DELAY = timedelta(hours=48)
     # Quick re-check loop for automated checks that are still running. It is bounded: a run re-checks while
     # retry_count <= MAX_QUICK_RECHECK_COUNT; past that only this loop stops. The profile is still pending, so no
@@ -619,7 +612,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         schedule_quick_recheck()
         return
 
-    # Success state (unchanged)
+    # Success state
     logger.info(f"[FINAL EVALUATION] pk={object_pk} has been successfully VERIFIED.")
     obj.verified = True
     obj.save(update_fields=['verified'])
