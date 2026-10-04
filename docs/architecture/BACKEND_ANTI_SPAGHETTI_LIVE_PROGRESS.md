@@ -318,6 +318,7 @@ Clean base: `main` at `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`
 4. Kernel code-line ceiling drops from 625 to 591 and the deleted module's top-level definitions are removed from the ratchet; no unrelated kernel baseline is changed.
 5. G2 does not touch runtime endpoint behavior, serializers actually used by dashboards, model ownership, routes or client contracts.
 6. Fresh exact-head CI/security is still required after moving PR #131.
+7. Senior activation audit found #131 was still stacked on the G1 branch after G1 merged. The PR base has been explicitly retargeted to `main` at `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`; any runs created before that retarget are not merge evidence. This checkpoint commit intentionally triggers a fresh synchronize event on the corrected main-target PR.
 
 ## Beyond E2 — deep review already completed
 
