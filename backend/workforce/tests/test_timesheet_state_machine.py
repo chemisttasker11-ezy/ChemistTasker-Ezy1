@@ -5,6 +5,7 @@ period). The transitions are called through workforce.timesheets, their historic
 """
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
+from unittest import mock
 
 from workforce.models import (
     Timesheet,
@@ -21,6 +22,7 @@ from workforce.timesheets import (
     approve_timesheet,
     build_timesheet,
     decide_check,
+    ensure_period_timesheets,
     lock_period,
     reopen_timesheet,
     submit_timesheet,
@@ -144,3 +146,38 @@ class TimesheetStateMachineTests(TestCase):
         )
         with self.assertRaisesMessage(ValidationError, "cannot be reopened in place"):
             reopen_timesheet(self.timesheet, self.owner, "late fix")
+
+        revision_count = self.timesheet.revisions.count()
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Locked timesheet periods cannot be recalculated in place.",
+        ):
+            build_timesheet(self.timesheet.pk, actor=self.owner)
+        self.timesheet.refresh_from_db()
+        self.assertEqual(self.timesheet.status, Timesheet.Status.APPROVED)
+        self.assertEqual(self.timesheet.revisions.count(), revision_count)
+
+    def test_locked_period_directory_sync_does_not_create_new_timesheets(self):
+        revision = self.built()
+        for timesheet in self.period.timesheets.all():
+            current = build_timesheet(timesheet.pk, actor=self.owner)
+            timesheet.refresh_from_db()
+            approve_timesheet(timesheet, self.owner, current.revision_number)
+        lock_period(self.period, self.owner)
+        self.period.refresh_from_db()
+
+        extra_worker = projection.User.objects.create_user(
+            email="locked-extra-worker@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        with mock.patch(
+            "workforce.timesheet_builder._worker_ids_for_period",
+            return_value=[extra_worker.pk],
+        ):
+            ensure_period_timesheets(self.period)
+
+        self.assertFalse(
+            Timesheet.objects.filter(period=self.period, user=extra_worker).exists(),
+            "a locked manifest must not gain a new timesheet through a read/list synchronization path",
+        )
