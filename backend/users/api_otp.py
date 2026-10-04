@@ -10,9 +10,11 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from organizations.access import admin_assignments_for
 from django.conf import settings
+from django.db import transaction
 from core.task_queue import async_task
 from rest_framework.views import APIView
 from users.tasks import send_async_email
+from users.delivery import deliver_email_best_effort
 from users.utils import get_frontend_onboarding_url, get_frontend_owner_pharmacies_url
 from datetime import timedelta
 from django.utils import timezone
@@ -22,6 +24,94 @@ from users.sessions import _build_authenticated_user_payload, _is_web_client, _s
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+_MOBILE_OTP_STATE_FIELDS = (
+    "first_name",
+    "last_name",
+    "username",
+    "mobile_number",
+    "mobile_otp_code",
+    "mobile_otp_created_at",
+    "is_mobile_verified",
+    "mobile_otp_failed_attempts",
+    "mobile_otp_locked_until",
+)
+
+
+def _snapshot_mobile_otp_state(user):
+    return {field: getattr(user, field) for field in _MOBILE_OTP_STATE_FIELDS}
+
+
+def _restore_failed_mobile_otp_attempt(user_id, *, expected_code, expected_created_at, previous_state):
+    """Restore only the failed attempt that is still current.
+
+    A newer concurrent request may already have replaced the OTP state; in that
+    case this cleanup must not clobber the newer attempt.
+    """
+    with transaction.atomic():
+        current = User.objects.select_for_update().get(pk=user_id)
+        if (
+            current.mobile_otp_code != expected_code
+            or current.mobile_otp_created_at != expected_created_at
+        ):
+            return False
+
+        for field, value in previous_state.items():
+            setattr(current, field, value)
+        current.save(update_fields=sorted(previous_state))
+        return True
+
+
+def _send_mobile_otp_sms(*, user_id, mobile_number, otp_code, action):
+    sms_payload = {
+        "enable_unicode": False,
+        "messages": [
+            {
+                "to": mobile_number,
+                "message": f"Your ChemistTasker verification code is {otp_code}",
+                "sender": settings.MOBILEMESSAGE_SENDER,
+            }
+        ],
+    }
+
+    try:
+        response = requests.post(
+            "https://api.mobilemessage.com.au/v1/messages",
+            json=sms_payload,
+            auth=HTTPBasicAuth(
+                settings.MOBILEMESSAGE_USERNAME,
+                settings.MOBILEMESSAGE_PASSWORD,
+            ),
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        logging.getLogger("users.views").warning(
+            "Mobile OTP %s failed for user %s error_type=%s",
+            action,
+            user_id,
+            type(exc).__name__,
+        )
+        return False
+
+    if response.status_code != 200:
+        # Provider bodies may echo the OTP and mobile number; log status only.
+        logging.getLogger("users.views").warning(
+            "Mobile OTP %s failed for user %s with provider status %s",
+            action,
+            user_id,
+            response.status_code,
+        )
+        return False
+
+    return True
+
+
+def _mobile_otp_delivery_failure_response():
+    return Response(
+        {"error": "Unable to send verification code right now. Please try again later."},
+        status=status.HTTP_502_BAD_GATEWAY,
+    )
 
 
 class VerifyOTPView(APIView):
@@ -75,13 +165,16 @@ class VerifyOTPView(APIView):
             "onboarding_link": onboarding_link,
             "owner_pharmacies_link": get_frontend_owner_pharmacies_url() if user.role == "OWNER" else "",
         }
-        async_task(
+        deliver_email_best_effort(
+            async_task,
             'users.tasks.send_async_email',
             subject="🎉 Welcome to ChemistTasker! Let’s Get You Started 🌟",
             recipient_list=[user.email],
             template_name="emails/welcome_email.html",
             context=ctx,
-            text_template="emails/welcome_email.txt"
+            text_template="emails/welcome_email.txt",
+            event="email_otp_verified",
+            user_id=user.id,
         )
 
         # Web verifies email only, then follows the existing UI flow back to login.
@@ -174,12 +267,15 @@ class ResendOTPView(APIView):
             user.save()
 
             context = {"otp": otp}
-            send_async_email(
+            deliver_email_best_effort(
+                send_async_email,
                 subject="Your ChemistTasker Verification Code",
                 recipient_list=[user.email],
                 template_name="emails/otp_email.html",
                 context=context,
                 text_template="emails/otp_email.txt",
+                event="email_otp_resend",
+                user_id=user.id,
             )
 
         return Response(
@@ -207,6 +303,7 @@ class RequestMobileOTPView(APIView):
         if not normalized or not normalized.startswith("61"):
             return Response({"error": "Invalid Australian mobile number format"}, status=status.HTTP_400_BAD_REQUEST)
 
+        previous_state = _snapshot_mobile_otp_state(user)
         changed_identity_fields, identity_error = _capture_mobile_identity(user, request.data)
         if identity_error is not None:
             return identity_error
@@ -231,11 +328,12 @@ class RequestMobileOTPView(APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        # Persist to user
         otp_code = generate_otp()
+        otp_hash = _hash_otp(otp_code)
+        generated_at = timezone.now()
         user.mobile_number = normalized
-        user.mobile_otp_code = _hash_otp(otp_code)
-        user.mobile_otp_created_at = timezone.now()
+        user.mobile_otp_code = otp_hash
+        user.mobile_otp_created_at = generated_at
         user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
         update_fields = [
@@ -261,36 +359,20 @@ class RequestMobileOTPView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        # Send SMS
-        sms_payload = {
-            "enable_unicode": False,
-            "messages": [
-                {
-                    "to": normalized,
-                    "message": f"Your ChemistTasker verification code is {otp_code}",
-                    "sender": settings.MOBILEMESSAGE_SENDER,
-                }
-            ]
-        }
-
-        resp = requests.post(
-            "https://api.mobilemessage.com.au/v1/messages",
-            json=sms_payload,
-            auth=HTTPBasicAuth(settings.MOBILEMESSAGE_USERNAME, settings.MOBILEMESSAGE_PASSWORD),
-            timeout=20,
+        delivered = _send_mobile_otp_sms(
+            user_id=user.id,
+            mobile_number=normalized,
+            otp_code=otp_code,
+            action="send",
         )
-
-        if resp.status_code != 200:
-            # The provider's body can echo the message (with the code) and the number: log the status only.
-            logging.getLogger("users.views").warning(
-                "Mobile OTP send failed for user %s with provider status %s",
+        if not delivered:
+            _restore_failed_mobile_otp_attempt(
                 user.id,
-                resp.status_code,
+                expected_code=otp_hash,
+                expected_created_at=generated_at,
+                previous_state=previous_state,
             )
-            return Response(
-                {"error": "Unable to send verification code right now. Please try again later."},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+            return _mobile_otp_delivery_failure_response()
 
         return Response({"detail": "OTP sent successfully"}, status=status.HTTP_200_OK)
 
@@ -377,10 +459,12 @@ class ResendMobileOTPView(APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        # Generate new OTP, invalidate old one
+        previous_state = _snapshot_mobile_otp_state(user)
         otp_code = generate_otp()
-        user.mobile_otp_code = _hash_otp(otp_code)
-        user.mobile_otp_created_at = timezone.now()
+        otp_hash = _hash_otp(otp_code)
+        generated_at = timezone.now()
+        user.mobile_otp_code = otp_hash
+        user.mobile_otp_created_at = generated_at
         user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
         user.save(update_fields=[
@@ -402,35 +486,19 @@ class ResendMobileOTPView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        # Send SMS
-        sms_payload = {
-            "enable_unicode": False,
-            "messages": [
-                {
-                    "to": user.mobile_number,
-                    "message": f"Your ChemistTasker verification code is {otp_code}",
-                    "sender": settings.MOBILEMESSAGE_SENDER,
-                }
-            ]
-        }
-
-        resp = requests.post(
-            "https://api.mobilemessage.com.au/v1/messages",
-            json=sms_payload,
-            auth=HTTPBasicAuth(settings.MOBILEMESSAGE_USERNAME, settings.MOBILEMESSAGE_PASSWORD),
-            timeout=20,
+        delivered = _send_mobile_otp_sms(
+            user_id=user.id,
+            mobile_number=user.mobile_number,
+            otp_code=otp_code,
+            action="resend",
         )
-
-        if resp.status_code != 200:
-            # The provider's body can echo the message (with the code) and the number: log the status only.
-            logging.getLogger("users.views").warning(
-                "Mobile OTP resend failed for user %s with provider status %s",
+        if not delivered:
+            _restore_failed_mobile_otp_attempt(
                 user.id,
-                resp.status_code,
+                expected_code=otp_hash,
+                expected_created_at=generated_at,
+                previous_state=previous_state,
             )
-            return Response(
-                {"error": "Unable to send verification code right now. Please try again later."},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+            return _mobile_otp_delivery_failure_response()
 
         return Response({"detail": "OTP resent successfully"}, status=status.HTTP_200_OK)
