@@ -71,6 +71,7 @@ class HubContextBuilder:
         for pharmacy in pharmacy_list:
             if not pharmacy.organization:
                 continue
+            pharmacy_perms = pharmacy_permissions.get(pharmacy.id, {})
             entry = lookup.setdefault(
                 pharmacy.organization.id,
                 {
@@ -79,6 +80,8 @@ class HubContextBuilder:
                     "is_org_admin": False,
                 },
             )
+            if pharmacy_perms.get("is_owner"):
+                entry["can_manage_profile"] = True
         for org_id in org_admin_org_ids:
             if org_id in lookup:
                 lookup[org_id]["can_manage_profile"] = True
@@ -105,19 +108,6 @@ class HubContextBuilder:
         member_counts = {}
         if organizations:
             org_ids = [org.id for org in organizations]
-            # distinct users from org memberships
-            org_staff = (
-                OrganizationMembership.objects.filter(organization_id__in=org_ids)
-                .values_list("user_id", flat=True)
-            )
-            # distinct users from pharmacy memberships under those orgs
-            pharm_members = (
-                Membership.objects.filter(
-                    is_active=True,
-                    pharmacy__organization_id__in=org_ids,
-                )
-                .values_list("user_id", flat=True)
-            )
             # Build per-org user sets to avoid double counting
             staff_by_org = {}
             for org_id, user_id in OrganizationMembership.objects.filter(
