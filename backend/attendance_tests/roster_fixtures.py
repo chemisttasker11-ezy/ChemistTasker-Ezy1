@@ -1,7 +1,7 @@
 """Shared data builders of the isolated roster tests."""
 from datetime import datetime, time, timedelta
 
-from client_profile.timezone_utils import get_pharmacy_timezone
+from organizations.timezone import get_pharmacy_timezone
 
 
 def approved_workforce_leave(*, user, pharmacy, day, leave_type="ANNUAL"):

@@ -202,52 +202,16 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 591
+KERNEL_CODE_LINE_CEILING = 296
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
     "client_profile/__init__.py": set(),
-    "client_profile/admin.py": set(),
-    "client_profile/admin_helpers.py": set(),
     "client_profile/apps.py": {"ClientProfileConfig"},
     "client_profile/domains/__init__.py": set(),
     "client_profile/domains/common/__init__.py": set(),
     "client_profile/domains/common/access.py": set(),
-    "client_profile/domains/common/helpers.py": set(),
-    "client_profile/domains/common/labels.py": set(),
-    "client_profile/domains/common/serializers.py": set(),
-    "client_profile/domains/dashboards/__init__.py": set(),
-    "client_profile/domains/dashboards/views.py": set(),
-    "client_profile/domains/memberships/__init__.py": set(),
-    "client_profile/domains/memberships/serializers.py": set(),
-    "client_profile/domains/memberships/views.py": set(),
-    "client_profile/domains/onboarding/__init__.py": set(),
-    "client_profile/domains/onboarding/emails.py": set(),
-    "client_profile/domains/onboarding/serializers.py": set(),
-    "client_profile/domains/onboarding/views.py": set(),
-    "client_profile/domains/orgs/__init__.py": set(),
-    "client_profile/domains/orgs/access.py": set(),
-    "client_profile/domains/orgs/claims.py": set(),
-    "client_profile/domains/orgs/serializers.py": set(),
-    "client_profile/domains/orgs/timezone.py": set(),
-    "client_profile/domains/orgs/views.py": set(),
-    "client_profile/domains/shifts/__init__.py": set(),
-    "client_profile/domains/shifts/base.py": set(),
-    "client_profile/domains/shifts/browse.py": set(),
-    "client_profile/domains/shifts/counter_offers.py": set(),
-    "client_profile/domains/shifts/emails.py": set(),
-    "client_profile/domains/shifts/engagement.py": set(),
-    "client_profile/domains/shifts/finalize.py": set(),
-    "client_profile/domains/shifts/leave.py": set(),
-    "client_profile/domains/shifts/limits.py": set(),
-    "client_profile/domains/shifts/notifications.py": set(),
-    "client_profile/domains/shifts/offers.py": set(),
-    "client_profile/domains/shifts/pricing.py": set(),
-    "client_profile/domains/shifts/serializers.py": set(),
-    "client_profile/domains/shifts/travel.py": set(),
-    "client_profile/domains/shifts/worker_requests.py": set(),
     "client_profile/fields.py": {"ENCRYPTED_VALUE_PREFIX", "EncryptedTextField", "_build_fernet"},
-    "client_profile/file_validation.py": set(),
     "client_profile/models/__init__.py": set(),
     "client_profile/models/common.py": {"chat_upload_path", "hub_attachment_upload_path"},
     "client_profile/models/memberships.py": set(),
@@ -255,7 +219,6 @@ KERNEL_DEFINITIONS = {
     "client_profile/models/orgs.py": set(),
     "client_profile/models/shifts.py": set(),
     "client_profile/tasks.py": set(),
-    "client_profile/timezone_utils.py": set(),
     "client_profile/urls.py": {"router", "urlpatterns"},
 }
 
