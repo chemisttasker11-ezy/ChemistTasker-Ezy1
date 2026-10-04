@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`6346e17717cf65646d206410b8a403b7a086053c`
+`87cfcfd890c264649955a399addf9561becd42c5`
 
-This is the merge commit of **PR #133 / G4 stale InvoiceRecord ContentType cleanup**.
+This is the merge commit of **PR #134 / G5 Celery dead-route cleanup + DST-safe attendance regression fixture**.
 
 ### Merged sequence completed during this senior review
 
@@ -46,6 +46,7 @@ This is the merge commit of **PR #133 / G4 stale InvoiceRecord ContentType clean
 - #131 G2 dashboard serializer cleanup + ownership/docs contraction
 - #132 G3 compatibility-kernel contraction + direct-owner test/import cleanup
 - #133 G4 stale InvoiceRecord ContentType cleanup + guarded data-migration contracts
+- #134 G5 Celery dead-route cleanup + DST-safe attendance regression fixture
 
 ## Important senior-review fixes already landed in main
 
@@ -362,7 +363,7 @@ Clean base: `main` at `b5f948a83bba91afa65a3795ea4c623e147ee407`
 11. Senior data-safety recheck confirmed the reference guard sees concrete ContentType FKs (including GenericForeignKey ContentType sides), standard Permission cascade and Admin Log SET_NULL remain the only allowed references, and canonical `invoicing.invoice` remains untouched.
 12. #133 was marked ready only after exact-head completion and merged with SHA guard `39ac480224bfce78c9969b1a27dd83eb02c5aa5e`. Merge commit: `6346e17717cf65646d206410b8a403b7a086053c`.
 
-## ACTIVE PR — #134 / G5 Celery dead-route cleanup
+## COMPLETED — #134 / G5 Celery dead-route cleanup
 
 Original PR branch: `fix/dead-celery-route`
 Original reviewed head: `40bac1df6e475674da3fe02f4f0b827d6473c18f`
@@ -384,6 +385,27 @@ Clean base: `main` at `6346e17717cf65646d206410b8a403b7a086053c`
 11. Senior diagnosis proved this was a pre-existing date/timezone test bug, not a G5 runtime regression: G4 and G5 attendance test/runtime blobs were identical; the fixture used `Australia/Sydney` but evaluated a 09:00–17:00 local roster slot at **09:00 UTC**. On 4 Oct 2026 Sydney is AEDT, so 09:00 UTC is 20:00 local, outside the +2h window ending 19:00.
 12. Fixed the regression **test only**: derive `today` in the pharmacy's `ZoneInfo` and evaluate the slot at 09:00 in that local timezone. Attendance production eligibility logic was intentionally unchanged.
 13. Because the DST-safe test fix changes the PR head, all earlier green G5 results are supporting evidence only. Fresh exact-head security, CodeQL, Shared Core/PostgreSQL/backend and release-gate must pass before merge.
+14. Final reviewed exact head: `67881a5806b7c778dab740552ea1032e7d45c57e`; final compare to G4 main was `behind=0`.
+15. Exact-head Public Repository Security, both CodeQL languages, shared-core, architecture, boundary, PostgreSQL migration rehearsal/concurrency, kiosk, mobile, Vite, Next, backend full contract tail and release-gate all passed green.
+16. Deployment topology recheck confirmed Docker still starts the Celery worker with `-Q email,default,notifications,ocr,billing`; only unmatched route patterns were removed.
+17. #134 was marked ready only after exact-head completion and merged with SHA guard `67881a5806b7c778dab740552ea1032e7d45c57e`. Merge commit: `87cfcfd890c264649955a399addf9561becd42c5`.
+
+## ACTIVE PR — #135 / H1 signal and startup registry contract
+
+Original PR branch: `test/signal-registry-contract`
+Reviewed source head: `fdd0083f118c1fb9eb3d2dec3bce927ce128e2a1`
+Clean reconciliation branch: `reconcile/h1-signals-post-g5-20261004`
+Clean base: `main` at `87cfcfd890c264649955a399addf9561becd42c5`
+
+### H1 reconciliation and senior review
+
+1. Rebuilt from G5-merged main as exactly two semantic files: add `core/test_signal_registry_contract.py` and add one signal/startup test step to the newest Shared Core backend workflow.
+2. The signal contract blob is **byte-identical** to the hardened reviewed H1 head.
+3. The current workflow preserves the G1 admin-registry test and G5 task contracts; H1 only adds `core.test_signal_registry_contract`. No stale workflow blob is copied.
+4. Reviewed signal test inspects imported `signals.py` modules, module-level executable calls, decorators/defaults/annotations, and recursively inspects class bodies while intentionally excluding function bodies.
+5. The old H1 P2 review comment about uninspected top-level/class-body startup side effects is therefore satisfied by the current reviewed test implementation.
+6. Preflight H1 diff on top of G5 exact head was exactly two files and `behind=0`.
+7. Fresh exact-head CI/security is required after moving PR #135.
 
 ## Beyond E2 — deep review already completed
 
@@ -458,13 +480,18 @@ Merge commit: `6346e17717cf65646d206410b8a403b7a086053c`.
 - Migration rehearsal, PostgreSQL contracts and release-gate green.
 
 ### #134 G5 Celery dead-route cleanup
-Active clean reconciliation on G4-merged main.
-- Senior follow-up removes **both** unmatched patterns: `client_profile.notifications.*` and `billing.tasks.*`.
+Merged after clean post-G4 reconciliation and full exact-head verification.
+Final reviewed head: `67881a5806b7c778dab740552ea1032e7d45c57e`.
+Merge commit: `87cfcfd890c264649955a399addf9561becd42c5`.
+- Removed both unmatched patterns: `client_profile.notifications.*` and `billing.tasks.*`.
 - Docker's `billing` worker queue remains untouched.
-- Route contract now requires every configured pattern to match a registered task; no reserved dead-pattern exception remains.
+- Route contract requires every configured pattern to match a registered task.
+- DST-safe attendance regression fixture is test-only; production eligibility logic was unchanged.
 
 ### #135 H1 signals/startup contract
-Deep-reviewed and strengthened.
+Active clean reconciliation on G5-merged main.
+- Signal/startup contract blob is byte-identical to the hardened reviewed H1 test.
+- Current workflow preserves G1/G5 gates and adds only the signal contract step.
 Current head: `fdd0083f118c1fb9eb3d2dec3bce927ce128e2a1`.
 - Original guard only checked `apps.ready()`.
 - Added AST inspection of `signals.py` import-time executable work.
@@ -516,12 +543,12 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #134 / G5 from `reconcile/g5-routes-post-g4-20261004`. Current main is `6346e17717cf65646d206410b8a403b7a086053c`.**
+**Resume at PR #135 / H1 from `reconcile/h1-signals-post-g5-20261004`. Current main is `87cfcfd890c264649955a399addf9561becd42c5`.**
 
-1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is the three reviewed G5 files, the DST-safe attendance regression fixture, plus this progress document.
-2. Verify both dead routes remain absent and `docker-compose.yml` still contains the deployed `billing` worker queue.
-3. Atomically move PR #134's branch to the verified reconciliation head; do not carry old-base history.
-4. Run fresh exact-head Shared Core Consolidation, task contracts, CodeQL and Public Repository Security.
-5. While G5 gates run, rebuild H1 from the G5 reconciliation head, then H2 from H1. Preserve the already-reviewed signal contract and H2 E1b storage-deletion rule.
-6. If all exact-head G5 gates are green, mark #134 ready and merge with exact-head SHA guard; then rebuild #135 H1 from G5-merged main.
-7. H3 remains last. After H2 merges, use PR #136 with an isolated empty-baseline probe to enumerate exact >650-line runtime modules, set final baselines, add only the incremental workflow step, and require a final exact-head green run.
+1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is H1's two reviewed files plus this progress document.
+2. Atomically move `test/signal-registry-contract` to the verified reconciliation head; do not carry old-base workflow history.
+3. Recheck the old P2 review thread against the current hardened test and resolve it only after confirming the head contains the class-body/module-level side-effect checks.
+4. Run fresh exact-head Shared Core Consolidation, the signal/startup contract, CodeQL and Public Repository Security.
+5. While H1 gates run, rebuild H2 from the H1 reconciliation head. Preserve E1b `default_storage.delete(name)`; apply only the seven reviewed H2 semantic paths.
+6. If all exact-head H1 gates are green, mark #135 ready and merge with exact-head SHA guard; immediately rebuild #137 H2 from H1-merged main.
+7. H3 remains last. Its mechanism is preflighted as exactly two files on top of H2, but final `LARGE_MODULES` baselines must be regenerated from post-H2 main before moving PR #136.
