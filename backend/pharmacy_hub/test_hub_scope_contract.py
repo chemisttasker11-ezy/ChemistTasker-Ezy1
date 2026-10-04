@@ -405,6 +405,27 @@ class ResolverAndPermissionTests(HubFixture):
         with self.assertRaises(PermissionDenied):
             Resolver(region_admin).group_scope(group_id)
 
+        Membership.objects.create(
+            user=region_admin,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+        detail = client_for(region_admin).get(HUB + f"groups/{group_id}/")
+        self.assertEqual(detail.status_code, 200, detail.content)
+        self.assertFalse(
+            detail.json()["is_admin"],
+            "historical creator identity must not advertise stale group-admin authority",
+        )
+        denied = client_for(region_admin).patch(
+            HUB + f"groups/{group_id}/",
+            {"description": "must not update"},
+            format="json",
+        )
+        self.assertEqual(denied.status_code, 403, denied.content)
+
     def test_control_plane_hub_authoring_does_not_reactivate_membership_or_create_admin(self):
         org_admin = self.users["org_admin"]
         stale = Membership.objects.create(
