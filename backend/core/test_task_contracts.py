@@ -1074,6 +1074,7 @@ class VerificationArtifactTests(TestCase):
             task(name).run("PharmacistOnboarding", 1, "51824753556", "Ann", "Lee", "a@example.com",
                            note_field="abn_verification_note")
         self.assertEqual(target.abn_entity_name, "EXAMPLE PHARMACY PTY LTD")
+        self.assertEqual(target.abn_details_for, "51824753556", "the facts are recorded against the looked-up ABN")
         self.assertEqual(target.abn_gst_from, date(2023, 9, 1))
         self.assertEqual(
             target.abn_verification_note,

@@ -206,7 +206,9 @@ class PaymentTabTests(TabFixture):
                 obj.refresh_from_db()
                 self.assertEqual(obj.abn_verification_note, "", "re-sending the same ABN is not a change")
 
-    def test_changing_abn_clears_scraped_entity_snapshot_before_new_lookup(self):
+    def test_changing_abn_keeps_previous_details_visible_but_unconfirmable_until_the_new_lookup(self):
+        # Owner decision: save the new ABN first; the previous ABN's ABR details stay visible (abn_details_for names
+        # the previous ABN) until the lookup for the new ABN replaces them, and they can never confirm the new ABN.
         for label in ("pharmacist", "otherstaff"):
             with self.subTest(role=label):
                 user, obj, url = self.onboarding(
@@ -218,9 +220,8 @@ class PaymentTabTests(TabFixture):
                     abn_entity_type="Australian Private Company",
                     abn_status="Active",
                     abn_gst_registered=True,
-                    abn_gst_from=timezone.localdate(),
-                    abn_gst_to=timezone.localdate(),
                     abn_last_checked=timezone.now(),
+                    abn_details_for="11111111111",
                     abn_verification_note="old result",
                 )
                 response, _ = self.patch(
@@ -229,37 +230,32 @@ class PaymentTabTests(TabFixture):
                     {"tab": "payment", "payment_preference": "ABN", "abn": "51824753556"},
                 )
                 self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(response.data["abn_details_for"], "11111111111")
                 obj.refresh_from_db()
                 self.assertEqual(
-                    (
-                        obj.abn_verified,
-                        obj.abn_entity_confirmed,
-                        obj.abn_entity_name,
-                        obj.abn_entity_type,
-                        obj.abn_status,
-                        obj.abn_gst_registered,
-                        obj.abn_gst_from,
-                        obj.abn_gst_to,
-                        obj.abn_last_checked,
-                        obj.abn_verification_note,
-                    ),
-                    (False, False, None, None, None, None, None, None, None, ""),
+                    (obj.abn, obj.abn_verified, obj.abn_entity_confirmed, obj.abn_entity_name, obj.abn_details_for),
+                    ("51824753556", False, False, "Old Pty Ltd", "11111111111"),
                 )
 
-                confirm, _ = self.patch(
-                    user,
-                    url,
-                    {"tab": "payment", "abn_entity_confirmed": True},
-                )
+                confirm, _ = self.patch(user, url, {"tab": "payment", "abn_entity_confirmed": True})
                 self.assertEqual(confirm.status_code, 200, confirm.data)
                 obj.refresh_from_db()
-                self.assertFalse(obj.abn_verified, "stale ABR data must not be confirmable after an ABN change")
+                self.assertFalse(obj.abn_verified, "the previous ABN's details must not confirm the new ABN")
+                self.assertFalse(obj.abn_entity_confirmed)
+
+                # The lookup for the new ABN lands: its details now belong to the current ABN and can be confirmed.
+                type(obj).objects.filter(pk=obj.pk).update(
+                    abn_entity_name="New Pty Ltd", abn_details_for="51824753556"
+                )
+                confirm, _ = self.patch(user, url, {"tab": "payment", "abn_entity_confirmed": True})
+                obj.refresh_from_db()
+                self.assertTrue(obj.abn_verified)
 
     def test_abn_confirmation_gst_sync_and_submit(self):
         for label in ("pharmacist", "otherstaff"):
             with self.subTest(role=label):
                 user, obj, url = self.onboarding(label, abn="51824753556", abn_entity_name="Pharmacy Pty Ltd",
-                                                 abn_gst_registered=True)
+                                                 abn_gst_registered=True, abn_details_for="51824753556")
                 response, work = self.patch(user, url, {"tab": "payment", "payment_preference": "ABN"})
                 self.assertEqual(response.status_code, 200, response.data)
                 obj.refresh_from_db()

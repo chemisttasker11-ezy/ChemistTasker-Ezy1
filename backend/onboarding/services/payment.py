@@ -5,6 +5,11 @@ from rest_framework import serializers
 from core.task_queue import async_task
 
 
+def abn_details_match(instance) -> bool:
+    """True when the stored ABR facts were scraped for the ABN currently on the profile."""
+    return bool(instance.abn) and (instance.abn_details_for or "").strip() == (instance.abn or "").strip()
+
+
 def apply_payment_tab(instance, vdata: dict, submit: bool):
     """
     Payment fields only. No GST file in V2.
@@ -36,39 +41,34 @@ def apply_payment_tab(instance, vdata: dict, submit: bool):
         instance.tfn_number = (vdata['tfn_number'] or '').strip()
         update_fields.append('tfn_number')
 
-    # 3) if ABN changed -> reset verification, confirmation and every fact scraped for the old ABN
+    # 3) if ABN changed -> reset verification and confirmation. The facts scraped for the previous ABN stay visible
+    #    (abn_details_for still names that ABN) until the lookup for the new ABN replaces them.
     if abn_changed:
         instance.abn_verified = False
         instance.abn_entity_confirmed = False
         instance.abn_verification_note = ""
-        instance.abn_entity_name = None
-        instance.abn_entity_type = None
-        instance.abn_status = None
-        instance.abn_gst_registered = None
-        instance.abn_gst_from = None
-        instance.abn_gst_to = None
-        instance.abn_last_checked = None
-        update_fields += [
-            'abn_verified', 'abn_entity_confirmed', 'abn_verification_note',
-            'abn_entity_name', 'abn_entity_type', 'abn_status',
-            'abn_gst_registered', 'abn_gst_from', 'abn_gst_to', 'abn_last_checked',
-        ]
+        update_fields += ['abn_verified', 'abn_entity_confirmed', 'abn_verification_note']
 
-    # 4) confirmation gate: only user confirmation can set abn_verified=True
+    details_are_current = bool(instance.abn_entity_name) and abn_details_match(instance)
+
+    # 4) confirmation gate: only user confirmation of the CURRENT ABN's details can set abn_verified=True
     if 'abn_entity_confirmed' in vdata:
         confirmed = bool(vdata['abn_entity_confirmed'])
-        if confirmed and instance.abn_entity_name:   # must have scraped data to confirm
+        if confirmed and details_are_current:
             instance.abn_verified = True
             if not instance.abn_verification_note:
                 instance.abn_verification_note = 'User confirmed ABN entity details.'
             update_fields += ['abn_verified', 'abn_verification_note']
         else:
+            if confirmed and instance.abn_entity_confirmed:
+                instance.abn_entity_confirmed = False
+                update_fields.append('abn_entity_confirmed')
             if instance.abn_verified:
                 instance.abn_verified = False
                 update_fields.append('abn_verified')
 
     # 5) optional sync of boolean gst_registered from ABR result if client didn’t send it
-    if 'gst_registered' not in vdata:
+    if 'gst_registered' not in vdata and details_are_current:
         if instance.abn_gst_registered is True and not instance.gst_registered:
             instance.gst_registered = True
             update_fields.append('gst_registered')

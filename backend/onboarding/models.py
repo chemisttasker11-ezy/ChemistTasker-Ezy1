@@ -239,6 +239,9 @@ class PharmacistOnboarding(models.Model):
     abn_gst_from         = models.DateField(blank=True, null=True)
     abn_gst_to           = models.DateField(blank=True, null=True)
     abn_last_checked     = models.DateTimeField(blank=True, null=True)
+    # The ABN the scraped facts above belong to. After an ABN change the previous facts stay visible (marked as the
+    # previous ABN's) until the lookup for the new ABN replaces them; they cannot be confirmed for the new ABN.
+    abn_details_for      = models.CharField(max_length=20, blank=True, default="")
     abn_entity_confirmed = models.BooleanField(default=False)
 
     # TFN
@@ -400,6 +403,9 @@ class OtherStaffOnboarding(models.Model):
     abn_gst_from = models.DateField(blank=True, null=True)
     abn_gst_to = models.DateField(blank=True, null=True)
     abn_last_checked = models.DateTimeField(blank=True, null=True)
+    # The ABN the scraped facts above belong to. After an ABN change the previous facts stay visible (marked as the
+    # previous ABN's) until the lookup for the new ABN replaces them; they cannot be confirmed for the new ABN.
+    abn_details_for = models.CharField(max_length=20, blank=True, default="")
     abn_entity_confirmed = models.BooleanField(default=False)
 
     # TFN (stored; masked via serializer)
