@@ -45,6 +45,7 @@ class EligibilityType:
     UNROSTERED_LOCAL = "UNROSTERED_LOCAL"
     CROSS_SITE_CHAIN = "CROSS_SITE_CHAIN"
     CROSS_SITE_ORG = "CROSS_SITE_ORG"
+    FAVOURITE_COVER = "FAVOURITE_COVER"
     REJECTED = "REJECTED"
 
 
@@ -202,6 +203,8 @@ def resolve_attendance_eligibility(
     Strict Order of Precedence:
     1. Confirmed Assignment -> Eligible, non-provisional.
     2. Unscheduled Local Staff -> Eligible, provisional UNROSTERED_LOCAL.
+    2b. Favourite-list locum / Shift Hero of this pharmacy covering an emergency -> Eligible, provisional
+        FAVOURITE_COVER (pending owner review; paid by the worker's own invoice or TFN payroll preference).
     3. Cross-Site Staff under same owner chain -> Eligible, provisional CROSS_SITE_CHAIN.
     4. Cross-Site Staff under same organization -> Eligible, provisional CROSS_SITE_ORG.
     5. Rejection with reason.
@@ -209,7 +212,7 @@ def resolve_attendance_eligibility(
     Negative Rules:
     - Never match on null owner or null organization.
     - Never infer eligibility from onboarding flags or org-admin roles.
-    - Favourite contacts / locums in directory without an assignment are rejected.
+    - Plain contacts (role CONTACT) without an assignment are rejected.
     - Read-only evaluation; never creates shifts or memberships.
     """
     if user is None or pharmacy is None:
@@ -261,6 +264,25 @@ def resolve_attendance_eligibility(
             eligibility_type=EligibilityType.UNROSTERED_LOCAL,
             is_provisional=True,
             cover_type=ProvisionalAttendance.CoverType.UNROSTERED_LOCAL,
+            assignment=None,
+            source_membership=local_membership,
+        )
+
+    # -------------------------------------------------------------------------
+    # Tier 2b: Favourite-list emergency cover (owner decision 2026-10-04)
+    # -------------------------------------------------------------------------
+    if (
+        local_membership is not None
+        and local_membership.is_active
+        and local_membership.status == Membership.Status.ACCEPTED
+        and local_membership.role != "CONTACT"
+        and local_membership.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES
+    ):
+        return AttendanceEligibilityResult(
+            is_eligible=True,
+            eligibility_type=EligibilityType.FAVOURITE_COVER,
+            is_provisional=True,
+            cover_type=ProvisionalAttendance.CoverType.FAVOURITE_COVER,
             assignment=None,
             source_membership=local_membership,
         )
@@ -342,10 +364,7 @@ def resolve_attendance_eligibility(
             rejection_reason = "LOCAL_MEMBERSHIP_PENDING"
         elif local_membership.status in (Membership.Status.REJECTED, Membership.Status.LEFT):
             rejection_reason = f"LOCAL_MEMBERSHIP_{local_membership.status}"
-        elif (
-            local_membership.role == "CONTACT"
-            or local_membership.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES
-        ):
+        elif local_membership.role == "CONTACT":
             rejection_reason = "FAVORITE_CONTACT_WITHOUT_ASSIGNMENT"
         else:
             rejection_reason = "LOCAL_MEMBERSHIP_INELIGIBLE"

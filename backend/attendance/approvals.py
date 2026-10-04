@@ -55,6 +55,35 @@ def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:
     )
 
 
+def _apply_worker_payment_terms(assignment, shift, user):
+    """Record the worker's own engagement/settlement terms on an approved emergency-cover assignment."""
+    from shifts.engagement import SETTLEMENT_TIMESHEET_ONLY, build_shift_engagement_terms
+
+    try:
+        terms = build_shift_engagement_terms(shift=shift, user=user)
+    except ValidationError as exc:
+        # The cover is real work; an incomplete payment profile must not block approval. It stays in the timesheet
+        # and the pharmacy settles it once the worker completes their payment details.
+        terms = {
+            "version": 1,
+            "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
+            "payment_profile_incomplete": True,
+            "notice": "Worker payment details are incomplete; settle this emergency cover once they are completed.",
+            "missing": getattr(exc, "message_dict", None) or list(getattr(exc, "messages", [])),
+        }
+    terms = {**terms, "source": "FAVOURITE_COVER_APPROVAL"}
+    assignment.payment_preference_snapshot = terms.get("payment_preference") or ""
+    assignment.settlement_channel = terms.get("settlement_channel") or ""
+    assignment.engagement_kind = terms.get("engagement_kind") or ""
+    assignment.engagement_terms_snapshot = terms
+    assignment.save(update_fields=[
+        "payment_preference_snapshot",
+        "settlement_channel",
+        "engagement_kind",
+        "engagement_terms_snapshot",
+    ])
+
+
 def approve_provisional_attendance(
     manager_user,
     provisional_id: int,
@@ -144,6 +173,11 @@ def approve_provisional_attendance(
             user=session.user,
             is_rostered=False,
         )
+
+        # 3b. Favourite-list emergency cover is paid the way the worker chose in onboarding: invoice (ABN) or
+        #     shift employment / payroll (TFN), exactly as if they had accepted an offer for this shift.
+        if provisional.cover_type == ProvisionalAttendance.CoverType.FAVOURITE_COVER:
+            _apply_worker_payment_terms(backfill_assignment, backfill_shift, session.user)
 
         # 4. Link assignment back to session and clear is_provisional
         session.assignment = backfill_assignment
