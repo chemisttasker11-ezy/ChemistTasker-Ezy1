@@ -24,6 +24,7 @@ from client_profile.domains.memberships.serializers import MembershipApplication
 from invoicing.services import generate_invoice_from_shifts
 from memberships.invites import create_membership_invite
 from memberships.models import Membership
+from organizations.models import PharmacyAdmin
 from rest_framework.test import APIClient
 
 
@@ -161,6 +162,30 @@ class MembershipLimitPostgresLockingTests(TransactionTestCase):
         membership_locks = self._for_update_positions(queries, Membership._meta.db_table)
         self.assertTrue(user_locks, "accept must lock the worker row to serialize the cross-pharmacy membership cap")
         self.assertTrue(membership_locks, "accept must lock the pending membership before changing its state")
+        self.assertLess(user_locks[0], membership_locks[0], "lock order must be user then membership")
+
+    def test_generic_reactivation_locks_user_then_membership_before_cap_check(self):
+        PharmacyAdmin.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacies[2],
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
+        )
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        with CaptureQueriesContext(connection) as captured:
+            response = client.patch(
+                f"/api/client-profile/memberships/{self.pending.pk}/",
+                {"is_active": True, "status": Membership.Status.ACCEPTED},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200, response.data)
+
+        queries = list(captured.captured_queries)
+        user_locks = self._for_update_positions(queries, User._meta.db_table)
+        membership_locks = self._for_update_positions(queries, Membership._meta.db_table)
+        self.assertTrue(user_locks, "generic reactivation must serialize the worker's cross-pharmacy cap")
+        self.assertTrue(membership_locks, "generic reactivation must lock the membership row before mutation")
         self.assertLess(user_locks[0], membership_locks[0], "lock order must be user then membership")
 
     def test_immediate_invite_locks_existing_user_before_counting_active_memberships(self):
