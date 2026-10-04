@@ -404,10 +404,6 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def get_is_admin(self, obj):
-        request = self.context.get("request")
-        if request and getattr(request, "user", None):
-            if obj.created_by_id == request.user.id:
-                return True
         admin_map = self.context.get("group_admin_map", {})
         return admin_map.get(obj.id, False)
 
