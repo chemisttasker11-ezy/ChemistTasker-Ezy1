@@ -38,9 +38,31 @@ _MOBILE_OTP_STATE_FIELDS = (
     "mobile_otp_locked_until",
 )
 
+_EMAIL_OTP_STATE_FIELDS = (
+    "otp_code",
+    "otp_created_at",
+    "otp_failed_attempts",
+    "otp_locked_until",
+)
+
 
 def _snapshot_mobile_otp_state(user):
     return {field: getattr(user, field) for field in _MOBILE_OTP_STATE_FIELDS}
+
+
+def _snapshot_email_otp_state(user):
+    return {field: getattr(user, field) for field in _EMAIL_OTP_STATE_FIELDS}
+
+
+def _restore_failed_email_otp_attempt(user_id, *, expected_code, expected_created_at, previous_state):
+    with transaction.atomic():
+        current = User.objects.select_for_update().get(pk=user_id)
+        if current.otp_code != expected_code or current.otp_created_at != expected_created_at:
+            return False
+        for field, value in previous_state.items():
+            setattr(current, field, value)
+        current.save(update_fields=sorted(previous_state))
+        return True
 
 
 def _restore_failed_mobile_otp_attempt(user_id, *, expected_code, expected_created_at, previous_state):
@@ -260,14 +282,17 @@ class ResendOTPView(APIView):
         email = request.data.get("email", "").strip().lower()
         user = User.objects.filter(email__iexact=email).first()
         if user and not user.is_otp_verified:
+            previous_state = _snapshot_email_otp_state(user)
             otp = str(secrets.randbelow(900000) + 100000)
-            user.otp_code = _hash_otp(otp)
-            user.otp_created_at = timezone.now()
+            otp_hash = _hash_otp(otp)
+            generated_at = timezone.now()
+            user.otp_code = otp_hash
+            user.otp_created_at = generated_at
             _reset_email_otp_security_state(user)
             user.save()
 
             context = {"otp": otp}
-            deliver_email_best_effort(
+            queued = deliver_email_best_effort(
                 send_async_email,
                 subject="Your ChemistTasker Verification Code",
                 recipient_list=[user.email],
@@ -277,6 +302,13 @@ class ResendOTPView(APIView):
                 event="email_otp_resend",
                 user_id=user.id,
             )
+            if not queued:
+                _restore_failed_email_otp_attempt(
+                    user.id,
+                    expected_code=otp_hash,
+                    expected_created_at=generated_at,
+                    previous_state=previous_state,
+                )
 
         return Response(
             {"detail": "If this email is eligible, a verification code has been sent."},
