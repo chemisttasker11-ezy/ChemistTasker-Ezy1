@@ -5,7 +5,20 @@ Logs go to the historical "users.views" channel that operators filter on."""
 import logging
 from django.utils import timezone
 from django.contrib.sessions.models import Session
+from django.db import transaction
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+
+
+def _delete_storage_path(storage, name, *, field_name, user_id):
+    try:
+        storage.delete(name)
+    except Exception as exc:
+        logging.getLogger("users.views").warning(
+            "Failed deleting verification storage object field=%s user_id=%s error_type=%s",
+            field_name,
+            user_id,
+            type(exc).__name__,
+        )
 
 
 def _delete_verification_docs_for_user(user):
@@ -22,18 +35,18 @@ def _delete_verification_docs_for_user(user):
         instance = model.objects.filter(user=user).first()
         if not instance:
             continue
+
         updated_fields = []
+        storage_cleanup = []
         for field_name in file_fields:
             file_field = getattr(instance, field_name, None)
-            if file_field:
-                try:
-                    file_field.delete(save=False)
-                except Exception:
-                    logging.getLogger("users.views").exception(
-                        "Failed deleting verification file %s for user %s", field_name, user.id
-                    )
+            name = getattr(file_field, "name", None)
+            storage = getattr(file_field, "storage", None)
+            if name:
                 setattr(instance, field_name, None)
                 updated_fields.append(field_name)
+                if storage:
+                    storage_cleanup.append((storage, name, field_name))
 
         if hasattr(instance, "government_id_type"):
             instance.government_id_type = None
@@ -42,8 +55,19 @@ def _delete_verification_docs_for_user(user):
             instance.identity_meta = {}
             updated_fields.append("identity_meta")
 
-        if updated_fields:
-            instance.save(update_fields=sorted(set(updated_fields)))
+        if not updated_fields:
+            continue
+
+        instance.save(update_fields=sorted(set(updated_fields)))
+        for storage, name, field_name in storage_cleanup:
+            transaction.on_commit(
+                lambda storage=storage, name=name, field_name=field_name: _delete_storage_path(
+                    storage,
+                    name,
+                    field_name=field_name,
+                    user_id=user.id,
+                )
+            )
 
 
 def _revoke_user_sessions(user):
