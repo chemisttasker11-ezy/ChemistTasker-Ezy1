@@ -243,6 +243,32 @@ class MembershipVisibilityTests(MembershipFixture):
             "organization filtering must narrow the caller's authorized pharmacies, not widen them",
         )
 
+    def test_membership_identity_cannot_be_reassigned_by_patch(self):
+        member_user, membership = self.member()
+        manager = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+        replacement_user = make_user("PHARMACIST")
+        _, other_pharmacy = make_owner_with_pharmacy("Immutable Target")
+
+        moved_user, _ = self.call(
+            manager,
+            "patch",
+            f"memberships/{membership.id}/",
+            {"user": replacement_user.id},
+        )
+        self.assertEqual(moved_user.status_code, 400, moved_user.data)
+
+        moved_pharmacy, _ = self.call(
+            manager,
+            "patch",
+            f"memberships/{membership.id}/",
+            {"pharmacy": other_pharmacy.id},
+        )
+        self.assertEqual(moved_pharmacy.status_code, 400, moved_pharmacy.data)
+
+        membership.refresh_from_db()
+        self.assertEqual(membership.user_id, member_user.id)
+        self.assertEqual(membership.pharmacy_id, self.pharmacy.id)
+
     def test_owner_membership_cannot_be_mutated_through_generic_membership_endpoint(self):
         self.call(self.owner, "get", "my-memberships/")
         owner_membership = Membership.objects.get(
