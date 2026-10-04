@@ -202,7 +202,7 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 625
+KERNEL_CODE_LINE_CEILING = 591
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
@@ -217,10 +217,6 @@ KERNEL_DEFINITIONS = {
     "client_profile/domains/common/labels.py": set(),
     "client_profile/domains/common/serializers.py": set(),
     "client_profile/domains/dashboards/__init__.py": set(),
-    "client_profile/domains/dashboards/serializers.py": {
-        "ExplorerDashboardResponseSerializer", "OtherStaffDashboardResponseSerializer",
-        "OwnerDashboardResponseSerializer", "PharmacistDashboardResponseSerializer", "ShiftSummarySerializer",
-    },
     "client_profile/domains/dashboards/views.py": set(),
     "client_profile/domains/memberships/__init__.py": set(),
     "client_profile/domains/memberships/serializers.py": set(),
