@@ -460,6 +460,12 @@ export function resolvePersonaSelection(
     if (match?.id != null) return { mode: 'admin', assignmentId: match.id };
   }
 
+  // A pharmacy-manager account has no persona of its own: it always works as the admin of its pharmacy.
+  if (normalizeRole(user.role) === 'PHARMACY_MANAGER') {
+    const first = assignments.find((assignment) => assignment.id != null);
+    if (first?.id != null) return { mode: 'admin', assignmentId: first.id };
+  }
+
   if (storedSelection?.startsWith('ROLE:')) {
     const selectedRole = normalizeRole(storedSelection.split(':')[1]);
     const baseRole = normalizeRole(user.role);

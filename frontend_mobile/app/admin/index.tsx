@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAdminWorkspace } from '@/context/AdminWorkspaceContext';
 import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
+import ChooseAccountTypeCard from '@/components/ChooseAccountTypeCard';
 import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
 
 export default function AdminHomeScreen() {
@@ -72,6 +73,8 @@ export default function AdminHomeScreen() {
             })}
           </View>
         </Surface> : null}
+
+        <ChooseAccountTypeCard />
 
         <Surface style={styles.hero}>
           <Text variant="labelLarge" style={styles.eyebrow}>Admin workspace</Text>

@@ -57,6 +57,8 @@ export function getRoleHome(role?: string | null) {
     case 'CHIEF_ADMIN':
     case 'REGION_ADMIN':
       return '/organization/dashboard';
+    case 'PHARMACY_MANAGER':
+      return '/admin';
     default:
       return '/login';
   }

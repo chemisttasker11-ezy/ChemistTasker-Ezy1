@@ -252,6 +252,7 @@ function AuthGate() {
       ORG_STAFF: 'organization',
       CHIEF_ADMIN: 'organization',
       REGION_ADMIN: 'organization',
+      PHARMACY_MANAGER: 'admin',
     };
 
     let active = true;

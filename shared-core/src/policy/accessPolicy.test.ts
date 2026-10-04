@@ -255,6 +255,13 @@ describe('shared access policy', () => {
     expect(canManageKioskDevices({ memberships: [{ ...region.memberships[0], admin_level: 'ROSTER_MANAGER' }] }, 30)).toBe(false);
   });
 
+  it('opens a pharmacy-manager account in the admin persona of its pharmacy', () => {
+    const manager = { id: 9, role: 'PHARMACY_MANAGER', admin_assignments: [{ id: 41, pharmacy_id: 70, admin_level: 'MANAGER' }] };
+    expect(resolvePersonaSelection(manager, null)).toEqual({ mode: 'admin', assignmentId: 41 });
+    expect(resolvePersonaSelection(manager, 'ROLE:PHARMACIST')).toEqual({ mode: 'admin', assignmentId: 41 });
+    expect(resolvePersonaSelection({ ...manager, admin_assignments: [] }, null)).toEqual({ mode: 'staff', assignmentId: null });
+  });
+
   it('restores valid admin persona and falls back to first normalized assignment', () => {
     const user = {
       id: 5,

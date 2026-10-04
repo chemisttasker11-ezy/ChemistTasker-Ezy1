@@ -2436,6 +2436,10 @@ export async function updateOrganizationHubProfileService(organizationId, payloa
     const data = await updateOrganizationHubProfile(organizationId, formData);
     return mapOrganization(data);
 }
+// A PHARMACY_MANAGER account (organisation-onboarded pharmacy contact) chooses its own account type once.
+export function chooseAccountType(role) {
+    return fetchApi('/users/me/account-type/', { method: 'POST', body: JSON.stringify({ role }) });
+}
 // Hub member directory: names only (no contact details), the viewer's own pharmacy first, searched on the server.
 export async function fetchHubMemberDirectory(params) {
     const query = new URLSearchParams({ scope: params.scope });

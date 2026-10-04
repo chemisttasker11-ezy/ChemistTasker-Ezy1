@@ -14,6 +14,7 @@ import DashboardOverviewTemplate, {
 import { useAdminScope } from "../../../contexts/AdminScopeContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import apiClient from "../../../utils/apiClient";
+import ChooseAccountTypeCard from "../../../components/ChooseAccountTypeCard";
 import { dashboardGreetingName } from "../../../utils/displayName";
 
 export default function AdminOverview() {
@@ -89,6 +90,8 @@ export default function AdminOverview() {
     : [];
 
   return (
+    <>
+    <ChooseAccountTypeCard />
     <DashboardOverviewTemplate
       title="Admin Dashboard"
       badge="Internal workspace"
@@ -113,5 +116,6 @@ export default function AdminOverview() {
       onOpenShifts={() => navigate(`${adminBasePath}/shift-center`)}
       onOpenActivity={() => navigate(`${adminBasePath}/shift-center`)}
     />
+    </>
   );
 }
