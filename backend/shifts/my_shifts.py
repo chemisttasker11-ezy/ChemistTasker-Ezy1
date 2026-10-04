@@ -20,7 +20,9 @@ class MyConfirmedShiftsViewSet(BaseShiftViewSet):
         now   = timezone.now()
         today = date.today()
 
-        qs = super().get_queryset().filter(
+        qs = super().get_queryset().exclude(
+            slots__unpublished_at__isnull=False
+        ).filter(
             slot_assignments__user=user
         )
         qs = qs.annotate(
@@ -48,7 +50,9 @@ class MyHistoryShiftsViewSet(BaseShiftViewSet):
         now   = timezone.now()
         today = date.today()
 
-        qs = super().get_queryset().filter(
+        qs = super().get_queryset().exclude(
+            slots__unpublished_at__isnull=False
+        ).filter(
             slot_assignments__user=user
         )
         payment_pref = self.request.query_params.get('payment_preference')
