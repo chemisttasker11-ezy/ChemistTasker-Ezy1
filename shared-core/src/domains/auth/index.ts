@@ -16,7 +16,6 @@ export {
   passwordResetConfirm,
   getOnboarding,
   updateOnboarding,
-  createOnboarding,
   getOnboardingDetail,
   updateOnboardingForm,
 } from '../../api';
