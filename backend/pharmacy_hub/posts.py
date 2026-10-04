@@ -32,7 +32,7 @@ def _identity_reactions_for_update(queryset, user):
     """Lock and return every reaction row representing one human user."""
     User.objects.select_for_update().only("pk").get(pk=user.pk)
     return list(
-        queryset.select_for_update()
+        queryset.select_for_update(of=("self",))
         .filter(Q(user_id=user.id) | Q(member__user_id=user.id))
         .order_by("id")
     )
