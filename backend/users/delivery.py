@@ -12,7 +12,8 @@ logger = logging.getLogger("users.views")
 
 def deliver_email_best_effort(dispatch, *args, event, user_id=None, **kwargs):
     try:
-        return dispatch(*args, **kwargs)
+        dispatch(*args, **kwargs)
+        return True
     except Exception as exc:
         logger.warning(
             "User email delivery enqueue failed event=%s user_id=%s error_type=%s",
@@ -20,4 +21,4 @@ def deliver_email_best_effort(dispatch, *args, event, user_id=None, **kwargs):
             user_id,
             type(exc).__name__,
         )
-        return None
+        return False
