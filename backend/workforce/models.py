@@ -759,6 +759,8 @@ class RosterActionAudit(models.Model):
         WORKER_RELEASED = "WORKER_RELEASED", "Worker Released"
         LEAVE_REQUESTED = "LEAVE_REQUESTED", "Leave Requested"
         LEAVE_APPROVED = "LEAVE_APPROVED", "Leave Approved"
+        SHIFT_UNPUBLISHED = "SHIFT_UNPUBLISHED", "Shift Unpublished For Editing"
+        SHIFT_REPUBLISHED = "SHIFT_REPUBLISHED", "Shift Republished"
 
     pharmacy = models.ForeignKey(
         "client_profile.Pharmacy",

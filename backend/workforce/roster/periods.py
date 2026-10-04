@@ -106,6 +106,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
             "is_rostered": a.is_rostered,
             "editable": a.is_rostered,
             "planned_break_minutes": a.slot.planned_break_minutes,
+            "is_unpublished": a.slot.unpublished_at is not None,
         }
         for a in assignments_list
     ]
@@ -120,6 +121,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
             "role_needed": s.shift.role_needed,
             "editable": s.roster_period_id is not None,
             "planned_break_minutes": s.planned_break_minutes,
+            "is_unpublished": s.unpublished_at is not None,
         }
         for s in vacant_list
     ]
