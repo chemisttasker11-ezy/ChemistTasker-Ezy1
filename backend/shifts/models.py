@@ -260,7 +260,7 @@ class ShiftDescriptionTemplate(models.Model):
 
 
 def _published_roster_period(pharmacy_id, work_date):
-    from workforce.models import RosterPeriod  # workforce imports shift models: resolve this guard at call time
+    from workforce.models import RosterPeriod  # workforce.models imports these models: resolve the guard at call time
 
     if not pharmacy_id or not work_date:
         return None
@@ -273,7 +273,7 @@ def _published_roster_period(pharmacy_id, work_date):
 
 
 def _published_period_for_slot(slot):
-    from workforce.models import RosterPeriod  # workforce imports shift models: resolve this guard at call time
+    from workforce.models import RosterPeriod  # workforce.models imports these models: resolve the guard at call time
 
     if slot.roster_period_id:
         period = RosterPeriod.objects.filter(pk=slot.roster_period_id).first()
