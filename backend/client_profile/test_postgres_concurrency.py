@@ -289,17 +289,19 @@ class TimesheetTransitionPostgresLockingTests(TransactionTestCase):
         queries = list(captured.captured_queries)
         period_table = connection.ops.quote_name(TimesheetPeriod._meta.db_table)
         timesheet_table = connection.ops.quote_name(Timesheet._meta.db_table)
+        period_from = f"FROM {period_table}"
+        timesheet_from = f"FROM {timesheet_table}"
         period_locks = [
             index
             for index, query in enumerate(queries)
             if "FOR UPDATE" in query["sql"].upper()
-            and period_table in query["sql"]
+            and period_from in query["sql"]
         ]
         timesheet_locks = [
             index
             for index, query in enumerate(queries)
             if "FOR UPDATE" in query["sql"].upper()
-            and timesheet_table in query["sql"]
+            and timesheet_from in query["sql"]
         ]
         self.assertTrue(period_locks, "builder must lock the timesheet period")
         self.assertTrue(timesheet_locks, "builder must lock the timesheet row")
