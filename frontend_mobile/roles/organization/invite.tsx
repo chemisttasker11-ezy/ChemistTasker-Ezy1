@@ -348,9 +348,7 @@ export default function OrganizationInviteScreen() {
       setError('This member is outside your delegation scope.');
       return;
     }
-    const selfPromotion = orgMembership?.role === 'CHIEF_ADMIN' &&
-      existing.user?.id === user?.id && editForm.role === 'ORG_ADMIN';
-    if (isScopedAdmin && !selfPromotion && (
+    if (isScopedAdmin && (
       !canDelegateOrganizationRole(orgMembership?.role, editForm.role) ||
       !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, editForm.admin_level, adminLevelMap) ||
       (isRegionAdmin && editForm.region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
@@ -634,8 +632,7 @@ export default function OrganizationInviteScreen() {
                 <Text style={styles.sectionLabel}>Role</Text>
                 <View style={styles.optionGrid}>
                   {roleDefinitions.filter((role) =>
-                    eligibleRoles.some((eligible) => eligible.key === role.key) ||
-                    (orgMembership?.role === 'CHIEF_ADMIN' && editForm.id === members.find((member) => member.user?.id === user?.id)?.id && role.key === 'ORG_ADMIN')
+                    eligibleRoles.some((eligible) => eligible.key === role.key)
                   ).map((role) => (
                     <Chip
                       key={role.key}

@@ -496,9 +496,7 @@ export default function InviteStaffPage() {
       setEditError('This member is outside your delegation scope.');
       return;
     }
-    const selfPromotion = orgMembership?.role === 'CHIEF_ADMIN' &&
-      existing.user?.id === user?.id && editForm.role === 'ORG_ADMIN';
-    if (isScopedAdmin && !selfPromotion && (
+    if (isScopedAdmin && (
       !canDelegateOrganizationRole(orgMembership?.role, editForm.role) ||
       !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, editForm.admin_level, adminLevelMap) ||
       (isRegionAdmin && editForm.region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
