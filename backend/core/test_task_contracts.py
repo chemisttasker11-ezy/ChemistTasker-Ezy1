@@ -185,11 +185,8 @@ class TaskIdentityContractTests(SimpleTestCase):
 
         from django.conf import settings
 
-        reserved = {"billing.tasks.*": "the billing queue every worker consumes, reserved for billing tasks"}
         registered = [name for name in celery_app().tasks if not name.startswith("celery.")]
         for pattern in settings.CELERY_TASK_ROUTES:
-            if pattern in reserved:
-                continue
             self.assertTrue(any(fnmatchcase(name, pattern) for name in registered), pattern)
 
     def test_beat_entries_are_unchanged(self):
