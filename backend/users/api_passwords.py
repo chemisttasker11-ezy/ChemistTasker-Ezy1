@@ -9,6 +9,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from django.conf import settings
 from rest_framework.views import APIView
 from users.tasks import send_async_email
+from users.delivery import deliver_email_best_effort
 from django.core.exceptions import ValidationError as DjangoValidationError
 from users.login_security import _reset_login_lockout_state
 from django.contrib.auth import get_user_model
@@ -68,7 +69,8 @@ class PasswordResetRequestAPIView(APIView):
             token = default_token_generator.make_token(user)
             reset_url = f"{settings.FRONTEND_BASE_URL}/reset-password/{uid}/{token}/"
             # send email
-            send_async_email(
+            deliver_email_best_effort(
+                send_async_email,
                 subject="Reset your password",
                 recipient_list=[user.email],
                 template_name="emails/password_reset_email.html",
@@ -77,6 +79,8 @@ class PasswordResetRequestAPIView(APIView):
                     'first_name': user.first_name,
                 },
                 text_template="emails/password_reset_email.txt",
+                event="password_reset",
+                user_id=user.id,
             )
         # Always succeed (do not reveal which emails are registered)
         return Response({'detail': 'If this email exists, a reset link has been sent.'})
