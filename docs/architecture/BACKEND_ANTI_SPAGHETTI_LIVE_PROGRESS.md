@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`a589c727d4cdc1ef71cd6611ee26f837cdb013ed`
+`cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`
 
-This is the merge commit of **PR #129 / F5 timesheet split + locked-period integrity hardening**.
+This is the merge commit of **PR #130 / G1 domain-admin ownership split**.
 
 ### Merged sequence completed during this senior review
 
@@ -42,6 +42,7 @@ This is the merge commit of **PR #129 / F5 timesheet split + locked-period integ
 - #127 F3 attendance split + scoped kiosk-pairing authorization projection fix
 - #128 F4 roster services split
 - #129 F5 timesheet split + PostgreSQL lock-order/locked-manifest/read-only hardening
+- #130 G1 domain-admin ownership split + focused admin-registry contract
 
 ## Important senior-review fixes already landed in main
 
@@ -280,7 +281,7 @@ Clean base: `main` at `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 22. Exact-head Public Repository Security, CodeQL Python/JavaScript, shared-core, architecture, boundary, backend, PostgreSQL concurrency, kiosk, mobile, Vite, Next and **release-gate** all passed green.
 23. #129 was marked ready only after exact-head completion and merged with SHA guard `7ae917dce3ce44087fb8b342f68bf473d9d24e4a`. Merge commit: `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`.
 
-## ACTIVE PR — #130 / G1 admin ownership
+## COMPLETED — #130 / G1 admin ownership
 
 Original PR branch: `refactor/admin-ownership`
 Reviewed source head: `1c0f5480b6555d7438ec4f69ae76382977f02e90`
@@ -299,6 +300,24 @@ Clean base: `main` at `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`
 8. Workflow reconciliation uses the newest `shared_core_consolidation_ci.yml` and adds only `core.test_admin_registry_contract` to the existing backend kernel/domain command; no stale workflow blob is copied.
 9. PR #130 had no unresolved review threads during preflight.
 10. Reconciliation branch is `behind=0`; before moving the PR, expected diff is exactly the eight reviewed G1 files plus this progress document.
+11. Final reviewed exact head: `04df39d1f7f0f1045f646b41b8987f3bee6f85be`; final compare was `behind=0`.
+12. Exact-head Public Repository Security, both CodeQL languages, architecture, boundary, shared-core, backend (including the narrowed 18-model admin registry contract), PostgreSQL concurrency, kiosk, mobile, Vite, Next and release-gate all passed green.
+13. #130 was marked ready only after exact-head completion and merged with SHA guard `04df39d1f7f0f1045f646b41b8987f3bee6f85be`. Merge commit: `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`.
+
+## ACTIVE PR — #131 / G2 dashboard serializer cleanup
+
+Original PR head reviewed: `c7bfbfd608985f5aa562b8b605698633f1d64f8e`
+Clean reconciliation branch: `reconcile/g2-dashboard-post-g1-20261004`
+Clean base: `main` at `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`
+
+### G2 reconciliation and senior review
+
+1. Rebuilt from G1-merged main as an exact **three-file semantic delta**, `behind=0`: delete `client_profile/domains/dashboards/serializers.py`, tighten the kernel ownership baseline, and update the architecture inventory.
+2. Reference scan confirmed all five deleted response serializer names appear only in the dead serializer module and the ownership baseline. No runtime caller, URL, task, migration, shared-core client or test consumer uses them.
+3. The original G2 P3 review correctly noted that the architecture doc still said the serializer should be removed “later.” The reconciled branch fixes that documentation in the same change.
+4. Kernel code-line ceiling drops from 625 to 591 and the deleted module's top-level definitions are removed from the ratchet; no unrelated kernel baseline is changed.
+5. G2 does not touch runtime endpoint behavior, serializers actually used by dashboards, model ownership, routes or client contracts.
+6. Fresh exact-head CI/security is still required after moving PR #131.
 
 ## Beyond E2 — deep review already completed
 
@@ -344,16 +363,18 @@ Merge commit: `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`.
 - Post-lock amendment workflow remains a separate product feature; do not implement an in-place unlock.
 
 ### #130 G1 admin ownership
-Active clean reconciliation on post-F5 main.
-Reviewed source head: `1c0f5480b6555d7438ec4f69ae76382977f02e90`.
+Merged after clean post-F5 reconciliation and full exact-head verification.
+Final reviewed head: `04df39d1f7f0f1045f646b41b8987f3bee6f85be`.
+Merge commit: `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`.
 - 19/19 moved admin classes/forms/mixins are byte-identical.
 - Registration/options contract is deliberately scoped to the 18 moved `client_profile` models rather than freezing unrelated third-party admins.
-- Current workflow is preserved; only the focused admin-registry test is added to the existing backend gate.
+- Full exact-head gate including the focused admin-registry contract and release-gate: green.
 
 ### #131 G2 dashboard serializer cleanup
-Deep-reviewed.
-- Found/fixed architecture documentation that still said the deleted dashboard serializer facade existed.
-- Must be reconciled after G1.
+Active clean reconciliation on G1-merged main.
+- Exact three-file semantic delta, `behind=0`.
+- Reference scan proves the five response serializers are dead.
+- Architecture inventory P3 is fixed in the same branch.
 
 ### #132 G3 client_profile contraction
 Deep-reviewed; fresh review clean.
@@ -424,11 +445,11 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #130 / G1 admin ownership from reconciliation branch `reconcile/g1-admin-post-f5-20261004`. Current main is `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`.**
+**Resume at PR #131 / G2 dashboard serializer cleanup from `reconcile/g2-dashboard-post-g1-20261004`. Current main is `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`.**
 
-1. Fetch the reconciliation branch live head after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is the eight reviewed G1 files plus this progress document.
-2. Recheck the narrowed admin-registry contract syntax/collection and exact registration set for the 18 moved client_profile-labelled models.
-3. Move `refactor/admin-ownership` atomically to the verified reconciliation head so PR #130 is preserved; do not carry old-base history.
-4. Run fresh exact-head Shared Core Consolidation, backend admin-registry contract, CodeQL and Public Repository Security.
-5. While #130 gates run, continue the already-preflighted G2/G3 stack on isolated branches; do not modify the G1 exact head.
-6. If all exact-head gates are green, mark #130 ready and merge with exact-head SHA guard, then rebuild #131 G2 from that main.
+1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head remains `behind=0`; expected diff is the three reviewed G2 files plus this progress document.
+2. Atomically move PR #131's branch to the reconciliation head; do not carry old stacked history.
+3. Recheck/resolve the old P3 documentation thread against the new head.
+4. Run fresh exact-head Shared Core Consolidation, CodeQL and Public Repository Security.
+5. While G2 gates run, continue the already-built G3/G4/G5/H1/H2 preflight stack on isolated branches; do not modify the G2 exact head.
+6. If all exact-head gates are green, mark #131 ready and merge with exact-head SHA guard; immediately rebuild #132 G3 from G2-merged main using the verified 87-path reconciliation (85/87 reviewed blobs identical, with only F5 PostgreSQL and E1b lifecycle regressions intentionally newer).
