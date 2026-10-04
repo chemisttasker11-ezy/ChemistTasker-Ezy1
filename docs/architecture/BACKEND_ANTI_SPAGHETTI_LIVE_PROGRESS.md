@@ -87,7 +87,7 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`5881c14907fa57fe0af459e9934e214e0de6a9d5`
+`c30bec8a70db4c9dd689db3079f03957f30ec8c3`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
@@ -118,6 +118,8 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 20. Removed the same stale `created_by` shortcut from group permission projection/serialization. A former scoped admin who later remains only ordinary staff sees `is_admin=false` and receives 403 on mutation instead of a misleading admin UI state.
 21. Group update review found a partial-persistence bug: `super().update()` saved name/description before replacement `member_ids` were domain-validated, so an invalid request could return 400 after changing the group.
 22. Added a red-first atomicity regression. Replacement memberships are now resolved before writes, the update runs inside `transaction.atomic()`, and the group row plus existing membership-link rows are locked so concurrent edits cannot interleave or escape serialization when the group initially has no links.
+23. Context/resolver contract review found an owner projection mismatch: `organization_scope` authorizes a pharmacy owner to manage the containing organization profile, but Hub Context advertised `can_manage_profile=false`. Added a targeted owner regression and now derive that permission from the existing per-pharmacy `is_owner` authority while keeping `is_org_admin=false`.
+24. Removed two unused lazy QuerySet assignments from organization member-count construction; the real per-organization distinct-user aggregation is unchanged.
 
 ### F1 gate status
 
@@ -258,7 +260,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `5881c14907fa57fe0af459e9934e214e0de6a9d5`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `c30bec8a70db4c9dd689db3079f03957f30ec8c3`.**
 
 1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is the 15 reviewed/hardened F1 code/test files plus this progress document. `posts.py`, `serializers.py` and `test_api.py` now also contain the reaction human-identity continuity hardening.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
