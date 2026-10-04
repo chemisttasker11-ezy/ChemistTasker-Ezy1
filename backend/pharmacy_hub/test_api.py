@@ -178,6 +178,95 @@ class HubReactionTests(HubBase):
         self.assertEqual(c.delete(url).status_code, 204)
         self.assertEqual(PharmacyHubReaction.objects.count(), 0)
 
+    def test_post_reaction_identity_is_stable_if_user_later_gains_a_membership(self):
+        pid = self.make_post()
+        url = f"{POSTS}{pid}/reactions/"
+        owner_client = client_for(self.owner)
+
+        first = owner_client.post(url, {"reaction_type": "LIKE"}, format="json")
+        self.assertEqual(first.status_code, 200, first.content)
+        first_reaction = PharmacyHubReaction.objects.get(post_id=pid)
+        self.assertEqual(first_reaction.user_id, self.owner.id)
+        self.assertIsNone(first_reaction.member_id)
+
+        Membership.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        detail = owner_client.get(f"{POSTS}{pid}/")
+        self.assertEqual(detail.status_code, 200, detail.content)
+        self.assertEqual(detail.json()["viewer_reaction"], "LIKE")
+
+        changed = owner_client.post(url, {"reaction_type": "LOVE"}, format="json")
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(PharmacyHubReaction.objects.filter(post_id=pid).count(), 1)
+        reaction = PharmacyHubReaction.objects.get(post_id=pid)
+        self.assertEqual(reaction.reaction_type, "LOVE")
+        self.assertEqual(changed.json()["reaction_summary"], {"LOVE": 1})
+        self.assertEqual(changed.json()["viewer_reaction"], "LOVE")
+
+        self.assertEqual(owner_client.delete(url).status_code, 204)
+        self.assertFalse(PharmacyHubReaction.objects.filter(post_id=pid).exists())
+        self.assertEqual(
+            PharmacyHubPost.objects.get(pk=pid).reaction_summary,
+            {},
+        )
+
+    def test_comment_reaction_identity_is_stable_if_user_later_gains_a_membership(self):
+        pid = self.make_post()
+        comments_url = f"{POSTS}{pid}/comments/"
+        cid = client_for(self.staff).post(
+            comments_url,
+            {"body": "identity test"},
+            format="json",
+        ).json()["id"]
+        url = f"{comments_url}{cid}/reactions/"
+        owner_client = client_for(self.owner)
+
+        first = owner_client.post(url, {"reaction_type": "LIKE"}, format="json")
+        self.assertEqual(first.status_code, 200, first.content)
+        first_reaction = PharmacyHubCommentReaction.objects.get(comment_id=cid)
+        self.assertEqual(first_reaction.user_id, self.owner.id)
+        self.assertIsNone(first_reaction.member_id)
+
+        Membership.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        listing = owner_client.get(comments_url)
+        self.assertEqual(listing.status_code, 200, listing.content)
+        comment = next(item for item in self.rows(listing) if item["id"] == cid)
+        self.assertEqual(comment["viewer_reaction"], "LIKE")
+
+        changed = owner_client.post(url, {"reaction_type": "LOVE"}, format="json")
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(
+            PharmacyHubCommentReaction.objects.filter(comment_id=cid).count(),
+            1,
+        )
+        reaction = PharmacyHubCommentReaction.objects.get(comment_id=cid)
+        self.assertEqual(reaction.reaction_type, "LOVE")
+        self.assertEqual(changed.json()["reaction_summary"], {"LOVE": 1})
+        self.assertEqual(changed.json()["viewer_reaction"], "LOVE")
+
+        deleted = owner_client.delete(url)
+        self.assertEqual(deleted.status_code, 200, deleted.content)
+        self.assertFalse(
+            PharmacyHubCommentReaction.objects.filter(comment_id=cid).exists()
+        )
+        self.assertEqual(deleted.json()["reaction_summary"], {})
+        self.assertIsNone(deleted.json()["viewer_reaction"])
+
     def test_invalid_reaction_type_is_400_and_outsider_is_403(self):
         pid = self.make_post()
         url = f"{POSTS}{pid}/reactions/"
