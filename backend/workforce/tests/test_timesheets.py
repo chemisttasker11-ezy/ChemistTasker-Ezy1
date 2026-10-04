@@ -30,7 +30,7 @@ from workforce.models import (
 )
 from workforce.timesheets import build_timesheet, decide_check
 from workforce.views import WorkforceLeaveListCreateView
-from client_profile.domains.shifts.leave import LeaveRequestViewSet
+from shifts.leave import LeaveRequestViewSet
 from workforce.roster.validation import worker_issues
 from users.models import OrganizationMembership
 
