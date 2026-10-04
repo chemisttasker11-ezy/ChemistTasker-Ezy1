@@ -276,6 +276,34 @@ class HubPollTests(HubBase):
         self.assertEqual(c.post(url, {"option_id": "abc"}, format="json").status_code, 400)
         self.assertEqual(c.post(url, {"option_id": 999999}, format="json").status_code, 400)
 
+    def test_user_keyed_platform_poll_creator_can_manage_their_poll(self):
+        outsider = self.outsider
+        create = client_for(outsider).post(
+            POLLS,
+            {
+                "scope": "platform",
+                "platform_hub": "public",
+                "question": "Public question?",
+                "option_labels": ["Yes", "No"],
+            },
+            format="json",
+        )
+        self.assertEqual(create.status_code, 201, create.content)
+        poll_id = create.json()["id"]
+        poll = PharmacyHubPoll.objects.get(pk=poll_id)
+        self.assertEqual(poll.created_by_id, outsider.id)
+        self.assertIsNone(poll.created_by_membership_id)
+
+        edited = client_for(outsider).patch(
+            f"{POLLS}{poll_id}/",
+            {"question": "Updated public question?"},
+            format="json",
+        )
+        self.assertEqual(edited.status_code, 200, edited.content)
+
+        deleted = client_for(outsider).delete(f"{POLLS}{poll_id}/")
+        self.assertEqual(deleted.status_code, 204, getattr(deleted, "content", b""))
+
     def test_only_creator_or_admin_can_delete_poll(self):
         poll = self.make_poll()
         url = f"{POLLS}{poll['id']}/"
