@@ -409,6 +409,29 @@ class ResolverAndPermissionTests(HubFixture):
         self.assertEqual(post.author_user_id, org_admin.id)
         self.assertIsNone(post.author_membership_id)
 
+    def test_user_keyed_control_plane_post_uses_real_author_for_tag_notifications(self):
+        org_admin = self.users["org_admin"]
+        self.assertFalse(
+            Membership.objects.filter(user=org_admin, pharmacy=self.pharmacy).exists()
+        )
+
+        created = client_for(org_admin).post(
+            HUB + "posts/",
+            {
+                "scope": "pharmacy",
+                "pharmacy_id": self.pharmacy.id,
+                "body": "Tagged update",
+                "tagged_member_ids": [self.staff_membership.id],
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+
+        alert = Notification.objects.filter(user=self.users["staff"]).latest("id")
+        expected_author = org_admin.get_full_name().strip() or org_admin.email
+        self.assertIn(expected_author, alert.title)
+        self.assertNotIn("A teammate", alert.title)
+
     def test_pharmacy_admin_does_not_become_organization_admin(self):
         Resolver = resolver_class()
         scope = Resolver(self.users["admin_member"]).organization_scope(self.org.id)
