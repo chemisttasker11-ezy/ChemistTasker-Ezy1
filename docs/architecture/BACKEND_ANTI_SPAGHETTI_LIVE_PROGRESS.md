@@ -380,6 +380,10 @@ Clean base: `main` at `6346e17717cf65646d206410b8a403b7a086053c`
 7. The legacy ownership allowance for `client_profile.notifications.*` is removed with the route. No unrelated kernel ownership baseline changes.
 8. PR #134 has no unresolved review threads.
 9. Fresh exact-head CI/security is required after moving PR #134. While it runs, H1/H2 have already been rebuilt on the corrected G5 semantic stack.
+10. First exact-head G5 run proved the new Celery route contract green, then failed later in `attendance_tests.test_kiosk_qr_pin_security.KioskQrPinSecurityTests.test_draft_roster_assignment_does_not_grant_confirmed_eligibility`: after publishing a roster, the fixture expected CONFIRMED_ASSIGNMENT but got UNROSTERED_LOCAL.
+11. Senior diagnosis proved this was a pre-existing date/timezone test bug, not a G5 runtime regression: G4 and G5 attendance test/runtime blobs were identical; the fixture used `Australia/Sydney` but evaluated a 09:00–17:00 local roster slot at **09:00 UTC**. On 4 Oct 2026 Sydney is AEDT, so 09:00 UTC is 20:00 local, outside the +2h window ending 19:00.
+12. Fixed the regression **test only**: derive `today` in the pharmacy's `ZoneInfo` and evaluate the slot at 09:00 in that local timezone. Attendance production eligibility logic was intentionally unchanged.
+13. Because the DST-safe test fix changes the PR head, all earlier green G5 results are supporting evidence only. Fresh exact-head security, CodeQL, Shared Core/PostgreSQL/backend and release-gate must pass before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -514,7 +518,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 **Resume at PR #134 / G5 from `reconcile/g5-routes-post-g4-20261004`. Current main is `6346e17717cf65646d206410b8a403b7a086053c`.**
 
-1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is the three reviewed G5 files plus this progress document.
+1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is the three reviewed G5 files, the DST-safe attendance regression fixture, plus this progress document.
 2. Verify both dead routes remain absent and `docker-compose.yml` still contains the deployed `billing` worker queue.
 3. Atomically move PR #134's branch to the verified reconciliation head; do not carry old-base history.
 4. Run fresh exact-head Shared Core Consolidation, task contracts, CodeQL and Public Repository Security.
