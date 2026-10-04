@@ -45,9 +45,20 @@ def user_can_invite_members_to_pharmacy(user, pharmacy):
 
 
 def user_can_change_membership(user, membership):
-    """The owner, an organization member who manages staff or admins over the pharmacy, or a pharmacy admin with the
-    manage-staff capability."""
+    """Who may change an ordinary staff membership.
+
+    The pharmacy owner's derived OWNER membership is a system/control-plane
+    invariant and is not mutable through the generic membership endpoint.
+    Ordinary staff memberships may be managed by the pharmacy owner, a scoped
+    organization staff/admin manager, or a PharmacyAdmin with MANAGE_STAFF.
+    """
     pharm = membership.pharmacy
+
+    if (
+        pharm
+        and getattr(getattr(pharm, "owner", None), "user_id", None) == membership.user_id
+    ):
+        return False
 
     # Owner of this pharmacy
     if pharm and pharm.owner and pharm.owner.user == user:
