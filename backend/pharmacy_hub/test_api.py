@@ -82,6 +82,39 @@ class HubScopeTests(HubBase):
         self.assertIsInstance(res.json(), dict)
 
 
+class HubGroupTests(HubBase):
+    def test_invalid_member_update_is_atomic(self):
+        groups = HUB + "groups/"
+        created = client_for(self.owner).post(
+            groups,
+            {
+                "pharmacy_id": self.pharmacy.id,
+                "name": "Original group",
+                "description": "Original description",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        group_id = created.json()["id"]
+
+        invalid = client_for(self.owner).patch(
+            f"{groups}{group_id}/",
+            {
+                "name": "Must not persist",
+                "description": "Must not persist",
+                "member_ids": [999999],
+            },
+            format="json",
+        )
+        self.assertEqual(invalid.status_code, 400, invalid.content)
+
+        from pharmacy_hub.models import PharmacyCommunityGroup
+
+        group = PharmacyCommunityGroup.objects.get(pk=group_id)
+        self.assertEqual(group.name, "Original group")
+        self.assertEqual(group.description, "Original description")
+
+
 class HubPostTests(HubBase):
     def test_member_creates_post_and_response_has_exact_fields(self):
         res = client_for(self.staff).post(POSTS, {**self.scope, "body": "first!"}, format="json")
