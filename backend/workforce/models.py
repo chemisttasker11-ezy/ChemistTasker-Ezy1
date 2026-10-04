@@ -573,44 +573,6 @@ class TimesheetManifest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
-class TimesheetCorrection(models.Model):
-    """An explicit, audited correction of a locked timesheet period.
-
-    Opening a correction keeps a full copy of the superseded manifest here, removes the live manifest and reopens the
-    period so its timesheets can be reopened, fixed and recalculated. Locking the period again creates an adjustment
-    manifest that names the superseded hash and closes this correction.
-    """
-
-    period = models.ForeignKey(TimesheetPeriod, on_delete=models.PROTECT, related_name="corrections")
-    reason = models.TextField()
-    opened_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="opened_timesheet_corrections"
-    )
-    opened_at = models.DateTimeField(auto_now_add=True)
-    superseded_manifest_hash = models.CharField(max_length=64)
-    superseded_manifest_snapshot = models.JSONField(default=dict)
-    superseded_locked_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="superseded_timesheet_locks",
-    )
-    superseded_locked_at = models.DateTimeField(null=True, blank=True)
-    adjustment_manifest_hash = models.CharField(max_length=64, blank=True, default="")
-    closed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ["-opened_at", "-id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["period"],
-                condition=Q(closed_at__isnull=True),
-                name="wf_one_open_timesheet_correction",
-            ),
-        ]
-
-
 # ---- Roster: periods, publication audits, acknowledgements, templates and action audits ----
 
 class RosterPeriod(models.Model):

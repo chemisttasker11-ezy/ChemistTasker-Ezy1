@@ -10,7 +10,6 @@ from .models import (
     TimesheetCheck,
     TimesheetCheckDecision,
     TimesheetComment,
-    TimesheetCorrection,
     TimesheetManifest,
     TimesheetPeriod,
     TimesheetRevision,
@@ -21,7 +20,7 @@ from .models import (
 for model in [
     CoverageRequirement, MembershipWorkSettings, RosterOperation, RosterRevisionState,
     Timesheet, TimesheetApproval, TimesheetCheck, TimesheetCheckDecision,
-    TimesheetComment, TimesheetCorrection, TimesheetManifest, TimesheetPeriod, TimesheetRevision,
+    TimesheetComment, TimesheetManifest, TimesheetPeriod, TimesheetRevision,
     TimesheetSegment, WorkforceLeaveRequest,
 ]:
     admin.site.register(model)

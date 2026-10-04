@@ -771,8 +771,7 @@ class TimesheetPeriodCorrectView(APIView):
             correction = correct_locked_period(period, request.user, request.data.get("reason", ""))
             return Response({
                 "status": TimesheetPeriod.Status.OPEN,
-                "correction_id": correction.pk,
-                "superseded_manifest_hash": correction.superseded_manifest_hash,
+                "superseded_manifest_hash": correction["superseded_manifest_hash"],
             })
         except TimesheetPeriod.DoesNotExist:
             return Response({"error": "Timesheet period not found."}, status=status.HTTP_404_NOT_FOUND)
