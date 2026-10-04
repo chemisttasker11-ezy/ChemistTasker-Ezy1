@@ -86,7 +86,7 @@ This is the merge commit of **PR #123 / E1b**.
 Branch: `refactor/membership-services`
 
 Latest reviewed E2 code checkpoint before the documentation-only checkpoint commit:
-`c8616e6945363b252846265d01f74f78d435d581`
+`fe6a82ece4577fffdbdd6b5684623711398a3634`
 
 > The authoritative exact branch head is PR #124's current head. This live file is itself updated by commits, so the branch head may be one documentation commit newer than the reviewed code checkpoint above.
 
@@ -150,7 +150,13 @@ The reconciled main→E2 diff is intentionally limited to 8 files:
    - `MembershipViewSet.perform_update()` now re-checks activation under the same user -> membership row-lock order used by self-accept.
    - PostgreSQL lock-contract coverage pins both locks and their order.
 
-10. **Existing E2 duplicate response alert fix preserved**
+10. **Invite-link queryset union runtime fix**
+   - The additive invite-link scope fix initially OR-combined a distinct organization queryset with non-distinct owner/admin querysets.
+   - Django rejects that at runtime with `TypeError: Cannot combine a unique query with a non-unique query.`
+   - Organization visibility is now wrapped as an outer non-distinct pharmacy queryset before unioning independent scopes; `distinct()` is applied once at the end.
+   - The failure was caught by the real membership endpoint contract, not hidden by unit-only coverage.
+
+11. **Existing E2 duplicate response alert fix preserved**
    - Worker membership response no longer creates the same manager in-app alert twice.
 
 ### E2 exact-head gate status
@@ -284,7 +290,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `c8616e6945363b252846265d01f74f78d435d581`.**
+**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `fe6a82ece4577fffdbdd6b5684623711398a3634`.**
 
 1. Check the fresh main-target Shared Core Consolidation, PostgreSQL/concurrency, CodeQL and Public Repository Security results on the PR's current exact head.
 2. If any exact-head failure occurs, inspect/fix it regression-first and update this file.
