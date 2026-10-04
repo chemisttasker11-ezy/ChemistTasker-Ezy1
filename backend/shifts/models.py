@@ -4,7 +4,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 import uuid
 from datetime import timedelta
-from workforce.models import RosterPeriod
 
 
 # Shift Model - Represents an available shift in a pharmacy
@@ -261,6 +260,8 @@ class ShiftDescriptionTemplate(models.Model):
 
 
 def _published_roster_period(pharmacy_id, work_date):
+    from workforce.models import RosterPeriod  # resolve reverse guard at call time
+
     if not pharmacy_id or not work_date:
         return None
     monday = work_date - timedelta(days=work_date.weekday())
@@ -272,6 +273,8 @@ def _published_roster_period(pharmacy_id, work_date):
 
 
 def _published_period_for_slot(slot):
+    from workforce.models import RosterPeriod  # resolve reverse guard at call time
+
     if slot.roster_period_id:
         period = RosterPeriod.objects.filter(pk=slot.roster_period_id).first()
         if period and period.status == RosterPeriod.Status.PUBLISHED:
