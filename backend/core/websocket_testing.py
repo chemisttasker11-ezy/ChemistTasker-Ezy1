@@ -7,7 +7,6 @@ from channels.testing import WebsocketCommunicator
 from django.utils import timezone
 
 import core.routing
-from client_profile.characterization_support import make_owner_with_pharmacy, make_staff_member, make_user
 from users.jwt_ws import JWTAuthMiddlewareStack
 from users.models import WebSocketTicket
 
@@ -25,6 +24,8 @@ def new_ticket(user, value, age_seconds=0):
 
 @database_sync_to_async
 def make_actors():
+    from client_profile.characterization_support import make_owner_with_pharmacy, make_staff_member, make_user
+
     owner, pharmacy = make_owner_with_pharmacy()
     alice, alice_m = make_staff_member(pharmacy)
     bob, bob_m = make_staff_member(pharmacy)
