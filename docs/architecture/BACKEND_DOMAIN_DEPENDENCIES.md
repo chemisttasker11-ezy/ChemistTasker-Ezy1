@@ -88,7 +88,7 @@ fails CI, and a resolved pair must be removed from the list.
 | `tasks.py` | compatibility facade | re-exports the deployed task objects (table below) and the historical paths of the ABR and referee-reminder functions. It defines and registers nothing. |
 | `admin.py` | admin of the `client_profile`-labelled models | admin URLs are `admin/client_profile/<model>/` |
 | `urls.py` | kernel URLconf | included by `core.client_profile_api_urls`; the router composition lives in core |
-| `admin_helpers.py`, `timezone_utils.py`, `file_validation.py`, `domains/**` | compatibility facades | historical import paths. `domains/dashboards/serializers.py` (5 response serializers) is unused: remove it later. |
+| `admin_helpers.py`, `timezone_utils.py`, `file_validation.py`, remaining `domains/**` modules | compatibility facades | historical import paths. The unused `domains/dashboards/serializers.py` response facade has been removed in G2; the remaining facades stay until their own reference scans prove they are dead. |
 | `apps.py` | app config | the `client_profile` app label |
 | `characterization_support.py` | test support | factories for the characterization and WebSocket tests |
 
