@@ -84,6 +84,13 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
                 pass
         return qs
 
+    def perform_update(self, serializer):
+        if _slot_locked_by_published_roster(serializer.instance.slot):
+            raise DRFValidationError(
+                "Unpublish this shift for editing before changing its assignment in a published roster."
+            )
+        super().perform_update(serializer)
+
     def perform_destroy(self, instance):
         if _slot_locked_by_published_roster(instance.slot):
             raise DRFValidationError(
@@ -138,6 +145,10 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         It now supports re-assigning a new user at the same time.
         """
         shift_instance = self.get_object()
+        if any(_slot_locked_by_published_roster(slot) for slot in shift_instance.slots.select_related("shift")):
+            raise DRFValidationError(
+                "Unpublish this shift for editing before changing or reassigning a published roster shift."
+            )
 
         with transaction.atomic():
             # First, let the serializer handle the update of the Shift and its Slots.

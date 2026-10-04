@@ -151,6 +151,24 @@ class RosterShiftRepublishTests(TestCase):
         client = APIClient()
         client.force_authenticate(self.owner)
 
+        denied_assignment_update = client.patch(
+            f"/api/client-profile/roster-owner/{assignment.pk}/",
+            {"user": self.workers[1].pk},
+            format="json",
+        )
+        self.assertEqual(denied_assignment_update.status_code, 400, denied_assignment_update.content)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.user_id, self.workers[0].pk)
+
+        denied_shift_update = client.patch(
+            f"/api/client-profile/roster-shifts/{self.slots[0].shift_id}/",
+            {"user_id": self.workers[1].pk},
+            format="json",
+        )
+        self.assertEqual(denied_shift_update.status_code, 400, denied_shift_update.content)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.user_id, self.workers[0].pk)
+
         denied_delete = client.delete(f"/api/client-profile/roster-owner/{assignment.pk}/")
         self.assertEqual(denied_delete.status_code, 400, denied_delete.content)
         self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
