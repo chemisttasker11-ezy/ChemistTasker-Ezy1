@@ -18,27 +18,7 @@ REVIEW_THRESHOLD = 650
 LOOSE_BASELINE_TOLERANCE = 0.10
 
 # path -> (baseline code lines, reason)
-LARGE_MODULES = {
-    "attendance/credentials.py": (722, "kiosk activation, signed rotating QR and worker PIN credential services"),
-    "attendance/views.py": (976, "kiosk, worker and manager attendance API; split by family in the attendance API PR"),
-    "billing/views.py": (829, "Stripe checkout, customer portal and webhook handling"),
-    "dashboards/views.py": (776, "role dashboards read model, one view per role"),
-    "memberships/views.py": (1176, "membership endpoints; workflows move to memberships services in their PR"),
-    "onboarding/serializers.py": (2077, "role onboarding tab serializers; tab workflows move to onboarding.services"),
-    "pharmacy_hub/models.py": (804, "pharmacy hub models"),
-    "pharmacy_hub/serializers.py": (1128, "hub feed, post, comment, reaction, poll, group and profile serializers"),
-    "pharmacy_hub/views.py": (1886, "hub API; split by family in the pharmacy hub PR"),
-    "shifts/base.py": (1347, "BaseShiftViewSet actions; they move to shift services in their PR"),
-    "shifts/browse.py": (1176, "shift listing and lifecycle viewsets; split in the browse PR"),
-    "shifts/models.py": (743, "shift models and their published-roster guards"),
-    "shifts/serializers.py": (1644, "shift, slot, interest, offer and counter-offer serializers"),
-    "users/views.py": (1496, "account and authentication API; split by responsibility in the users PR"),
-    "worker_finance/services.py": (906, "transactional worker invoice operations over the canonical invoice tables"),
-    "workforce/models.py": (671, "workforce models"),
-    "workforce/roster/services.py": (909, "roster services; split by family in the roster services PR"),
-    "workforce/timesheets.py": (959, "timesheet pipeline; split by layer in the timesheets PR"),
-    "workforce/views.py": (881, "workforce API: leave, employment, timesheets and work settings"),
-}
+LARGE_MODULES = {}
 
 
 def module_sizes():
