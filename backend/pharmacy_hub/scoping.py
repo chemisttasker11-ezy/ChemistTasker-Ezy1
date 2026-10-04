@@ -62,9 +62,12 @@ class HubAttachmentMixin:
             raise
 
     def _remove_attachments(self, post, request):
-        raw_ids = request.data.get("remove_attachment_ids", [])
-        if isinstance(raw_ids, str):
-            raw_ids = [raw_ids]
+        if hasattr(request.data, "getlist"):
+            raw_ids = request.data.getlist("remove_attachment_ids")
+        else:
+            raw_ids = request.data.get("remove_attachment_ids", [])
+            if isinstance(raw_ids, (str, int)):
+                raw_ids = [raw_ids]
         ids = []
         for raw in raw_ids:
             try:
