@@ -138,7 +138,10 @@ class HubPollViewSet(
         resolver = HubScopeResolver(self.request.user)
         scope = resolver.from_poll(poll)
         membership = scope.get("request_membership")
-        is_creator = getattr(poll, "created_by_membership_id", None) == getattr(membership, "id", None)
+        is_creator = (
+            getattr(poll, "created_by_id", None) == getattr(self.request.user, "id", None)
+            or getattr(poll, "created_by_membership_id", None) == getattr(membership, "id", None)
+        )
         if not (
             is_creator
             or scope.get("has_admin_permissions")
