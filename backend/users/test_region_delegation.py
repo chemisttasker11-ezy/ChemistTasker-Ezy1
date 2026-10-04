@@ -135,15 +135,26 @@ class RegionDelegationTests(TestCase):
             for row in hub_rows
             if isinstance(row.get('user'), dict)
         }
-        self.assertIn(self.actor.id, hub_user_ids)
+        # This combined view contains real pharmacy Membership rows only.
+        # Organization-only control-plane users stay in the standard directory
+        # and a GET must never manufacture CONTACT employment state for them.
+        self.assertNotIn(self.actor.id, hub_user_ids)
         self.assertIn(visible_user.id, hub_user_ids)
         self.assertNotIn(hidden_user.id, hub_user_ids)
-
-        visible_contact = Membership.objects.get(
-            user=visible_user,
-            pharmacy=self.pharmacy,
+        self.assertFalse(
+            Membership.objects.filter(
+                user=self.actor,
+                pharmacy__organization=self.organization,
+            ).exists(),
+            'hub listing must not manufacture a pharmacy membership for the actor',
         )
-        self.assertEqual(visible_contact.role, 'CONTACT')
+        self.assertFalse(
+            Membership.objects.filter(
+                user=visible_user,
+                pharmacy=self.pharmacy,
+            ).exists(),
+            'hub listing must not manufacture a membership inside the target admin scope',
+        )
 
         visible_rows = [
             row for row in hub_rows
@@ -153,7 +164,11 @@ class RegionDelegationTests(TestCase):
             row.get('pharmacy'): row.get('organization_role')
             for row in visible_rows
         }
-        self.assertEqual(role_by_pharmacy.get(self.pharmacy.id), 'REGION_ADMIN')
+        self.assertNotIn(
+            self.pharmacy.id,
+            role_by_pharmacy,
+            'no synthetic target-scope pharmacy row should be created',
+        )
         self.assertIsNone(
             role_by_pharmacy.get(actor_other_pharmacy.id),
             'org-role metadata must not be attached outside the target admin assigned scope',
