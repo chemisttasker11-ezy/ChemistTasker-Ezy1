@@ -129,7 +129,7 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertIsNotNone(delivery.processed_at)
 
 class OrganizationBillingScopeTests(TestCase):
-    def test_only_owner_and_org_admin_can_manage_billing(self):
+    def test_owner_pharmacy_admins_and_org_admins_can_pay_but_only_org_admin_holds_the_account(self):
         from billing.utils import resolve_billing_account, user_can_manage_billing_for_pharmacy
         from client_profile.characterization_support import make_owner_with_pharmacy, make_user
         from organizations.models import Organization, PharmacyAdmin
@@ -151,14 +151,19 @@ class OrganizationBillingScopeTests(TestCase):
             user=chief, organization=organization, role="CHIEF_ADMIN", admin_level="MANAGER",
         )
         chief_membership.pharmacies.add(pharmacy)
-        self.assertFalse(user_can_manage_billing_for_pharmacy(chief, pharmacy))
+        self.assertTrue(user_can_manage_billing_for_pharmacy(chief, pharmacy))
 
         region = make_user("ORG_STAFF")
         region_membership = OrganizationMembership.objects.create(
             user=region, organization=organization, role="REGION_ADMIN", admin_level="MANAGER",
         )
         region_membership.pharmacies.add(pharmacy)
-        self.assertFalse(user_can_manage_billing_for_pharmacy(region, pharmacy))
+        self.assertTrue(user_can_manage_billing_for_pharmacy(region, pharmacy))
+        other_region = make_user("ORG_STAFF")
+        OrganizationMembership.objects.create(
+            user=other_region, organization=organization, role="REGION_ADMIN", admin_level="MANAGER",
+        )
+        self.assertFalse(user_can_manage_billing_for_pharmacy(other_region, pharmacy), "only assigned pharmacies")
 
         pharmacy_manager = make_user("PHARMACY_MANAGER")
         PharmacyAdmin.objects.create(
@@ -167,8 +172,17 @@ class OrganizationBillingScopeTests(TestCase):
             admin_level=PharmacyAdmin.AdminLevel.MANAGER,
             is_active=True,
         )
-        self.assertFalse(user_can_manage_billing_for_pharmacy(pharmacy_manager, pharmacy))
+        self.assertTrue(user_can_manage_billing_for_pharmacy(pharmacy_manager, pharmacy))
+        comms_admin = make_user("PHARMACIST")
+        PharmacyAdmin.objects.create(
+            user=comms_admin, pharmacy=pharmacy,
+            admin_level=PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER, is_active=True,
+        )
+        self.assertFalse(user_can_manage_billing_for_pharmacy(comms_admin, pharmacy), "communication-only admins do not pay")
+        self.assertFalse(user_can_manage_billing_for_pharmacy(make_user("PHARMACIST"), pharmacy))
 
         account = resolve_billing_account(pharmacy, acting_user=chief)
         self.assertEqual(account["billing_contact"], org_admin, "Chief Admin must never become the billing account holder")
 
+        account = resolve_billing_account(pharmacy, acting_user=region)
+        self.assertEqual(account["billing_contact"], org_admin, "paying never moves the billing account holder")

@@ -30,15 +30,28 @@ def is_in_free_trial(user) -> bool:
 
 
 def user_can_manage_billing_for_pharmacy(user, pharmacy) -> bool:
+    """Who may pay ChemistTasker for this pharmacy (owner decision 2026-10-05).
+
+    The pharmacy owner, a pharmacy admin who manages its roster (owner, manager or roster-manager level), an
+    organisation-wide admin of its organisation (Org Admin or Chief Admin) and a Region Admin assigned to it. Paying
+    does not make the payer the billing account holder; see resolve_billing_account.
+    """
+    from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+    from users.org_roles import ORG_WIDE_ADMIN_ROLES
+
+    if not user or not getattr(user, 'is_authenticated', False) or pharmacy is None:
+        return False
     if pharmacy.owner and getattr(pharmacy.owner, 'user', None) == user:
         return True
-    if OrganizationMembership.objects.filter(
+    if pharmacy.organization_id and OrganizationMembership.objects.filter(
         user=user,
-        role='ORG_ADMIN',
+        role__in=ORG_WIDE_ADMIN_ROLES,
         organization_id=pharmacy.organization_id,
     ).exists():
         return True
-    return False
+    if OrganizationMembership.objects.filter(user=user, role='REGION_ADMIN', pharmacies=pharmacy).exists():
+        return True
+    return has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER)
 
 
 def resolve_billing_account(pharmacy, acting_user=None) -> dict:
