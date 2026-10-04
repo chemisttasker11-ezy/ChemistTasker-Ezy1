@@ -23,7 +23,7 @@ class AdditionalAdminInvitationTests(TestCase):
         self.client.force_authenticate(user=self.inviter)
 
     def invite(self, email, admin_level='MANAGER'):
-        with patch('client_profile.domains.orgs.views.async_task'):
+        with patch('organizations.views.async_task'):
             return self.client.post('/api/client-profile/pharmacy-admins/', {
                 'pharmacy': self.pharmacy.id,
                 'email': email,
