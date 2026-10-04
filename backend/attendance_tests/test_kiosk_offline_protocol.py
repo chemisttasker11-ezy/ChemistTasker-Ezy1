@@ -377,6 +377,35 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertEqual(listing.status_code, 200)
         self.assertEqual(len(listing.data["devices"]), 1)
 
+    def test_scoped_organization_manager_pairing_options_follow_assignments(self):
+        manager = User.objects.create(
+            email="pairing-scope-admin@offline.test",
+            role="PHARMACIST",
+            is_active=True,
+        )
+        membership = OrganizationMembership.objects.create(
+            user=manager,
+            organization=self.pharmacy.organization,
+            role="CHIEF_ADMIN",
+            admin_level="MANAGER",
+        )
+        membership.pharmacies.add(self.pharmacy)
+        unassigned = Pharmacy.objects.create(
+            name="Unassigned Pairing Pharmacy",
+            owner=self.pharmacy.owner,
+            organization=self.pharmacy.organization,
+            timezone="Australia/Brisbane",
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=manager)
+        response = client.get("/attendance/kiosk/pairing/request/")
+
+        self.assertEqual(response.status_code, 200)
+        pharmacy_ids = {row["id"] for row in response.data["pharmacies"]}
+        self.assertIn(self.pharmacy.id, pharmacy_ids)
+        self.assertNotIn(unassigned.id, pharmacy_ids)
+
     def test_unscoped_chief_cannot_manage_kiosk_devices(self):
         chief = User.objects.create(email="unscoped-chief@offline.test", role="PHARMACIST", is_active=True)
         OrganizationMembership.objects.create(
