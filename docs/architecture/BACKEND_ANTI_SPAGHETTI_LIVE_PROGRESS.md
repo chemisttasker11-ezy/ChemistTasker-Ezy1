@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`c0e0cb4c4d2606f557b961773979cbf38020143c`
+`82258451dc319f0a5d795cae93134f267c125c74`
 
-This is the merge commit of **PR #126 / F2 users split**. A documentation-only progress checkpoint may sit one commit above this SHA; no runtime code changes are implied by that documentation commit.
+This is the merge commit of **PR #127 / F3 attendance split**.
 
 ### Merged sequence completed during this senior review
 
@@ -39,6 +39,7 @@ This is the merge commit of **PR #126 / F2 users split**. A documentation-only p
 - #124 E2 membership services
 - #125 F1 Pharmacy Hub split + senior identity/scope/atomicity/storage hardening
 - #126 F2 users split + privacy/delivery/OTP/storage/directory hardening
+- #127 F3 attendance split + scoped kiosk-pairing authorization projection fix
 
 ## Important senior-review fixes already landed in main
 
@@ -209,23 +210,42 @@ Clean base:
 - Merge commit / code-bearing main checkpoint: `c0e0cb4c4d2606f557b961773979cbf38020143c`.
 - Verified remote `main` was identical to that merge commit before this documentation-only checkpoint.
 
-## ACTIVE PR — #127 / F3 attendance split
+## COMPLETED — #127 / F3 attendance split
 
 Original PR branch: `refactor/attendance-api-split`
-Reviewed source head: `668c952925f4757356685101c52e933eb30e206b`
-Historical base: `7e191332d5f959da37f95638a2fce5decbf02e87`
+Final reviewed head: `e8061d0da4d60dc90bee8d65b8ab9a12a67920ec`
+Merge commit: `82258451dc319f0a5d795cae93134f267c125c74`
 
-### F3 reconciliation and senior integration review
+### F3 final senior result
 
-1. Created clean reconciliation branch `reconcile/f3-attendance-post-f2-20261004` from newest main documentation checkpoint `552dadb3f639bfeb247f5b6403d6ae02d90eb6b6` (runtime checkpoint remains F2 merge `c0e0cb4c4d2606f557b961773979cbf38020143c`).
-2. Overlaid exactly the five reviewed F3 attendance files from source head `668c952925f4757356685101c52e933eb30e206b`; none had changed on main, so no old-main code was resurrected.
-3. Manager attendance endpoints deliberately remain in `attendance.views` to preserve URL imports, protected error-surface patch targets/log channel, and operational-model ownership contracts.
-4. The reviewed stable 400 `pharmacy_id must be an integer.` contract remains pinned before pharmacy lookup.
-5. Senior integration review found one pre-existing authorization projection defect in `KioskRequestPairingCodeView.get`: the canonical `is_authorized_kiosk_manager()` permits assigned CHIEF_ADMIN/REGION_ADMIN managers, but the list prefilter admitted organization users only when role == ORG_ADMIN, so valid scoped managers saw no assigned pharmacy option.
-6. Fixed the pairing candidate prefilter to include assigned Chief/Region pharmacies while leaving final authorization to the canonical helper; unassigned pharmacies remain excluded and non-manager admin levels remain rejected by the helper.
-7. Added regression `test_scoped_organization_manager_pairing_options_follow_assignments` in `attendance_tests/test_kiosk_offline_protocol.py`.
-8. Scanned the rest of moved kiosk/worker code for the same narrow-prefilter pattern; other kiosk-management paths call the canonical helper directly.
-9. Exact reconciliation diff before this documentation update is the five F3 files plus the focused kiosk authorization regression file; `behind=0` from newest main.
+1. Reconciled from post-F2 main without old-base history; final head was `behind=0`.
+2. Preserved historical attendance URLs and `attendance.views` re-export/patch/logging contracts.
+3. Preserved the stable non-integer manager `pharmacy_id` 400 contract.
+4. Fixed pairing-options projection so assigned CHIEF_ADMIN/REGION_ADMIN managers see only their assigned pharmacies while final authority remains with `is_authorized_kiosk_manager()`.
+5. Added scoped pairing-options regression alongside existing kiosk-device authority tests.
+6. Exact-head Public Repository Security: green.
+7. Exact-head CodeQL Python + JavaScript/TypeScript: green.
+8. Exact-head Shared Core Consolidation: architecture, boundary, shared-core, PostgreSQL concurrency, kiosk, mobile, Vite, Next, backend attendance/kiosk contracts, workforce/finance tail and final release-gate all green.
+9. #127 was marked ready only after exact-head completion and merged with SHA guard `e8061d0da4d60dc90bee8d65b8ab9a12a67920ec`.
+
+## ACTIVE PR — #128 / F4 roster services split
+
+Original PR branch: `refactor/roster-services-split`
+Reviewed source head: `38c241b8e73dc4ac99745aeb986961a43a856d0b`
+Clean reconciliation branch: `reconcile/f4-roster-post-f3-20261004`
+Clean base: `main` at `82258451dc319f0a5d795cae93134f267c125c74`
+
+### F4 reconciliation and senior review
+
+1. Created the clean branch directly from F3-merged main and overlaid exactly the nine reviewed `workforce/roster/*` files; none of those nine files changed between F4's historical base and current main, so no later fix is being overwritten.
+2. Final pre-documentation code diff is exactly those nine roster files and is `behind=0`.
+3. Rechecked #117's authorization correction: roster-management mutations continue to use `workforce.roster.permissions.is_authorized_attendance_manager()`, which delegates to canonical `workforce.permissions.can_manage_roster_pharmacy()`; no legacy “any active PharmacyAdmin can roster” shortcut was reintroduced.
+4. Checked every live importer of `workforce.roster.services`; the façade preserves all historical import paths used by V2 views, revisions, worker actions and attendance/roster tests.
+5. Compared the old monolithic service implementation with the eight extracted owner modules using top-level function boundaries: all **26/26 moved functions are byte-identical**. F4 is therefore an ownership split with no silent business-logic drift.
+6. Import graph remains acyclic at the extracted service layer: owner modules depend downward on periods/edit/rate helpers and do not import the façade back.
+7. Reviewed transaction/marketplace/history guards in publication, bulk edit, copy, templates and acknowledgements. Existing period/user locking, all-or-nothing bulk transactions, marketplace-slot protection and leave/attendance history protections remain unchanged.
+8. Investigated malformed roster date/time parsing: the public V2 copy/template/bulk endpoints already catch both Django `ValidationError` and Python `ValueError` and return 400, so there is no newly introduced 500 to fix in F4.
+9. PR #128 has no unresolved review threads.
 
 ## Beyond E2 — deep review already completed
 
@@ -253,21 +273,19 @@ Already-reviewed fixes:
 - New active hardening targets are recorded in the ACTIVE F2 section above.
 
 ### #127 F3 attendance
-Deep-reviewed.
-Current branch head: `668c952925f4757356685101c52e933eb30e206b`.
-Historical exact-head CI/CodeQL green; old base.
-- Reviewed worker/kiosk auth, throttles and error surfaces.
-- Unexpected failures use stable redacted client responses.
-- Domain ValidationError/PermissionDenied messages remain intentionally client-visible.
-- Old generic ">20 CodeQL problems" comment is historical; current head has no line-level unresolved review threads. Still require fresh current-main CodeQL.
+Merged after clean post-F2 reconciliation, scoped pairing-options hardening and full exact-head verification.
+Final reviewed head: `e8061d0da4d60dc90bee8d65b8ab9a12a67920ec`.
+Merge commit: `82258451dc319f0a5d795cae93134f267c125c74`.
 
 ### #128 F4 roster
-Deep-reviewed.
-Current head: `38c241b8e73dc4ac99745aeb986961a43a856d0b`.
-Historical exact-head CI green; old base.
-- Explicitly checked against #117.
-- Service modules use canonical `workforce.permissions.can_manage_roster_pharmacy()`.
-- No reintroduction of "any active PharmacyAdmin can roster" logic.
+Actively reconciled on post-F3 main.
+Reviewed source head: `38c241b8e73dc4ac99745aeb986961a43a856d0b`.
+Clean reconciliation branch: `reconcile/f4-roster-post-f3-20261004`.
+- All nine F4 files have zero overlap with later-main changes.
+- 26/26 moved service functions are byte-identical after extraction.
+- Canonical roster-management authority remains intact.
+- No unresolved review threads.
+- Fresh exact-head verification still required after moving PR #128.
 
 ### #129 F5 timesheets
 Deep-reviewed and hardened.
@@ -360,11 +378,12 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #127 / F3 attendance from reconciliation branch `reconcile/f3-attendance-post-f2-20261004`. Reviewed source head is `668c952925f4757356685101c52e933eb30e206b`.**
+**Resume at PR #128 / F4 roster from reconciliation branch `reconcile/f4-roster-post-f3-20261004`. Reviewed source head is `38c241b8e73dc4ac99745aeb986961a43a856d0b`; current code-bearing main is `82258451dc319f0a5d795cae93134f267c125c74`.**
 
-1. Fetch the reconciliation branch live head after this documentation commit and compare newest `main` → exact head; expected code diff is the five reviewed F3 attendance files plus `attendance_tests/test_kiosk_offline_protocol.py` for the scoped pairing regression and this progress document.
-2. Move `refactor/attendance-api-split` atomically to the reconciliation head so PR #127 is preserved; do not merge old-base history.
-3. Run fresh main-target Shared Core Consolidation, attendance/kiosk suites, PostgreSQL where relevant, CodeQL and Public Repository Security on the exact PR head.
-4. Confirm the new scoped Chief/Region pairing-options regression passes together with the existing manager kiosk-device scope tests and protected `attendance.views` error/import contracts.
-5. If any gate fails, fix regression-first and update this file. If all exact-head gates are green, mark #127 ready and merge with an exact-head SHA guard.
-6. After merge, advance this file to #128 F4 and reconstruct F4 directly from newest main; F4's nine `workforce/roster/*` files have already been preflighted as non-overlapping.
+1. Fetch the reconciliation branch live head after this documentation commit and verify newest `main` → exact head remains `behind=0`; expected diff is the nine reviewed roster files plus this progress document.
+2. Move `refactor/roster-services-split` atomically to the reconciliation head so PR #128 is preserved; do not merge old-base history.
+3. Run fresh main-target Shared Core Consolidation, roster/attendance suites, PostgreSQL where relevant, CodeQL and Public Repository Security on the exact PR head.
+4. Reconfirm the #117 canonical roster capability boundary and the historical `workforce.roster.services` façade imports under CI.
+5. If any gate fails, fix regression-first and update this file.
+6. If all exact-head gates are green, mark #128 ready and merge with exact-head SHA guard.
+7. Immediately advance to #129 F5, preserving every E2 membership PostgreSQL test and applying only the reviewed F5 timesheet concurrency additions.
