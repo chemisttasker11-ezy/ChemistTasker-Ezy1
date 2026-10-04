@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from users.account_deletion import _anonymize_user, _delete_verification_docs_for_user, _revoke_user_sessions, _revoke_user_tokens
 from users.recaptcha import verify_recaptcha
+from users.delivery import deliver_email_best_effort
 
 
 class ContactMessageCreateView(generics.CreateAPIView):
@@ -49,12 +50,15 @@ class ContactMessageCreateView(generics.CreateAPIView):
             'submitted_at': contact.created_at,
         }
 
-        send_async_email(
+        deliver_email_best_effort(
+            send_async_email,
             subject=f"Contact Us: {contact.subject}",
             recipient_list=[support_email],
             template_name="emails/contact_us.html",
             context=context,
             text_template="emails/contact_us.txt",
+            event="contact_support",
+            user_id=getattr(user, "id", None),
         )
 
 
@@ -78,7 +82,8 @@ class DeleteAccountView(APIView):
             _delete_verification_docs_for_user(user)
 
         if original_email:
-            async_task(
+            deliver_email_best_effort(
+                async_task,
                 'users.tasks.send_async_email',
                 subject="Your ChemistTasker account deletion",
                 recipient_list=[original_email],
@@ -88,6 +93,8 @@ class DeleteAccountView(APIView):
                     "support_email": "info@chemisttasker.com",
                 },
                 text_template="emails/account_deleted.txt",
+                event="account_deleted",
+                user_id=user.id,
             )
 
         return Response({"success": True}, status=status.HTTP_200_OK)
