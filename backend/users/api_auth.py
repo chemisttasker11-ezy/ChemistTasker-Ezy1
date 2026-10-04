@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from django.conf import settings
 from rest_framework.views import APIView
 from users.tasks import send_async_email
+from users.delivery import deliver_email_best_effort
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from users.serializers import (
     UserRegistrationSerializer,
@@ -56,12 +57,15 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         otp_subject = "Your ChemistTasker Verification Code"
         otp_context = {"otp": getattr(user, "_plain_email_otp", "")}
-        send_async_email(
+        deliver_email_best_effort(
+            send_async_email,
             subject=otp_subject,
             recipient_list=[user.email],
             template_name="emails/otp_email.html",
             context=otp_context,
-            text_template="emails/otp_email.txt"
+            text_template="emails/otp_email.txt",
+            event="registration_otp",
+            user_id=user.id,
         )
 
 
