@@ -3,7 +3,6 @@ from unittest import mock
 
 from django.test import SimpleTestCase
 
-from client_profile.domains.common import serializers as legacy
 from core.serializer_lifecycle import (
     RemoveOldFilesMixin,
     _delete_file_if_unreferenced,
@@ -30,17 +29,17 @@ class SerializerLifecycleOwnershipTests(SimpleTestCase):
         old_file.delete.assert_not_called()
         self.assertEqual(instance.certificate, "new/certificate.pdf")
 
-    def test_legacy_lifecycle_exports_point_to_core(self):
+    def test_lifecycle_helpers_are_defined_by_their_owners(self):
         expected = {
-            "verification_fields_changed": verification_fields_changed,
-            "_file_has_changed": _file_has_changed,
-            "_delete_file_if_unreferenced": _delete_file_if_unreferenced,
-            "_should_clear_flag": _should_clear_flag,
-            "_update_locked_user_fields": _update_locked_user_fields,
-            "RemoveOldFilesMixin": RemoveOldFilesMixin,
-            "UploadValidationMixin": UploadValidationMixin,
-            "_build_absolute_media_url": _build_absolute_media_url,
-            "_get_user_short_bio": _get_user_short_bio,
+            verification_fields_changed: "core.serializer_lifecycle",
+            _file_has_changed: "core.serializer_lifecycle",
+            _delete_file_if_unreferenced: "core.serializer_lifecycle",
+            _should_clear_flag: "core.serializer_lifecycle",
+            _update_locked_user_fields: "core.serializer_lifecycle",
+            RemoveOldFilesMixin: "core.serializer_lifecycle",
+            UploadValidationMixin: "core.serializer_mixins",
+            _build_absolute_media_url: "users.presentation",
+            _get_user_short_bio: "users.presentation",
         }
-        for name, value in expected.items():
-            self.assertIs(getattr(legacy, name), value)
+        for value, module in expected.items():
+            self.assertEqual(value.__module__, module, value.__name__)
