@@ -205,6 +205,8 @@ class RosterShiftRepublishTests(TestCase):
         hidden_rows = hidden.data.get("results", hidden.data) if isinstance(hidden.data, dict) else hidden.data
         self.assertNotIn(assignment.pk, {row["id"] for row in hidden_rows})
 
+        # Vacant roster slots are created while the period is still draft, then become locked when the week is published.
+        RosterPeriod.objects.filter(pk=self.period.pk).update(status=RosterPeriod.Status.DRAFT)
         vacant_shift = Shift.objects.create(
             pharmacy=self.pharmacy,
             role_needed="PHARMACIST",
@@ -219,6 +221,7 @@ class RosterShiftRepublishTests(TestCase):
             end_time=time(17),
             roster_period=self.period,
         )
+        RosterPeriod.objects.filter(pk=self.period.pk).update(status=RosterPeriod.Status.PUBLISHED)
         open_before = client.get(
             f"/api/client-profile/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
         )
