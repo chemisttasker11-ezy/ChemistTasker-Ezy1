@@ -2,16 +2,6 @@
 from django.core.files.storage import default_storage
 from rest_framework import serializers
 
-from chat.models import Message
-from onboarding.models import (
-    ExplorerOnboarding,
-    OtherStaffOnboarding,
-    OwnerOnboarding,
-    PharmacistOnboarding,
-)
-from organizations.models import Chain, Organization, Pharmacy
-from pharmacy_hub.models import PharmacyHubAttachment
-
 
 def verification_fields_changed(instance, validated_data, fields):
     for field in fields:
@@ -37,6 +27,13 @@ def _file_has_changed(new_file, old_file):
 
 
 def _known_file_references():
+    # Resolve domain models when the registry is consulted so core has no
+    # module-import dependency on application model modules.
+    from chat.models import Message
+    from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
+    from organizations.models import Chain, Organization, Pharmacy
+    from pharmacy_hub.models import PharmacyHubAttachment
+
     return [
         (OwnerOnboarding, "profile_photo"),
         (PharmacistOnboarding, "profile_photo"),
