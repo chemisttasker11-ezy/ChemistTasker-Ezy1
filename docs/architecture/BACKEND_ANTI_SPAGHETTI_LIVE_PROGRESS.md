@@ -17,11 +17,11 @@
 
 ## Current authoritative state
 
-### Current remote main
+### Current code-bearing main checkpoint
 
-`525e18e3592e6a18a321ee145791a6abff383e07`
+`c0e0cb4c4d2606f557b961773979cbf38020143c`
 
-This is the merge commit of **PR #125 / F1 Pharmacy Hub split**.
+This is the merge commit of **PR #126 / F2 users split**. A documentation-only progress checkpoint may sit one commit above this SHA; no runtime code changes are implied by that documentation commit.
 
 ### Merged sequence completed during this senior review
 
@@ -38,6 +38,7 @@ This is the merge commit of **PR #125 / F1 Pharmacy Hub split**.
 - #123 E1b onboarding role-tabs/skills/submission/progress services
 - #124 E2 membership services
 - #125 F1 Pharmacy Hub split + senior identity/scope/atomicity/storage hardening
+- #126 F2 users split + privacy/delivery/OTP/storage/directory hardening
 
 ## Important senior-review fixes already landed in main
 
@@ -147,7 +148,7 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 - Merge commit / new main: `525e18e3592e6a18a321ee145791a6abff383e07`.
 - Verified remote `main` is identical to that merge commit.
 
-## ACTIVE PR — #126 / F2 users split
+## COMPLETED — #126 / F2 users split
 
 Original PR branch: `refactor/users-auth-split`
 
@@ -182,6 +183,7 @@ Clean base:
 9. Removed `OrganizationMembership` → fake CONTACT `Membership` synthesis from `for_hub/include_pharmacy_members` reads. The combined view now contains real pharmacy Membership rows only; organization-only control-plane identities stay in the normal organization-membership directory.
 10. Updated the Region Admin regression to pin side-effect-free reads while preserving role/region/assigned-pharmacy visibility boundaries.
 11. Added `users.test_delivery_resilience` with focused regressions for storage rollback, queue-failure non-enumeration, account-deletion queue failure, SMS provider rejection/transport exceptions and retry state.
+12. An undelivered e-mail OTP resend now restores the prior OTP code/timestamp/failed-attempt state, guarded by row lock + expected code/timestamp so a concurrent newer resend cannot be overwritten.
 
 ### F2 preflight findings to harden regression-first
 
@@ -194,6 +196,34 @@ Clean base:
 7. Compatibility façade check is clean: `users.views` still re-exports URL-exposed classes and historical helpers such as `_build_authenticated_user_payload`; current `users/urls.py` wildcard routing remains compatible.
 8. PR #126 has no unresolved human review threads. Historical CodeQL clear-text OTP logging threads are resolved/outdated and their fixes are present.
 
+### F2 final gate and merge
+
+- Final exact head: `46cc7361485c787bdae1af8fadb10ac043c4f50c`.
+- Base: F1 main `525e18e3592e6a18a321ee145791a6abff383e07`; final compare was `behind=0`, mergeable.
+- Exact-head Public Repository Security: green.
+- Exact-head CodeQL: green.
+- Exact-head Shared Core Consolidation: full `users` package, boundary audit, architecture audit, shared-core, backend, PostgreSQL migration/concurrency, kiosk, mobile, Vite, Next and release-gate all green.
+- The full users gate specifically passed the new `users.test_delivery_resilience` regressions and the side-effect-free Region Admin directory contract.
+- #126 was marked ready only after the exact-head gates completed.
+- Merge was SHA-guarded against `46cc7361485c787bdae1af8fadb10ac043c4f50c`.
+- Merge commit / code-bearing main checkpoint: `c0e0cb4c4d2606f557b961773979cbf38020143c`.
+- Verified remote `main` was identical to that merge commit before this documentation-only checkpoint.
+
+## ACTIVE PR — #127 / F3 attendance split
+
+Original PR branch: `refactor/attendance-api-split`
+Reviewed source head: `668c952925f4757356685101c52e933eb30e206b`
+Historical base: `7e191332d5f959da37f95638a2fce5decbf02e87`
+
+### F3 preflight ready
+
+1. F3 changes exactly five attendance files: `attendance/api_support.py`, `attendance/kiosk_api.py`, `attendance/views.py`, `attendance/worker_api.py`, and `attendance_tests/test_attendance_api.py`.
+2. None of those files changed from F3's old base through F1 main, and F2 changes only the users domain/workflow/docs, so there is no semantic overlap to reconcile.
+3. Current reviewed F3 head has no unresolved review threads; historical exact-head Security, CodeQL and Shared Core are green.
+4. Manager attendance endpoints deliberately remain in `attendance.views` to preserve protected patch/log/import contracts.
+5. The only non-move behavior pinned by F3 is stable 400 `pharmacy_id must be an integer.` before pharmacy lookup.
+6. Rebuild F3 directly from newest main rather than merging its old-base history, then run fresh exact-head gates.
+
 ## Beyond E2 — deep review already completed
 
 The expensive code/architecture review has already been front-loaded. These PRs do NOT need to be understood from scratch again; they need current-main reconciliation, protection against resurrecting old code, and exact-head final gates.
@@ -205,8 +235,10 @@ Merge commit: `525e18e3592e6a18a321ee145791a6abff383e07`.
 Full senior findings and exact-head gate evidence are recorded above.
 
 ### #126 F2 users
-Deep-reviewed through live source head `7e3230c377b8c732c023a1788d4899007b560535`; now actively reconciling/hardening on post-F1 main.
-Historical exact-head CI/CodeQL/security are green on the old base.
+Merged after full current-main reconstruction, senior hardening and exact-head verification.
+Final reviewed head: `46cc7361485c787bdae1af8fadb10ac043c4f50c`.
+Merge commit: `c0e0cb4c4d2606f557b961773979cbf38020143c`.
+Full reconciliation, fixes and gate evidence are recorded above.
 
 Already-reviewed fixes:
 - Removed DEBUG OTP + phone logging/stdout while preserving explicit DEBUG response field.
@@ -325,11 +357,12 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #126 / F2 on reconciliation branch `reconcile/f2-users-post-f1-20261004`. Current main is `525e18e3592e6a18a321ee145791a6abff383e07`; reviewed F2 source head is `7e3230c377b8c732c023a1788d4899007b560535`.**
+**Resume at PR #127 / F3 attendance. First fetch the live exact head; the reviewed source head is `668c952925f4757356685101c52e933eb30e206b`.**
 
-1. Reconciliation branch is confirmed `behind=0` from current main; reviewed overlay and workflow intent are preserved.
-2. Failure-boundary regressions and production fixes listed above are committed, including side-effect-free organization directory reads.
-3. Deep-review the exact reconciled diff one final time, then move `refactor/users-auth-split` to the reconciliation head so PR #126 is preserved.
-4. Run fresh main-target Shared Core Consolidation, full `users` package, PostgreSQL where applicable, CodeQL and Public Repository Security on the exact PR head.
-5. If any gate fails, fix regression-first and update this file before rerunning.
-6. If all exact-head gates are green, mark #126 ready and merge guarded by exact head SHA, update this file, then proceed to #127 F3.
+1. Fetch newest `main` after this documentation checkpoint and create a clean F3 reconciliation branch from it.
+2. Overlay only F3's five reviewed attendance files from `668c9529`; do not merge old-base history.
+3. Re-check exact main → reconciliation diff, attendance URL/re-export compatibility, protected `attendance.views` manager/error-surface imports and the stable non-integer `pharmacy_id` 400 contract.
+4. Update this file on the F3 branch with the exact reconciliation checkpoint.
+5. Move `refactor/attendance-api-split` atomically to the reconciled head so PR #127 is preserved.
+6. Run fresh main-target Shared Core Consolidation, attendance suites, PostgreSQL where relevant, CodeQL and Public Repository Security on the exact PR head.
+7. If any gate fails, fix regression-first and update this file; if all gates are green, mark #127 ready, merge with exact-head SHA guard, then proceed to #128 F4.
