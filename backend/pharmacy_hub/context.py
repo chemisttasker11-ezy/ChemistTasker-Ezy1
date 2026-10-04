@@ -178,12 +178,9 @@ class HubContextBuilder:
             for link in member_links
             if link.is_admin
         }
-        request_user = getattr(request, "user", None)
         for group in groups:
             perms = pharmacy_permissions.get(group.pharmacy_id, {})
             if perms.get("has_admin_permissions"):
-                admin_map[group.id] = True
-            if request_user and group.created_by_id == request_user.id:
                 admin_map[group.id] = True
         serializer = HubCommunityGroupSerializer(
             groups,
