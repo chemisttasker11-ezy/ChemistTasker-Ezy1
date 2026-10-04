@@ -268,6 +268,7 @@ Clean base: `main` at `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 11. `ensure_period_timesheets()` could also create a new worker Timesheet around/after final lock. It now serializes on the period row and becomes a no-op once the period is LOCKED; a regression proves a locked period cannot gain a new Timesheet through list/directory synchronization.
 12. Normal pre-lock behavior is unchanged: manager recalculation/reopen/approval and worker submission continue as before; manager approval without prior worker submission remains the explicitly pinned current product behavior.
 13. Post-lock correction is a separate product gap, not solved by rewriting the locked record. Web/mobile already tell users “later corrections require the adjustment workflow,” but no actual unlock/TimesheetAdjustment workflow exists in the repo. Senior direction: keep the original locked manifest immutable and implement future post-lock amendments as a new linked adjustment revision with actor/time/reason rather than an in-place unlock that rewrites audit/payroll history.
+14. First exact-head PostgreSQL run after the builder hardening failed only in the new lock-order assertion: the matcher searched for raw table name `workforce_timesheet`, which is also a prefix of `workforce_timesheetperiod`, so the period-lock query was misclassified as both period and timesheet. Senior review confirmed production lock order was already period → timesheet. The regression now matches Django's exact quoted PostgreSQL table identifiers; production code was intentionally left unchanged.
 
 ## Beyond E2 — deep review already completed
 
@@ -399,6 +400,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 2. Move `refactor/timesheets-split` atomically to the reconciliation head so PR #129 is preserved; do not carry old-base history.
 3. Run fresh main-target Shared Core Consolidation, full workforce/timesheet tests, PostgreSQL concurrency, CodeQL and Public Repository Security on the exact PR head.
 4. Pay special attention to the new locked-build/ensure regressions and the PostgreSQL period→timesheet builder lock-order assertion.
+   - If PostgreSQL fails again, distinguish a real row-lock/transaction defect from a test instrumentation issue before touching production code.
 5. If any gate fails, fix regression-first and update this file.
 6. If all exact-head gates are green, mark #129 ready and merge with exact-head SHA guard.
 7. Immediately proceed to #130 G1. Keep the future post-lock adjustment workflow as a separately tracked product feature; do not weaken locked-manifest immutability in F5.
