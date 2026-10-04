@@ -57,16 +57,33 @@ def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:
 
 def _apply_worker_payment_terms(assignment, shift, user):
     """Record the worker's own engagement/settlement terms on an approved emergency-cover assignment."""
-    from shifts.engagement import SETTLEMENT_TIMESHEET_ONLY, build_shift_engagement_terms
+    from shifts.engagement import (
+        KIND_INDEPENDENT_CONTRACTOR,
+        KIND_SHIFT_EMPLOYMENT,
+        PAYMENT_ABN,
+        PAYMENT_TFN,
+        SETTLEMENT_TIMESHEET_ONLY,
+        build_shift_engagement_terms,
+        worker_onboarding,
+    )
 
     try:
         terms = build_shift_engagement_terms(shift=shift, user=user)
     except ValidationError as exc:
-        # The cover is real work; an incomplete payment profile must not block approval. It stays in the timesheet
-        # and the pharmacy settles it once the worker completes their payment details.
+        # The cover is real work; an incomplete payment/rate profile must not block approval. Preserve the worker's
+        # explicit TFN/ABN choice so payroll/invoicing follow-up knows which settlement path they intended.
+        onboarding = worker_onboarding(user)
+        preference = str(getattr(onboarding, "payment_preference", "") or "").upper()
+        engagement_kind = (
+            KIND_INDEPENDENT_CONTRACTOR if preference == PAYMENT_ABN
+            else KIND_SHIFT_EMPLOYMENT if preference == PAYMENT_TFN
+            else ""
+        )
         terms = {
             "version": 1,
             "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
+            "payment_preference": preference if preference in {PAYMENT_TFN, PAYMENT_ABN} else "",
+            "engagement_kind": engagement_kind,
             "payment_profile_incomplete": True,
             "notice": "Worker payment details are incomplete; settle this emergency cover once they are completed.",
             "missing": getattr(exc, "message_dict", None) or list(getattr(exc, "messages", [])),

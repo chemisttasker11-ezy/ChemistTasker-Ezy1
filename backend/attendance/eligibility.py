@@ -7,11 +7,13 @@ resolving the exact eligibility tier:
    A confirmed assignment does not require permanent pharmacy membership.
 2. Unscheduled Local Staff: Active, accepted employed staff (Full-Time, Part-Time,
    Casual) at the target pharmacy. Provisional (pending manager approval).
+2b. Favourite emergency cover: an active accepted LOCUM or SHIFT_HERO favourite at the target
+   pharmacy may clock in provisionally without an assignment, pending manager review.
 3. Cross-Site Staff: Active, accepted employed staff at another pharmacy sharing
    the same owner chain (same owner or active Chain) or same organization.
    Provisional (pending manager approval). Records the source membership.
 
-Unauthorized attempts (inactive, pending, favourite contacts without an assignment,
+Unauthorized attempts (inactive, pending, plain CONTACT favourites without an assignment,
 unrelated staff, null-to-null owner/org matches, org-admin without membership)
 are rejected. The service is strictly read-only and never auto-creates shifts
 or memberships.

@@ -79,6 +79,34 @@ class FavouriteCoverTests(TestCase):
             "approval never creates a permanent membership",
         )
 
+    def test_tfn_preference_is_preserved_when_payroll_terms_need_follow_up(self):
+        PharmacistOnboarding.objects.create(
+            user=self.locum,
+            payment_preference="TFN",
+            tfn_number="123456789",
+        )
+        provisional = approve_provisional_attendance(self.owner, self.covered_session().pk)
+        assignment = provisional.backfill_assignment
+        self.assertEqual(provisional.status, ProvisionalAttendance.Status.APPROVED)
+        self.assertEqual(assignment.payment_preference_snapshot, "TFN")
+        self.assertEqual(assignment.engagement_kind, "SHIFT_EMPLOYMENT")
+        self.assertEqual(assignment.settlement_channel, "TIMESHEET_ONLY")
+        self.assertTrue(assignment.engagement_terms_snapshot["payment_profile_incomplete"])
+        self.assertEqual(assignment.engagement_terms_snapshot["source"], "FAVOURITE_COVER_APPROVAL")
+
+    def test_incomplete_abn_preference_is_preserved_for_invoice_follow_up(self):
+        PharmacistOnboarding.objects.create(
+            user=self.locum,
+            payment_preference="ABN",
+            abn="51824753556",
+        )
+        provisional = approve_provisional_attendance(self.owner, self.covered_session().pk)
+        assignment = provisional.backfill_assignment
+        self.assertEqual(assignment.payment_preference_snapshot, "ABN")
+        self.assertEqual(assignment.engagement_kind, "INDEPENDENT_CONTRACTOR")
+        self.assertEqual(assignment.settlement_channel, "TIMESHEET_ONLY")
+        self.assertTrue(assignment.engagement_terms_snapshot["payment_profile_incomplete"])
+
     def test_incomplete_payment_details_do_not_block_approval(self):
         provisional = approve_provisional_attendance(self.owner, self.covered_session().pk)
         assignment = provisional.backfill_assignment
