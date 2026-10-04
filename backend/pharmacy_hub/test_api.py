@@ -161,6 +161,49 @@ class HubPostTests(HubBase):
             "invalid attachment batches must not leave a partially-created post",
         )
 
+    def test_invalid_attachment_update_does_not_change_post_or_remove_existing_file(self):
+        original = SimpleUploadedFile(
+            "original.png",
+            b"\x89PNG\r\n\x1a\noriginal",
+            content_type="image/png",
+        )
+        created = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "original body",
+                "attachments": [original],
+            },
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        attachment = PharmacyHubAttachment.objects.get(post_id=post_id)
+        stored_name = attachment.file.name
+
+        invalid = SimpleUploadedFile(
+            "invalid.exe",
+            b"invalid",
+            content_type="application/octet-stream",
+        )
+        response = client_for(self.staff).patch(
+            f"{POSTS}{post_id}/",
+            {
+                "body": "must not persist",
+                "remove_attachment_ids": [attachment.id],
+                "attachments": [invalid],
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+
+        post = PharmacyHubPost.objects.get(pk=post_id)
+        self.assertEqual(post.body, "original body")
+        self.assertTrue(
+            PharmacyHubAttachment.objects.filter(pk=attachment.id).exists()
+        )
+        self.assertTrue(default_storage.exists(stored_name))
+
     def test_remove_attachment_deletes_the_storage_object(self):
         uploaded = SimpleUploadedFile(
             "remove-me.png",
