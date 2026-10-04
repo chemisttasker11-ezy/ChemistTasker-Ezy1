@@ -1,7 +1,7 @@
 from datetime import date, time, timedelta
 from queue import Queue
 from threading import Barrier, Thread
-from unittest import skipUnless
+from unittest import mock, skipUnless
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -22,6 +22,9 @@ from client_profile.models import (
 from invoicing.models import Invoice, InvoiceLineItem
 from client_profile.domains.memberships.serializers import MembershipApplicationSerializer
 from invoicing.services import generate_invoice_from_shifts
+from workforce.models import Timesheet, TimesheetPeriod, TimesheetRevision
+from workforce.timesheet_builder import build_timesheet
+from workforce.timesheet_transitions import submit_timesheet
 from memberships.invites import create_membership_invite
 from memberships.models import Membership
 from organizations.models import PharmacyAdmin
@@ -205,6 +208,108 @@ class MembershipLimitPostgresLockingTests(TransactionTestCase):
         queries = list(captured.captured_queries)
         user_locks = self._for_update_positions(queries, User._meta.db_table)
         self.assertTrue(user_locks, "invite activation must share the worker-row lock used by self-acceptance")
+
+
+
+@POSTGRES_ONLY
+class TimesheetTransitionPostgresLockingTests(TransactionTestCase):
+    reset_sequences = True
+
+    def test_submit_locks_only_timesheet_with_nullable_membership(self):
+        worker = User.objects.create_user(
+            email="pg-timesheet-worker@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        owner = User.objects.create_user(
+            email="pg-timesheet-owner@example.com",
+            password="test-pass",
+            role="OWNER",
+        )
+        pharmacy = Pharmacy.objects.create(name="PG Timesheet Pharmacy")
+        period = TimesheetPeriod.objects.create(
+            pharmacy=pharmacy,
+            start_date=date(2026, 10, 5),
+            end_date=date(2026, 10, 11),
+            created_by=owner,
+        )
+        timesheet = Timesheet.objects.create(
+            period=period,
+            user=worker,
+            membership=None,
+            status=Timesheet.Status.READY,
+            needs_rebuild=False,
+        )
+        TimesheetRevision.objects.create(
+            timesheet=timesheet,
+            revision_number=1,
+            source_fingerprint="pg-lock-test",
+            snapshot={},
+        )
+
+        revision = submit_timesheet(timesheet, worker, 1)
+
+        self.assertEqual(revision.revision_number, 1)
+        timesheet.refresh_from_db()
+        self.assertEqual(timesheet.status, Timesheet.Status.SUBMITTED)
+
+    def test_builder_locks_period_before_timesheet(self):
+        worker = User.objects.create_user(
+            email="pg-timesheet-builder-worker@example.com",
+            password="test-pass",
+            role="PHARMACIST",
+        )
+        owner = User.objects.create_user(
+            email="pg-timesheet-builder-owner@example.com",
+            password="test-pass",
+            role="OWNER",
+        )
+        pharmacy = Pharmacy.objects.create(name="PG Timesheet Builder Pharmacy")
+        period = TimesheetPeriod.objects.create(
+            pharmacy=pharmacy,
+            start_date=date(2026, 10, 12),
+            end_date=date(2026, 10, 18),
+            created_by=owner,
+        )
+        timesheet = Timesheet.objects.create(
+            period=period,
+            user=worker,
+            membership=None,
+            status=Timesheet.Status.READY,
+            needs_rebuild=True,
+        )
+
+        with CaptureQueriesContext(connection) as captured, mock.patch(
+            "workforce.timesheet_builder._period_bounds",
+            side_effect=RuntimeError("stop after row locks"),
+        ):
+            with self.assertRaisesMessage(RuntimeError, "stop after row locks"):
+                build_timesheet(timesheet.pk, actor=owner)
+
+        queries = list(captured.captured_queries)
+        period_table = connection.ops.quote_name(TimesheetPeriod._meta.db_table)
+        timesheet_table = connection.ops.quote_name(Timesheet._meta.db_table)
+        period_from = f"FROM {period_table}"
+        timesheet_from = f"FROM {timesheet_table}"
+        period_locks = [
+            index
+            for index, query in enumerate(queries)
+            if "FOR UPDATE" in query["sql"].upper()
+            and period_from in query["sql"]
+        ]
+        timesheet_locks = [
+            index
+            for index, query in enumerate(queries)
+            if "FOR UPDATE" in query["sql"].upper()
+            and timesheet_from in query["sql"]
+        ]
+        self.assertTrue(period_locks, "builder must lock the timesheet period")
+        self.assertTrue(timesheet_locks, "builder must lock the timesheet row")
+        self.assertLess(
+            period_locks[0],
+            timesheet_locks[0],
+            "builder lock order must be period then timesheet to match transition/period locking",
+        )
 
 
 

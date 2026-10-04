@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`82258451dc319f0a5d795cae93134f267c125c74`
+`27a6fb36030edb7d0dc4c76e5c770e1293609326`
 
-This is the merge commit of **PR #127 / F3 attendance split**.
+This is the merge commit of **PR #128 / F4 roster services split**.
 
 ### Merged sequence completed during this senior review
 
@@ -40,6 +40,7 @@ This is the merge commit of **PR #127 / F3 attendance split**.
 - #125 F1 Pharmacy Hub split + senior identity/scope/atomicity/storage hardening
 - #126 F2 users split + privacy/delivery/OTP/storage/directory hardening
 - #127 F3 attendance split + scoped kiosk-pairing authorization projection fix
+- #128 F4 roster services split
 
 ## Important senior-review fixes already landed in main
 
@@ -228,24 +229,52 @@ Merge commit: `82258451dc319f0a5d795cae93134f267c125c74`
 8. Exact-head Shared Core Consolidation: architecture, boundary, shared-core, PostgreSQL concurrency, kiosk, mobile, Vite, Next, backend attendance/kiosk contracts, workforce/finance tail and final release-gate all green.
 9. #127 was marked ready only after exact-head completion and merged with SHA guard `e8061d0da4d60dc90bee8d65b8ab9a12a67920ec`.
 
-## ACTIVE PR — #128 / F4 roster services split
+## COMPLETED — #128 / F4 roster services split
 
 Original PR branch: `refactor/roster-services-split`
-Reviewed source head: `38c241b8e73dc4ac99745aeb986961a43a856d0b`
-Clean reconciliation branch: `reconcile/f4-roster-post-f3-20261004`
-Clean base: `main` at `82258451dc319f0a5d795cae93134f267c125c74`
+Final reviewed head: `c6bcb5fd29b893fbcf90dee7388321a27d0815d6`
+Merge commit: `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 
-### F4 reconciliation and senior review
+### F4 final senior result
 
-1. Created the clean branch directly from F3-merged main and overlaid exactly the nine reviewed `workforce/roster/*` files; none of those nine files changed between F4's historical base and current main, so no later fix is being overwritten.
-2. Final pre-documentation code diff is exactly those nine roster files and is `behind=0`.
-3. Rechecked #117's authorization correction: roster-management mutations continue to use `workforce.roster.permissions.is_authorized_attendance_manager()`, which delegates to canonical `workforce.permissions.can_manage_roster_pharmacy()`; no legacy “any active PharmacyAdmin can roster” shortcut was reintroduced.
-4. Checked every live importer of `workforce.roster.services`; the façade preserves all historical import paths used by V2 views, revisions, worker actions and attendance/roster tests.
-5. Compared the old monolithic service implementation with the eight extracted owner modules using top-level function boundaries: all **26/26 moved functions are byte-identical**. F4 is therefore an ownership split with no silent business-logic drift.
-6. Import graph remains acyclic at the extracted service layer: owner modules depend downward on periods/edit/rate helpers and do not import the façade back.
-7. Reviewed transaction/marketplace/history guards in publication, bulk edit, copy, templates and acknowledgements. Existing period/user locking, all-or-nothing bulk transactions, marketplace-slot protection and leave/attendance history protections remain unchanged.
-8. Investigated malformed roster date/time parsing: the public V2 copy/template/bulk endpoints already catch both Django `ValidationError` and Python `ValueError` and return 400, so there is no newly introduced 500 to fix in F4.
-9. PR #128 has no unresolved review threads.
+1. Rebuilt cleanly from F3-merged main with exactly the nine reviewed roster-service files plus this progress document; final compare was `behind=0`.
+2. Reconfirmed #117's canonical roster capability boundary. All roster-management mutations remain behind `is_authorized_attendance_manager()` / `can_manage_roster_pharmacy()`; no legacy “any PharmacyAdmin can roster” shortcut returned.
+3. Historical `workforce.roster.services` façade preserved every live import.
+4. Compared the monolith with extracted owner modules using top-level function boundaries: **26/26 moved functions are byte-identical**.
+5. Exact-head Public Repository Security: green.
+6. Exact-head CodeQL Python + JavaScript/TypeScript: green.
+7. Exact-head Shared Core Consolidation: backend, PostgreSQL concurrency, shared-core, architecture, boundary, kiosk, mobile, Vite, Next and release-gate all green.
+8. #128 was marked ready only after exact-head completion and merged with SHA guard `c6bcb5fd29b893fbcf90dee7388321a27d0815d6`.
+
+## ACTIVE PR — #129 / F5 timesheet split
+
+Original PR branch: `refactor/timesheets-split`
+Reviewed source head: `2b8aa3e66cc857a98912c435f8978008f8366ae0`
+Clean reconciliation branch: `reconcile/f5-timesheets-post-f4-20261004`
+Clean base: `main` at `27a6fb36030edb7d0dc4c76e5c770e1293609326`
+
+### F5 reconciliation and senior review
+
+1. Rebuilt from post-F4 main without old-base history.
+2. Eight timesheet split/test files had zero later-main overlap. The only overlapping file was `backend/client_profile/test_postgres_concurrency.py`; every E2 membership locking test was preserved and only the F5 timesheet imports/tests were added.
+3. Historical `workforce.timesheets` façade preserves all 33 historical functions plus existing exported tolerance/engagement constants.
+4. Function-body comparison against current main: **28/33 original functions are byte-identical**. The only changed functions are `ensure_period_timesheets`, `build_timesheet`, `submit_timesheet`, `approve_timesheet`, and `reopen_timesheet`; the only new functions are the two row-lock helpers.
+5. Existing F5 hardening remains: submit/approve/reopen are atomic, lock period first then timesheet, re-read current state under lock, reject locked-period transitions, and restrict PostgreSQL row locks with `of=("self",)`.
+6. PostgreSQL execution coverage with `membership=None` is preserved to prevent nullable outer-join lock regressions.
+7. Senior preflight found an unresolved P1: `build_timesheet()` used a joined timesheet+period row lock whose acquisition order could oppose transition/period locking and deadlock under PostgreSQL.
+8. Fixed builder lock order regression-first: builder now resolves the period, locks `TimesheetPeriod` first, then locks only the `Timesheet` row using `of=("self",)`; PostgreSQL query-order coverage proves period FOR UPDATE occurs before timesheet FOR UPDATE.
+9. Senior review found a locked-manifest integrity gap: `build_timesheet()` only blocked a locked period when `force=True`, so a normal/direct build could still create a new revision or change live status after the manifest had been frozen.
+10. Locked-period build regression added. **All** direct builds now reject a LOCKED period regardless of `force`.
+11. `ensure_period_timesheets()` could also create a new worker Timesheet around/after final lock. It now serializes on the period row and becomes a no-op once the period is LOCKED; a regression proves a locked period cannot gain a new Timesheet through list/directory synchronization.
+12. Normal pre-lock behavior is unchanged: manager recalculation/reopen/approval and worker submission continue as before; manager approval without prior worker submission remains the explicitly pinned current product behavior.
+13. Post-lock correction is a separate product gap, not solved by rewriting the locked record. Web/mobile already tell users “later corrections require the adjustment workflow,” but no actual unlock/TimesheetAdjustment workflow exists in the repo. Senior direction: keep the original locked manifest immutable and implement future post-lock amendments as a new linked adjustment revision with actor/time/reason rather than an in-place unlock that rewrites audit/payroll history.
+14. First exact-head PostgreSQL run on `ead17ae873b8ace6b00b5920b230510e6775b02f` exposed a **test matcher defect**, not a production locking defect: the assertion matched table names by substring, so `workforce_timesheet` also matched `workforce_timesheetperiod` and one period-lock query could be classified as both locks.
+15. Tightened the PostgreSQL regression to identify lock acquisition by the query's exact `FROM <quoted_table>` base table. Senior review confirmed production builder code already locked period → timesheet correctly, so production code was intentionally left unchanged.
+16. Because the assertion/documentation corrections changed the PR head, all prior green results are supporting evidence only. Fresh exact-head Shared Core/PostgreSQL/CodeQL/security must pass on the final head before merge.
+17. Senior API integration review found a locked-read edge: `TimesheetDetailView.GET` auto-rebuilt manager-visible rows when `needs_rebuild=True`. Normal locking prevents that flag, but a stale legacy/manual flag on a LOCKED row would invoke the correctly rejecting builder from a GET and could surface as HTTP 500.
+18. Added a red-first locked-detail regression. A LOCKED timesheet detail GET is now strictly read-only even with stale `needs_rebuild=True`: it returns the existing approved data, creates no revision and leaves the flag/status untouched. Explicit recalculate continues to return the locked-period validation error.
+19. Fresh exact-head backend on `08a851ff08492c107bef6e37134f1a686287171d` reached Workforce/Finance and exposed a test-fixture error before exercising the new locked-directory assertion: the regression referenced `projection.User`, but the reused fixture module does not expose that name in the CI import context.
+20. Corrected the regression to construct the extra worker through Django's `get_user_model()`. No F5 production code changed for this failure; prior PostgreSQL concurrency, CodeQL, security, architecture, boundary, shared-core, kiosk, mobile, Vite and Next evidence remains supporting-only until the new exact head passes the full final gate.
 
 ## Beyond E2 — deep review already completed
 
@@ -278,26 +307,19 @@ Final reviewed head: `e8061d0da4d60dc90bee8d65b8ab9a12a67920ec`.
 Merge commit: `82258451dc319f0a5d795cae93134f267c125c74`.
 
 ### #128 F4 roster
-Actively reconciled on post-F3 main.
-Reviewed source head: `38c241b8e73dc4ac99745aeb986961a43a856d0b`.
-Clean reconciliation branch: `reconcile/f4-roster-post-f3-20261004`.
-- All nine F4 files have zero overlap with later-main changes.
-- 26/26 moved service functions are byte-identical after extraction.
-- Canonical roster-management authority remains intact.
-- No unresolved review threads.
-- Fresh exact-head verification still required after moving PR #128.
+Merged after clean post-F3 reconciliation and full exact-head verification.
+Final reviewed head: `c6bcb5fd29b893fbcf90dee7388321a27d0815d6`.
+Merge commit: `27a6fb36030edb7d0dc4c76e5c770e1293609326`.
 
 ### #129 F5 timesheets
-Deep-reviewed and hardened.
-Current head: `2b8aa3e66cc857a98912c435f8978008f8366ae0`.
-Historical exact-head CI green; old base.
-
-Fixes:
-- Locked period previously allowed worker resubmission changing APPROVED → SUBMITTED.
-- Submit/approve/reopen now serialize with period locking and refuse locked-period transition.
-- Consistent period → timesheet lock order.
-- PostgreSQL `select_for_update` restricted to `of=("self",)` to avoid nullable joined-row lock failures and excess pharmacy locking.
-- Added real PostgreSQL execution coverage.
+Actively reconciled and hardened on post-F4 main.
+Reviewed source head: `2b8aa3e66cc857a98912c435f8978008f8366ae0`.
+Clean reconciliation branch: `reconcile/f5-timesheets-post-f4-20261004`.
+- 28/33 original functions remain byte-identical.
+- Five intentional integrity changes: ensure/build/submit/approve/reopen.
+- Preserved all E2 membership PostgreSQL tests.
+- Added period-first builder lock-order regression and locked-manifest immutability regressions.
+- Post-lock amendment workflow is a separate product gap; do not implement an in-place unlock.
 
 ### #130 G1 admin ownership
 Deep-reviewed.
@@ -378,12 +400,13 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #128 / F4 roster from reconciliation branch `reconcile/f4-roster-post-f3-20261004`. Reviewed source head is `38c241b8e73dc4ac99745aeb986961a43a856d0b`; current code-bearing main is `82258451dc319f0a5d795cae93134f267c125c74`.**
+**Resume at PR #129 / F5 from reconciliation branch `reconcile/f5-timesheets-post-f4-20261004`. Current main is `27a6fb36030edb7d0dc4c76e5c770e1293609326`; reviewed source head is `2b8aa3e66cc857a98912c435f8978008f8366ae0`.**
 
-1. Fetch the reconciliation branch live head after this documentation commit and verify newest `main` → exact head remains `behind=0`; expected diff is the nine reviewed roster files plus this progress document.
-2. Move `refactor/roster-services-split` atomically to the reconciliation head so PR #128 is preserved; do not merge old-base history.
-3. Run fresh main-target Shared Core Consolidation, roster/attendance suites, PostgreSQL where relevant, CodeQL and Public Repository Security on the exact PR head.
-4. Reconfirm the #117 canonical roster capability boundary and the historical `workforce.roster.services` façade imports under CI.
+1. Fetch the reconciliation branch live head after this documentation commit and confirm current main → exact head remains `behind=0`; expected diff is the F5 timesheet split/test files, the preserved/extended PostgreSQL concurrency file, the locked-detail read guard in `workforce/views.py`, and this progress document.
+2. Move `refactor/timesheets-split` atomically to the reconciliation head so PR #129 is preserved; do not carry old-base history.
+3. Run fresh main-target Shared Core Consolidation, full workforce/timesheet tests, PostgreSQL concurrency, CodeQL and Public Repository Security on the exact PR head.
+4. Pay special attention to the new locked-build/ensure regressions and the PostgreSQL period→timesheet builder lock-order assertion, including the corrected exact-FROM SQL matcher.
+   - If PostgreSQL fails again, distinguish a real row-lock/transaction defect from a test instrumentation issue before touching production code.
 5. If any gate fails, fix regression-first and update this file.
-6. If all exact-head gates are green, mark #128 ready and merge with exact-head SHA guard.
-7. Immediately advance to #129 F5, preserving every E2 membership PostgreSQL test and applying only the reviewed F5 timesheet concurrency additions.
+6. If all exact-head gates are green, mark #129 ready and merge with exact-head SHA guard.
+7. Immediately proceed to #130 G1. Keep the future post-lock adjustment workflow as a separately tracked product feature; do not weaken locked-manifest immutability in F5.
