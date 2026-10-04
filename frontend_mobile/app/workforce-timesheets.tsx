@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
 import {
   fetchPharmaciesService,
   type WorkforceTimesheetPeriod,
@@ -107,9 +107,33 @@ export default function WorkforceTimesheetsScreen() {
     });
   };
 
+  const [correctionReason, setCorrectionReason] = useState('');
+
+  // Reopen a locked period on purpose to fix a mistake: the current manifest is kept for audit, and locking again
+  // creates an adjustment.
+  const correctPeriod = () => {
+    if (!periodId) return;
+    const reason = correctionReason.trim();
+    if (!reason) {
+      setError('A reason is required to correct a locked period.');
+      return;
+    }
+    Alert.alert('Correct locked period?', 'The period reopens so timesheets can be fixed, approved and locked again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Correct',
+        style: 'destructive',
+        onPress: () => void run(async () => {
+          await workforce.correctTimesheetPeriod(periodId, reason);
+          setCorrectionReason('');
+        }),
+      },
+    ]);
+  };
+
   const lockPeriod = () => {
     if (!periodId) return;
-    Alert.alert('Lock reviewed period?', 'Locked time becomes immutable and later corrections require the adjustment workflow.', [
+    Alert.alert('Lock reviewed period?', 'Locked time is frozen; a mistake can only be fixed with "Correct locked period", which keeps the current manifest for audit.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Lock', style: 'destructive', onPress: () => void run(() => workforce.lockTimesheetPeriod(periodId)) },
     ]);
@@ -135,6 +159,18 @@ export default function WorkforceTimesheetsScreen() {
           <Button mode="outlined" disabled={!pharmacyId || busy} onPress={openCurrent}>Open current fortnight</Button>
           <Button disabled={!periodId || busy || selectedPeriod?.status === 'LOCKED'} onPress={() => void run(() => workforce.recalculateTimesheetPeriod(periodId!, true))}>Recalculate</Button>
           <Button disabled={!periodId || busy || selectedPeriod?.status === 'LOCKED'} textColor="#B42318" onPress={lockPeriod}>Lock</Button>
+          {selectedPeriod?.status === 'LOCKED' ? (
+            <View style={{ width: '100%', gap: 6 }}>
+              <TextInput
+                mode="outlined"
+                dense
+                label="Reason for correcting this locked period"
+                value={correctionReason}
+                onChangeText={setCorrectionReason}
+              />
+              <Button mode="outlined" textColor="#B42318" disabled={busy} onPress={correctPeriod}>Correct locked period</Button>
+            </View>
+          ) : null}
         </View>
 
         {!!periods.length && <>

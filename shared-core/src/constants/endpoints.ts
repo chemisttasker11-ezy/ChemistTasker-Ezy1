@@ -314,6 +314,7 @@ export const API_ENDPOINTS = {
         timesheetPeriodSummary: (id: number) => `/client-profile/workforce/timesheet-periods/${id}/summary/`,
         timesheetPeriodRecalculate: (id: number) => `/client-profile/workforce/timesheet-periods/${id}/recalculate/`,
         timesheetPeriodLock: (id: number) => `/client-profile/workforce/timesheet-periods/${id}/lock/`,
+        timesheetPeriodCorrect: (id: number) => `/client-profile/workforce/timesheet-periods/${id}/correct/`,
         timesheets: '/client-profile/workforce/timesheets/',
         timesheet: (id: number) => `/client-profile/workforce/timesheets/${id}/`,
         timesheetRecalculate: (id: number) => `/client-profile/workforce/timesheets/${id}/recalculate/`,

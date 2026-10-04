@@ -447,6 +447,8 @@ export const workforce = {
     getTimesheetPeriodSummary: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodSummary(id)),
     recalculateTimesheetPeriod: (id, sync = false) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodRecalculate(id), { method: 'POST', body: { sync } }),
     lockTimesheetPeriod: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodLock(id), { method: 'POST', body: {} }),
+    // Reopen a locked period on purpose to fix a mistake; the superseded manifest is kept and re-locking adjusts it.
+    correctTimesheetPeriod: (id, reason) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodCorrect(id), { method: 'POST', body: { reason } }),
     listTimesheets: (periodId, query = {}) => operationalRequest(API_ENDPOINTS.workforce.timesheets, { query: { period_id: periodId, ...query } }),
     getTimesheet: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheet(id)),
     recalculateTimesheet: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheetRecalculate(id), { method: 'POST', body: {} }),

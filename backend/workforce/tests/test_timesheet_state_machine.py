@@ -15,6 +15,7 @@ from workforce.models import (
     TimesheetCheck,
     TimesheetCheckDecision,
     TimesheetComment,
+    TimesheetCorrection,
     TimesheetManifest,
     TimesheetPeriod,
 )
@@ -24,6 +25,7 @@ from workforce.timesheets import (
     add_comment,
     approve_timesheet,
     build_timesheet,
+    correct_locked_period,
     decide_check,
     ensure_period_timesheets,
     lock_period,
@@ -118,6 +120,46 @@ class TimesheetStateMachineTests(TestCase):
         self.assertEqual((worker_comment.body, worker_comment.worker_visible, manager_note.worker_visible),
                          ("Please check", True, False))
         self.assertEqual(TimesheetComment.objects.filter(timesheet=self.timesheet).count(), 2)
+
+    def lock_all(self):
+        for timesheet in self.period.timesheets.all():
+            current = build_timesheet(timesheet.pk, actor=self.owner)
+            timesheet.refresh_from_db()
+            approve_timesheet(timesheet, self.owner, current.revision_number)
+        return lock_period(self.period, self.owner)
+
+    def test_a_locked_period_can_be_corrected_on_purpose_and_relocked_as_an_adjustment(self):
+        self.built()
+        original = self.lock_all()
+        original_hash, original_snapshot = original.manifest_hash, original.snapshot
+
+        with self.assertRaises(PermissionDenied):
+            correct_locked_period(self.period, self.worker, "Wrong hours")
+        with self.assertRaisesMessage(ValidationError, "A reason is required to correct a locked period."):
+            correct_locked_period(self.period, self.owner, "  ")
+
+        correction = correct_locked_period(self.period, self.owner, "Break entered twice")
+        self.period.refresh_from_db()
+        self.assertEqual((self.period.status, self.period.locked_at), (TimesheetPeriod.Status.OPEN, None))
+        self.assertFalse(TimesheetManifest.objects.filter(period=self.period).exists())
+        self.assertEqual(
+            (correction.superseded_manifest_hash, correction.superseded_manifest_snapshot),
+            (original_hash, original_snapshot),
+            "the superseded manifest is kept for audit",
+        )
+        with self.assertRaisesMessage(ValidationError, "Only a locked period can be corrected."):
+            correct_locked_period(self.period, self.owner, "again")
+
+        # The mistake can now be fixed: reopen, recalculate, approve and lock again.
+        self.timesheet.refresh_from_db()
+        reopen_timesheet(self.timesheet, self.owner, "Break entered twice")
+        adjustment = self.lock_all()
+        self.assertNotEqual(adjustment.manifest_hash, original_hash)
+        self.assertEqual(adjustment.snapshot["adjustment"]["supersedes_manifest_hash"], original_hash)
+        correction.refresh_from_db()
+        self.assertEqual(correction.adjustment_manifest_hash, adjustment.manifest_hash)
+        self.assertIsNotNone(correction.closed_at)
+        self.assertEqual(TimesheetCorrection.objects.filter(period=self.period).count(), 1)
 
     def test_locking_requires_every_timesheet_approved_and_freezes_the_period(self):
         revision = self.built()

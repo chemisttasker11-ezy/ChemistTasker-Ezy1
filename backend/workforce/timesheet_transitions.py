@@ -8,6 +8,7 @@ from workforce.models import (
     TimesheetCheck,
     TimesheetCheckDecision,
     TimesheetComment,
+    TimesheetCorrection,
     TimesheetManifest,
     TimesheetPeriod,
 )
@@ -206,6 +207,18 @@ def lock_period(period, user):
                 "INVOICE and TIMESHEET_ONLY assignments remain in the audit timesheet snapshot only."
             ),
         }
+        open_correction = (
+            TimesheetCorrection.objects.select_for_update()
+            .filter(period=period, closed_at__isnull=True)
+            .first()
+        )
+        if open_correction:
+            # An adjustment manifest names the manifest it supersedes and why.
+            manifest_snapshot["adjustment"] = {
+                "supersedes_manifest_hash": open_correction.superseded_manifest_hash,
+                "correction_id": open_correction.pk,
+                "reason": open_correction.reason,
+            }
         manifest_hash = _hash(manifest_snapshot)
         manifest, _ = TimesheetManifest.objects.get_or_create(
             period=period,
@@ -217,4 +230,41 @@ def lock_period(period, user):
         period.locked_by = user
         period.locked_at = timezone.now()
         period.save(update_fields=["status", "locked_by", "locked_at", "updated_at"])
+        if open_correction:
+            open_correction.adjustment_manifest_hash = manifest.manifest_hash
+            open_correction.closed_at = period.locked_at
+            open_correction.save(update_fields=["adjustment_manifest_hash", "closed_at"])
         return manifest
+
+
+def correct_locked_period(period, user, reason: str):
+    """Reopen a locked period on purpose to fix a mistake, keeping the superseded manifest for audit.
+
+    Only a pharmacy manager may do this, with a reason. The live manifest is copied into a TimesheetCorrection and
+    removed; the period returns to OPEN so timesheets can be reopened and recalculated, then locked again.
+    """
+    require_manage_pharmacy(user, period.pharmacy)
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError("A reason is required to correct a locked period.")
+    with transaction.atomic():
+        period = TimesheetPeriod.objects.select_for_update(of=("self",)).select_related("pharmacy").get(pk=period.pk)
+        if period.status != TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Only a locked period can be corrected.")
+        manifest = TimesheetManifest.objects.select_for_update().filter(period=period).first()
+        correction = TimesheetCorrection.objects.create(
+            period=period,
+            reason=reason,
+            opened_by=user,
+            superseded_manifest_hash=manifest.manifest_hash if manifest else "",
+            superseded_manifest_snapshot=manifest.snapshot if manifest else {},
+            superseded_locked_by=period.locked_by,
+            superseded_locked_at=period.locked_at,
+        )
+        if manifest:
+            manifest.delete()
+        period.status = TimesheetPeriod.Status.OPEN
+        period.locked_by = None
+        period.locked_at = None
+        period.save(update_fields=["status", "locked_by", "locked_at", "updated_at"])
+        return correction

@@ -29,6 +29,7 @@ import {
   fetchTimesheetSummary,
   listTimesheetPeriods,
   listTimesheets,
+  correctTimesheetPeriod,
   lockTimesheetPeriod,
   openTimesheetPeriod,
   recalculateTimesheetPeriod,
@@ -159,7 +160,7 @@ export default function TimesheetsPage() {
 
   const lock = async () => {
     if (!periodId) return;
-    if (!window.confirm('Lock this reviewed period? Locked time is immutable; later corrections must use a later adjustment workflow.')) return;
+    if (!window.confirm('Lock this reviewed period? Locked time is frozen; a mistake can only be fixed with "Correct locked period", which keeps the current manifest for audit.')) return;
     setActionLoading(true);
     setError('');
     try {
@@ -170,6 +171,29 @@ export default function TimesheetsPage() {
     } catch (err: any) {
       const payload = err?.response?.data;
       setError(payload?.error || payload?.message || (payload ? JSON.stringify(payload) : err?.message) || 'Unable to lock period.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const correct = async () => {
+    if (!periodId) return;
+    const reason = window.prompt('Why does this locked period need correcting? The current manifest is kept for audit and the period reopens so timesheets can be fixed and locked again.');
+    if (reason == null) return;
+    if (!reason.trim()) {
+      setError('A reason is required to correct a locked period.');
+      return;
+    }
+    setActionLoading(true);
+    setError('');
+    try {
+      await correctTimesheetPeriod(periodId, reason.trim());
+      setFeedback('Period reopened for correction. Reopen the affected timesheets, fix them, approve and lock again.');
+      await loadPeriods();
+      await loadPeriod();
+    } catch (err: any) {
+      const payload = err?.response?.data;
+      setError(payload?.error || payload?.message || (payload ? JSON.stringify(payload) : err?.message) || 'Unable to correct period.');
     } finally {
       setActionLoading(false);
     }
@@ -203,6 +227,9 @@ export default function TimesheetsPage() {
             <Box flex={1} />
             <Button startIcon={<RefreshIcon />} onClick={recalculate} disabled={!periodId || actionLoading || selectedPeriod?.status === 'LOCKED'}>Recalculate</Button>
             <Button color="warning" startIcon={<LockOutlinedIcon />} variant="outlined" onClick={lock} disabled={!periodId || actionLoading || selectedPeriod?.status === 'LOCKED'}>Lock reviewed period</Button>
+            {selectedPeriod?.status === 'LOCKED' && (
+              <Button color="error" variant="outlined" onClick={correct} disabled={actionLoading}>Correct locked period</Button>
+            )}
           </Stack>
         </Paper>
 

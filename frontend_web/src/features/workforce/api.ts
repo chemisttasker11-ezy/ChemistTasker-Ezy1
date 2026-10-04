@@ -8,6 +8,7 @@ export const openTimesheetPeriod = (pharmacyId: number, startDate: string, endDa
 export const fetchTimesheetSummary = (periodId: number) => workforce.getTimesheetPeriodSummary(periodId);
 export const recalculateTimesheetPeriod = (periodId: number, sync = false) => workforce.recalculateTimesheetPeriod(periodId, sync);
 export const lockTimesheetPeriod = (periodId: number) => workforce.lockTimesheetPeriod(periodId);
+export const correctTimesheetPeriod = (periodId: number, reason: string) => workforce.correctTimesheetPeriod(periodId, reason);
 export const listTimesheets = (periodId: number, filters?: { status?: string; search?: string }) => workforce.listTimesheets(periodId, filters);
 export const fetchTimesheetDetail = (timesheetId: number) => workforce.getTimesheet(timesheetId);
 export const recalculateTimesheet = (timesheetId: number) => workforce.recalculateTimesheet(timesheetId);
