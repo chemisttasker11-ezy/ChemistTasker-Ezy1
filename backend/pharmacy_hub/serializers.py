@@ -501,22 +501,18 @@ class HubCommentSerializer(serializers.ModelSerializer):
         return obj.deleted_at is not None
 
     def get_viewer_reaction(self, obj):
-        membership = self.context.get("request_membership")
         request = self.context.get("request")
         request_user = getattr(request, "user", None)
-        if membership:
-            return (
-                obj.reactions.filter(member=membership)
-                .values_list("reaction_type", flat=True)
-                .first()
+        if not request_user or not request_user.is_authenticated:
+            return None
+        return (
+            obj.reactions.filter(
+                Q(user_id=request_user.id) | Q(member__user_id=request_user.id)
             )
-        if request_user and request_user.is_authenticated:
-            return (
-                obj.reactions.filter(user=request_user)
-                .values_list("reaction_type", flat=True)
-                .first()
-            )
-        return None
+            .order_by("id")
+            .values_list("reaction_type", flat=True)
+            .first()
+        )
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -775,22 +771,18 @@ class HubPostSerializer(serializers.ModelSerializer):
         return obj.organization_id
 
     def get_viewer_reaction(self, obj):
-        membership = self.context.get("request_membership")
         request = self.context.get("request")
         request_user = getattr(request, "user", None)
-        if membership:
-            return (
-                obj.reactions.filter(member=membership)
-                .values_list("reaction_type", flat=True)
-                .first()
+        if not request_user or not request_user.is_authenticated:
+            return None
+        return (
+            obj.reactions.filter(
+                Q(user_id=request_user.id) | Q(member__user_id=request_user.id)
             )
-        if request_user and request_user.is_authenticated:
-            return (
-                obj.reactions.filter(user=request_user)
-                .values_list("reaction_type", flat=True)
-                .first()
-            )
-        return None
+            .order_by("id")
+            .values_list("reaction_type", flat=True)
+            .first()
+        )
 
     def get_recent_comments(self, obj):
         comments_qs = (
