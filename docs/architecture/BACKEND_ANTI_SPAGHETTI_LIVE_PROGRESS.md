@@ -169,6 +169,20 @@ Clean base:
 5. PR #126 itself will be preserved. After reconciliation/hardening is complete, move `refactor/users-auth-split` atomically to the verified reconciliation head rather than merging old-base history.
 6. Historical CI/CodeQL/security on `7e3230c` are green but are supporting evidence only; final verification must run on the reconciled exact head.
 
+### F2 senior fixes committed on the reconciliation branch
+
+1. Added `users.delivery.deliver_email_best_effort()` as one redacted failure boundary while preserving each caller's existing transport and Celery task identity.
+2. Registration OTP, welcome e-mail, OTP resend, password reset, contact-support mail, account-deletion confirmation and organization invites no longer turn an already-persisted user action into HTTP 500 when the queue/broker is unavailable.
+3. Password-reset and e-mail-OTP resend now remain non-enumerating during queue failure; known and unknown e-mails keep the same public response.
+4. Account-deletion identity documents now clear database ownership inside the transaction and delete captured storage paths only after commit. A rollback keeps both the DB reference and physical file.
+5. Account-deletion confirmation delivery is best-effort; a completed anonymisation/revocation remains HTTP 200 even if Celery/Redis is unavailable.
+6. Mobile OTP send/resend share one provider helper with redacted status/error-type logging. Transport exceptions now return the same stable 502 as provider rejection.
+7. Failed mobile OTP attempts restore the previous identity/mobile/OTP state only if that failed attempt is still current, using a row lock + expected code/timestamp compare so a newer concurrent request cannot be clobbered.
+8. A failed SMS delivery therefore creates no false 60-second cooldown and an immediate retry is allowed.
+9. Removed `OrganizationMembership` → fake CONTACT `Membership` synthesis from `for_hub/include_pharmacy_members` reads. The combined view now contains real pharmacy Membership rows only; organization-only control-plane identities stay in the normal organization-membership directory.
+10. Updated the Region Admin regression to pin side-effect-free reads while preserving role/region/assigned-pharmacy visibility boundaries.
+11. Added `users.test_delivery_resilience` with focused regressions for storage rollback, queue-failure non-enumeration, account-deletion queue failure, SMS provider rejection/transport exceptions and retry state.
+
 ### F2 preflight findings to harden regression-first
 
 1. **Account-deletion file rollback safety.** `users/account_deletion.py` deletes verification files from storage with bound `FieldFile.delete(save=False)` while the database transaction is still open. A later rollback can restore database references after physical files are already gone. Rework to clear DB ownership transactionally, capture path/storage, and delete storage only after commit; follow the E1b path-based deletion principle.
@@ -313,10 +327,9 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 **Resume at PR #126 / F2 on reconciliation branch `reconcile/f2-users-post-f1-20261004`. Current main is `525e18e3592e6a18a321ee145791a6abff383e07`; reviewed F2 source head is `7e3230c377b8c732c023a1788d4899007b560535`.**
 
-1. Confirm the reconciliation branch is `behind=0` from current main and contains exactly the 14 reviewed users files plus the one-line current-workflow coverage expansion and this progress document.
-2. Add red-first F2 regressions for account-deletion storage rollback safety and queue failure, password-reset/OTP-resend non-enumeration during broker failure, and SMS provider exception/cooldown behavior.
-3. Fix those issues inside the users-domain split without changing historical API URLs, task identities or client contracts.
-4. Decide the `for_hub/include_pharmacy_members` read-time CONTACT Membership synthesis using current shared-core callers and F1's explicit human-identity rules; if removed, pin the no-side-effect contract.
-5. Deep-review the exact reconciled diff, then move `refactor/users-auth-split` to the verified reconciliation head so PR #126 is preserved.
-6. Run fresh main-target Shared Core Consolidation, backend/users full package, PostgreSQL where applicable, CodeQL and Public Repository Security on the exact PR head.
-7. If all exact-head gates are green, mark #126 ready and merge guarded by exact head SHA, update this file, then proceed to #127 F3.
+1. Reconciliation branch is confirmed `behind=0` from current main; reviewed overlay and workflow intent are preserved.
+2. Failure-boundary regressions and production fixes listed above are committed, including side-effect-free organization directory reads.
+3. Deep-review the exact reconciled diff one final time, then move `refactor/users-auth-split` to the reconciliation head so PR #126 is preserved.
+4. Run fresh main-target Shared Core Consolidation, full `users` package, PostgreSQL where applicable, CodeQL and Public Repository Security on the exact PR head.
+5. If any gate fails, fix regression-first and update this file before rerunning.
+6. If all exact-head gates are green, mark #126 ready and merge guarded by exact head SHA, update this file, then proceed to #127 F3.
