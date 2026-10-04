@@ -6,13 +6,15 @@ team_calendar and public_hub), the permission map behind /hub/context/, the cont
 platform posting, owner alerts and profile edits. The expected tables were recorded from the code before the hub
 module was split, so they pin the rules exactly while the code moves.
 """
-import base64
+import io
 import json
+from unittest import mock
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from PIL import Image
 from rest_framework.exceptions import PermissionDenied
 
 from client_profile.characterization_support import BASE, client_for, make_owner_with_pharmacy, make_user
@@ -23,13 +25,10 @@ from organizations.models import Organization, PharmacyAdmin
 from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyCommunityGroupMembership, PharmacyHubPost
 from users.models import OrganizationMembership
 
-PNG_BYTES = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nksAAAAASUVORK5CYII="
-)
-
-
 def png_upload(name):
-    return SimpleUploadedFile(name, PNG_BYTES, content_type="image/png")
+    buffer = io.BytesIO()
+    Image.new("RGB", (1, 1)).save(buffer, format="PNG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
 
 HUB = BASE + "hub/"
@@ -479,16 +478,20 @@ class ResolverAndPermissionTests(HubFixture):
             Membership.objects.filter(user=org_admin, pharmacy=self.pharmacy).exists()
         )
 
-        created = client_for(org_admin).post(
-            HUB + "posts/",
-            {
-                "scope": "pharmacy",
-                "pharmacy_id": self.pharmacy.id,
-                "body": "Tagged update",
-                "tagged_member_ids": [self.staff_membership.id],
-            },
-            format="json",
-        )
+        with mock.patch(
+            "pharmacy_hub.posts.async_task",
+            side_effect=RuntimeError("broker unavailable"),
+        ):
+            created = client_for(org_admin).post(
+                HUB + "posts/",
+                {
+                    "scope": "pharmacy",
+                    "pharmacy_id": self.pharmacy.id,
+                    "body": "Tagged update",
+                    "tagged_member_ids": [self.staff_membership.id],
+                },
+                format="json",
+            )
         self.assertEqual(created.status_code, 201, created.content)
 
         alert = Notification.objects.filter(user=self.users["staff"]).latest("id")
