@@ -87,7 +87,7 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`041ca086c85480ba0bccb211a9128a41d11b5087`
+`22a683a9c8431fb508a90cdb0c05a571b7e9c871`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
@@ -107,10 +107,13 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 9. Vote writes serialize on the User row and collapse any historical user-keyed/membership-keyed duplicate rows on the next vote, repairing materialized option counts without a schema migration.
 10. Platform/user-keyed poll creator ownership is now stable. Poll management recognizes either `created_by=User` or historical `created_by_membership`, so a membership-less platform creator can edit/delete their own poll.
 11. Endpoint regressions pin allowed/denied scope, side-effect-free control-plane authoring, vote identity continuity and user-keyed creator ownership.
+12. Deep exact-head review found the same User ↔ Membership identity-transition defect in post/comment reactions: a person could react while membership-less, later gain a Membership, then create a second materialized reaction; delete removed only the current identity row.
+13. Added red-first post/comment reaction identity regressions. Reaction writes now serialize on the User row, reuse one human reaction, collapse historical user/member duplicates, and recompute summary counts. Deletes remove every representation of the same human identity.
+14. Serializer `viewer_reaction` now resolves by human identity (`user_id` OR `member__user_id`) so read state remains stable across Membership creation.
 
 ### F1 gate status
 
-Fresh post-E2 main-target CI must run on PR #125's current exact head after this checkpoint update. Historical old-base F1 CI was green but is supporting evidence only.
+Fresh post-E2 main-target CI must run on PR #125's current exact head after this checkpoint update. CodeQL and Public Repository Security were green on `d3a2b92`; that evidence became supporting-only after the reaction-identity fix. The new exact head must pass all final gates before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -247,9 +250,9 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `041ca086c85480ba0bccb211a9128a41d11b5087`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `22a683a9c8431fb508a90cdb0c05a571b7e9c871`.**
 
-1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is the 15 reviewed/hardened F1 code/test files plus this progress document (the original 13-file split plus `pharmacy_hub/serializers.py` and `pharmacy_hub/test_api.py` for poll identity continuity).
+1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is the 15 reviewed/hardened F1 code/test files plus this progress document. `posts.py`, `serializers.py` and `test_api.py` now also contain the reaction human-identity continuity hardening.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
 3. If any failure occurs, fix regression-first and update this file.
 4. If all exact-head gates are green, mark #125 ready and merge guarded by exact head SHA.
