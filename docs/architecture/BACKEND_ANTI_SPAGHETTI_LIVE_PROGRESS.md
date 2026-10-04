@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`52d72d10c01813263ff5c3c0738741b9e93339c7`
+`4948f3ff7b0381852df8da8103d60a04e99d3f3e`
 
-This is the merge commit of **PR #135 / H1 signal and startup registry contract**.
+This is the signed merge commit of **PR #137 / H2 import-cycle reduction**.
 
 ### Merged sequence completed during this senior review
 
@@ -48,6 +48,7 @@ This is the merge commit of **PR #135 / H1 signal and startup registry contract*
 - #133 G4 stale InvoiceRecord ContentType cleanup + guarded data-migration contracts
 - #134 G5 Celery dead-route cleanup + DST-safe attendance regression fixture
 - #135 H1 signal/startup registry contract + import-time side-effect guard
+- #137 H2 import-cycle reduction
 
 ## Important senior-review fixes already landed in main
 
@@ -412,7 +413,7 @@ Clean base: `main` at `87cfcfd890c264649955a399addf9561becd42c5`
 10. The historical P2 startup-side-effect concern is resolved by the current module/class-body AST inspection.
 11. #135 was marked ready only after exact-head completion and merged with SHA guard `36591782f41db09e1925ec2a2ef931e5e724fd4b`. Merge commit / new main: `52d72d10c01813263ff5c3c0738741b9e93339c7`.
 
-## ACTIVE PR — #137 / H2 import-cycle reduction
+## COMPLETED — #137 / H2 import-cycle reduction
 
 Original PR branch: `refactor/cycle-reduction`
 Reviewed source head: `93f36938f0d425c028a83c69ff626969ce72c301`
@@ -427,7 +428,24 @@ Clean base: `main` at `52d72d10c01813263ff5c3c0738741b9e93339c7`
 4. `core/test_backend_ownership_boundaries.py` preserves the post-G3 kernel ceiling/baselines and only contracts `ALLOWED_MUTUAL_APP_PAIRS` from 17 to the 11 intentional pairs.
 5. `BACKEND_DOMAIN_DEPENDENCIES.md` applies only the H2 semantic dependency/cycle documentation to the newest G-era document.
 6. Reconciliation compare to H1 main is `behind=0`; expected diff is the seven H2 semantic files plus this progress document.
-7. Move PR #137 atomically to the verified reconciliation head, then require fresh exact-head CI/security before merge.
+7. PR #137 was moved atomically to the clean reconciliation head `bb3b684fee9ce454e86eacbfe221eed9c1adae26`.
+8. Fresh exact-head Public Repository Security and both CodeQL languages passed.
+9. Fresh exact-head Shared Core Consolidation passed: backend, PostgreSQL migration rehearsal/concurrency, architecture, boundary, kiosk, Vite, Next, mobile and release-gate all green.
+10. #137 merged with exact-head SHA guard. Signed merge commit / new main: `4948f3ff7b0381852df8da8103d60a04e99d3f3e`.
+
+## ACTIVE PR — #136 / H3 large-module ratchet — MERGE LAST
+
+Clean reconciliation branch: `reconcile/h3-final-post-h2-20261004`
+Clean base: `main` at `4948f3ff7b0381852df8da8103d60a04e99d3f3e`
+
+### H3 final policy
+
+1. Large-module review threshold is intentionally **999 code lines** per owner direction.
+2. The ratchet still scans the whole backend runtime module set and fails new unreviewed modules above 999.
+3. Only modules currently above 999 remain listed: `pharmacy_hub/serializers.py` at 1161 and `shifts/serializers.py` at 1000.
+4. Earlier 650-line provisional ratchet was rejected; it incorrectly treated ordinary split modules such as `attendance/kiosk_api.py` as architecture violations.
+5. Final H3 diff must remain the ratchet test + one CI workflow step + this progress record.
+6. Require fresh exact-head security, CodeQL and full Shared Core/release gate before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -519,17 +537,20 @@ Merge commit: `52d72d10c01813263ff5c3c0738741b9e93339c7`.
 - Exact-head security, both CodeQL languages, full Shared Core/backend/PostgreSQL gates and release-gate green.
 
 ### #137 H2 import-cycle reduction
-Active clean reconciliation on H1-merged main.
-Reviewed source head: `93f36938f0d425c028a83c69ff626969ce72c301`.
-Reconciliation branch: `reconcile/h2-cycles-post-h1-20261004`.
-- Seven semantic paths only; current compare is `behind=0`.
-- Lazy imports remain reviewed for app-registry/runtime safety.
-- E1b path-based storage deletion and G-era ownership/documentation changes are preserved.
-- Fresh exact-head CI/security is required after moving PR #137.
+Merged after clean H1-based reconciliation and full exact-head verification.
+Final reviewed head: `bb3b684fee9ce454e86eacbfe221eed9c1adae26`.
+Merge commit: `4948f3ff7b0381852df8da8103d60a04e99d3f3e`.
+- Six avoidable module-level mutual pairs removed; 11 intentional pairs remain documented and enforced.
+- E1b path-based storage deletion and G-era ownership/documentation changes were preserved.
+- Security, CodeQL, backend, PostgreSQL, architecture/boundary, kiosk, web/mobile and release-gate all green.
 
 ### #136 H3 module-size ratchet — MERGE LAST
-Deep-reviewed.
-Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
+Active clean reconciliation on post-H2 main.
+Policy threshold: **999 code lines**.
+Clean branch: `reconcile/h3-final-post-h2-20261004`.
+- Whole-backend runtime scan preserved.
+- Only current >999 modules are explicitly baselined.
+- Final exact-head CI/security still required before merge.
 - Scans the whole runtime backend module set, not a hand-picked directory.
 - Fails for a new >650-line runtime module.
 - Fails if a listed oversized module grows.
@@ -565,12 +586,10 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #137 / H2 from `reconcile/h2-cycles-post-h1-20261004`. Current main is `52d72d10c01813263ff5c3c0738741b9e93339c7`.**
+**Finish PR #136 / H3 from `reconcile/h3-final-post-h2-20261004`. Current main is `4948f3ff7b0381852df8da8103d60a04e99d3f3e`.**
 
-1. Confirm final reconciliation diff is the seven reviewed H2 semantic paths plus this progress document and `behind=0`.
-2. Atomically move `refactor/cycle-reduction` to the verified reconciliation head; do not merge its old-base history.
-3. Recheck PR #137 review threads and exact changed paths after the ref move.
-4. Require fresh exact-head Shared Core Consolidation, architecture/boundary contracts, backend, PostgreSQL, CodeQL, Public Repository Security and release-gate.
-5. If all exact-head H2 gates are green, mark #137 ready and merge with exact-head SHA guard.
-6. Rebuild #136 H3 LAST from post-H2 main. Regenerate exact `LARGE_MODULES` baselines from that final runtime tree, preserve the newest CI workflow, and move only the H3 mechanism + tightened baselines.
-7. Require fresh exact-head H3 security/CodeQL/full gate, merge with SHA guard, then run the final architecture/release audit from final `main`.
+1. Confirm clean compare is `behind=0` and contains only the H3 ratchet test, the single Shared Core workflow step, and this progress document.
+2. Move `test/module-size-ratchet` atomically to the clean head.
+3. Require fresh exact-head Public Repository Security, both CodeQL languages, backend, PostgreSQL, architecture/boundary, kiosk, Vite, Next, mobile and release-gate.
+4. If all green, merge #136 with exact-head SHA guard.
+5. Verify remote `main` equals the merge commit and perform the final architecture/release audit. No real-staging gate is required.
