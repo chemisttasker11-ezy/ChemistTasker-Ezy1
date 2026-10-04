@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`27a6fb36030edb7d0dc4c76e5c770e1293609326`
+`a589c727d4cdc1ef71cd6611ee26f837cdb013ed`
 
-This is the merge commit of **PR #128 / F4 roster services split**.
+This is the merge commit of **PR #129 / F5 timesheet split + locked-period integrity hardening**.
 
 ### Merged sequence completed during this senior review
 
@@ -41,6 +41,7 @@ This is the merge commit of **PR #128 / F4 roster services split**.
 - #126 F2 users split + privacy/delivery/OTP/storage/directory hardening
 - #127 F3 attendance split + scoped kiosk-pairing authorization projection fix
 - #128 F4 roster services split
+- #129 F5 timesheet split + PostgreSQL lock-order/locked-manifest/read-only hardening
 
 ## Important senior-review fixes already landed in main
 
@@ -246,7 +247,7 @@ Merge commit: `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 7. Exact-head Shared Core Consolidation: backend, PostgreSQL concurrency, shared-core, architecture, boundary, kiosk, mobile, Vite, Next and release-gate all green.
 8. #128 was marked ready only after exact-head completion and merged with SHA guard `c6bcb5fd29b893fbcf90dee7388321a27d0815d6`.
 
-## ACTIVE PR — #129 / F5 timesheet split
+## COMPLETED — #129 / F5 timesheet split
 
 Original PR branch: `refactor/timesheets-split`
 Reviewed source head: `2b8aa3e66cc857a98912c435f8978008f8366ae0`
@@ -275,6 +276,29 @@ Clean base: `main` at `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 18. Added a red-first locked-detail regression. A LOCKED timesheet detail GET is now strictly read-only even with stale `needs_rebuild=True`: it returns the existing approved data, creates no revision and leaves the flag/status untouched. Explicit recalculate continues to return the locked-period validation error.
 19. Fresh exact-head backend on `08a851ff08492c107bef6e37134f1a686287171d` reached Workforce/Finance and exposed a test-fixture error before exercising the new locked-directory assertion: the regression referenced `projection.User`, but the reused fixture module does not expose that name in the CI import context.
 20. Corrected the regression to construct the extra worker through Django's `get_user_model()`. No F5 production code changed for this failure; prior PostgreSQL concurrency, CodeQL, security, architecture, boundary, shared-core, kiosk, mobile, Vite and Next evidence remains supporting-only until the new exact head passes the full final gate.
+21. Final reviewed exact head: `7ae917dce3ce44087fb8b342f68bf473d9d24e4a`; final compare to F4 main was `behind=0`.
+22. Exact-head Public Repository Security, CodeQL Python/JavaScript, shared-core, architecture, boundary, backend, PostgreSQL concurrency, kiosk, mobile, Vite, Next and **release-gate** all passed green.
+23. #129 was marked ready only after exact-head completion and merged with SHA guard `7ae917dce3ce44087fb8b342f68bf473d9d24e4a`. Merge commit: `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`.
+
+## ACTIVE PR — #130 / G1 admin ownership
+
+Original PR branch: `refactor/admin-ownership`
+Reviewed source head: `1c0f5480b6555d7438ec4f69ae76382977f02e90`
+Clean reconciliation branch: `reconcile/g1-admin-post-f5-20261004`
+Clean base: `main` at `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`
+
+### G1 reconciliation and senior review
+
+1. Proved G1 has **zero file overlap with F5**, so the post-F5 rebuild cannot overwrite any timesheet hardening.
+2. Rebuilt only the reviewed admin ownership surface: `client_profile/admin.py`, four domain admin modules, ownership/admin contract tests, and one additive current-workflow CI change.
+3. Compared the moved implementations against pre-move current main: **19/19 admin classes/forms/mixins are byte-identical**. G1 changes ownership/location, not admin behavior.
+4. Registration coverage is identical: the same 18 `client_profile`-labelled models stay registered, including direct registrations for MembershipApplication, RefereeResponse and WorkerShiftRequest.
+5. `client_profile.admin` remains a compatibility facade for historical test/import paths while registrations live in the owning domain apps; no reverse domain dependency was introduced.
+6. Original G1's 1,100-line global admin snapshot was over-broad: it froze 78 project/third-party admin registrations although G1 only moves 18 client_profile-labelled models. Senior review narrowed the contract to those **18 moved registrations and their exact options**, reducing unrelated dependency noise while preserving the real invariant.
+7. The narrowed registry test still checks admin class, list display/filter, search, readonly fields, inlines, form, ordering and actions, plus OTP admin registry sharing.
+8. Workflow reconciliation uses the newest `shared_core_consolidation_ci.yml` and adds only `core.test_admin_registry_contract` to the existing backend kernel/domain command; no stale workflow blob is copied.
+9. PR #130 had no unresolved review threads during preflight.
+10. Reconciliation branch is `behind=0`; before moving the PR, expected diff is exactly the eight reviewed G1 files plus this progress document.
 
 ## Beyond E2 — deep review already completed
 
@@ -312,19 +336,19 @@ Final reviewed head: `c6bcb5fd29b893fbcf90dee7388321a27d0815d6`.
 Merge commit: `27a6fb36030edb7d0dc4c76e5c770e1293609326`.
 
 ### #129 F5 timesheets
-Actively reconciled and hardened on post-F4 main.
-Reviewed source head: `2b8aa3e66cc857a98912c435f8978008f8366ae0`.
-Clean reconciliation branch: `reconcile/f5-timesheets-post-f4-20261004`.
-- 28/33 original functions remain byte-identical.
-- Five intentional integrity changes: ensure/build/submit/approve/reopen.
+Merged after clean post-F4 reconstruction, PostgreSQL lock-order hardening, locked-manifest immutability and locked-detail read protection.
+Final reviewed head: `7ae917dce3ce44087fb8b342f68bf473d9d24e4a`.
+Merge commit: `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`.
 - Preserved all E2 membership PostgreSQL tests.
-- Added period-first builder lock-order regression and locked-manifest immutability regressions.
-- Post-lock amendment workflow is a separate product gap; do not implement an in-place unlock.
+- Final exact-head full gate including PostgreSQL and release-gate: green.
+- Post-lock amendment workflow remains a separate product feature; do not implement an in-place unlock.
 
 ### #130 G1 admin ownership
-Deep-reviewed.
-Current head: `1c0f5480b6555d7438ec4f69ae76382977f02e90`.
-- Admin registry snapshot compares live `admin.site._registry` across all registered models/admin classes/options against pre-move contract.
+Active clean reconciliation on post-F5 main.
+Reviewed source head: `1c0f5480b6555d7438ec4f69ae76382977f02e90`.
+- 19/19 moved admin classes/forms/mixins are byte-identical.
+- Registration/options contract is deliberately scoped to the 18 moved `client_profile` models rather than freezing unrelated third-party admins.
+- Current workflow is preserved; only the focused admin-registry test is added to the existing backend gate.
 
 ### #131 G2 dashboard serializer cleanup
 Deep-reviewed.
@@ -400,13 +424,11 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #129 / F5 from reconciliation branch `reconcile/f5-timesheets-post-f4-20261004`. Current main is `27a6fb36030edb7d0dc4c76e5c770e1293609326`; reviewed source head is `2b8aa3e66cc857a98912c435f8978008f8366ae0`.**
+**Resume at PR #130 / G1 admin ownership from reconciliation branch `reconcile/g1-admin-post-f5-20261004`. Current main is `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`.**
 
-1. Fetch the reconciliation branch live head after this documentation commit and confirm current main → exact head remains `behind=0`; expected diff is the F5 timesheet split/test files, the preserved/extended PostgreSQL concurrency file, the locked-detail read guard in `workforce/views.py`, and this progress document.
-2. Move `refactor/timesheets-split` atomically to the reconciliation head so PR #129 is preserved; do not carry old-base history.
-3. Run fresh main-target Shared Core Consolidation, full workforce/timesheet tests, PostgreSQL concurrency, CodeQL and Public Repository Security on the exact PR head.
-4. Pay special attention to the new locked-build/ensure regressions and the PostgreSQL period→timesheet builder lock-order assertion, including the corrected exact-FROM SQL matcher.
-   - If PostgreSQL fails again, distinguish a real row-lock/transaction defect from a test instrumentation issue before touching production code.
-5. If any gate fails, fix regression-first and update this file.
-6. If all exact-head gates are green, mark #129 ready and merge with exact-head SHA guard.
-7. Immediately proceed to #130 G1. Keep the future post-lock adjustment workflow as a separately tracked product feature; do not weaken locked-manifest immutability in F5.
+1. Fetch the reconciliation branch live head after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is the eight reviewed G1 files plus this progress document.
+2. Recheck the narrowed admin-registry contract syntax/collection and exact registration set for the 18 moved client_profile-labelled models.
+3. Move `refactor/admin-ownership` atomically to the verified reconciliation head so PR #130 is preserved; do not carry old-base history.
+4. Run fresh exact-head Shared Core Consolidation, backend admin-registry contract, CodeQL and Public Repository Security.
+5. While #130 gates run, continue the already-preflighted G2/G3 stack on isolated branches; do not modify the G1 exact head.
+6. If all exact-head gates are green, mark #130 ready and merge with exact-head SHA guard, then rebuild #131 G2 from that main.

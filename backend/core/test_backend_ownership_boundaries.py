@@ -202,18 +202,12 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 1030
+KERNEL_CODE_LINE_CEILING = 625
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
     "client_profile/__init__.py": set(),
-    "client_profile/admin.py": {
-        "ChainAdmin", "ExplorerOnboardingAdmin", "MembershipAdmin", "OrganizationAdmin", "OtherStaffOnboardingAdmin",
-        "OwnerOnboardingAdmin", "OwnerOnboardingAdminForm", "PharmacistOnboardingAdmin",
-        "PharmacyAdminAssignmentAdmin", "PharmacyModelAdmin", "RoleScopedOnboardingAdminMixin", "ShiftAdmin",
-        "ShiftCounterOfferAdmin", "ShiftCounterOfferSlotInline", "ShiftInterestAdmin", "ShiftOfferAdmin",
-        "ShiftRejectionAdmin", "ShiftSlotAssignmentAdmin", "ShiftSlotInline",
-    },
+    "client_profile/admin.py": set(),
     "client_profile/admin_helpers.py": set(),
     "client_profile/apps.py": {"ClientProfileConfig"},
     "client_profile/domains/__init__.py": set(),
