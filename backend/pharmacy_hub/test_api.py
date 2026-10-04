@@ -6,8 +6,8 @@ from django.test import TestCase
 
 from client_profile.models import Membership
 from pharmacy_hub.models import (
-    PharmacyHubComment, PharmacyHubCommentReaction, PharmacyHubPoll, PharmacyHubPollReaction, PharmacyHubPost,
-    PharmacyHubReaction,
+    PharmacyHubComment, PharmacyHubCommentReaction, PharmacyHubPoll, PharmacyHubPollReaction, PharmacyHubPollVote,
+    PharmacyHubPost, PharmacyHubReaction,
 )
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
@@ -226,6 +226,47 @@ class HubPollTests(HubBase):
         counts = {o["label"]: o["vote_count"] for o in moved["options"]}
         self.assertEqual(counts, {"Pizza": 0, "Salad": 1})
         self.assertEqual(moved["selected_option_id"], salad["id"])
+
+    def test_vote_identity_is_stable_if_user_later_gains_a_membership(self):
+        poll = self.make_poll(who=self.owner)
+        pizza, salad = sorted(poll["options"], key=lambda option: option["label"])
+        url = f"{POLLS}{poll['id']}/vote/"
+        owner_client = client_for(self.owner)
+
+        first = owner_client.post(url, {"option_id": pizza["id"]}, format="json")
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(PharmacyHubPollVote.objects.filter(poll_id=poll["id"]).count(), 1)
+        first_vote = PharmacyHubPollVote.objects.get(poll_id=poll["id"])
+        self.assertEqual(first_vote.user_id, self.owner.id)
+        self.assertIsNone(first_vote.membership_id)
+
+        Membership.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        before_move = owner_client.get(
+            POLLS + f"{poll['id']}/?scope=pharmacy&pharmacy_id={self.pharmacy.id}"
+        )
+        self.assertEqual(before_move.status_code, 200, before_move.content)
+        self.assertTrue(before_move.json()["has_voted"])
+        self.assertEqual(before_move.json()["selected_option_id"], pizza["id"])
+
+        moved = owner_client.post(url, {"option_id": salad["id"]}, format="json")
+        self.assertEqual(moved.status_code, 200, moved.content)
+        self.assertEqual(PharmacyHubPollVote.objects.filter(poll_id=poll["id"]).count(), 1)
+        vote = PharmacyHubPollVote.objects.get(poll_id=poll["id"])
+        self.assertEqual(vote.pk, first_vote.pk)
+        self.assertEqual(vote.user_id, self.owner.id)
+        self.assertIsNone(vote.membership_id)
+        self.assertEqual(vote.option_id, salad["id"])
+        self.assertTrue(moved.json()["has_voted"])
+        self.assertEqual(moved.json()["selected_option_id"], salad["id"])
+        self.assertEqual(moved.json()["total_votes"], 1)
 
     def test_vote_validation(self):
         poll = self.make_poll()
