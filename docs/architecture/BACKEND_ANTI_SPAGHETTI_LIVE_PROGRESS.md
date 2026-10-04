@@ -87,7 +87,7 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`c30bec8a70db4c9dd689db3079f03957f30ec8c3`
+`711b3918b8066a9ce7a6438ea058072092d979ba`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
@@ -120,6 +120,12 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 22. Added a red-first atomicity regression. Replacement memberships are now resolved before writes, the update runs inside `transaction.atomic()`, and the group row plus existing membership-link rows are locked so concurrent edits cannot interleave or escape serialization when the group initially has no links.
 23. Context/resolver contract review found an owner projection mismatch: `organization_scope` authorizes a pharmacy owner to manage the containing organization profile, but Hub Context advertised `can_manage_profile=false`. Added a targeted owner regression and now derive that permission from the existing per-pharmacy `is_owner` authority while keeping `is_org_admin=false`.
 24. Removed two unused lazy QuerySet assignments from organization member-count construction; the real per-organization distinct-user aggregation is unchanged.
+25. Attachment review found request-level partial persistence: a multi-file create/update validated each file only while writing it, so a later invalid file could return 400 after the post or earlier attachments had already changed.
+26. Added red-first create and update rollback regressions. The entire attachment batch is now validated before any post mutation; post + attachment DB writes run atomically.
+27. Attachment add failure cleanup now handles both previously-created rows and the current unsaved/failed attachment object, covering the FileField case where storage write succeeds before a database insert fails.
+28. Attachment removal previously bulk-deleted database rows without deleting storage objects. Removal now locks the selected attachment rows, deletes DB ownership inside the transaction, and schedules path-based storage deletion only after commit so rollback cannot strand a database reference to a missing file.
+29. Hub Pharmacy/Organization profile cover replacement also leaked old storage objects. Added coverage for both endpoints and an F1-local profile cleanup mixin that deletes the old path after commit only when no live model reference remains.
+30. Storage cleanup deliberately follows the E1b principle of deleting by captured storage path rather than mutating a bound FieldFile; no shared lifecycle module was changed in F1.
 
 ### F1 gate status
 
@@ -260,9 +266,9 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `c30bec8a70db4c9dd689db3079f03957f30ec8c3`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `711b3918b8066a9ce7a6438ea058072092d979ba`.**
 
-1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is the 15 reviewed/hardened F1 code/test files plus this progress document. `posts.py`, `serializers.py` and `test_api.py` now also contain the reaction human-identity continuity hardening.
+1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff remains inside the reviewed/hardened F1 Pharmacy Hub code/test surface plus this progress document. `posts.py`, `scoping.py`, `serializers.py`, `test_api.py` and `test_hub_scope_contract.py` now also contain identity, mutation-atomicity and storage-lifecycle hardening.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
 3. If any failure occurs, fix regression-first and update this file.
 4. If all exact-head gates are green, mark #125 ready and merge guarded by exact head SHA.
