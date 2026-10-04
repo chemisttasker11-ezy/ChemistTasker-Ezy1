@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`4948f3ff7b0381852df8da8103d60a04e99d3f3e`
+`fd37f27eec2db09a6eed9f72fc5cde89d9fc7768`
 
-This is the signed merge commit of **PR #137 / H2 import-cycle reduction**.
+This is the signed merge commit of **PR #136 / H3 final 999-line module-size ratchet**.
 
 ### Merged sequence completed during this senior review
 
@@ -49,6 +49,7 @@ This is the signed merge commit of **PR #137 / H2 import-cycle reduction**.
 - #134 G5 Celery dead-route cleanup + DST-safe attendance regression fixture
 - #135 H1 signal/startup registry contract + import-time side-effect guard
 - #137 H2 import-cycle reduction
+- #136 H3 final 999-line module-size ratchet
 
 ## Important senior-review fixes already landed in main
 
@@ -433,7 +434,7 @@ Clean base: `main` at `52d72d10c01813263ff5c3c0738741b9e93339c7`
 9. Fresh exact-head Shared Core Consolidation passed: backend, PostgreSQL migration rehearsal/concurrency, architecture, boundary, kiosk, Vite, Next, mobile and release-gate all green.
 10. #137 merged with exact-head SHA guard. Signed merge commit / new main: `4948f3ff7b0381852df8da8103d60a04e99d3f3e`.
 
-## ACTIVE PR — #136 / H3 large-module ratchet — MERGE LAST
+## COMPLETED — #136 / H3 large-module ratchet — MERGED LAST
 
 Clean reconciliation branch: `reconcile/h3-final-post-h2-20261004`
 Clean base: `main` at `4948f3ff7b0381852df8da8103d60a04e99d3f3e`
@@ -445,7 +446,10 @@ Clean base: `main` at `4948f3ff7b0381852df8da8103d60a04e99d3f3e`
 3. Only modules currently above 999 remain listed: `pharmacy_hub/serializers.py` at 1161 and `shifts/serializers.py` at 1000.
 4. Earlier 650-line provisional ratchet was rejected; it incorrectly treated ordinary split modules such as `attendance/kiosk_api.py` as architecture violations.
 5. Final H3 diff must remain the ratchet test + one CI workflow step + this progress record.
-6. Require fresh exact-head security, CodeQL and full Shared Core/release gate before merge.
+6. Fresh exact-head Public Repository Security and both CodeQL languages passed.
+7. Fresh Shared Core Consolidation passed: 999-line ratchet, backend contract tail, PostgreSQL migration rehearsal/concurrency, architecture, boundary, kiosk, Vite, Next, mobile and release-gate all green.
+8. #136 merged last with exact-head SHA guard `a32168f7dfbeaa75c32cbc952cef0568b9fc9b50`.
+9. Signed H3 merge commit / final code-bearing main checkpoint: `fd37f27eec2db09a6eed9f72fc5cde89d9fc7768`.
 
 ## Beyond E2 — deep review already completed
 
@@ -544,13 +548,15 @@ Merge commit: `4948f3ff7b0381852df8da8103d60a04e99d3f3e`.
 - E1b path-based storage deletion and G-era ownership/documentation changes were preserved.
 - Security, CodeQL, backend, PostgreSQL, architecture/boundary, kiosk, web/mobile and release-gate all green.
 
-### #136 H3 module-size ratchet — MERGE LAST
-Active clean reconciliation on post-H2 main.
+### #136 H3 module-size ratchet — MERGED LAST
+Merged after clean post-H2 reconciliation and full exact-head verification.
+Final reviewed head: `a32168f7dfbeaa75c32cbc952cef0568b9fc9b50`.
+Merge commit: `fd37f27eec2db09a6eed9f72fc5cde89d9fc7768`.
 Policy threshold: **999 code lines**.
-Clean branch: `reconcile/h3-final-post-h2-20261004`.
 - Whole-backend runtime scan preserved.
-- Only current >999 modules are explicitly baselined.
-- Final exact-head CI/security still required before merge.
+- Only current >999 modules are explicitly baselined: `pharmacy_hub/serializers.py` 1161 and `shifts/serializers.py` 1000.
+- 999-line ratchet exact-head step passed.
+- Security, both CodeQL languages, backend, PostgreSQL, architecture/boundary, kiosk, Vite, Next, mobile and release-gate all green.
 - Scans the whole runtime backend module set, not a hand-picked directory.
 - Fails for a new >999-line runtime module.
 - Fails if a listed oversized module grows.
@@ -586,10 +592,13 @@ Clean branch: `reconcile/h3-final-post-h2-20261004`.
 
 ## NEXT ACTION
 
-**Finish PR #136 / H3 from `reconcile/h3-final-post-h2-20261004`. Current main is `4948f3ff7b0381852df8da8103d60a04e99d3f3e`.**
+**Backend anti-spaghetti sequence is COMPLETE through H3.**
 
-1. Confirm clean compare is `behind=0` and contains only the H3 ratchet test, the single Shared Core workflow step, and this progress document.
-2. Move `test/module-size-ratchet` atomically to the clean head.
-3. Require fresh exact-head Public Repository Security, both CodeQL languages, backend, PostgreSQL, architecture/boundary, kiosk, Vite, Next, mobile and release-gate.
-4. If all green, merge #136 with exact-head SHA guard.
-5. Verify remote `main` equals the merge commit and perform the final architecture/release audit. No real-staging gate is required.
+Final code-bearing main checkpoint: `fd37f27eec2db09a6eed9f72fc5cde89d9fc7768`.
+
+- PRs #113 through #137 in the planned D/E/F/G/H sequence have been deeply reviewed/reconciled as recorded above.
+- H2 reduced avoidable mutual app-import pairs from 17 to 11 intentional documented pairs.
+- H3 merged last with the owner-selected **999 code-line** review threshold.
+- Exact-head Public Repository Security, both CodeQL languages, backend, PostgreSQL concurrency/migration rehearsal, architecture/boundary, kiosk, Vite, Next, mobile and release-gate were green before the final merge.
+- Real staging is intentionally not a blocker.
+- Future backend changes should preserve these contracts and let the architecture/ratchet gates detect regression; do not reopen this sequence unless a new concrete defect is found.
