@@ -296,6 +296,14 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(clock_out_resp.data["status"], "CLOCKED_OUT")
 
+    def test_manager_pending_rejects_non_integer_pharmacy_id(self):
+        mgr_client = APIClient()
+        mgr_client.force_authenticate(user=self.owner_user)
+        response = mgr_client.get("/attendance/manager/pending/?pharmacy_id=not-a-number")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "pharmacy_id must be an integer.")
+
+
     def test_manager_review_approve_and_corrections_api(self):
         # 1. Create a provisional attendance
         device, raw_token = activate_kiosk_device(self.owner_user, self.pharmacy, "Kiosk")

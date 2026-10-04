@@ -215,14 +215,17 @@ Original PR branch: `refactor/attendance-api-split`
 Reviewed source head: `668c952925f4757356685101c52e933eb30e206b`
 Historical base: `7e191332d5f959da37f95638a2fce5decbf02e87`
 
-### F3 preflight ready
+### F3 reconciliation and senior integration review
 
-1. F3 changes exactly five attendance files: `attendance/api_support.py`, `attendance/kiosk_api.py`, `attendance/views.py`, `attendance/worker_api.py`, and `attendance_tests/test_attendance_api.py`.
-2. None of those files changed from F3's old base through F1 main, and F2 changes only the users domain/workflow/docs, so there is no semantic overlap to reconcile.
-3. Current reviewed F3 head has no unresolved review threads; historical exact-head Security, CodeQL and Shared Core are green.
-4. Manager attendance endpoints deliberately remain in `attendance.views` to preserve protected patch/log/import contracts.
-5. The only non-move behavior pinned by F3 is stable 400 `pharmacy_id must be an integer.` before pharmacy lookup.
-6. Rebuild F3 directly from newest main rather than merging its old-base history, then run fresh exact-head gates.
+1. Created clean reconciliation branch `reconcile/f3-attendance-post-f2-20261004` from newest main documentation checkpoint `552dadb3f639bfeb247f5b6403d6ae02d90eb6b6` (runtime checkpoint remains F2 merge `c0e0cb4c4d2606f557b961773979cbf38020143c`).
+2. Overlaid exactly the five reviewed F3 attendance files from source head `668c952925f4757356685101c52e933eb30e206b`; none had changed on main, so no old-main code was resurrected.
+3. Manager attendance endpoints deliberately remain in `attendance.views` to preserve URL imports, protected error-surface patch targets/log channel, and operational-model ownership contracts.
+4. The reviewed stable 400 `pharmacy_id must be an integer.` contract remains pinned before pharmacy lookup.
+5. Senior integration review found one pre-existing authorization projection defect in `KioskRequestPairingCodeView.get`: the canonical `is_authorized_kiosk_manager()` permits assigned CHIEF_ADMIN/REGION_ADMIN managers, but the list prefilter admitted organization users only when role == ORG_ADMIN, so valid scoped managers saw no assigned pharmacy option.
+6. Fixed the pairing candidate prefilter to include assigned Chief/Region pharmacies while leaving final authorization to the canonical helper; unassigned pharmacies remain excluded and non-manager admin levels remain rejected by the helper.
+7. Added regression `test_scoped_organization_manager_pairing_options_follow_assignments` in `attendance_tests/test_kiosk_offline_protocol.py`.
+8. Scanned the rest of moved kiosk/worker code for the same narrow-prefilter pattern; other kiosk-management paths call the canonical helper directly.
+9. Exact reconciliation diff before this documentation update is the five F3 files plus the focused kiosk authorization regression file; `behind=0` from newest main.
 
 ## Beyond E2 — deep review already completed
 
@@ -357,12 +360,11 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #127 / F3 attendance. First fetch the live exact head; the reviewed source head is `668c952925f4757356685101c52e933eb30e206b`.**
+**Resume at PR #127 / F3 attendance from reconciliation branch `reconcile/f3-attendance-post-f2-20261004`. Reviewed source head is `668c952925f4757356685101c52e933eb30e206b`.**
 
-1. Fetch newest `main` after this documentation checkpoint and create a clean F3 reconciliation branch from it.
-2. Overlay only F3's five reviewed attendance files from `668c9529`; do not merge old-base history.
-3. Re-check exact main → reconciliation diff, attendance URL/re-export compatibility, protected `attendance.views` manager/error-surface imports and the stable non-integer `pharmacy_id` 400 contract.
-4. Update this file on the F3 branch with the exact reconciliation checkpoint.
-5. Move `refactor/attendance-api-split` atomically to the reconciled head so PR #127 is preserved.
-6. Run fresh main-target Shared Core Consolidation, attendance suites, PostgreSQL where relevant, CodeQL and Public Repository Security on the exact PR head.
-7. If any gate fails, fix regression-first and update this file; if all gates are green, mark #127 ready, merge with exact-head SHA guard, then proceed to #128 F4.
+1. Fetch the reconciliation branch live head after this documentation commit and compare newest `main` → exact head; expected code diff is the five reviewed F3 attendance files plus `attendance_tests/test_kiosk_offline_protocol.py` for the scoped pairing regression and this progress document.
+2. Move `refactor/attendance-api-split` atomically to the reconciliation head so PR #127 is preserved; do not merge old-base history.
+3. Run fresh main-target Shared Core Consolidation, attendance/kiosk suites, PostgreSQL where relevant, CodeQL and Public Repository Security on the exact PR head.
+4. Confirm the new scoped Chief/Region pairing-options regression passes together with the existing manager kiosk-device scope tests and protected `attendance.views` error/import contracts.
+5. If any gate fails, fix regression-first and update this file. If all exact-head gates are green, mark #127 ready and merge with an exact-head SHA guard.
+6. After merge, advance this file to #128 F4 and reconstruct F4 directly from newest main; F4's nine `workforce/roster/*` files have already been preflighted as non-overlapping.
