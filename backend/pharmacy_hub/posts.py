@@ -201,6 +201,9 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
     def create(self, request, *args, **kwargs):
         data = self._normalize_params(request.data)
         self.scope_context = self._resolve_scope_from_params(data)
+        attachments = self._validate_attachments(
+            request.FILES.getlist("attachments")
+        )
         resolver = HubScopeResolver(request.user)
         membership = self.scope_context.get("request_membership")
         is_platform_post = self.scope_context.get("scope_type") == "platform"
@@ -224,20 +227,26 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
             community_group = self.scope_context.get("community_group")
         elif scope_type == "platform":
             platform_hub = self.scope_context.get("platform_hub")
-        post = serializer.save(
-            pharmacy=pharmacy,
-            organization=organization,
-            community_group=community_group,
-            platform_hub=platform_hub,
-            author_membership=membership,
-            author_user=request.user,
-            original_body=serializer.validated_data.get("body", ""),
-            is_edited=False,
-            last_edited_at=None,
-            last_edited_by=None,
+
+        with transaction.atomic():
+            post = serializer.save(
+                pharmacy=pharmacy,
+                organization=organization,
+                community_group=community_group,
+                platform_hub=platform_hub,
+                author_membership=membership,
+                author_user=request.user,
+                original_body=serializer.validated_data.get("body", ""),
+                is_edited=False,
+                last_edited_at=None,
+                last_edited_by=None,
+            )
+            self._add_attachments(post, attachments)
+
+        self._notify_tagged_members(
+            post,
+            getattr(serializer, "_newly_tagged_members", []),
         )
-        self._add_attachments(post, request.FILES.getlist("attachments"))
-        self._notify_tagged_members(post, getattr(serializer, "_newly_tagged_members", []))
         output = self.get_serializer(post)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -261,6 +270,9 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
             raise PermissionDenied("Only the author can edit this post.")
         if instance.deleted_at:
             raise PermissionDenied("You cannot edit a deleted post.")
+        attachments = self._validate_attachments(
+            self.request.FILES.getlist("attachments")
+        )
         extra = {}
         new_body = serializer.validated_data.get("body")
         if new_body is not None and new_body != instance.body:
@@ -269,9 +281,12 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
                 extra["original_body"] = instance.body
             extra["last_edited_at"] = timezone.now()
             extra["last_edited_by"] = self.request.user
-        post = serializer.save(**extra)
-        self._remove_attachments(post, self.request)
-        self._add_attachments(post, self.request.FILES.getlist("attachments"))
+
+        with transaction.atomic():
+            post = serializer.save(**extra)
+            self._remove_attachments(post, self.request)
+            self._add_attachments(post, attachments)
+
         new_mentions = getattr(serializer, "_newly_tagged_members", [])
         if new_mentions:
             self._notify_tagged_members(post, new_mentions)
