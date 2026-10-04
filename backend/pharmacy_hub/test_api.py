@@ -2,6 +2,7 @@
 
 Group, organization and platform scopes share the same resolver and are exercised by the existing
 public_hub / membership tests; this file pins the pharmacy-scope contract end to end."""
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from client_profile.models import Membership
@@ -128,6 +129,36 @@ class HubPostTests(HubBase):
         res = client_for(self.owner).post(POSTS, {**self.scope, "body": "from owner"}, format="json")
         self.assertEqual(res.status_code, 201)
         self.assertGreaterEqual(Membership.objects.filter(user=self.owner).count(), before)
+
+    def test_all_attachments_are_validated_before_post_creation(self):
+        good = SimpleUploadedFile(
+            "good.png",
+            b"\x89PNG\r\n\x1a\nminimal",
+            content_type="image/png",
+        )
+        bad = SimpleUploadedFile(
+            "bad.exe",
+            b"not-an-allowed-attachment",
+            content_type="application/octet-stream",
+        )
+        before_posts = PharmacyHubPost.objects.count()
+
+        response = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "must remain atomic",
+                "attachments": [good, bad],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(
+            PharmacyHubPost.objects.count(),
+            before_posts,
+            "invalid attachment batches must not leave a partially-created post",
+        )
 
     def test_outsider_cannot_post(self):
         res = client_for(self.outsider).post(POSTS, {**self.scope, "body": "x"}, format="json")
