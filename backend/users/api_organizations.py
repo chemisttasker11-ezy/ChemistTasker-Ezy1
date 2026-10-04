@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from users.models import OrganizationMembership
 from memberships.models import Membership
-from organizations.models import Pharmacy
 from users.serializers import InviteOrgUserSerializer, OrganizationMembershipDetailSerializer
 from users.permissions import OrganizationRolePermission
 from users.org_roles import (
@@ -287,41 +286,6 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
             return next(iter(org_ids))
         raise PermissionDenied("Specify an organization id to load members.")
 
-    def _ensure_membership_for_org_user(self, organization, user, *, allowed_pharmacy_ids=None):
-        membership_qs = Membership.objects.filter(
-            user=user,
-            is_active=True,
-            pharmacy__organization=organization,
-        )
-        pharmacy_qs = Pharmacy.objects.filter(organization=organization)
-        if allowed_pharmacy_ids is not None:
-            allowed_pharmacy_ids = set(allowed_pharmacy_ids)
-            if not allowed_pharmacy_ids:
-                return None
-            membership_qs = membership_qs.filter(pharmacy_id__in=allowed_pharmacy_ids)
-            pharmacy_qs = pharmacy_qs.filter(id__in=allowed_pharmacy_ids)
-
-        membership = membership_qs.select_related("pharmacy").order_by("id").first()
-        if membership:
-            return membership
-
-        primary_pharmacy = pharmacy_qs.order_by("id").first()
-        if not primary_pharmacy:
-            return None
-        membership, _ = Membership.objects.get_or_create(
-            user=user,
-            pharmacy=primary_pharmacy,
-            defaults={
-                "role": "CONTACT",
-                "employment_type": "FULL_TIME",
-                "is_active": True,
-            },
-        )
-        if not membership.is_active:
-            membership.is_active = True
-            membership.save(update_fields=["is_active"])
-        return membership
-
     def list(self, request, *args, **kwargs):
         include_pharmacy_members = (
             self._parse_bool_param("include_pharmacy_members")
@@ -394,17 +358,10 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
                     if membership.pharmacy_id in target_scope_ids
                 ]
 
-            if not user_memberships:
-                ensured = self._ensure_membership_for_org_user(
-                    org_membership.organization,
-                    org_membership.user,
-                    allowed_pharmacy_ids=target_scope_ids,
-                )
-                if ensured:
-                    memberships.append(ensured)
-                    membership_by_user.setdefault(org_membership.user_id, []).append(ensured)
-                    user_memberships = [ensured]
-
+            # Directory reads never manufacture pharmacy-employment Membership rows.
+            # OrganizationMembership is a distinct control-plane identity; attach
+            # organization-role metadata only to real pharmacy memberships that
+            # already exist inside the target admin's assigned scope.
             org_membership_links[org_membership.id] = user_memberships
 
         org_meta_by_membership = {}
