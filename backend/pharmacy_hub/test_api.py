@@ -161,6 +161,51 @@ class HubPostTests(HubBase):
             "invalid attachment batches must not leave a partially-created post",
         )
 
+    def test_multiple_attachment_ids_are_removed_from_one_multipart_update(self):
+        uploads = [
+            SimpleUploadedFile(
+                f"remove-{index}.png",
+                b"\x89PNG\r\n\x1a\nattachment-" + str(index).encode(),
+                content_type="image/png",
+            )
+            for index in (1, 2)
+        ]
+        created = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "bulk attachment cleanup",
+                "attachments": uploads,
+            },
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        attachments = list(
+            PharmacyHubAttachment.objects.filter(post_id=post_id).order_by("id")
+        )
+        self.assertEqual(len(attachments), 2)
+        stored_names = [attachment.file.name for attachment in attachments]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            removed = client_for(self.staff).patch(
+                f"{POSTS}{post_id}/",
+                {
+                    "body": "bulk attachment cleanup",
+                    "remove_attachment_ids": [
+                        attachment.id for attachment in attachments
+                    ],
+                },
+                format="multipart",
+            )
+
+        self.assertEqual(removed.status_code, 200, removed.content)
+        self.assertFalse(
+            PharmacyHubAttachment.objects.filter(post_id=post_id).exists()
+        )
+        for stored_name in stored_names:
+            self.assertFalse(default_storage.exists(stored_name))
+
     def test_invalid_attachment_update_does_not_change_post_or_remove_existing_file(self):
         original = SimpleUploadedFile(
             "original.png",
