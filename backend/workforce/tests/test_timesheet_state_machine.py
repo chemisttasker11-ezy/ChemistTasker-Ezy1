@@ -6,6 +6,7 @@ period). The transitions are called through workforce.timesheets, their historic
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
 from unittest import mock
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from workforce.models import (
     Timesheet,
@@ -17,6 +18,7 @@ from workforce.models import (
     TimesheetPeriod,
 )
 from workforce.tests import test_timesheets as projection
+from workforce.views import TimesheetDetailView
 from workforce.timesheets import (
     add_comment,
     approve_timesheet,
@@ -181,3 +183,23 @@ class TimesheetStateMachineTests(TestCase):
             Timesheet.objects.filter(period=self.period, user=extra_worker).exists(),
             "a locked manifest must not gain a new timesheet through a read/list synchronization path",
         )
+
+    def test_locked_timesheet_detail_is_read_only_with_stale_rebuild_flag(self):
+        for timesheet in self.period.timesheets.all():
+            current = build_timesheet(timesheet.pk, actor=self.owner)
+            timesheet.refresh_from_db()
+            approve_timesheet(timesheet, self.owner, current.revision_number)
+        lock_period(self.period, self.owner)
+
+        Timesheet.objects.filter(pk=self.timesheet.pk).update(needs_rebuild=True)
+        revision_count = self.timesheet.revisions.count()
+        request = APIRequestFactory().get(f"/api/workforce/timesheets/{self.timesheet.pk}/")
+        force_authenticate(request, user=self.owner)
+
+        response = TimesheetDetailView.as_view()(request, pk=self.timesheet.pk)
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.timesheet.refresh_from_db()
+        self.assertTrue(self.timesheet.needs_rebuild)
+        self.assertEqual(self.timesheet.status, Timesheet.Status.APPROVED)
+        self.assertEqual(self.timesheet.revisions.count(), revision_count)
