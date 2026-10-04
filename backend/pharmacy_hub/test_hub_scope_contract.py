@@ -6,9 +6,12 @@ team_calendar and public_hub), the permission map behind /hub/context/, the cont
 platform posting, owner alerts and profile edits. The expected tables were recorded from the code before the hub
 module was split, so they pin the rules exactly while the code moves.
 """
+import base64
 import json
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.exceptions import PermissionDenied
 
@@ -19,6 +22,15 @@ from onboarding.models import OtherStaffOnboarding
 from organizations.models import Organization, PharmacyAdmin
 from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyCommunityGroupMembership, PharmacyHubPost
 from users.models import OrganizationMembership
+
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nksAAAAASUVORK5CYII="
+)
+
+
+def png_upload(name):
+    return SimpleUploadedFile(name, PNG_BYTES, content_type="image/png")
+
 
 HUB = BASE + "hub/"
 RECORDED = {'context': {'admin_member': {'groups': ['Night team'],
@@ -581,6 +593,42 @@ class PostingAcrossScopesTests(HubFixture):
 
 
 class ProfileTests(HubFixture):
+    def test_cover_replacement_cleans_old_storage_for_pharmacy_and_organization(self):
+        owner_client = client_for(self.users["owner"])
+        targets = [
+            (
+                self.pharmacy,
+                HUB + f"pharmacies/{self.pharmacy.id}/profile/",
+            ),
+            (
+                self.org,
+                HUB + f"organizations/{self.org.id}/profile/",
+            ),
+        ]
+
+        for index, (target, url) in enumerate(targets):
+            with self.subTest(target=target.__class__.__name__):
+                target.cover_image.save(
+                    f"old-cover-{index}.png",
+                    png_upload(f"old-cover-{index}.png"),
+                    save=True,
+                )
+                old_name = target.cover_image.name
+                self.assertTrue(default_storage.exists(old_name))
+
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = owner_client.patch(
+                        url,
+                        {"cover_image": png_upload(f"new-cover-{index}.png")},
+                        format="multipart",
+                    )
+
+                self.assertEqual(response.status_code, 200, response.content)
+                target.refresh_from_db()
+                self.assertNotEqual(target.cover_image.name, old_name)
+                self.assertFalse(default_storage.exists(old_name))
+                self.assertTrue(default_storage.exists(target.cover_image.name))
+
     def test_who_may_edit_profiles(self):
         actual = {}
         for label, user in self.users.items():
