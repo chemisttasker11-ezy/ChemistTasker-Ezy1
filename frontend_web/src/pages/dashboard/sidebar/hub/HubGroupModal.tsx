@@ -97,6 +97,16 @@ export function CreateGroupModal({
     }
   }, [currentUserId, initialGroup, mode]);
 
+  // Large organisations are searched on the server; the list keeps every member already loaded so selections stay visible.
+  const [serverQuery, setServerQuery] = useState('');
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const trimmed = searchQuery.trim();
+      setServerQuery(trimmed.length >= 2 ? trimmed : '');
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [searchQuery]);
+
   useEffect(() => {
     let isMounted = true;
     const loadMembers = async () => {
@@ -110,15 +120,21 @@ export function CreateGroupModal({
             .filter((id): id is number => typeof id === 'number');
           const uniqueIds = Array.from(new Set(pharmacyIds));
           const responses = await Promise.all(
-            uniqueIds.map((id) => fetchPharmacyGroupMembers(id))
+            uniqueIds.map((id) => fetchPharmacyGroupMembers(id, serverQuery))
           );
           results = responses.flat();
         } else {
-          // For organization groups, load the full org roster (org staff + all pharmacy members under the org).
-          results = await fetchOrganizationMembers(scope.organizationId);
+          // Organisation groups: the staff of every pharmacy in the organisation, own pharmacy first.
+          results = await fetchOrganizationMembers(scope.organizationId, serverQuery);
         }
         if (isMounted) {
-          setMembers(results.filter((member) => currentUserId == null || member.userId !== currentUserId));
+          const loaded = results.filter((member) => currentUserId == null || member.userId !== currentUserId);
+          setMembers((previous) => {
+            const byId = new Map(previous.map((member) => [member.membershipId, member]));
+            loaded.forEach((member) => byId.set(member.membershipId, member));
+            const loadedIds = new Set(loaded.map((member) => member.membershipId));
+            return [...loaded, ...Array.from(byId.values()).filter((member) => !loadedIds.has(member.membershipId))];
+          });
         }
       } catch (err) {
         console.error('Failed to load members for group', err);
@@ -135,7 +151,7 @@ export function CreateGroupModal({
     return () => {
       isMounted = false;
     };
-  }, [currentUserId, scope, pharmacies]);
+  }, [currentUserId, scope, pharmacies, serverQuery]);
 
   const uniqueRoles = useMemo(() => {
     const roles = new Set<string>();
@@ -150,9 +166,11 @@ export function CreateGroupModal({
   const filteredMembers = useMemo(() => {
     return members.filter(member => {
       const matchesRole = roleFilter === 'ALL' || member.role === roleFilter;
+      const query = searchQuery.toLowerCase();
       const matchesQuery =
-        getMemberDisplayName(member).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+        getMemberDisplayName(member).toLowerCase().includes(query) ||
+        (member.jobTitle?.toLowerCase().includes(query) ?? false) ||
+        (member.pharmacyName?.toLowerCase().includes(query) ?? false);
       return matchesRole && matchesQuery;
     });
   }, [members, roleFilter, searchQuery]);
@@ -347,7 +365,7 @@ export function CreateGroupModal({
           <TextField
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search members by name or email"
+            placeholder="Search members by name, role or pharmacy"
             fullWidth
             InputProps={{
               startAdornment: (

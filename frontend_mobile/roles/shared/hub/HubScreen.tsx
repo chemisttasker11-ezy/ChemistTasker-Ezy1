@@ -24,7 +24,6 @@ import {
   createHubGroup,
   deleteHubGroup,
   fetchHubContext,
-  fetchOrganizationGroupMembers,
   fetchOrganizationMembers,
   fetchHubGroup,
   fetchPharmacyGroupMembers,
@@ -319,7 +318,8 @@ export default function HubScreen() {
           });
           options = Object.values(merged);
         } else {
-          options = (await fetchOrganizationGroupMembers(scope.id)) as any;
+          // Organisation groups: the staff of every pharmacy in the organisation, own pharmacy first (names only).
+          options = (await fetchOrganizationMembers(scope.id)) as any;
         }
         setMemberOptions(
           filterPharmacyStaffMembers(options || []).filter((member: any) => user?.id == null || member?.userId !== user.id),
@@ -532,9 +532,9 @@ export default function HubScreen() {
     const base = roleFilter === 'all' ? memberOptions : memberOptions.filter((m) => String(m.role) === roleFilter);
     if (!query) return base;
     return base.filter((m) => {
-      const name = getMemberDisplayName(m).toLowerCase();
-      const email = (m.email || '').toLowerCase();
-      return name.includes(query) || email.includes(query);
+      return [getMemberDisplayName(m), m.jobTitle, m.pharmacyName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
     });
   }, [memberOptions, roleFilter, memberSearch]);
 

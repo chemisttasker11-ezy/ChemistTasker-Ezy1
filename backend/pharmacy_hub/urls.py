@@ -5,6 +5,7 @@ from pharmacy_hub.views import (
     HubCommentViewSet,
     HubCommunityGroupViewSet,
     HubContextView,
+    HubMemberDirectoryView,
     HubOrganizationProfileView,
     HubPharmacyProfileView,
     HubPollCommentViewSet,
@@ -41,6 +42,7 @@ hub_poll_comment_detail = HubPollCommentViewSet.as_view(
 
 urlpatterns = [
     path('hub/context/', HubContextView.as_view(), name='hub-context'),
+    path('hub/members/', HubMemberDirectoryView.as_view(), name='hub-member-directory'),
     path('hub/groups/', hub_group_list, name='hub-group-list'),
     path('hub/groups/<int:pk>/', hub_group_detail, name='hub-group-detail'),
     path('hub/posts/', hub_post_list, name='hub-post-list'),

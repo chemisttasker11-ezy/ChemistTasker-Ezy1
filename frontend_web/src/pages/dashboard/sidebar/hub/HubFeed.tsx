@@ -584,7 +584,8 @@ export function ScopeFeed({
 }
 
 interface TagMembersSelectorProps {
-  loadMembers?: () => Promise<HubGroupMemberOption[]>;
+  /** Loads the hub member directory (names only, own pharmacy first); `search` is applied on the server. */
+  loadMembers?: (search?: string) => Promise<HubGroupMemberOption[]>;
   value: HubGroupMemberOption[];
   onChange: (members: HubGroupMemberOption[]) => void;
   disabled?: boolean;
@@ -593,7 +594,6 @@ interface TagMembersSelectorProps {
 type AggregatedMemberOption = {
   key: string;
   fullName: string;
-  email: string | null;
   role: string | null;
   jobTitle?: string | null;
   membershipIds: number[];
@@ -610,6 +610,13 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
   const isDarkMode = theme.palette.mode === 'dark';
   const [options, setOptions] = useState<HubGroupMemberOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => window.clearTimeout(handle);
+  }, [searchInput]);
 
   useEffect(() => {
     let isMounted = true;
@@ -619,12 +626,15 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
       return;
     }
     setLoading(true);
-    loadMembers()
+    loadMembers(search || undefined)
       .then((members) => {
         if (isMounted) {
-          setOptions(
-            filterPharmacyStaffMembers(members).filter((member) => user?.id == null || member.userId !== user.id),
+          const found = filterPharmacyStaffMembers(members).filter(
+            (member) => user?.id == null || member.userId !== user.id,
           );
+          // Keep already-selected members available while a search narrows the list.
+          const seen = new Set(found.map((member) => member.membershipId));
+          setOptions([...found, ...value.filter((member) => !seen.has(member.membershipId))]);
         }
       })
       .catch(() => {
@@ -640,7 +650,9 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
     return () => {
       isMounted = false;
     };
-  }, [loadMembers, user?.id]);
+    // `value` is read only to keep selections visible; reloading on every selection is unnecessary.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadMembers, search, user?.id]);
 
   if (!loadMembers) {
     return null;
@@ -667,9 +679,6 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
         if (!entry.fullName && member.fullName) {
           entry.fullName = member.fullName;
         }
-        if (!entry.email && member.email) {
-          entry.email = member.email;
-        }
         if (!entry.jobTitle && member.jobTitle) {
           entry.jobTitle = member.jobTitle;
         }
@@ -677,7 +686,6 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
         map.set(key, {
           key,
           fullName: getMemberDisplayName(member),
-          email: member.email,
           role: member.role,
           jobTitle: member.jobTitle ?? null,
           membershipIds: [member.membershipId],
@@ -685,11 +693,8 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
         });
       }
     });
-    return Array.from(map.values()).sort((a, b) => {
-      const labelA = (a.fullName || '').toLowerCase();
-      const labelB = (b.fullName || '').toLowerCase();
-      return labelA.localeCompare(labelB);
-    });
+    // The directory already orders the viewer's own pharmacy first, then by pharmacy and name.
+    return Array.from(map.values());
   }, [options]);
 
   const selectedMembershipIds = useMemo(
@@ -788,6 +793,11 @@ function TagMembersSelector({ loadMembers, value, onChange, disabled = false }: 
         openOnFocus
         disabled={disabled}
         onChange={(_, newValue) => applyAggregatedSelection(newValue as AggregatedMemberOption[])}
+        inputValue={searchInput}
+        onInputChange={(_, next, reason) => {
+          if (reason !== 'reset') setSearchInput(next);
+        }}
+        filterOptions={(list) => list}
         isOptionEqualToValue={(option, selected) => option.key === selected.key}
         getOptionLabel={(option) =>
           formatMemberLabel(option.fullName || 'Member', option.role, option.jobTitle)

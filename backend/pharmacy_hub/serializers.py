@@ -922,14 +922,13 @@ class HubPostSerializer(serializers.ModelSerializer):
             user = getattr(membership, "user", None)
             full_name = ""
             if user:
-                full_name = user.get_full_name().strip() or user.email or ""
+                full_name = user.get_full_name().strip()
             if not full_name:
                 full_name = membership.display_name if hasattr(membership, "display_name") else ""
             tagged.append(
                 {
                     "membership_id": membership.id,
                     "full_name": full_name or "(Unnamed)",
-                    "email": user.email if user else None,
                     "role": membership.role,
                     "job_title": membership.job_title or "",
                 }

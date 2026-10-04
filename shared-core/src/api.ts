@@ -2436,22 +2436,37 @@ export async function updateOrganizationHubProfileService(organizationId, payloa
     const data = await updateOrganizationHubProfile(organizationId, formData);
     return mapOrganization(data);
 }
-export async function fetchPharmacyGroupMembers(pharmacyId) {
-    const data = await fetchApi(`/client-profile/memberships/?pharmacy=${pharmacyId}`);
-    return asList(data)
-        .filter(member => ['FULL_TIME', 'PART_TIME', 'CASUAL'].includes(member.employment_type ?? member.employmentType ?? ''))
-        .map(member => mapOptionFromSource({
-            membershipId: member.id,
-            userId: member.user,
-            fullName: memberDisplayName(member, member.id),
-            email: member.user_details?.email ?? null,
+// Hub member directory: names only (no contact details), the viewer's own pharmacy first, searched on the server.
+export async function fetchHubMemberDirectory(params) {
+    const query = new URLSearchParams({ scope: params.scope });
+    if (params.pharmacyId != null)
+        query.set('pharmacy_id', String(params.pharmacyId));
+    if (params.organizationId != null)
+        query.set('organization_id', String(params.organizationId));
+    if (params.groupId != null)
+        query.set('group_id', String(params.groupId));
+    if (params.search)
+        query.set('search', params.search);
+    if (params.limit)
+        query.set('limit', String(params.limit));
+    const data = await fetchApi(`/client-profile/hub/members/?${query.toString()}`);
+    return asList(data).map(member => ({
+        ...mapOptionFromSource({
+            membershipId: member.membership_id,
+            userId: member.user_id ?? null,
+            fullName: member.full_name,
+            email: null,
             role: member.role ?? null,
             employmentType: member.employment_type ?? null,
-            pharmacyId: pharmacyId,
+            pharmacyId: member.pharmacy_id ?? null,
             pharmacyName: member.pharmacy_name ?? null,
-            jobTitle: member.job_title ?? null,
-            profilePhotoUrl: member.user_details?.profile_photo_url ?? null,
-        }));
+            jobTitle: member.job_title || null,
+        }),
+        isOwnPharmacy: Boolean(member.is_own_pharmacy),
+    }));
+}
+export async function fetchPharmacyGroupMembers(pharmacyId, search = '') {
+    return fetchHubMemberDirectory({ scope: 'pharmacy', pharmacyId, search });
 }
 export async function fetchOrganizationGroupMembers(organizationId) {
     const data = await getHubGroups({ organization_id: organizationId, include_pharmacy_members: true });
@@ -2469,22 +2484,9 @@ export async function fetchOrganizationGroupMembers(organizationId) {
             jobTitle: member.job_title ?? null,
         }));
 }
-// Organization members: org staff + all pharmacy members under the org.
-export async function fetchOrganizationMembers(organizationId) {
-    const data = await fetchApi(`/client-profile/memberships/?organization=${organizationId}&page_size=500`);
-    const list = asList(data.results ?? data);
-    return list.filter(member => ['FULL_TIME', 'PART_TIME', 'CASUAL'].includes(member.employment_type ?? member.employmentType ?? '')).map((member) => mapOptionFromSource({
-        membershipId: member.id,
-        userId: member.user_details?.id ?? null,
-        fullName: memberDisplayName(member, member.id),
-        email: member.user_details?.email ?? null,
-        role: member.role ?? null,
-        employmentType: member.employment_type ?? null,
-        pharmacyId: member.pharmacy_detail?.id ?? null,
-        pharmacyName: member.pharmacy_detail?.name ?? null,
-        jobTitle: member.job_title ?? null,
-        profilePhotoUrl: member.user_details?.profile_photo_url ?? null,
-    }));
+// Organization members: the active staff of every pharmacy in the organisation, own pharmacy first.
+export async function fetchOrganizationMembers(organizationId, search = '') {
+    return fetchHubMemberDirectory({ scope: 'organization', organizationId, search });
 }
 export async function fetchHubGroupMembers(groupId) {
     const group = await fetchHubGroup(groupId, { includeMembers: true });
@@ -2492,7 +2494,7 @@ export async function fetchHubGroupMembers(groupId) {
         membershipId: member.membershipId,
         userId: member.member.userDetails.id,
         fullName: groupMemberDisplayName(member),
-        email: member.member.userDetails.email,
+        email: null,
         role: member.member.role,
         employmentType: member.member.employmentType,
         pharmacyId: member.pharmacyId ?? group.pharmacyId ?? null,

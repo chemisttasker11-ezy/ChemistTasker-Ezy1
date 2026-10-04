@@ -502,6 +502,8 @@ export type HubGroupMemberOption = {
     pharmacyName: string | null;
     jobTitle: string | null;
     profilePhotoUrl: string | null;
+    /** Hub member directory: the member works at one of the viewer's own pharmacies (listed first). */
+    isOwnPharmacy?: boolean;
 };
 
 // ============ HUB - PAYLOAD TYPES ============
