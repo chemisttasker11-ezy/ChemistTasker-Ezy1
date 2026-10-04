@@ -1,12 +1,15 @@
 """Failure-boundary contracts for user-account delivery and deletion side effects."""
+from datetime import timedelta
 from unittest import mock
 
 import requests
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_user
@@ -92,7 +95,22 @@ class EmailQueueFailureBoundaryTests(TestCase):
         self.assertEqual((unknown.status_code, unknown.data), (200, expected))
 
     def test_email_otp_resend_remains_non_enumerating_if_queue_is_unavailable(self):
-        user = make_user("PHARMACIST", is_otp_verified=False)
+        previous_created_at = timezone.now() - timedelta(minutes=2)
+        previous_code = make_password("112233")
+        user = make_user(
+            "PHARMACIST",
+            is_otp_verified=False,
+            otp_code=previous_code,
+            otp_created_at=previous_created_at,
+            otp_failed_attempts=3,
+            otp_locked_until=None,
+        )
+        previous_state = (
+            user.otp_code,
+            user.otp_created_at,
+            user.otp_failed_attempts,
+            user.otp_locked_until,
+        )
         expected = {
             "detail": "If this email is eligible, a verification code has been sent."
         }
@@ -116,6 +134,17 @@ class EmailQueueFailureBoundaryTests(TestCase):
 
         self.assertEqual((known.status_code, known.data), (200, expected))
         self.assertEqual((unknown.status_code, unknown.data), (200, expected))
+        user.refresh_from_db()
+        self.assertEqual(
+            (
+                user.otp_code,
+                user.otp_created_at,
+                user.otp_failed_attempts,
+                user.otp_locked_until,
+            ),
+            previous_state,
+            "an undelivered resend must not invalidate the prior OTP/security state",
+        )
 
 
 @override_settings(
