@@ -39,16 +39,22 @@ class HubAttachmentMixin:
 
     def _add_attachments(self, post, files):
         created = []
+        current = None
         try:
             for uploaded in files or []:
-                attachment = PharmacyHubAttachment.objects.create(
+                current = PharmacyHubAttachment(
                     post=post,
                     file=uploaded,
                     kind=self._attachment_kind(uploaded),
                 )
-                created.append(attachment)
+                current.save()
+                created.append(current)
+                current = None
         except Exception:
-            for attachment in created:
+            cleanup = [*created]
+            if current is not None:
+                cleanup.append(current)
+            for attachment in cleanup:
                 name = getattr(attachment.file, "name", None)
                 storage = getattr(attachment.file, "storage", None)
                 if name and storage:
