@@ -46,7 +46,7 @@ class PharmacyManagerOnboardingTests(TestCase):
         pharmacy = Pharmacy.objects.get(email="contact@new-pharmacy.test")
         contact = pharmacy.memberships.get().user
 
-        self.assertEqual(contact.role, "EXPLORER")
+        self.assertEqual(contact.role, "PHARMACY_MANAGER")
         self.assertFalse(OrganizationMembership.objects.filter(user=contact).exists())
         self.assertIsNone(body["organization_membership_id"])
 
@@ -107,7 +107,7 @@ class OnboardedChiefAdminMigrationTests(TestCase):
         self.migrate()
         self.assertFalse(OrganizationMembership.objects.filter(pk=membership.pk).exists())
         user.refresh_from_db()
-        self.assertEqual(user.role, "EXPLORER")
+        self.assertEqual(user.role, "PHARMACY_MANAGER")
         assignment = PharmacyAdmin.objects.get(user=user, pharmacy=self.pharmacy)
         self.assertTrue(assignment.is_active)
         self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
@@ -118,3 +118,96 @@ class OnboardedChiefAdminMigrationTests(TestCase):
         self.migrate()
         self.assertTrue(OrganizationMembership.objects.filter(pk=real_chief.pk, role="CHIEF_ADMIN").exists())
         self.assertTrue(OrganizationMembership.objects.filter(pk=unassigned.pk, role="CHIEF_ADMIN").exists())
+
+
+class PharmacyManagerAccountTypeTests(TestCase):
+    """The PHARMACY_MANAGER account works from the admin dashboard and may choose its own account type once."""
+
+    def setUp(self):
+        self.organization = Organization.objects.create(name="Choice Org", slug="choice-org")
+        org_admin = make_user("OWNER")
+        OrganizationMembership.objects.create(user=org_admin, organization=self.organization, role="ORG_ADMIN")
+        client = APIClient()
+        client.force_authenticate(user=org_admin)
+        with mock.patch("organizations.claims.async_task"):
+            response = client.post(CLAIM_URL, {"pharmacy_email": "manager@choice.test"}, format="json")
+        self.assertEqual(response.status_code, 201, response.content)
+        self.pharmacy = Pharmacy.objects.get(email="manager@choice.test")
+        self.contact = self.pharmacy.memberships.get().user
+        self.contact.is_otp_verified = True
+        self.contact.save(update_fields=["is_otp_verified"])
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.contact)
+
+    def choose(self, role):
+        return self.client.post("/api/users/me/account-type/", {"role": role}, format="json")
+
+    def test_dashboard_is_the_admin_dashboard_of_the_managed_pharmacy(self):
+        from users.navigation import get_frontend_dashboard_url
+
+        self.assertTrue(get_frontend_dashboard_url(self.contact).endswith(f"/dashboard/admin/{self.pharmacy.id}"))
+
+    def test_account_type_is_chosen_once_and_admin_access_is_kept(self):
+        self.assertEqual(self.choose("EXPLORER").status_code, 400)
+        response = self.choose("PHARMACIST")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["role"], "PHARMACIST")
+        self.assertTrue(response.json()["onboarding_url"].endswith("/dashboard/pharmacist/onboarding"))
+        self.assertEqual(self.choose("OWNER").status_code, 400, "the account type can be chosen only once")
+        self.assertTrue(has_admin_capability(self.contact, self.pharmacy, CAPABILITY_MANAGE_STAFF))
+
+    def test_owner_onboarding_submission_makes_them_the_real_owner(self):
+        self.assertEqual(self.choose("OWNER").status_code, 200)
+        self.contact.refresh_from_db()
+        response = self.client.patch(
+            "/api/client-profile/owner/onboarding/me/",
+            {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.pharmacy.refresh_from_db()
+        self.assertEqual(self.pharmacy.owner.user_id, self.contact.id)
+        self.assertEqual(self.pharmacy.organization_id, self.organization.id, "the pharmacy stays in its organisation")
+        self.assertEqual(
+            PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy).admin_level,
+            PharmacyAdmin.AdminLevel.OWNER,
+        )
+
+    def test_owner_submission_never_takes_over_an_owned_pharmacy(self):
+        _owner, owned = make_owner_with_pharmacy("Already Owned")
+        owned.email = "manager@choice.test"
+        owned.organization = self.organization
+        owned.save(update_fields=["email", "organization"])
+        PharmacyAdmin.objects.create(user=self.contact, pharmacy=owned, admin_level=PharmacyAdmin.AdminLevel.MANAGER)
+        self.choose("OWNER")
+        self.client.patch(
+            "/api/client-profile/owner/onboarding/me/",
+            {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
+            format="json",
+        )
+        owned.refresh_from_db()
+        self.assertNotEqual(owned.owner.user_id, self.contact.id)
+
+
+class SelfRegistrationRoleTests(TestCase):
+    def test_invitation_only_account_types_cannot_be_self_registered(self):
+        for role in ("PHARMACY_MANAGER", "ORG_STAFF"):
+            with (
+                self.subTest(role=role),
+                mock.patch("users.api_auth.send_async_email"),
+                mock.patch("users.api_auth.verify_recaptcha", return_value=True),
+            ):
+                response = APIClient().post(
+                    "/api/users/register/",
+                    {
+                        "email": f"{role.lower()}@register.test",
+                        "password": "Sufficiently-Long-9",
+                        "confirm_password": "Sufficiently-Long-9",
+                        "role": role,
+                        "accepted_terms": True,
+                        "captcha_token": "test-token",
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertIn("role", response.json())

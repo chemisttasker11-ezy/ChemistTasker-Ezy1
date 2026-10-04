@@ -116,6 +116,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             })
         return attrs
     
+    def validate_role(self, value):
+        # Organisation and pharmacy-manager accounts are created by invitations, never self-selected.
+        if value not in User.SELF_REGISTRATION_ROLES:
+            raise serializers.ValidationError("Choose Pharmacy Owner, Pharmacist, Other Staff or Explorer.")
+        return value
+
     def validate_accepted_terms(self, value):
         if not value:
             raise serializers.ValidationError("You must accept the Terms of Service to register.")

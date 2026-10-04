@@ -50,6 +50,11 @@ def get_frontend_onboarding_url(user):
         return f"{base}/dashboard/explorer/onboarding"
     if role in {"ORG_STAFF", "ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN", "ORGANIZATION"}:
         return f"{base}/dashboard/organization/overview"
+    if role == "PHARMACY_MANAGER":
+        # No onboarding for this account type; it works from the admin dashboard of its pharmacy.
+        from users.navigation import get_frontend_dashboard_url
+
+        return get_frontend_dashboard_url(user)
     return f"{base}/dashboard/"
 
 

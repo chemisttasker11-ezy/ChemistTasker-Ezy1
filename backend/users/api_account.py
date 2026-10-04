@@ -98,3 +98,31 @@ class DeleteAccountView(APIView):
             )
 
         return Response({"success": True}, status=status.HTTP_200_OK)
+
+
+class ChooseAccountTypeView(APIView):
+    """POST /api/users/me/account-type/ {"role": "PHARMACIST" | "OTHER_STAFF" | "OWNER"}.
+
+    A PHARMACY_MANAGER account (created when an organisation onboards a pharmacy by email) may choose its own account
+    type once. Its pharmacy-admin access is kept; the response names the onboarding page of the chosen type.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from users.models import User
+        from users.utils import get_frontend_onboarding_url
+
+        role = str(request.data.get("role") or "").strip().upper()
+        if role not in User.CHOOSABLE_ACCOUNT_TYPES:
+            raise ValidationError({"role": "Choose PHARMACIST, OTHER_STAFF or OWNER."})
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            if user.role != "PHARMACY_MANAGER":
+                raise ValidationError({"role": "Your account type is already set."})
+            user.role = role
+            user.save(update_fields=["role"])
+        return Response(
+            {"role": user.role, "onboarding_url": get_frontend_onboarding_url(user)},
+            status=status.HTTP_200_OK,
+        )

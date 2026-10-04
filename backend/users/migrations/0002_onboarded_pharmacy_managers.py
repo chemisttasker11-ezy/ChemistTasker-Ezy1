@@ -9,7 +9,8 @@ For each membership that is exactly that shape this migration:
 * keeps the contact's PharmacyAdmin assignments (an OWNER level on a pharmacy they do not own becomes MANAGER, which has
   the same capabilities; OWNER is reserved for the pharmacy owner);
 * deletes the Chief Admin organisation membership (its pharmacy links go with it);
-* moves an ORG_STAFF account with no other organisation membership to EXPLORER, as a new pharmacy-admin invite would.
+* moves an ORG_STAFF account with no other organisation membership to the PHARMACY_MANAGER account type, the type
+  email onboarding now creates (admin dashboard first, own profile type chosen later).
 
 A Chief Admin membership with another job title, no pharmacies, or a pharmacy without an active assignment for the same
 user is not touched; a warning names it so an operator can decide. Reversing is a no-op.
@@ -56,7 +57,7 @@ def convert_onboarded_chief_admins(apps, schema_editor):
         user_id = membership.user_id
         membership.delete()
         if not OrganizationMembership.objects.using(db).filter(user_id=user_id).exists():
-            User.objects.using(db).filter(pk=user_id, role="ORG_STAFF").update(role="EXPLORER")
+            User.objects.using(db).filter(pk=user_id, role="ORG_STAFF").update(role="PHARMACY_MANAGER")
 
 
 class Migration(migrations.Migration):

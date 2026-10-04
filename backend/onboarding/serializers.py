@@ -130,7 +130,14 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
         return super().update(instance, validated_data)
 
     def _basic_tab(self, instance, vdata: dict, submit: bool):
-        return apply_owner_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
+        instance = apply_owner_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
+        if submit:
+            # An organisation-onboarded pharmacy manager who chose the owner account type becomes the real owner
+            # of that pharmacy when they submit owner onboarding.
+            from organizations.onboarded_ownership import adopt_onboarded_pharmacies
+
+            adopt_onboarded_pharmacies(instance)
+        return instance
 
     def get_progress_percent(self, obj):
         return owner_progress_percent(obj)

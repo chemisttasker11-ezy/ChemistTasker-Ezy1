@@ -26,6 +26,7 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('mobile/app-config/', MobileAppConfigView.as_view(), name='mobile-app-config'),
     path('me/', CurrentUserView.as_view(), name='me'),
+    path('me/account-type/', ChooseAccountTypeView.as_view(), name='me-account-type'),
     path('ws-ticket/', WsTicketView.as_view(), name='ws-ticket'),
     path('password-reset-confirm/',PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm_api'),
     path('password-reset/', PasswordResetRequestAPIView.as_view(), name='password-reset-request'),

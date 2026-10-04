@@ -42,7 +42,14 @@ class User(AbstractUser):
         ('OTHER_STAFF', 'Other Staff'),
         ('ORG_STAFF',   'Organization Staff'),
         ('EXPLORER',    'Explorer'),
+        # Created only when an organisation onboards a pharmacy by email: the contact manages that pharmacy through a
+        # pharmacy-admin assignment and may later choose PHARMACIST, OTHER_STAFF or OWNER once (CHOOSABLE_ACCOUNT_TYPES).
+        ('PHARMACY_MANAGER', 'Pharmacy Manager'),
     )
+    # Account types a person may pick when registering; the others are created by an invitation.
+    SELF_REGISTRATION_ROLES = ('OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER')
+    # Account types a PHARMACY_MANAGER may switch to, once, to add their own profile and onboarding.
+    CHOOSABLE_ACCOUNT_TYPES = ('PHARMACIST', 'OTHER_STAFF', 'OWNER')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     USERNAME_FIELD = 'email'       # log in with email
@@ -60,6 +67,8 @@ class User(AbstractUser):
         return self.role == 'ORG_STAFF'
     def is_explorer(self):
         return self.role == 'EXPLORER'
+    def is_pharmacy_manager(self):
+        return self.role == 'PHARMACY_MANAGER'
     
     otp_code = models.CharField(max_length=128, blank=True, null=True)
     otp_created_at = models.DateTimeField(blank=True, null=True)

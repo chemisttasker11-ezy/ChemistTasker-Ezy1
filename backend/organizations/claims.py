@@ -180,10 +180,11 @@ class OwnerOnboardingClaim(APIView):
         return name[:120]
 
     def _ensure_org_user_account(self, email: str):
-        # A new account is a non-clinical pharmacy admin, exactly as the pharmacy-admin invitation creates one.
+        # A new account starts as a PHARMACY_MANAGER: admin dashboard first, no onboarding; the person may later
+        # choose their own account type (pharmacist, other staff or owner). An existing account keeps its type.
         user, created = User.objects.get_or_create(
             email=email,
-            defaults={'role': 'EXPLORER'}
+            defaults={'role': 'PHARMACY_MANAGER'}
         )
         temp_password = None
         if created:
