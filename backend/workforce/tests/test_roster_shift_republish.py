@@ -4,11 +4,13 @@ from unittest import mock
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
+from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy, make_user
 from memberships.models import Membership
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterActionAudit, RosterPeriod
+from workforce.roster.serializers import RosterAssignmentSerializer
 from workforce.roster.publication import (
     get_worker_published_roster,
     republish_roster_shift,
@@ -105,3 +107,62 @@ class RosterShiftRepublishTests(TestCase):
         self.assertIsNone(slot.unpublished_at)
         audit = RosterActionAudit.objects.get(action_type=RosterActionAudit.ActionType.SHIFT_REPUBLISHED)
         self.assertEqual(audit.details["slot_id"], slot.id)
+
+    def test_roster_assignment_contract_exposes_per_shift_publication_state(self):
+        assignment = ShiftSlotAssignment.objects.select_related(
+            "slot__roster_period", "shift__pharmacy", "user",
+        ).get(slot=self.slots[0])
+        before = RosterAssignmentSerializer(assignment).data
+        self.assertTrue(before["is_published_roster"])
+        self.assertFalse(before["is_unpublished"])
+
+        unpublish_roster_shift(self.slots[0], self.owner)
+        assignment = ShiftSlotAssignment.objects.select_related(
+            "slot__roster_period", "shift__pharmacy", "user",
+        ).get(pk=assignment.pk)
+        after = RosterAssignmentSerializer(assignment).data
+        self.assertTrue(after["is_published_roster"])
+        self.assertTrue(after["is_unpublished"])
+
+    def test_republish_can_move_to_another_published_week(self):
+        next_week = self.week + timedelta(days=7)
+        next_period = RosterPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            week_start=next_week,
+            created_by=self.owner,
+            status=RosterPeriod.Status.PUBLISHED,
+        )
+        slot = self.slots[0]
+        unpublish_roster_shift(slot, self.owner)
+        slot.refresh_from_db()
+        slot.date = next_week
+        slot.save()
+        slot.assignments.update(slot_date=next_week)
+
+        republish_roster_shift(slot, self.owner, notify="none")
+
+        slot.refresh_from_db()
+        self.assertIsNone(slot.unpublished_at)
+        audit = RosterActionAudit.objects.get(action_type=RosterActionAudit.ActionType.SHIFT_REPUBLISHED)
+        self.assertEqual(audit.details["period_id"], next_period.pk)
+
+    def test_published_roster_mutations_require_per_shift_unpublish(self):
+        assignment = ShiftSlotAssignment.objects.get(slot=self.slots[0])
+        client = APIClient()
+        client.force_authenticate(self.owner)
+
+        denied_delete = client.delete(f"/api/client-profile/roster-owner/{assignment.pk}/")
+        self.assertEqual(denied_delete.status_code, 400, denied_delete.content)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
+
+        denied_escalate = client.post(
+            f"/api/client-profile/roster-shifts/{self.slots[0].shift_id}/escalate/",
+            {"target_visibility": "PLATFORM"},
+            format="json",
+        )
+        self.assertEqual(denied_escalate.status_code, 400, denied_escalate.content)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
+
+        unpublish_roster_shift(self.slots[0], self.owner)
+        allowed_delete = client.delete(f"/api/client-profile/roster-owner/{assignment.pk}/")
+        self.assertEqual(allowed_delete.status_code, 204, allowed_delete.content)

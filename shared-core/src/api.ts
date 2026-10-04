@@ -415,6 +415,8 @@ export const rosterV2 = {
     createTemplate: (body) => operationalRequest(API_ENDPOINTS.rosterV2.templates, { method: 'POST', body }),
     applyTemplate: (body) => operationalRequest(API_ENDPOINTS.rosterV2.templateApply, { method: 'POST', body }),
     bulkEdit: (periodId, operations) => operationalRequest(API_ENDPOINTS.rosterV2.bulkEdit, { method: 'POST', body: { period_id: periodId, operations } }),
+    unpublishShift: (slotId) => operationalRequest(API_ENDPOINTS.rosterV2.shiftUnpublish, { method: 'POST', body: { slot_id: slotId } }),
+    republishShift: (slotId, notify = 'worker') => operationalRequest(API_ENDPOINTS.rosterV2.shiftRepublish, { method: 'POST', body: { slot_id: slotId, notify } }),
     requestSwap: (assignmentId, targetUserId, notes = '') => operationalRequest(API_ENDPOINTS.rosterV2.workerSwapRequest, { method: 'POST', body: { assignment_id: assignmentId, target_user_id: targetUserId, notes } }),
     requestCover: (assignmentId, reason = '') => operationalRequest(API_ENDPOINTS.rosterV2.workerCoverRequest, { method: 'POST', body: { assignment_id: assignmentId, reason } }),
     approveSwap: (requestId, targetUserId?: number) => operationalRequest(API_ENDPOINTS.rosterV2.managerApproveSwap, { method: 'POST', body: { request_id: requestId, ...(targetUserId ? { target_user_id: targetUserId } : {}) } }),

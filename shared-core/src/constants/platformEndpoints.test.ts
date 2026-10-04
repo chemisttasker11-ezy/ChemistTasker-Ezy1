@@ -52,6 +52,8 @@ describe('legacy API_ENDPOINTS reconciliation', () => {
     expect(API_ENDPOINTS.attendance.managerTimeline(11)).toBe('/client-profile/attendance/manager/timeline/11/');
     expect(API_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/client-profile/attendance/roster/acknowledgements/12/');
     expect(API_ENDPOINTS.rosterV2.managerApproveReplacement).toBe('/client-profile/attendance/roster/manager/approve-replacement/');
+    expect(API_ENDPOINTS.rosterV2.shiftUnpublish).toBe('/client-profile/attendance/roster/shift/unpublish/');
+    expect(API_ENDPOINTS.rosterV2.shiftRepublish).toBe('/client-profile/attendance/roster/shift/republish/');
     expect(API_ENDPOINTS.workforce.rosterWorkspace).toBe('/client-profile/workforce/roster/workspace/');
     expect(API_ENDPOINTS.workforce.leaveDecision(3)).toBe('/client-profile/workforce/leave/3/decision/');
     expect(API_ENDPOINTS.workforce.timesheetPeriodSummary(4)).toBe('/client-profile/workforce/timesheet-periods/4/summary/');

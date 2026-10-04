@@ -248,6 +248,8 @@ export const API_ENDPOINTS = {
         templates: '/client-profile/attendance/roster/templates/',
         templateApply: '/client-profile/attendance/roster/templates/apply/',
         bulkEdit: '/client-profile/attendance/roster/bulk-edit/',
+        shiftUnpublish: '/client-profile/attendance/roster/shift/unpublish/',
+        shiftRepublish: '/client-profile/attendance/roster/shift/republish/',
         workerSwapRequest: '/client-profile/attendance/roster/worker/swap-request/',
         workerCoverRequest: '/client-profile/attendance/roster/worker/cover-request/',
         managerApproveSwap: '/client-profile/attendance/roster/manager/approve-swap/',

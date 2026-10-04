@@ -27,6 +27,17 @@ from organizations.access import managed_pharmacies as managed_pharmacies_for, u
 from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
 
 
+def _slot_locked_by_published_roster(slot):
+    if slot.unpublished_at is not None:
+        return False
+    week_start = slot.date - timedelta(days=slot.date.weekday())
+    return RosterPeriod.objects.filter(
+        pharmacy_id=slot.shift.pharmacy_id,
+        week_start=week_start,
+        status=RosterPeriod.Status.PUBLISHED,
+    ).exists()
+
+
 # Roster
 class RosterOwnerViewSet(viewsets.ModelViewSet):
     """
@@ -44,7 +55,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         controlled_pharmacies = managed_pharmacies_for(user)
         qs = qs.filter(
             shift__pharmacy__in=controlled_pharmacies
-        ).select_related('shift__pharmacy', 'slot', 'user').prefetch_related(
+        ).select_related('shift__pharmacy', 'slot', 'slot__roster_period', 'user').prefetch_related(
             'user__workforce_timesheets__period'
         ).distinct()
 
@@ -72,6 +83,13 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
         return qs
+
+    def perform_destroy(self, instance):
+        if _slot_locked_by_published_roster(instance.slot):
+            raise DRFValidationError(
+                "Unpublish this shift for editing before removing its assignment from a published roster."
+            )
+        super().perform_destroy(instance)
 
     @action(detail=False, methods=['get'], url_path='members-for-roster')
     def members_for_roster(self, request):
@@ -106,6 +124,13 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Shift.objects.filter(pharmacy__in=managed_pharmacies_for(self.request.user))
+
+    def perform_destroy(self, instance):
+        if any(_slot_locked_by_published_roster(slot) for slot in instance.slots.select_related("shift")):
+            raise DRFValidationError(
+                "Unpublish published roster shifts for editing before deleting this shift."
+            )
+        super().perform_destroy(instance)
 
     def update(self, request, *args, **kwargs):
         """
@@ -214,8 +239,35 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             end_date = date.fromisoformat(end_date_str)
             qs = qs.filter(slots__date__lte=end_date)
 
-        serializer = OpenShiftSerializer(qs, many=True)
-        return Response(serializer.data)
+        shifts = list(qs.prefetch_related("slots"))
+        week_pairs = {
+            (shift.pharmacy_id, slot.date - timedelta(days=slot.date.weekday()))
+            for shift in shifts
+            for slot in shift.slots.all()
+        }
+        published_pairs = set()
+        if week_pairs:
+            published_pairs = set(
+                RosterPeriod.objects.filter(
+                    status=RosterPeriod.Status.PUBLISHED,
+                    pharmacy_id__in={pair[0] for pair in week_pairs},
+                    week_start__in={pair[1] for pair in week_pairs},
+                ).values_list("pharmacy_id", "week_start")
+            )
+
+        payload = list(OpenShiftSerializer(shifts, many=True).data)
+        for shift, shift_payload in zip(shifts, payload):
+            slot_objects = {slot.pk: slot for slot in shift.slots.all()}
+            for slot_payload in shift_payload.get("slots", []):
+                slot = slot_objects.get(slot_payload.get("id"))
+                if slot is None:
+                    continue
+                slot_payload["is_unpublished"] = slot.unpublished_at is not None
+                slot_payload["is_published_roster"] = (
+                    shift.pharmacy_id,
+                    slot.date - timedelta(days=slot.date.weekday()),
+                ) in published_pairs
+        return Response(payload)
 
     @action(detail=False, methods=['post'], url_path='create-open-shift')
     def create_open_shift(self, request):
@@ -315,6 +367,10 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
         if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        if any(_slot_locked_by_published_roster(slot) for slot in shift.slots.select_related("shift")):
+            raise DRFValidationError(
+                "Unpublish this shift for editing before escalating a published roster shift."
+            )
 
         allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
         if not allowed_tiers:

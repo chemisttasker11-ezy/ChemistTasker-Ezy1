@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Box,
   Button,
@@ -93,6 +93,8 @@ type AssignmentOptionsDialogProps = {
   setEscalationLevel: Setter<string>;
   setIsEscalateDialogOpen: Setter<boolean>;
   handleDeleteAssignment: () => void | Promise<void>;
+  handleUnpublishRosterShift: () => void | Promise<void>;
+  handleRepublishRosterShift: (notify: 'worker' | 'team' | 'none') => void | Promise<void>;
   onOpenTimesheets: () => void;
   onOpenWorkforce: () => void;
 };
@@ -222,6 +224,8 @@ export default function RosterOwnerDialogs({
     setEscalationLevel,
     setIsEscalateDialogOpen,
     handleDeleteAssignment,
+    handleUnpublishRosterShift,
+    handleRepublishRosterShift,
     onOpenTimesheets,
     onOpenWorkforce,
   } = assignmentOptions;
@@ -274,6 +278,11 @@ export default function RosterOwnerDialogs({
     handleClosePostShiftModal,
     handlePostShiftCompleted,
   } = postShift;
+
+  const [republishNotify, setRepublishNotify] = useState<'worker' | 'team' | 'none'>('worker');
+  const isUnpublished = Boolean(selectedAssignment?.isUnpublished);
+  const isPublishedRoster = Boolean(selectedAssignment?.isPublishedRoster);
+  const publishedMutationLocked = isPublishedRoster && !isUnpublished;
 
   return (
     <>
@@ -375,6 +384,17 @@ export default function RosterOwnerDialogs({
                 {selectedAssignment.leaveRequest?.status === 'APPROVED' &&
                   <ListItem><Chip label="LEAVE APPROVED" color="error" size="small" /></ListItem>
                 }
+                {isUnpublished && (
+                  <ListItem><Chip label="UNPUBLISHED · HIDDEN FROM WORKERS" color="warning" size="small" /></ListItem>
+                )}
+                {publishedMutationLocked && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Published roster shift"
+                      secondary="Unpublish this shift first to edit, reassign, delete or escalate it without taking the whole week back to draft."
+                    />
+                  </ListItem>
+                )}
             </List>}
             {selectedAssignment && !selectedAssignment.isOpenShift && (
               <RosterWorkforceSummary
@@ -391,25 +411,60 @@ export default function RosterOwnerDialogs({
             )}
         </DialogContent>
         <DialogActions sx={{ flexDirection: 'column', alignItems: 'stretch', p: 2, gap: 1}}>
-            <Button
-              variant="outlined"
-              disabled={isActionLoading}
-              onClick={() => {
-                if (!selectedAssignment) return;
-                setIsOptionsDialogOpen(false);
-                setIsEditDialogOpen(true);
-                setShiftToEdit({
-                  id: selectedAssignment.shift ?? selectedAssignment.id,
-                  roleNeeded: selectedAssignment.shiftDetail?.roleNeeded,
-                  slots: selectedAssignment.slotDetail ? [selectedAssignment.slotDetail] : [],
-                });
-                setEditIsOpenShift(Boolean(selectedAssignment.isOpenShift));
-                setEditOpenShiftVisibility(selectedAssignment.shiftDetail?.visibility ?? openShiftVisibility);
-                setSelectedUserForAssignment(selectedAssignment.user ?? null);
-              }}
-            >
-              Edit Shift / Re-Assign
-            </Button>
+            {publishedMutationLocked ? (
+              <Button
+                variant="contained"
+                color="warning"
+                disabled={isActionLoading}
+                onClick={() => void handleUnpublishRosterShift()}
+              >
+                {isActionLoading ? <CircularProgress size={24} color="inherit" /> : 'Unpublish for editing'}
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                disabled={isActionLoading}
+                onClick={() => {
+                  if (!selectedAssignment) return;
+                  setIsOptionsDialogOpen(false);
+                  setIsEditDialogOpen(true);
+                  setShiftToEdit({
+                    id: selectedAssignment.shift ?? selectedAssignment.id,
+                    roleNeeded: selectedAssignment.shiftDetail?.roleNeeded,
+                    slots: selectedAssignment.slotDetail ? [selectedAssignment.slotDetail] : [],
+                  });
+                  setEditIsOpenShift(Boolean(selectedAssignment.isOpenShift));
+                  setEditOpenShiftVisibility(selectedAssignment.shiftDetail?.visibility ?? openShiftVisibility);
+                  setSelectedUserForAssignment(selectedAssignment.user ?? null);
+                }}
+              >
+                Edit Shift / Re-Assign
+              </Button>
+            )}
+            {isUnpublished && (
+              <>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Republish notification</InputLabel>
+                  <Select
+                    value={republishNotify}
+                    label="Republish notification"
+                    onChange={(event) => setRepublishNotify(event.target.value as 'worker' | 'team' | 'none')}
+                  >
+                    <MenuItem value="worker">Assigned worker</MenuItem>
+                    <MenuItem value="team">Whole team</MenuItem>
+                    <MenuItem value="none">No notification</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  color="success"
+                  disabled={isActionLoading}
+                  onClick={() => void handleRepublishRosterShift(republishNotify)}
+                >
+                  {isActionLoading ? <CircularProgress size={24} color="inherit" /> : 'Republish shift'}
+                </Button>
+              </>
+            )}
             <Button
               variant="outlined"
               disabled={isActionLoading}
@@ -433,7 +488,7 @@ export default function RosterOwnerDialogs({
             </Button>
             <Button
               variant="outlined"
-              disabled={isActionLoading || !selectableEscalationLevels.length}
+              disabled={isActionLoading || publishedMutationLocked || !selectableEscalationLevels.length}
               color="secondary"
               onClick={() => {
                 if (!selectedAssignment) {
@@ -450,7 +505,7 @@ export default function RosterOwnerDialogs({
             >
               Escalate Shift
             </Button>
-            <Button variant="contained" disabled={isActionLoading} color="error" onClick={handleDeleteAssignment}>
+            <Button variant="contained" disabled={isActionLoading || publishedMutationLocked} color="error" onClick={handleDeleteAssignment}>
                 {isActionLoading ? <CircularProgress size={24} color="inherit" /> : 'Delete Assignment'}
             </Button>
             <Button onClick={() => setIsOptionsDialogOpen(false)} sx={{mt: 1}} disabled={isActionLoading}>Cancel</Button>

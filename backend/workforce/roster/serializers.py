@@ -1,4 +1,5 @@
 """Serializers for the roster views: users, shifts and assignments."""
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -9,6 +10,7 @@ from memberships.models import Membership
 from shifts.models import Shift, ShiftSlotAssignment
 from shifts.serializers import ShiftSlotSerializer
 from shifts.escalation import allowed_tiers
+from workforce.models import RosterPeriod
 
 
 # === Rosters ===
@@ -38,6 +40,8 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
     leave_request = serializers.SerializerMethodField()
     origin = serializers.SerializerMethodField()
     workforce_status = serializers.SerializerMethodField()
+    is_unpublished = serializers.SerializerMethodField()
+    is_published_roster = serializers.SerializerMethodField()
 
     class Meta:
         model = ShiftSlotAssignment
@@ -45,6 +49,7 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
             "id", "slot_date", "unit_rate", "rate_reason", "is_rostered",
             "payment_preference_snapshot", "settlement_channel", "engagement_kind",
             "engagement_terms_accepted_at", "workforce_status",
+            "is_unpublished", "is_published_roster",
             "user", "slot", "shift",
             "user_detail",
             "slot_detail",
@@ -52,6 +57,20 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
             "leave_request",
             "origin",
         ]
+
+    def get_is_unpublished(self, obj):
+        return bool(getattr(obj.slot, "unpublished_at", None))
+
+    def get_is_published_roster(self, obj):
+        linked = getattr(obj.slot, "roster_period", None)
+        if linked is not None:
+            return linked.status == RosterPeriod.Status.PUBLISHED
+        week_start = obj.slot_date - timedelta(days=obj.slot_date.weekday())
+        return RosterPeriod.objects.filter(
+            pharmacy_id=obj.shift.pharmacy_id,
+            week_start=week_start,
+            status=RosterPeriod.Status.PUBLISHED,
+        ).exists()
 
     def get_workforce_status(self, obj):
         request = self.context.get("request")

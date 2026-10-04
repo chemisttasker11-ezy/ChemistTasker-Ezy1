@@ -161,6 +161,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
             "editable": a.is_rostered and not a.slot.is_recurring,
             "planned_break_minutes": a.slot.planned_break_minutes,
             "role": a.shift.role_needed,
+            "is_unpublished": a.slot.unpublished_at is not None,
         })
 
     staff_view = sorted(
@@ -194,6 +195,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
                 "start_time": str(a.slot.start_time),
                 "end_time": str(a.slot.end_time),
                 "role": a.shift.role_needed,
+                "is_unpublished": a.slot.unpublished_at is not None,
             })
 
     for s in vacant_list:
@@ -208,6 +210,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
                 "start_time": str(s.start_time),
                 "end_time": str(s.end_time),
                 "role": s.shift.role_needed,
+                "is_unpublished": s.unpublished_at is not None,
             })
 
     for d_data in days_map.values():
