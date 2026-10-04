@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 
 from client_profile.models import Organization, Pharmacy
 from users.models import OrganizationMembership
+from memberships.models import Membership
 
 
 class RegionDelegationTests(TestCase):
@@ -39,7 +40,7 @@ class RegionDelegationTests(TestCase):
             'pharmacies': [self.pharmacy.id],
         }
         payload.update(overrides)
-        with patch('users.views.async_task'):
+        with patch('users.api_organizations.async_task'):
             return self.client.post('/api/users/invite-org-user/', payload, content_type='application/json')
 
     def test_region_can_invite_sub_region_within_same_scope_and_level(self):
@@ -64,6 +65,122 @@ class RegionDelegationTests(TestCase):
                 response = self.invite(email=f'blocked-{index}@example.com', **change)
                 self.assertEqual(response.status_code, 403)
                 self.assertFalse(get_user_model().objects.filter(email=f'blocked-{index}@example.com').exists())
+
+    def test_region_directory_and_hub_listing_stay_inside_assigned_pharmacies(self):
+        visible_user = get_user_model().objects.create_user(
+            email='visible-region-peer@example.com', password='Password123!', role='ORG_STAFF'
+        )
+        visible = OrganizationMembership.objects.create(
+            user=visible_user,
+            organization=self.organization,
+            role='REGION_ADMIN',
+            admin_level='COMMUNICATION_MANAGER',
+            region='North',
+            job_title='Visible Peer',
+        )
+        visible.pharmacies.add(self.pharmacy)
+
+        actor_other_pharmacy = Pharmacy.objects.create(
+            name='Actor Other Pharmacy',
+            organization=self.organization,
+        )
+        self.membership.pharmacies.add(actor_other_pharmacy)
+        Membership.objects.create(
+            user=visible_user,
+            pharmacy=actor_other_pharmacy,
+            role='CONTACT',
+            employment_type='FULL_TIME',
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        hidden_user = get_user_model().objects.create_user(
+            email='hidden-region-peer@example.com', password='Password123!', role='ORG_STAFF'
+        )
+        hidden = OrganizationMembership.objects.create(
+            user=hidden_user,
+            organization=self.organization,
+            role='REGION_ADMIN',
+            admin_level='COMMUNICATION_MANAGER',
+            region='South',
+            job_title='Hidden Peer',
+        )
+        hidden.pharmacies.add(self.other_pharmacy)
+        Membership.objects.create(
+            user=hidden_user,
+            pharmacy=self.other_pharmacy,
+            role='CONTACT',
+            employment_type='FULL_TIME',
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        listed = self.client.get(
+            f'/api/users/organization-memberships/?organization={self.organization.id}'
+        )
+        self.assertEqual(listed.status_code, 200, listed.data)
+        rows = listed.data['results'] if isinstance(listed.data, dict) else listed.data
+        listed_ids = {row['id'] for row in rows}
+        self.assertIn(self.membership.id, listed_ids)
+        self.assertIn(visible.id, listed_ids)
+        self.assertNotIn(hidden.id, listed_ids)
+
+        hub = self.client.get(
+            f'/api/users/organization-memberships/?organization={self.organization.id}&for_hub=true'
+        )
+        self.assertEqual(hub.status_code, 200, hub.data)
+        hub_rows = hub.data['results'] if isinstance(hub.data, dict) else hub.data
+        hub_user_ids = {
+            row.get('user', {}).get('id')
+            for row in hub_rows
+            if isinstance(row.get('user'), dict)
+        }
+        # This combined view contains real pharmacy Membership rows only.
+        # Organization-only control-plane users stay in the standard directory
+        # and a GET must never manufacture CONTACT employment state for them.
+        self.assertNotIn(self.actor.id, hub_user_ids)
+        self.assertIn(visible_user.id, hub_user_ids)
+        self.assertNotIn(hidden_user.id, hub_user_ids)
+        self.assertFalse(
+            Membership.objects.filter(
+                user=self.actor,
+                pharmacy__organization=self.organization,
+            ).exists(),
+            'hub listing must not manufacture a pharmacy membership for the actor',
+        )
+        self.assertFalse(
+            Membership.objects.filter(
+                user=visible_user,
+                pharmacy=self.pharmacy,
+            ).exists(),
+            'hub listing must not manufacture a membership inside the target admin scope',
+        )
+
+        visible_rows = [
+            row for row in hub_rows
+            if isinstance(row.get('user'), dict) and row['user'].get('id') == visible_user.id
+        ]
+        role_by_pharmacy = {
+            row.get('pharmacy'): row.get('organization_role')
+            for row in visible_rows
+        }
+        self.assertNotIn(
+            self.pharmacy.id,
+            role_by_pharmacy,
+            'no synthetic target-scope pharmacy row should be created',
+        )
+        self.assertIsNone(
+            role_by_pharmacy.get(actor_other_pharmacy.id),
+            'org-role metadata must not be attached outside the target admin assigned scope',
+        )
+
+        self.assertFalse(
+            Membership.objects.filter(
+                user=hidden_user,
+                pharmacy=self.pharmacy,
+            ).exists(),
+            'scoped hub listing must not manufacture a membership outside the target user scope',
+        )
 
     def test_region_cannot_overwrite_higher_existing_org_membership(self):
         target = get_user_model().objects.create_user(

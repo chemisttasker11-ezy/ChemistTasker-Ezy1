@@ -471,7 +471,7 @@ class LoginEnumerationSafetyTests(TestCase):
 
 
 class EmailOtpSecurityTests(TestCase):
-    @patch("users.views.async_task")
+    @patch("users.api_otp.async_task")
     def test_web_otp_verification_does_not_expose_or_set_auth_tokens(self, _async_task):
         user = get_user_model().objects.create_user(
             email="web-otp@example.com",
@@ -498,7 +498,7 @@ class EmailOtpSecurityTests(TestCase):
         user.refresh_from_db()
         self.assertTrue(user.is_otp_verified)
 
-    @patch("users.views.async_task")
+    @patch("users.api_otp.async_task")
     def test_mobile_otp_verification_keeps_token_contract(self, _async_task):
         user = get_user_model().objects.create_user(
             email="mobile-otp@example.com",
