@@ -271,6 +271,8 @@ Clean base: `main` at `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 14. First exact-head PostgreSQL run on `ead17ae873b8ace6b00b5920b230510e6775b02f` exposed a **test matcher defect**, not a production locking defect: the assertion matched table names by substring, so `workforce_timesheet` also matched `workforce_timesheetperiod` and one period-lock query could be classified as both locks.
 15. Tightened the PostgreSQL regression to identify lock acquisition by the query's exact `FROM <quoted_table>` base table. Senior review confirmed production builder code already locked period → timesheet correctly, so production code was intentionally left unchanged.
 16. Because the assertion/documentation corrections changed the PR head, all prior green results are supporting evidence only. Fresh exact-head Shared Core/PostgreSQL/CodeQL/security must pass on the final head before merge.
+17. Senior API integration review found a locked-read edge: `TimesheetDetailView.GET` auto-rebuilt manager-visible rows when `needs_rebuild=True`. Normal locking prevents that flag, but a stale legacy/manual flag on a LOCKED row would invoke the correctly rejecting builder from a GET and could surface as HTTP 500.
+18. Added a red-first locked-detail regression. A LOCKED timesheet detail GET is now strictly read-only even with stale `needs_rebuild=True`: it returns the existing approved data, creates no revision and leaves the flag/status untouched. Explicit recalculate continues to return the locked-period validation error.
 
 ## Beyond E2 — deep review already completed
 
@@ -398,7 +400,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 **Resume at PR #129 / F5 from reconciliation branch `reconcile/f5-timesheets-post-f4-20261004`. Current main is `27a6fb36030edb7d0dc4c76e5c770e1293609326`; reviewed source head is `2b8aa3e66cc857a98912c435f8978008f8366ae0`.**
 
-1. Fetch the reconciliation branch live head after this documentation commit and confirm current main → exact head remains `behind=0`; expected diff is eight F5 timesheet/test files, the preserved/extended PostgreSQL concurrency file, and this progress document.
+1. Fetch the reconciliation branch live head after this documentation commit and confirm current main → exact head remains `behind=0`; expected diff is the F5 timesheet split/test files, the preserved/extended PostgreSQL concurrency file, the locked-detail read guard in `workforce/views.py`, and this progress document.
 2. Move `refactor/timesheets-split` atomically to the reconciliation head so PR #129 is preserved; do not carry old-base history.
 3. Run fresh main-target Shared Core Consolidation, full workforce/timesheet tests, PostgreSQL concurrency, CodeQL and Public Repository Security on the exact PR head.
 4. Pay special attention to the new locked-build/ensure regressions and the PostgreSQL period→timesheet builder lock-order assertion, including the corrected exact-FROM SQL matcher.
