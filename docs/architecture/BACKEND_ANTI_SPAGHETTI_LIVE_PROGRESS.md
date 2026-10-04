@@ -552,7 +552,7 @@ Clean branch: `reconcile/h3-final-post-h2-20261004`.
 - Only current >999 modules are explicitly baselined.
 - Final exact-head CI/security still required before merge.
 - Scans the whole runtime backend module set, not a hand-picked directory.
-- Fails for a new >650-line runtime module.
+- Fails for a new >999-line runtime module.
 - Fails if a listed oversized module grows.
 - Forces baselines downward when modules shrink.
 - Final baselines MUST be regenerated/tightened from final main after D/E/F/G/H1/H2 land.
