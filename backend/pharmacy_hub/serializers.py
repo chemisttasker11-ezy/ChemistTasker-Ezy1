@@ -17,6 +17,7 @@ from pharmacy_hub.models import (
     PharmacyHubReaction,
 )
 from django.db import transaction
+from django.db.models import Q
 from core.file_validation import IMAGE_UPLOAD_POLICY
 from users.presentation import (
     _build_absolute_media_url,
@@ -1078,47 +1079,43 @@ class HubPollSerializer(serializers.ModelSerializer):
     def _get_membership(self):
         return self.context.get("request_membership")
 
-    def get_has_voted(self, obj):
-        membership = self._get_membership()
+    def _viewer_vote(self, obj):
+        """Return this human viewer's vote regardless of its stored identity FK.
+
+        Hub voters may be stored directly by User or indirectly by Membership.
+        Treat both representations as the same person so gaining/losing a
+        Membership cannot make an existing vote disappear from the response.
+        """
         request = self.context.get("request")
         request_user = getattr(request, "user", None)
+        if not request_user or not request_user.is_authenticated:
+            return None
+
         votes = getattr(obj, "_prefetched_votes", None)
-        if membership:
-            if votes is None:
-                return obj.votes.filter(membership=membership).exists()
-            return any(v.membership_id == membership.id for v in votes)
-        if request_user and request_user.is_authenticated:
-            if votes is None:
-                return obj.votes.filter(user=request_user).exists()
-            return any(v.user_id == request_user.id for v in votes)
-        return False
+        if votes is None:
+            return (
+                obj.votes.filter(
+                    Q(user_id=request_user.id)
+                    | Q(membership__user_id=request_user.id)
+                )
+                .select_related("membership")
+                .order_by("id")
+                .first()
+            )
+
+        for vote in votes:
+            if vote.user_id == request_user.id:
+                return vote
+            if vote.membership_id and getattr(vote.membership, "user_id", None) == request_user.id:
+                return vote
+        return None
+
+    def get_has_voted(self, obj):
+        return self._viewer_vote(obj) is not None
 
     def get_selected_option_id(self, obj):
-        membership = self._get_membership()
-        request = self.context.get("request")
-        request_user = getattr(request, "user", None)
-        votes = getattr(obj, "_prefetched_votes", None)
-        if membership:
-            if votes is None:
-                return (
-                    obj.votes.filter(membership=membership)
-                    .values_list("option_id", flat=True)
-                    .first()
-                )
-            for vote in votes:
-                if vote.membership_id == membership.id:
-                    return vote.option_id
-        elif request_user and request_user.is_authenticated:
-            if votes is None:
-                return (
-                    obj.votes.filter(user=request_user)
-                    .values_list("option_id", flat=True)
-                    .first()
-                )
-            for vote in votes:
-                if vote.user_id == request_user.id:
-                    return vote.option_id
-        return None
+        vote = self._viewer_vote(obj)
+        return vote.option_id if vote else None
 
     def get_created_by(self, obj):
         return self.get_author(obj)
