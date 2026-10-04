@@ -1,4 +1,6 @@
 """Hub posts with their comments and reactions."""
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -26,6 +28,7 @@ from pharmacy_hub.scoping import HubAttachmentMixin, HubScopedViewSetMixin
 
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _identity_reactions_for_update(queryset, user):
@@ -166,15 +169,21 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
                     "hub_url": hub_url,
                     "action_url": hub_path,
                 }
-                async_task(
-                    "users.tasks.send_async_email",
-                    subject=title,
-                    recipient_list=[email],
-                    template_name="emails/hub_post_tagged.html",
-                    context=context,
-                    text_template="emails/hub_post_tagged.txt",
-                    suppress_auto_notification=True,
-                )
+                try:
+                    async_task(
+                        "users.tasks.send_async_email",
+                        subject=title,
+                        recipient_list=[email],
+                        template_name="emails/hub_post_tagged.html",
+                        context=context,
+                        text_template="emails/hub_post_tagged.txt",
+                        suppress_auto_notification=True,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to enqueue hub mention email (%s).",
+                        type(exc).__name__,
+                    )
 
     def list(self, request, *args, **kwargs):
         self.scope_context = self._resolve_scope_from_params(request.query_params)
