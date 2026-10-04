@@ -2,13 +2,14 @@
 
 Group, organization and platform scopes share the same resolver and are exercised by the existing
 public_hub / membership tests; this file pins the pharmacy-scope contract end to end."""
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from client_profile.models import Membership
 from pharmacy_hub.models import (
     PharmacyHubComment, PharmacyHubCommentReaction, PharmacyHubPoll, PharmacyHubPollReaction, PharmacyHubPollVote,
-    PharmacyHubPost, PharmacyHubReaction,
+    PharmacyHubAttachment, PharmacyHubPost, PharmacyHubReaction,
 )
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
@@ -159,6 +160,41 @@ class HubPostTests(HubBase):
             before_posts,
             "invalid attachment batches must not leave a partially-created post",
         )
+
+    def test_remove_attachment_deletes_the_storage_object(self):
+        uploaded = SimpleUploadedFile(
+            "remove-me.png",
+            b"\x89PNG\r\n\x1a\nattachment",
+            content_type="image/png",
+        )
+        created = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "attachment cleanup",
+                "attachments": [uploaded],
+            },
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        attachment = PharmacyHubAttachment.objects.get(post_id=post_id)
+        stored_name = attachment.file.name
+        self.assertTrue(default_storage.exists(stored_name))
+
+        removed = client_for(self.staff).patch(
+            f"{POSTS}{post_id}/",
+            {
+                "body": "attachment cleanup",
+                "remove_attachment_ids": [attachment.id],
+            },
+            format="multipart",
+        )
+        self.assertEqual(removed.status_code, 200, removed.content)
+        self.assertFalse(
+            PharmacyHubAttachment.objects.filter(pk=attachment.id).exists()
+        )
+        self.assertFalse(default_storage.exists(stored_name))
 
     def test_outsider_cannot_post(self):
         res = client_for(self.outsider).post(POSTS, {**self.scope, "body": "x"}, format="json")
