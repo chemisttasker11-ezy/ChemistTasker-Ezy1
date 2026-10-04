@@ -355,13 +355,17 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
             memberships = self._resolve_memberships(instance.pharmacy, membership_ids)
 
         with transaction.atomic():
-            response = super().update(instance, validated_data)
+            locked_instance = PharmacyCommunityGroup.objects.select_for_update().get(
+                pk=instance.pk
+            )
+            self.instance = locked_instance
+            response = super().update(locked_instance, validated_data)
             if memberships is not None:
                 desired_ids = {membership.id for membership in memberships}
                 existing_links = {
                     link.membership_id: link
                     for link in PharmacyCommunityGroupMembership.objects.select_for_update().filter(
-                        group=instance
+                        group=locked_instance
                     )
                 }
                 new_links = []
@@ -379,7 +383,7 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
                 to_remove = set(existing_links.keys()) - desired_ids
                 if to_remove:
                     PharmacyCommunityGroupMembership.objects.filter(
-                        group=instance, membership_id__in=to_remove
+                        group=locked_instance, membership_id__in=to_remove
                     ).delete()
         return response
 
