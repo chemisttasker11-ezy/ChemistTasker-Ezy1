@@ -16,6 +16,7 @@ export const ORG_PORTAL_ROLES = [
 ] as const;
 
 const ORG_PORTAL_ROLE_SET = new Set<string>(ORG_PORTAL_ROLES);
+const ORG_WIDE_AUTHORITY_ROLES = new Set(['ORG_ADMIN', 'CHIEF_ADMIN']);
 export type AuthorityPharmacyRef = {
   id: number | string;
   name?: string | null;
@@ -213,7 +214,7 @@ export function canAccessOrganizationPharmacies(membership?: AuthorityMembership
   if (!membership || membership.organization_id == null) return false;
   const role = normalizeRole(membership.role);
   if (!ORG_ROLES.includes(role as (typeof ORG_ROLES)[number])) return false;
-  if (role === 'ORG_ADMIN' && Array.isArray(membership.capabilities) &&
+  if (ORG_WIDE_AUTHORITY_ROLES.has(role) && Array.isArray(membership.capabilities) &&
       membership.capabilities.some((capability) => normalizeRole(capability) === 'VIEW_ALL_PHARMACIES')) {
     return true;
   }
@@ -339,11 +340,12 @@ function orgMembershipHasCapability(
     .map(normalizeAdminCapability)
     .filter((value): value is AdminCapability => value !== null);
   if (!capabilities.includes(capability)) return false;
+  const role = normalizeRole(membership.role);
   if (pharmacyId == null) {
-    return normalizeRole(membership.role) === 'ORG_ADMIN' ||
+    return ORG_WIDE_AUTHORITY_ROLES.has(role) ||
       (membership.pharmacies ?? []).some((pharmacy) => numericPharmacyId(pharmacy.id) != null);
   }
-  if (normalizeRole(membership.role) === 'ORG_ADMIN') {
+  if (ORG_WIDE_AUTHORITY_ROLES.has(role)) {
     return (membership.organization_pharmacies ?? []).some(
       (pharmacy) => numericPharmacyId(pharmacy.id) === pharmacyId,
     );
@@ -412,7 +414,7 @@ export function canManageKioskDevices(user: AuthorityUser | null | undefined, ph
   return (user.memberships ?? []).some((membership) => {
     if (!membership?.organization_id) return false;
     const role = normalizeRole(membership.role);
-    if (role === 'ORG_ADMIN' || role === 'CHIEF_ADMIN') {
+    if (ORG_WIDE_AUTHORITY_ROLES.has(role)) {
       return (membership.organization_pharmacies ?? []).some((pharmacy) => numericPharmacyId(pharmacy.id) === id);
     }
     if (role === 'REGION_ADMIN' &&

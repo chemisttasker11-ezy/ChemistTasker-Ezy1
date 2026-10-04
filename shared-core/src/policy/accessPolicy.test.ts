@@ -87,6 +87,10 @@ describe('shared access policy', () => {
       role: 'ORG_ADMIN',
       memberships: [{ organization_id: 8, role: 'ORG_ADMIN', capabilities: ['view_all_pharmacies'] }],
     })).toBe(true);
+    expect(hasInternalWorkspaceAccess({
+      role: 'CHIEF_ADMIN',
+      memberships: [{ organization_id: 8, role: 'CHIEF_ADMIN', capabilities: ['view_all_pharmacies'], pharmacies: [] }],
+    })).toBe(true);
     expect(canAccessOrganizationPharmacies({ organization_id: 8, role: 'ORG_STAFF', pharmacies: [{ id: 50 }] })).toBe(false);
   });
 
@@ -179,6 +183,36 @@ describe('shared access policy', () => {
     expect(hasAdminCapability(user, 'MANAGE_ROSTER', { pharmacyId: 31 })).toBe(true);
     expect(hasAdminCapability(user, 'MANAGE_ROSTER', { pharmacyId: 99 })).toBe(false);
     expect(hasAdminCapability(user, 'MANAGE_ROSTER')).toBe(true);
+  });
+
+  it('treats Chief Admin as organisation-wide for explicit pharmacy capabilities', () => {
+    const chief = {
+      role: 'CHIEF_ADMIN',
+      memberships: [{
+        organization_id: 7,
+        role: 'CHIEF_ADMIN',
+        capabilities: ['MANAGE_ROSTER', 'VIEW_ALL_PHARMACIES'],
+        pharmacies: [],
+        organization_pharmacies: [{ id: 31 }, { id: 32 }],
+      }],
+    };
+    expect(hasAdminCapability(chief, 'MANAGE_ROSTER')).toBe(true);
+    expect(hasAdminCapability(chief, 'MANAGE_ROSTER', { pharmacyId: 31 })).toBe(true);
+    expect(hasAdminCapability(chief, 'MANAGE_ROSTER', { pharmacyId: 32 })).toBe(true);
+    expect(hasAdminCapability(chief, 'MANAGE_ROSTER', { pharmacyId: 99 })).toBe(false);
+
+    const region = {
+      role: 'REGION_ADMIN',
+      memberships: [{
+        organization_id: 7,
+        role: 'REGION_ADMIN',
+        capabilities: ['MANAGE_ROSTER'],
+        pharmacies: [{ id: 31 }],
+        organization_pharmacies: [{ id: 31 }, { id: 32 }],
+      }],
+    };
+    expect(hasAdminCapability(region, 'MANAGE_ROSTER', { pharmacyId: 31 })).toBe(true);
+    expect(hasAdminCapability(region, 'MANAGE_ROSTER', { pharmacyId: 32 })).toBe(false);
   });
 
   it('does not report organization capability when a scoped admin has no visible pharmacies', () => {
