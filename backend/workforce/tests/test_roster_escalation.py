@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from client_profile.characterization_support import BASE, client_for, make_owner_with_pharmacy, make_user
-from client_profile.domains.shifts.limits import MAX_PUBLIC_SHIFTS_PER_DAY
+from shifts.limits import MAX_PUBLIC_SHIFTS_PER_DAY
 from client_profile.models import Shift, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 

@@ -44,9 +44,11 @@ no kernel module (its relations to pharmacies and shifts are string references),
   migrations/
 ```
 
-The kernel keeps one package per domain under `client_profile/domains/<domain>/` (views, serializers, services) and a
-`client_profile/models/` package with one module per domain. Shared kernel helpers that other apps import stay at
-`client_profile/admin_helpers.py`, `file_validation.py`, `timezone_utils.py` (and `fields.py`, referenced by migrations).
+The kernel keeps a `client_profile/models/` package with one module per domain (historical model import paths and the
+upload callables that migrations reference) and `fields.py` (referenced by migrations). The per-domain facade packages
+under `client_profile/domains/` and the helper facades `admin_helpers.py`, `file_validation.py` and `timezone_utils.py`
+were removed: nothing imported them. Only `client_profile/domains/common/access.py` remains, because the boundary test
+pins its helper names as legacy contracts.
 
 ## Dependency rules
 
@@ -63,7 +65,7 @@ Seams where the kernel reaches into a leaf app (each is a single, reviewed place
   (`router.registry.extend(...)`, so the API root listing, route order and `client_profile:` route names are
   unchanged) and includes the apps' explicit `path()` lists before the router.
 * the dashboards read invoices and hub posts; the upload-reference registry
-  (`domains/common/serializers.py`) lists chat and hub attachments; `onboarding/tasks.py` (`final_evaluation`) calls the rewards
+  (`core/serializer_lifecycle.py`) lists chat and hub attachments; `onboarding/tasks.py` (`final_evaluation`) calls the rewards
   service after verification (lazy import).
 * the kernel and `workforce` form the scheduling domain: the shift models guard published roster periods
   (`workforce.RosterPeriod`), shift leave and engagement code call the workforce leave and engagement services, and a

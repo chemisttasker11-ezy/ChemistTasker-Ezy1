@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from django.test import SimpleTestCase
 
 from invoicing.navigation import invoice_action_url
-from client_profile.domains.dashboards.views import _dashboard_invoice_action_url
+from dashboards.views import _dashboard_invoice_action_url
 
 
 class InvoiceNavigationContractTests(SimpleTestCase):
