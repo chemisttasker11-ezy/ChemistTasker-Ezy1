@@ -269,6 +269,20 @@ class InviteLinkTests(MembershipFixture):
             rows = listed.data["results"] if isinstance(listed.data, dict) else listed.data
             self.assertEqual(bool(rows), seen)
 
+        other_org = Organization.objects.create(name="Other Invite Org", slug="other-invite-org")
+        OrganizationMembership.objects.create(
+            user=self.owner,
+            organization=other_org,
+            role="ORG_ADMIN",
+        )
+        owner_listed, _ = self.call(self.owner, "get", "membership-invite-links/")
+        owner_rows = owner_listed.data["results"] if isinstance(owner_listed.data, dict) else owner_listed.data
+        self.assertIn(
+            link.id,
+            {row["id"] for row in owner_rows},
+            "organization administration must not hide invite links for a separately owned pharmacy",
+        )
+
         info, _ = self.call(None, "get", f"magic/memberships/{link.token}/")
         self.assertEqual((info.status_code, info.data["pharmacy_name"], info.data["category"]),
                          (200, self.pharmacy.name, "LOCUM_CASUAL"))
