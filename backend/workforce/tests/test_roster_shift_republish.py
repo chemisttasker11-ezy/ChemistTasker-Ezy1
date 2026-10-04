@@ -217,6 +217,7 @@ class RosterShiftRepublishTests(TestCase):
             date=self.week + timedelta(days=2),
             start_time=time(9),
             end_time=time(17),
+            roster_period=self.period,
         )
         open_before = client.get(
             f"/api/client-profile/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"

@@ -378,11 +378,6 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
         if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        if any(_slot_locked_by_published_roster(slot) for slot in shift.slots.select_related("shift")):
-            raise DRFValidationError(
-                "Unpublish this shift for editing before escalating a published roster shift."
-            )
-
         allowed_tiers = self.serializer_class.build_allowed_tiers(shift.pharmacy)
         if not allowed_tiers:
             return Response({'detail': 'No escalation tiers available for this pharmacy.'}, status=status.HTTP_400_BAD_REQUEST)
