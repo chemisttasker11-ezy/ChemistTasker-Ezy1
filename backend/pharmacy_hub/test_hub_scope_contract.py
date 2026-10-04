@@ -125,7 +125,7 @@ RECORDED = {'context': {'admin_member': {'groups': ['Night team'],
                                        'organization_groups',
                                        'organizations',
                                        'pharmacies'],
-                              'organizations': [],
+                              'organizations': ['Hub Org'],
                               'pharmacies': [],
                               'status': 200},
              'shift_manager': {'groups': [],
@@ -213,7 +213,7 @@ RECORDED = {'context': {'admin_member': {'groups': ['Night team'],
                        'platform_pharmacist': [403, 403],
                        'platform_public': [403, 403]},
              'region_admin': {'group': [403, 403],
-                              'organization': [403, 403],
+                              'organization': [201, 200],
                               'pharmacy': [403, 403],
                               'platform_pharmacist': [403, 403],
                               'platform_public': [403, 403]},
@@ -238,7 +238,7 @@ RECORDED = {'context': {'admin_member': {'groups': ['Night team'],
               'locum': [403, 403],
               'org_admin': [200, 200],
               'outsider': [403, 403],
-              'owner': [200, 200],
+              'owner': [200, 403],
               'region_admin': [403, 403],
               'shift_manager': [403, 403],
               'sibling_staff': [403, 403],
@@ -357,8 +357,10 @@ class ResolverAndPermissionTests(HubFixture):
         self.assertFalse(scoped["is_org_admin"])
         with self.assertRaises(PermissionDenied):
             Resolver(self.users["region_admin"]).pharmacy_scope(self.sibling.id)
-        with self.assertRaises(PermissionDenied):
-            Resolver(self.users["region_admin"]).organization_scope(self.org.id)
+        # Their own organisation hub is open to them, without organisation administration.
+        org_scope = Resolver(self.users["region_admin"]).organization_scope(self.org.id)
+        self.assertFalse(org_scope["has_admin_permissions"])
+        self.assertFalse(org_scope["is_org_admin"])
 
         membership_count = Membership.objects.filter(
             user=self.users["region_admin"],
@@ -384,6 +386,120 @@ class ResolverAndPermissionTests(HubFixture):
             admin_count,
             "hub posting must not promote a scoped org role to PharmacyAdmin",
         )
+
+    def test_region_admin_reads_and_posts_in_own_org_hub_only(self):
+        region = self.users["region_admin"]
+        client = client_for(region)
+        feed = client.get(HUB + "posts/", {"scope": "organization", "organization_id": self.org.id})
+        self.assertEqual(feed.status_code, 200, feed.content)
+
+        memberships_before = Membership.objects.filter(user=region).count()
+        created = client.post(
+            HUB + "posts/",
+            {"scope": "organization", "organization_id": self.org.id, "body": "Region update"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertNotIn(
+            "email",
+            created.json()["author"]["user_details"],
+            "Hub author payloads expose display identity, not contact e-mail",
+        )
+        self.assertEqual(
+            Membership.objects.filter(user=region).count(),
+            memberships_before,
+            "an organisation role posts as its user, never through a manufactured pharmacy membership",
+        )
+        post = PharmacyHubPost.objects.get(pk=created.json()["id"])
+        self.assertEqual(post.author_user_id, region.id)
+        self.assertIsNone(post.author_membership_id)
+
+        pin = client.post(HUB + f"posts/{post.id}/pin/")
+        self.assertEqual(pin.status_code, 403, "a region admin is not an organisation hub administrator")
+
+        other_org = Organization.objects.create(name="Other Hub Org", slug="other-hub-org")
+        with self.assertRaises(PermissionDenied):
+            resolver_class()(region).organization_scope(other_org.id)
+
+    def test_chief_admin_is_an_organisation_wide_hub_admin(self):
+        chief = make_user("OWNER")
+        OrganizationMembership.objects.create(user=chief, organization=self.org, role="CHIEF_ADMIN")
+        Resolver = resolver_class()
+
+        org_scope = Resolver(chief).organization_scope(self.org.id)
+        self.assertTrue(org_scope["has_admin_permissions"])
+        self.assertTrue(org_scope["is_org_admin"])
+        for pharmacy in (self.pharmacy, self.sibling):
+            with self.subTest(pharmacy=pharmacy.name):
+                self.assertTrue(Resolver(chief).pharmacy_scope(pharmacy.id)["has_admin_permissions"])
+
+        profile = client_for(chief).patch(
+            HUB + f"organizations/{self.org.id}/profile/", {"about": "Chief edit"}, format="json"
+        )
+        self.assertEqual(profile.status_code, 200, profile.content)
+
+    def test_member_directory_is_names_only_own_pharmacy_first_and_searchable(self):
+        staff = self.users["staff"]
+        client = client_for(staff)
+        response = client.get(HUB + "members/", {"scope": "organization", "organization_id": self.org.id})
+        self.assertEqual(response.status_code, 200, response.content)
+        rows = response.json()
+        self.assertEqual(
+            set(rows[0]),
+            {"membership_id", "user_id", "full_name", "role", "employment_type", "job_title",
+             "pharmacy_id", "pharmacy_name", "is_own_pharmacy"},
+            "the directory never returns contact details",
+        )
+        pharmacies = [row["pharmacy_id"] for row in rows]
+        self.assertIn(self.sibling.id, pharmacies, "organisation scope lists sibling pharmacies' staff")
+        first_sibling = pharmacies.index(self.sibling.id)
+        self.assertTrue(all(row["is_own_pharmacy"] for row in rows[:first_sibling]))
+        self.assertFalse(any(row["is_own_pharmacy"] for row in rows[first_sibling:]))
+        self.assertNotIn(
+            self.users["locum"].id, {row["user_id"] for row in rows}, "only active pharmacy staff can be tagged"
+        )
+
+        sibling_user = self.users["sibling_staff"]
+        sibling_user.first_name = "Zelda"
+        sibling_user.save(update_fields=["first_name"])
+        searched = client.get(
+            HUB + "members/", {"scope": "organization", "organization_id": self.org.id, "search": "zel"}
+        ).json()
+        self.assertEqual([row["user_id"] for row in searched], [sibling_user.id])
+
+        own = client.get(HUB + "members/", {"scope": "pharmacy", "pharmacy_id": self.pharmacy.id}).json()
+        self.assertEqual({row["pharmacy_id"] for row in own}, {self.pharmacy.id})
+
+        outsider = client_for(self.users["outsider"]).get(
+            HUB + "members/", {"scope": "organization", "organization_id": self.org.id}
+        )
+        self.assertEqual(outsider.status_code, 403)
+        self.assertEqual(client.get(HUB + "members/").status_code, 400)
+
+    def test_group_creator_stays_group_admin_while_active_staff_and_owner_always_admins(self):
+        manager = self.users["admin_member"]
+        created = client_for(manager).post(
+            HUB + "groups/",
+            {"pharmacy_id": self.pharmacy.id, "name": "Dispensary team"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        group = PharmacyCommunityGroup.objects.get(pk=created.json()["id"])
+        self.assertTrue(
+            group.memberships.get(membership__user=manager).is_admin,
+            "the creator is flagged as a group admin at creation",
+        )
+        Resolver = resolver_class()
+
+        # Demoted from pharmacy admin but still active staff: still the group's admin.
+        PharmacyAdmin.objects.filter(user=manager, pharmacy=self.pharmacy).update(is_active=False)
+        self.assertTrue(Resolver(manager).group_scope(group.id)["has_group_admin_permissions"])
+
+        # Left the pharmacy: no group access at all; the owner remains the group's admin.
+        Membership.objects.filter(user=manager, pharmacy=self.pharmacy).update(is_active=False)
+        with self.assertRaises(PermissionDenied):
+            Resolver(manager).group_scope(group.id)
+        self.assertTrue(Resolver(self.owner).group_scope(group.id)["has_group_admin_permissions"])
 
     def test_group_creator_loses_admin_access_when_current_pharmacy_scope_is_removed(self):
         Resolver = resolver_class()
@@ -548,13 +664,14 @@ class ContextTests(HubFixture):
             }
         self.check_recorded("context", actual)
 
-    def test_owner_context_advertises_organization_profile_authority(self):
+    def test_owner_context_does_not_advertise_organization_profile_authority(self):
+        # A pharmacy owner inside an organisation manages only their pharmacy profile.
         response = client_for(self.users["owner"]).get(HUB + "context/")
         self.assertEqual(response.status_code, 200, response.content)
         organization = next(
             item for item in response.json()["organizations"] if item["id"] == self.org.id
         )
-        self.assertTrue(organization["can_manage_profile"])
+        self.assertFalse(organization["can_manage_profile"])
         self.assertFalse(organization["is_org_admin"])
 
 
@@ -597,19 +714,20 @@ class PostingAcrossScopesTests(HubFixture):
 
 class ProfileTests(HubFixture):
     def test_cover_replacement_cleans_old_storage_for_pharmacy_and_organization(self):
-        owner_client = client_for(self.users["owner"])
         targets = [
             (
                 self.pharmacy,
                 HUB + f"pharmacies/{self.pharmacy.id}/profile/",
+                client_for(self.users["owner"]),
             ),
             (
                 self.org,
                 HUB + f"organizations/{self.org.id}/profile/",
+                client_for(self.users["org_admin"]),
             ),
         ]
 
-        for index, (target, url) in enumerate(targets):
+        for index, (target, url, owner_client) in enumerate(targets):
             with self.subTest(target=target.__class__.__name__):
                 target.cover_image.save(
                     f"old-cover-{index}.png",

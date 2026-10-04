@@ -52,4 +52,5 @@ from workforce.timesheet_transitions import (  # noqa: F401  (historical import 
     decide_check,
     add_comment,
     lock_period,
+    correct_locked_period,
 )

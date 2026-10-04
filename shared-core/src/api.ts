@@ -415,6 +415,8 @@ export const rosterV2 = {
     createTemplate: (body) => operationalRequest(API_ENDPOINTS.rosterV2.templates, { method: 'POST', body }),
     applyTemplate: (body) => operationalRequest(API_ENDPOINTS.rosterV2.templateApply, { method: 'POST', body }),
     bulkEdit: (periodId, operations) => operationalRequest(API_ENDPOINTS.rosterV2.bulkEdit, { method: 'POST', body: { period_id: periodId, operations } }),
+    unpublishShift: (slotId) => operationalRequest(API_ENDPOINTS.rosterV2.shiftUnpublish, { method: 'POST', body: { slot_id: slotId } }),
+    republishShift: (slotId, notify = 'worker') => operationalRequest(API_ENDPOINTS.rosterV2.shiftRepublish, { method: 'POST', body: { slot_id: slotId, notify } }),
     requestSwap: (assignmentId, targetUserId, notes = '') => operationalRequest(API_ENDPOINTS.rosterV2.workerSwapRequest, { method: 'POST', body: { assignment_id: assignmentId, target_user_id: targetUserId, notes } }),
     requestCover: (assignmentId, reason = '') => operationalRequest(API_ENDPOINTS.rosterV2.workerCoverRequest, { method: 'POST', body: { assignment_id: assignmentId, reason } }),
     approveSwap: (requestId, targetUserId?: number) => operationalRequest(API_ENDPOINTS.rosterV2.managerApproveSwap, { method: 'POST', body: { request_id: requestId, ...(targetUserId ? { target_user_id: targetUserId } : {}) } }),
@@ -447,6 +449,8 @@ export const workforce = {
     getTimesheetPeriodSummary: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodSummary(id)),
     recalculateTimesheetPeriod: (id, sync = false) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodRecalculate(id), { method: 'POST', body: { sync } }),
     lockTimesheetPeriod: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodLock(id), { method: 'POST', body: {} }),
+    // Reopen a locked period on purpose to fix a mistake; the superseded manifest is kept and re-locking adjusts it.
+    correctTimesheetPeriod: (id, reason) => operationalRequest(API_ENDPOINTS.workforce.timesheetPeriodCorrect(id), { method: 'POST', body: { reason } }),
     listTimesheets: (periodId, query = {}) => operationalRequest(API_ENDPOINTS.workforce.timesheets, { query: { period_id: periodId, ...query } }),
     getTimesheet: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheet(id)),
     recalculateTimesheet: (id) => operationalRequest(API_ENDPOINTS.workforce.timesheetRecalculate(id), { method: 'POST', body: {} }),
@@ -2436,22 +2440,41 @@ export async function updateOrganizationHubProfileService(organizationId, payloa
     const data = await updateOrganizationHubProfile(organizationId, formData);
     return mapOrganization(data);
 }
-export async function fetchPharmacyGroupMembers(pharmacyId) {
-    const data = await fetchApi(`/client-profile/memberships/?pharmacy=${pharmacyId}`);
-    return asList(data)
-        .filter(member => ['FULL_TIME', 'PART_TIME', 'CASUAL'].includes(member.employment_type ?? member.employmentType ?? ''))
-        .map(member => mapOptionFromSource({
-            membershipId: member.id,
-            userId: member.user,
-            fullName: memberDisplayName(member, member.id),
-            email: member.user_details?.email ?? null,
+// A PHARMACY_MANAGER account (organisation-onboarded pharmacy contact) chooses its own account type once.
+export function chooseAccountType(role) {
+    return fetchApi('/users/me/account-type/', { method: 'POST', body: JSON.stringify({ role }) });
+}
+// Hub member directory: names only (no contact details), the viewer's own pharmacy first, searched on the server.
+export async function fetchHubMemberDirectory(params) {
+    const query = new URLSearchParams({ scope: params.scope });
+    if (params.pharmacyId != null)
+        query.set('pharmacy_id', String(params.pharmacyId));
+    if (params.organizationId != null)
+        query.set('organization_id', String(params.organizationId));
+    if (params.groupId != null)
+        query.set('group_id', String(params.groupId));
+    if (params.search)
+        query.set('search', params.search);
+    if (params.limit)
+        query.set('limit', String(params.limit));
+    const data = await fetchApi(`/client-profile/hub/members/?${query.toString()}`);
+    return asList(data).map(member => ({
+        ...mapOptionFromSource({
+            membershipId: member.membership_id,
+            userId: member.user_id ?? null,
+            fullName: member.full_name,
+            email: null,
             role: member.role ?? null,
             employmentType: member.employment_type ?? null,
-            pharmacyId: pharmacyId,
+            pharmacyId: member.pharmacy_id ?? null,
             pharmacyName: member.pharmacy_name ?? null,
-            jobTitle: member.job_title ?? null,
-            profilePhotoUrl: member.user_details?.profile_photo_url ?? null,
-        }));
+            jobTitle: member.job_title || null,
+        }),
+        isOwnPharmacy: Boolean(member.is_own_pharmacy),
+    }));
+}
+export async function fetchPharmacyGroupMembers(pharmacyId, search = '') {
+    return fetchHubMemberDirectory({ scope: 'pharmacy', pharmacyId, search });
 }
 export async function fetchOrganizationGroupMembers(organizationId) {
     const data = await getHubGroups({ organization_id: organizationId, include_pharmacy_members: true });
@@ -2469,22 +2492,9 @@ export async function fetchOrganizationGroupMembers(organizationId) {
             jobTitle: member.job_title ?? null,
         }));
 }
-// Organization members: org staff + all pharmacy members under the org.
-export async function fetchOrganizationMembers(organizationId) {
-    const data = await fetchApi(`/client-profile/memberships/?organization=${organizationId}&page_size=500`);
-    const list = asList(data.results ?? data);
-    return list.filter(member => ['FULL_TIME', 'PART_TIME', 'CASUAL'].includes(member.employment_type ?? member.employmentType ?? '')).map((member) => mapOptionFromSource({
-        membershipId: member.id,
-        userId: member.user_details?.id ?? null,
-        fullName: memberDisplayName(member, member.id),
-        email: member.user_details?.email ?? null,
-        role: member.role ?? null,
-        employmentType: member.employment_type ?? null,
-        pharmacyId: member.pharmacy_detail?.id ?? null,
-        pharmacyName: member.pharmacy_detail?.name ?? null,
-        jobTitle: member.job_title ?? null,
-        profilePhotoUrl: member.user_details?.profile_photo_url ?? null,
-    }));
+// Organization members: the active staff of every pharmacy in the organisation, own pharmacy first.
+export async function fetchOrganizationMembers(organizationId, search = '') {
+    return fetchHubMemberDirectory({ scope: 'organization', organizationId, search });
 }
 export async function fetchHubGroupMembers(groupId) {
     const group = await fetchHubGroup(groupId, { includeMembers: true });
@@ -2492,7 +2502,7 @@ export async function fetchHubGroupMembers(groupId) {
         membershipId: member.membershipId,
         userId: member.member.userDetails.id,
         fullName: groupMemberDisplayName(member),
-        email: member.member.userDetails.email,
+        email: null,
         role: member.member.role,
         employmentType: member.member.employmentType,
         pharmacyId: member.pharmacyId ?? group.pharmacyId ?? null,

@@ -298,14 +298,11 @@ class HubScopeResolver:
             organization=organization,
             owner__user_id=self.user.id,
         ).exists()
-        org_admin = any(
-            full_access
-            for _org_membership, full_access, _visible_ids in _org_hub_memberships(
-                self.user,
-                organization.id,
-            )
-        )
-        if not any([membership, is_owner, org_admin]):
+        org_hub_memberships = list(_org_hub_memberships(self.user, organization.id))
+        org_admin = any(full_access for _org_membership, full_access, _visible_ids in org_hub_memberships)
+        # Every hub-capable role of THIS organisation (a region admin included) may read and post in its
+        # organisation hub; organisation-wide administration stays with the org-wide admin roles.
+        if not any([membership, is_owner, org_hub_memberships]):
             raise PermissionDenied("You do not have access to this organization hub.")
         # A pharmacy-level admin may participate in the organization hub
         # through their staff membership, but pharmacy-scoped authority does
@@ -323,6 +320,9 @@ class HubScopeResolver:
             "has_group_admin_permissions": False,
             "is_owner": is_owner,
             "is_org_admin": org_admin,
+            # An organisation role (region admin included) authors as its user, never through a manufactured
+            # pharmacy membership.
+            "is_org_role_member": bool(org_hub_memberships),
         }
 
     def platform_scope(self, platform_hub):
@@ -394,6 +394,7 @@ class HubScopeResolver:
             or scope.get("has_group_admin_permissions")
             or scope.get("is_owner")
             or scope.get("is_org_admin")
+            or scope.get("is_org_role_member")
         ):
             return None
 

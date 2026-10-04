@@ -462,6 +462,7 @@ class ProvisionalAttendance(models.Model):
         UNROSTERED_LOCAL = "UNROSTERED_LOCAL", "Unrostered Local Staff"
         CROSS_SITE_CHAIN = "CROSS_SITE_CHAIN", "Cross-Site Same Owner Chain"
         CROSS_SITE_ORG = "CROSS_SITE_ORG", "Cross-Site Same Organization"
+        FAVOURITE_COVER = "FAVOURITE_COVER", "Favourite-List Emergency Cover"
 
     session = models.OneToOneField(
         AttendanceSession,

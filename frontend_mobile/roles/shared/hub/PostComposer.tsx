@@ -81,7 +81,17 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
   const [members, setMembers] = useState<any[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberQuery, setMemberQuery] = useState('');
   const submission = useSubmissionGuard();
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const trimmed = memberSearch.trim();
+      setMemberQuery(trimmed.length >= 2 ? trimmed : '');
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [memberSearch]);
 
   const stableScope = useMemo(() => {
     if (!scope || scope.id == null) return null;
@@ -94,7 +104,9 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
     return { type: normalizedType as 'pharmacy' | 'organization' | 'group', id: idNum };
   }, [scope]);
 
-  const loadMembers = async () => {
+  // The hub member directory lists the viewer's own pharmacy first and searches on the server; members already
+  // loaded stay known so selected tags keep their names while a search narrows the list.
+  const loadMembers = async (search = '') => {
     if (!stableScope) {
       setMembers([]);
       return;
@@ -104,31 +116,53 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
     try {
       let resp: any = [];
       if (stableScope.type === 'pharmacy') {
-        resp = await fetchPharmacyGroupMembers(stableScope.id as any);
+        resp = await fetchPharmacyGroupMembers(stableScope.id as any, search);
       } else if (stableScope.type === 'organization') {
-        resp = await fetchOrganizationMembers(stableScope.id as any);
+        resp = await fetchOrganizationMembers(stableScope.id as any, search);
       } else if (stableScope.type === 'group') {
         resp = await fetchHubGroupMembers(stableScope.id as any);
       } else {
         resp = [];
       }
       const normalized = Array.isArray(resp?.results) ? resp.results : Array.isArray(resp) ? resp : [];
-      setMembers(
-        filterPharmacyStaffMembers(normalized).filter((member: any) => user?.id == null || member?.userId !== user.id),
+      const loaded = filterPharmacyStaffMembers(normalized).filter(
+        (member: any) => user?.id == null || member?.userId !== user.id,
       );
+      const idOf = (member: any) => member.membershipId || member.membership_id || member.id;
+      setMembers((previous) => {
+        const loadedIds = new Set(loaded.map(idOf));
+        return [...loaded, ...previous.filter((member) => !loadedIds.has(idOf(member)))];
+      });
     } catch (err: any) {
       setMemberError(err?.message || 'Failed to load members');
-      setMembers([]);
     } finally {
       setMembersLoading(false);
     }
   };
 
   useEffect(() => {
+    if (visible && memberQuery) {
+      loadMembers(memberQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberQuery]);
+
+  const visibleMembers = useMemo(() => {
+    const query = memberSearch.trim().toLowerCase();
+    if (!query) return members;
+    return members.filter((m) =>
+      [getMemberDisplayName(m), m.jobTitle, m.role, m.pharmacyName || m.pharmacy_name]
+        .filter(Boolean)
+        .some((value: string) => String(value).toLowerCase().includes(query)),
+    );
+  }, [members, memberSearch]);
+
+  useEffect(() => {
     if (visible) {
       loadMembers();
     } else {
       setMembers([]);
+      setMemberSearch('');
       setTaggedMemberIds([]);
       setMemberError(null);
       setAttachments([]);
@@ -290,13 +324,21 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
         )}
         <View style={{ marginBottom: 8 }}>
           <Text style={{ fontWeight: '600', marginBottom: 4 }}>Tag members</Text>
-          {membersLoading ? (
+          <TextInput
+            mode="outlined"
+            dense
+            placeholder="Search by name, role or pharmacy"
+            value={memberSearch}
+            onChangeText={setMemberSearch}
+            style={{ marginBottom: 6 }}
+          />
+          {membersLoading && !members.length ? (
             <Text style={styles.muted}>Loading members...</Text>
           ) : memberError ? (
             <HelperText type="error">{memberError}</HelperText>
-          ) : members.length ? (
+          ) : visibleMembers.length ? (
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 8, maxHeight: 180 }}>
-              {members.map((m) => {
+              {visibleMembers.map((m) => {
                 const id = m.membershipId || m.membership_id || m.id;
                 const name = getMemberDisplayName(m);
                 const checked = taggedMemberIds.includes(id);

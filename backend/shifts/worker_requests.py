@@ -13,6 +13,7 @@ from core.task_queue import async_task
 from datetime import date
 from shifts.access import _normalized_role_code, _otherstaff_onboarding_role
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 from shifts.serializers import WorkerShiftRequestSerializer
 
 
@@ -47,7 +48,7 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
 
         # Org-admin pharmacies (direct or claimed)
         org_ids = list(
-            OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').values_list('organization_id', flat=True)
+            OrganizationMembership.objects.filter(user=user, role__in=ORG_WIDE_ADMIN_ROLES).values_list('organization_id', flat=True)
         )
         if org_ids:
             controlled |= Pharmacy.objects.filter(organization_id__in=org_ids)
@@ -109,7 +110,7 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
         org_admins = []
         if pharmacy.organization_id:
             org_admins = OrganizationMembership.objects.filter(
-                role='ORG_ADMIN',
+                role__in=ORG_WIDE_ADMIN_ROLES,
                 organization_id=pharmacy.organization_id
             ).select_related('user')
 
@@ -375,7 +376,7 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
             pharmacy.organization_id
             and OrganizationMembership.objects.filter(
                 user=user,
-                role='ORG_ADMIN',
+                role__in=ORG_WIDE_ADMIN_ROLES,
                 organization_id=pharmacy.organization_id
             ).exists()
         )

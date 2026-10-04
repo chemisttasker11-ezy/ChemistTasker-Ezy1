@@ -272,9 +272,16 @@ def _published_roster_period(pharmacy_id, work_date):
     ).first()
 
 
+def _slot_is_unpublished(slot):
+    """True while this one shift has been taken back to draft inside a published roster week to be edited."""
+    return bool(slot.pk) and ShiftSlot.objects.filter(pk=slot.pk, unpublished_at__isnull=False).exists()
+
+
 def _published_period_for_slot(slot):
     from workforce.models import RosterPeriod  # workforce.models imports these models: resolve the guard at call time
 
+    if _slot_is_unpublished(slot):
+        return None
     if slot.roster_period_id:
         period = RosterPeriod.objects.filter(pk=slot.roster_period_id).first()
         if period and period.status == RosterPeriod.Status.PUBLISHED:
@@ -316,7 +323,7 @@ def _assert_roster_shift_mutable(shift):
 
 def _assert_roster_assignment_mutable(assignment):
     slot = assignment.slot if assignment.slot_id else None
-    if not slot:
+    if not slot or _slot_is_unpublished(slot):
         return
     is_rostered = assignment.is_rostered
     if assignment.pk:
@@ -341,6 +348,14 @@ class ShiftSlot(models.Model):
         help_text="Explicit ownership of a roster slot, retained when it is vacant.",
     )
     planned_break_minutes = models.PositiveSmallIntegerField(default=0)
+    unpublished_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Set while this shift is taken back to draft inside a published roster week so it can be edited; "
+            "cleared when it is republished."
+        ),
+    )
     shift = models.ForeignKey(
         Shift,
         on_delete=models.CASCADE,

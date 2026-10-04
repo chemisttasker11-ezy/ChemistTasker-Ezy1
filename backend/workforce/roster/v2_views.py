@@ -261,6 +261,44 @@ class RosterUnpublishView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class RosterShiftUnpublishView(APIView):
+    """POST attendance/roster/shift/unpublish/ {"slot_id": int}: take one shift of a published week back to draft."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from shifts.models import ShiftSlot
+        from workforce.roster.publication import unpublish_roster_shift
+
+        slot = get_object_or_404(ShiftSlot.objects.select_related("shift__pharmacy"), pk=request.data.get("slot_id"))
+        try:
+            slot = unpublish_roster_shift(slot, request.user)
+        except DjangoPermissionDenied as e:
+            raise PermissionDenied("You are not authorized to change rosters for this pharmacy.")
+        except DjangoValidationError as e:
+            return Response({"error": " ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"slot_id": slot.pk, "is_unpublished": True, "unpublished_at": slot.unpublished_at.isoformat()})
+
+
+class RosterShiftRepublishView(APIView):
+    """POST attendance/roster/shift/republish/ {"slot_id": int, "notify": "worker" | "team" | "none"}."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from shifts.models import ShiftSlot
+        from workforce.roster.publication import republish_roster_shift
+
+        slot = get_object_or_404(ShiftSlot.objects.select_related("shift__pharmacy"), pk=request.data.get("slot_id"))
+        try:
+            slot = republish_roster_shift(slot, request.user, notify=request.data.get("notify", "worker"))
+        except DjangoPermissionDenied as e:
+            raise PermissionDenied("You are not authorized to change rosters for this pharmacy.")
+        except DjangoValidationError as e:
+            return Response({"error": " ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"slot_id": slot.pk, "is_unpublished": False})
+
+
 class RosterArchiveView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

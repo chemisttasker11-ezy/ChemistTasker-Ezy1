@@ -168,29 +168,48 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
             return
 
         parsed = _parse_abn_html_fields(html or "")
+        entity_name = parsed.get("entity_name") or legal_name or ""
+        if not entity_name:
+            # A failed lookup must not relabel or partially overwrite the previous ABN snapshot.
+            obj.abn_verified = False
+            updates = ["abn_verified"]
+            if note_field and hasattr(obj, note_field):
+                setattr(
+                    obj,
+                    note_field,
+                    "Failed to fetch ABN details. ABN may be invalid or ABR site unavailable.",
+                )
+                updates.append(note_field)
+            obj.save(update_fields=list({field for field in updates if hasattr(obj, field)}))
+            return
 
-        obj.abn_entity_name  = parsed.get("entity_name") or legal_name or ""
-        obj.abn_entity_type  = parsed.get("entity_type") or ""
-        obj.abn_status       = parsed.get("abn_status") or ""
-        if "abn_gst_registered" in parsed:
-            obj.abn_gst_registered = parsed["abn_gst_registered"]
-        if "abn_gst_from" in parsed:
-            obj.abn_gst_from = parsed["abn_gst_from"]
-        if "abn_gst_to" in parsed:
-            obj.abn_gst_to = parsed["abn_gst_to"]
+        obj.abn_entity_name = entity_name
+        obj.abn_entity_type = parsed.get("entity_type") or ""
+        obj.abn_status = parsed.get("abn_status") or ""
+        obj.abn_gst_registered = parsed.get("abn_gst_registered")
+        obj.abn_gst_from = parsed.get("abn_gst_from")
+        obj.abn_gst_to = parsed.get("abn_gst_to")
         obj.abn_last_checked = timezone.now()
+        obj.abn_details_for = expected_abn
         if obj.abn_entity_confirmed:
             obj.abn_verified = True
 
-        # note is informational only; final verification depends on user confirmation in the UI
-        if not legal_name:
-            note = "Failed to fetch ABN details. ABN may be invalid or ABR site unavailable."
-        else:
-            note = "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you."
-        updates = ["abn_entity_name","abn_entity_type","abn_status","abn_gst_registered","abn_gst_from","abn_gst_to","abn_last_checked", "abn_verified"]
+        note = "ABN details fetched from ABR. Review the details below and confirm in the UI if they belong to you."
+        updates = [
+            "abn_entity_name",
+            "abn_entity_type",
+            "abn_status",
+            "abn_gst_registered",
+            "abn_gst_from",
+            "abn_gst_to",
+            "abn_last_checked",
+            "abn_details_for",
+            "abn_verified",
+        ]
         if note_field and hasattr(obj, note_field):
-            setattr(obj, note_field, note[:255]); updates.append(note_field)
-        obj.save(update_fields=list({f for f in updates if hasattr(obj, f)}))
+            setattr(obj, note_field, note[:255])
+            updates.append(note_field)
+        obj.save(update_fields=list({field for field in updates if hasattr(obj, field)}))
 
 
 @shared_task(name="client_profile.tasks.verify_ahpra_task", queue="ocr")

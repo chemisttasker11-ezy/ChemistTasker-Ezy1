@@ -56,7 +56,9 @@ class HubOrganizationProfileView(APIView):
     def patch(self, request, organization_pk: int):
         resolver = HubScopeResolver(request.user)
         scope = resolver.organization_scope(organization_pk)
-        if not scope.get("has_admin_permissions"):
+        # The organisation profile belongs to the organisation's org-wide admins. A pharmacy owner or
+        # pharmacy admin inside the organisation manages only their own pharmacy profile.
+        if not scope.get("is_org_admin"):
             raise PermissionDenied("You cannot update this organization profile.")
         serializer = HubOrganizationProfileSerializer(
             scope["organization"], data=request.data, partial=True

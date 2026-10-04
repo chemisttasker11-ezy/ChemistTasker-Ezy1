@@ -45,6 +45,7 @@ import {
   OpenShift,
   RosterPharmacyMember,
   RosterShiftDetail,
+  rosterV2,
   fetchPharmaciesService,
   fetchRosterOwnerAssignments,
   fetchWorkerShiftRequestsService,
@@ -453,6 +454,48 @@ export default function RosterOwnerPage() {
     finally { setIsActionLoading(false); }
   };
 
+  const handleUnpublishRosterShift = async () => {
+    const slotId = selectedAssignment?.slotDetail?.id ?? selectedAssignment?.slot;
+    if (!slotId) {
+      showSnackbar("This roster shift is missing its slot id.");
+      return;
+    }
+    setIsActionLoading(true);
+    try {
+      await rosterV2.unpublishShift(Number(slotId));
+      setSelectedAssignment((current) => current ? {
+        ...current,
+        isUnpublished: true,
+        isPublishedRoster: true,
+      } : current);
+      showSnackbar("Shift unpublished for editing. It is hidden from workers until you republish it.");
+      reloadAssignments();
+    } catch (err: any) {
+      showSnackbar(`Unable to unpublish shift: ${err?.message || 'Failed'}`);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRepublishRosterShift = async (notify: 'worker' | 'team' | 'none') => {
+    const slotId = selectedAssignment?.slotDetail?.id ?? selectedAssignment?.slot;
+    if (!slotId) {
+      showSnackbar("This roster shift is missing its slot id.");
+      return;
+    }
+    setIsActionLoading(true);
+    try {
+      await rosterV2.republishShift(Number(slotId), notify);
+      showSnackbar("Shift republished successfully.");
+      setIsOptionsDialogOpen(false);
+      reloadAssignments();
+    } catch (err: any) {
+      showSnackbar(`Unable to republish shift: ${err?.message || 'Failed'}`);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleSaveChanges = async () => {
     if (!shiftToEdit) return;
     // If user chose to convert to an open shift, launch the Post Shift wizard overlay
@@ -753,6 +796,8 @@ export default function RosterOwnerPage() {
           allowedEscalationLevels,
         },
         leaveRequest: null,
+        isUnpublished: Boolean(firstSlot?.isUnpublished),
+        isPublishedRoster: Boolean(firstSlot?.isPublishedRoster),
       };
       setSelectedAssignment(tempAssignment);
       setIsOptionsDialogOpen(true);
@@ -1266,6 +1311,8 @@ export default function RosterOwnerPage() {
           setEscalationLevel,
           setIsEscalateDialogOpen,
           handleDeleteAssignment,
+          handleUnpublishRosterShift,
+          handleRepublishRosterShift,
           onOpenTimesheets: () => navigate(`/dashboard/workforce/timesheets?pharmacy_id=${selectedPharmacyId ?? ''}`),
           onOpenWorkforce: () => navigate(`/dashboard/workforce/settings?pharmacy_id=${selectedPharmacyId ?? ''}`),
         }}

@@ -55,6 +55,7 @@ from .timesheets import (
     approve_timesheet,
     build_timesheet,
     decide_check,
+    correct_locked_period,
     ensure_period_timesheets,
     lock_period,
     period_summary,
@@ -757,6 +758,27 @@ class TimesheetPeriodRecalculateView(APIView):
             return Response({"error": "Timesheet period not found."}, status=status.HTTP_404_NOT_FOUND)
         except (DjangoPermissionDenied, DjangoValidationError) as exc:
             return _validation_response(exc, status.HTTP_403_FORBIDDEN if isinstance(exc, DjangoPermissionDenied) else status.HTTP_400_BAD_REQUEST)
+
+
+class TimesheetPeriodCorrectView(APIView):
+    """POST timesheet-periods/<pk>/correct/ {"reason": "..."}: reopen a locked period on purpose to fix a mistake."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            period = TimesheetPeriod.objects.select_related("pharmacy").get(pk=pk)
+            correction = correct_locked_period(period, request.user, request.data.get("reason", ""))
+            return Response({
+                "status": TimesheetPeriod.Status.OPEN,
+                "superseded_manifest_hash": correction["superseded_manifest_hash"],
+            })
+        except TimesheetPeriod.DoesNotExist:
+            return Response({"error": "Timesheet period not found."}, status=status.HTTP_404_NOT_FOUND)
+        except DjangoPermissionDenied:
+            return Response({"error": "You do not have permission to correct this timesheet period."}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
 
 
 class TimesheetPeriodLockView(APIView):

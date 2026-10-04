@@ -34,6 +34,7 @@ from users.models import (
     OrganizationMembership,
     User,
 )
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 from organizations.access import managed_pharmacies as managed_pharmacies_for
 from shifts.base import BaseShiftViewSet
 from shifts.selectors import (
@@ -303,7 +304,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
             pharmacy__owner__user=user
         ) | Q(
             pharmacy__organization__memberships__user=user,
-            pharmacy__organization__memberships__role='ORG_ADMIN'
+            pharmacy__organization__memberships__role__in=ORG_WIDE_ADMIN_ROLES
         )
         combined_filter |= is_owner_admin_of_pharmacy_q
 

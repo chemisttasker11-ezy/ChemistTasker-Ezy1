@@ -130,9 +130,8 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
         key="CHIEF_ADMIN",
         label="Chief Admin",
         description=(
-            "Scoped organisation administrator who focuses on onboarding or managing specific pharmacies."
-            " Shares pharmacy-level capabilities with an organisation admin but visibility is limited"
-            " to the pharmacies explicitly assigned to them."
+            "Organisation-wide administrator. Same capabilities as an organisation admin across every"
+            " pharmacy tied to the organisation, but cannot create or change organisation admins."
         ),
         default_admin_level=PharmacyAdmin.AdminLevel.MANAGER,
         allowed_admin_levels=(
@@ -146,10 +145,12 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             OrgCapability.MANAGE_ROSTER,
             OrgCapability.MANAGE_COMMS,
             OrgCapability.INVITE_STAFF,
+            OrgCapability.CLAIM_PHARMACY,
+            OrgCapability.VIEW_ALL_PHARMACIES,
         ),
         requires_job_title=True,
         requires_region=False,
-        requires_pharmacies=True,
+        requires_pharmacies=False,
     ),
     "REGION_ADMIN": OrgRoleDefinition(
         key="REGION_ADMIN",
@@ -192,9 +193,9 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
 
 # Chief Admin
 # -----------
-# - Senior administrator focused on a defined set of pharmacies.
-# - Shares pharmacy-level capabilities with the selected admin level (Manager/Roster/Comms).
-# - Requires a job title for clarity in directories and an explicit list of pharmacies to manage.
+# - Organisation-wide administrator with the organisation admin's capabilities over every pharmacy.
+# - Cannot create, change or remove organisation admins.
+# - Requires a job title for clarity in directories.
 
 # Region Admin
 # ------------
@@ -202,6 +203,15 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
 # - Must provide job title, operating region, and the pharmacies they oversee.
 # - Capabilities match the chosen admin level (Manager, Roster Manager, or Communication Manager).
 # """
+
+
+# Organisation roles whose authority spans every pharmacy of their organisation. Use this (or
+# membership_has_org_wide_scope) instead of comparing a role name with "ORG_ADMIN".
+ORG_WIDE_ADMIN_ROLES: tuple[str, ...] = tuple(
+    key
+    for key, definition in ROLE_DEFINITIONS.items()
+    if OrgCapability.VIEW_ALL_PHARMACIES in definition.organisation_capabilities
+)
 
 
 def get_role_definition(role: str) -> OrgRoleDefinition | None:
@@ -242,16 +252,20 @@ def membership_capabilities(membership) -> set[str]:
     return role_capabilities(getattr(membership, "role", None), getattr(membership, "admin_level", None))
 
 
+def membership_has_org_wide_scope(membership) -> bool:
+    return OrgCapability.VIEW_ALL_PHARMACIES in membership_capabilities(membership)
+
+
 def membership_visible_pharmacies(membership):
     from organizations.models import Pharmacy  # Local import to avoid circular loading
 
     if not membership:
         return Pharmacy.objects.none()
 
-    if membership.role == 'ORG_ADMIN':
+    if membership_has_org_wide_scope(membership):
         return Pharmacy.objects.filter(organization=membership.organization)
 
-    if membership.role in {'CHIEF_ADMIN', 'REGION_ADMIN'}:
+    if membership.role == 'REGION_ADMIN':
         return membership.pharmacies.all()
 
     return Pharmacy.objects.none()

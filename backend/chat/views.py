@@ -24,6 +24,7 @@ from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_fil
 from datetime import date
 from django.db import transaction
 from users.models import OrganizationMembership, User
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from chat.serializers import (
@@ -177,7 +178,7 @@ class ConversationViewSet(mixins.ListModelMixin,
                 if org_id:
                     org_admins = OrganizationMembership.objects.filter(
                         organization_id=org_id,
-                        role='ORG_ADMIN',
+                        role__in=ORG_WIDE_ADMIN_ROLES,
                     ).select_related('user')
                     for adm in org_admins:
                         if adm.user and adm.user.id != user.id:

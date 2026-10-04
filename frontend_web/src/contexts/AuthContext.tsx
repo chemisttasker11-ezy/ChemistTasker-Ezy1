@@ -331,6 +331,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
 
+    // A pharmacy-manager account has no persona of its own: it always works as the admin of its pharmacy.
+    if (!applied && user.role === "PHARMACY_MANAGER") {
+      const first = assignments.find((assignment) => assignment.id != null);
+      if (first?.id != null) {
+        applyAdmin(first.id);
+        applied = true;
+      }
+    }
+
     if (!applied) {
       if (user.role === "PHARMACIST" || user.role === "OTHER_STAFF") {
         applyRole(user.role);

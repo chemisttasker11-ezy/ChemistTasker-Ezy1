@@ -16,6 +16,7 @@ from users.org_roles import (
     OrgCapability,
     membership_capabilities,
     membership_visible_pharmacy_ids,
+    role_requires_field,
 )
 from django.conf import settings
 from core.task_queue import async_task
@@ -29,15 +30,13 @@ from django.shortcuts import get_object_or_404
 User = get_user_model()
 
 
-def _enforce_org_delegation(actor_membership, *, role, admin_level, region, pharmacy_ids, existing=None, allow_self_promotion=False):
+def _enforce_org_delegation(actor_membership, *, role, admin_level, region, pharmacy_ids, existing=None):
     """Scoped admins cannot delegate a higher role, level, or pharmacy scope."""
     actor_role = actor_membership.role
     if actor_role not in {'CHIEF_ADMIN', 'REGION_ADMIN'}:
         return
-    if (actor_role == 'CHIEF_ADMIN' and allow_self_promotion and existing and
-            existing.pk == actor_membership.pk and role == 'ORG_ADMIN'):
-        return
-    actor_ids = set(actor_membership.pharmacies.values_list('id', flat=True))
+    # Chief admins reach every pharmacy of their organisation; region admins only their assigned ones.
+    actor_ids = set(membership_visible_pharmacy_ids(actor_membership))
     requested_ids = set(pharmacy_ids)
     actor_level = ADMIN_LEVEL_DEFINITIONS.get(actor_membership.admin_level)
     requested_level = ADMIN_LEVEL_DEFINITIONS.get(admin_level)
@@ -48,7 +47,7 @@ def _enforce_org_delegation(actor_membership, *, role, admin_level, region, phar
         raise PermissionDenied('Cannot grant an admin level above your own.')
     if actor_role == 'REGION_ADMIN' and (region or '').strip().casefold() != (actor_membership.region or '').strip().casefold():
         raise PermissionDenied('Region admins may assign members only within their region.')
-    if not requested_ids or not requested_ids.issubset(actor_ids):
+    if role_requires_field(role, 'pharmacy_ids') and (not requested_ids or not requested_ids.issubset(actor_ids)):
         raise PermissionDenied('Region admins may assign only their scoped pharmacies.')
     if existing:
         existing_ids = set(existing.pharmacies.values_list('id', flat=True))
@@ -58,7 +57,8 @@ def _enforce_org_delegation(actor_membership, *, role, admin_level, region, phar
         if (actor_role == 'REGION_ADMIN' and
                 (existing.region or '').strip().casefold() != (actor_membership.region or '').strip().casefold()):
             raise PermissionDenied('Cannot manage a membership outside your region scope.')
-        if not existing_ids or not existing_ids.issubset(actor_ids):
+        if (role_requires_field(existing.role, 'pharmacy_ids') and
+                (not existing_ids or not existing_ids.issubset(actor_ids))):
             raise PermissionDenied('Cannot manage a membership outside your region scope.')
 
 
@@ -195,9 +195,7 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
         if actor_membership.pk == target_membership.pk:
             return True
 
-        if actor_membership.role == 'CHIEF_ADMIN':
-            allowed_roles = {'CHIEF_ADMIN', 'REGION_ADMIN'}
-        elif actor_membership.role == 'REGION_ADMIN':
+        if actor_membership.role == 'REGION_ADMIN':
             allowed_roles = {'REGION_ADMIN'}
         else:
             return False
@@ -496,7 +494,6 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
                 region=serializer.validated_data.get('region', instance.region),
                 pharmacy_ids=requested_pharmacies if requested_pharmacies is not None else instance.pharmacies.values_list('id', flat=True),
                 existing=instance,
-                allow_self_promotion=True,
             )
         if instance.role == 'ORG_ADMIN' and new_role != 'ORG_ADMIN':
             remaining = OrganizationMembership.objects.filter(

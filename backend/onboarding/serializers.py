@@ -130,7 +130,14 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
         return super().update(instance, validated_data)
 
     def _basic_tab(self, instance, vdata: dict, submit: bool):
-        return apply_owner_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
+        instance = apply_owner_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
+        if submit:
+            # An organisation-onboarded pharmacy manager who chose the owner account type becomes the real owner
+            # of that pharmacy when they submit owner onboarding.
+            from organizations.onboarded_ownership import adopt_onboarded_pharmacies
+
+            adopt_onboarded_pharmacies(instance)
+        return instance
 
     def get_progress_percent(self, obj):
         return owner_progress_percent(obj)
@@ -232,7 +239,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             'super_fund_name','super_usi','super_member_number',
             'abn_verified','abn_verification_note',
             'abn_entity_name','abn_entity_type','abn_status',
-            'abn_gst_registered','abn_gst_from','abn_gst_to','abn_last_checked',
+            'abn_gst_registered','abn_gst_from','abn_gst_to','abn_last_checked','abn_details_for',
             'abn_entity_confirmed',
 
 
@@ -331,6 +338,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             'abn_gst_from': {'read_only': True},
             'abn_gst_to': {'read_only': True},
             'abn_last_checked': {'read_only': True},
+            'abn_details_for': {'read_only': True},
 
 
             # referees input
@@ -528,7 +536,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             'super_fund_name','super_usi','super_member_number',
             'abn_verified','abn_verification_note',
             'abn_entity_name','abn_entity_type','abn_status',
-            'abn_gst_registered','abn_gst_from','abn_gst_to','abn_last_checked',
+            'abn_gst_registered','abn_gst_from','abn_gst_to','abn_last_checked','abn_details_for',
             'abn_entity_confirmed',
 
             # ---------- REFEREES ----------
@@ -624,6 +632,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             'abn_gst_from': {'read_only': True},
             'abn_gst_to': {'read_only': True},
             'abn_last_checked': {'read_only': True},
+            'abn_details_for': {'read_only': True},
 
             # referees
             'referee1_name':       {'required': False, 'allow_blank': True, 'allow_null': True},

@@ -93,6 +93,7 @@ class KioskRequestPairingCodeView(APIView):
     def get(self, request):
         from django.db.models import Q
         from users.models import OrganizationMembership
+        from users.org_roles import ORG_WIDE_ADMIN_ROLES
         from organizations.models import PharmacyAdmin
 
         pharmacies = Pharmacy.objects.select_related("owner").order_by("name", "pk")
@@ -111,12 +112,12 @@ class KioskRequestPairingCodeView(APIView):
             org_ids = {
                 membership.organization_id
                 for membership in org_memberships
-                if membership.role == "ORG_ADMIN"
+                if membership.role in ORG_WIDE_ADMIN_ROLES
             }
             scoped_pharmacy_ids = {
                 pharmacy.pk
                 for membership in org_memberships
-                if membership.role in {"CHIEF_ADMIN", "REGION_ADMIN"}
+                if membership.role not in ORG_WIDE_ADMIN_ROLES
                 for pharmacy in membership.pharmacies.all()
             }
             pharmacies = pharmacies.filter(

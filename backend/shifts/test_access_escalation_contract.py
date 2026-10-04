@@ -44,6 +44,8 @@ class ManagePharmacyRuleTests(TestCase):
             "owner": (self.owner, True),
             "org admin": (self.org_member("ORG_ADMIN"), True),
             "chief admin of the pharmacy": (self.org_member("CHIEF_ADMIN", [self.pharmacy]), True),
+            # Chief admins are organisation-wide: no pharmacy assignment is needed.
+            "chief admin without assignments": (self.org_member("CHIEF_ADMIN"), True),
             "region admin of the pharmacy": (self.org_member("REGION_ADMIN", [self.pharmacy]), True),
             "region admin elsewhere": (self.org_member("REGION_ADMIN", [self.other]), False),
             "manager admin": (self.admin(PharmacyAdmin.AdminLevel.MANAGER), True),
@@ -68,9 +70,11 @@ class ManagePharmacyRuleTests(TestCase):
         self.assertEqual(managed(self.org_member("ORG_ADMIN")), {self.pharmacy.id})
         self.assertEqual(managed(self.admin(PharmacyAdmin.AdminLevel.ROSTER_MANAGER)), {self.pharmacy.id})
         self.assertEqual(managed(self.admin(PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER)), set())
-        # CURRENT BEHAVIOUR: CHIEF/REGION admins can manage their pharmacies (rule above) but the managed-pharmacy
+        # Chief admins are organisation-wide admins, so their managed listing is the whole organisation.
+        self.assertEqual(managed(self.org_member("CHIEF_ADMIN")), {self.pharmacy.id})
+        # CURRENT BEHAVIOUR: REGION admins can manage their pharmacies (rule above) but the managed-pharmacy
         # listing does not include them. Pinned here; aligning the two is a separate, deliberate decision.
-        self.assertEqual(managed(self.org_member("CHIEF_ADMIN", [self.pharmacy])), set())
+        self.assertEqual(managed(self.org_member("REGION_ADMIN", [self.pharmacy])), set())
         self.assertEqual(managed(make_user("PHARMACIST")), set())
 
 

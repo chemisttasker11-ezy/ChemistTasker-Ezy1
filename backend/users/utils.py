@@ -50,6 +50,11 @@ def get_frontend_onboarding_url(user):
         return f"{base}/dashboard/explorer/onboarding"
     if role in {"ORG_STAFF", "ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN", "ORGANIZATION"}:
         return f"{base}/dashboard/organization/overview"
+    if role == "PHARMACY_MANAGER":
+        # No onboarding for this account type; it works from the admin dashboard of its pharmacy.
+        from users.navigation import get_frontend_dashboard_url
+
+        return get_frontend_dashboard_url(user)
     return f"{base}/dashboard/"
 
 
@@ -126,18 +131,7 @@ def build_org_invite_context(
             scope_message = (
                 "You'll be able to assign pharmacies to your region once you sign in."
             )
-    elif membership.role == "CHIEF_ADMIN":
-        if pharmacy_names:
-            scope_message = (
-                "You'll manage onboarding and day-to-day activity for: "
-                + ", ".join(pharmacy_names)
-                + "."
-            )
-        else:
-            scope_message = (
-                "You'll help manage the organization's pharmacies and support each location."
-            )
-    elif membership.role == "ORG_ADMIN":
+    elif membership.role in ("CHIEF_ADMIN", "ORG_ADMIN"):
         scope_message = (
             "You'll have full visibility across the organization and all pharmacies linked to it."
         )
@@ -169,3 +163,45 @@ def build_org_invite_context(
     }
 
     return context
+
+
+def build_pharmacy_manager_invite_context(
+    *,
+    organization,
+    pharmacy,
+    inviter,
+    magic_link: str,
+    dashboard_link: str,
+    temp_password: str | None = None,
+) -> dict:
+    """Email context for a person an organisation onboards as the manager of one pharmacy.
+
+    Uses the organisation invite template; the person is a pharmacy-level MANAGER admin, not an
+    organisation role, so the scope is that single pharmacy.
+    """
+    from organizations.models import PharmacyAdmin
+
+    inviter_name = inviter.get_full_name() if callable(getattr(inviter, "get_full_name", None)) else ""
+    if not inviter_name:
+        inviter_name = getattr(inviter, "email", None) or "A ChemistTasker admin"
+    level = get_admin_level_definition(PharmacyAdmin.AdminLevel.MANAGER)
+    return {
+        "org_name": getattr(organization, "name", "") or "",
+        "role_label": "Pharmacy Manager",
+        "magic_link": magic_link,
+        "dashboard_link": dashboard_link,
+        "inviter": inviter_name,
+        "role_description": "",
+        "admin_level_label": getattr(level, "label", "Manager"),
+        "admin_level_description": getattr(level, "description", ""),
+        "capability_descriptions": [
+            CAPABILITY_DESCRIPTIONS.get(key, key.replace("_", " ").title())
+            for key in sorted(getattr(level, "pharmacy_capabilities", ()))
+        ],
+        "job_title": "",
+        "region": "",
+        "scope_message": f"You'll manage {pharmacy.name} for the organisation.",
+        "pharmacies": [pharmacy.name],
+        "has_pharmacies": True,
+        "temporary_password": temp_password,
+    }

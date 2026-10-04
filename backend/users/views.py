@@ -67,6 +67,7 @@ from users.api_passwords import (  # noqa: F401
 )
 from users.api_account import (  # noqa: F401
     ContactMessageCreateView,
+    ChooseAccountTypeView,
     DeleteAccountView,
 )
 from users.api_organizations import (  # noqa: F401

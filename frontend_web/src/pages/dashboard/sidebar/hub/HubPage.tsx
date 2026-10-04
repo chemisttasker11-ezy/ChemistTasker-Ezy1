@@ -287,14 +287,14 @@ export default function HubPage() {
     setIsMobileSidebarOpen(false);
   }, []);
 
-  const pharmacyMembersLoader = useCallback(() => {
+  const pharmacyMembersLoader = useCallback((search?: string) => {
     if (!selectedPharmacyId) return Promise.resolve<HubGroupMemberOption[]>([]);
-    return fetchPharmacyGroupMembers(selectedPharmacyId);
+    return fetchPharmacyGroupMembers(selectedPharmacyId, search);
   }, [selectedPharmacyId]);
 
-  const organizationMembersLoader = useCallback(() => {
+  const organizationMembersLoader = useCallback((search?: string) => {
     if (!selectedOrganization?.id) return Promise.resolve<HubGroupMemberOption[]>([]);
-    return fetchOrganizationMembers(selectedOrganization.id);
+    return fetchOrganizationMembers(selectedOrganization.id, search);
   }, [selectedOrganization?.id]);
 
   const openCommunityGroupModal = useCallback(() => {

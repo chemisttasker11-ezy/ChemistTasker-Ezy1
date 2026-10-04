@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, workforce, type RosterPharmacyMember, type WorkerShiftRequest } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, updateRosterShiftService, workforce, type RosterPharmacyMember, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -72,6 +72,7 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [republishNotify, setRepublishNotify] = useState<'worker' | 'team' | 'none'>('worker');
 
   const loadPeriod = useCallback(async () => {
     if (!pharmacyId) return null;
@@ -131,6 +132,105 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     const initialized = await roster.initializePeriod(pharmacyId, weekStart);
     setPeriod(initialized);
     return initialized;
+  };
+
+  const slotIdFor = (row: any) => Number(row?.slot_id ?? row?.slotId ?? row?.slot?.id ?? 0);
+  const shiftIdFor = (row: any) => Number(row?.shift_id ?? row?.shiftId ?? row?.shift?.id ?? row?.shift ?? 0);
+  const isRowUnpublished = (row: any) => Boolean(row?.is_unpublished ?? row?.isUnpublished);
+
+  const unpublishRosterShift = async (row: any) => {
+    const slotId = slotIdFor(row);
+    if (!slotId) {
+      setError('This roster shift is missing its slot id.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await roster.unpublishShift(slotId);
+      await load();
+    } catch (e) {
+      setError(errorMessage(e, 'Unable to unpublish shift for editing.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const republishRosterShift = async (row: any) => {
+    const slotId = slotIdFor(row);
+    if (!slotId) {
+      setError('This roster shift is missing its slot id.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await roster.republishShift(slotId, republishNotify);
+      await load();
+    } catch (e) {
+      setError(errorMessage(e, 'Unable to republish shift.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const editRosterShift = (row: any) => {
+    const shiftId = shiftIdFor(row);
+    const slotId = slotIdFor(row);
+    if (!shiftId || !slotId) {
+      setError('This roster shift is missing its edit identifiers.');
+      return;
+    }
+    const userId = row?.worker_id ?? row?.user_id ?? row?.userId ?? row?.user?.id ?? '';
+    router.push({
+      pathname: '/manager/roster/shift-editor',
+      params: {
+        pharmacyId: String(pharmacyId),
+        mode: 'edit',
+        shiftId: String(shiftId),
+        slotId: String(slotId),
+        date: String(row?.date ?? row?.slot_date ?? row?.slotDate ?? ''),
+        startTime: String(row?.start_time ?? row?.startTime ?? row?.slot?.start_time ?? ''),
+        endTime: String(row?.end_time ?? row?.endTime ?? row?.slot?.end_time ?? ''),
+        role: String(row?.role_needed ?? row?.role ?? row?.shift?.role_needed ?? 'PHARMACIST'),
+        userId: userId ? String(userId) : '',
+      },
+    } as any);
+  };
+
+  const renderShiftActions = (row: any) => {
+    const unpublished = isRowUnpublished(row);
+    const published = String(period?.status || '').toUpperCase() === 'PUBLISHED';
+    return (
+      <View style={{ gap: 6, marginTop: 6 }}>
+        {published && !unpublished ? (
+          <Button mode="outlined" disabled={busy} onPress={() => void unpublishRosterShift(row)}>
+            Unpublish for editing
+          </Button>
+        ) : (
+          <Button mode="outlined" disabled={busy} onPress={() => editRosterShift(row)}>
+            Edit shift
+          </Button>
+        )}
+        {unpublished ? (
+          <>
+            <InfoNote title="Unpublished">Hidden from workers until this shift is republished.</InfoNote>
+            <ChoiceChips
+              value={republishNotify}
+              onChange={(value) => setRepublishNotify(value as 'worker' | 'team' | 'none')}
+              options={[
+                { value: 'worker', label: 'Notify worker' },
+                { value: 'team', label: 'Notify team' },
+                { value: 'none', label: 'No notification' },
+              ]}
+            />
+            <Button mode="contained" disabled={busy} onPress={() => void republishRosterShift(row)}>
+              Republish shift
+            </Button>
+          </>
+        ) : null}
+      </View>
+    );
   };
 
   if (screen === 'shift-editor') {
@@ -255,10 +355,10 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
         { label:'Vacancies',value:vacant.length,tone:vacant.length?'warning':'success' },
       ]} />
       {screen === 'staff' ? <Section title="Staff allocation">
-        {(grouped as any[]).length ? (grouped as any[]).map((group:any,index:number)=><Card key={index} mode="outlined"><Card.Content style={{gap:8}}><Text variant="titleSmall">{group.label}</Text>{group.rows.map((row:any,i:number)=><Text key={i} variant="bodySmall" style={{color:palette.muted}}>{slotSummary(row)} · {replaceUnderscore(row.role || row.role_needed || '')}</Text>)}</Card.Content></Card>) : <EmptyState title="No assignments" body="Create roster shifts or assign workers to this week." />}
+        {(grouped as any[]).length ? (grouped as any[]).map((group:any,index:number)=><Card key={index} mode="outlined"><Card.Content style={{gap:8}}><Text variant="titleSmall">{group.label}</Text>{group.rows.map((row:any,i:number)=><View key={i} style={{gap:4}}><Text variant="bodySmall" style={{color:palette.muted}}>{slotSummary(row)} · {replaceUnderscore(row.role || row.role_needed || '')}</Text>{renderShiftActions(row)}</View>)}</Card.Content></Card>) : <EmptyState title="No assignments" body="Create roster shifts or assign workers to this week." />}
       </Section> : <Section title={screen === 'calendar' ? 'Week schedule' : 'Roster assignments'}>
-        {assignments.length ? assignments.map((row:any,index:number)=><DataRow key={row.assignment_id || row.id || index} title={row.worker_name || row.user_name || row.user?.name || 'Assigned worker'} subtitle={`${slotSummary(row)} · ${replaceUnderscore(row.role || row.role_needed || row.shift?.role_needed || '')}`} status="Assigned" />) : <EmptyState title="No assignments" body="This roster week has no assigned shifts yet." />}
-        {vacant.map((row:any,index:number)=><DataRow key={'vacant'+(row.id||index)} title={replaceUnderscore(row.role || row.role_needed || 'Open role')} subtitle={slotSummary(row)} status="Vacant" />)}
+        {assignments.length ? assignments.map((row:any,index:number)=><View key={row.assignment_id || row.id || index} style={{gap:4}}><DataRow title={row.worker_name || row.user_name || row.user?.name || 'Assigned worker'} subtitle={`${slotSummary(row)} · ${replaceUnderscore(row.role || row.role_needed || row.shift?.role_needed || '')}`} status={isRowUnpublished(row) ? "Unpublished" : "Assigned"} />{renderShiftActions(row)}</View>) : <EmptyState title="No assignments" body="This roster week has no assigned shifts yet." />}
+        {vacant.map((row:any,index:number)=><View key={'vacant'+(row.id||index)} style={{gap:4}}><DataRow title={replaceUnderscore(row.role || row.role_needed || 'Open role')} subtitle={slotSummary(row)} status={isRowUnpublished(row) ? "Unpublished" : "Vacant"} />{renderShiftActions(row)}</View>)}
       </Section>}
       {screen === 'workspace' ? <Section title="Roster tools">
         <ScreenLink title="Calendar" subtitle="Week-by-week schedule." onPress={() => router.push('/manager/roster/calendar' as any)} />
@@ -278,11 +378,16 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
 
 function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod, onSaved }: { pharmacyId:number; pharmacyName?:string|null; weekStart:string; period:any; ensurePeriod:()=>Promise<any>; onSaved:()=>Promise<void> }) {
   const router=useRouter();
-  const [date,setDate]=useState(weekStart);
-  const [start,setStart]=useState('09:00');
-  const [end,setEnd]=useState('17:00');
-  const [role,setRole]=useState('PHARMACIST');
-  const [userId,setUserId]=useState<number|null>(null);
+  const editParams=useLocalSearchParams<{ mode?:string; shiftId?:string; slotId?:string; date?:string; startTime?:string; endTime?:string; role?:string; userId?:string }>();
+  const editing=editParams.mode === 'edit' && Number(editParams.shiftId || 0) > 0 && Number(editParams.slotId || 0) > 0;
+  const [date,setDate]=useState(editing && editParams.date ? String(editParams.date) : weekStart);
+  const [start,setStart]=useState(editing && editParams.startTime ? String(editParams.startTime).slice(0,5) : '09:00');
+  const [end,setEnd]=useState(editing && editParams.endTime ? String(editParams.endTime).slice(0,5) : '17:00');
+  const [role,setRole]=useState(editing && editParams.role ? String(editParams.role) : 'PHARMACIST');
+  const [userId,setUserId]=useState<number|null>(() => {
+    const parsed = Number(editParams.userId || 0);
+    return editing && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  });
   const [eligibleMembers,setEligibleMembers]=useState<RosterPharmacyMember[]>([]);
   const [membersLoading,setMembersLoading]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -316,12 +421,26 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod
   const save=async()=>{
     setBusy(true);setError('');
     try{
-      const p=period?.period_id ? period : await ensurePeriod();
-      await roster.bulkEdit(Number(p.period_id || p.id), [{action:'create_shift',date,start_time:start,end_time:end,role,...(userId?{user_id:userId}:{})}]);
-      await onSaved();router.replace('/manager/roster' as any);
-    }catch(e){setError(errorMessage(e,'Unable to create roster shift.'));}finally{setBusy(false);}
+      if (editing) {
+        await updateRosterShiftService(Number(editParams.shiftId), {
+          role_needed: role,
+          slots: [{
+            id: Number(editParams.slotId),
+            date,
+            start_time: start,
+            end_time: end,
+          }],
+          user_id: userId,
+        });
+      } else {
+        const p=period?.period_id ? period : await ensurePeriod();
+        await roster.bulkEdit(Number(p.period_id || p.id), [{action:'create_shift',date,start_time:start,end_time:end,role,...(userId?{user_id:userId}:{})}]);
+      }
+      await onSaved();
+      router.replace({ pathname: '/manager/roster', params: { pharmacyId: String(pharmacyId) } } as any);
+    }catch(e){setError(errorMessage(e, editing ? 'Unable to update roster shift.' : 'Unable to create roster shift.'));}finally{setBusy(false);}
   };
-  return <ParityPage title="Add roster shift" subtitle="Create a draft roster slot and optionally assign an eligible pharmacy team member." error={error}>
+  return <ParityPage title={editing ? "Edit roster shift" : "Add roster shift"} subtitle={editing ? "Update this individually unpublished shift. It stays hidden until you explicitly republish it." : "Create a draft roster slot and optionally assign an eligible pharmacy team member."} error={error}>
     <InfoNote title={pharmacyName || `Pharmacy #${pharmacyId}`}>Roster changes are transactional and server validated before publication.</InfoNote>
     <Section title="Shift details">
       <DatePickerInput
@@ -348,7 +467,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod
       {membersLoading?<Text variant="bodySmall" style={{color:palette.muted}}>Loading eligible members…</Text>:null}
       {!membersLoading&&!eligibleMembers.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible active members were returned for this role.</Text>:null}
     </Section>
-    <Button mode="contained" loading={busy} disabled={busy||!date||!start||!end} onPress={()=>void save()}>Create draft shift</Button>
+    <Button mode="contained" loading={busy} disabled={busy||!date||!start||!end} onPress={()=>void save()}>{editing ? 'Save shift changes' : 'Create draft shift'}</Button>
   </ParityPage>;
 }
 

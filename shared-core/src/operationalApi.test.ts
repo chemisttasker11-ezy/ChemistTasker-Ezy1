@@ -45,6 +45,27 @@ describe('authenticated operational api.ts domains', () => {
     ]);
   });
 
+  it('owns per-shift roster unpublish and republish through shared-core', async () => {
+    const calls: Array<{ url: string; method: string; body: string | null }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? init.body : null,
+      });
+      return json({ status: 'ok' });
+    }) as unknown as typeof fetch;
+    configure(fetchImpl);
+
+    await rosterV2.unpublishShift(7);
+    await rosterV2.republishShift(7, 'team');
+
+    expect(calls).toEqual([
+      { url: 'https://example.test/api/client-profile/attendance/roster/shift/unpublish/', method: 'POST', body: JSON.stringify({ slot_id: 7 }) },
+      { url: 'https://example.test/api/client-profile/attendance/roster/shift/republish/', method: 'POST', body: JSON.stringify({ slot_id: 7, notify: 'team' }) },
+    ]);
+  });
+
   it('refreshes once after a 401 and retries the authenticated operational request', async () => {
     const calls: Array<{ authorization: string | null; body: string | null }> = [];
     const refreshToken = vi.fn(async () => 'refreshed-token');

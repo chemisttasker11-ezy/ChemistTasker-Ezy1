@@ -12,3 +12,4 @@ from pharmacy_hub.groups import HubCommunityGroupViewSet  # noqa: F401
 from pharmacy_hub.posts import HubPostViewSet, HubCommentViewSet, HubReactionView, HubCommentReactionView  # noqa: F401
 from pharmacy_hub.polls import HubPollViewSet, HubPollCommentViewSet, HubPollReactionView  # noqa: F401
 from pharmacy_hub.profiles import HubContextView, HubPharmacyProfileView, HubOrganizationProfileView  # noqa: F401
+from pharmacy_hub.directory import HubMemberDirectoryView  # noqa: F401

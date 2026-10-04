@@ -19,6 +19,7 @@ type ApiData = {
   abn_gst_registered?: boolean | null;
   abn_gst_from?: string | null;
   abn_last_checked?: string | null;
+  abn_details_for?: string | null; // the ABN the ABR readbacks above belong to
   abn_verified?: boolean | null;
   abn_verification_note?: string | null;
 };
@@ -31,6 +32,8 @@ export default function PharmacistPaymentScreen() {
   const [checkingABN, setCheckingABN] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState<ApiData>({});
+  // After an ABN change the previous ABN's ABR details stay visible until the lookup for the new ABN replaces them.
+  const detailsForPreviousAbn = !!data.abn_details_for && (data.abn ?? '').trim() !== data.abn_details_for.trim();
   const [tfnInput, setTfnInput] = useState('');
   const [abnInput, setAbnInput] = useState('');
   const [showSuperABN, setShowSuperABN] = useState(false);
@@ -243,13 +246,19 @@ export default function PharmacistPaymentScreen() {
               <Button mode="outlined" onPress={checkABN} loading={checkingABN} disabled={checkingABN || !abnInput.trim()} style={styles.flex}>
                 Check ABN
               </Button>
-              <Button mode="contained" onPress={confirmABN} loading={saving} disabled={saving || !data.abn_entity_name || !!data.abn_verified} style={styles.flex}>
+              <Button mode="contained" onPress={confirmABN} loading={saving} disabled={saving || !data.abn_entity_name || detailsForPreviousAbn || !!data.abn_verified} style={styles.flex}>
                 {data.abn_verified ? 'Confirmed' : 'Confirm ABN'}
               </Button>
             </View>
 
             {data.abn_entity_name ? (
               <View style={styles.abnBox}>
+                {detailsForPreviousAbn ? (
+                  <HelperText type="info">
+                    These details belong to your previous ABN ({data.abn_details_for}). We are checking your new ABN; you
+                    can confirm once its details appear.
+                  </HelperText>
+                ) : null}
                 <Text style={styles.abnText}>Entity: {data.abn_entity_name}</Text>
                 {data.abn_entity_type ? <Text style={styles.abnText}>Type: {data.abn_entity_type}</Text> : null}
                 {data.abn_status ? <Text style={styles.abnText}>Status: {data.abn_status}</Text> : null}

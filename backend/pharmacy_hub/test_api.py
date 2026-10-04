@@ -206,6 +206,42 @@ class HubPostTests(HubBase):
         for stored_name in stored_names:
             self.assertFalse(default_storage.exists(stored_name))
 
+    def test_only_the_attachments_the_user_deletes_are_removed(self):
+        uploads = [
+            SimpleUploadedFile(
+                f"keep-{index}.png",
+                b"\x89PNG\r\n\x1a\nkeep-" + str(index).encode(),
+                content_type="image/png",
+            )
+            for index in (1, 2, 3)
+        ]
+        created = client_for(self.staff).post(
+            POSTS,
+            {**self.scope, "body": "three files", "attachments": uploads},
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        first, second, third = PharmacyHubAttachment.objects.filter(post_id=post_id).order_by("id")
+        kept_names = [first.file.name, third.file.name]
+        removed_name = second.file.name
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = client_for(self.staff).patch(
+                f"{POSTS}{post_id}/",
+                {"body": "three files", "remove_attachment_ids": [second.id]},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            list(PharmacyHubAttachment.objects.filter(post_id=post_id).order_by("id").values_list("id", flat=True)),
+            [first.id, third.id],
+        )
+        self.assertFalse(default_storage.exists(removed_name))
+        for name in kept_names:
+            self.assertTrue(default_storage.exists(name))
+
     def test_invalid_attachment_update_does_not_change_post_or_remove_existing_file(self):
         original = SimpleUploadedFile(
             "original.png",

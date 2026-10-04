@@ -16,6 +16,7 @@ from memberships.models import MembershipApplication
 from memberships.notifications import _frontend_base_url, _manage_detail_url_for_role
 from organizations.models import PharmacyAdmin
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 from users.navigation import get_frontend_dashboard_url
 from users.tasks import send_async_email
 
@@ -69,7 +70,7 @@ def email_membership_application_submitted(app_id: int):
     if getattr(pharmacy, "organization_id", None):
         org_admin_emails = list(
             OrganizationMembership.objects
-            .filter(role="ORG_ADMIN", organization_id=pharmacy.organization_id)
+            .filter(role__in=ORG_WIDE_ADMIN_ROLES, organization_id=pharmacy.organization_id)
             .select_related("user")
             .values_list("user__email", flat=True)
         )

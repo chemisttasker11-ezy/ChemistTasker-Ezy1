@@ -60,7 +60,9 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         user = self.request.user
         # _dbg(f"get_queryset: user_id={getattr(user,'id',None)} email={getattr(user,'email',None)} top_role={getattr(user,'role',None)}")
 
-        qs = super().get_queryset().filter(
+        qs = super().get_queryset().exclude(
+            slots__unpublished_at__isnull=False
+        ).filter(
             Q(visibility__in=COMMUNITY_LEVELS) |
             Q(visibility=PUBLIC_LEVEL, post_anonymously=False)
         ).annotate(
@@ -405,7 +407,9 @@ class PublicShiftViewSet(BaseShiftViewSet):
     def get_queryset(self):
         now = timezone.now()
         today = date.today()
-        qs = super().get_queryset().filter(
+        qs = super().get_queryset().exclude(
+            slots__unpublished_at__isnull=False
+        ).filter(
             visibility=PUBLIC_LEVEL
         ).annotate(
             slot_count=Count('slots', distinct=True)
@@ -513,7 +517,10 @@ class PublicJobBoardView(generics.ListAPIView):
         """
         This method ensures that only shifts with open, unassigned slots are returned.
         """
-        qs = Shift.objects.filter(visibility='PLATFORM', dedicated_user__isnull=True)
+        qs = Shift.objects.filter(
+            visibility='PLATFORM',
+            dedicated_user__isnull=True,
+        ).exclude(slots__unpublished_at__isnull=False)
 
         org_param = self.request.query_params.get("organization")
         if org_param:

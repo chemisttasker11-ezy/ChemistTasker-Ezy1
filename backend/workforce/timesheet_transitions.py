@@ -206,7 +206,33 @@ def lock_period(period, user):
                 "INVOICE and TIMESHEET_ONLY assignments remain in the audit timesheet snapshot only."
             ),
         }
+        existing = TimesheetManifest.objects.select_for_update().filter(period=period).first()
+        corrections = list((existing.snapshot or {}).get("corrections", [])) if existing else []
+        open_correction = corrections[-1] if corrections and not corrections[-1].get("closed_at") else None
+        if existing and open_correction:
+            # Re-locking after a deliberate correction: the manifest becomes an adjustment that names the content it
+            # supersedes; the hash covers the payroll content only, the correction history travels with it.
+            manifest_snapshot["adjustment"] = {
+                "supersedes_manifest_hash": open_correction["superseded_manifest_hash"],
+                "reason": open_correction["reason"],
+            }
+            manifest_hash = _hash(manifest_snapshot)
+            open_correction["adjustment_manifest_hash"] = manifest_hash
+            open_correction["closed_at"] = timezone.now().isoformat()
+            existing.manifest_hash = manifest_hash
+            existing.snapshot = {**manifest_snapshot, "corrections": corrections}
+            existing.save(update_fields=["manifest_hash", "snapshot"])
+            period.status = TimesheetPeriod.Status.LOCKED
+            period.locked_by = user
+            period.locked_at = timezone.now()
+            period.save(update_fields=["status", "locked_by", "locked_at", "updated_at"])
+            return existing
+        if existing and "adjustment" in (existing.snapshot or {}):
+            manifest_snapshot["adjustment"] = existing.snapshot["adjustment"]
+        # The hash covers the payroll content only, so an unchanged re-lock stays idempotent.
         manifest_hash = _hash(manifest_snapshot)
+        if corrections:
+            manifest_snapshot["corrections"] = corrections
         manifest, _ = TimesheetManifest.objects.get_or_create(
             period=period,
             defaults={"manifest_hash": manifest_hash, "snapshot": manifest_snapshot, "created_by": user},
@@ -218,3 +244,41 @@ def lock_period(period, user):
         period.locked_at = timezone.now()
         period.save(update_fields=["status", "locked_by", "locked_at", "updated_at"])
         return manifest
+
+
+def correct_locked_period(period, user, reason: str):
+    """Reopen a locked period on purpose to fix a mistake, keeping the superseded manifest content for audit.
+
+    Only a pharmacy manager may do this, with a reason. The period's existing manifest records the correction (reason,
+    who, when, and the superseded hash and content); the period returns to OPEN so timesheets can be reopened and
+    recalculated. Locking again turns that manifest into an adjustment of the superseded content.
+    """
+    require_manage_pharmacy(user, period.pharmacy)
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError("A reason is required to correct a locked period.")
+    with transaction.atomic():
+        period = TimesheetPeriod.objects.select_for_update(of=("self",)).select_related("pharmacy").get(pk=period.pk)
+        if period.status != TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Only a locked period can be corrected.")
+        manifest = TimesheetManifest.objects.select_for_update().get(period=period)
+        snapshot = dict(manifest.snapshot or {})
+        corrections = list(snapshot.pop("corrections", []))
+        correction = {
+            "reason": reason,
+            "requested_by_user_id": user.pk,
+            "requested_at": timezone.now().isoformat(),
+            "superseded_manifest_hash": manifest.manifest_hash,
+            "superseded_manifest": snapshot,
+            "superseded_locked_by_user_id": period.locked_by_id,
+            "superseded_locked_at": period.locked_at.isoformat() if period.locked_at else None,
+            "adjustment_manifest_hash": "",
+            "closed_at": None,
+        }
+        manifest.snapshot = {**snapshot, "corrections": [*corrections, correction]}
+        manifest.save(update_fields=["snapshot"])
+        period.status = TimesheetPeriod.Status.OPEN
+        period.locked_by = None
+        period.locked_at = None
+        period.save(update_fields=["status", "locked_by", "locked_at", "updated_at"])
+        return correction

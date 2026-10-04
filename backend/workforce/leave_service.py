@@ -14,6 +14,7 @@ from organizations.timezone import get_pharmacy_timezone
 from shifts.emails import build_roster_email_link
 from core.task_queue import async_task
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 from .models import WorkforceLeaveRequest
 from .permissions import can_manage_pharmacy
@@ -64,7 +65,7 @@ def _slot_leave_recipients(row):
             membership.user
             for membership in OrganizationMembership.objects.filter(
                 organization_id=pharmacy.organization_id,
-                role="ORG_ADMIN",
+                role__in=ORG_WIDE_ADMIN_ROLES,
             ).select_related("user")
             if membership.user
         )

@@ -502,6 +502,8 @@ export type HubGroupMemberOption = {
     pharmacyName: string | null;
     jobTitle: string | null;
     profilePhotoUrl: string | null;
+    /** Hub member directory: the member works at one of the viewer's own pharmacies (listed first). */
+    isOwnPharmacy?: boolean;
 };
 
 // ============ HUB - PAYLOAD TYPES ============
@@ -1302,6 +1304,8 @@ export interface RosterSlotDetailApi {
     date: string;
     start_time: string;
     end_time: string;
+    is_unpublished?: boolean;
+    is_published_roster?: boolean;
 }
 
 export type RosterSlotDetail = CamelCasedPropertiesDeep<RosterSlotDetailApi>;
@@ -1355,6 +1359,8 @@ export interface RosterAssignmentApi {
     settlement_channel?: 'PAYROLL' | 'TIMESHEET_ONLY' | 'INVOICE' | string | null;
     engagement_kind?: string | null;
     engagement_terms_accepted_at?: string | null;
+    is_unpublished?: boolean;
+    is_published_roster?: boolean;
     workforce_status?: {
         payment_preference?: string;
         settlement_channel?: 'PAYROLL' | 'TIMESHEET_ONLY' | 'INVOICE' | string;

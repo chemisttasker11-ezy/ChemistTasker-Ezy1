@@ -20,6 +20,7 @@ from users.org_roles import (
     OrgCapability,
 )
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 from organizations.access import is_admin_of, pharmacies_user_admins
 from pharmacy_hub.access import HubScopeResolver
@@ -253,7 +254,7 @@ class CalendarEventViewSet(
             is_org_admin = OrganizationMembership.objects.filter(
                 user=self.request.user,
                 organization_id=organization_id,
-                role='ORG_ADMIN',
+                role__in=ORG_WIDE_ADMIN_ROLES,
             ).exists()
             if not is_org_admin:
                 raise PermissionDenied("Only organization admins can create organization-level events.")
@@ -276,7 +277,7 @@ class CalendarEventViewSet(
             is_org_admin = OrganizationMembership.objects.filter(
                 user=self.request.user,
                 organization_id=event.organization_id,
-                role='ORG_ADMIN',
+                role__in=ORG_WIDE_ADMIN_ROLES,
             ).exists()
             if not is_org_admin:
                 raise PermissionDenied("Only organization admins can edit organization-level events.")
@@ -294,7 +295,7 @@ class CalendarEventViewSet(
             is_org_admin = OrganizationMembership.objects.filter(
                 user=self.request.user,
                 organization_id=instance.organization_id,
-                role='ORG_ADMIN',
+                role__in=ORG_WIDE_ADMIN_ROLES,
             ).exists()
             if not is_org_admin:
                 raise PermissionDenied("Only organization admins can delete organization-level events.")

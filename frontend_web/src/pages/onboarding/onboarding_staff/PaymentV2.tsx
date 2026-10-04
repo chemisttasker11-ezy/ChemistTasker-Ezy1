@@ -38,12 +38,17 @@ type ApiData = {
   abn_gst_from?: string | null; // ISO date from serializer
   abn_gst_to?: string | null;   // ISO date from serializer
   abn_last_checked?: string | null;
+  abn_details_for?: string | null; // the ABN the ABR readbacks above belong to
 
   // verification flags
   abn_verified?: boolean | null;
   abn_verification_note?: string | null;
   abn_entity_confirmed?: boolean | null;
 };
+
+// After an ABN change the previous ABN's ABR details stay visible until the lookup for the new ABN replaces them.
+const showsPreviousAbnDetails = (data: { abn?: string | null; abn_details_for?: string | null }) =>
+  !!data.abn_details_for && (data.abn ?? '').trim() !== data.abn_details_for.trim();
 
 const prettyDate = (d?: string | null) => {
   if (!d) return '';
@@ -183,6 +188,12 @@ export default function PaymentV2() {
     return (
       <Box sx={{ mt: 1 }}>
         <Typography variant="subtitle2" sx={{ mb: .5 }}>ABN details (from ABR)</Typography>
+        {showsPreviousAbnDetails(data) && (
+          <Alert severity="warning" sx={{ mb: 1 }}>
+            These details belong to your previous ABN ({data.abn_details_for}). We are checking your new ABN; you can
+            confirm once its details appear.
+          </Alert>
+        )}
         <Box component="ul" sx={{ pl: 2, m: 0, color: 'text.secondary' }}>
           {data.abn_entity_name ? <li><b>Entity name:</b> {data.abn_entity_name}</li> : null}
           {data.abn_entity_type ? <li><b>Entity type:</b> {data.abn_entity_type}</li> : null}
@@ -446,6 +457,7 @@ export default function PaymentV2() {
                 disabled={
                   saving ||
                   !data.abn_entity_name ||           // nothing scraped yet
+                  showsPreviousAbnDetails(data) ||   // details are still the previous ABN's
                   !!data.abn_verified                // already confirmed
                 }
               >
