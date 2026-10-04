@@ -20,6 +20,7 @@ from users.org_roles import (
 )
 from django.conf import settings
 from core.task_queue import async_task
+from users.delivery import deliver_email_best_effort
 from rest_framework.views import APIView
 from users.utils import build_org_invite_context
 from django.db.models import Q
@@ -150,13 +151,16 @@ class InviteOrgUserView(generics.CreateAPIView):
         )
         recipient_list = [user.email]
 
-        async_task(
+        deliver_email_best_effort(
+            async_task,
             'users.tasks.send_async_email',
             subject=f"You've been invited to join {organization.name} on ChemistTasker",
             recipient_list=recipient_list,
             template_name="emails/org_invite_new_user.html",
             context=context,
             text_template="emails/org_invite_new_user.txt",
+            event="organization_invite",
+            user_id=user.id,
         )
 
         # 5) Return success
