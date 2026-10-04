@@ -129,5 +129,3 @@ All of them were reviewed:
 ## Not in this change
 
 * Moving or renaming tables, labels or migrations.
-* The stale `worker_finance.invoicerecord` ContentType. It is a separate, deliberate data cleanup, done once nothing
-  in `django_content_type`, `auth_permission`, `django_admin_log` or a generic relation references it.
