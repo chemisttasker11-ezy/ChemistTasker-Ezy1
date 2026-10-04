@@ -19,9 +19,9 @@
 
 ### Current remote main
 
-`230396de7aabf649bf20ce347e702267d03cb4a4`
+`525e18e3592e6a18a321ee145791a6abff383e07`
 
-This is the merge commit of **PR #124 / E2**.
+This is the merge commit of **PR #125 / F1 Pharmacy Hub split**.
 
 ### Merged sequence completed during this senior review
 
@@ -37,6 +37,7 @@ This is the merge commit of **PR #124 / E2**.
 - #122 E1a onboarding tab services
 - #123 E1b onboarding role-tabs/skills/submission/progress services
 - #124 E2 membership services
+- #125 F1 Pharmacy Hub split + senior identity/scope/atomicity/storage hardening
 
 ## Important senior-review fixes already landed in main
 
@@ -82,7 +83,7 @@ This is the merge commit of **PR #124 / E2**.
 - Added focused lifecycle regression and real regulatory endpoint verification-task coverage.
 - Final exact head merged fully green.
 
-## ACTIVE PR — #125 / F1 pharmacy hub split
+## COMPLETED — #125 / F1 pharmacy hub split
 
 Branch: `refactor/pharmacy-hub-split`
 
@@ -134,36 +135,73 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 36. The remaining backend failures were test-fixture corrections, not production semantics: the user-keyed platform-poll creator fixture is now OTP-verified as required by `platform_scope`, and profile-cover tests generate a real PNG through Pillow so DRF/ImageField validation exercises the intended replacement/cleanup path.
 37. Because code changed after `f445d121`, all green results from that SHA are supporting evidence only. The new exact head after this checkpoint must pass the full main-target gate again before #125 is marked ready or merged.
 
-### F1 gate status
+### F1 final gate and merge
 
-Fresh post-E2 main-target CI must run on PR #125's current exact head after this checkpoint update. The prior `f445d121` run was green everywhere except backend domain tests and directly produced fixes #34–36 above; all prior results are supporting evidence only. The new exact head must pass all final gates before merge.
+- Corrected exact head: `bb1fa390524b35cbd9767f1f4fd4f7367e148f57`.
+- Base remained E2 main `230396de7aabf649bf20ce347e702267d03cb4a4`; final compare was `behind=0`, mergeable.
+- Exact-head Public Repository Security: green.
+- Exact-head CodeQL Python + JavaScript/TypeScript: green.
+- Exact-head Shared Core Consolidation: boundary audit, architecture audit, shared-core, backend, PostgreSQL migration/concurrency, kiosk, mobile, Vite, Next and final release-gate all green.
+- #125 was marked ready only after those exact-head jobs completed.
+- Merge was SHA-guarded against `bb1fa390524b35cbd9767f1f4fd4f7367e148f57`.
+- Merge commit / new main: `525e18e3592e6a18a321ee145791a6abff383e07`.
+- Verified remote `main` is identical to that merge commit.
+
+## ACTIVE PR — #126 / F2 users split
+
+Original PR branch: `refactor/users-auth-split`
+
+Live reviewed source head:
+`7e3230c377b8c732c023a1788d4899007b560535`
+
+Clean post-F1 reconciliation branch:
+`reconcile/f2-users-post-f1-20261004`
+
+Clean base:
+`main` at `525e18e3592e6a18a321ee145791a6abff383e07`
+
+### F2 reconciliation status
+
+1. The progress file's earlier reviewed head `2428f3c2536e00db532e9f95598b19467d388119` was stale. The live PR advanced five commits to `7e3230c377b8c732c023a1788d4899007b560535`; those follow-up changes are intentional Region/Chief directory-scope hardening in `users/api_organizations.py` plus regressions in `users/test_region_delegation.py`.
+2. Compared F2's old base `7e191332d5f959da37f95638a2fce5decbf02e87` to post-E2 main: none of the 14 `backend/users/*` F2 files changed on main. The only overlapping later-main file was the shared CI workflow.
+3. Created `reconcile/f2-users-post-f1-20261004` directly from F1 merge main and overlaid the 14 live reviewed users-domain files from `7e3230c`.
+4. Deliberately did **not** copy F2's stale workflow blob. Preserved the newest post-F1 workflow and applied only F2's intended one-line coverage expansion: `users.tests billing.tests` → `users billing.tests`.
+5. PR #126 itself will be preserved. After reconciliation/hardening is complete, move `refactor/users-auth-split` atomically to the verified reconciliation head rather than merging old-base history.
+6. Historical CI/CodeQL/security on `7e3230c` are green but are supporting evidence only; final verification must run on the reconciled exact head.
+
+### F2 preflight findings to harden regression-first
+
+1. **Account-deletion file rollback safety.** `users/account_deletion.py` deletes verification files from storage with bound `FieldFile.delete(save=False)` while the database transaction is still open. A later rollback can restore database references after physical files are already gone. Rework to clear DB ownership transactionally, capture path/storage, and delete storage only after commit; follow the E1b path-based deletion principle.
+2. **Account-deletion broker failure.** `DeleteAccountView` commits anonymisation/revocation and then enqueues its confirmation email. A Celery/Redis outage can return HTTP 500 after the account is already deleted. Confirmation delivery must be best-effort and must not reverse or misreport a completed deletion.
+3. **Outbound-email failure boundary.** Registration, e-mail OTP verification/resend, password reset, contact submission, account deletion and organization invite can persist durable state before queuing e-mail. Production broker failure currently can propagate from `send_async_email()` / `async_task()`.
+4. **Non-enumeration under queue outage.** Password reset and OTP resend intentionally return non-enumerating responses. If queueing fails only for a real account, known e-mails can currently diverge from unknown-account responses and leak account existence. Add explicit broker-failure non-enumeration regressions.
+5. **Mobile OTP provider exceptions and false cooldown.** Request/resend persist the new OTP and timestamp before the SMS provider call. Non-200 delivery failure leaves a fresh cooldown despite no confirmed delivery; transport exceptions can currently escape as 500. Add redacted stable 502 handling and define rollback/clearing so a confirmed failure does not create a false retry cooldown.
+6. **GET/list side effect in organization Hub directory.** `for_hub/include_pharmacy_members` can manufacture a CONTACT pharmacy Membership during a read. The live F2 follow-up correctly constrains that side effect to actor/target visible pharmacy scope, but current shared-core Hub member loading does not use `for_hub`; assess removing the read-time Membership synthesis entirely so F2 aligns with F1's explicit User-vs-Membership identity rules.
+7. Compatibility façade check is clean: `users.views` still re-exports URL-exposed classes and historical helpers such as `_build_authenticated_user_payload`; current `users/urls.py` wildcard routing remains compatible.
+8. PR #126 has no unresolved human review threads. Historical CodeQL clear-text OTP logging threads are resolved/outdated and their fixes are present.
 
 ## Beyond E2 — deep review already completed
 
 The expensive code/architecture review has already been front-loaded. These PRs do NOT need to be understood from scratch again; they need current-main reconciliation, protection against resurrecting old code, and exact-head final gates.
 
 ### #125 F1 pharmacy hub
-Deep-reviewed and materially hardened.
-Current branch head at last review: `54721fd5603e1e8691b107ed71e8c57c9d88e42f`.
-Historical exact-head CI was fully green, but it is based on old main and must be reconciled after E2.
-
-Senior findings/fixes:
-- Removed implicit hub authority for legacy `SHIFT_MANAGER` role not present in canonical role definitions.
-- Region/Chief org authority now follows canonical capabilities and assigned-pharmacy visibility instead of all pharmacies in organization.
-- Scoped org admin can post to an assigned pharmacy without manufacturing a permanent Membership / PharmacyAdmin MANAGER side effect.
-- Pharmacy-level admin no longer becomes organization-profile admin merely by administering one pharmacy.
-- Added endpoint regressions for scope and no privilege-escalation side effects.
+Merged after full current-main reconciliation and exact-head verification.
+Final reviewed head: `bb1fa390524b35cbd9767f1f4fd4f7367e148f57`.
+Merge commit: `525e18e3592e6a18a321ee145791a6abff383e07`.
+Full senior findings and exact-head gate evidence are recorded above.
 
 ### #126 F2 users
-Deep-reviewed.
-Current branch head at last review: `2428f3c2536e00db532e9f95598b19467d388119`.
-Historical exact-head CI green; old base.
+Deep-reviewed through live source head `7e3230c377b8c732c023a1788d4899007b560535`; now actively reconciling/hardening on post-F1 main.
+Historical exact-head CI/CodeQL/security are green on the old base.
 
-Fixes:
+Already-reviewed fixes:
 - Removed DEBUG OTP + phone logging/stdout while preserving explicit DEBUG response field.
 - Added request/resend regression tests.
 - Redacted raw reCAPTCHA provider exception text; logs error type only.
 - Added secret-bearing exception regression.
+- Region/Chief organization-directory reads now follow delegation role/region/assigned-pharmacy scope.
+- Hub-directory organization-role metadata is attached only inside the target admin's assigned pharmacy scope.
+- New active hardening targets are recorded in the ACTIVE F2 section above.
 
 ### #127 F3 attendance
 Deep-reviewed.
@@ -273,10 +311,12 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `b96438c52824ab9b079cefa5ba95bf4c2e5c7d9c`.**
+**Resume at PR #126 / F2 on reconciliation branch `reconcile/f2-users-post-f1-20261004`. Current main is `525e18e3592e6a18a321ee145791a6abff383e07`; reviewed F2 source head is `7e3230c377b8c732c023a1788d4899007b560535`.**
 
-1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff remains inside the reviewed/hardened F1 Pharmacy Hub code/test surface plus this progress document. `posts.py`, `scoping.py`, `serializers.py`, `test_api.py` and `test_hub_scope_contract.py` now also contain identity, mutation-atomicity and storage-lifecycle hardening.
-2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
-3. If any failure occurs, fix regression-first and update this file.
-4. If all exact-head gates are green, mark #125 ready and merge guarded by exact head SHA.
-5. Update this file with the new main merge SHA, then reconcile #126 F2 using the mapped workflow exception above.
+1. Confirm the reconciliation branch is `behind=0` from current main and contains exactly the 14 reviewed users files plus the one-line current-workflow coverage expansion and this progress document.
+2. Add red-first F2 regressions for account-deletion storage rollback safety and queue failure, password-reset/OTP-resend non-enumeration during broker failure, and SMS provider exception/cooldown behavior.
+3. Fix those issues inside the users-domain split without changing historical API URLs, task identities or client contracts.
+4. Decide the `for_hub/include_pharmacy_members` read-time CONTACT Membership synthesis using current shared-core callers and F1's explicit human-identity rules; if removed, pin the no-side-effect contract.
+5. Deep-review the exact reconciled diff, then move `refactor/users-auth-split` to the verified reconciliation head so PR #126 is preserved.
+6. Run fresh main-target Shared Core Consolidation, backend/users full package, PostgreSQL where applicable, CodeQL and Public Repository Security on the exact PR head.
+7. If all exact-head gates are green, mark #126 ready and merge guarded by exact head SHA, update this file, then proceed to #127 F3.
