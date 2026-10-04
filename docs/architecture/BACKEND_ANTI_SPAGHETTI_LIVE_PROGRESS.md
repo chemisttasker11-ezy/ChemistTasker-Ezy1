@@ -87,7 +87,7 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`711b3918b8066a9ce7a6438ea058072092d979ba`
+`eb8b1b70c5b50117aa12a12dfb288a6fdd68018b`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
@@ -126,6 +126,8 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 28. Attachment removal previously bulk-deleted database rows without deleting storage objects. Removal now locks the selected attachment rows, deletes DB ownership inside the transaction, and schedules path-based storage deletion only after commit so rollback cannot strand a database reference to a missing file.
 29. Hub Pharmacy/Organization profile cover replacement also leaked old storage objects. Added coverage for both endpoints and an F1-local profile cleanup mixin that deletes the old path after commit only when no live model reference remains.
 30. Storage cleanup deliberately follows the E1b principle of deleting by captured storage path rather than mutating a bound FieldFile; no shared lifecycle module was changed in F1.
+31. Multipart attachment removal had a cardinality bug: shared-core submits repeated `remove_attachment_ids` values, but the backend used `QueryDict.get()`, so only the last requested attachment was removed.
+32. Added a two-attachment regression and switched removal parsing to `getlist()` when available, preserving plain mapping compatibility. One update now removes every requested attachment row and corresponding storage object.
 
 ### F1 gate status
 
@@ -266,7 +268,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `711b3918b8066a9ce7a6438ea058072092d979ba`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `eb8b1b70c5b50117aa12a12dfb288a6fdd68018b`.**
 
 1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff remains inside the reviewed/hardened F1 Pharmacy Hub code/test surface plus this progress document. `posts.py`, `scoping.py`, `serializers.py`, `test_api.py` and `test_hub_scope_contract.py` now also contain identity, mutation-atomicity and storage-lifecycle hardening.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
