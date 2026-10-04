@@ -16,7 +16,6 @@ import secrets
 from django.utils import timezone
 from organizations.models import Pharmacy
 from memberships.models import Membership as PharmacyMembership
-from shifts.models import Shift
 from organizations.access import admin_assignments_for
 from .org_roles import (
     ADMIN_LEVEL_DEFINITIONS,
@@ -154,6 +153,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         if referral_code:
             shift = None
             if referral_shift_id:
+                from shifts.models import Shift  # resolve reverse lookup at call time
+
                 shift = Shift.objects.filter(pk=referral_shift_id).first()
             try:
                 claim_referral_code(
