@@ -2,6 +2,7 @@
 import json
 import mimetypes
 from collections.abc import Mapping
+from django.db import transaction
 from django.http import QueryDict
 from rest_framework.exceptions import ValidationError
 from pharmacy_hub.models import PharmacyHubAttachment
@@ -9,7 +10,22 @@ from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_fil
 from pharmacy_hub.access import HubScopeResolver
 
 
+def _delete_storage_path(storage, name):
+    if not name:
+        return
+    try:
+        storage.delete(name)
+    except Exception:
+        pass
+
+
 class HubAttachmentMixin:
+    def _validate_attachments(self, files):
+        validated = [uploaded for uploaded in (files or []) if uploaded]
+        for uploaded in validated:
+            validate_uploaded_file(uploaded, ATTACHMENT_UPLOAD_POLICY, "attachment")
+        return validated
+
     def _attachment_kind(self, uploaded):
         content_type = getattr(uploaded, "content_type", None)
         if not content_type:
@@ -22,15 +38,22 @@ class HubAttachmentMixin:
         return PharmacyHubAttachment.Kind.FILE
 
     def _add_attachments(self, post, files):
-        for uploaded in files or []:
-            if not uploaded:
-                continue
-            validate_uploaded_file(uploaded, ATTACHMENT_UPLOAD_POLICY, "attachment")
-            PharmacyHubAttachment.objects.create(
-                post=post,
-                file=uploaded,
-                kind=self._attachment_kind(uploaded),
-            )
+        created = []
+        try:
+            for uploaded in files or []:
+                attachment = PharmacyHubAttachment.objects.create(
+                    post=post,
+                    file=uploaded,
+                    kind=self._attachment_kind(uploaded),
+                )
+                created.append(attachment)
+        except Exception:
+            for attachment in created:
+                name = getattr(attachment.file, "name", None)
+                storage = getattr(attachment.file, "storage", None)
+                if name and storage:
+                    _delete_storage_path(storage, name)
+            raise
 
     def _remove_attachments(self, post, request):
         raw_ids = request.data.get("remove_attachment_ids", [])
@@ -42,8 +65,26 @@ class HubAttachmentMixin:
                 ids.append(int(raw))
             except (TypeError, ValueError):
                 continue
-        if ids:
-            PharmacyHubAttachment.objects.filter(post=post, id__in=ids).delete()
+        if not ids:
+            return
+
+        attachments = list(
+            PharmacyHubAttachment.objects.select_for_update().filter(
+                post=post,
+                id__in=ids,
+            )
+        )
+        for attachment in attachments:
+            name = getattr(attachment.file, "name", None)
+            storage = getattr(attachment.file, "storage", None)
+            attachment.delete()
+            if name and storage:
+                transaction.on_commit(
+                    lambda storage=storage, name=name: _delete_storage_path(
+                        storage,
+                        name,
+                    )
+                )
 
 
 class HubScopedViewSetMixin:
