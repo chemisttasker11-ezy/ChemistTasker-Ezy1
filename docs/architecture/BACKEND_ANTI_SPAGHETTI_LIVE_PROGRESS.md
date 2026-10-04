@@ -248,7 +248,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 **Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `ae7cee9e130c18bd9a4473a1dfeb5dcc6fe9dd12`.**
 
-1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is only the 13 F1 files plus this progress document.
+1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is the 15 reviewed/hardened F1 code/test files plus this progress document (the original 13-file split plus `pharmacy_hub/serializers.py` and `pharmacy_hub/test_api.py` for poll identity continuity).
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
 3. If any failure occurs, fix regression-first and update this file.
 4. If all exact-head gates are green, mark #125 ready and merge guarded by exact head SHA.
