@@ -27,6 +27,62 @@ from users.presentation import (
 from core.serializer_mixins import UploadValidationMixin
 
 
+def _delete_profile_file_if_unreferenced(model, field_name, instance_pk, storage, name):
+    if not name:
+        return
+    if model.objects.filter(**{field_name: name}).exclude(pk=instance_pk).exists():
+        return
+    try:
+        storage.delete(name)
+    except Exception:
+        pass
+
+
+class HubProfileFileCleanupMixin:
+    file_fields = ("cover_image",)
+
+    def update(self, instance, validated_data):
+        cleanup = []
+        for field_name in self.file_fields:
+            if field_name not in validated_data:
+                continue
+            old_file = getattr(instance, field_name, None)
+            old_name = getattr(old_file, "name", None)
+            if not old_name:
+                continue
+            incoming_name = getattr(validated_data.get(field_name), "name", None)
+            if incoming_name == old_name:
+                continue
+            cleanup.append(
+                (
+                    type(instance),
+                    field_name,
+                    instance.pk,
+                    getattr(old_file, "storage", None),
+                    old_name,
+                )
+            )
+
+        response = super().update(instance, validated_data)
+        for model, field_name, instance_pk, storage, name in cleanup:
+            if not storage:
+                continue
+            transaction.on_commit(
+                lambda model=model,
+                field_name=field_name,
+                instance_pk=instance_pk,
+                storage=storage,
+                name=name: _delete_profile_file_if_unreferenced(
+                    model,
+                    field_name,
+                    instance_pk,
+                    storage,
+                    name,
+                )
+            )
+        return response
+
+
 def _serialize_user_summary(user, request):
     if not user:
         return None
@@ -119,7 +175,7 @@ class HubOrganizationSerializer(serializers.ModelSerializer):
         return perms.get(obj.id, {}).get("is_org_admin", False)
 
 
-class HubPharmacyProfileSerializer(UploadValidationMixin, serializers.ModelSerializer):
+class HubPharmacyProfileSerializer(HubProfileFileCleanupMixin, UploadValidationMixin, serializers.ModelSerializer):
     upload_validation_map = {
         "cover_image": IMAGE_UPLOAD_POLICY,
     }
@@ -174,7 +230,7 @@ def _serialize_hub_author(membership, user, request):
     }
 
 
-class HubOrganizationProfileSerializer(UploadValidationMixin, serializers.ModelSerializer):
+class HubOrganizationProfileSerializer(HubProfileFileCleanupMixin, UploadValidationMixin, serializers.ModelSerializer):
     upload_validation_map = {
         "cover_image": IMAGE_UPLOAD_POLICY,
     }
