@@ -87,7 +87,7 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`cfa545071db6af8721ffba45e85258c8e274e7dc`
+`5d0c6961f443fb44733bbe595a1dc435d5c3466c`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
@@ -112,6 +112,9 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 14. Serializer `viewer_reaction` now resolves by human identity (`user_id` OR `member__user_id`) so read state remains stable across Membership creation.
 15. PostgreSQL review caught a nullable-join row-lock hazard in reaction identity repair. Reaction rows now use `select_for_update(of=("self",))` while the User row remains the serialization lock, avoiding PostgreSQL attempts to lock the nullable Membership join.
 16. Side-effect-free user-keyed control-plane posts exposed a mention-notification regression: tag notifications derived the author only from `author_membership`, producing “A teammate” and failing self-author identity checks. Added regression and fallback to `post.author_user`.
+17. Deep scope review found stale creator authority in community groups: `created_by` alone could bypass current pharmacy authorization, so a former owner/admin/scoped org admin who created a group could retain group-admin access after their pharmacy authority was removed.
+18. Added a red-first regression using a Region Admin who is assigned the pharmacy, creates a group, then loses that assignment; `group_scope` must deny after scope removal.
+19. Group creator status is now informational only. Access requires current pharmacy-level admin authority or an active staff group Membership; management requires current pharmacy admin authority or an active group Membership marked admin.
 
 ### F1 gate status
 
@@ -252,7 +255,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `cfa545071db6af8721ffba45e85258c8e274e7dc`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `5d0c6961f443fb44733bbe595a1dc435d5c3466c`.**
 
 1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is the 15 reviewed/hardened F1 code/test files plus this progress document. `posts.py`, `serializers.py` and `test_api.py` now also contain the reaction human-identity continuity hardening.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
