@@ -805,7 +805,11 @@ class TimesheetDetailView(APIView):
     def get(self, request, pk):
         try:
             timesheet = Timesheet.objects.select_related("period__pharmacy", "user", "membership").get(pk=pk)
-            if timesheet.needs_rebuild and can_manage_pharmacy(request.user, timesheet.period.pharmacy):
+            if (
+                timesheet.needs_rebuild
+                and timesheet.period.status != TimesheetPeriod.Status.LOCKED
+                and can_manage_pharmacy(request.user, timesheet.period.pharmacy)
+            ):
                 build_timesheet(timesheet.pk, actor=request.user)
                 timesheet.refresh_from_db()
             return Response(serialize_timesheet(timesheet, detail=True, user=request.user))
