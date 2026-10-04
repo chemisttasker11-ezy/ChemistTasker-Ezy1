@@ -20,7 +20,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from invoicing.models import Invoice, InvoiceLineItem
-from client_profile.domains.memberships.serializers import MembershipApplicationSerializer
+from memberships.serializers import MembershipApplicationSerializer
 from invoicing.services import generate_invoice_from_shifts
 from workforce.models import Timesheet, TimesheetPeriod, TimesheetRevision
 from workforce.timesheet_builder import build_timesheet
