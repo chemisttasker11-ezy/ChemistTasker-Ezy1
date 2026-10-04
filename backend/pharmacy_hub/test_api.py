@@ -2,12 +2,14 @@
 
 Group, organization and platform scopes share the same resolver and are exercised by the existing
 public_hub / membership tests; this file pins the pharmacy-scope contract end to end."""
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from client_profile.models import Membership
 from pharmacy_hub.models import (
-    PharmacyHubComment, PharmacyHubCommentReaction, PharmacyHubPoll, PharmacyHubPollReaction, PharmacyHubPost,
-    PharmacyHubReaction,
+    PharmacyHubComment, PharmacyHubCommentReaction, PharmacyHubPoll, PharmacyHubPollReaction, PharmacyHubPollVote,
+    PharmacyHubAttachment, PharmacyHubPost, PharmacyHubReaction,
 )
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
@@ -82,6 +84,39 @@ class HubScopeTests(HubBase):
         self.assertIsInstance(res.json(), dict)
 
 
+class HubGroupTests(HubBase):
+    def test_invalid_member_update_is_atomic(self):
+        groups = HUB + "groups/"
+        created = client_for(self.owner).post(
+            groups,
+            {
+                "pharmacy_id": self.pharmacy.id,
+                "name": "Original group",
+                "description": "Original description",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        group_id = created.json()["id"]
+
+        invalid = client_for(self.owner).patch(
+            f"{groups}{group_id}/",
+            {
+                "name": "Must not persist",
+                "description": "Must not persist",
+                "member_ids": [999999],
+            },
+            format="json",
+        )
+        self.assertEqual(invalid.status_code, 400, invalid.content)
+
+        from pharmacy_hub.models import PharmacyCommunityGroup
+
+        group = PharmacyCommunityGroup.objects.get(pk=group_id)
+        self.assertEqual(group.name, "Original group")
+        self.assertEqual(group.description, "Original description")
+
+
 class HubPostTests(HubBase):
     def test_member_creates_post_and_response_has_exact_fields(self):
         res = client_for(self.staff).post(POSTS, {**self.scope, "body": "first!"}, format="json")
@@ -95,6 +130,160 @@ class HubPostTests(HubBase):
         res = client_for(self.owner).post(POSTS, {**self.scope, "body": "from owner"}, format="json")
         self.assertEqual(res.status_code, 201)
         self.assertGreaterEqual(Membership.objects.filter(user=self.owner).count(), before)
+
+    def test_all_attachments_are_validated_before_post_creation(self):
+        good = SimpleUploadedFile(
+            "good.png",
+            b"\x89PNG\r\n\x1a\nminimal",
+            content_type="image/png",
+        )
+        bad = SimpleUploadedFile(
+            "bad.exe",
+            b"not-an-allowed-attachment",
+            content_type="application/octet-stream",
+        )
+        before_posts = PharmacyHubPost.objects.count()
+
+        response = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "must remain atomic",
+                "attachments": [good, bad],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(
+            PharmacyHubPost.objects.count(),
+            before_posts,
+            "invalid attachment batches must not leave a partially-created post",
+        )
+
+    def test_multiple_attachment_ids_are_removed_from_one_multipart_update(self):
+        uploads = [
+            SimpleUploadedFile(
+                f"remove-{index}.png",
+                b"\x89PNG\r\n\x1a\nattachment-" + str(index).encode(),
+                content_type="image/png",
+            )
+            for index in (1, 2)
+        ]
+        created = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "bulk attachment cleanup",
+                "attachments": uploads,
+            },
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        attachments = list(
+            PharmacyHubAttachment.objects.filter(post_id=post_id).order_by("id")
+        )
+        self.assertEqual(len(attachments), 2)
+        stored_names = [attachment.file.name for attachment in attachments]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            removed = client_for(self.staff).patch(
+                f"{POSTS}{post_id}/",
+                {
+                    "body": "bulk attachment cleanup",
+                    "remove_attachment_ids": [
+                        attachment.id for attachment in attachments
+                    ],
+                },
+                format="multipart",
+            )
+
+        self.assertEqual(removed.status_code, 200, removed.content)
+        self.assertFalse(
+            PharmacyHubAttachment.objects.filter(post_id=post_id).exists()
+        )
+        for stored_name in stored_names:
+            self.assertFalse(default_storage.exists(stored_name))
+
+    def test_invalid_attachment_update_does_not_change_post_or_remove_existing_file(self):
+        original = SimpleUploadedFile(
+            "original.png",
+            b"\x89PNG\r\n\x1a\noriginal",
+            content_type="image/png",
+        )
+        created = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "original body",
+                "attachments": [original],
+            },
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        attachment = PharmacyHubAttachment.objects.get(post_id=post_id)
+        stored_name = attachment.file.name
+
+        invalid = SimpleUploadedFile(
+            "invalid.exe",
+            b"invalid",
+            content_type="application/octet-stream",
+        )
+        response = client_for(self.staff).patch(
+            f"{POSTS}{post_id}/",
+            {
+                "body": "must not persist",
+                "remove_attachment_ids": [attachment.id],
+                "attachments": [invalid],
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+
+        post = PharmacyHubPost.objects.get(pk=post_id)
+        self.assertEqual(post.body, "original body")
+        self.assertTrue(
+            PharmacyHubAttachment.objects.filter(pk=attachment.id).exists()
+        )
+        self.assertTrue(default_storage.exists(stored_name))
+
+    def test_remove_attachment_deletes_the_storage_object(self):
+        uploaded = SimpleUploadedFile(
+            "remove-me.png",
+            b"\x89PNG\r\n\x1a\nattachment",
+            content_type="image/png",
+        )
+        created = client_for(self.staff).post(
+            POSTS,
+            {
+                **self.scope,
+                "body": "attachment cleanup",
+                "attachments": [uploaded],
+            },
+            format="multipart",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        attachment = PharmacyHubAttachment.objects.get(post_id=post_id)
+        stored_name = attachment.file.name
+        self.assertTrue(default_storage.exists(stored_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            removed = client_for(self.staff).patch(
+                f"{POSTS}{post_id}/",
+                {
+                    "body": "attachment cleanup",
+                    "remove_attachment_ids": [attachment.id],
+                },
+                format="multipart",
+            )
+        self.assertEqual(removed.status_code, 200, removed.content)
+        self.assertFalse(
+            PharmacyHubAttachment.objects.filter(pk=attachment.id).exists()
+        )
+        self.assertFalse(default_storage.exists(stored_name))
 
     def test_outsider_cannot_post(self):
         res = client_for(self.outsider).post(POSTS, {**self.scope, "body": "x"}, format="json")
@@ -178,6 +367,95 @@ class HubReactionTests(HubBase):
         self.assertEqual(c.delete(url).status_code, 204)
         self.assertEqual(PharmacyHubReaction.objects.count(), 0)
 
+    def test_post_reaction_identity_is_stable_if_user_later_gains_a_membership(self):
+        pid = self.make_post()
+        url = f"{POSTS}{pid}/reactions/"
+        owner_client = client_for(self.owner)
+
+        first = owner_client.post(url, {"reaction_type": "LIKE"}, format="json")
+        self.assertEqual(first.status_code, 200, first.content)
+        first_reaction = PharmacyHubReaction.objects.get(post_id=pid)
+        self.assertEqual(first_reaction.user_id, self.owner.id)
+        self.assertIsNone(first_reaction.member_id)
+
+        Membership.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        detail = owner_client.get(f"{POSTS}{pid}/")
+        self.assertEqual(detail.status_code, 200, detail.content)
+        self.assertEqual(detail.json()["viewer_reaction"], "LIKE")
+
+        changed = owner_client.post(url, {"reaction_type": "LOVE"}, format="json")
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(PharmacyHubReaction.objects.filter(post_id=pid).count(), 1)
+        reaction = PharmacyHubReaction.objects.get(post_id=pid)
+        self.assertEqual(reaction.reaction_type, "LOVE")
+        self.assertEqual(changed.json()["reaction_summary"], {"LOVE": 1})
+        self.assertEqual(changed.json()["viewer_reaction"], "LOVE")
+
+        self.assertEqual(owner_client.delete(url).status_code, 204)
+        self.assertFalse(PharmacyHubReaction.objects.filter(post_id=pid).exists())
+        self.assertEqual(
+            PharmacyHubPost.objects.get(pk=pid).reaction_summary,
+            {},
+        )
+
+    def test_comment_reaction_identity_is_stable_if_user_later_gains_a_membership(self):
+        pid = self.make_post()
+        comments_url = f"{POSTS}{pid}/comments/"
+        cid = client_for(self.staff).post(
+            comments_url,
+            {"body": "identity test"},
+            format="json",
+        ).json()["id"]
+        url = f"{comments_url}{cid}/reactions/"
+        owner_client = client_for(self.owner)
+
+        first = owner_client.post(url, {"reaction_type": "LIKE"}, format="json")
+        self.assertEqual(first.status_code, 200, first.content)
+        first_reaction = PharmacyHubCommentReaction.objects.get(comment_id=cid)
+        self.assertEqual(first_reaction.user_id, self.owner.id)
+        self.assertIsNone(first_reaction.member_id)
+
+        Membership.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        listing = owner_client.get(comments_url)
+        self.assertEqual(listing.status_code, 200, listing.content)
+        comment = next(item for item in self.rows(listing) if item["id"] == cid)
+        self.assertEqual(comment["viewer_reaction"], "LIKE")
+
+        changed = owner_client.post(url, {"reaction_type": "LOVE"}, format="json")
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(
+            PharmacyHubCommentReaction.objects.filter(comment_id=cid).count(),
+            1,
+        )
+        reaction = PharmacyHubCommentReaction.objects.get(comment_id=cid)
+        self.assertEqual(reaction.reaction_type, "LOVE")
+        self.assertEqual(changed.json()["reaction_summary"], {"LOVE": 1})
+        self.assertEqual(changed.json()["viewer_reaction"], "LOVE")
+
+        deleted = owner_client.delete(url)
+        self.assertEqual(deleted.status_code, 200, deleted.content)
+        self.assertFalse(
+            PharmacyHubCommentReaction.objects.filter(comment_id=cid).exists()
+        )
+        self.assertEqual(deleted.json()["reaction_summary"], {})
+        self.assertIsNone(deleted.json()["viewer_reaction"])
+
     def test_invalid_reaction_type_is_400_and_outsider_is_403(self):
         pid = self.make_post()
         url = f"{POSTS}{pid}/reactions/"
@@ -227,6 +505,47 @@ class HubPollTests(HubBase):
         self.assertEqual(counts, {"Pizza": 0, "Salad": 1})
         self.assertEqual(moved["selected_option_id"], salad["id"])
 
+    def test_vote_identity_is_stable_if_user_later_gains_a_membership(self):
+        poll = self.make_poll(who=self.owner)
+        pizza, salad = sorted(poll["options"], key=lambda option: option["label"])
+        url = f"{POLLS}{poll['id']}/vote/"
+        owner_client = client_for(self.owner)
+
+        first = owner_client.post(url, {"option_id": pizza["id"]}, format="json")
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(PharmacyHubPollVote.objects.filter(poll_id=poll["id"]).count(), 1)
+        first_vote = PharmacyHubPollVote.objects.get(poll_id=poll["id"])
+        self.assertEqual(first_vote.user_id, self.owner.id)
+        self.assertIsNone(first_vote.membership_id)
+
+        Membership.objects.create(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        before_move = owner_client.get(
+            POLLS + f"{poll['id']}/?scope=pharmacy&pharmacy_id={self.pharmacy.id}"
+        )
+        self.assertEqual(before_move.status_code, 200, before_move.content)
+        self.assertTrue(before_move.json()["has_voted"])
+        self.assertEqual(before_move.json()["selected_option_id"], pizza["id"])
+
+        moved = owner_client.post(url, {"option_id": salad["id"]}, format="json")
+        self.assertEqual(moved.status_code, 200, moved.content)
+        self.assertEqual(PharmacyHubPollVote.objects.filter(poll_id=poll["id"]).count(), 1)
+        vote = PharmacyHubPollVote.objects.get(poll_id=poll["id"])
+        self.assertEqual(vote.pk, first_vote.pk)
+        self.assertEqual(vote.user_id, self.owner.id)
+        self.assertIsNone(vote.membership_id)
+        self.assertEqual(vote.option_id, salad["id"])
+        self.assertTrue(moved.json()["has_voted"])
+        self.assertEqual(moved.json()["selected_option_id"], salad["id"])
+        self.assertEqual(moved.json()["total_votes"], 1)
+
     def test_vote_validation(self):
         poll = self.make_poll()
         url = f"{POLLS}{poll['id']}/vote/"
@@ -234,6 +553,36 @@ class HubPollTests(HubBase):
         self.assertEqual(c.post(url, {}, format="json").status_code, 400)
         self.assertEqual(c.post(url, {"option_id": "abc"}, format="json").status_code, 400)
         self.assertEqual(c.post(url, {"option_id": 999999}, format="json").status_code, 400)
+
+    def test_user_keyed_platform_poll_creator_can_manage_their_poll(self):
+        outsider = self.outsider
+        outsider.is_otp_verified = True
+        outsider.save(update_fields=["is_otp_verified"])
+        create = client_for(outsider).post(
+            POLLS,
+            {
+                "scope": "platform",
+                "platform_hub": "public",
+                "question": "Public question?",
+                "option_labels": ["Yes", "No"],
+            },
+            format="json",
+        )
+        self.assertEqual(create.status_code, 201, create.content)
+        poll_id = create.json()["id"]
+        poll = PharmacyHubPoll.objects.get(pk=poll_id)
+        self.assertEqual(poll.created_by_id, outsider.id)
+        self.assertIsNone(poll.created_by_membership_id)
+
+        edited = client_for(outsider).patch(
+            f"{POLLS}{poll_id}/",
+            {"question": "Updated public question?"},
+            format="json",
+        )
+        self.assertEqual(edited.status_code, 200, edited.content)
+
+        deleted = client_for(outsider).delete(f"{POLLS}{poll_id}/")
+        self.assertEqual(deleted.status_code, 204, getattr(deleted, "content", b""))
 
     def test_only_creator_or_admin_can_delete_poll(self):
         poll = self.make_poll()

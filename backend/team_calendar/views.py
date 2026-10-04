@@ -22,7 +22,7 @@ from users.org_roles import (
 from users.models import OrganizationMembership
 
 from organizations.access import is_admin_of, pharmacies_user_admins
-from pharmacy_hub.views import HubScopeResolver
+from pharmacy_hub.access import HubScopeResolver
 from memberships.models import Membership
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy

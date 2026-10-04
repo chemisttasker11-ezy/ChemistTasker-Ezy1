@@ -19,9 +19,9 @@
 
 ### Current remote main
 
-`4b18d4b4708b9087208a811d6f417b2faf95f58b`
+`230396de7aabf649bf20ce347e702267d03cb4a4`
 
-This is the merge commit of **PR #123 / E1b**.
+This is the merge commit of **PR #124 / E2**.
 
 ### Merged sequence completed during this senior review
 
@@ -36,6 +36,7 @@ This is the merge commit of **PR #123 / E1b**.
 - #120 D6 browse/lifecycle split
 - #122 E1a onboarding tab services
 - #123 E1b onboarding role-tabs/skills/submission/progress services
+- #124 E2 membership services
 
 ## Important senior-review fixes already landed in main
 
@@ -81,88 +82,61 @@ This is the merge commit of **PR #123 / E1b**.
 - Added focused lifecycle regression and real regulatory endpoint verification-task coverage.
 - Final exact head merged fully green.
 
-## ACTIVE PR — #124 / E2 membership services
+## ACTIVE PR — #125 / F1 pharmacy hub split
 
-Branch: `refactor/membership-services`
+Branch: `refactor/pharmacy-hub-split`
 
-Latest reviewed E2 code checkpoint before the documentation-only checkpoint commit:
-`fe6a82ece4577fffdbdd6b5684623711398a3634`
-
-> The authoritative exact branch head is PR #124's current head. This live file is itself updated by commits, so the branch head may be one documentation commit newer than the reviewed code checkpoint above.
+Latest reconciled code checkpoint before this documentation commit:
+`b96438c52824ab9b079cefa5ba95bf4c2e5c7d9c`
 
 Base:
-`main` at `4b18d4b4708b9087208a811d6f417b2faf95f58b`
+`main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
 
-The reconciled main→E2 diff is intentionally limited to 8 files:
-- `backend/client_profile/test_postgres_concurrency.py`
-- `backend/memberships/access.py`
-- `backend/memberships/applications.py`
-- `backend/memberships/invites.py`
-- `backend/memberships/notifications.py`
-- `backend/memberships/selectors.py`
-- `backend/memberships/test_membership_workflows_contract.py`
-- `backend/memberships/views.py`
+The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integration review then intentionally added `pharmacy_hub/serializers.py` and `pharmacy_hub/test_api.py` for the poll human-identity fix, plus this progress document. The original 13-file overlay remains conflict-safe: none changed on main after F1 branched and E2 touches none of them.
 
-### E2 senior-review fixes already committed
+### F1 senior-review fixes already committed
 
-1. **Cross-pharmacy active-membership cap race**
-   - Existing-user invite activation and worker self-accept could race across different pharmacies and both pass the max-3 count.
-   - Existing-user invite locks the worker row before counting.
-   - Accept locks worker → pending membership before checking/updating.
-   - Reject/quit lock their membership transition rows.
-   - Added PostgreSQL lock-contract coverage.
+1. Hub organization authority now follows canonical `users.org_roles` capabilities and pharmacy scope instead of hard-coded role-name shortcuts.
+2. Legacy `SHIFT_MANAGER` receives no implicit hub administration.
+3. Region/Chief admins can manage only assigned pharmacy hubs.
+4. Scoped org authors do not manufacture a Membership or PharmacyAdmin MANAGER side effect merely to create a hub post.
+5. Pharmacy-level admins retain pharmacy-profile authority but do not become organization-profile admins.
+6. Control-plane hub authoring (owner/pharmacy admin/org admin) is now side-effect free when no real Membership exists: posts/polls/comments use the explicit user author instead of manufacturing/reactivating Membership or PharmacyAdmin state.
+7. Regression coverage proves a LEFT membership remains LEFT/inactive and no PharmacyAdmin is created when an ORG_ADMIN authors a pharmacy-hub post.
+8. Poll voting is now stable across User ↔ Membership identity changes. A person who voted while membership-less cannot gain a second vote after receiving a Membership; read state (`has_voted`, `selected_option_id`) follows the same human identity.
+9. Vote writes serialize on the User row and collapse any historical user-keyed/membership-keyed duplicate rows on the next vote, repairing materialized option counts without a schema migration.
+10. Platform/user-keyed poll creator ownership is now stable. Poll management recognizes either `created_by=User` or historical `created_by_membership`, so a membership-less platform creator can edit/delete their own poll.
+11. Endpoint regressions pin allowed/denied scope, side-effect-free control-plane authoring, vote identity continuity and user-keyed creator ownership.
+12. Deep exact-head review found the same User ↔ Membership identity-transition defect in post/comment reactions: a person could react while membership-less, later gain a Membership, then create a second materialized reaction; delete removed only the current identity row.
+13. Added red-first post/comment reaction identity regressions. Reaction writes now serialize on the User row, reuse one human reaction, collapse historical user/member duplicates, and recompute summary counts. Deletes remove every representation of the same human identity.
+14. Serializer `viewer_reaction` now resolves by human identity (`user_id` OR `member__user_id`) so read state remains stable across Membership creation.
+15. PostgreSQL review caught a nullable-join row-lock hazard in reaction identity repair. Reaction rows now use `select_for_update(of=("self",))` while the User row remains the serialization lock, avoiding PostgreSQL attempts to lock the nullable Membership join.
+16. Side-effect-free user-keyed control-plane posts exposed a mention-notification regression: tag notifications derived the author only from `author_membership`, producing “A teammate” and failing self-author identity checks. Added regression and fallback to `post.author_user`.
+17. Deep scope review found stale creator authority in community groups: `created_by` alone could bypass current pharmacy authorization, so a former owner/admin/scoped org admin who created a group could retain group-admin access after their pharmacy authority was removed.
+18. Added a red-first regression using a Region Admin who is assigned the pharmacy, creates a group, then loses that assignment; `group_scope` must deny after scope removal.
+19. Group creator status is now informational only. Access requires current pharmacy-level admin authority or an active staff group Membership; management requires current pharmacy admin authority or an active group Membership marked admin.
+20. Removed the same stale `created_by` shortcut from group permission projection/serialization. A former scoped admin who later remains only ordinary staff sees `is_admin=false` and receives 403 on mutation instead of a misleading admin UI state.
+21. Group update review found a partial-persistence bug: `super().update()` saved name/description before replacement `member_ids` were domain-validated, so an invalid request could return 400 after changing the group.
+22. Added a red-first atomicity regression. Replacement memberships are now resolved before writes, the update runs inside `transaction.atomic()`, and the group row plus existing membership-link rows are locked so concurrent edits cannot interleave or escape serialization when the group initially has no links.
+23. Context/resolver contract review found an owner projection mismatch: `organization_scope` authorizes a pharmacy owner to manage the containing organization profile, but Hub Context advertised `can_manage_profile=false`. Added a targeted owner regression and now derive that permission from the existing per-pharmacy `is_owner` authority while keeping `is_org_admin=false`.
+24. Removed two unused lazy QuerySet assignments from organization member-count construction; the real per-organization distinct-user aggregation is unchanged.
+25. Attachment review found request-level partial persistence: a multi-file create/update validated each file only while writing it, so a later invalid file could return 400 after the post or earlier attachments had already changed.
+26. Added red-first create and update rollback regressions. The entire attachment batch is now validated before any post mutation; post + attachment DB writes run atomically.
+27. Attachment add failure cleanup now handles both previously-created rows and the current unsaved/failed attachment object, covering the FileField case where storage write succeeds before a database insert fails.
+28. Attachment removal previously bulk-deleted database rows without deleting storage objects. Removal now locks the selected attachment rows, deletes DB ownership inside the transaction, and schedules path-based storage deletion only after commit so rollback cannot strand a database reference to a missing file.
+29. Hub Pharmacy/Organization profile cover replacement also leaked old storage objects. Added coverage for both endpoints and an F1-local profile cleanup mixin that deletes the old path after commit only when no live model reference remains.
+30. Storage cleanup deliberately follows the E1b principle of deleting by captured storage path rather than mutating a bound FieldFile; no shared lifecycle module was changed in F1.
+31. Multipart attachment removal had a cardinality bug: shared-core submits repeated `remove_attachment_ids` values, but the backend used `QueryDict.get()`, so only the last requested attachment was removed.
+32. Added a two-attachment regression and switched removal parsing to `getlist()` when available, preserving plain mapping compatibility. One update now removes every requested attachment row and corresponding storage object.
+33. Final exact-head gate on `f445d12103e1cd4e12fb6254a27226ea4d161996` passed security, both CodeQL languages, architecture, boundary, shared-core, PostgreSQL migration/concurrency, kiosk, mobile, Vite and Next, but backend domain tests exposed four F1 issues before merge.
+34. One failure was a real availability defect: after the post DB transaction had committed, tagged-member email enqueue still propagated a Celery/Redis broker outage and turned a valid Hub post request into HTTP 500. Tag email dispatch is now best-effort with redacted exception-type logging; the durable in-app notification/post remain successful.
+35. The broker regression is deterministic: the scope-contract test now forces `pharmacy_hub.posts.async_task` to fail and requires the post/notification path to remain successful.
+36. The remaining backend failures were test-fixture corrections, not production semantics: the user-keyed platform-poll creator fixture is now OTP-verified as required by `platform_scope`, and profile-cover tests generate a real PNG through Pillow so DRF/ImageField validation exercises the intended replacement/cleanup path.
+37. Because code changed after `f445d121`, all green results from that SHA are supporting evidence only. The new exact head after this checkpoint must pass the full main-target gate again before #125 is marked ready or merged.
 
-2. **PostgreSQL nullable-join lock issue**
-   - Pharmacy invite query used `select_for_update().select_related("owner__user")`.
-   - Restricted lock to pharmacy row via `of=("self",)`.
+### F1 gate status
 
-3. **Organization filter privacy leak**
-   - Ordinary member of Pharmacy A could call `?organization=<org>` and replace the authorized queryset with all members of every sibling pharmacy in that organization.
-   - Organization filtering now only narrows the already-authorized pharmacy set.
-   - Added endpoint regression proving sibling membership stays hidden.
-
-4. **Application visibility union bug**
-   - ORG_ADMIN scope previously replaced owned-pharmacy scope instead of adding to it.
-   - An org admin who separately owned another pharmacy could lose that pharmacy's applications.
-   - Visibility scopes are now additive.
-
-5. **Canonical Region/Chief staff-management authority**
-   - Old E2 rule treated only ORG_ADMIN/owner/pharmacy MANAGE_STAFF as application approvers, despite canonical organization roles giving scoped Region/Chief admins MANAGE_STAFF / MANAGE_ADMINS.
-   - Application list + approve/reject now follow canonical organization capability + pharmacy scope.
-   - Scoped Region/Chief may manage only assigned pharmacies; full ORG_ADMIN remains organization-wide.
-
-6. **Invite-link visibility union bug**
-   - Organization scope previously replaced separately-owned-pharmacy scope for invite-link listing.
-   - Org, owner and pharmacy-admin invite-management scopes are now additive.
-   - Added regression proving organization administration cannot hide invite links for a separately owned pharmacy.
-
-7. **Owner-membership control-plane protection**
-   - The pharmacy owner's derived OWNER membership was reachable through the generic Membership PATCH/DELETE endpoint.
-   - A Manager (or the owner through the generic endpoint) could deactivate/delete it and rely on a later read to repair it.
-   - Generic membership mutation now refuses the pharmacy owner's membership; endpoint regression covers both Manager and owner callers.
-
-8. **Membership identity immutability**
-   - The generic serializer exposed writable `user` and `pharmacy` fields after object permission was checked against the old record.
-   - PATCH can no longer reassign a membership to another user or move it to another pharmacy; regression coverage requires 400 and unchanged identity.
-
-9. **Generic reactivation cap locking**
-   - Admin PATCH reactivation previously relied on the serializer's unlocked max-active-membership count and could race across pharmacies.
-   - `MembershipViewSet.perform_update()` now re-checks activation under the same user -> membership row-lock order used by self-accept.
-   - PostgreSQL lock-contract coverage pins both locks and their order.
-
-10. **Invite-link queryset union runtime fix**
-   - The additive invite-link scope fix initially OR-combined a distinct organization queryset with non-distinct owner/admin querysets.
-   - Django rejects that at runtime with `TypeError: Cannot combine a unique query with a non-unique query.`
-   - Organization visibility is now wrapped as an outer non-distinct pharmacy queryset before unioning independent scopes; `distinct()` is applied once at the end.
-   - The failure was caught by the real membership endpoint contract, not hidden by unit-only coverage.
-
-11. **Existing E2 duplicate response alert fix preserved**
-   - Worker membership response no longer creates the same manager in-app alert twice.
-
-### E2 exact-head gate status
-
-Fresh main-target workflows must be evaluated on PR #124's current exact head after the latest selector fixes and this checkpoint update.
-Do **not** merge using any older E2 green runs.
+Fresh post-E2 main-target CI must run on PR #125's current exact head after this checkpoint update. The prior `f445d121` run was green everywhere except backend domain tests and directly produced fixes #34–36 above; all prior results are supporting evidence only. The new exact head must pass all final gates before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -270,30 +244,39 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 - Forces baselines downward when modules shrink.
 - Final baselines MUST be regenerated/tightened from final main after D/E/F/G/H1/H2 land.
 
+## Known reconciliation hazards already mapped
+
+- **F2 #126:** do not copy its old CI workflow blob; preserve current workflow and apply only the auth/account expansion from `users.tests` to the whole `users` package.
+- **F5 #129:** E2 and F5 both touch `backend/client_profile/test_postgres_concurrency.py`. Preserve all E2 membership locking tests and apply only F5's timesheet imports + `TimesheetTransitionPostgresLockingTests`.
+- **G1 #130 / H1 #135 / H3 #136:** all edit the shared CI workflow. Apply each incremental test-step addition to the newest workflow; never replace the whole old blob.
+- **G2/G3/H2:** all touch `core/test_backend_ownership_boundaries.py` and/or architecture docs. Apply their semantic deltas in sequence on the newest files.
+- **G3 #132:** its PostgreSQL test edit is only the import-owner path change; preserve E2/F5 concurrency additions. Its serializer-lifecycle test rewrite must preserve E1b's storage-cleanup regression.
+- **H2 #137:** its `core/serializer_lifecycle.py` change is only moving domain imports into `_known_file_references()`; preserve E1b's `default_storage` / path-based deletion fix.
+- **H3 #136:** regenerate module-size baselines from final main and merge last.
+
 ## Final intended sequence
 
-1. Finish exact-head #124 E2 gate and merge.
-2. Reconcile/verify/merge #125 F1.
-3. Reconcile/verify/merge #126 F2.
-4. Reconcile/verify/merge #127 F3.
-5. Reconcile/verify/merge #128 F4.
-6. Reconcile/verify/merge #129 F5.
-7. Reconcile/verify/merge #130 G1.
-8. Reconcile/verify/merge #131 G2.
-9. Reconcile/verify/merge #132 G3.
-10. Reconcile/verify/merge #133 G4.
-11. Reconcile/verify/merge #134 G5.
-12. Reconcile/verify/merge #135 H1.
-13. Reconcile/verify/merge #137 H2.
-14. Rebuild final module-size baselines and merge #136 H3 LAST.
-15. Final architecture/release audit from final `main`.
+1. Reconcile/verify/merge #125 F1.
+2. Reconcile/verify/merge #126 F2.
+3. Reconcile/verify/merge #127 F3.
+4. Reconcile/verify/merge #128 F4.
+5. Reconcile/verify/merge #129 F5.
+6. Reconcile/verify/merge #130 G1.
+7. Reconcile/verify/merge #131 G2.
+8. Reconcile/verify/merge #132 G3.
+9. Reconcile/verify/merge #133 G4.
+10. Reconcile/verify/merge #134 G5.
+11. Reconcile/verify/merge #135 H1.
+12. Reconcile/verify/merge #137 H2.
+13. Rebuild final module-size baselines and merge #136 H3 LAST.
+14. Final architecture/release audit from final `main`.
 
 ## NEXT ACTION
 
-**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `fe6a82ece4577fffdbdd6b5684623711398a3634`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `b96438c52824ab9b079cefa5ba95bf4c2e5c7d9c`.**
 
-1. Check the fresh main-target Shared Core Consolidation, PostgreSQL/concurrency, CodeQL and Public Repository Security results on the PR's current exact head.
-2. If any exact-head failure occurs, inspect/fix it regression-first and update this file.
-3. If all exact-head gates are green, mark #124 ready and merge guarded by exact head SHA.
-4. Update this file with the new main merge SHA.
-5. Reconcile #125 F1's reviewed files/security fixes onto that new main; do not merge its old-base head directly.
+1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff remains inside the reviewed/hardened F1 Pharmacy Hub code/test surface plus this progress document. `posts.py`, `scoping.py`, `serializers.py`, `test_api.py` and `test_hub_scope_contract.py` now also contain identity, mutation-atomicity and storage-lifecycle hardening.
+2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
+3. If any failure occurs, fix regression-first and update this file.
+4. If all exact-head gates are green, mark #125 ready and merge guarded by exact head SHA.
+5. Update this file with the new main merge SHA, then reconcile #126 F2 using the mapped workflow exception above.

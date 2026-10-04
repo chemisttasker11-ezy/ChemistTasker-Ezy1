@@ -17,6 +17,7 @@ from pharmacy_hub.models import (
     PharmacyHubReaction,
 )
 from django.db import transaction
+from django.db.models import Q
 from core.file_validation import IMAGE_UPLOAD_POLICY
 from users.presentation import (
     _build_absolute_media_url,
@@ -24,6 +25,62 @@ from users.presentation import (
     _resolve_user_profile_photo,
 )
 from core.serializer_mixins import UploadValidationMixin
+
+
+def _delete_profile_file_if_unreferenced(model, field_name, instance_pk, storage, name):
+    if not name:
+        return
+    if model.objects.filter(**{field_name: name}).exclude(pk=instance_pk).exists():
+        return
+    try:
+        storage.delete(name)
+    except Exception:
+        pass
+
+
+class HubProfileFileCleanupMixin:
+    file_fields = ("cover_image",)
+
+    def update(self, instance, validated_data):
+        cleanup = []
+        for field_name in self.file_fields:
+            if field_name not in validated_data:
+                continue
+            old_file = getattr(instance, field_name, None)
+            old_name = getattr(old_file, "name", None)
+            if not old_name:
+                continue
+            incoming_name = getattr(validated_data.get(field_name), "name", None)
+            if incoming_name == old_name:
+                continue
+            cleanup.append(
+                (
+                    type(instance),
+                    field_name,
+                    instance.pk,
+                    getattr(old_file, "storage", None),
+                    old_name,
+                )
+            )
+
+        response = super().update(instance, validated_data)
+        for model, field_name, instance_pk, storage, name in cleanup:
+            if not storage:
+                continue
+            transaction.on_commit(
+                lambda model=model,
+                field_name=field_name,
+                instance_pk=instance_pk,
+                storage=storage,
+                name=name: _delete_profile_file_if_unreferenced(
+                    model,
+                    field_name,
+                    instance_pk,
+                    storage,
+                    name,
+                )
+            )
+        return response
 
 
 def _serialize_user_summary(user, request):
@@ -118,7 +175,7 @@ class HubOrganizationSerializer(serializers.ModelSerializer):
         return perms.get(obj.id, {}).get("is_org_admin", False)
 
 
-class HubPharmacyProfileSerializer(UploadValidationMixin, serializers.ModelSerializer):
+class HubPharmacyProfileSerializer(HubProfileFileCleanupMixin, UploadValidationMixin, serializers.ModelSerializer):
     upload_validation_map = {
         "cover_image": IMAGE_UPLOAD_POLICY,
     }
@@ -173,7 +230,7 @@ def _serialize_hub_author(membership, user, request):
     }
 
 
-class HubOrganizationProfileSerializer(UploadValidationMixin, serializers.ModelSerializer):
+class HubOrganizationProfileSerializer(HubProfileFileCleanupMixin, UploadValidationMixin, serializers.ModelSerializer):
     upload_validation_map = {
         "cover_image": IMAGE_UPLOAD_POLICY,
     }
@@ -348,34 +405,42 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         membership_ids = validated_data.pop("member_ids", None)
-        response = super().update(instance, validated_data)
+        memberships = None
         if membership_ids is not None:
             membership_ids = set(membership_ids)
             memberships = self._resolve_memberships(instance.pharmacy, membership_ids)
-            desired_ids = {membership.id for membership in memberships}
-            existing_links = {
-                link.membership_id: link
-                for link in PharmacyCommunityGroupMembership.objects.filter(
-                    group=instance
-                )
-            }
-            new_links = []
-            for membership in memberships:
-                if membership.id in existing_links:
-                    continue
-                new_links.append(
-                    PharmacyCommunityGroupMembership(
-                        group=instance,
-                        membership=membership,
+
+        with transaction.atomic():
+            locked_instance = PharmacyCommunityGroup.objects.select_for_update().get(
+                pk=instance.pk
+            )
+            self.instance = locked_instance
+            response = super().update(locked_instance, validated_data)
+            if memberships is not None:
+                desired_ids = {membership.id for membership in memberships}
+                existing_links = {
+                    link.membership_id: link
+                    for link in PharmacyCommunityGroupMembership.objects.select_for_update().filter(
+                        group=locked_instance
                     )
-                )
-            if new_links:
-                PharmacyCommunityGroupMembership.objects.bulk_create(new_links)
-            to_remove = set(existing_links.keys()) - desired_ids
-            if to_remove:
-                PharmacyCommunityGroupMembership.objects.filter(
-                    group=instance, membership_id__in=to_remove
-                ).delete()
+                }
+                new_links = []
+                for membership in memberships:
+                    if membership.id in existing_links:
+                        continue
+                    new_links.append(
+                        PharmacyCommunityGroupMembership(
+                            group=instance,
+                            membership=membership,
+                        )
+                    )
+                if new_links:
+                    PharmacyCommunityGroupMembership.objects.bulk_create(new_links)
+                to_remove = set(existing_links.keys()) - desired_ids
+                if to_remove:
+                    PharmacyCommunityGroupMembership.objects.filter(
+                        group=locked_instance, membership_id__in=to_remove
+                    ).delete()
         return response
 
     def get_member_count(self, obj):
@@ -403,10 +468,6 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def get_is_admin(self, obj):
-        request = self.context.get("request")
-        if request and getattr(request, "user", None):
-            if obj.created_by_id == request.user.id:
-                return True
         admin_map = self.context.get("group_admin_map", {})
         return admin_map.get(obj.id, False)
 
@@ -500,22 +561,18 @@ class HubCommentSerializer(serializers.ModelSerializer):
         return obj.deleted_at is not None
 
     def get_viewer_reaction(self, obj):
-        membership = self.context.get("request_membership")
         request = self.context.get("request")
         request_user = getattr(request, "user", None)
-        if membership:
-            return (
-                obj.reactions.filter(member=membership)
-                .values_list("reaction_type", flat=True)
-                .first()
+        if not request_user or not request_user.is_authenticated:
+            return None
+        return (
+            obj.reactions.filter(
+                Q(user_id=request_user.id) | Q(member__user_id=request_user.id)
             )
-        if request_user and request_user.is_authenticated:
-            return (
-                obj.reactions.filter(user=request_user)
-                .values_list("reaction_type", flat=True)
-                .first()
-            )
-        return None
+            .order_by("id")
+            .values_list("reaction_type", flat=True)
+            .first()
+        )
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -774,22 +831,18 @@ class HubPostSerializer(serializers.ModelSerializer):
         return obj.organization_id
 
     def get_viewer_reaction(self, obj):
-        membership = self.context.get("request_membership")
         request = self.context.get("request")
         request_user = getattr(request, "user", None)
-        if membership:
-            return (
-                obj.reactions.filter(member=membership)
-                .values_list("reaction_type", flat=True)
-                .first()
+        if not request_user or not request_user.is_authenticated:
+            return None
+        return (
+            obj.reactions.filter(
+                Q(user_id=request_user.id) | Q(member__user_id=request_user.id)
             )
-        if request_user and request_user.is_authenticated:
-            return (
-                obj.reactions.filter(user=request_user)
-                .values_list("reaction_type", flat=True)
-                .first()
-            )
-        return None
+            .order_by("id")
+            .values_list("reaction_type", flat=True)
+            .first()
+        )
 
     def get_recent_comments(self, obj):
         comments_qs = (
@@ -1078,47 +1131,43 @@ class HubPollSerializer(serializers.ModelSerializer):
     def _get_membership(self):
         return self.context.get("request_membership")
 
-    def get_has_voted(self, obj):
-        membership = self._get_membership()
+    def _viewer_vote(self, obj):
+        """Return this human viewer's vote regardless of its stored identity FK.
+
+        Hub voters may be stored directly by User or indirectly by Membership.
+        Treat both representations as the same person so gaining/losing a
+        Membership cannot make an existing vote disappear from the response.
+        """
         request = self.context.get("request")
         request_user = getattr(request, "user", None)
+        if not request_user or not request_user.is_authenticated:
+            return None
+
         votes = getattr(obj, "_prefetched_votes", None)
-        if membership:
-            if votes is None:
-                return obj.votes.filter(membership=membership).exists()
-            return any(v.membership_id == membership.id for v in votes)
-        if request_user and request_user.is_authenticated:
-            if votes is None:
-                return obj.votes.filter(user=request_user).exists()
-            return any(v.user_id == request_user.id for v in votes)
-        return False
+        if votes is None:
+            return (
+                obj.votes.filter(
+                    Q(user_id=request_user.id)
+                    | Q(membership__user_id=request_user.id)
+                )
+                .select_related("membership")
+                .order_by("id")
+                .first()
+            )
+
+        for vote in votes:
+            if vote.user_id == request_user.id:
+                return vote
+            if vote.membership_id and getattr(vote.membership, "user_id", None) == request_user.id:
+                return vote
+        return None
+
+    def get_has_voted(self, obj):
+        return self._viewer_vote(obj) is not None
 
     def get_selected_option_id(self, obj):
-        membership = self._get_membership()
-        request = self.context.get("request")
-        request_user = getattr(request, "user", None)
-        votes = getattr(obj, "_prefetched_votes", None)
-        if membership:
-            if votes is None:
-                return (
-                    obj.votes.filter(membership=membership)
-                    .values_list("option_id", flat=True)
-                    .first()
-                )
-            for vote in votes:
-                if vote.membership_id == membership.id:
-                    return vote.option_id
-        elif request_user and request_user.is_authenticated:
-            if votes is None:
-                return (
-                    obj.votes.filter(user=request_user)
-                    .values_list("option_id", flat=True)
-                    .first()
-                )
-            for vote in votes:
-                if vote.user_id == request_user.id:
-                    return vote.option_id
-        return None
+        vote = self._viewer_vote(obj)
+        return vote.option_id if vote else None
 
     def get_created_by(self, obj):
         return self.get_author(obj)
