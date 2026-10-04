@@ -10,20 +10,38 @@ from workforce.timesheet_data import _active_membership, _attach_employment_enga
 
 
 def ensure_period_timesheets(period):
-    for user_id in _worker_ids_for_period(period):
-        membership = _active_membership(user_id, period.pharmacy_id)
-        Timesheet.objects.get_or_create(period=period, user_id=user_id, defaults={"membership": membership})
+    with transaction.atomic():
+        period = TimesheetPeriod.objects.select_for_update(of=("self",)).get(pk=period.pk)
+        if period.status == TimesheetPeriod.Status.LOCKED:
+            return
+        for user_id in _worker_ids_for_period(period):
+            membership = _active_membership(user_id, period.pharmacy_id)
+            Timesheet.objects.get_or_create(period=period, user_id=user_id, defaults={"membership": membership})
+
+
+def _locked_timesheet_and_period_for_build(timesheet_id):
+    """Lock the period before the timesheet so builds share transition/lock order."""
+    period_id = Timesheet.objects.values_list("period_id", flat=True).get(pk=timesheet_id)
+    period = (
+        TimesheetPeriod.objects.select_for_update(of=("self",))
+        .select_related("pharmacy")
+        .get(pk=period_id)
+    )
+    timesheet = (
+        Timesheet.objects.select_for_update(of=("self",))
+        .select_related("user", "membership")
+        .get(pk=timesheet_id)
+    )
+    if timesheet.period_id != period.pk:
+        raise ValidationError("Timesheet period changed. Refresh and retry.")
+    timesheet.period = period
+    return timesheet, period
 
 
 def build_timesheet(timesheet_id: int, *, actor=None, force=False):
     with transaction.atomic():
-        timesheet = (
-            Timesheet.objects.select_for_update(of=("self", "period"))
-            .select_related("period__pharmacy", "user", "membership")
-            .get(pk=timesheet_id)
-        )
-        period = timesheet.period
-        if period.status == TimesheetPeriod.Status.LOCKED and force:
+        timesheet, period = _locked_timesheet_and_period_for_build(timesheet_id)
+        if period.status == TimesheetPeriod.Status.LOCKED:
             raise ValidationError("Locked timesheet periods cannot be recalculated in place.")
 
         start_bound, end_bound, tz = _period_bounds(period)
