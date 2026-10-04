@@ -17,7 +17,7 @@ from memberships.models import Membership
 from notifications.models import Notification
 from onboarding.models import OtherStaffOnboarding
 from organizations.models import Organization, PharmacyAdmin
-from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyCommunityGroupMembership
+from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyCommunityGroupMembership, PharmacyHubPost
 from users.models import OrganizationMembership
 
 HUB = BASE + "hub/"
@@ -373,6 +373,41 @@ class ResolverAndPermissionTests(HubFixture):
             admin_count,
             "hub posting must not promote a scoped org role to PharmacyAdmin",
         )
+
+    def test_control_plane_hub_authoring_does_not_reactivate_membership_or_create_admin(self):
+        org_admin = self.users["org_admin"]
+        stale = Membership.objects.create(
+            user=org_admin,
+            pharmacy=self.pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.LEFT,
+            is_active=False,
+        )
+        admin_count = PharmacyAdmin.objects.filter(
+            user=org_admin,
+            pharmacy=self.pharmacy,
+        ).count()
+
+        created = client_for(org_admin).post(
+            HUB + "posts/",
+            {"scope": "pharmacy", "pharmacy_id": self.pharmacy.id, "body": "Org admin update"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+
+        stale.refresh_from_db()
+        self.assertEqual(stale.status, Membership.Status.LEFT)
+        self.assertFalse(stale.is_active)
+        self.assertEqual(
+            PharmacyAdmin.objects.filter(user=org_admin, pharmacy=self.pharmacy).count(),
+            admin_count,
+            "hub authoring must not manufacture a PharmacyAdmin assignment",
+        )
+
+        post = PharmacyHubPost.objects.get(pk=created.data["id"])
+        self.assertEqual(post.author_user_id, org_admin.id)
+        self.assertIsNone(post.author_membership_id)
 
     def test_pharmacy_admin_does_not_become_organization_admin(self):
         Resolver = resolver_class()
