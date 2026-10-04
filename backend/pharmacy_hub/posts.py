@@ -98,6 +98,8 @@ class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelVi
         if not memberships:
             return
         author_user = getattr(getattr(post, "author_membership", None), "user", None)
+        if not author_user:
+            author_user = getattr(post, "author_user", None)
         author_name = ""
         if author_user:
             author_name = author_user.get_full_name().strip() or author_user.email or ""
