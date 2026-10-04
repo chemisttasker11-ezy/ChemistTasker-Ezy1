@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 
-from client_profile.admin import (
+from onboarding.admin import (
     ExplorerOnboardingAdmin,
     OtherStaffOnboardingAdmin,
     OwnerOnboardingAdmin,
@@ -19,9 +19,9 @@ from client_profile.models import (
     Shift,
     WorkerShiftRequest,
 )
-from client_profile.domains.onboarding.serializers import OwnerOnboardingV2Serializer
-from client_profile.domains.shifts.serializers import WorkerShiftRequestSerializer
-from client_profile.domains.shifts.worker_requests import WorkerShiftRequestViewSet
+from onboarding.serializers import OwnerOnboardingV2Serializer
+from shifts.serializers import WorkerShiftRequestSerializer
+from shifts.worker_requests import WorkerShiftRequestViewSet
 
 
 class OnboardingRoleInvariantTests(TestCase):
