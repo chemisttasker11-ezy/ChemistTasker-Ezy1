@@ -87,7 +87,7 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`eb8b1b70c5b50117aa12a12dfb288a6fdd68018b`
+`b96438c52824ab9b079cefa5ba95bf4c2e5c7d9c`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
@@ -128,10 +128,15 @@ The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integrat
 30. Storage cleanup deliberately follows the E1b principle of deleting by captured storage path rather than mutating a bound FieldFile; no shared lifecycle module was changed in F1.
 31. Multipart attachment removal had a cardinality bug: shared-core submits repeated `remove_attachment_ids` values, but the backend used `QueryDict.get()`, so only the last requested attachment was removed.
 32. Added a two-attachment regression and switched removal parsing to `getlist()` when available, preserving plain mapping compatibility. One update now removes every requested attachment row and corresponding storage object.
+33. Final exact-head gate on `f445d12103e1cd4e12fb6254a27226ea4d161996` passed security, both CodeQL languages, architecture, boundary, shared-core, PostgreSQL migration/concurrency, kiosk, mobile, Vite and Next, but backend domain tests exposed four F1 issues before merge.
+34. One failure was a real availability defect: after the post DB transaction had committed, tagged-member email enqueue still propagated a Celery/Redis broker outage and turned a valid Hub post request into HTTP 500. Tag email dispatch is now best-effort with redacted exception-type logging; the durable in-app notification/post remain successful.
+35. The broker regression is deterministic: the scope-contract test now forces `pharmacy_hub.posts.async_task` to fail and requires the post/notification path to remain successful.
+36. The remaining backend failures were test-fixture corrections, not production semantics: the user-keyed platform-poll creator fixture is now OTP-verified as required by `platform_scope`, and profile-cover tests generate a real PNG through Pillow so DRF/ImageField validation exercises the intended replacement/cleanup path.
+37. Because code changed after `f445d121`, all green results from that SHA are supporting evidence only. The new exact head after this checkpoint must pass the full main-target gate again before #125 is marked ready or merged.
 
 ### F1 gate status
 
-Fresh post-E2 main-target CI must run on PR #125's current exact head after this checkpoint update. CodeQL and Public Repository Security were green on `d3a2b92`; that evidence became supporting-only after the reaction-identity fix. The new exact head must pass all final gates before merge.
+Fresh post-E2 main-target CI must run on PR #125's current exact head after this checkpoint update. The prior `f445d121` run was green everywhere except backend domain tests and directly produced fixes #34–36 above; all prior results are supporting evidence only. The new exact head must pass all final gates before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -268,7 +273,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `eb8b1b70c5b50117aa12a12dfb288a6fdd68018b`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `b96438c52824ab9b079cefa5ba95bf4c2e5c7d9c`.**
 
 1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff remains inside the reviewed/hardened F1 Pharmacy Hub code/test surface plus this progress document. `posts.py`, `scoping.py`, `serializers.py`, `test_api.py` and `test_hub_scope_contract.py` now also contain identity, mutation-atomicity and storage-lifecycle hardening.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
