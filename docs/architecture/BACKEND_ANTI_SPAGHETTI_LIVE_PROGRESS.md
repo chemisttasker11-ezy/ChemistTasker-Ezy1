@@ -273,6 +273,8 @@ Clean base: `main` at `27a6fb36030edb7d0dc4c76e5c770e1293609326`
 16. Because the assertion/documentation corrections changed the PR head, all prior green results are supporting evidence only. Fresh exact-head Shared Core/PostgreSQL/CodeQL/security must pass on the final head before merge.
 17. Senior API integration review found a locked-read edge: `TimesheetDetailView.GET` auto-rebuilt manager-visible rows when `needs_rebuild=True`. Normal locking prevents that flag, but a stale legacy/manual flag on a LOCKED row would invoke the correctly rejecting builder from a GET and could surface as HTTP 500.
 18. Added a red-first locked-detail regression. A LOCKED timesheet detail GET is now strictly read-only even with stale `needs_rebuild=True`: it returns the existing approved data, creates no revision and leaves the flag/status untouched. Explicit recalculate continues to return the locked-period validation error.
+19. Fresh exact-head backend on `08a851ff08492c107bef6e37134f1a686287171d` reached Workforce/Finance and exposed a test-fixture error before exercising the new locked-directory assertion: the regression referenced `projection.User`, but the reused fixture module does not expose that name in the CI import context.
+20. Corrected the regression to construct the extra worker through Django's `get_user_model()`. No F5 production code changed for this failure; prior PostgreSQL concurrency, CodeQL, security, architecture, boundary, shared-core, kiosk, mobile, Vite and Next evidence remains supporting-only until the new exact head passes the full final gate.
 
 ## Beyond E2 — deep review already completed
 
