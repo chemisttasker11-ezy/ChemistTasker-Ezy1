@@ -1,14 +1,16 @@
 """One shift of a published roster week: unpublish, edit, republish with a notification choice (owner decision)."""
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest import mock
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy, make_user
 from memberships.models import Membership
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
+from attendance.eligibility import EligibilityType, resolve_attendance_eligibility
 from workforce.models import RosterActionAudit, RosterPeriod
 from workforce.roster.serializers import RosterAssignmentSerializer
 from workforce.roster.publication import (
@@ -230,3 +232,29 @@ class RosterShiftRepublishTests(TestCase):
         self.assertEqual(open_after.status_code, 200, open_after.content)
         open_after_rows = open_after.data.get("results", open_after.data) if isinstance(open_after.data, dict) else open_after.data
         self.assertNotIn(vacant_shift.pk, {row["id"] for row in open_after_rows})
+
+    def test_unpublished_roster_assignment_cannot_confer_normal_clock_in_eligibility(self):
+        worker = self.workers[0]
+        assignment = ShiftSlotAssignment.objects.get(slot=self.slots[0])
+        target_time = timezone.make_aware(
+            datetime.combine(self.slots[0].date, time(10)),
+            timezone.get_current_timezone(),
+        )
+        before = resolve_attendance_eligibility(
+            worker,
+            self.pharmacy,
+            target_time=target_time,
+            assignment_id=assignment.pk,
+        )
+        self.assertTrue(before.is_eligible)
+        self.assertEqual(before.eligibility_type, EligibilityType.CONFIRMED_ASSIGNMENT)
+
+        unpublish_roster_shift(self.slots[0], self.owner)
+
+        after = resolve_attendance_eligibility(
+            worker,
+            self.pharmacy,
+            target_time=target_time,
+            assignment_id=assignment.pk,
+        )
+        self.assertNotEqual(after.eligibility_type, EligibilityType.CONFIRMED_ASSIGNMENT)

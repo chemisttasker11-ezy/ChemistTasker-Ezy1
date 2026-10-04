@@ -97,6 +97,8 @@ def is_draft_roster_assignment(assignment: ShiftSlotAssignment) -> bool:
     """
     if not getattr(assignment, "is_rostered", False):
         return False
+    if getattr(getattr(assignment, "slot", None), "unpublished_at", None) is not None:
+        return True
 
     slot_date = assignment.slot_date or getattr(assignment.slot, "date", None)
     if not slot_date:
