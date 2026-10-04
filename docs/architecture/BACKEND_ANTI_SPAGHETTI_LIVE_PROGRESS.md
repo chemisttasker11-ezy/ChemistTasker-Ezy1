@@ -85,8 +85,10 @@ This is the merge commit of **PR #123 / E1b**.
 
 Branch: `refactor/membership-services`
 
-Current reviewed head:
-`10a797e6eef290f95ec11c83c9e1e8f5bc5a5e18`
+Latest reviewed E2 code checkpoint before the documentation-only checkpoint commit:
+`c14036c108faba1caed1e1e9f1bd9839052b1471`
+
+> The authoritative exact branch head is PR #124's current head. This live file is itself updated by commits, so the branch head may be one documentation commit newer than the reviewed code checkpoint above.
 
 Base:
 `main` at `4b18d4b4708b9087208a811d6f417b2faf95f58b`
@@ -129,12 +131,17 @@ The reconciled main→E2 diff is intentionally limited to 8 files:
    - Application list + approve/reject now follow canonical organization capability + pharmacy scope.
    - Scoped Region/Chief may manage only assigned pharmacies; full ORG_ADMIN remains organization-wide.
 
-6. **Existing E2 duplicate response alert fix preserved**
+6. **Invite-link visibility union bug**
+   - Organization scope previously replaced separately-owned-pharmacy scope for invite-link listing.
+   - Org, owner and pharmacy-admin invite-management scopes are now additive.
+   - Added regression proving organization administration cannot hide invite links for a separately owned pharmacy.
+
+7. **Existing E2 duplicate response alert fix preserved**
    - Worker membership response no longer creates the same manager in-app alert twice.
 
 ### E2 exact-head gate status
 
-Fresh main-target workflows are running on `10a797e6...`.
+Fresh main-target workflows must be evaluated on PR #124's current exact head after the latest selector fixes and this checkpoint update.
 Do **not** merge using any older E2 green runs.
 
 ## Beyond E2 — deep review already completed
@@ -263,9 +270,9 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #124 / E2, exact head `10a797e6eef290f95ec11c83c9e1e8f5bc5a5e18`.**
+**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `c14036c108faba1caed1e1e9f1bd9839052b1471`.**
 
-1. Check the fresh main-target Shared Core Consolidation, PostgreSQL/concurrency, CodeQL and Public Repository Security results.
+1. Check the fresh main-target Shared Core Consolidation, PostgreSQL/concurrency, CodeQL and Public Repository Security results on the PR's current exact head.
 2. If any exact-head failure occurs, inspect/fix it regression-first and update this file.
 3. If all exact-head gates are green, mark #124 ready and merge guarded by exact head SHA.
 4. Update this file with the new main merge SHA.
