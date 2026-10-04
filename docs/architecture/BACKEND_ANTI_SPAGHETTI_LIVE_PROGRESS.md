@@ -541,6 +541,19 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 13. Rebuild final module-size baselines and merge #136 H3 LAST.
 14. Final architecture/release audit from final `main`.
 
+## Forward preflight prepared while H1 exact-head CI runs
+
+- H1 exact active head remains `36591782f41db09e1925ec2a2ef931e5e724fd4b`; do not modify it while its exact-head jobs are running.
+- Exact H2 preflight branch: `preflight/h2-after-h1-exact-20261004`.
+- H2 preflight base: H1 exact head `36591782f41db09e1925ec2a2ef931e5e724fd4b`.
+- H2 exact preflight head before this documentation commit: `89264b018130681e72856d34630156350f94a270`.
+- H2 diff is exactly seven reviewed semantic paths and `behind=0`: `core/serializer_lifecycle.py`, `core/test_backend_ownership_boundaries.py`, `core/websocket_testing.py`, `shifts/models.py`, `users/role_labels.py`, `users/serializers.py`, and `BACKEND_DOMAIN_DEPENDENCIES.md`.
+- Critical H2 preservation is already applied: E1b `storage.delete(name)` / path-based cleanup remains intact; only domain imports were moved inside `_known_file_references()`.
+- H2 reviewed code alignment: `websocket_testing.py`, `shifts/models.py`, `users/role_labels.py`, and `users/serializers.py` are aligned with the reviewed H2 target; the remaining files intentionally retain newer E1b/G3/G5 architecture protections.
+- Exact H3 mechanism preflight branch: `preflight/h3-mechanism-after-h2-exact-20261004`.
+- H3 mechanism adds exactly two files on top of H2: `core/test_module_size_ratchet.py` and one additive workflow step. Final numeric baselines are **not** final and must be regenerated from post-H2 `main`.
+- H3 workflow preflight preserves G1 admin-registry, G5 task-contract, and H1 signal/startup gates.
+
 ## NEXT ACTION
 
 **Resume at PR #135 / H1 from `reconcile/h1-signals-post-g5-20261004`. Current main is `87cfcfd890c264649955a399addf9561becd42c5`.**
