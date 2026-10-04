@@ -386,17 +386,19 @@ class HubScopeResolver:
         if membership:
             return membership
 
-        # Scoped organization admins (for example a Region/Chief Admin with
-        # MANAGE_COMMS on an explicitly assigned pharmacy) already have
-        # authority through their OrganizationMembership. Hub models support a
-        # direct user author, so do not manufacture a PharmacyAdmin/Membership
-        # merely to obtain an author_membership FK; doing so would permanently
-        # widen their pharmacy privileges beyond the canonical org scope.
+        # Control-plane authority already identifies the actor. Hub models
+        # carry an explicit user author/creator as well as the optional legacy
+        # Membership FK, so never manufacture or reactivate Membership /
+        # PharmacyAdmin state merely to populate author_membership. Apart from
+        # privilege widening for scoped admins, the old helper could turn a
+        # LEFT/REJECTED membership active again while leaving its status
+        # unchanged. Ordinary staff still arrive here with request_membership
+        # already resolved from their real active pharmacy membership.
         if (
-            scope["scope_type"] in {"pharmacy", "group"}
-            and scope.get("has_admin_permissions")
-            and not scope.get("is_owner")
-            and not scope.get("is_org_admin")
+            scope.get("has_admin_permissions")
+            or scope.get("has_group_admin_permissions")
+            or scope.get("is_owner")
+            or scope.get("is_org_admin")
         ):
             return None
 
