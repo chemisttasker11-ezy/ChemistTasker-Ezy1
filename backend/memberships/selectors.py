@@ -123,7 +123,11 @@ def visible_memberships(user, query_params):
 
 def visible_invite_links(user, query_params):
     """Active invite links visible through any independent invite-management scope."""
-    visible_pharmacies = _get_org_pharmacies_queryset(user)
+    # _get_org_pharmacies_queryset() is already distinct(). Wrap it in an
+    # outer non-distinct queryset before OR-combining owner/admin scopes;
+    # Django refuses to combine a unique queryset with a non-unique one.
+    org_scope_ids = _get_org_pharmacies_queryset(user).values_list("id", flat=True)
+    visible_pharmacies = Pharmacy.objects.filter(id__in=org_scope_ids)
 
     try:
         owner = OwnerOnboarding.objects.get(user=user)
