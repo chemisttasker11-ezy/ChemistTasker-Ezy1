@@ -114,6 +114,15 @@ class MembershipSerializer(serializers.ModelSerializer):
         role = attrs.get('role', getattr(self.instance, 'role', None))
         employment_type = attrs.get('employment_type', getattr(self.instance, 'employment_type', None))
 
+        if self.instance is not None:
+            immutable_errors = {}
+            if 'user' in attrs and attrs['user'].pk != self.instance.user_id:
+                immutable_errors['user'] = 'Membership user cannot be changed; create a new membership instead.'
+            if 'pharmacy' in attrs and attrs['pharmacy'].pk != self.instance.pharmacy_id:
+                immutable_errors['pharmacy'] = 'Membership pharmacy cannot be changed; create a new membership instead.'
+            if immutable_errors:
+                raise serializers.ValidationError(immutable_errors)
+
         if role == 'PHARMACY_ADMIN':
             raise serializers.ValidationError({
                 'role': 'Use the pharmacy admin management endpoints to assign admin roles.'
