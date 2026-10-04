@@ -374,6 +374,37 @@ class ResolverAndPermissionTests(HubFixture):
             "hub posting must not promote a scoped org role to PharmacyAdmin",
         )
 
+    def test_group_creator_loses_admin_access_when_current_pharmacy_scope_is_removed(self):
+        Resolver = resolver_class()
+        region_admin = self.users["region_admin"]
+        region_membership = OrganizationMembership.objects.get(
+            user=region_admin,
+            organization=self.org,
+        )
+        region_membership.pharmacies.add(self.pharmacy)
+
+        created = client_for(region_admin).post(
+            HUB + "groups/",
+            {
+                "pharmacy_id": self.pharmacy.id,
+                "name": "Scoped temporary group",
+                "description": "scope must remain current",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        group_id = created.json()["id"]
+        group = PharmacyCommunityGroup.objects.get(pk=group_id)
+        self.assertEqual(group.created_by_id, region_admin.id)
+        self.assertTrue(
+            Resolver(region_admin).group_scope(group_id)["has_group_admin_permissions"]
+        )
+
+        region_membership.pharmacies.clear()
+
+        with self.assertRaises(PermissionDenied):
+            Resolver(region_admin).group_scope(group_id)
+
     def test_control_plane_hub_authoring_does_not_reactivate_membership_or_create_admin(self):
         org_admin = self.users["org_admin"]
         stale = Membership.objects.create(
