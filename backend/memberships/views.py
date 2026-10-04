@@ -6,6 +6,7 @@ from organizations.models import (
     PharmacyAdmin,
 )
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
@@ -79,6 +80,33 @@ class MembershipViewSet(viewsets.ModelViewSet):
     def check_object_permissions(self, request, obj):
         if not user_can_change_membership(request.user, obj):
             self.permission_denied(request, message="Not allowed to modify this membership.")
+
+    def perform_update(self, serializer):
+        """Serialize generic reactivation against the cross-pharmacy membership cap.
+
+        DRF validates before perform_update(), so the serializer's normal cap
+        check alone can race across two pharmacies. Re-check the activation
+        transition under the same user -> membership lock order used by worker
+        self-acceptance.
+        """
+        original = serializer.instance
+        with transaction.atomic():
+            User.objects.select_for_update().only("pk").get(pk=original.user_id)
+            locked = Membership.objects.select_for_update().get(pk=original.pk)
+
+            will_be_active = serializer.validated_data.get("is_active", locked.is_active)
+            if will_be_active and not locked.is_active:
+                active_count = _count_active_memberships(
+                    locked.user,
+                    exclude_membership_id=locked.pk,
+                )
+                if active_count >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
+                    raise DRFValidationError({
+                        "is_active": f"User already belongs to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies."
+                    })
+
+            serializer.instance = locked
+            serializer.save()
 
 
     def destroy(self, request, *args, **kwargs):
