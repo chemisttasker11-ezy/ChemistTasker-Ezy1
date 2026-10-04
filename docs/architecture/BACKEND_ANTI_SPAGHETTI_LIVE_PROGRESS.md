@@ -86,7 +86,7 @@ This is the merge commit of **PR #123 / E1b**.
 Branch: `refactor/membership-services`
 
 Latest reviewed E2 code checkpoint before the documentation-only checkpoint commit:
-`c14036c108faba1caed1e1e9f1bd9839052b1471`
+`fbc283e5ee587a2aca4210ac43c9e6b481a51711`
 
 > The authoritative exact branch head is PR #124's current head. This live file is itself updated by commits, so the branch head may be one documentation commit newer than the reviewed code checkpoint above.
 
@@ -136,7 +136,12 @@ The reconciled main→E2 diff is intentionally limited to 8 files:
    - Org, owner and pharmacy-admin invite-management scopes are now additive.
    - Added regression proving organization administration cannot hide invite links for a separately owned pharmacy.
 
-7. **Existing E2 duplicate response alert fix preserved**
+7. **Owner-membership control-plane protection**
+   - The pharmacy owner's derived OWNER membership was reachable through the generic Membership PATCH/DELETE endpoint.
+   - A Manager (or the owner through the generic endpoint) could deactivate/delete it and rely on a later read to repair it.
+   - Generic membership mutation now refuses the pharmacy owner's membership; endpoint regression covers both Manager and owner callers.
+
+8. **Existing E2 duplicate response alert fix preserved**
    - Worker membership response no longer creates the same manager in-app alert twice.
 
 ### E2 exact-head gate status
@@ -270,7 +275,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `c14036c108faba1caed1e1e9f1bd9839052b1471`.**
+**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `fbc283e5ee587a2aca4210ac43c9e6b481a51711`.**
 
 1. Check the fresh main-target Shared Core Consolidation, PostgreSQL/concurrency, CodeQL and Public Repository Security results on the PR's current exact head.
 2. If any exact-head failure occurs, inspect/fix it regression-first and update this file.
