@@ -243,6 +243,36 @@ class MembershipVisibilityTests(MembershipFixture):
             "organization filtering must narrow the caller's authorized pharmacies, not widen them",
         )
 
+    def test_owner_membership_cannot_be_mutated_through_generic_membership_endpoint(self):
+        self.call(self.owner, "get", "my-memberships/")
+        owner_membership = Membership.objects.get(
+            user=self.owner,
+            pharmacy=self.pharmacy,
+        )
+        manager = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+
+        for label, actor in (("manager", manager), ("owner", self.owner)):
+            with self.subTest(actor=label):
+                patched, _ = self.call(
+                    actor,
+                    "patch",
+                    f"memberships/{owner_membership.id}/",
+                    {"is_active": False, "status": Membership.Status.LEFT},
+                )
+                self.assertEqual(patched.status_code, 403, patched.data)
+
+                deleted, _ = self.call(
+                    actor,
+                    "delete",
+                    f"memberships/{owner_membership.id}/",
+                )
+                self.assertEqual(deleted.status_code, 403, getattr(deleted, "data", None))
+
+        owner_membership.refresh_from_db()
+        self.assertEqual(owner_membership.role, "OWNER")
+        self.assertEqual(owner_membership.status, Membership.Status.ACCEPTED)
+        self.assertTrue(owner_membership.is_active)
+
     def test_removing_a_member(self):
         _, membership = self.member()
         response, _ = self.call(self.owner, "delete", f"memberships/{membership.id}/")
