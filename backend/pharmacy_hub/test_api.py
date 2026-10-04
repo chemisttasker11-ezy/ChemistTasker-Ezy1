@@ -556,6 +556,8 @@ class HubPollTests(HubBase):
 
     def test_user_keyed_platform_poll_creator_can_manage_their_poll(self):
         outsider = self.outsider
+        outsider.is_otp_verified = True
+        outsider.save(update_fields=["is_otp_verified"])
         create = client_for(outsider).post(
             POLLS,
             {
