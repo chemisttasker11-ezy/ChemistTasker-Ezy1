@@ -50,7 +50,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     CRUD for corporate Organizations.
      - LIST/RETRIEVE: any authenticated user
      - CREATE: superusers only
-     - UPDATE/DELETE: only ORG_ADMIN of that org
+     - UPDATE/DELETE: only organisation-wide admins (Org Admin / Chief Admin) of that org
     """
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
@@ -61,7 +61,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return [permissions.IsAdminUser()]
         # update, partial_update, destroy
-        self.required_roles = ['ORG_ADMIN', 'CHIEF_ADMIN', 'REGION_ADMIN']
+        self.required_roles = list(ORG_WIDE_ADMIN_ROLES)
         return [permissions.IsAuthenticated(), OrganizationRolePermission()]
 
 

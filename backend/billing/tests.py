@@ -127,3 +127,22 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(process_event.call_count, 2)
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
         self.assertIsNotNone(delivery.processed_at)
+
+class OrganizationBillingScopeTests(TestCase):
+    def test_unassigned_chief_does_not_gain_org_wide_billing_access(self):
+        from billing.utils import user_can_manage_billing_for_pharmacy
+        from organizations.models import Organization
+        from users.models import OrganizationMembership
+
+        organization = Organization.objects.create(name="Billing Org")
+        pharmacy = Pharmacy.objects.create(name="Billing Org Pharmacy", organization=organization)
+        chief = get_user_model().objects.create_user(email="chief-billing@example.test", role="ORG_STAFF")
+        OrganizationMembership.objects.create(
+            user=chief, organization=organization, role="CHIEF_ADMIN", admin_level="MANAGER",
+        )
+        self.assertFalse(user_can_manage_billing_for_pharmacy(chief, pharmacy))
+
+        org_admin = get_user_model().objects.create_user(email="org-billing@example.test", role="ORG_STAFF")
+        OrganizationMembership.objects.create(user=org_admin, organization=organization, role="ORG_ADMIN")
+        self.assertTrue(user_can_manage_billing_for_pharmacy(org_admin, pharmacy))
+

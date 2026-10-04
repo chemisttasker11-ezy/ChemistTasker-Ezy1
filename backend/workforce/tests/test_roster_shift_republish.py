@@ -74,3 +74,34 @@ class RosterShiftRepublishTests(TestCase):
         notify.assert_not_called()
         with self.assertRaises(ValidationError):
             republish_roster_shift(slot, self.owner)
+
+    def test_republish_requires_the_edited_shift_to_still_belong_to_a_published_week(self):
+        slot = self.slots[0]
+        unpublish_roster_shift(slot, self.owner)
+        slot.refresh_from_db()
+        slot.date = slot.date + timedelta(days=7)
+        slot.save()
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "This shift must belong to a published roster week before it can be republished.",
+        ):
+            republish_roster_shift(slot, self.owner, notify="none")
+
+        slot.refresh_from_db()
+        self.assertIsNotNone(slot.unpublished_at)
+        self.assertFalse(
+            RosterActionAudit.objects.filter(action_type=RosterActionAudit.ActionType.SHIFT_REPUBLISHED).exists()
+        )
+
+    def test_republish_notification_failure_is_non_fatal_after_commit(self):
+        slot = self.slots[0]
+        unpublish_roster_shift(slot, self.owner)
+        with mock.patch("notifications.services.notify_users", side_effect=RuntimeError("broker unavailable")):
+            with self.captureOnCommitCallbacks(execute=True):
+                republish_roster_shift(slot, self.owner, notify="worker")
+
+        slot.refresh_from_db()
+        self.assertIsNone(slot.unpublished_at)
+        audit = RosterActionAudit.objects.get(action_type=RosterActionAudit.ActionType.SHIFT_REPUBLISHED)
+        self.assertEqual(audit.details["slot_id"], slot.id)

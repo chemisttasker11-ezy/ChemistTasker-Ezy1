@@ -1055,6 +1055,43 @@ class VerificationArtifactTests(TestCase):
         self.assertIsNone(current.abn_entity_name)
         self.assertEqual(current.abn, "51824753556")
 
+    def test_abn_failed_lookup_preserves_previous_snapshot_and_marker(self):
+        name = "client_profile.tasks.verify_abn_task"
+        target = SimpleNamespace(
+            abn="51824753556",
+            abn_verified=False,
+            abn_entity_confirmed=False,
+            abn_verification_note="",
+            abn_entity_name="PREVIOUS ENTITY",
+            abn_entity_type="Previous type",
+            abn_status="Active",
+            abn_gst_registered=True,
+            abn_gst_from=date(2022, 1, 1),
+            abn_gst_to=None,
+            abn_last_checked=datetime(2026, 9, 1, tzinfo=dt_timezone.utc),
+            abn_details_for="11111111111",
+            save=mock.Mock(),
+        )
+        overrides = {
+            "fetch_instance_with_retries": lambda model, pk: target,
+            "_fetch_instance_for_update": lambda model, pk: target,
+            "abn_lookup": lambda abn: (None, None),
+        }
+        with patch_impl(name, **overrides):
+            task(name).run(
+                "PharmacistOnboarding", 1, "51824753556", "Ann", "Lee", "a@example.com",
+                note_field="abn_verification_note",
+            )
+        self.assertEqual(target.abn_entity_name, "PREVIOUS ENTITY")
+        self.assertEqual(target.abn_entity_type, "Previous type")
+        self.assertTrue(target.abn_gst_registered)
+        self.assertEqual(target.abn_details_for, "11111111111")
+        self.assertEqual(
+            target.abn_verification_note,
+            "Failed to fetch ABN details. ABN may be invalid or ABR site unavailable.",
+        )
+        self.assertFalse(target.abn_verified)
+
     def test_abn_verification_persists_fields_and_writes_no_artifacts(self):
         # The ABR page and a JSON copy of the parsed fields were written to verification_outputs/ after the fields were
         # already saved. Nothing reads them (full-repository reference scan), so the task no longer writes them.

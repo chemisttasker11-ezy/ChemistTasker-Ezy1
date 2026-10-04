@@ -248,7 +248,7 @@ class RegionDelegationTests(TestCase):
         self.assertEqual(deletion.status_code, 403)
         self.assertTrue(OrganizationMembership.objects.filter(id=chief.id).exists())
 
-    def test_chief_can_promote_self_to_org_admin(self):
+    def test_chief_cannot_promote_self_to_org_admin(self):
         self.membership.role = 'CHIEF_ADMIN'
         self.membership.admin_level = 'MANAGER'
         self.membership.save(update_fields=['role', 'admin_level'])
@@ -256,9 +256,9 @@ class RegionDelegationTests(TestCase):
             f'/api/users/organization-memberships/{self.membership.id}/',
             {'role': 'ORG_ADMIN'}, content_type='application/json'
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         self.membership.refresh_from_db()
-        self.assertEqual(self.membership.role, 'ORG_ADMIN')
+        self.assertEqual(self.membership.role, 'CHIEF_ADMIN')
 
     def test_chief_delegates_across_the_whole_organisation_but_not_org_admin(self):
         # Chief admins are organisation-wide: any pharmacy of the organisation is inside their scope.
@@ -279,6 +279,21 @@ class RegionDelegationTests(TestCase):
         outside_org = Pharmacy.objects.create(name='Outside Pharmacy', organization=Organization.objects.create(name='Elsewhere'))
         foreign = self.invite(email='foreign@example.com', pharmacies=[outside_org.id])
         self.assertIn(foreign.status_code, (400, 403), foreign.content)
+
+    def test_region_cannot_update_organization_record_but_chief_can(self):
+        update_url = f'/api/client-profile/organizations/{self.organization.id}/'
+        denied = self.client.patch(update_url, {'name': 'Region Rename'}, content_type='application/json')
+        self.assertEqual(denied.status_code, 403)
+        self.organization.refresh_from_db()
+        self.assertEqual(self.organization.name, 'Regional Group')
+
+        self.membership.role = 'CHIEF_ADMIN'
+        self.membership.admin_level = 'MANAGER'
+        self.membership.save(update_fields=['role', 'admin_level'])
+        allowed = self.client.patch(update_url, {'name': 'Chief Rename'}, content_type='application/json')
+        self.assertEqual(allowed.status_code, 200, allowed.content)
+        self.organization.refresh_from_db()
+        self.assertEqual(self.organization.name, 'Chief Rename')
 
     def test_org_admin_payload_lists_only_verified_org_pharmacies(self):
         outside_org = Organization.objects.create(name='Other Group')

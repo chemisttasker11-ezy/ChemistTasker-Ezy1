@@ -274,7 +274,7 @@ class RosterShiftUnpublishView(APIView):
         try:
             slot = unpublish_roster_shift(slot, request.user)
         except DjangoPermissionDenied as e:
-            raise PermissionDenied(str(e))
+            raise PermissionDenied("You are not authorized to change rosters for this pharmacy.")
         except DjangoValidationError as e:
             return Response({"error": " ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"slot_id": slot.pk, "is_unpublished": True, "unpublished_at": slot.unpublished_at.isoformat()})
@@ -293,7 +293,7 @@ class RosterShiftRepublishView(APIView):
         try:
             slot = republish_roster_shift(slot, request.user, notify=request.data.get("notify", "worker"))
         except DjangoPermissionDenied as e:
-            raise PermissionDenied(str(e))
+            raise PermissionDenied("You are not authorized to change rosters for this pharmacy.")
         except DjangoValidationError as e:
             return Response({"error": " ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"slot_id": slot.pk, "is_unpublished": False})

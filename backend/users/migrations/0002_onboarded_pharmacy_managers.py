@@ -27,6 +27,7 @@ ONBOARDING_JOB_TITLE = "Pharmacy Onboarding Admin"
 def convert_onboarded_chief_admins(apps, schema_editor):
     OrganizationMembership = apps.get_model("users", "OrganizationMembership")
     PharmacyAdmin = apps.get_model("client_profile", "PharmacyAdmin")
+    Membership = apps.get_model("client_profile", "Membership")
     User = apps.get_model("users", "User")
     db = schema_editor.connection.alias
 
@@ -49,6 +50,11 @@ def convert_onboarded_chief_admins(apps, schema_editor):
             continue
 
         for assignment in assignments:
+            if assignment.membership_id:
+                Membership.objects.using(db).filter(
+                    pk=assignment.membership_id,
+                    role="OWNER",
+                ).update(role="CONTACT")
             owner = assignment.pharmacy.owner
             if assignment.admin_level == "OWNER" and getattr(owner, "user_id", None) != membership.user_id:
                 assignment.admin_level = "MANAGER"

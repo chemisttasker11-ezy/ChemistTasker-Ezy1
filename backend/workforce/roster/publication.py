@@ -224,14 +224,18 @@ def republish_roster_shift(slot, user, notify="worker"):
         locked = ShiftSlot.objects.select_for_update().select_related("shift__pharmacy").get(pk=slot.pk)
         if not locked.unpublished_at:
             raise ValidationError("This shift is not unpublished.")
-        ShiftSlot.objects.filter(pk=locked.pk).update(unpublished_at=None)
-        locked.unpublished_at = None
         pharmacy = locked.shift.pharmacy
         period = _published_roster_period(pharmacy.pk, locked.date)
+        if period is None:
+            raise ValidationError(
+                "This shift must belong to a published roster week before it can be republished."
+            )
+        ShiftSlot.objects.filter(pk=locked.pk).update(unpublished_at=None)
+        locked.unpublished_at = None
         slot_workers = _slot_worker_ids(locked)
         if notify == "worker":
             recipients = slot_workers
-        elif notify == "team" and period is not None:
+        elif notify == "team":
             recipients = list(get_roster_period_assignments(period).values_list("user_id", flat=True).distinct())
         else:
             recipients = []
@@ -241,7 +245,7 @@ def republish_roster_shift(slot, user, notify="worker"):
             performed_by=user,
             details={
                 "slot_id": locked.pk,
-                "period_id": getattr(period, "pk", None),
+                "period_id": period.pk,
                 "notify": notify,
                 "notified_user_ids": recipients,
             },
@@ -266,5 +270,5 @@ def republish_roster_shift(slot, user, notify="worker"):
                 )
 
         if recipients:
-            transaction.on_commit(_notify)
+            transaction.on_commit(_notify, robust=True)
         return locked

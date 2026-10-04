@@ -92,7 +92,6 @@ def _serialize_user_summary(user, request):
         "username": getattr(user, "username", None),
         "first_name": getattr(user, "first_name", None),
         "last_name": getattr(user, "last_name", None),
-        "email": getattr(user, "email", None),
         "profile_photo_url": _build_absolute_media_url(request, photo),
     }
 
@@ -249,11 +248,14 @@ class HubMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_user_details(self, obj):
-        return _chat_member_identity(
+        identity = _chat_member_identity(
             getattr(obj, "user", None),
             self.context.get("request"),
             obj,
         )
+        if identity:
+            identity.pop("email", None)
+        return identity
 
 
 class PharmacyCommunityGroupMemberSerializer(serializers.ModelSerializer):

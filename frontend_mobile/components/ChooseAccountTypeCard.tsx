@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button, HelperText, Surface, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import apiClient from '@/utils/apiClient';
+import { chooseAccountType } from '@chemisttasker/shared-core';
 
 // A pharmacy-manager account (a pharmacy contact onboarded by an organisation) may add its own profile once.
 const ACCOUNT_TYPES = [
@@ -24,7 +24,7 @@ export default function ChooseAccountTypeCard() {
     setSaving(role);
     setError(null);
     try {
-      await apiClient.post('/users/me/account-type/', { role });
+      await chooseAccountType(role);
       await refreshUser();
       router.replace(onboardingPath as any);
     } catch (err: any) {

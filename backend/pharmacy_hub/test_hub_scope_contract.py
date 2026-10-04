@@ -400,6 +400,11 @@ class ResolverAndPermissionTests(HubFixture):
             format="json",
         )
         self.assertEqual(created.status_code, 201, created.content)
+        self.assertNotIn(
+            "email",
+            created.json()["author"]["user_details"],
+            "Hub author payloads expose display identity, not contact e-mail",
+        )
         self.assertEqual(
             Membership.objects.filter(user=region).count(),
             memberships_before,

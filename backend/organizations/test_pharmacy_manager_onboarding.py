@@ -89,12 +89,12 @@ class OnboardedChiefAdminMigrationTests(TestCase):
         membership.pharmacies.add(self.pharmacy)
         if with_assignment:
             pharmacy_membership = Membership.objects.create(
-                user=user, pharmacy=self.pharmacy, role="CONTACT", employment_type="FULL_TIME",
+                user=user, pharmacy=self.pharmacy, role="OWNER", employment_type="FULL_TIME",
                 status=Membership.Status.ACCEPTED, is_active=True,
             )
             PharmacyAdmin.objects.create(
                 user=user, pharmacy=self.pharmacy, membership=pharmacy_membership,
-                admin_level=PharmacyAdmin.AdminLevel.MANAGER, is_active=True,
+                admin_level=PharmacyAdmin.AdminLevel.OWNER, is_active=True,
             )
         return user, membership
 
@@ -111,6 +111,11 @@ class OnboardedChiefAdminMigrationTests(TestCase):
         assignment = PharmacyAdmin.objects.get(user=user, pharmacy=self.pharmacy)
         self.assertTrue(assignment.is_active)
         self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(
+            Membership.objects.get(user=user, pharmacy=self.pharmacy).role,
+            "CONTACT",
+            "the legacy OWNER membership must become the same CONTACT membership created by the new flow",
+        )
 
     def test_other_chief_admins_are_untouched(self):
         _user, real_chief = self.legacy_onboarded(job_title="Chief Operations Officer")

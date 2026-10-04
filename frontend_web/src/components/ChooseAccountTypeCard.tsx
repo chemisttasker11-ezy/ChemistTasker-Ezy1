@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Card, CardContent, Stack, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import apiClient from "../utils/apiClient";
+import { chooseAccountType } from "@chemisttasker/shared-core";
 
 // A pharmacy-manager account (a pharmacy contact onboarded by an organisation) may add its own profile once.
 const ACCOUNT_TYPES = [
@@ -23,8 +23,8 @@ export default function ChooseAccountTypeCard() {
     setSaving(role);
     setError(null);
     try {
-      const response = await apiClient.post("/users/me/account-type/", { role });
-      const onboardingUrl: string = response.data?.onboarding_url ?? "";
+      const response = await chooseAccountType(role);
+      const onboardingUrl: string = response?.onboarding_url ?? "";
       setUser((previous) => (previous ? { ...previous, role } : previous));
       navigate(onboardingUrl ? new URL(onboardingUrl, window.location.origin).pathname : "/dashboard");
     } catch (err: any) {

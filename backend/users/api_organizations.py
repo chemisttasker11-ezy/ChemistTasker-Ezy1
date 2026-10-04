@@ -30,13 +30,10 @@ from django.shortcuts import get_object_or_404
 User = get_user_model()
 
 
-def _enforce_org_delegation(actor_membership, *, role, admin_level, region, pharmacy_ids, existing=None, allow_self_promotion=False):
+def _enforce_org_delegation(actor_membership, *, role, admin_level, region, pharmacy_ids, existing=None):
     """Scoped admins cannot delegate a higher role, level, or pharmacy scope."""
     actor_role = actor_membership.role
     if actor_role not in {'CHIEF_ADMIN', 'REGION_ADMIN'}:
-        return
-    if (actor_role == 'CHIEF_ADMIN' and allow_self_promotion and existing and
-            existing.pk == actor_membership.pk and role == 'ORG_ADMIN'):
         return
     # Chief admins reach every pharmacy of their organisation; region admins only their assigned ones.
     actor_ids = set(membership_visible_pharmacy_ids(actor_membership))
@@ -497,7 +494,6 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
                 region=serializer.validated_data.get('region', instance.region),
                 pharmacy_ids=requested_pharmacies if requested_pharmacies is not None else instance.pharmacies.values_list('id', flat=True),
                 existing=instance,
-                allow_self_promotion=True,
             )
         if instance.role == 'ORG_ADMIN' and new_role != 'ORG_ADMIN':
             remaining = OrganizationMembership.objects.filter(

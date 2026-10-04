@@ -775,8 +775,8 @@ class TimesheetPeriodCorrectView(APIView):
             })
         except TimesheetPeriod.DoesNotExist:
             return Response({"error": "Timesheet period not found."}, status=status.HTTP_404_NOT_FOUND)
-        except DjangoPermissionDenied as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DjangoPermissionDenied:
+            return Response({"error": "You do not have permission to correct this timesheet period."}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             return _validation_response(exc)
 
