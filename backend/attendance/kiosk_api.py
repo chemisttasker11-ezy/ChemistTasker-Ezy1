@@ -101,11 +101,29 @@ class KioskRequestPairingCodeView(APIView):
                 user=request.user, is_active=True,
                 admin_level__in=[PharmacyAdmin.AdminLevel.OWNER, PharmacyAdmin.AdminLevel.MANAGER],
             ).values_list("pharmacy_id", flat=True)
-            org_ids = OrganizationMembership.objects.filter(
-                user=request.user, role="ORG_ADMIN",
-            ).values_list("organization_id", flat=True)
+
+            org_memberships = list(
+                OrganizationMembership.objects.filter(
+                    user=request.user,
+                    role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"],
+                ).prefetch_related("pharmacies")
+            )
+            org_ids = {
+                membership.organization_id
+                for membership in org_memberships
+                if membership.role == "ORG_ADMIN"
+            }
+            scoped_pharmacy_ids = {
+                pharmacy.pk
+                for membership in org_memberships
+                if membership.role in {"CHIEF_ADMIN", "REGION_ADMIN"}
+                for pharmacy in membership.pharmacies.all()
+            }
             pharmacies = pharmacies.filter(
-                Q(owner__user=request.user) | Q(pk__in=admin_ids) | Q(organization_id__in=org_ids)
+                Q(owner__user=request.user)
+                | Q(pk__in=admin_ids)
+                | Q(organization_id__in=org_ids)
+                | Q(pk__in=scoped_pharmacy_ids)
             )
         return Response({"pharmacies": [{"id": pharmacy.pk, "name": pharmacy.name,
                                          "timezone": pharmacy.timezone}
