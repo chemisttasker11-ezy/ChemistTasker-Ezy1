@@ -122,17 +122,16 @@ def visible_memberships(user, query_params):
 
 
 def visible_invite_links(user, query_params):
-    """Active invite links of the pharmacies the user owns or administers (organization scope, else owned
-    pharmacies; plus pharmacies where they hold the manage-staff capability)."""
-    # Owners see own pharmacies; Org-Admins see org; Pharmacy Admins see their pharmacies
-    # mirror visibility logic from MembershipViewSet.get_queryset
+    """Active invite links visible through any independent invite-management scope."""
     visible_pharmacies = _get_org_pharmacies_queryset(user)
-    if not visible_pharmacies.exists():
-        try:
-            owner = OwnerOnboarding.objects.get(user=user)
-            visible_pharmacies = Pharmacy.objects.filter(owner=owner)
-        except OwnerOnboarding.DoesNotExist:
-            visible_pharmacies = Pharmacy.objects.none()
+
+    try:
+        owner = OwnerOnboarding.objects.get(user=user)
+    except OwnerOnboarding.DoesNotExist:
+        owner = None
+    if owner is not None:
+        visible_pharmacies |= Pharmacy.objects.filter(owner=owner)
+
     admin_scoped_ids = [
         pharm.id
         for pharm in pharmacies_user_admins(user)
@@ -140,6 +139,7 @@ def visible_invite_links(user, query_params):
     ]
     if admin_scoped_ids:
         visible_pharmacies |= Pharmacy.objects.filter(id__in=admin_scoped_ids)
+
     visible_pharmacies = visible_pharmacies.distinct()
     qs = MembershipInviteLink.objects.filter(pharmacy__in=visible_pharmacies, is_active=True)
     pid = query_params.get('pharmacy')
