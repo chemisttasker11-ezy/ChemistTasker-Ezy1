@@ -1,5 +1,8 @@
 """Hub posts with their comments and reactions."""
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from core.task_queue import async_task
@@ -20,6 +23,46 @@ from pharmacy_hub.serializers import HubCommentSerializer, HubPostSerializer, Hu
 from pharmacy_hub.access import HubScopeResolver
 from pharmacy_hub.notifications import _build_hub_post_action_params, _build_hub_post_action_url, _get_user_display_name, _notify_hub_post_owner
 from pharmacy_hub.scoping import HubAttachmentMixin, HubScopedViewSetMixin
+
+
+User = get_user_model()
+
+
+def _identity_reactions_for_update(queryset, user):
+    """Lock and return every reaction row representing one human user."""
+    User.objects.select_for_update().only("pk").get(pk=user.pk)
+    return list(
+        queryset.select_for_update()
+        .filter(Q(user_id=user.id) | Q(member__user_id=user.id))
+        .order_by("id")
+    )
+
+
+def _upsert_identity_reaction(queryset, *, user, member, reaction_type, create_kwargs):
+    with transaction.atomic():
+        reactions = _identity_reactions_for_update(queryset, user)
+        reaction = reactions[0] if reactions else None
+        for duplicate in reactions[1:]:
+            duplicate.delete()
+        if reaction is None:
+            identity = {"member": member} if member else {"user": user}
+            reaction = queryset.model.objects.create(
+                **create_kwargs,
+                **identity,
+                reaction_type=reaction_type,
+            )
+        elif reaction.reaction_type != reaction_type:
+            reaction.reaction_type = reaction_type
+            reaction.updated_at = timezone.now()
+            reaction.save(update_fields=["reaction_type", "updated_at"])
+        return reaction
+
+
+def _delete_identity_reactions(queryset, *, user):
+    with transaction.atomic():
+        reactions = _identity_reactions_for_update(queryset, user)
+        for reaction in reactions:
+            reaction.delete()
 
 
 class HubPostViewSet(HubAttachmentMixin, HubScopedViewSetMixin, viewsets.ModelViewSet):
@@ -435,17 +478,12 @@ class HubReactionView(APIView):
         serializer = HubReactionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reaction_type = serializer.validated_data["reaction_type"]
-        lookup = {"post": post}
-        if membership:
-            lookup["member"] = membership
-        else:
-            lookup["user"] = request.user
-        PharmacyHubReaction.objects.update_or_create(
-            **lookup,
-            defaults={
-                "reaction_type": reaction_type,
-                "updated_at": timezone.now(),
-            },
+        _upsert_identity_reaction(
+            PharmacyHubReaction.objects.filter(post=post),
+            user=request.user,
+            member=membership,
+            reaction_type=reaction_type,
+            create_kwargs={"post": post},
         )
         post.recompute_reaction_summary()
         actor_user = getattr(membership, "user", None) or request.user
@@ -477,12 +515,11 @@ class HubReactionView(APIView):
         resolver = HubScopeResolver(request.user)
         scope = resolver.from_post(post)
         membership = scope.get("request_membership")
-        if membership:
-            PharmacyHubReaction.objects.filter(post=post, member=membership).delete()
-        else:
-            PharmacyHubReaction.objects.filter(post=post, user=request.user).delete()
-        if membership or request.user.is_authenticated:
-            post.recompute_reaction_summary()
+        _delete_identity_reactions(
+            PharmacyHubReaction.objects.filter(post=post),
+            user=request.user,
+        )
+        post.recompute_reaction_summary()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -521,17 +558,12 @@ class HubCommentReactionView(APIView):
         serializer = HubReactionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reaction_type = serializer.validated_data["reaction_type"]
-        lookup = {"comment": comment}
-        if membership:
-            lookup["member"] = membership
-        else:
-            lookup["user"] = request.user
-        PharmacyHubCommentReaction.objects.update_or_create(
-            **lookup,
-            defaults={
-                "reaction_type": reaction_type,
-                "updated_at": timezone.now(),
-            },
+        _upsert_identity_reaction(
+            PharmacyHubCommentReaction.objects.filter(comment=comment),
+            user=request.user,
+            member=membership,
+            reaction_type=reaction_type,
+            create_kwargs={"comment": comment},
         )
         comment.recompute_reaction_summary()
         serializer_context = self._serializer_context(scope, membership)
@@ -543,14 +575,10 @@ class HubCommentReactionView(APIView):
         resolver = HubScopeResolver(request.user)
         scope = resolver.from_post(comment.post)
         membership = scope.get("request_membership")
-        if membership:
-            PharmacyHubCommentReaction.objects.filter(
-                comment=comment, member=membership
-            ).delete()
-        else:
-            PharmacyHubCommentReaction.objects.filter(
-                comment=comment, user=request.user
-            ).delete()
+        _delete_identity_reactions(
+            PharmacyHubCommentReaction.objects.filter(comment=comment),
+            user=request.user,
+        )
         comment.recompute_reaction_summary()
         serializer_context = self._serializer_context(scope, membership)
         response = HubCommentSerializer(comment, context=serializer_context)
