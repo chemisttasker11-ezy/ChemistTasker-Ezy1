@@ -182,14 +182,15 @@ class HubPostTests(HubBase):
         stored_name = attachment.file.name
         self.assertTrue(default_storage.exists(stored_name))
 
-        removed = client_for(self.staff).patch(
-            f"{POSTS}{post_id}/",
-            {
-                "body": "attachment cleanup",
-                "remove_attachment_ids": [attachment.id],
-            },
-            format="multipart",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            removed = client_for(self.staff).patch(
+                f"{POSTS}{post_id}/",
+                {
+                    "body": "attachment cleanup",
+                    "remove_attachment_ids": [attachment.id],
+                },
+                format="multipart",
+            )
         self.assertEqual(removed.status_code, 200, removed.content)
         self.assertFalse(
             PharmacyHubAttachment.objects.filter(pk=attachment.id).exists()
