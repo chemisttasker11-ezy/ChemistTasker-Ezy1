@@ -86,7 +86,7 @@ This is the merge commit of **PR #123 / E1b**.
 Branch: `refactor/membership-services`
 
 Latest reviewed E2 code checkpoint before the documentation-only checkpoint commit:
-`fbc283e5ee587a2aca4210ac43c9e6b481a51711`
+`c8616e6945363b252846265d01f74f78d435d581`
 
 > The authoritative exact branch head is PR #124's current head. This live file is itself updated by commits, so the branch head may be one documentation commit newer than the reviewed code checkpoint above.
 
@@ -141,7 +141,16 @@ The reconciled main→E2 diff is intentionally limited to 8 files:
    - A Manager (or the owner through the generic endpoint) could deactivate/delete it and rely on a later read to repair it.
    - Generic membership mutation now refuses the pharmacy owner's membership; endpoint regression covers both Manager and owner callers.
 
-8. **Existing E2 duplicate response alert fix preserved**
+8. **Membership identity immutability**
+   - The generic serializer exposed writable `user` and `pharmacy` fields after object permission was checked against the old record.
+   - PATCH can no longer reassign a membership to another user or move it to another pharmacy; regression coverage requires 400 and unchanged identity.
+
+9. **Generic reactivation cap locking**
+   - Admin PATCH reactivation previously relied on the serializer's unlocked max-active-membership count and could race across pharmacies.
+   - `MembershipViewSet.perform_update()` now re-checks activation under the same user -> membership row-lock order used by self-accept.
+   - PostgreSQL lock-contract coverage pins both locks and their order.
+
+10. **Existing E2 duplicate response alert fix preserved**
    - Worker membership response no longer creates the same manager in-app alert twice.
 
 ### E2 exact-head gate status
@@ -275,7 +284,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `fbc283e5ee587a2aca4210ac43c9e6b481a51711`.**
+**Resume at PR #124 / E2. First fetch the PR's current exact head; latest reviewed code checkpoint is `c8616e6945363b252846265d01f74f78d435d581`.**
 
 1. Check the fresh main-target Shared Core Consolidation, PostgreSQL/concurrency, CodeQL and Public Repository Security results on the PR's current exact head.
 2. If any exact-head failure occurs, inspect/fix it regression-first and update this file.
