@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`
+`9e11f97250bd4ddce1b9781663cf58962444371b`
 
-This is the merge commit of **PR #130 / G1 domain-admin ownership split**.
+This is the merge commit of **PR #131 / G2 dashboard serializer cleanup**.
 
 ### Merged sequence completed during this senior review
 
@@ -43,6 +43,7 @@ This is the merge commit of **PR #130 / G1 domain-admin ownership split**.
 - #128 F4 roster services split
 - #129 F5 timesheet split + PostgreSQL lock-order/locked-manifest/read-only hardening
 - #130 G1 domain-admin ownership split + focused admin-registry contract
+- #131 G2 dashboard serializer cleanup + ownership/docs contraction
 
 ## Important senior-review fixes already landed in main
 
@@ -304,21 +305,42 @@ Clean base: `main` at `a589c727d4cdc1ef71cd6611ee26f837cdb013ed`
 12. Exact-head Public Repository Security, both CodeQL languages, architecture, boundary, shared-core, backend (including the narrowed 18-model admin registry contract), PostgreSQL concurrency, kiosk, mobile, Vite, Next and release-gate all passed green.
 13. #130 was marked ready only after exact-head completion and merged with SHA guard `04df39d1f7f0f1045f646b41b8987f3bee6f85be`. Merge commit: `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`.
 
-## ACTIVE PR — #131 / G2 dashboard serializer cleanup
+## COMPLETED — #131 / G2 dashboard serializer cleanup
 
-Original PR head reviewed: `c7bfbfd608985f5aa562b8b605698633f1d64f8e`
-Clean reconciliation branch: `reconcile/g2-dashboard-post-g1-20261004`
-Clean base: `main` at `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`
+Final reviewed head: `cc301d97127e6a7ae81d2caa72eb5d69bf4e6d6f`
+Merge commit: `9e11f97250bd4ddce1b9781663cf58962444371b`
 
-### G2 reconciliation and senior review
+### G2 final senior result
 
-1. Rebuilt from G1-merged main as an exact **three-file semantic delta**, `behind=0`: delete `client_profile/domains/dashboards/serializers.py`, tighten the kernel ownership baseline, and update the architecture inventory.
-2. Reference scan confirmed all five deleted response serializer names appear only in the dead serializer module and the ownership baseline. No runtime caller, URL, task, migration, shared-core client or test consumer uses them.
-3. The original G2 P3 review correctly noted that the architecture doc still said the serializer should be removed “later.” The reconciled branch fixes that documentation in the same change.
-4. Kernel code-line ceiling drops from 625 to 591 and the deleted module's top-level definitions are removed from the ratchet; no unrelated kernel baseline is changed.
-5. G2 does not touch runtime endpoint behavior, serializers actually used by dashboards, model ownership, routes or client contracts.
-6. Fresh exact-head CI/security is still required after moving PR #131.
-7. Senior activation audit found #131 was still stacked on the G1 branch after G1 merged. The PR base has been explicitly retargeted to `main` at `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`; any runs created before that retarget are not merge evidence. This checkpoint commit intentionally triggers a fresh synchronize event on the corrected main-target PR.
+1. Clean post-G1 three-file semantic delta plus progress document; final branch was `behind=0`.
+2. Deleted only the proven-dead dashboard response serializer facade.
+3. Tightened the kernel ownership baseline and corrected the architecture inventory in the same change.
+4. Original P3 architecture-doc review thread was resolved against the corrected head.
+5. Exact-head Public Repository Security, both CodeQL languages, shared-core, backend, boundary, architecture, PostgreSQL concurrency, kiosk, mobile, Vite, Next and release-gate all passed green.
+6. #131 merged from exact reviewed head `cc301d97127e6a7ae81d2caa72eb5d69bf4e6d6f`.
+
+## ACTIVE PR — #132 / G3 compatibility-kernel contraction
+
+Original reviewed PR head: `4bf4803a3bbfdb9787564444c804f2f1629041e2`
+Senior preflight head: `c3d3d5279a52b11deef8dd0440cea5b245e74b9d`
+Clean reconciliation branch: `reconcile/g3-contraction-post-g2-20261004`
+Clean base: `main` at `9e11f97250bd4ddce1b9781663cf58962444371b`
+
+### G3 reconciliation and senior review
+
+1. Rebuilt from G2-merged main as one controlled tree commit, not by merging old stacked history.
+2. Exact diff is **87 reviewed paths**, `behind=0`: 61 removals, 21 modifications, 4 additions and 1 rename.
+3. Real post-G2 branch has **zero blob mismatches** versus the senior-reviewed G3 preflight branch for every touched file.
+4. Compared the preflight against the original reviewed G3 target: **85/87 changed files are blob-identical**. The only intentional newer differences are:
+   - `backend/client_profile/test_postgres_concurrency.py`, preserving E2 membership-cap locking plus F5 timesheet PostgreSQL coverage.
+   - `backend/core/test_serializer_lifecycle_ownership.py`, preserving E1b path-based storage cleanup regression while replacing only the deleted-facade ownership assertion.
+5. Reference scans prove deleted `client_profile` facade families have no hidden runtime callers. Remaining references are exactly tests/docs G3 repoints or deletes.
+6. `client_profile/domains/common/access.py` intentionally remains as the one pinned legacy access seam; its package docstring is narrowed accordingly.
+7. G1-owned domain admin modules are self-contained; deleting `client_profile/admin.py` and `client_profile/admin_helpers.py` does not break admin startup.
+8. Kernel ownership ratchet is updated surgically: only entries for actually deleted modules are removed; code-line ceiling contracts from 591 to 296.
+9. App-registration tests are added for memberships/onboarding/organizations/shifts, and membership role-label coverage is moved from the deleted compatibility path to the owning app.
+10. Runtime/client behavior is unchanged; this is a compatibility-kernel contraction plus test/import-owner correction.
+11. Fresh exact-head CI/security is still required after moving PR #132.
 
 ## Beyond E2 — deep review already completed
 
@@ -372,10 +394,13 @@ Merge commit: `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`.
 - Full exact-head gate including the focused admin-registry contract and release-gate: green.
 
 ### #131 G2 dashboard serializer cleanup
-Active clean reconciliation on G1-merged main.
-- Exact three-file semantic delta, `behind=0`.
-- Reference scan proves the five response serializers are dead.
-- Architecture inventory P3 is fixed in the same branch.
+Merged after clean post-G1 reconciliation and full exact-head verification.
+Final reviewed head: `cc301d97127e6a7ae81d2caa72eb5d69bf4e6d6f`.
+Merge commit: `9e11f97250bd4ddce1b9781663cf58962444371b`.
+- Exact three-file semantic delta plus progress document.
+- Dead serializer reference scan clean.
+- Architecture inventory P3 resolved.
+- Full exact-head gate including release-gate: green.
 
 ### #132 G3 client_profile contraction
 Deep-reviewed; fresh review clean.
@@ -446,11 +471,18 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #131 / G2 dashboard serializer cleanup from `reconcile/g2-dashboard-post-g1-20261004`. Current main is `cd8c6d4e319d0c6ca1109fb10b67fba02b1c9b21`.**
+**Resume at PR #132 / G3 from `reconcile/g3-contraction-post-g2-20261004`. Current main is `9e11f97250bd4ddce1b9781663cf58962444371b`.**
 
-1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head remains `behind=0`; expected diff is the three reviewed G2 files plus this progress document.
-2. Atomically move PR #131's branch to the reconciliation head; do not carry old stacked history.
-3. Recheck/resolve the old P3 documentation thread against the new head.
-4. Run fresh exact-head Shared Core Consolidation, CodeQL and Public Repository Security.
-5. While G2 gates run, continue the already-built G3/G4/G5/H1/H2 preflight stack on isolated branches; do not modify the G2 exact head.
-6. If all exact-head gates are green, mark #131 ready and merge with exact-head SHA guard; immediately rebuild #132 G3 from G2-merged main using the verified 87-path reconciliation (85/87 reviewed blobs identical, with only F5 PostgreSQL and E1b lifecycle regressions intentionally newer).
+1. Fetch the reconciliation branch after this documentation commit and confirm main → exact head remains `behind=0`; expected diff is the 87 reviewed G3 paths plus this progress document.
+2. Atomically move PR #132's branch to the reconciliation head; do not carry old stacked history.
+3. Run fresh exact-head Shared Core Consolidation, CodeQL and Public Repository Security.
+4. Pay particular attention to:
+   - current F5/E2 PostgreSQL concurrency coverage remaining intact;
+   - E1b path-based serializer storage cleanup regression remaining intact;
+   - app registration/admin import startup after legacy facade deletion;
+   - kernel ownership ceiling/inventory and direct-owner test imports.
+5. While G3 gates run, continue the already-reviewed G4/G5/H1/H2/H3 preflight stack on isolated branches; do not modify the G3 exact head.
+6. If all exact-head gates are green, mark #132 ready and merge with exact-head SHA guard, then rebuild #133 G4 from that merge commit.
+7. G5 senior preflight finding to preserve later: `billing.tasks.*` is also an unmatched dead Celery route; remove it with `client_profile.notifications.*` and require every configured route pattern to match a registered task.
+8. H2 rule remains critical: never copy old `serializer_lifecycle.py`; preserve E1b `default_storage.delete(name)` and apply only lazy-import movement.
+9. H3 remains last; regenerate the final `LARGE_MODULES` baselines from post-H2 main. New candidate discovered: `attendance/kiosk_api.py` (~830 raw lines); several old entries are now definitely stale because they are below 650 raw lines.
