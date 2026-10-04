@@ -13,6 +13,7 @@ Verifies:
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 import os
 import unittest
+from zoneinfo import ZoneInfo
 
 import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
@@ -307,7 +308,9 @@ class KioskQrPinSecurityTests(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test_draft_roster_assignment_does_not_grant_confirmed_eligibility(self):
         """Assignments in a DRAFT roster period are excluded from Tier 1 confirmed eligibility."""
-        today = date.today()
+        pharmacy_tz = ZoneInfo(self.pharmacy.timezone)
+        today = timezone.localdate(timezone.now(), timezone=pharmacy_tz)
+        scheduled_time = datetime.combine(today, time(9, 0), tzinfo=pharmacy_tz)
         monday = today - timedelta(days=today.weekday())
 
         # 1. Create a DRAFT roster period
@@ -346,7 +349,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
         local_result = resolve_attendance_eligibility(
             self.worker_user,
             self.pharmacy,
-            target_time=datetime.combine(today, time(9, 0), tzinfo=dt_timezone.utc),
+            target_time=scheduled_time,
         )
         self.assertTrue(local_result.is_eligible)
         self.assertEqual(local_result.eligibility_type, EligibilityType.UNROSTERED_LOCAL)
@@ -370,7 +373,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
         locum_result = resolve_attendance_eligibility(
             self.external_locum_user,
             self.pharmacy,
-            target_time=datetime.combine(today, time(9, 0), tzinfo=dt_timezone.utc),
+            target_time=scheduled_time,
         )
         self.assertFalse(locum_result.is_eligible)
         self.assertEqual(locum_result.rejection_reason, "NO_ASSIGNMENT_OR_MEMBERSHIP")
@@ -385,7 +388,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
         published_result = resolve_attendance_eligibility(
             self.worker_user,
             self.pharmacy,
-            target_time=datetime.combine(today, time(9, 0), tzinfo=dt_timezone.utc),
+            target_time=scheduled_time,
         )
         self.assertTrue(published_result.is_eligible)
         self.assertEqual(published_result.eligibility_type, EligibilityType.CONFIRMED_ASSIGNMENT)

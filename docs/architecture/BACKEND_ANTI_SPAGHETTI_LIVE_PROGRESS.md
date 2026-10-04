@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`b5f948a83bba91afa65a3795ea4c623e147ee407`
+`6346e17717cf65646d206410b8a403b7a086053c`
 
-This is the merge commit of **PR #132 / G3 compatibility-kernel contraction**.
+This is the merge commit of **PR #133 / G4 stale InvoiceRecord ContentType cleanup**.
 
 ### Merged sequence completed during this senior review
 
@@ -45,6 +45,7 @@ This is the merge commit of **PR #132 / G3 compatibility-kernel contraction**.
 - #130 G1 domain-admin ownership split + focused admin-registry contract
 - #131 G2 dashboard serializer cleanup + ownership/docs contraction
 - #132 G3 compatibility-kernel contraction + direct-owner test/import cleanup
+- #133 G4 stale InvoiceRecord ContentType cleanup + guarded data-migration contracts
 
 ## Important senior-review fixes already landed in main
 
@@ -336,7 +337,7 @@ Merge commit: `b5f948a83bba91afa65a3795ea4c623e147ee407`
 7. Exact-head Public Repository Security, both CodeQL languages, shared-core, architecture, boundary, PostgreSQL concurrency, kiosk, mobile, Vite, Next, backend kernel/domain/promoted/public-hub/attendance/workforce-finance suites and release-gate all passed green.
 8. #132 was marked ready and merged with exact-head SHA guard `0fefb9c5c4914cbdba4adf068ba7eaa102bb9585`.
 
-## ACTIVE PR — #133 / G4 stale InvoiceRecord ContentType cleanup
+## COMPLETED — #133 / G4 stale InvoiceRecord ContentType cleanup
 
 Original reviewed head: `82fb159d5dcfa6df0dcd3231287264b09f3e5e5a`
 Clean reconciliation branch: `reconcile/g4-contenttype-post-g3-20261004`
@@ -356,6 +357,33 @@ Clean base: `main` at `b5f948a83bba91afa65a3795ea4c623e147ee407`
 6. Generic relations are covered because their ContentType side is still a concrete FK; current onboarding generic references therefore block deletion safely if any row points at the stale ContentType.
 7. Cleanup and reference checks use the database alias being migrated. Canonical `invoicing.invoice` ContentType/permissions are explicitly protected by tests.
 8. Fresh exact-head CI/security is still required after moving PR #133.
+9. Final reviewed exact head: `39ac480224bfce78c9969b1a27dd83eb02c5aa5e`; final compare to G3 main was `behind=0`.
+10. Exact-head Public Repository Security, both CodeQL languages, architecture, boundary, shared-core, backend, PostgreSQL migration rehearsal/concurrency, kiosk, mobile, Vite, Next and release-gate all passed green.
+11. Senior data-safety recheck confirmed the reference guard sees concrete ContentType FKs (including GenericForeignKey ContentType sides), standard Permission cascade and Admin Log SET_NULL remain the only allowed references, and canonical `invoicing.invoice` remains untouched.
+12. #133 was marked ready only after exact-head completion and merged with SHA guard `39ac480224bfce78c9969b1a27dd83eb02c5aa5e`. Merge commit: `6346e17717cf65646d206410b8a403b7a086053c`.
+
+## ACTIVE PR — #134 / G5 Celery dead-route cleanup
+
+Original PR branch: `fix/dead-celery-route`
+Original reviewed head: `40bac1df6e475674da3fe02f4f0b827d6473c18f`
+Clean reconciliation branch: `reconcile/g5-routes-post-g4-20261004`
+Clean base: `main` at `6346e17717cf65646d206410b8a403b7a086053c`
+
+### G5 reconciliation and senior review
+
+1. Rebuilt from G4-merged main as exactly three semantic files: `core/settings.py`, `core/test_backend_ownership_boundaries.py`, and `core/test_task_contracts.py`.
+2. Original G5 removed only `client_profile.notifications.*`. Senior follow-up found a second dead configured pattern: `billing.tasks.*`.
+3. Repository-wide task-name search confirms `billing.tasks.*` appears only in `core/settings.py`; no registered task uses that namespace.
+4. Deployment queue topology is intentionally unchanged: Docker still starts Celery with `-Q email,default,notifications,ocr,billing`. Removing a dead task-route pattern does **not** remove or rename the `billing` queue.
+5. Reconciled settings remove both unmatched patterns: `client_profile.notifications.*` and `billing.tasks.*`.
+6. The route contract is strengthened: **every configured CELERY_TASK_ROUTES pattern must match at least one registered non-Celery task**. There is no reserved exception for `billing.tasks.*`.
+7. The legacy ownership allowance for `client_profile.notifications.*` is removed with the route. No unrelated kernel ownership baseline changes.
+8. PR #134 has no unresolved review threads.
+9. Fresh exact-head CI/security is required after moving PR #134. While it runs, H1/H2 have already been rebuilt on the corrected G5 semantic stack.
+10. First exact-head G5 run proved the new Celery route contract green, then failed later in `attendance_tests.test_kiosk_qr_pin_security.KioskQrPinSecurityTests.test_draft_roster_assignment_does_not_grant_confirmed_eligibility`: after publishing a roster, the fixture expected CONFIRMED_ASSIGNMENT but got UNROSTERED_LOCAL.
+11. Senior diagnosis proved this was a pre-existing date/timezone test bug, not a G5 runtime regression: G4 and G5 attendance test/runtime blobs were identical; the fixture used `Australia/Sydney` but evaluated a 09:00–17:00 local roster slot at **09:00 UTC**. On 4 Oct 2026 Sydney is AEDT, so 09:00 UTC is 20:00 local, outside the +2h window ending 19:00.
+12. Fixed the regression **test only**: derive `today` in the pharmacy's `ZoneInfo` and evaluate the slot at 09:00 in that local timezone. Attendance production eligibility logic was intentionally unchanged.
+13. Because the DST-safe test fix changes the PR head, all earlier green G5 results are supporting evidence only. Fresh exact-head security, CodeQL, Shared Core/PostgreSQL/backend and release-gate must pass before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -423,15 +451,17 @@ Deep-reviewed; fresh review clean.
 - Current old-stack PR may show non-mergeable until G1/G2 are rebuilt/merged in sequence.
 
 ### #133 G4 stale InvoiceRecord ContentType
-Deep-reviewed and hardened.
-Current head: `82fb159d5dcfa6df0dcd3231287264b09f3e5e5a`.
-- Migration reference guard now queries using migration DB alias.
-- Verified standard `auth.Permission` / `admin.LogEntry` references are explicitly handled as expected cleanup references; unknown references remain blockers.
+Merged after clean post-G3 reconstruction and full exact-head verification.
+Final reviewed head: `39ac480224bfce78c9969b1a27dd83eb02c5aa5e`.
+Merge commit: `6346e17717cf65646d206410b8a403b7a086053c`.
+- Guarded migration/test blobs remained identical to reviewed G4.
+- Migration rehearsal, PostgreSQL contracts and release-gate green.
 
 ### #134 G5 Celery dead-route cleanup
-Deep-reviewed.
-- Removes only dead `client_profile.notifications.*` route.
-- Test ensures every non-reserved configured route pattern matches a registered task.
+Active clean reconciliation on G4-merged main.
+- Senior follow-up removes **both** unmatched patterns: `client_profile.notifications.*` and `billing.tasks.*`.
+- Docker's `billing` worker queue remains untouched.
+- Route contract now requires every configured pattern to match a registered task; no reserved dead-pattern exception remains.
 
 ### #135 H1 signals/startup contract
 Deep-reviewed and strengthened.
@@ -486,14 +516,12 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #133 / G4 from `reconcile/g4-contenttype-post-g3-20261004`. Current main is `b5f948a83bba91afa65a3795ea4c623e147ee407`.**
+**Resume at PR #134 / G5 from `reconcile/g5-routes-post-g4-20261004`. Current main is `6346e17717cf65646d206410b8a403b7a086053c`.**
 
-1. Fetch the reconciliation branch after this documentation commit and confirm main → exact head remains `behind=0`; expected diff is the three reviewed G4 files plus this progress document.
-2. Atomically move `fix/stale-invoicerecord-contenttype` to the verified reconciliation head; do not carry old-base history.
-3. Run fresh exact-head Shared Core Consolidation, migration rehearsal/PostgreSQL contracts, CodeQL and Public Repository Security.
-4. Pay special attention to migration `0008` behavior on both fresh DBs and databases containing a stale ContentType, and confirm canonical `invoicing.invoice` permissions remain untouched.
-5. While G4 gates run, continue G5/H1/H2/H3 preflight on isolated branches; do not modify the G4 exact head.
-6. If all exact-head gates are green, mark #133 ready and merge with exact-head SHA guard, then rebuild #134 G5 from that merge commit.
-7. G5 senior fix is mandatory: remove **both** unmatched routes `client_profile.notifications.*` and `billing.tasks.*`; the route contract must require every configured pattern to match a registered task. Keep the Docker worker's reserved `billing` queue unchanged because deployment queue topology is outside the routing cleanup.
-8. H2 rule remains critical: preserve E1b `default_storage.delete(name)` and apply only lazy-import movement.
-9. H3 remains last and will use the isolated empty-baseline probe to derive exact post-H2 module baselines before the final green run.
+1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is the three reviewed G5 files, the DST-safe attendance regression fixture, plus this progress document.
+2. Verify both dead routes remain absent and `docker-compose.yml` still contains the deployed `billing` worker queue.
+3. Atomically move PR #134's branch to the verified reconciliation head; do not carry old-base history.
+4. Run fresh exact-head Shared Core Consolidation, task contracts, CodeQL and Public Repository Security.
+5. While G5 gates run, rebuild H1 from the G5 reconciliation head, then H2 from H1. Preserve the already-reviewed signal contract and H2 E1b storage-deletion rule.
+6. If all exact-head G5 gates are green, mark #134 ready and merge with exact-head SHA guard; then rebuild #135 H1 from G5-merged main.
+7. H3 remains last. After H2 merges, use PR #136 with an isolated empty-baseline probe to enumerate exact >650-line runtime modules, set final baselines, add only the incremental workflow step, and require a final exact-head green run.
