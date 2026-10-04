@@ -34,7 +34,7 @@ class StripeWebhookIdempotencyTests(TestCase):
             )),
         )
         finalize.side_effect = [RuntimeError('temporary assignment failure'), (0, [])]
-        with patch('client_profile.domains.shifts.emails.send_shift_payment_finalized_notifications'):
+        with patch('shifts.emails.send_shift_payment_finalized_notifications'):
             first = self.client.post(reverse('billing:stripe_webhook'), b'{}', content_type='application/json')
             self.assertEqual(first.status_code, 500)
             self.assertFalse(ShiftPayment.objects.exists())

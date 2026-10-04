@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase
 from django.urls import resolve, reverse
 
-from client_profile.domains.dashboards.views import (
+from dashboards.views import (
     ExplorerDashboard,
     OrganizationDashboardView,
     OtherStaffDashboard,
