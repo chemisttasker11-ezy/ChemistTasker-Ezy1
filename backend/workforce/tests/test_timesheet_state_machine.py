@@ -3,6 +3,7 @@
 Reuses the projection tests' fixture (a pharmacist rostered and clocked in a published roster week, with a timesheet
 period). The transitions are called through workforce.timesheets, their historical import path.
 """
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
 from unittest import mock
@@ -168,7 +169,7 @@ class TimesheetStateMachineTests(TestCase):
         lock_period(self.period, self.owner)
         self.period.refresh_from_db()
 
-        extra_worker = projection.User.objects.create_user(
+        extra_worker = get_user_model().objects.create_user(
             email="locked-extra-worker@example.com",
             password="test-pass",
             role="PHARMACIST",
