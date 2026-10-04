@@ -19,9 +19,9 @@
 
 ### Current code-bearing main checkpoint
 
-`87cfcfd890c264649955a399addf9561becd42c5`
+`52d72d10c01813263ff5c3c0738741b9e93339c7`
 
-This is the merge commit of **PR #134 / G5 Celery dead-route cleanup + DST-safe attendance regression fixture**.
+This is the merge commit of **PR #135 / H1 signal and startup registry contract**.
 
 ### Merged sequence completed during this senior review
 
@@ -47,6 +47,7 @@ This is the merge commit of **PR #134 / G5 Celery dead-route cleanup + DST-safe 
 - #132 G3 compatibility-kernel contraction + direct-owner test/import cleanup
 - #133 G4 stale InvoiceRecord ContentType cleanup + guarded data-migration contracts
 - #134 G5 Celery dead-route cleanup + DST-safe attendance regression fixture
+- #135 H1 signal/startup registry contract + import-time side-effect guard
 
 ## Important senior-review fixes already landed in main
 
@@ -390,7 +391,7 @@ Clean base: `main` at `6346e17717cf65646d206410b8a403b7a086053c`
 16. Deployment topology recheck confirmed Docker still starts the Celery worker with `-Q email,default,notifications,ocr,billing`; only unmatched route patterns were removed.
 17. #134 was marked ready only after exact-head completion and merged with SHA guard `67881a5806b7c778dab740552ea1032e7d45c57e`. Merge commit: `87cfcfd890c264649955a399addf9561becd42c5`.
 
-## ACTIVE PR — #135 / H1 signal and startup registry contract
+## COMPLETED — #135 / H1 signal and startup registry contract
 
 Original PR branch: `test/signal-registry-contract`
 Reviewed source head: `fdd0083f118c1fb9eb3d2dec3bce927ce128e2a1`
@@ -405,7 +406,28 @@ Clean base: `main` at `87cfcfd890c264649955a399addf9561becd42c5`
 4. Reviewed signal test inspects imported `signals.py` modules, module-level executable calls, decorators/defaults/annotations, and recursively inspects class bodies while intentionally excluding function bodies.
 5. The old H1 P2 review comment about uninspected top-level/class-body startup side effects is therefore satisfied by the current reviewed test implementation.
 6. Preflight H1 diff on top of G5 exact head was exactly two files and `behind=0`.
-7. Fresh exact-head CI/security is required after moving PR #135.
+7. Fresh exact-head CI/security was run after moving PR #135.
+8. Final reviewed exact head: `36591782f41db09e1925ec2a2ef931e5e724fd4b`; final compare to G5 main was `behind=0`.
+9. Exact-head Public Repository Security, both CodeQL languages, shared-core, architecture, boundary, PostgreSQL migration rehearsal/concurrency, kiosk, mobile, Vite, Next, backend full contract tail, the signal/startup contract and release-gate all passed green.
+10. The historical P2 startup-side-effect concern is resolved by the current module/class-body AST inspection.
+11. #135 was marked ready only after exact-head completion and merged with SHA guard `36591782f41db09e1925ec2a2ef931e5e724fd4b`. Merge commit / new main: `52d72d10c01813263ff5c3c0738741b9e93339c7`.
+
+## ACTIVE PR — #137 / H2 import-cycle reduction
+
+Original PR branch: `refactor/cycle-reduction`
+Reviewed source head: `93f36938f0d425c028a83c69ff626969ce72c301`
+Clean reconciliation branch: `reconcile/h2-cycles-post-h1-20261004`
+Clean base: `main` at `52d72d10c01813263ff5c3c0738741b9e93339c7`
+
+### H2 reconciliation and senior review
+
+1. Rebuilt H2 directly from H1-merged main as exactly seven reviewed semantic paths.
+2. Four paths untouched by later main are byte-identical to the reviewed H2 head: `core/websocket_testing.py`, `shifts/models.py`, `users/role_labels.py`, and `users/serializers.py`.
+3. `core/serializer_lifecycle.py` applies only H2's deferred domain imports while preserving the E1b path-based storage deletion contract: `storage.delete(name)`; the stale bound `FieldFile.delete(save=False)` behavior is not reintroduced.
+4. `core/test_backend_ownership_boundaries.py` preserves the post-G3 kernel ceiling/baselines and only contracts `ALLOWED_MUTUAL_APP_PAIRS` from 17 to the 11 intentional pairs.
+5. `BACKEND_DOMAIN_DEPENDENCIES.md` applies only the H2 semantic dependency/cycle documentation to the newest G-era document.
+6. Reconciliation compare to H1 main is `behind=0`; expected diff is the seven H2 semantic files plus this progress document.
+7. Move PR #137 atomically to the verified reconciliation head, then require fresh exact-head CI/security before merge.
 
 ## Beyond E2 — deep review already completed
 
@@ -489,21 +511,21 @@ Merge commit: `87cfcfd890c264649955a399addf9561becd42c5`.
 - DST-safe attendance regression fixture is test-only; production eligibility logic was unchanged.
 
 ### #135 H1 signals/startup contract
-Active clean reconciliation on G5-merged main.
-- Signal/startup contract blob is byte-identical to the hardened reviewed H1 test.
-- Current workflow preserves G1/G5 gates and adds only the signal contract step.
-Current head: `fdd0083f118c1fb9eb3d2dec3bce927ce128e2a1`.
-- Original guard only checked `apps.ready()`.
-- Added AST inspection of `signals.py` import-time executable work.
-- Then closed class-body loophole: Python class bodies execute at import time, so class statements are inspected recursively while function bodies remain deferred.
-- Historical exact-head CI green; reconcile on final main later.
+Merged after clean post-G5 reconciliation and full exact-head verification.
+Final reviewed head: `36591782f41db09e1925ec2a2ef931e5e724fd4b`.
+Merge commit: `52d72d10c01813263ff5c3c0738741b9e93339c7`.
+- Signal/startup contract preserved the hardened module-level and class-body import-time side-effect guard.
+- P2 review concern resolved.
+- Exact-head security, both CodeQL languages, full Shared Core/backend/PostgreSQL gates and release-gate green.
 
 ### #137 H2 import-cycle reduction
-Deep-reviewed.
-Current head: `93f36938f0d425c028a83c69ff626969ce72c301`.
-- Lazy imports reviewed for app-registry/runtime safety.
-- Fixed architecture dependency table to remove resolved module-level `shifts -> workforce` dependency.
-- When reconciling, apply semantic doc change to newest G-era document rather than overwriting newer architecture documentation with old blob.
+Active clean reconciliation on H1-merged main.
+Reviewed source head: `93f36938f0d425c028a83c69ff626969ce72c301`.
+Reconciliation branch: `reconcile/h2-cycles-post-h1-20261004`.
+- Seven semantic paths only; current compare is `behind=0`.
+- Lazy imports remain reviewed for app-registry/runtime safety.
+- E1b path-based storage deletion and G-era ownership/documentation changes are preserved.
+- Fresh exact-head CI/security is required after moving PR #137.
 
 ### #136 H3 module-size ratchet — MERGE LAST
 Deep-reviewed.
@@ -543,12 +565,12 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #135 / H1 from `reconcile/h1-signals-post-g5-20261004`. Current main is `87cfcfd890c264649955a399addf9561becd42c5`.**
+**Resume at PR #137 / H2 from `reconcile/h2-cycles-post-h1-20261004`. Current main is `52d72d10c01813263ff5c3c0738741b9e93339c7`.**
 
-1. Fetch the reconciliation branch after this documentation commit and confirm current main → exact head is `behind=0`; expected diff is H1's two reviewed files plus this progress document.
-2. Atomically move `test/signal-registry-contract` to the verified reconciliation head; do not carry old-base workflow history.
-3. Recheck the old P2 review thread against the current hardened test and resolve it only after confirming the head contains the class-body/module-level side-effect checks.
-4. Run fresh exact-head Shared Core Consolidation, the signal/startup contract, CodeQL and Public Repository Security.
-5. While H1 gates run, rebuild H2 from the H1 reconciliation head. Preserve E1b `default_storage.delete(name)`; apply only the seven reviewed H2 semantic paths.
-6. If all exact-head H1 gates are green, mark #135 ready and merge with exact-head SHA guard; immediately rebuild #137 H2 from H1-merged main.
-7. H3 remains last. Its mechanism is preflighted as exactly two files on top of H2, but final `LARGE_MODULES` baselines must be regenerated from post-H2 main before moving PR #136.
+1. Confirm final reconciliation diff is the seven reviewed H2 semantic paths plus this progress document and `behind=0`.
+2. Atomically move `refactor/cycle-reduction` to the verified reconciliation head; do not merge its old-base history.
+3. Recheck PR #137 review threads and exact changed paths after the ref move.
+4. Require fresh exact-head Shared Core Consolidation, architecture/boundary contracts, backend, PostgreSQL, CodeQL, Public Repository Security and release-gate.
+5. If all exact-head H2 gates are green, mark #137 ready and merge with exact-head SHA guard.
+6. Rebuild #136 H3 LAST from post-H2 main. Regenerate exact `LARGE_MODULES` baselines from that final runtime tree, preserve the newest CI workflow, and move only the H3 mechanism + tightened baselines.
+7. Require fresh exact-head H3 security/CodeQL/full gate, merge with SHA guard, then run the final architecture/release audit from final `main`.
