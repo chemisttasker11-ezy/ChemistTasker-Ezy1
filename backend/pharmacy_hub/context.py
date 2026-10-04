@@ -10,7 +10,7 @@ from pharmacy_hub.serializers import (
     HubOrganizationSerializer,
     HubPharmacySerializer,
 )
-from pharmacy_hub.access import get_user_chemisttasker_hubs, get_user_pharmacy_permissions
+from pharmacy_hub.access import _org_hub_memberships, get_user_chemisttasker_hubs, get_user_pharmacy_permissions
 from pharmacy_hub.selectors import STAFF_GROUP_MEMBER_FILTER, staff_group_members_prefetch
 
 
@@ -71,8 +71,7 @@ class HubContextBuilder:
         for pharmacy in pharmacy_list:
             if not pharmacy.organization:
                 continue
-            pharmacy_perms = pharmacy_permissions.get(pharmacy.id, {})
-            entry = lookup.setdefault(
+            lookup.setdefault(
                 pharmacy.organization.id,
                 {
                     "organization": pharmacy.organization,
@@ -80,8 +79,17 @@ class HubContextBuilder:
                     "is_org_admin": False,
                 },
             )
-            if pharmacy_perms.get("is_owner"):
-                entry["can_manage_profile"] = True
+        # A hub-capable organisation role (a region admin included) always sees its own organisation hub,
+        # even before any pharmacy is assigned to it.
+        for org_membership, _full_access, _visible_ids in _org_hub_memberships(self.user):
+            lookup.setdefault(
+                org_membership.organization_id,
+                {
+                    "organization": org_membership.organization,
+                    "can_manage_profile": False,
+                    "is_org_admin": False,
+                },
+            )
         for org_id in org_admin_org_ids:
             if org_id in lookup:
                 lookup[org_id]["can_manage_profile"] = True
