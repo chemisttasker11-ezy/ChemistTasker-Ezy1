@@ -533,6 +533,15 @@ class ContextTests(HubFixture):
             }
         self.check_recorded("context", actual)
 
+    def test_owner_context_advertises_organization_profile_authority(self):
+        response = client_for(self.users["owner"]).get(HUB + "context/")
+        self.assertEqual(response.status_code, 200, response.content)
+        organization = next(
+            item for item in response.json()["organizations"] if item["id"] == self.org.id
+        )
+        self.assertTrue(organization["can_manage_profile"])
+        self.assertFalse(organization["is_org_admin"])
+
 
 class PostingAcrossScopesTests(HubFixture):
     def test_who_may_post_where(self):
