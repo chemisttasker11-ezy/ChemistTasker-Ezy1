@@ -266,14 +266,9 @@ class HubScopeResolver:
         is_group_creator = bool(group.created_by_id == self.user.id)
         has_group_admin = bool(
             scope["has_admin_permissions"]
-            or is_group_creator
             or (group_membership and group_membership.is_admin)
         )
-        if (
-            not group_membership
-            and not scope.get("has_admin_permissions")
-            and not is_group_creator
-        ):
+        if not group_membership and not scope.get("has_admin_permissions"):
             raise PermissionDenied("You must be a member of this group.")
         scope.update(
             {
