@@ -184,3 +184,49 @@ class RosterShiftRepublishTests(TestCase):
         unpublish_roster_shift(self.slots[0], self.owner)
         allowed_delete = client.delete(f"/api/client-profile/roster-owner/{assignment.pk}/")
         self.assertEqual(allowed_delete.status_code, 204, allowed_delete.content)
+
+    def test_unpublished_shift_is_hidden_from_legacy_worker_and_open_shift_apis(self):
+        worker = self.workers[0]
+        assignment = ShiftSlotAssignment.objects.get(slot=self.slots[0])
+        client = APIClient()
+        client.force_authenticate(worker)
+
+        visible = client.get(f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.pk}")
+        self.assertEqual(visible.status_code, 200, visible.content)
+        visible_rows = visible.data.get("results", visible.data) if isinstance(visible.data, dict) else visible.data
+        self.assertIn(assignment.pk, {row["id"] for row in visible_rows})
+
+        unpublish_roster_shift(self.slots[0], self.owner)
+
+        hidden = client.get(f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.pk}")
+        self.assertEqual(hidden.status_code, 200, hidden.content)
+        hidden_rows = hidden.data.get("results", hidden.data) if isinstance(hidden.data, dict) else hidden.data
+        self.assertNotIn(assignment.pk, {row["id"] for row in hidden_rows})
+
+        vacant_shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            role_needed="PHARMACIST",
+            visibility="FULL_PART_TIME",
+            is_roster_container=True,
+            created_by=self.owner,
+        )
+        vacant_slot = ShiftSlot.objects.create(
+            shift=vacant_shift,
+            date=self.week + timedelta(days=2),
+            start_time=time(9),
+            end_time=time(17),
+        )
+        open_before = client.get(
+            f"/api/client-profile/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
+        )
+        self.assertEqual(open_before.status_code, 200, open_before.content)
+        open_before_rows = open_before.data.get("results", open_before.data) if isinstance(open_before.data, dict) else open_before.data
+        self.assertIn(vacant_shift.pk, {row["id"] for row in open_before_rows})
+
+        unpublish_roster_shift(vacant_slot, self.owner)
+        open_after = client.get(
+            f"/api/client-profile/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
+        )
+        self.assertEqual(open_after.status_code, 200, open_after.content)
+        open_after_rows = open_after.data.get("results", open_after.data) if isinstance(open_after.data, dict) else open_after.data
+        self.assertNotIn(vacant_shift.pk, {row["id"] for row in open_after_rows})

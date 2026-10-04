@@ -543,7 +543,8 @@ class RosterWorkerViewSet(viewsets.ReadOnlyModelViewSet):
         # Start with a base queryset of all assignments either in those pharmacies
         # OR explicitly assigned to the current user (to surface public-pool assignments).
         qs = ShiftSlotAssignment.objects.filter(
-            Q(shift__pharmacy_id__in=member_pharmacy_ids) | Q(user=user)
+            Q(shift__pharmacy_id__in=member_pharmacy_ids) | Q(user=user),
+            slot__unpublished_at__isnull=True,
         ).select_related('shift__pharmacy', 'slot', 'user').prefetch_related(
             'user__workforce_timesheets__period'
         ).distinct()

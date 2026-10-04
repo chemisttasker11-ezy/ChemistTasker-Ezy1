@@ -152,7 +152,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         now = timezone.now()
         self._auto_escalate_shifts(now)
-        qs = Shift.objects.all().annotate(interested_users_count=Count('interests'))
+        # An individually unpublished roster slot is back in manager-only draft/edit state.
+        # Exclude the whole shift from worker/candidate discovery until that slot is explicitly republished.
+        qs = Shift.objects.exclude(slots__unpublished_at__isnull=False).annotate(
+            interested_users_count=Count('interests')
+        )
         user = self.request.user
         if getattr(user, "role", None) in ["PHARMACIST", "OTHER_STAFF", "EXPLORER"]:
             qs = qs.filter(Q(dedicated_user__isnull=True) | Q(dedicated_user=user))
