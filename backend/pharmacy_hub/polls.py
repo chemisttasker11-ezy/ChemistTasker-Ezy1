@@ -1,5 +1,6 @@
 """Hub polls with their votes, comments and reactions."""
 from collections.abc import Mapping
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q, F
 from django.shortcuts import get_object_or_404
@@ -19,6 +20,10 @@ from pharmacy_hub.models import (
 from pharmacy_hub.serializers import HubPollCommentSerializer, HubPollSerializer, HubReactionSerializer
 from pharmacy_hub.access import HubScopeResolver
 from pharmacy_hub.scoping import HubScopedViewSetMixin
+from memberships.models import Membership
+
+
+User = get_user_model()
 
 
 class HubPollViewSet(
@@ -185,6 +190,13 @@ class HubPollViewSet(
         except (TypeError, ValueError):
             raise ValidationError({"option_id": "Invalid option."})
         with transaction.atomic():
+            # A person's hub identity may move between the explicit User FK and
+            # a pharmacy Membership FK over time. Serialize by User and look
+            # through every membership owned by that user so the same human
+            # cannot acquire a second vote merely because their representation
+            # changed.
+            User.objects.select_for_update().only("pk").get(pk=request.user.pk)
+
             option = (
                 PharmacyHubPollOption.objects.select_for_update()
                 .filter(poll=poll, pk=option_id)
@@ -192,12 +204,31 @@ class HubPollViewSet(
             )
             if not option:
                 raise ValidationError({"option_id": "Invalid option."})
-            vote_qs = PharmacyHubPollVote.objects.select_for_update().select_related("option")
-            if membership:
-                vote_qs = vote_qs.filter(poll=poll, membership=membership)
-            else:
-                vote_qs = vote_qs.filter(poll=poll, user=request.user)
-            vote = vote_qs.first()
+
+            membership_ids = Membership.objects.filter(
+                user_id=request.user.id
+            ).values_list("id", flat=True)
+            identity_votes = list(
+                PharmacyHubPollVote.objects.select_for_update()
+                .select_related("option")
+                .filter(poll=poll)
+                .filter(
+                    Q(user_id=request.user.id)
+                    | Q(membership_id__in=membership_ids)
+                )
+                .order_by("id")
+            )
+            vote = identity_votes[0] if identity_votes else None
+
+            # Historical versions could store one user-keyed and one
+            # membership-keyed vote for the same person. Collapse such rows on
+            # the next write and repair their materialized option counts.
+            for duplicate in identity_votes[1:]:
+                PharmacyHubPollOption.objects.filter(pk=duplicate.option_id).update(
+                    vote_count=F("vote_count") - 1
+                )
+                duplicate.delete()
+
             if vote and vote.option_id == option.id:
                 pass
             else:
