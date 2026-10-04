@@ -87,12 +87,12 @@ This is the merge commit of **PR #124 / E2**.
 Branch: `refactor/pharmacy-hub-split`
 
 Latest reconciled code checkpoint before this documentation commit:
-`8e282b39fc29a652f683ee6e0509610fd61b438e`
+`ae7cee9e130c18bd9a4473a1dfeb5dcc6fe9dd12`
 
 Base:
 `main` at `230396de7aabf649bf20ce347e702267d03cb4a4`
 
-The post-E2 main→F1 diff is exactly the 13 reviewed F1 files. A branch-point audit proved none of those files changed on main after F1 branched, and E2 touches none of them, so exact reviewed-file overlay is safe.
+The post-E2 reconciliation began as the 13 reviewed F1 files. Senior E2-integration review then intentionally added `pharmacy_hub/serializers.py` and `pharmacy_hub/test_api.py` for the poll human-identity fix, plus this progress document. The original 13-file overlay remains conflict-safe: none changed on main after F1 branched and E2 touches none of them.
 
 ### F1 senior-review fixes already committed
 
@@ -103,7 +103,9 @@ The post-E2 main→F1 diff is exactly the 13 reviewed F1 files. A branch-point a
 5. Pharmacy-level admins retain pharmacy-profile authority but do not become organization-profile admins.
 6. Control-plane hub authoring (owner/pharmacy admin/org admin) is now side-effect free when no real Membership exists: posts/polls/comments use the explicit user author instead of manufacturing/reactivating Membership or PharmacyAdmin state.
 7. Regression coverage proves a LEFT membership remains LEFT/inactive and no PharmacyAdmin is created when an ORG_ADMIN authors a pharmacy-hub post.
-8. Endpoint regressions pin allowed/denied scope and prove scoped posting creates no persistent privilege widening.
+8. Poll voting is now stable across User ↔ Membership identity changes. A person who voted while membership-less cannot gain a second vote after receiving a Membership; read state (`has_voted`, `selected_option_id`) follows the same human identity.
+9. Vote writes serialize on the User row and collapse any historical user-keyed/membership-keyed duplicate rows on the next vote, repairing materialized option counts without a schema migration.
+10. Endpoint regressions pin allowed/denied scope, side-effect-free control-plane authoring and vote identity continuity.
 
 ### F1 gate status
 
@@ -244,7 +246,7 @@ Current head: `c13a9d9a5927866f5217ebcb67ab09adda001636`.
 
 ## NEXT ACTION
 
-**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `8e282b39fc29a652f683ee6e0509610fd61b438e`.**
+**Resume at PR #125 / F1. First fetch PR #125's live exact head. Latest reconciled code checkpoint before this documentation commit is `ae7cee9e130c18bd9a4473a1dfeb5dcc6fe9dd12`.**
 
 1. Verify PR metadata has caught up to the reconciled branch ref and compare current main → exact head; expected diff is only the 13 F1 files plus this progress document.
 2. Run/check fresh main-target Shared Core Consolidation, backend, CodeQL and Public Repository Security on the exact F1 head.
