@@ -349,34 +349,38 @@ class HubCommunityGroupSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         membership_ids = validated_data.pop("member_ids", None)
-        response = super().update(instance, validated_data)
+        memberships = None
         if membership_ids is not None:
             membership_ids = set(membership_ids)
             memberships = self._resolve_memberships(instance.pharmacy, membership_ids)
-            desired_ids = {membership.id for membership in memberships}
-            existing_links = {
-                link.membership_id: link
-                for link in PharmacyCommunityGroupMembership.objects.filter(
-                    group=instance
-                )
-            }
-            new_links = []
-            for membership in memberships:
-                if membership.id in existing_links:
-                    continue
-                new_links.append(
-                    PharmacyCommunityGroupMembership(
-                        group=instance,
-                        membership=membership,
+
+        with transaction.atomic():
+            response = super().update(instance, validated_data)
+            if memberships is not None:
+                desired_ids = {membership.id for membership in memberships}
+                existing_links = {
+                    link.membership_id: link
+                    for link in PharmacyCommunityGroupMembership.objects.select_for_update().filter(
+                        group=instance
                     )
-                )
-            if new_links:
-                PharmacyCommunityGroupMembership.objects.bulk_create(new_links)
-            to_remove = set(existing_links.keys()) - desired_ids
-            if to_remove:
-                PharmacyCommunityGroupMembership.objects.filter(
-                    group=instance, membership_id__in=to_remove
-                ).delete()
+                }
+                new_links = []
+                for membership in memberships:
+                    if membership.id in existing_links:
+                        continue
+                    new_links.append(
+                        PharmacyCommunityGroupMembership(
+                            group=instance,
+                            membership=membership,
+                        )
+                    )
+                if new_links:
+                    PharmacyCommunityGroupMembership.objects.bulk_create(new_links)
+                to_remove = set(existing_links.keys()) - desired_ids
+                if to_remove:
+                    PharmacyCommunityGroupMembership.objects.filter(
+                        group=instance, membership_id__in=to_remove
+                    ).delete()
         return response
 
     def get_member_count(self, obj):
