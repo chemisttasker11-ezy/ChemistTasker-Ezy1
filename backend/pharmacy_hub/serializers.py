@@ -253,9 +253,7 @@ class HubMembershipSerializer(serializers.ModelSerializer):
             self.context.get("request"),
             obj,
         )
-        if identity:
-            identity.pop("email", None)
-        return identity
+        return {key: value for key, value in identity.items() if key != "email"} if identity else identity
 
 
 class PharmacyCommunityGroupMemberSerializer(serializers.ModelSerializer):

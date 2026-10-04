@@ -1,6 +1,5 @@
 from datetime import date, timedelta
 from django.conf import settings
-from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from users.models import OrganizationMembership
 
 BILLING_STATE_PRE_LIVE = "PRE_LIVE"
@@ -39,13 +38,7 @@ def user_can_manage_billing_for_pharmacy(user, pharmacy) -> bool:
         organization_id=pharmacy.organization_id,
     ).exists():
         return True
-    if OrganizationMembership.objects.filter(
-        user=user,
-        role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
-        pharmacies=pharmacy,
-    ).exists():
-        return True
-    return has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER)
+    return False
 
 
 def resolve_billing_account(pharmacy, acting_user=None) -> dict:
@@ -67,6 +60,7 @@ def resolve_billing_account(pharmacy, acting_user=None) -> dict:
             and OrganizationMembership.objects.filter(
                 user=acting_user,
                 organization=organization,
+                role='ORG_ADMIN',
             ).exists()
         ):
             billing_contact = acting_user
@@ -75,7 +69,7 @@ def resolve_billing_account(pharmacy, acting_user=None) -> dict:
         elif owner_user is not None:
             billing_contact = owner_user
         else:
-            billing_contact = acting_user
+            billing_contact = None
         return {
             'scope': 'organization',
             'organization': organization,

@@ -129,20 +129,46 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertIsNotNone(delivery.processed_at)
 
 class OrganizationBillingScopeTests(TestCase):
-    def test_unassigned_chief_does_not_gain_org_wide_billing_access(self):
-        from billing.utils import user_can_manage_billing_for_pharmacy
-        from organizations.models import Organization
+    def test_only_owner_and_org_admin_can_manage_billing(self):
+        from billing.utils import resolve_billing_account, user_can_manage_billing_for_pharmacy
+        from client_profile.characterization_support import make_owner_with_pharmacy, make_user
+        from organizations.models import Organization, PharmacyAdmin
         from users.models import OrganizationMembership
 
         organization = Organization.objects.create(name="Billing Org")
-        pharmacy = Pharmacy.objects.create(name="Billing Org Pharmacy", organization=organization)
-        chief = get_user_model().objects.create_user(email="chief-billing@example.test", role="ORG_STAFF")
-        OrganizationMembership.objects.create(
-            user=chief, organization=organization, role="CHIEF_ADMIN", admin_level="MANAGER",
-        )
-        self.assertFalse(user_can_manage_billing_for_pharmacy(chief, pharmacy))
+        owner, pharmacy = make_owner_with_pharmacy("Billing Org Pharmacy")
+        pharmacy.organization = organization
+        pharmacy.save(update_fields=["organization"])
 
-        org_admin = get_user_model().objects.create_user(email="org-billing@example.test", role="ORG_STAFF")
+        self.assertTrue(user_can_manage_billing_for_pharmacy(owner, pharmacy))
+
+        org_admin = make_user("ORG_STAFF")
         OrganizationMembership.objects.create(user=org_admin, organization=organization, role="ORG_ADMIN")
         self.assertTrue(user_can_manage_billing_for_pharmacy(org_admin, pharmacy))
+
+        chief = make_user("ORG_STAFF")
+        chief_membership = OrganizationMembership.objects.create(
+            user=chief, organization=organization, role="CHIEF_ADMIN", admin_level="MANAGER",
+        )
+        chief_membership.pharmacies.add(pharmacy)
+        self.assertFalse(user_can_manage_billing_for_pharmacy(chief, pharmacy))
+
+        region = make_user("ORG_STAFF")
+        region_membership = OrganizationMembership.objects.create(
+            user=region, organization=organization, role="REGION_ADMIN", admin_level="MANAGER",
+        )
+        region_membership.pharmacies.add(pharmacy)
+        self.assertFalse(user_can_manage_billing_for_pharmacy(region, pharmacy))
+
+        pharmacy_manager = make_user("PHARMACY_MANAGER")
+        PharmacyAdmin.objects.create(
+            user=pharmacy_manager,
+            pharmacy=pharmacy,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
+        )
+        self.assertFalse(user_can_manage_billing_for_pharmacy(pharmacy_manager, pharmacy))
+
+        account = resolve_billing_account(pharmacy, acting_user=chief)
+        self.assertEqual(account["billing_contact"], org_admin, "Chief Admin must never become the billing account holder")
 
