@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from django.conf import settings
 from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 BILLING_STATE_PRE_LIVE = "PRE_LIVE"
 BILLING_STATE_FREE_TRIAL = "FREE_TRIAL"
@@ -35,13 +36,13 @@ def user_can_manage_billing_for_pharmacy(user, pharmacy) -> bool:
         return True
     if OrganizationMembership.objects.filter(
         user=user,
-        role='ORG_ADMIN',
+        role__in=ORG_WIDE_ADMIN_ROLES,
         organization_id=pharmacy.organization_id,
     ).exists():
         return True
     if OrganizationMembership.objects.filter(
         user=user,
-        role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
+        role='REGION_ADMIN',
         pharmacies=pharmacy,
     ).exists():
         return True

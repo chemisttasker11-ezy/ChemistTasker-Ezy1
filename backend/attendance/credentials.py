@@ -100,8 +100,8 @@ def is_authorized_kiosk_manager(user, pharmacy: Pharmacy) -> bool:
     ).exists():
         return True
 
-    # 3. Org admins cover their organization; Chief and Region require an
-    # explicit pharmacy assignment. An empty scope never means all pharmacies.
+    # 3. Org-wide admins (Org and Chief) cover their organization; Region admins
+    # require an explicit pharmacy assignment. An empty scope never means all pharmacies.
     if pharmacy.organization_id:
         try:
             from users.models import OrganizationMembership
@@ -111,8 +111,10 @@ def is_authorized_kiosk_manager(user, pharmacy: Pharmacy) -> bool:
                 organization_id=pharmacy.organization_id,
                 role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"],
             )
+            from users.org_roles import ORG_WIDE_ADMIN_ROLES
+
             for membership in memberships:
-                if membership.role == "ORG_ADMIN":
+                if membership.role in ORG_WIDE_ADMIN_ROLES:
                     return True
                 if membership.admin_level in (
                     PharmacyAdmin.AdminLevel.OWNER,

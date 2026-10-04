@@ -265,6 +265,8 @@ export function canManageOrganizationMember(
   if (actorRole !== 'REGION_ADMIN' && actorRole !== 'CHIEF_ADMIN') return true;
   if (!canDelegateOrganizationRole(actor.role, target.role ?? '')) return false;
   if (!canDelegateOrganizationAdminLevel(actor.admin_level, target.admin_level ?? '', levels)) return false;
+  // Chief admins are organisation-wide: only the role and admin-level ceilings apply to them.
+  if (actorRole === 'CHIEF_ADMIN') return true;
   if (actorRole === 'REGION_ADMIN' &&
       (actor.region ?? '').trim().toLowerCase() !== (target.region ?? '').trim().toLowerCase()) return false;
   const actorIds = new Set((actor.pharmacies ?? []).map((pharmacy) => numericPharmacyId(pharmacy.id)));
@@ -410,10 +412,10 @@ export function canManageKioskDevices(user: AuthorityUser | null | undefined, ph
   return (user.memberships ?? []).some((membership) => {
     if (!membership?.organization_id) return false;
     const role = normalizeRole(membership.role);
-    if (role === 'ORG_ADMIN') {
+    if (role === 'ORG_ADMIN' || role === 'CHIEF_ADMIN') {
       return (membership.organization_pharmacies ?? []).some((pharmacy) => numericPharmacyId(pharmacy.id) === id);
     }
-    if ((role === 'CHIEF_ADMIN' || role === 'REGION_ADMIN') &&
+    if (role === 'REGION_ADMIN' &&
         ['OWNER', 'MANAGER'].includes(normalizeAdminLevel(membership.admin_level))) {
       return (membership.pharmacies ?? []).some((pharmacy) => numericPharmacyId(pharmacy.id) === id) &&
         (membership.organization_pharmacies ?? []).some((pharmacy) => numericPharmacyId(pharmacy.id) === id);

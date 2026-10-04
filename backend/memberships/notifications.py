@@ -9,6 +9,7 @@ from notifications.services import notify_users
 from organizations.access import CAPABILITY_MANAGE_STAFF, has_admin_capability
 from organizations.models import PharmacyAdmin
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 
 def _frontend_base_url() -> str:
@@ -78,7 +79,7 @@ def _membership_controller_users(pharmacy, invited_by=None):
     if getattr(pharmacy, "organization_id", None):
         for org_membership in OrganizationMembership.objects.filter(
             organization_id=pharmacy.organization_id,
-            role="ORG_ADMIN",
+            role__in=ORG_WIDE_ADMIN_ROLES,
         ).select_related("user"):
             add(org_membership.user)
 

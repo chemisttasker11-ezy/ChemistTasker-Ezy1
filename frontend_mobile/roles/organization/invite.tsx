@@ -134,6 +134,8 @@ export default function OrganizationInviteScreen() {
 
   const orgId = orgMembership?.organization_id ?? orgMembership?.organizationId ?? null;
   const isRegionAdmin = orgMembership?.role === 'REGION_ADMIN';
+  // Chief and region admins cannot delegate above their own role or admin level; only region admins are
+  // limited to their assigned pharmacies (chief admins are organisation-wide).
   const isScopedAdmin = isRegionAdmin || orgMembership?.role === 'CHIEF_ADMIN';
   const inviterCapabilities = useMemo(
     () => new Set<string>(Array.isArray(orgMembership?.capabilities) ? orgMembership.capabilities : []),
@@ -156,10 +158,10 @@ export default function OrganizationInviteScreen() {
     canManageOrganizationMember(orgMembership, member, adminLevelMap);
 
   const availablePharmacies = useMemo(
-    () => isScopedAdmin
+    () => isRegionAdmin
       ? pharmacies.filter((pharmacy) => orgMembership?.pharmacies?.some((assigned: PharmacyOption) => assigned.id === pharmacy.id))
       : pharmacies,
-    [isScopedAdmin, orgMembership?.pharmacies, pharmacies]
+    [isRegionAdmin, orgMembership?.pharmacies, pharmacies]
   );
 
   const selectedRoleDefinition = useMemo(
@@ -281,9 +283,9 @@ export default function OrganizationInviteScreen() {
       !canDelegateOrganizationRole(orgMembership?.role, selectedRole) ||
       !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, selectedAdminLevel, adminLevelMap) ||
       (isRegionAdmin && region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
-      !selectedPharmacyIds.length ||
+      (isRegionAdmin && !selectedPharmacyIds.length) ||
       selectedPharmacyIds.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
-    )) return 'This invitation exceeds your region delegation scope.';
+    )) return 'This invitation exceeds your delegation scope.';
     if (selectedRoleDefinition.requires_job_title && !jobTitle.trim()) return 'Job title is required for this role.';
     if (selectedRoleDefinition.requires_region && !region.trim()) return 'Region is required for this role.';
     if (selectedRoleDefinition.requires_pharmacies && selectedPharmacyIds.length === 0) {
@@ -352,10 +354,10 @@ export default function OrganizationInviteScreen() {
       !canDelegateOrganizationRole(orgMembership?.role, editForm.role) ||
       !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, editForm.admin_level, adminLevelMap) ||
       (isRegionAdmin && editForm.region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
-      !editForm.pharmacy_ids.length ||
+      (isRegionAdmin && !editForm.pharmacy_ids.length) ||
       editForm.pharmacy_ids.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
     )) {
-      setError('This update exceeds your region delegation scope.');
+      setError('This update exceeds your delegation scope.');
       return;
     }
     const definition = roleDefinitions.find((role) => role.key === editForm.role);

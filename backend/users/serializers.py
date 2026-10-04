@@ -22,6 +22,7 @@ from .org_roles import (
     ROLE_DEFINITIONS,
     get_admin_level_definition,
     get_role_definition,
+    membership_has_org_wide_scope,
     role_capabilities,
     role_requires_field,
 )
@@ -31,7 +32,7 @@ User = get_user_model()
 def serialize_org_memberships(queryset):
     queryset = queryset.select_related('organization').prefetch_related('pharmacies')
     memberships = list(queryset)
-    org_admin_ids = {membership.organization_id for membership in memberships if membership.role == 'ORG_ADMIN'}
+    org_admin_ids = {membership.organization_id for membership in memberships if membership_has_org_wide_scope(membership)}
     organization_pharmacies = {}
     for pharmacy in Pharmacy.objects.filter(organization_id__in=org_admin_ids).values('id', 'name', 'organization_id'):
         organization_pharmacies.setdefault(pharmacy['organization_id'], []).append({
@@ -63,7 +64,7 @@ def serialize_org_memberships(queryset):
                 'region': membership.region,
                 'pharmacies': pharmacy_data,
                 'organization_pharmacies': organization_pharmacies.get(membership.organization_id, [])
-                if membership.role == 'ORG_ADMIN' else [],
+                if membership_has_org_wide_scope(membership) else [],
                 'capabilities': sorted(role_capabilities(membership.role, membership.admin_level)),
             }
         )

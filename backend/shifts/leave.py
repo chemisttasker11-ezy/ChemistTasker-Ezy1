@@ -38,7 +38,7 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         )
         user = self.request.user
 
-        from users.org_roles import OrgCapability, membership_capabilities
+        from users.org_roles import OrgCapability, membership_capabilities, membership_has_org_wide_scope
 
         visible = Q(user=user)
         if getattr(user, "is_superuser", False):
@@ -60,9 +60,9 @@ class LeaveRequestViewSet(viewsets.ViewSet):
         for membership in OrganizationMembership.objects.filter(user=user).prefetch_related("pharmacies"):
             if OrgCapability.MANAGE_ROSTER not in membership_capabilities(membership):
                 continue
-            if membership.role == "ORG_ADMIN":
+            if membership_has_org_wide_scope(membership):
                 visible |= Q(pharmacy__organization_id=membership.organization_id)
-            elif membership.role in {"CHIEF_ADMIN", "REGION_ADMIN"}:
+            elif membership.role == "REGION_ADMIN":
                 visible |= Q(
                     pharmacy__organization_id=membership.organization_id,
                     pharmacy_id__in=membership.pharmacies.values_list("id", flat=True),

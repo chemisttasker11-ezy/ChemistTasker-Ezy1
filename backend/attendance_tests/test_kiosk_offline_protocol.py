@@ -363,7 +363,7 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         membership = OrganizationMembership.objects.create(
             user=org_admin,
             organization=self.pharmacy.organization,
-            role="CHIEF_ADMIN",
+            role="REGION_ADMIN",
             admin_level="MANAGER",
         )
         membership.pharmacies.add(self.pharmacy)
@@ -386,7 +386,7 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         membership = OrganizationMembership.objects.create(
             user=manager,
             organization=self.pharmacy.organization,
-            role="CHIEF_ADMIN",
+            role="REGION_ADMIN",
             admin_level="MANAGER",
         )
         membership.pharmacies.add(self.pharmacy)
@@ -406,16 +406,36 @@ class KioskOfflineProtocolTests(unittest.TestCase):
         self.assertIn(self.pharmacy.id, pharmacy_ids)
         self.assertNotIn(unassigned.id, pharmacy_ids)
 
-    def test_unscoped_chief_cannot_manage_kiosk_devices(self):
-        chief = User.objects.create(email="unscoped-chief@offline.test", role="PHARMACIST", is_active=True)
+    def test_unscoped_region_admin_cannot_manage_kiosk_devices(self):
+        region = User.objects.create(email="unscoped-region@offline.test", role="PHARMACIST", is_active=True)
+        OrganizationMembership.objects.create(
+            user=region, organization=self.pharmacy.organization,
+            role="REGION_ADMIN", admin_level="MANAGER",
+        )
+        client = APIClient()
+        client.force_authenticate(user=region)
+        response = client.get(f"/attendance/manager/kiosk-devices/?pharmacy_id={self.pharmacy.id}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_chief_admin_covers_organization_without_explicit_pharmacy_assignment(self):
+        chief = User.objects.create(email="org-wide-chief@offline.test", role="PHARMACIST", is_active=True)
         OrganizationMembership.objects.create(
             user=chief, organization=self.pharmacy.organization,
             role="CHIEF_ADMIN", admin_level="MANAGER",
         )
+        unassigned = Pharmacy.objects.create(
+            name="Chief Pairing Pharmacy",
+            owner=self.pharmacy.owner,
+            organization=self.pharmacy.organization,
+            timezone="Australia/Brisbane",
+        )
         client = APIClient()
         client.force_authenticate(user=chief)
         response = client.get(f"/attendance/manager/kiosk-devices/?pharmacy_id={self.pharmacy.id}")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        pairing = client.get("/attendance/kiosk/pairing/request/")
+        self.assertEqual(pairing.status_code, 200)
+        self.assertTrue({self.pharmacy.id, unassigned.id} <= {row["id"] for row in pairing.data["pharmacies"]})
 
     def test_org_admin_covers_organization_without_explicit_pharmacy_assignment(self):
         org_admin = User.objects.create(email="umbrella-admin@offline.test", role="PHARMACIST", is_active=True)

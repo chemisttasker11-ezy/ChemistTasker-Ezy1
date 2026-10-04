@@ -9,6 +9,7 @@ from organizations.access import is_admin_of
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 from ratings.serializers import (
     MyRatingSerializer,
     PendingRatingsSerializer,
@@ -42,7 +43,7 @@ class RatingViewSet(viewsets.GenericViewSet):
             return True
         # 2) Org-admin of pharmacy's organization
         if OrganizationMembership.objects.filter(
-            user=user, role="ORG_ADMIN", organization_id=pharmacy.organization_id
+            user=user, role__in=ORG_WIDE_ADMIN_ROLES, organization_id=pharmacy.organization_id
         ).exists():
             return True
         # 3) Pharmacy admin of THIS pharmacy
@@ -63,9 +64,9 @@ class RatingViewSet(viewsets.GenericViewSet):
             user=rater, is_active=True
         ).values_list("pharmacy_id", flat=True)
 
-        # Pharmacies under organizations where rater is ORG_ADMIN
+        # Pharmacies under organizations where rater is an org-wide admin
         org_ids = OrganizationMembership.objects.filter(
-            user=rater, role="ORG_ADMIN"
+            user=rater, role__in=ORG_WIDE_ADMIN_ROLES
         ).values_list("organization_id", flat=True)
         org_pharmacy_ids = Pharmacy.objects.filter(
             organization_id__in=list(org_ids)
@@ -251,7 +252,7 @@ class RatingViewSet(viewsets.GenericViewSet):
         # Pharmacies the user controls
         pharm_control = Pharmacy.objects.filter(
             Q(owner__user=user)
-            | Q(organization__memberships__user=user, organization__memberships__role="ORG_ADMIN")
+            | Q(organization__memberships__user=user, organization__memberships__role__in=ORG_WIDE_ADMIN_ROLES)
             | Q(admin_assignments__user=user, admin_assignments__is_active=True)
         ).distinct()
 

@@ -19,7 +19,8 @@ from core.task_queue import async_task
 from organizations.access import _collect_org_access_scope
 from django.db import transaction
 from users.models import OrganizationMembership, User
-from users.utils import build_org_invite_context
+from users.org_roles import ORG_WIDE_ADMIN_ROLES, OrgCapability, membership_capabilities
+from users.utils import build_pharmacy_manager_invite_context
 import re
 from organizations.serializers import (
     PharmacyClaimCreateSerializer,
@@ -115,7 +116,7 @@ def _send_pharmacy_created_email(pharmacy, created_by_user, organization=None):
 def _notify_org_of_claim_response(claim):
     admins = OrganizationMembership.objects.filter(
         organization_id=claim.organization_id,
-        role="ORG_ADMIN",
+        role__in=ORG_WIDE_ADMIN_ROLES,
     ).select_related("user")
     recipients = []
     action_url = _build_org_claims_url()
@@ -179,9 +180,10 @@ class OwnerOnboardingClaim(APIView):
         return name[:120]
 
     def _ensure_org_user_account(self, email: str):
+        # A new account is a non-clinical pharmacy admin, exactly as the pharmacy-admin invitation creates one.
         user, created = User.objects.get_or_create(
             email=email,
-            defaults={'role': 'ORG_STAFF'}
+            defaults={'role': 'EXPLORER'}
         )
         temp_password = None
         if created:
@@ -189,57 +191,24 @@ class OwnerOnboardingClaim(APIView):
             user.save(update_fields=['password'])
         return user, temp_password
 
-    def _ensure_scoped_chief_admin_membership(self, user, organization, pharmacy):
-        membership_defaults = {
-            'role': 'CHIEF_ADMIN',
-            'admin_level': PharmacyAdmin.AdminLevel.MANAGER,
-            'job_title': 'Pharmacy Onboarding Admin',
-        }
-        membership, _created = OrganizationMembership.objects.get_or_create(
-            user=user,
-            organization=organization,
-            defaults=membership_defaults,
-        )
-        update_fields = set()
-        if membership.role != 'CHIEF_ADMIN':
-            membership.role = 'CHIEF_ADMIN'
-            update_fields.add('role')
-        if membership.admin_level != PharmacyAdmin.AdminLevel.MANAGER:
-            membership.admin_level = PharmacyAdmin.AdminLevel.MANAGER
-            update_fields.add('admin_level')
-        if not membership.job_title:
-            membership.job_title = 'Pharmacy Onboarding Admin'
-            update_fields.add('job_title')
-        if update_fields:
-            membership.save(update_fields=list(update_fields))
-        if not membership.pharmacies.filter(pk=pharmacy.pk).exists():
-            membership.pharmacies.add(pharmacy)
-        return membership
-
     def _send_org_invite_email(self, user, organization, pharmacy, inviter, temp_password=None):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         frontend_url = settings.FRONTEND_BASE_URL
         magic_link = f"{frontend_url}/reset-password/{uid}/{token}/"
 
-        membership = (
-            OrganizationMembership.objects.select_related("organization")
-            .prefetch_related("pharmacies")
-            .filter(user=user, organization=organization)
-            .first()
-        )
-
-        invitation_context = build_org_invite_context(
-            membership=membership,
+        invitation_context = build_pharmacy_manager_invite_context(
+            organization=organization,
+            pharmacy=pharmacy,
             inviter=inviter,
             magic_link=magic_link,
-            dashboard_link=f"{frontend_url}/dashboard/organization/overview",
+            dashboard_link=f"{frontend_url}/dashboard/admin/{pharmacy.pk}",
             temp_password=temp_password,
         )
 
         async_task(
             'users.tasks.send_async_email',
-            subject=f"You've been invited to join {organization.name} on ChemistTasker",
+            subject=f"You've been invited to manage {pharmacy.name} for {organization.name} on ChemistTasker",
             recipient_list=[user.email],
             template_name="emails/org_invite_new_user.html",
             context=invitation_context,
@@ -256,24 +225,27 @@ class OwnerOnboardingClaim(APIView):
                 verified=False,
             )
             user, temp_password = self._ensure_org_user_account(email)
-            membership = self._ensure_scoped_chief_admin_membership(user, organization, pharmacy)
+            # The onboarded contact manages this one pharmacy: a pharmacy-level MANAGER admin (the owner's
+            # capabilities without being the owner), never an organisation role that would reach every pharmacy.
             pharmacy_membership, _ = Membership.objects.get_or_create(
                 user=user,
                 pharmacy=pharmacy,
                 defaults={
-                    'role': 'OWNER',
+                    'role': 'CONTACT',
                     'employment_type': 'FULL_TIME',
+                    'status': Membership.Status.ACCEPTED,
                     'is_active': True,
                     'invited_by': request.user,
                 }
             )
-            PharmacyAdmin.objects.update_or_create(
+            assignment, _ = PharmacyAdmin.objects.update_or_create(
                 user=user,
                 pharmacy=pharmacy,
                 defaults={
                     'membership': pharmacy_membership,
-                    'admin_level': PharmacyAdmin.AdminLevel.OWNER,
+                    'admin_level': PharmacyAdmin.AdminLevel.MANAGER,
                     'staff_role': 'OTHER',
+                    'job_title': 'Pharmacy Manager',
                     'is_active': True,
                     'created_by': request.user,
                 }
@@ -284,15 +256,21 @@ class OwnerOnboardingClaim(APIView):
             'detail': 'Pharmacy created and invitation sent.',
             'pharmacy': serialized,
             'user_id': user.id,
-            # return both: org-scoped membership and pharmacy ownership membership
-            'organization_membership_id': membership.id,
+            # No organisation role is created; the key stays for response compatibility.
+            'organization_membership_id': None,
             'pharmacy_membership_id': pharmacy_membership.id,
+            'pharmacy_admin_id': assignment.id,
         }
 
     def post(self, request):
-        membership = request.user.organization_memberships.filter(
-            role='ORG_ADMIN'
-        ).select_related('organization').first()
+        membership = next(
+            (
+                org_membership
+                for org_membership in request.user.organization_memberships.select_related('organization').order_by('id')
+                if OrgCapability.CLAIM_PHARMACY in membership_capabilities(org_membership)
+            ),
+            None,
+        )
         if not membership:
             return Response(
                 {'detail': 'Not an Org-Admin.'},

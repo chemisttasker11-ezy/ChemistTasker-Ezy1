@@ -33,7 +33,7 @@ from organizations.access import _get_org_pharmacies_queryset
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from users.models import OrganizationMembership, User
-from users.org_roles import membership_capabilities, membership_visible_pharmacy_ids, OrgCapability
+from users.org_roles import ORG_WIDE_ADMIN_ROLES, membership_capabilities, membership_visible_pharmacy_ids, OrgCapability
 from organizations.claims import _send_pharmacy_created_email
 from organizations.serializers import (
     ChainSerializer,
@@ -321,7 +321,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
             pharmacies_user_admins(user).values_list("id", flat=True)
         )
         org_admin_org_ids = OrganizationMembership.objects.filter(
-            user=user, role="ORG_ADMIN"
+            user=user, role__in=ORG_WIDE_ADMIN_ROLES
         ).values_list("organization_id", flat=True)
         org_admin_org_ids = list(org_admin_org_ids)
         if org_admin_org_ids:
@@ -343,7 +343,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
         if getattr(pharmacy.owner, "user_id", None) == user.id:
             return True
         if pharmacy.organization_id and OrganizationMembership.objects.filter(
-            user=user, role="ORG_ADMIN", organization_id=pharmacy.organization_id
+            user=user, role__in=ORG_WIDE_ADMIN_ROLES, organization_id=pharmacy.organization_id
         ).exists():
             return True
         return has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ADMINS)
@@ -533,18 +533,18 @@ class ChainViewSet(viewsets.ModelViewSet):
             return
 
         user = request.user
-        # allow create for both OwnerOnboarding and ORG_ADMIN
+        # allow create for both OwnerOnboarding and org-wide admins
         if request.method == 'POST':
             if OwnerOnboarding.objects.filter(user=user).exists():
                 return
-            if OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').exists():
+            if OrganizationMembership.objects.filter(user=user, role__in=ORG_WIDE_ADMIN_ROLES).exists():
                 return
             self.permission_denied(request)
 
-        # allow update/delete if chain owner or any ORG_ADMIN
+        # allow update/delete if chain owner or any org-wide admin
         if IsOwner().has_permission(request, self):
             return
-        if OrganizationMembership.objects.filter(user=user, role='ORG_ADMIN').exists():
+        if OrganizationMembership.objects.filter(user=user, role__in=ORG_WIDE_ADMIN_ROLES).exists():
             return
         self.permission_denied(request)
 
@@ -559,7 +559,7 @@ class ChainViewSet(viewsets.ModelViewSet):
 
         # Org-admin–created chains
         org_mem = OrganizationMembership.objects.filter(
-            user=user, role='ORG_ADMIN'
+            user=user, role__in=ORG_WIDE_ADMIN_ROLES
         ).first()
         if org_mem:
             qs |= Chain.objects.filter(organization=org_mem.organization)
@@ -575,7 +575,7 @@ class ChainViewSet(viewsets.ModelViewSet):
             return
         # Org-admin flow
         org_mem = OrganizationMembership.objects.filter(
-            user=user, role='ORG_ADMIN'
+            user=user, role__in=ORG_WIDE_ADMIN_ROLES
         ).first()
         if org_mem:
             serializer.save(organization=org_mem.organization)

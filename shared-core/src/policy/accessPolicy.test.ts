@@ -33,6 +33,10 @@ describe('shared access policy', () => {
     const actor = { role: 'REGION_ADMIN', admin_level: 'ROSTER_MANAGER', region: 'North', pharmacies: [{ id: 7 }] };
     expect(canManageOrganizationMember(actor, { ...actor, pharmacies: [{ id: 7 }] }, levels)).toBe(true);
     expect(canManageOrganizationMember(actor, { ...actor, pharmacies: [{ id: 8 }] }, levels)).toBe(false);
+    // Chief admins are organisation-wide: only the role and admin-level ceilings apply.
+    const chief = { role: 'CHIEF_ADMIN', admin_level: 'MANAGER', pharmacies: [] };
+    expect(canManageOrganizationMember(chief, { ...actor, pharmacies: [{ id: 8 }] }, levels)).toBe(true);
+    expect(canManageOrganizationMember(chief, { ...chief, role: 'ORG_ADMIN' }, levels)).toBe(false);
   });
   it('resolves organization portal access only from a real organization membership or role', () => {
     const staff = {
@@ -241,7 +245,13 @@ describe('shared access policy', () => {
     expect(canManageKioskDevices(region, 30)).toBe(true);
     expect(canManageKioskDevices(region, 31)).toBe(false);
     expect(canManageKioskDevices({ memberships: [{ ...region.memberships[0], pharmacies: [] }] }, 30)).toBe(false);
-    expect(canManageKioskDevices({ memberships: [{ ...region.memberships[0], role: 'CHIEF_ADMIN', admin_level: 'OWNER' }] }, 30)).toBe(true);
+    const chief = { memberships: [{
+      organization_id: 7, role: 'CHIEF_ADMIN', admin_level: 'MANAGER',
+      pharmacies: [], organization_pharmacies: [{ id: 30 }, { id: 32 }],
+    }] };
+    expect(canManageKioskDevices(chief, 30)).toBe(true);
+    expect(canManageKioskDevices(chief, 32)).toBe(true);
+    expect(canManageKioskDevices(chief, 31)).toBe(false);
     expect(canManageKioskDevices({ memberships: [{ ...region.memberships[0], admin_level: 'ROSTER_MANAGER' }] }, 30)).toBe(false);
   });
 

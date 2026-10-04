@@ -136,17 +136,18 @@ def user_can_manage_pharmacy(user, pharmacy) -> bool:
         return True
 
     from users.models import OrganizationMembership
+    from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
     if OrganizationMembership.objects.filter(
         user=user,
-        role='ORG_ADMIN',
+        role__in=ORG_WIDE_ADMIN_ROLES,
         organization_id=pharmacy.organization_id,
     ).exists():
         return True
 
     if OrganizationMembership.objects.filter(
         user=user,
-        role__in=['CHIEF_ADMIN', 'REGION_ADMIN'],
+        role='REGION_ADMIN',
         pharmacies=pharmacy,
     ).exists():
         return True
@@ -166,6 +167,7 @@ def managed_pharmacies(user):
         return Pharmacy.objects.none()
 
     from users.models import OrganizationMembership
+    from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
     pharmacies = Pharmacy.objects.none()
 
@@ -173,7 +175,7 @@ def managed_pharmacies(user):
         pharmacies |= Pharmacy.objects.filter(owner=user.owneronboarding)
 
     org_ids = list(
-        OrganizationMembership.objects.filter(user=user, role="ORG_ADMIN").values_list(
+        OrganizationMembership.objects.filter(user=user, role__in=ORG_WIDE_ADMIN_ROLES).values_list(
             "organization_id", flat=True
         )
     )

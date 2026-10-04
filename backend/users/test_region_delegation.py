@@ -260,16 +260,25 @@ class RegionDelegationTests(TestCase):
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.role, 'ORG_ADMIN')
 
-    def test_chief_can_delegate_scoped_region_but_not_org_admin_to_others(self):
+    def test_chief_delegates_across_the_whole_organisation_but_not_org_admin(self):
+        # Chief admins are organisation-wide: any pharmacy of the organisation is inside their scope.
         self.membership.role = 'CHIEF_ADMIN'
         self.membership.admin_level = 'MANAGER'
         self.membership.save(update_fields=['role', 'admin_level'])
+        self.membership.pharmacies.clear()
         allowed = self.invite(email='chief-delegate@example.com')
         self.assertEqual(allowed.status_code, 201)
+        elsewhere_in_org = self.invite(email='south@example.com', pharmacies=[self.other_pharmacy.id])
+        self.assertEqual(elsewhere_in_org.status_code, 201)
+        peer_chief = self.invite(
+            email='peer-chief@example.com', role='CHIEF_ADMIN', admin_level='MANAGER', pharmacies=[],
+        )
+        self.assertEqual(peer_chief.status_code, 201, peer_chief.content)
         elevated = self.invite(email='too-high@example.com', role='ORG_ADMIN')
         self.assertEqual(elevated.status_code, 403)
-        expanded = self.invite(email='outside@example.com', pharmacies=[self.other_pharmacy.id])
-        self.assertEqual(expanded.status_code, 403)
+        outside_org = Pharmacy.objects.create(name='Outside Pharmacy', organization=Organization.objects.create(name='Elsewhere'))
+        foreign = self.invite(email='foreign@example.com', pharmacies=[outside_org.id])
+        self.assertIn(foreign.status_code, (400, 403), foreign.content)
 
     def test_org_admin_payload_lists_only_verified_org_pharmacies(self):
         outside_org = Organization.objects.create(name='Other Group')

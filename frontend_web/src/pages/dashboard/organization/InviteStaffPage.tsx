@@ -186,6 +186,8 @@ export default function InviteStaffPage() {
 
   const orgId = orgMembership?.organization_id ?? null;
   const isRegionAdmin = orgMembership?.role === 'REGION_ADMIN';
+  // Chief and region admins cannot delegate above their own role or admin level; only region admins are
+  // limited to their assigned pharmacies (chief admins are organisation-wide).
   const isScopedAdmin = isRegionAdmin || orgMembership?.role === 'CHIEF_ADMIN';
   const inviterCapabilities = new Set(orgMembership?.capabilities ?? []);
   const canInvite = inviterCapabilities.has('invite_staff');
@@ -231,10 +233,10 @@ export default function InviteStaffPage() {
     (orgMembership?.role === 'CHIEF_ADMIN' && member.user?.id === user?.id) ||
     canManageOrganizationMember(orgMembership, member, adminLevelMap);
   const availablePharmacies = useMemo(
-    () => isScopedAdmin
+    () => isRegionAdmin
       ? pharmacies.filter((pharmacy) => orgMembership?.pharmacies?.some((assigned) => assigned.id === pharmacy.id))
       : pharmacies,
-    [isScopedAdmin, orgMembership?.pharmacies, pharmacies]
+    [isRegionAdmin, orgMembership?.pharmacies, pharmacies]
   );
 
   const currentUserId = user?.id ?? null;
@@ -407,10 +409,10 @@ export default function InviteStaffPage() {
       !canDelegateOrganizationRole(orgMembership?.role, selectedRole) ||
       !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, selectedAdminLevel, adminLevelMap) ||
       (isRegionAdmin && region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
-      !selectedPharmacyIds.length ||
+      (isRegionAdmin && !selectedPharmacyIds.length) ||
       selectedPharmacyIds.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
     )) {
-      setError('This invitation exceeds your region delegation scope.');
+      setError('This invitation exceeds your delegation scope.');
       return;
     }
     if (roleDefinition.requires_job_title && !jobTitle.trim()) {
@@ -500,8 +502,8 @@ export default function InviteStaffPage() {
       !canDelegateOrganizationRole(orgMembership?.role, editForm.role) ||
       !canDelegateOrganizationAdminLevel(orgMembership?.admin_level, editForm.admin_level, adminLevelMap) ||
       (isRegionAdmin && editForm.region.trim().toLowerCase() !== (orgMembership?.region ?? '').trim().toLowerCase()) ||
-      !editForm.pharmacy_ids.length ||
-      editForm.pharmacy_ids.some((id) => !orgMembership?.pharmacies?.some((pharmacy) => pharmacy.id === id))
+      (isRegionAdmin && !editForm.pharmacy_ids.length) ||
+      editForm.pharmacy_ids.some((id) => !availablePharmacies.some((pharmacy) => pharmacy.id === id))
     )) {
       setEditError('This role or admin level exceeds your delegation scope.');
       return;
