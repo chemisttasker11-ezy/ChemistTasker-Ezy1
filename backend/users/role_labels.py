@@ -1,5 +1,4 @@
 """Display labels derived from user/work roles."""
-from onboarding.models import OtherStaffOnboarding
 
 
 OTHER_STAFF_ROLE_LABELS = {
@@ -25,6 +24,8 @@ def user_work_role_label(user, fallback="candidate"):
         if profile:
             role_type = getattr(profile, "role_type", None)
         if not role_type and getattr(user, "id", None):
+            from onboarding.models import OtherStaffOnboarding  # resolve reverse lookup at call time
+
             role_type = (
                 OtherStaffOnboarding.objects.filter(user=user)
                 .values_list("role_type", flat=True)
