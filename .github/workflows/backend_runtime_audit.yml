@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - 'backend/requirements*.txt'
+      - 'scripts/collect_backend_runtime_releases.py'
       - '.github/workflows/backend_runtime_audit.yml'
       - 'docs/architecture/BACKEND_RUNTIME_BASELINE.md'
   push:
     branches: [main]
     paths:
       - 'backend/requirements*.txt'
+      - 'scripts/collect_backend_runtime_releases.py'
       - '.github/workflows/backend_runtime_audit.yml'
   workflow_dispatch:
 
@@ -70,10 +72,15 @@ jobs:
                   findings = package.get('vulns', [])
                   if findings:
                       fixes = sorted({version for finding in findings for version in finding.get('fix_versions', [])})
-                      print(package['name'], package['version'], 'advisories=', len(findings), 'reported fixes=', ','.join(fixes))
+                      unique_ids = {finding['id'] for finding in findings}
+                      print(package['name'], package['version'], 'advisory entries=', len(findings), 'unique IDs=', len(unique_ids), 'reported fixes=', ','.join(fixes))
           else:
               print('No advisory report produced; inspect the failed install/audit step.')
           PY_AUDIT
+      - name: Verify release availability and dependency constraints
+        if: always()
+        run: |
+          "${RUNNER_TEMP}/application-runtime/bin/python" scripts/collect_backend_runtime_releases.py
       - name: Retain reviewable evidence even if the audit fails
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
