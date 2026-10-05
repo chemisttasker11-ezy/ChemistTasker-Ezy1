@@ -24,6 +24,9 @@ jobs:
   resolved-runtime-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -40,11 +43,11 @@ jobs:
           "${RUNNER_TEMP}/application-runtime/bin/python" -m pip install -r backend/requirements.txt
       - name: Record actual runtime and resolved dependency set
         run: |
-          mkdir -p .runtime-evidence
-          git rev-parse HEAD > .runtime-evidence/COMMIT
-          "${RUNNER_TEMP}/application-runtime/bin/python" -m pip freeze > .runtime-evidence/requirements.resolved.txt
-          "${RUNNER_TEMP}/application-runtime/bin/python" -c "import django, sys; print(sys.version); print('Django', django.get_version()); assert django.VERSION[:2] == (5, 2)" > .runtime-evidence/runtime.txt
-          "${RUNNER_TEMP}/application-runtime/bin/python" -m pip check | tee .runtime-evidence/pip-check.txt
+          mkdir -p runtime-evidence
+          git rev-parse HEAD > runtime-evidence/COMMIT
+          "${RUNNER_TEMP}/application-runtime/bin/python" -m pip freeze > runtime-evidence/requirements.resolved.txt
+          "${RUNNER_TEMP}/application-runtime/bin/python" -c "import django, sys; print(sys.version); print('Django', django.get_version()); assert django.VERSION[:2] == (5, 2)" > runtime-evidence/runtime.txt
+          "${RUNNER_TEMP}/application-runtime/bin/python" -m pip check | tee runtime-evidence/pip-check.txt
       - name: Install a pinned auditor separately from the application
         run: |
           python -m venv "${RUNNER_TEMP}/runtime-auditor"
@@ -52,14 +55,30 @@ jobs:
       - name: Audit the exact resolved application packages
         run: |
           "${RUNNER_TEMP}/runtime-auditor/bin/python" -m pip_audit \
-            --requirement .runtime-evidence/requirements.resolved.txt \
+            --requirement runtime-evidence/requirements.resolved.txt \
             --no-deps --disable-pip --strict --progress-spinner off \
-            --format json --output .runtime-evidence/advisories.json
+            --format json --output runtime-evidence/advisories.json
+      - name: Summarize collected advisories
+        if: always()
+        run: |
+          python - <<'PY_AUDIT'
+          import json
+          from pathlib import Path
+          report = Path('runtime-evidence/advisories.json')
+          if report.exists():
+              for package in json.loads(report.read_text()).get('dependencies', []):
+                  findings = package.get('vulns', [])
+                  if findings:
+                      fixes = sorted({version for finding in findings for version in finding.get('fix_versions', [])})
+                      print(package['name'], package['version'], 'advisories=', len(findings), 'reported fixes=', ','.join(fixes))
+          else:
+              print('No advisory report produced; inspect the failed install/audit step.')
+          PY_AUDIT
       - name: Retain reviewable evidence even if the audit fails
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: backend-runtime-evidence
-          path: .runtime-evidence/
+          path: runtime-evidence/
           if-no-files-found: warn
           retention-days: 7
