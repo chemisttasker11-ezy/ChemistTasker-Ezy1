@@ -373,3 +373,18 @@ class RosterSlotHTTPContractTests(TestCase):
         self.assertEqual(after.details["slot_after"]["end_time"], "18:00:00")
         self.assertEqual(before.details["slot_id"], after.details["slot_id"])
         self.assertEqual(RosterActionAudit.objects.count(), 2)
+
+    def test_generic_shift_endpoint_cannot_replace_roster_slots(self):
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        with mock.patch("shifts.posting.send_shift_updated_notifications") as announce:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(
+                    f"/api/client-profile/shifts/{self.shift.pk}/", self.payload(), format="json",
+                )
+        self.assertEqual(response.status_code, 400, response.content)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.end_time, time(17))
+        self.assertIsNotNone(self.slot.unpublished_at)
+        self.assert_original_assignment()
+        announce.assert_not_called()

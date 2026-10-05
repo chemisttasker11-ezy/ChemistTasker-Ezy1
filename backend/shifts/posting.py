@@ -140,6 +140,17 @@ def revise_shift(
     """Apply a validated edit: recalculate the escalation level when the visibility changes (`allowed_tiers` must
     contain it), replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
     announce the update after commit."""
+    # Roster slot IDs and accepted assignments are durable identities. They may
+    # only be edited by the in-place roster command, never this marketplace
+    # collection-replacement path (including when individually unpublished).
+    if slots_payload is not None and (
+        instance.is_roster_container
+        or instance.slots.filter(roster_period__isnull=False).exists()
+        or instance.slot_assignments.filter(is_rostered=True).exists()
+    ):
+        raise serializers.ValidationError({
+            "slots": "Use the roster editor to update existing roster slots in place."
+        })
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
