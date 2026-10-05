@@ -82,10 +82,7 @@ def edit_roster_slots(shift, user, command):
     """
     edits = {item["id"]: {key: value for key, value in item.items() if key != "id"}
              for item in command["slots"]}
-    initial_dates = dict(shift.slots.filter(pk__in=edits).values_list("pk", "date"))
-    if set(initial_dates) != set(edits):
-        raise ValidationError({"slots": "Every edited slot must belong to this shift."})
-    targets = {pk: data.get("date", initial_dates[pk]) for pk, data in edits.items()}
+    targets = {pk: data.get("date") for pk, data in edits.items()}
     requested_worker = command.get("user_id", UNSET)
     extra_workers = () if requested_worker is UNSET or requested_worker is None else (requested_worker,)
 
@@ -117,7 +114,7 @@ def edit_roster_slots(shift, user, command):
             old_period = periods.get(slot.roster_period_id) or _period_for_date(periods, shift.pharmacy_id, slot.date)
             if old_period:
                 affected_period_ids.add(old_period.pk)
-            proposed_date = targets[pk]
+            proposed_date = edits[pk].get("date", slot.date)
             destination = _period_for_date(periods, shift.pharmacy_id, proposed_date)
             if week_start(proposed_date) != week_start(slot.date):
                 if destination is None:
@@ -126,6 +123,7 @@ def edit_roster_slots(shift, user, command):
                     raise ValidationError("A slot cannot be moved into an archived roster.")
                 if destination.status == RosterPeriod.Status.PUBLISHED and slot.unpublished_at is None:
                     raise ValidationError("Only an individually unpublished slot can be moved into a published week.")
+            if proposed_date != slot.date:
                 for assignment in attached:
                     _protect_assignment_history(assignment)
             if destination:

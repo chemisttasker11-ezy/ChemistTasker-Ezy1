@@ -214,3 +214,162 @@ class RosterSlotHTTPContractTests(TestCase):
         self.assertEqual(self.slot.end_time, time(17))
         self.assertIsNone(self.slot.unpublished_at)
         self.assert_original_assignment()
+
+    def test_partial_slot_fields_preserve_date_period_and_contract(self):
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        response = self.client.patch(
+            self.url, {"slots": [{"id": self.slot.pk, "end_time": "18:30"}]}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.end_time, time(18, 30))
+        self.assertEqual(self.slot.date, self.week)
+        self.assertEqual(self.slot.roster_period_id, self.period.pk)
+        self.assertIsNotNone(self.slot.unpublished_at)
+        self.assert_original_assignment()
+
+    def test_slot_identity_and_server_owned_fields_are_strict(self):
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        attempts = [
+            {"slots": []},
+            {"slots": [{"end_time": "18:00"}]},
+            {"slots": [{"id": self.slot.pk}, {"id": self.slot.pk}]},
+            {"slots": [{"id": self.slot.pk, "unpublished_at": None}]},
+            {"slots": [{"id": self.slot.pk, "roster_period": self.period.pk}]},
+            {"slots": [{"id": self.slot.pk}], "pharmacy": self.pharmacy.pk},
+        ]
+        for payload in attempts:
+            with self.subTest(payload=payload):
+                response = self.client.patch(self.url, payload, format="json")
+                self.assertEqual(response.status_code, 400, response.content)
+                self.slot.refresh_from_db()
+                self.assertEqual(self.slot.end_time, time(17))
+                self.assertIsNotNone(self.slot.unpublished_at)
+                self.assert_original_assignment()
+
+    def test_shift_wide_role_change_cannot_mutate_a_published_sibling(self):
+        sibling = ShiftSlot.objects.create(
+            shift=self.shift, date=self.week + timedelta(days=1),
+            start_time=time(10), end_time=time(16), roster_period=self.period,
+        )
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        payload = self.payload()
+        payload["role_needed"] = "ASSISTANT"
+        response = self.client.patch(self.url, payload, format="json")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.shift.refresh_from_db()
+        self.slot.refresh_from_db()
+        sibling.refresh_from_db()
+        self.assertEqual(self.shift.role_needed, "PHARMACIST")
+        self.assertEqual(self.slot.end_time, time(17))
+        self.assertIsNone(sibling.unpublished_at)
+        self.assert_original_assignment()
+
+    def test_late_model_validation_failure_rolls_back_every_selected_slot(self):
+        sibling = ShiftSlot.objects.create(
+            shift=self.shift, date=self.week + timedelta(days=1),
+            start_time=time(10), end_time=time(16), roster_period=self.period,
+        )
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        unpublish_roster_shift(sibling, self.owner)
+        payload = self.payload()
+        payload["slots"].append({"id": sibling.pk, "planned_break_minutes": 900})
+        response = self.client.patch(self.url, payload, format="json")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.slot.refresh_from_db()
+        sibling.refresh_from_db()
+        self.assertEqual(self.slot.end_time, time(17))
+        self.assertEqual(sibling.planned_break_minutes, 0)
+        self.assertIsNotNone(self.slot.unpublished_at)
+        self.assertIsNotNone(sibling.unpublished_at)
+        self.assert_original_assignment()
+
+    def test_ineligible_replacement_rolls_back_slot_and_accepted_terms(self):
+        replacement = make_user("OTHER_STAFF")
+        Membership.objects.create(
+            user=replacement, pharmacy=self.pharmacy, role="ASSISTANT",
+            employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        payload = self.payload()
+        payload["user_id"] = replacement.pk
+        response = self.client.patch(self.url, payload, format="json")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.end_time, time(17))
+        self.assert_original_assignment()
+
+    def test_overlap_rejection_is_atomic(self):
+        other_shift = Shift.objects.create(pharmacy=self.pharmacy, role_needed="PHARMACIST")
+        other_slot = ShiftSlot.objects.create(
+            shift=other_shift, date=self.week, start_time=time(17, 30), end_time=time(19),
+            roster_period=self.period,
+        )
+        ShiftSlotAssignment.objects.create(
+            shift=other_shift, slot=other_slot, slot_date=self.week, user=self.worker, is_rostered=True,
+        )
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        response = self.client.patch(self.url, self.payload(), format="json")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.end_time, time(17))
+        self.assert_original_assignment()
+
+    def test_reassignment_does_not_retarget_an_existing_invoice(self):
+        from invoicing.models import Invoice, InvoiceLineItem
+
+        invoice = Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy)
+        item = InvoiceLineItem.objects.create(
+            invoice=invoice, source_assignment=self.assignment, shift=self.shift,
+            description="Frozen prior service", quantity=1, unit_price=57, total=57,
+        )
+        replacement = make_user("PHARMACIST")
+        Membership.objects.create(
+            user=replacement, pharmacy=self.pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        payload = self.payload()
+        payload["user_id"] = replacement.pk
+        response = self.client.patch(self.url, payload, format="json")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.slot.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(self.slot.end_time, time(17))
+        self.assertEqual(item.source_assignment_id, self.assignment.pk)
+        self.assert_original_assignment()
+
+    def test_republish_rechecks_worker_eligibility(self):
+        from django.core.exceptions import ValidationError
+
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        Membership.objects.filter(user=self.worker, pharmacy=self.pharmacy).update(is_active=False)
+        with self.assertRaises(ValidationError):
+            republish_roster_shift(self.slot, self.owner, notify="none")
+        self.slot.refresh_from_db()
+        self.assertIsNotNone(self.slot.unpublished_at)
+        self.assert_original_assignment()
+
+    def test_publication_audit_uses_existing_rows_and_records_before_after(self):
+        from workforce.models import RosterActionAudit
+
+        self.publish_fixture()
+        unpublish_roster_shift(self.slot, self.owner)
+        before = RosterActionAudit.objects.get(action_type="SHIFT_UNPUBLISHED")
+        self.assertEqual(before.details["slot_before"]["end_time"], "17:00:00")
+        response = self.client.patch(self.url, self.payload(), format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.slot.refresh_from_db()
+        republish_roster_shift(self.slot, self.owner, notify="none")
+        after = RosterActionAudit.objects.get(action_type="SHIFT_REPUBLISHED")
+        self.assertEqual(after.details["slot_after"]["end_time"], "18:00:00")
+        self.assertEqual(before.details["slot_id"], after.details["slot_id"])
+        self.assertEqual(RosterActionAudit.objects.count(), 2)
