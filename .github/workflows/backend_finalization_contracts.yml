@@ -95,6 +95,38 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install pinned backend requirements
         run: pip install -r backend/requirements.txt
+      - name: Archive isolated test runtime
+        if: matrix.database == 'sqlite'
+        shell: bash
+        run: |
+          python - <<'PY_RUNTIME'
+          import hashlib, json, os, pathlib, subprocess, sys, tarfile
+          destination = pathlib.Path(os.environ['RUNNER_TEMP']) / 'finalization-runtime'
+          destination.mkdir(exist_ok=True)
+          prefix = pathlib.Path(sys.base_prefix)
+          archive = destination / 'python-runtime.tar.gz'
+          def keep(info):
+              parts = pathlib.PurePosixPath(info.name).parts
+              if '__pycache__' in parts or '.cache' in parts:
+                  return None
+              return info
+          with tarfile.open(archive, 'w:gz') as tar:
+              for item in ('bin/python3.12', 'lib/libpython3.12.so', 'lib/libpython3.12.so.1.0', 'lib/python3.12'):
+                  path = prefix / item
+                  if path.exists():
+                      tar.add(path, arcname=item, filter=keep)
+          (destination / 'SHA256SUMS').write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + '  python-runtime.tar.gz\n')
+          (destination / 'COMMIT').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True))
+          (destination / 'requirements.freeze').write_text(subprocess.check_output([sys.executable, '-m', 'pip', 'freeze'], text=True))
+          (destination / 'runtime.json').write_text(json.dumps({'version': sys.version, 'platform': sys.platform}, indent=2))
+          PY_RUNTIME
+      - name: Retain isolated test runtime (temporary bootstrap)
+        if: matrix.database == 'sqlite'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-runtime
+          path: ${{ runner.temp }}/finalization-runtime/
+          retention-days: 1
       - name: Migration drift
         run: python backend/manage.py makemigrations --check --dry-run --settings=${{ matrix.settings }}
       - name: Roster HTTP identity and publication contracts
