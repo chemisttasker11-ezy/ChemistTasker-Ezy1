@@ -43,7 +43,6 @@ django-multiselectfield==0.1.13
 django-axes==7.1.0
 django-otp==1.5.4
 django-storages==1.14.6
-django-tenants==3.7.0
 django-two-factor-auth==1.17.0
 djangorestframework==3.16.0
 djangorestframework_simplejwt==5.5.0
