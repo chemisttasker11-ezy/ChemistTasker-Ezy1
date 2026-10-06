@@ -56,9 +56,9 @@ const config:NextConfig={
   ...['dashboard','onboarding','setup','kiosk','membership'].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
   {source:'/kiosk',destination:`${dashboard}/kiosk`},
   ...['dashboard-assets','js','assets','images',...(isDev?['src','@vite','@id','@fs','node_modules','@react-refresh','landing_next/shared']:[])].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
-  {source:'/ws/:path*',destination:`${api.replace(/\/api$/, '')}/ws/:path*`},
-  {source:'/media/:path*',destination:`${api.replace(/\/api$/, '')}/media/:path*`},
-  {source:'/api/:path*',destination:`${api}/:path*`},
+  {source:'/ws/:path*',destination:`${api.replace(/\/api\/v1$/, '')}/ws/:path*`},
+  {source:'/media/:path*',destination:`${api.replace(/\/api\/v1$/, '')}/media/:path*`},
+  {source:'/api/v1/:path*',destination:`${api}/:path*`},
  ]};},
 };
 
