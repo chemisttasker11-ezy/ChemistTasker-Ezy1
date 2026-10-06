@@ -119,10 +119,10 @@ describe('createChemistTaskerApi named community operations', () => {
 
     expect(calls).toEqual([
       { url: 'https://example.test/api/users/login/', method: 'POST' },
-      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/', method: 'POST' },
-      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/5/', method: 'PATCH' },
-      { url: 'https://example.test/api/client-profile/hub/posts/4/reactions/', method: 'POST' },
-      { url: 'https://example.test/api/client-profile/hub/posts/4/comments/5/reactions/', method: 'DELETE' },
+      { url: 'https://example.test/api/v1/hub/posts/4/comments/', method: 'POST' },
+      { url: 'https://example.test/api/v1/hub/posts/4/comments/5/', method: 'PATCH' },
+      { url: 'https://example.test/api/v1/hub/posts/4/reactions/', method: 'POST' },
+      { url: 'https://example.test/api/v1/hub/posts/4/comments/5/reactions/', method: 'DELETE' },
     ]);
   });
 });
