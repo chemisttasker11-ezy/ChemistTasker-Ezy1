@@ -41,7 +41,7 @@ apiClient.interceptors.response.use(
       const url = response.config?.url || '';
 
       const isWrite = method === 'post' || method === 'patch' || method === 'put';
-      const isOnboarding = /\/client-profile\/[^/]+\/onboarding\//.test(url);
+      const isOnboarding = /\/[^/]+\/onboarding\//.test(url);
 
       if (isWrite && isOnboarding) {
         window.dispatchEvent(new Event('onboarding-updated'));
