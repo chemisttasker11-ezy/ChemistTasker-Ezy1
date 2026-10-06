@@ -15,13 +15,13 @@ test('reuses base URL, credentials and fresh token provider', async () => {
   let seen;
   global.fetch = async (url, options) => { seen = { url: String(url), options }; return page([]); };
   await finance.items();
-  assert.equal(seen.url, 'https://api.example.invalid/api/client-profile/finance/items/');
+  assert.equal(seen.url, 'https://api.example.invalid/api/v1/finance/items/');
   assert.equal(seen.options.credentials, 'include');
   assert.equal(seen.options.headers.get('Authorization'), 'Bearer private-token');
 });
 test('follows same-origin finance pagination', async () => {
   const { finance, configureFinanceApi } = fresh(); configureFinanceApi(config); let calls = 0;
-  global.fetch = async () => ++calls === 1 ? page([{ id: 1 }], 'https://api.example.invalid/api/client-profile/finance/items/?page=2') : page([{ id: 2 }]);
+  global.fetch = async () => ++calls === 1 ? page([{ id: 1 }], 'https://api.example.invalid/api/v1/finance/items/?page=2') : page([{ id: 2 }]);
   assert.deepEqual(await finance.items(), [{ id: 1 }, { id: 2 }]); assert.equal(calls, 2);
 });
 test('does not send a token to cross-origin pagination URLs', async () => {
@@ -51,7 +51,7 @@ test('downloads receipt bytes through the authenticated API', async () => {
 });
 test('rejects repeated pagination instead of looping or silently truncating', async () => {
   const { finance, configureFinanceApi } = fresh(); configureFinanceApi(config); let calls = 0;
-  global.fetch = async () => { calls++; return page([], 'https://api.example.invalid/api/client-profile/finance/items/?page=2'); };
+  global.fetch = async () => { calls++; return page([], 'https://api.example.invalid/api/v1/finance/items/?page=2'); };
   await assert.rejects(finance.items(), /pagination repeated/); assert.equal(calls, 2);
 });
 
@@ -62,6 +62,6 @@ test('authenticated requests fail closed on HTTP redirects', async () => {
 });
 test('pagination rejects credentials embedded in a URL', async () => {
   const { finance, configureFinanceApi } = fresh(); configureFinanceApi(config); let calls = 0;
-  global.fetch = async () => { calls++; return page([], 'https://name:secret@api.example.invalid/api/client-profile/finance/items/'); };
+  global.fetch = async () => { calls++; return page([], 'https://name:secret@api.example.invalid/api/v1/finance/items/'); };
   await assert.rejects(finance.items(), /cannot leave/); assert.equal(calls, 1);
 });
