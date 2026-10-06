@@ -307,6 +307,7 @@ jobs:
           node-version: "22"
       - run: node scripts/audit-architecture-boundaries.mjs
       - run: node scripts/audit-shared-core-package.mjs
+      - run: node scripts/audit-api-v1-cutover.mjs
 
   kiosk:
     runs-on: ubuntu-latest
