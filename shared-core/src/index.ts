@@ -60,3 +60,5 @@ export * from './utils/pricing';
 
 // Shared mobile/desktop offline kiosk protocol.
 export * from './kioskProtocol';
+
+export * from './domains/rosterPublication';

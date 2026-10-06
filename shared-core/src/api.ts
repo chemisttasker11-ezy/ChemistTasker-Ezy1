@@ -4,6 +4,7 @@
  * Complete API functions for ChemistTasker
  */
 import { API_ENDPOINTS } from './constants/endpoints';
+import type { RosterValidateCommand, RosterPublishCommand, RosterValidationResult, RosterPublicationResult } from './domains/rosterPublication';
 import type { ShiftOfferAcceptancePayload, RosterPharmacyMember, WorkerShiftRequest } from './types';
 let config = null;
 export function configureApi(apiConfig) {
@@ -403,8 +404,8 @@ export const attendance = {
 export const rosterV2 = {
     getPeriod: (pharmacyId, weekStart) => operationalRequest(API_ENDPOINTS.rosterV2.period, { query: { pharmacy_id: pharmacyId, week_start: weekStart } }),
     initializePeriod: (pharmacyId, weekStart) => operationalRequest(API_ENDPOINTS.rosterV2.period, { method: 'POST', body: { pharmacy_id: pharmacyId, week_start: weekStart } }),
-    validate: (body) => operationalRequest(API_ENDPOINTS.rosterV2.validate, { method: 'POST', body }),
-    publish: (body) => operationalRequest(API_ENDPOINTS.rosterV2.publish, { method: 'POST', body }),
+    validate: (body: RosterValidateCommand): Promise<RosterValidationResult> => operationalRequest(API_ENDPOINTS.workforce.rosterValidate, { method: 'POST', body }),
+    publish: (body: RosterPublishCommand): Promise<RosterPublicationResult> => operationalRequest(API_ENDPOINTS.workforce.rosterPublish, { method: 'POST', body }),
     unpublish: (body) => operationalRequest(API_ENDPOINTS.rosterV2.unpublish, { method: 'POST', body }),
     archive: (body) => operationalRequest(API_ENDPOINTS.rosterV2.archive, { method: 'POST', body }),
     getWorkerRoster: (query) => operationalRequest(API_ENDPOINTS.rosterV2.worker, { query }),
@@ -429,7 +430,7 @@ export const rosterV2 = {
 export const workforce = {
     getRosterWorkspace: (pharmacyId, weekStart) => operationalRequest(API_ENDPOINTS.workforce.rosterWorkspace, { query: { pharmacy_id: pharmacyId, week_start: weekStart } }),
     validateRoster: (periodId, expectedRevision) => operationalRequest(API_ENDPOINTS.workforce.rosterValidate, { method: 'POST', body: { period_id: periodId, expected_revision: expectedRevision } }),
-    publishRoster: (body) => operationalRequest(API_ENDPOINTS.workforce.rosterPublish, { method: 'POST', body }),
+    publishRoster: (body: RosterPublishCommand): Promise<RosterPublicationResult> => operationalRequest(API_ENDPOINTS.workforce.rosterPublish, { method: 'POST', body }),
     getPayrollConfiguration: (pharmacyId) => operationalRequest(API_ENDPOINTS.workforce.payrollConfiguration, { query: { pharmacy_id: pharmacyId } }),
     updatePayrollConfiguration: (body) => operationalRequest(API_ENDPOINTS.workforce.payrollConfiguration, { method: 'PATCH', body }),
     listWorkSettings: (pharmacyId) => operationalRequest(API_ENDPOINTS.workforce.workSettings, { query: { pharmacy_id: pharmacyId } }),

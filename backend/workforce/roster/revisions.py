@@ -17,23 +17,12 @@ from workforce.roster.validation import work_interval
 
 from workforce.models import CoverageRequirement, RosterOperation, RosterRevisionState
 from workforce.permissions import require_manage_pharmacy
+from workforce.roster.publication_contract import RosterCommandConflict, warning_key
 
 
 def _json_hash(payload) -> str:
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
-
-
-def warning_key(item: dict) -> str:
-    stable = {
-        "type": item.get("type"),
-        "assignment_id": item.get("assignment_id"),
-        "user_id": item.get("user_id"),
-        "date": item.get("date"),
-        "required_role": item.get("required_role"),
-        "conflicting_assignment_id": item.get("conflicting_assignment_id"),
-    }
-    return _json_hash(stable)[:24]
 
 
 def get_revision_state(period: RosterPeriod, *, lock=False) -> RosterRevisionState:
@@ -160,29 +149,46 @@ def serialize_workspace(pharmacy, week_start: date):
     }
 
 
-def _load_operation(operation_id):
+def _operation_uuid(value):
     try:
-        return RosterOperation.objects.filter(operation_id=UUID(str(operation_id))).first()
+        return UUID(str(value))
     except (TypeError, ValueError, AttributeError):
         raise ValidationError("operation_id must be a valid UUID.")
 
 
+def _positive_revision(value):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValidationError("expected_revision must be a positive integer.")
+    return value
+
+
+def revision_summary(period):
+    """A side-effect-free projection for the period read/init response."""
+    state = RosterRevisionState.objects.filter(period=period).first() if period else None
+    return {
+        "draft_revision": state.draft_revision if state else (1 if period else 0),
+        "published_revision": state.published_revision if state else 0,
+        "validated_revision": state.validated_revision if state else None,
+    }
+
+
 def validate_revision(period, expected_revision: int):
     state = get_revision_state(period, lock=True)
-    if int(expected_revision) != state.draft_revision:
-        raise ValidationError({
-            "code": "ROSTER_REVISION_CONFLICT",
-            "message": "Roster changed since it was loaded. Refresh and review the latest draft.",
-            "current_revision": state.draft_revision,
-        })
+    if _positive_revision(expected_revision) != state.draft_revision:
+        raise RosterCommandConflict(
+            "ROSTER_REVISION_CONFLICT",
+            "Roster changed since it was loaded. Refresh and review the latest draft.",
+            current_revision=state.draft_revision,
+        )
     return state
 
 
 def validate_period_command(*, user, period: RosterPeriod, expected_revision: int):
     require_manage_pharmacy(user, period.pharmacy)
     with transaction.atomic():
-        state = validate_revision(period, expected_revision)
-        validation = validate_roster_period(period)
+        locked_period = RosterPeriod.objects.select_for_update(of=("self",)).select_related("pharmacy").get(pk=period.pk)
+        state = validate_revision(locked_period, expected_revision)
+        validation = validate_roster_period(locked_period)
         payload = {
             **validation,
             "draft_revision": state.draft_revision,
@@ -196,63 +202,57 @@ def validate_period_command(*, user, period: RosterPeriod, expected_revision: in
 
 def publish_period_command(*, user, period: RosterPeriod, expected_revision: int, operation_id, acknowledged_warning_keys):
     require_manage_pharmacy(user, period.pharmacy)
-    request_payload = {
+    revision = _positive_revision(expected_revision)
+    operation_id = _operation_uuid(operation_id)
+    if not isinstance(acknowledged_warning_keys, (list, tuple)) or any(
+        not isinstance(key, str) or not key or len(key) > 128 for key in acknowledged_warning_keys
+    ):
+        raise ValidationError("acknowledged_warning_keys must be a list of warning keys.")
+    keys = sorted(set(acknowledged_warning_keys))
+    request_hash = _json_hash({
         "period_id": period.pk,
-        "expected_revision": int(expected_revision),
-        "acknowledged_warning_keys": sorted(set(acknowledged_warning_keys or [])),
-    }
-    request_hash = _json_hash(request_payload)
+        "expected_revision": revision,
+        "acknowledged_warning_keys": keys,
+    })
 
     with transaction.atomic():
-        # Serialize commands for the same period before checking the idempotency ledger.
-        # This closes the race where two identical requests both observed no operation row.
-        locked_period = RosterPeriod.objects.select_for_update().select_related("pharmacy").get(pk=period.pk)
-        previous = _load_operation(operation_id)
-        if previous:
-            if previous.period_id != locked_period.pk or previous.request_hash != request_hash:
-                raise ValidationError("operation_id was already used for a different roster command.")
-            return previous.result_json
-
-        state = validate_revision(locked_period, expected_revision)
-        validation = validate_roster_period(locked_period)
-        if validation["errors"]:
-            raise ValidationError({"code": "ROSTER_BLOCKING_ERRORS", "errors": validation["errors"]})
-
-        warnings = [{**w, "warning_key": warning_key(w)} for w in validation.get("warnings", [])]
-        required_keys = {w["warning_key"] for w in warnings}
-        supplied_keys = set(acknowledged_warning_keys or [])
-        missing = sorted(required_keys - supplied_keys)
-        if missing:
-            raise ValidationError({
-                "code": "ROSTER_WARNINGS_REQUIRE_ACKNOWLEDGEMENT",
-                "missing_warning_keys": missing,
-                "warnings": warnings,
-            })
-
-        published, final_validation = publish_roster_period(
-            locked_period,
-            published_by=user,
-            force_warnings=True,  # safe here because every current warning was explicitly acknowledged above
+        locked_period = RosterPeriod.objects.select_for_update(of=("self",)).select_related("pharmacy").get(pk=period.pk)
+        # Reserve the globally unique operation before publishing. get_or_create
+        # serializes conflicting UUIDs even when callers selected different periods.
+        # Validation failure rolls this uncommitted reservation back with the command.
+        operation, created = RosterOperation.objects.get_or_create(
+            operation_id=operation_id,
+            defaults={"period": locked_period, "operation_type": "PUBLISH", "request_hash": request_hash,
+                      "result_json": {}, "created_by": user},
         )
+        if not created:
+            if (operation.period_id != locked_period.pk or operation.request_hash != request_hash
+                    or operation.operation_type != "PUBLISH" or operation.created_by_id != user.pk):
+                raise RosterCommandConflict("ROSTER_OPERATION_CONFLICT", "operation_id was already used for a different roster command.")
+            if not operation.result_json:
+                raise RosterCommandConflict("ROSTER_OPERATION_INCOMPLETE", "This operation has no completed result. Use a new operation after review.")
+            return operation.result_json
+
+        state = validate_revision(locked_period, revision)
+        # The underlying publication service validates the exact current warning
+        # keys after acquiring the period and worker locks. No force-warnings escape.
+        published, validation = publish_roster_period(
+            locked_period, published_by=user, acknowledged_warning_keys=keys,
+        )
+        validation = {**validation, "warnings": [{**w, "warning_key": warning_key(w)} for w in validation.get("warnings", [])]}
         state.published_revision = state.draft_revision
         state.validated_revision = state.draft_revision
-        state.validation_snapshot = {**final_validation, "warnings": warnings}
+        state.validation_snapshot = validation
         state.save(update_fields=["published_revision", "validated_revision", "validation_snapshot", "changed_at"])
-
         result = {
             "status": "PUBLISHED",
             "period_id": published.pk,
             "week_start": str(published.week_start),
+            "published_at": published.published_at.isoformat() if published.published_at else None,
             "draft_revision": state.draft_revision,
             "published_revision": state.published_revision,
-            "validation": state.validation_snapshot,
+            "validation": validation,
         }
-        RosterOperation.objects.create(
-            operation_id=operation_id,
-            period=locked_period,
-            operation_type="PUBLISH",
-            request_hash=request_hash,
-            result_json=result,
-            created_by=user,
-        )
+        operation.result_json = result
+        operation.save(update_fields=["result_json"])
         return result

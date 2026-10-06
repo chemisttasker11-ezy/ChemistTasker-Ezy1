@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { prepareRosterPublication, type RosterPublicationAttempt } from '@chemisttasker/shared-core';
 import {
   Alert,
   Button,
@@ -30,33 +31,46 @@ export default function RosterPublishReviewDialog({
   const [ack, setAck] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [validatedRevision, setValidatedRevision] = useState<number | null>(null);
+  const attempt = useRef<RosterPublicationAttempt | undefined>(undefined);
   const allWarningKeys = useMemo(() => warnings.map((row) => row.warning_key).filter(Boolean) as string[], [warnings]);
 
   useEffect(() => {
-    if (!open || !workspace?.period_id) return;
+    setValidatedRevision(null);
+    setWarnings([]);
+    setErrors([]);
     setAck(new Set());
+    attempt.current = undefined;
+    if (!open || !workspace?.period_id) return;
+    let active = true;
     setMessage('');
     setBusy(true);
     validateRosterRevision(workspace.period_id, workspace.draft_revision)
       .then((result) => {
-        const validation = result as { warnings?: RosterWarning[]; errors?: Array<{ type: string; message: string }> };
+        if (!active) return;
+        const validation = result as { draft_revision: number; warnings?: RosterWarning[]; errors?: Array<{ type: string; message: string }> };
         setWarnings(validation.warnings || []);
         setErrors(validation.errors || []);
+        setValidatedRevision(validation.draft_revision);
       })
-      .catch((err: any) => setMessage(err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Validation failed.'))
-      .finally(() => setBusy(false));
+      .catch((err: any) => { if (active) setMessage(err?.message || 'Validation failed. Refresh before publishing.'); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
   }, [open, workspace?.period_id, workspace?.draft_revision]);
 
   const publish = async () => {
-    if (!workspace?.period_id) return;
+    if (!workspace?.period_id || validatedRevision !== workspace.draft_revision) return;
     setBusy(true);
     setMessage('');
     try {
+      attempt.current = prepareRosterPublication(
+        workspace.period_id, validatedRevision, Array.from(ack), () => crypto.randomUUID(), attempt.current,
+      );
       await publishRosterRevision({
-        periodId: workspace.period_id,
-        expectedRevision: workspace.draft_revision,
-        acknowledgedWarningKeys: Array.from(ack),
-        operationId: crypto.randomUUID(),
+        periodId: attempt.current.command.period_id,
+        expectedRevision: attempt.current.command.expected_revision,
+        acknowledgedWarningKeys: attempt.current.command.acknowledged_warning_keys,
+        operationId: attempt.current.command.operation_id,
       });
       await onPublished();
       onClose();
@@ -83,12 +97,12 @@ export default function RosterPublishReviewDialog({
               </Stack>
             </Alert>;
           })}
-          {!errors.length && !warnings.length && <Alert severity="success">No blocking errors or warnings.</Alert>}
+          {validatedRevision !== null && !errors.length && !warnings.length && <Alert severity="success">No blocking errors or warnings.</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>Cancel</Button>
-        <Button variant="contained" onClick={publish} disabled={busy || errors.length > 0 || ack.size !== allWarningKeys.length}>Publish reviewed roster</Button>
+        <Button variant="contained" onClick={publish} disabled={busy || validatedRevision !== workspace?.draft_revision || errors.length > 0 || ack.size !== allWarningKeys.length}>Publish reviewed roster</Button>
       </DialogActions>
     </Dialog>
   );

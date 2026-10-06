@@ -1,5 +1,6 @@
 import os
 import unittest
+from uuid import uuid4
 from datetime import date, time, timedelta
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
@@ -24,6 +25,7 @@ from client_profile.models import (
 from workforce.models import RosterAcknowledgement, RosterPeriod, RosterPublicationAudit
 from talent.models import UserAvailability
 from workforce.roster.services import get_or_create_roster_period, publish_roster_period
+from workforce.roster.revisions import revision_summary
 
 User = get_user_model()
 
@@ -90,12 +92,12 @@ class RosterAPITests(unittest.TestCase):
         self.client.force_authenticate(user=self.owner_user)
 
         # 1. Validate
-        val_res = self.client.post("/attendance/roster/validate/", {"period_id": self.period.id}, format="json")
+        val_res = self.client.post("/attendance/roster/validate/", {"period_id": self.period.id, "expected_revision": revision_summary(self.period)["draft_revision"]}, format="json")
         self.assertEqual(val_res.status_code, 200)
         self.assertTrue(val_res.json()["is_valid"])
 
         # 2. Publish
-        pub_res = self.client.post("/attendance/roster/publish/", {"period_id": self.period.id, "force_warnings": True}, format="json")
+        pub_res = self.client.post("/attendance/roster/publish/", {"period_id": self.period.id, "expected_revision": val_res.json()["draft_revision"], "operation_id": str(uuid4()), "acknowledged_warning_keys": [w["warning_key"] for w in val_res.json()["warnings"]]}, format="json")
         self.assertEqual(pub_res.status_code, 200)
         self.assertEqual(pub_res.json()["status"], "PUBLISHED")
 

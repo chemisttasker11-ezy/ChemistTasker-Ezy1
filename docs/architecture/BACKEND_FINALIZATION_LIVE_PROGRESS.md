@@ -25,9 +25,9 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | ID | Milestone | Status | Exit evidence |
 | --- | --- | --- | --- |
 | F01 | Roster slot write-path correction (#140) | MERGED | Actual HTTP PATCH preserves slot/assignment identity, unpublished state, sibling records and cross-week period ownership; notification choices occur at republish; negative/rollback tests; PostgreSQL verification. |
-| F02 | Supported runtime baseline (#141) | IN PROGRESS | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
+| F02 | Supported runtime baseline (#141) | MERGED | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
 | F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
-| F04 | Roster publication convergence | PLANNED | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
+| F04 | Roster publication convergence | IMPLEMENTED - hosted acceptance pending | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
 | F05 | Shared-core transport and domain convergence | PLANNED | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
 | F06 | Canonical /api/v1 domain cutover | PLANNED | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
 | F07 | Production acceptance and closure | PLANNED | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
@@ -116,10 +116,34 @@ reviewed DRF field-metadata adaptation and explicit numeric-ID regression tests.
 Combined exact-head hosted acceptance is pending. No new tables/models/migrations
 or billing-policy change. Temporary recovery/transport helpers are not release files.
 
-## NEXT ACTION (current)
+## Previous next action (superseded)
 
 1. Verify and review F02 on integrated F01/F03/attendance main before guarded merge.
 2. Complete F04 publication convergence using the existing revision/idempotency command.
 3. Complete F05 shared-core and F06 canonical /api/v1 migration with all callers verified.
 4. Complete F07 workflow/schema/populated-upgrade/concurrency/deployment evidence.
 F04-F07 are not complete. Do not describe a structural/refactor gate as final acceptance.
+
+## F04 implementation checkpoint - 2026-10-06
+
+F02 merged at 6e3a9e78aa23f54a689cff1402722c48801259be. The signed merge tree
+d09ea9c76fad8eb1086b73921f7c99d6ab9a72d2 equals the fully tested runtime head.
+Strict resolved audit, serializer/finalization SQLite/PG, full integration/release,
+CodeQL and repository security passed. F01-F03 plus independent attendance fix are merged.
+
+F04 now uses one revision/idempotency/warning-aware publication command for both
+transitional HTTP mounts. Web/mobile review exactly the returned revision and warning
+keys, and preserve operation UUID across retries of the same reviewed command.
+Global UUID conflicts return 409 rather than an integrity-error 500; failed requests
+leave no reservation/publication. Whole-week withdrawal invalidates prior reviews.
+Local real-PG regression: 131 tests passed. Isolated roster API suites: 21 passed.
+Shared-core: 86 passed and typecheck passed. Hosted exact-head acceptance is pending.
+Detailed boundaries/evidence: ROSTER_PUBLICATION_CONVERGENCE.md. No new models/tables/migrations.
+
+## NEXT ACTION (current)
+
+1. Review and run F04 exact-head hosted integration, HTTP/PG race and client checks before merge.
+2. Complete F05 shared-core transport/domain convergence without SSR credential sharing.
+3. Complete F06 canonical /api/v1 routes, reverse refs and clients before legacy HTTP removal.
+4. Complete F07 schema/populated upgrade/concurrency/deployment acceptance and clean recovery branches.
+The programme is not complete. PR #139 remains explicitly separate.

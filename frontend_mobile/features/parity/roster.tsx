@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, updateRosterShiftService, workforce, type RosterPharmacyMember, type WorkerShiftRequest } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, prepareRosterPublication, updateRosterShiftService, workforce, type RosterPharmacyMember, type RosterPublicationAttempt, type RosterValidationResult, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
-import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, replaceUnderscore, startOfWeek, toNumber } from './utils';
+import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, idempotencyKey, replaceUnderscore, startOfWeek, toNumber } from './utils';
 
 type RosterScreen =
   | 'workspace'
@@ -67,7 +67,12 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [membersByRole, setMembersByRole] = useState<Record<string, RosterPharmacyMember[]>>({});
   const [audits, setAudits] = useState<any[]>([]);
   const [acknowledgements, setAcknowledgements] = useState<any>(null);
-  const [validation, setValidation] = useState<any>(null);
+  const [validation, setValidation] = useState<RosterValidationResult | null>(null);
+  const [reviewedPeriodId, setReviewedPeriodId] = useState<number | null>(null);
+  const [warningAcknowledgements, setWarningAcknowledgements] = useState<string[]>([]);
+  const publicationAttempt = useRef<RosterPublicationAttempt | undefined>(undefined);
+  const reviewScope = useRef('');
+  reviewScope.current = `${pharmacyId}:${weekStart}`;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -76,16 +81,25 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
 
   const loadPeriod = useCallback(async () => {
     if (!pharmacyId) return null;
+    const scope = `${pharmacyId}:${weekStart}`;
     const result = await roster.getPeriod(pharmacyId, weekStart);
+    if (reviewScope.current !== scope) return null;
     setPeriod(result);
     return result;
   }, [pharmacyId, weekStart]);
 
   const load = useCallback(async () => {
     if (!pharmacyId) { setLoading(false); return; }
+    const scope = `${pharmacyId}:${weekStart}`;
+    setLoading(true);
     setError('');
+    setValidation(null);
+    setReviewedPeriodId(null);
+    setWarningAcknowledgements([]);
+    publicationAttempt.current = undefined;
     try {
       const p = await loadPeriod();
+      if (reviewScope.current !== scope) return;
       if (screen === 'coverage') setCoverage(asArray(await workforce.listCoverageRequirements(pharmacyId)));
       if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
       if (screen === 'approvals') {
@@ -111,11 +125,11 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
         setAcknowledgements(await roster.getAcknowledgements(Number(p.period_id)));
       }
     } catch (e) {
-      setError(errorMessage(e, 'Unable to load roster data.'));
+      if (reviewScope.current === scope) setError(errorMessage(e, 'Unable to load roster data.'));
     } finally {
-      setLoading(false); setRefreshing(false);
+      if (reviewScope.current === scope) { setLoading(false); setRefreshing(false); }
     }
-  }, [loadPeriod, pharmacyId, screen]);
+  }, [loadPeriod, pharmacyId, screen, weekStart]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -132,6 +146,35 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     const initialized = await roster.initializePeriod(pharmacyId, weekStart);
     setPeriod(initialized);
     return initialized;
+  };
+
+  const reviewIsCurrent = reviewedPeriodId === periodId &&
+    validation?.draft_revision === Number(period?.draft_revision) &&
+    period?.status !== 'ARCHIVED';
+
+  const runValidation = async () => {
+    const scope = reviewScope.current;
+    setBusy(true);
+    setError('');
+    setValidation(null);
+    setReviewedPeriodId(null);
+    setWarningAcknowledgements([]);
+    publicationAttempt.current = undefined;
+    try {
+      const p = await ensurePeriod();
+      const id = Number(p.period_id || p.id);
+      const result = await roster.validate({
+        period_id: id,
+        expected_revision: Number(p.draft_revision),
+      });
+      if (reviewScope.current !== scope) return;
+      setReviewedPeriodId(id);
+      setValidation(result);
+    } catch (e) {
+      if (reviewScope.current === scope) setError(errorMessage(e, 'Roster validation failed.'));
+    } finally {
+      if (reviewScope.current === scope) setBusy(false);
+    }
   };
 
   const slotIdFor = (row: any) => Number(row?.slot_id ?? row?.slotId ?? row?.slot?.id ?? 0);
@@ -277,20 +320,12 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     );
   }
   if (screen === 'validate') {
-    const run = async () => {
-      setBusy(true); setError('');
-      try {
-        const p = await ensurePeriod();
-        setValidation(await roster.validate({ period_id: Number(p.period_id || p.id) }));
-      } catch (e) { setError(errorMessage(e, 'Roster validation failed.')); }
-      finally { setBusy(false); }
-    };
     const errors = asArray<any>(validation?.errors);
     const warnings = asArray<any>(validation?.warnings);
     return (
       <ParityPage title={titles[screen]} subtitle="Pre-publish safety and coverage validation." loading={loading} error={error} onRetry={load}>
         <InfoNote title="Revision">{`${pharmacyName || 'Pharmacy'} · week of ${weekStart} · ${period?.status || 'DRAFT'}`}</InfoNote>
-        <Button mode="contained" loading={busy} onPress={() => void run()}>Run validation</Button>
+        <Button mode="contained" loading={busy} disabled={busy || loading || period?.status === 'ARCHIVED'} onPress={() => void runValidation()}>Run validation</Button>
         {validation ? <>
           <MetricGrid items={[{label:'Errors',value:errors.length,tone:errors.length?'danger':'success'},{label:'Warnings',value:warnings.length,tone:warnings.length?'warning':'success'}]} />
           <Section title="Results">
@@ -303,14 +338,25 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     );
   }
   if (screen === 'publish') {
-    const publish = async (forceWarnings = false) => {
-      setBusy(true); setError('');
+    const publish = async () => {
+      if (!reviewIsCurrent || !validation || validation.errors.length ||
+          validation.warnings.some((warning) => !warningAcknowledgements.includes(warning.warning_key))) {
+        setError('Review the current roster revision and acknowledge its warnings before publishing.');
+        return;
+      }
+      setBusy(true);
+      setError('');
       try {
-        const p = await ensurePeriod();
-        await roster.publish({ period_id: Number(p.period_id || p.id), force_warnings: forceWarnings });
+        const attempt = prepareRosterPublication(
+          periodId, validation.draft_revision, warningAcknowledgements,
+          () => idempotencyKey('roster-publication'), publicationAttempt.current,
+        );
+        publicationAttempt.current = attempt;
+        await roster.publish(attempt.command);
         await load();
-      } catch (e) { setError(errorMessage(e, 'Unable to publish roster.')); }
-      finally { setBusy(false); }
+      } catch (e) {
+        setError(errorMessage(e, 'Unable to publish roster. Refresh and review if the revision changed.'));
+      } finally { setBusy(false); }
     };
     const unpublish = async () => {
       if (!periodId) return;
@@ -318,18 +364,32 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       try { await roster.unpublish({ period_id: periodId }); await load(); }
       catch(e){ setError(errorMessage(e)); } finally { setBusy(false); }
     };
+    const ready = reviewIsCurrent && validation && !validation.errors.length &&
+      validation.warnings.every((warning) => warningAcknowledgements.includes(warning.warning_key));
     return (
-      <ParityPage title={titles[screen]} subtitle="Publish a validated roster revision atomically." loading={loading} error={error} onRetry={load}>
+      <ParityPage title={titles[screen]} subtitle="Publish exactly the roster revision you reviewed." loading={loading} error={error} onRetry={load}>
         <MetricGrid items={[{label:'Status',value:period?.status || 'DRAFT'},{label:'Assignments',value:period?.total_assignments ?? assignments.length},{label:'Vacancies',value:vacant.length,tone:vacant.length?'warning':'success'}]} />
-        <InfoNote title="Safe publish">Publishing is server validated. Blocking errors cannot be bypassed; warning-only publication requires explicit confirmation.</InfoNote>
+        <InfoNote title="Reviewed publication">Review this revision first. A changed roster or warning requires a new review; a lost-response retry reuses the same operation ID.</InfoNote>
         <ActionButtons>
           {period?.status === 'PUBLISHED'
-            ? <Button mode="outlined" loading={busy} onPress={() => void unpublish()}>Return to draft</Button>
+            ? <Button mode="outlined" loading={busy} disabled={busy || loading} onPress={() => void unpublish()}>Return to draft</Button>
             : <>
-              <Button mode="contained" loading={busy} onPress={() => void publish(false)}>Publish</Button>
-              <Button mode="outlined" disabled={busy} onPress={() => void publish(true)}>Publish with warnings acknowledged</Button>
+              <Button mode="outlined" loading={busy} disabled={busy || loading || period?.status === 'ARCHIVED'} onPress={() => void runValidation()}>Review current revision</Button>
+              <Button mode="contained" disabled={busy || loading || !ready} onPress={() => void publish()}>Publish reviewed revision</Button>
             </>}
         </ActionButtons>
+        {reviewIsCurrent && validation ? <Section title={`Revision ${validation.draft_revision} review`}>
+          {validation.errors.map((row, index) => <DataRow key={`error-${index}`} title={String(row.message || row.type || 'Validation error')} status="Error" />)}
+          {validation.warnings.map((warning) => <Checkbox.Item
+            key={warning.warning_key}
+            label={String(warning.message || warning.type || 'Roster warning')}
+            status={warningAcknowledgements.includes(warning.warning_key) ? 'checked' : 'unchecked'}
+            disabled={busy}
+            onPress={() => setWarningAcknowledgements((keys) => keys.includes(warning.warning_key)
+              ? keys.filter((key) => key !== warning.warning_key) : [...keys, warning.warning_key])}
+          />)}
+          {!validation.errors.length && !validation.warnings.length ? <InfoNote title="Review passed" tone="success">No blocking errors or warnings were found for this revision.</InfoNote> : null}
+        </Section> : null}
       </ParityPage>
     );
   }

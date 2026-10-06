@@ -43,6 +43,7 @@ import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ViewWeekIcon from '@mui/icons-material/ViewWeek';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
+import { rosterV2 } from '@chemisttasker/shared-core';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import RosterGridViews, { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
 import RosterSafePublishButton from '../../features/workforce/RosterSafePublishButton';
@@ -57,6 +58,8 @@ export interface RosterPlanningToolbarProps {
 }
 
 interface RosterPeriodData {
+  draft_revision: number;
+  published_revision: number;
   period_id: number | null;
   week_start: string;
   week_end: string;
@@ -163,10 +166,8 @@ export default function RosterPlanningToolbar({
     }
     setIsLoading(true);
     try {
-      const res = await apiClient.get(
-        `/client-profile/attendance/roster/period/?pharmacy_id=${pharmacyId}&week_start=${mondayStr}`
-      );
-      setPeriod(res.data);
+      const result = await rosterV2.getPeriod(pharmacyId, mondayStr);
+      setPeriod(result);
     } catch (err: any) {
       console.error('Failed to fetch roster period details', err);
     } finally {
@@ -184,11 +185,12 @@ export default function RosterPlanningToolbar({
     if (!period) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.post('/client-profile/attendance/roster/validate/', {
-        period_id: period.period_id,
-        pharmacy_id: pharmacyId, week_start: mondayStr,
+      const current = period.period_id ? period : await rosterV2.initializePeriod(pharmacyId!, mondayStr);
+      setPeriod(current);
+      const result = await rosterV2.validate({
+        period_id: Number(current.period_id), expected_revision: Number(current.draft_revision),
       });
-      setValidationResult(res.data);
+      setValidationResult(result as ValidationResult);
       setValidationDialogOpen(true);
     } catch (err: any) {
       setFeedbackMessage({
@@ -200,33 +202,7 @@ export default function RosterPlanningToolbar({
     }
   };
 
-  // 2. Publish Roster
-  const handlePublish = async (forceWarnings = false) => {
-    if (!period) return;
-    setActionLoading(true);
-    try {
-      const res = await apiClient.post('/client-profile/attendance/roster/publish/', {
-        period_id: period.period_id,
-        pharmacy_id: pharmacyId, week_start: mondayStr,
-        force_warnings: forceWarnings,
-      });
-      setFeedbackMessage({
-        type: 'success',
-        text: `Roster for w/c ${res.data.week_start} is now PUBLISHED and visible to staff!`,
-      });
-      setValidationDialogOpen(false);
-      await fetchPeriodData();
-      onRosterUpdated?.();
-    } catch (err: any) {
-      setFeedbackMessage({
-        type: 'error',
-        text: err.response?.data?.error || 'Publication failed.',
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-  void handlePublish;
+  // Publication uses the existing RosterSafePublishButton and reviewed command.
 
   // 3. Unpublish Roster (Revert to Draft)
   const handleUnpublish = async () => {

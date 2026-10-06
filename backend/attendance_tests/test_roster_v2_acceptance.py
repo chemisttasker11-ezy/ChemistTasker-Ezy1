@@ -1,3 +1,4 @@
+from uuid import uuid4
 import os
 import unittest
 from datetime import date, datetime, time, timedelta
@@ -32,6 +33,7 @@ from workforce.models import (
 from talent.models import UserAvailability
 from workforce.roster.services import get_or_create_roster_period, publish_roster_period
 from attendance_tests.roster_fixtures import approved_workforce_leave
+from workforce.roster.revisions import revision_summary
 
 User = get_user_model()
 
@@ -256,7 +258,7 @@ class RosterV2AcceptanceTests(unittest.TestCase):
             is_rostered=True,
         )
 
-        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id}, format="json")
+        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"]}, format="json")
         self.assertEqual(val_res.status_code, 200)
         self.assertFalse(val_res.json()["is_valid"])
         self.assertTrue(any(err.get("type") == "ROLE_MISMATCH" for err in val_res.json()["errors"]))
@@ -282,7 +284,7 @@ class RosterV2AcceptanceTests(unittest.TestCase):
             is_rostered=True,
         )
 
-        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id}, format="json")
+        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"]}, format="json")
         self.assertFalse(val_res.json()["is_valid"])
         self.assertTrue(any(err.get("type") == "SHIFT_OVERLAP" for err in val_res.json()["errors"]))
 
@@ -296,13 +298,13 @@ class RosterV2AcceptanceTests(unittest.TestCase):
         # Case C: Approved leave conflict
         leave = approved_workforce_leave(user=self.pharmacist, pharmacy=self.pharmacy, day=self.monday)
 
-        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id}, format="json")
+        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"]}, format="json")
         self.assertFalse(val_res.json()["is_valid"])
         self.assertTrue(any(err.get("type") == "APPROVED_LEAVE_CONFLICT" for err in val_res.json()["errors"]))
 
         # Remove leave: now roster should be completely valid
         leave.delete()
-        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id}, format="json")
+        val_res = self.client.post("/attendance/roster/validate/", {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"]}, format="json")
         self.assertTrue(val_res.json()["is_valid"])
         self.assertEqual(len(val_res.json()["errors"]), 0)
 
@@ -332,7 +334,7 @@ class RosterV2AcceptanceTests(unittest.TestCase):
         self.client.force_authenticate(user=self.owner_user)
         pub_res = self.client.post(
             "/attendance/roster/publish/",
-            {"period_id": period.id, "force_warnings": True},
+            {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"], "operation_id": str(uuid4()), "acknowledged_warning_keys": []},
             format="json",
         )
         self.assertEqual(pub_res.status_code, 200)
@@ -596,11 +598,11 @@ class RosterV2AcceptanceTests(unittest.TestCase):
         self.client.force_authenticate(user=self.pharmacist)
 
         # 1. Validate
-        res = self.client.post("/attendance/roster/validate/", {"period_id": period.id}, format="json")
+        res = self.client.post("/attendance/roster/validate/", {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"]}, format="json")
         self.assertEqual(res.status_code, 403)
 
         # 2. Publish
-        res = self.client.post("/attendance/roster/publish/", {"period_id": period.id}, format="json")
+        res = self.client.post("/attendance/roster/publish/", {"period_id": period.id, "expected_revision": revision_summary(period)["draft_revision"], "operation_id": str(uuid4()), "acknowledged_warning_keys": []}, format="json")
         self.assertEqual(res.status_code, 403)
 
         # 3. Unpublish
