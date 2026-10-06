@@ -1,8 +1,14 @@
 import type { ApiQuery } from './client';
+/** A linear suffix scan avoids unanchored regex backtracking on library input. */
+function withTrailingSlash(value: string): string {
+    let end = value.length;
+    while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+    return value.slice(0, end) + '/';
+}
 /** Resolve once before reading credentials; relative bases are browser-only. */
 export function apiUrl(baseUrl: string, path: string, query?: ApiQuery): URL {
     const locationHref = typeof globalThis.location !== 'undefined' ? globalThis.location.href : undefined;
-    const base = new URL(`${baseUrl.replace(/\/+$/, '')}/`, locationHref);
+    const base = new URL(withTrailingSlash(baseUrl), locationHref);
     if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) {
         throw new Error('Invalid API base URL.');
     }
@@ -27,7 +33,7 @@ export function apiUrl(baseUrl: string, path: string, query?: ApiQuery): URL {
 }
 export function assertAllowedPath(baseUrl: string, target: URL, prefix: string, message?: string): void {
     const allowed = apiUrl(baseUrl, prefix);
-    const root = `${allowed.pathname.replace(/\/+$/, '')}/`;
+    const root = withTrailingSlash(allowed.pathname);
     // Reject encoded separators/dot components too: a downstream proxy may decode them.
     let decoded: string;
     try {
