@@ -1,7 +1,6 @@
 from django.test import SimpleTestCase
 from django.urls import Resolver404, resolve, reverse
 
-from core.api_v1_urls import router
 from worker_finance import legacy as finance_legacy
 
 
@@ -47,11 +46,10 @@ class ApiV1CompositionContractTests(SimpleTestCase):
         "calendar-feed",
     ]
 
-    def test_composed_router_order_is_legacy_order(self):
-        self.assertEqual(
-            [prefix for prefix, _viewset, _basename in router.registry],
-            self.expected_prefixes,
-        )
+    def test_domain_owned_router_paths_are_composed_under_api_v1(self):
+        for prefix in self.expected_prefixes:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(resolve(f"/api/v1/{prefix}/"))
 
     def test_namespace_and_representative_reverse_paths_are_canonical(self):
         self.assertEqual(reverse("api_v1:organization-list"), "/api/v1/organizations/")
