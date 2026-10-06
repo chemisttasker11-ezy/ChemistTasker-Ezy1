@@ -61,9 +61,9 @@ describe('converged client security and compatibility', () => {
       calls.push([String(url), new Headers(init?.headers).get('Authorization')]);
       return json({});
     }) as typeof fetch;
-    configureApi({ baseURL: 'https://a.test/api', getToken: () => token.promise, fetchImpl });
+    configureApi({ baseURL: 'https://a.test/api/v1', getToken: () => token.promise, fetchImpl });
     const first = fetchApi('/users/me/');
-    configureApi({ baseURL: 'https://b.test/api', getToken: () => 'b-token', fetchImpl });
+    configureApi({ baseURL: 'https://b.test/api/v1', getToken: () => 'b-token', fetchImpl });
     token.resolve('a-token');
     await Promise.all([first, fetchApi('/users/me/')]);
     expect(calls).toContainEqual(['https://a.test/api/v1/users/me/', 'Bearer a-token']);
