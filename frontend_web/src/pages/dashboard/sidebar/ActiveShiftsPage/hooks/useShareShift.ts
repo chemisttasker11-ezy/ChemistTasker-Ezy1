@@ -19,7 +19,7 @@ export function useShareShift(showSnackbar: (msg: string) => void) {
                     throw new Error('Missing share token');
                 }
                 const publicUrl = (link as any).url ?? `${window.location.origin}/shifts/link?token=${token}`;
-                const { data: referral } = await apiClient.post('/client-profile/pill-rewards/refer-shift/', {
+                const { data: referral } = await apiClient.post('/pill-rewards/refer-shift/', {
                     shift_id: shift.id,
                 });
                 const referralCode = referral?.referral_code;

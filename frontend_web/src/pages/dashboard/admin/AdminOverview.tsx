@@ -28,7 +28,7 @@ export default function AdminOverview() {
   useEffect(() => {
     let mounted = true;
     apiClient
-      .get("/client-profile/pill-rewards/balance/")
+      .get("/pill-rewards/balance/")
       .then(({ data }) => {
         if (!mounted) return;
         setPillSummary({
@@ -47,7 +47,7 @@ export default function AdminOverview() {
   useEffect(() => {
     let mounted = true;
     apiClient
-      .get("/client-profile/dashboard/owner/", { params: { workspace: "internal", pharmacy_id: pharmacyId } })
+      .get("/dashboard/owner/", { params: { workspace: "internal", pharmacy_id: pharmacyId } })
       .then(({ data }) => {
         if (mounted) setDashboardData(data);
       })

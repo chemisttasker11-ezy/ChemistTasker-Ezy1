@@ -358,7 +358,7 @@ export default function InvoiceDetailPage() {
   const handleDownloadPdf = () => {
     if (!id) return;
     apiClient
-      .get(`/client-profile/invoices/${Number(id)}/pdf/`, { responseType: 'blob' })
+      .get(`/invoices/${Number(id)}/pdf/`, { responseType: 'blob' })
       .then((response) => {
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
