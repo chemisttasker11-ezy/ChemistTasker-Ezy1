@@ -149,7 +149,6 @@ ALLOWED_LEGACY_IMPORTS = {
 # Literal strings starting with client_profile that are neither the app label, a model label nor a task name.
 ALLOWED_STRING_REFERENCES = {
     "client_profile.apps.ClientProfileConfig": "INSTALLED_APPS entry of the kernel app",
-    "client_profile.urls": "the kernel URLconf, included by core.api_v1_urls",
     "client_profile.tasks.verify_*": "Celery route pattern of the verification tasks (CELERY_TASK_ROUTES)",
 }
 
@@ -217,7 +216,7 @@ KERNEL_DEFINITIONS = {
     "client_profile/models/orgs.py": set(),
     "client_profile/models/shifts.py": set(),
     "client_profile/tasks.py": set(),
-    "client_profile/urls.py": {"router", "urlpatterns"},
+    "client_profile/urls.py": {"urlpatterns"},
 }
 
 # label -> (db_table, module defining the class) of every model of the kernel and of the apps split from it.

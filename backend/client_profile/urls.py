@@ -1,18 +1,8 @@
-# client_profile/urls.py
-"""Routes owned by the client_profile kernel.
+"""Historical client_profile kernel URLconf.
 
-Project-level composition of promoted domain apps lives in
-`core.api_v1_urls`. Keeping this module domain-local prevents
-client_profile from becoming the owner of unrelated apps while preserving the
-public `api_v1:` namespace at the project composition layer.
+Public HTTP ownership lives in the canonical domain URL modules composed by
+core.api_v1_urls. This kernel URLconf is intentionally empty and is not mounted
+by the project URL configuration.
 """
-from django.urls import path
-from rest_framework.routers import DefaultRouter
 
-router = DefaultRouter()
-router.include_root_view = False
-
-
-
-urlpatterns = [
-]
+urlpatterns = []
