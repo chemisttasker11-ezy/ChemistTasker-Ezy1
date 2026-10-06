@@ -2,7 +2,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 
 from client_profile.models import Membership, MembershipApplication, MembershipInviteLink
-from core.api_v1_urls import router
+from memberships.urls import router
 
 
 class MembershipDomainExtractionContractTests(SimpleTestCase):
@@ -31,7 +31,7 @@ class MembershipDomainExtractionContractTests(SimpleTestCase):
         }
         self.assertEqual(actual, self.expected_router_contracts)
 
-    def test_magic_link_paths_keep_client_profile_namespace(self):
+    def test_magic_link_paths_keep_api_v1_namespace(self):
         self.assertEqual(
             reverse("api_v1:magic-membership-detail", kwargs={"token": "abc"}),
             "/api/v1/magic/memberships/abc/",
