@@ -101,7 +101,7 @@ class DeleteAccountView(APIView):
 
 
 class ChooseAccountTypeView(APIView):
-    """POST /api/users/me/account-type/ {"role": "PHARMACIST" | "OTHER_STAFF" | "OWNER"}.
+    """POST /api/v1/users/me/account-type/ {"role": "PHARMACIST" | "OTHER_STAFF" | "OWNER"}.
 
     A PHARMACY_MANAGER account (created when an organisation onboards a pharmacy by email) may choose its own account
     type once. Its pharmacy-admin access is kept; the response names the onboarding page of the chosen type.
