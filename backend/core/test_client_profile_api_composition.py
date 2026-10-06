@@ -61,15 +61,16 @@ class ApiV1CompositionContractTests(SimpleTestCase):
         self.assertEqual(reverse("api_v1:owner-onboarding-me"), "/api/v1/owner/onboarding/me/")
 
     def test_removed_application_namespaces_do_not_resolve(self):
+        legacy_root = "/api/"
         for path in (
-            "/api/client-profile/pharmacies/",
-            "/api/users/me/",
-            "/api/public-hub/articles/",
-            "/api/marketplace/categories/",
-            "/api/ethical/me/access/",
-            "/api/content/documents/",
-            "/api/billing/plans/",
-            "/api/account/",
+            legacy_root + "client-profile/pharmacies/",
+            legacy_root + "users/me/",
+            legacy_root + "public-hub/articles/",
+            legacy_root + "marketplace/categories/",
+            legacy_root + "ethical/me/access/",
+            legacy_root + "content/documents/",
+            legacy_root + "billing/plans/",
+            legacy_root + "account/",
         ):
             with self.subTest(path=path), self.assertRaises(Resolver404):
                 resolve(path)
