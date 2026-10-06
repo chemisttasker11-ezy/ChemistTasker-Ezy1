@@ -188,7 +188,7 @@ export default function SharedCalendarScreen() {
     setLoading(true);
     setError(null);
     try {
-      const feed = await fetchJson('/client-profile/calendar-feed/', {
+      const feed = await fetchJson('/calendar-feed/', {
         pharmacy_id: selectedPharmacyId,
         date_from: dateRange.from,
         date_to: dateRange.to,
@@ -442,9 +442,9 @@ export default function SharedCalendarScreen() {
         recurrence,
       };
       if (editingEventId) {
-        await postJson(`/client-profile/calendar-events/${editingEventId}/`, payload, 'PATCH');
+        await postJson(`/calendar-events/${editingEventId}/`, payload, 'PATCH');
       } else {
-        await postJson('/client-profile/calendar-events/', payload);
+        await postJson('/calendar-events/', payload);
       }
       setEventModalOpen(false);
       setEditingEventId(null);
@@ -508,9 +508,9 @@ export default function SharedCalendarScreen() {
         recurrence,
       };
       if (editingNoteId) {
-        await postJson(`/client-profile/work-notes/${editingNoteId}/`, payload, 'PATCH');
+        await postJson(`/work-notes/${editingNoteId}/`, payload, 'PATCH');
       } else {
-        await postJson('/client-profile/work-notes/', payload);
+        await postJson('/work-notes/', payload);
       }
       setNoteModalOpen(false);
       setEditingNoteId(null);
@@ -840,7 +840,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await postJson(`/client-profile/calendar-events/${baseId}/`, {}, 'DELETE');
+                                          await postJson(`/calendar-events/${baseId}/`, {}, 'DELETE');
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -874,7 +874,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await postJson(`/client-profile/work-notes/${baseId}/`, {}, 'DELETE');
+                                          await postJson(`/work-notes/${baseId}/`, {}, 'DELETE');
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -898,7 +898,7 @@ export default function SharedCalendarScreen() {
                                     if (!baseId) return;
                                     const occurrenceDate = format(item.date, 'yyyy-MM-dd');
                                     await postJson(
-                                      `/client-profile/work-notes/${baseId}/${action}/`,
+                                      `/work-notes/${baseId}/${action}/`,
                                       { occurrence_date: occurrenceDate },
                                       'POST'
                                     );

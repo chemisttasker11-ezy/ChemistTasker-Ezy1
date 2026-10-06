@@ -21,7 +21,7 @@ export function useShareShift(showSnackbar: (msg: string) => void) {
                 }
                 const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'https://app.chemisttasker.com';
                 const publicUrl = link?.url ?? `${baseUrl}/shifts/link?token=${token}`;
-                const { data: referral } = await apiClient.post('/client-profile/pill-rewards/refer-shift/', {
+                const { data: referral } = await apiClient.post('/pill-rewards/refer-shift/', {
                     shift_id: shift.id,
                 });
                 const referralCode = referral?.referral_code;

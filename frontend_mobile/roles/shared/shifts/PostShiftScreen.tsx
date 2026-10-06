@@ -519,7 +519,7 @@ export default function PostShiftScreen() {
         const loadDescriptionTemplate = async () => {
             setDescriptionTemplateLoading(true);
             try {
-                const { data } = await apiClient.get('/client-profile/shift-description-templates/', {
+                const { data } = await apiClient.get('/shift-description-templates/', {
                     params: { pharmacy: pharmacyId, role_needed: roleNeeded },
                 });
                 if (cancelled) return;
@@ -569,7 +569,7 @@ export default function PostShiftScreen() {
         }
         setDescriptionTemplateSaving(true);
         try {
-            const { data } = await apiClient.post('/client-profile/shift-description-templates/', {
+            const { data } = await apiClient.post('/shift-description-templates/', {
                 pharmacy: pharmacyId,
                 role_needed: roleNeeded,
                 description,
@@ -605,7 +605,7 @@ export default function PostShiftScreen() {
                 rate_early_morning: rateEarlyMorning || null,
                 rate_late_night: rateLateNight || null,
             };
-            const { data } = await apiClient.patch(`/client-profile/pharmacies/${pharmacyId}/`, payload);
+            const { data } = await apiClient.patch(`/pharmacies/${pharmacyId}/`, payload);
             setPharmacies((current) =>
                 current.map((pharmacy) =>
                     Number(pharmacy.id) === Number(pharmacyId)
