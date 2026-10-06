@@ -12,7 +12,11 @@ export function resolveApiBaseUrl(value = process.env.EXPO_PUBLIC_API_URL): stri
   const trimmed = (value || '').trim().replace(/\/+$/, '');
   if (!trimmed) return '';
 
-  const normalized = trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+  const normalized = trimmed.endsWith('/api/v1')
+    ? trimmed
+    : trimmed.endsWith('/api')
+      ? `${trimmed}/v1`
+      : `${trimmed}/api/v1`;
   if (Platform.OS !== 'web' || typeof window === 'undefined') {
     return normalized;
   }
