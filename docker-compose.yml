@@ -9,8 +9,8 @@ services:
     expose:
       - "3000"
     environment:
-      PLATFORM_API_URL: "http://web:8000/api"
-      HUB_API_URL: "http://web:8000/api"
+      PLATFORM_API_URL: "http://web:8000/api/v1"
+      HUB_API_URL: "http://web:8000/api/v1"
       NEXT_PUBLIC_SITE_URL: "https://chemisttasker.com.au"
       DASHBOARD_INTERNAL_URL: "http://frontend:80"
     networks:
