@@ -133,7 +133,7 @@ export default function OwnerOverviewHome({
   useEffect(() => {
     let mounted = true;
     apiClient
-      .get("/client-profile/pill-rewards/balance/")
+      .get("/pill-rewards/balance/")
       .then(({ data }) => {
         if (!mounted) return;
         setPillBalance(Number(data?.balance ?? 0));

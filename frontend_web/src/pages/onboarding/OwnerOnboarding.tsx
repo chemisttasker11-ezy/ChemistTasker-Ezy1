@@ -353,7 +353,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   const handleCopyFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data: referral } = await apiClient.post('/client-profile/pill-rewards/refer-friend/', {});
+      const { data: referral } = await apiClient.post('/pill-rewards/refer-friend/', {});
       const code = referral?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const url = new URL('/register', window.location.origin);
