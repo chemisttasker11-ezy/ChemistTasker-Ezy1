@@ -12,7 +12,7 @@ credentials = json.loads((Path(settings.BASE_DIR).parent / ".local-run" / "kiosk
 session = requests.Session()
 session.trust_env = False
 session.headers["X-Device-Token"] = credentials["token"]
-base = "http://127.0.0.1:8001/api/client-profile/attendance/kiosk/"
+base = "http://127.0.0.1:8001/api/v1/attendance/kiosk/"
 identifier = "chemisttasker@gmail.com"
 pin = "246810"
 otp = Notification.objects.filter(title="Kiosk PIN Setup Code").latest("id").payload["otp"]
