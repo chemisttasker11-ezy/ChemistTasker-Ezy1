@@ -12,7 +12,7 @@ Authoritative recovery record for the programme authorized on 2026-10-06. The ea
 - Keep the 999-code-line review threshold. Remove serializer exceptions when no longer needed; do not inflate baselines or compress source to evade the ratchet.
 - Platform billing remains distinct from workforce/payroll capability. No billing-policy changes in this programme without a separate explicit decision.
 - Real staging is not a gate. Controlled CI PostgreSQL, schema, workflow and deployment evidence is required instead.
-- Expo may be temporarily incomplete during migration, but that is not an exemption from listing unverified shipping clients in the final acceptance report.
+- Owner confirmation on 2026-10-06: final acceptance MUST include properly rewired Expo, Next and Vite. Temporary migration gaps are not the final deliverable; all three must use the canonical shared-core contracts and pass their acceptance checks.
 - Never call a planned, inspected or merely compiled change runtime-tested. Record exact commits and checks.
 - Never merge a failing/draft evidence branch. Recheck current main, reviewed head, required checks and review findings before each merge.
 
@@ -25,9 +25,9 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | ID | Milestone | Status | Exit evidence |
 | --- | --- | --- | --- |
 | F01 | Roster slot write-path correction (#140) | MERGED | Actual HTTP PATCH preserves slot/assignment identity, unpublished state, sibling records and cross-week period ownership; notification choices occur at republish; negative/rollback tests; PostgreSQL verification. |
-| F02 | Supported runtime baseline (#141) | IN PROGRESS | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
+| F02 | Supported runtime baseline (#141) | MERGED | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
 | F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
-| F04 | Roster publication convergence | PLANNED | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
+| F04 | Roster publication convergence | IMPLEMENTED - selection-lifetime correction awaiting exact-head CI | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
 | F05 | Shared-core transport and domain convergence | PLANNED | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
 | F06 | Canonical /api/v1 domain cutover | PLANNED | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
 | F07 | Production acceptance and closure | PLANNED | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
@@ -116,10 +116,47 @@ reviewed DRF field-metadata adaptation and explicit numeric-ID regression tests.
 Combined exact-head hosted acceptance is pending. No new tables/models/migrations
 or billing-policy change. Temporary recovery/transport helpers are not release files.
 
-## NEXT ACTION (current)
+## Previous next action (superseded)
 
 1. Verify and review F02 on integrated F01/F03/attendance main before guarded merge.
 2. Complete F04 publication convergence using the existing revision/idempotency command.
 3. Complete F05 shared-core and F06 canonical /api/v1 migration with all callers verified.
 4. Complete F07 workflow/schema/populated-upgrade/concurrency/deployment evidence.
 F04-F07 are not complete. Do not describe a structural/refactor gate as final acceptance.
+
+## F04 implementation checkpoint - 2026-10-06
+
+F02 merged at 6e3a9e78aa23f54a689cff1402722c48801259be. The signed merge tree
+d09ea9c76fad8eb1086b73921f7c99d6ab9a72d2 equals the fully tested runtime head.
+Strict resolved audit, serializer/finalization SQLite/PG, full integration/release,
+CodeQL and repository security passed. F01-F03 plus independent attendance fix are merged.
+
+F04 now uses one revision/idempotency/warning-aware publication command for both
+transitional HTTP mounts. Web/mobile review exactly the returned revision and warning
+keys, and preserve operation UUID across retries of the same reviewed command.
+Global UUID conflicts return 409 rather than an integrity-error 500; failed requests
+leave no reservation/publication. Whole-week withdrawal invalidates prior reviews.
+Local real-PG regression: 131 tests passed. Isolated roster API suites: 21 passed.
+Shared-core: 86 passed and typecheck passed. Hosted exact-head acceptance is pending.
+Detailed boundaries/evidence: ROSTER_PUBLICATION_CONVERGENCE.md. No new models/tables/migrations.
+
+## NEXT ACTION (current)
+
+1. Review and run F04 exact-head hosted integration, HTTP/PG race and client checks before merge.
+2. Complete F05 shared-core transport/domain convergence without SSR credential sharing.
+3. Complete F06 canonical /api/v1 routes, reverse refs and clients before legacy HTTP removal.
+4. Complete F07 schema/populated upgrade/concurrency/deployment acceptance and clean recovery branches.
+The programme is not complete. PR #139 remains explicitly separate.
+
+## F04 selection-lifetime correction - 2026-10-06
+
+Source checkpoint: 32c86cbd9fc9c33d14ce6e64f067fc3c8c04177c. A recovery read/write session confirmed main remains 6e3a9e78aa23f54a689cff1402722c48801259be. No repeat authorization was needed.
+
+- The reported Expo initialization race is corrected using a keyed pharmacy/week/screen component and per-mounted-selection request tickets. Unmount, refresh or a newer operation invalidates late results. Initialization is checked before any period state write or dependent validation request. A new selection owns fresh busy/review state, including A -> B -> A changes.
+- Publication/withdrawal/per-slot completion paths do not update or reload a newer selection. The server may already have accepted a cancelled-view mutation; the guard only suppresses stale client continuations and does not pretend to cancel committed work.
+- Vite workspace initialization and publication-dialog completion use the same framework-independent scope utility. Each awaited dependency is checked before and after execution.
+- Added 10 deterministic deferred-response tests for the actual shared review helper and scope utility. Local shared-core typecheck/build and all 96 tests passed. This does not substitute for mounted Expo/browser acceptance or the exact-head hosted gate.
+- All three final clients are required in F05-F07: Expo (authenticated/native operations and navigation), Vite (operational screens and auth), and Next (request-scoped SSR/public/content/proxy behavior). Native kiosk device signing remains separate.
+- A temporary contents:read recovery workflow exported only the exact tracked source and pinned shared-core node dependencies. Source tar SHA-256 f80ec0ca1fa2915051e0800fa15f45158b5dddf0884827f3e475cd33d336a5fa and reconstructed tree 67c895e8b627f343c6df516bb90733b3c6d60258 were verified before edits. Temporary recovery/patch tooling is not part of the release tree.
+
+Next: full exact-head checks and final review of F04, while implementing F05. F06 will carry a complete method/path/caller inventory and F07 must prove all three rewired clients, not merely update endpoint constants. No model/table/migration or billing-policy change.

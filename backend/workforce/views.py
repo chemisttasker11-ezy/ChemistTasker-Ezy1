@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timedelta
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
@@ -48,7 +47,8 @@ from .models import (
     WorkforceLeaveRequest,
 )
 from .permissions import can_manage_pharmacy, can_view_worker_timesheet, require_manage_pharmacy, require_manage_workforce_pharmacy
-from workforce.roster.revisions import publish_period_command, serialize_workspace, validate_period_command
+from workforce.roster.revisions import serialize_workspace
+from workforce.roster.command_api import RosterPublishRevisionView, RosterValidateRevisionView
 from .tasks import rebuild_timesheet_period_task, rebuild_timesheet_task
 from .timesheets import (
     add_comment,
@@ -440,53 +440,6 @@ class RosterWorkspaceView(APIView):
             return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except DjangoValidationError as exc:
             return _validation_response(exc)
-
-
-class RosterValidateRevisionView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        try:
-            period = RosterPeriod.objects.select_related("pharmacy").get(pk=request.data.get("period_id"))
-            result = validate_period_command(
-                user=request.user,
-                period=period,
-                expected_revision=int(request.data.get("expected_revision")),
-            )
-            return Response(result)
-        except RosterPeriod.DoesNotExist:
-            return Response({"error": "Roster period not found."}, status=status.HTTP_404_NOT_FOUND)
-        except (TypeError, ValueError):
-            return Response({"error": "expected_revision is required."}, status=status.HTTP_400_BAD_REQUEST)
-        except DjangoPermissionDenied as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except DjangoValidationError as exc:
-            return _validation_response(exc, status.HTTP_409_CONFLICT)
-
-
-class RosterPublishRevisionView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        try:
-            period = RosterPeriod.objects.select_related("pharmacy").get(pk=request.data.get("period_id"))
-            operation_id = request.data.get("operation_id") or str(uuid.uuid4())
-            result = publish_period_command(
-                user=request.user,
-                period=period,
-                expected_revision=int(request.data.get("expected_revision")),
-                operation_id=operation_id,
-                acknowledged_warning_keys=request.data.get("acknowledged_warning_keys") or [],
-            )
-            return Response(result)
-        except RosterPeriod.DoesNotExist:
-            return Response({"error": "Roster period not found."}, status=status.HTTP_404_NOT_FOUND)
-        except (TypeError, ValueError):
-            return Response({"error": "expected_revision is required."}, status=status.HTTP_400_BAD_REQUEST)
-        except DjangoPermissionDenied as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except DjangoValidationError as exc:
-            return _validation_response(exc, status.HTTP_409_CONFLICT)
 
 
 class MembershipWorkSettingsView(APIView):

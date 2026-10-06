@@ -66,6 +66,26 @@ describe('authenticated operational api.ts domains', () => {
     ]);
   });
 
+  it('uses one reviewed publication contract from both roster facades', async () => {
+    const calls: Array<{ url: string; body: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({url: String(input), body: String(init?.body)});
+      return json({status: 'PUBLISHED', period_id: 7});
+    }) as unknown as typeof fetch;
+    configure(fetchImpl);
+    const command = {
+      period_id: 7, expected_revision: 3,
+      operation_id: '6f581c55-693b-4f91-8651-76f210c22157',
+      acknowledged_warning_keys: ['reviewed-warning'],
+    };
+    await rosterV2.publish(command);
+    await workforce.publishRoster(command);
+    expect(calls).toEqual(Array.from({length: 2}, () => ({
+      url: 'https://example.test/api/client-profile/workforce/roster/publish/',
+      body: JSON.stringify(command),
+    })));
+  });
+
   it('refreshes once after a 401 and retries the authenticated operational request', async () => {
     const calls: Array<{ authorization: string | null; body: string | null }> = [];
     const refreshToken = vi.fn(async () => 'refreshed-token');

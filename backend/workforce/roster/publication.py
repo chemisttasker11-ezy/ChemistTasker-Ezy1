@@ -9,6 +9,7 @@ from workforce.models import RosterPeriod, RosterPublicationAudit
 from workforce.roster.permissions import is_authorized_attendance_manager
 from workforce.roster.periods import get_roster_period_assignments, validate_roster_period
 from workforce.roster.slot_locking import locked_roster_slots, week_start
+from workforce.roster.publication_contract import reviewed_validation
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -26,7 +27,7 @@ def _notify_roster_publication(period_id, worker_ids, revision):
                               "notification_kind": "roster_published"})
 
 
-def publish_roster_period(roster_period, published_by, force_warnings=False):
+def publish_roster_period(roster_period, published_by, force_warnings=False, *, acknowledged_warning_keys=None):
     """
     Atomically validates and publishes a roster period:
     - Verifies published_by is authorized manager for roster_period.pharmacy.
@@ -44,19 +45,24 @@ def publish_roster_period(roster_period, published_by, force_warnings=False):
 
         if period.status == RosterPeriod.Status.ARCHIVED:
             raise ValidationError("Cannot publish an archived roster period.")
-        if period.status == RosterPeriod.Status.PUBLISHED:
+        if period.status == RosterPeriod.Status.PUBLISHED and acknowledged_warning_keys is None:
             return period, validate_roster_period(period)
 
         worker_ids = get_roster_period_assignments(period).values_list("user_id", flat=True)
         list(User.objects.select_for_update().filter(pk__in=worker_ids).order_by("pk"))
         validation = validate_roster_period(period)
+        if acknowledged_warning_keys is not None:
+            validation = reviewed_validation(validation, acknowledged_warning_keys)
         if not validation["is_valid"]:
             error_msgs = [e["message"] for e in validation["errors"]]
             raise ValidationError(f"Cannot publish roster with blocking errors: {'; '.join(error_msgs)}")
 
-        if validation["warnings"] and not force_warnings:
+        if validation["warnings"] and not force_warnings and acknowledged_warning_keys is None:
             warning_msgs = [w["message"] for w in validation["warnings"]]
             raise ValidationError(f"Roster has warnings: {'; '.join(warning_msgs)}")
+
+        if period.status == RosterPeriod.Status.PUBLISHED:
+            return period, validation
 
         # Update period
         period.status = RosterPeriod.Status.PUBLISHED
@@ -99,8 +105,13 @@ def unpublish_roster_period(roster_period, unpublished_by):
         period = RosterPeriod.objects.select_for_update().get(pk=roster_period.pk)
         if period.status == RosterPeriod.Status.ARCHIVED:
             raise ValidationError("Cannot unpublish an archived roster period.")
+        if period.status == RosterPeriod.Status.DRAFT:
+            return period
         period.status = RosterPeriod.Status.DRAFT
         period.save(update_fields=["status", "updated_at"])
+        # A previous review must not silently undo another manager's withdrawal.
+        from workforce.roster.revisions import bump_roster_revision
+        bump_roster_revision(period.pk)
         return period
 
 

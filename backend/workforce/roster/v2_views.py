@@ -15,10 +15,8 @@ from workforce.roster.services import (
     get_roster_period_assignments,
     get_roster_period_grid,
     get_worker_published_roster,
-    publish_roster_period,
     save_period_as_template,
     unpublish_roster_period,
-    validate_roster_period,
 )
 from workforce.roster.worker_actions import (
     approve_cover_replacement,
@@ -28,6 +26,11 @@ from workforce.roster.worker_actions import (
     request_direct_swap,
     submit_cover_request,
 )
+from workforce.roster.command_api import (
+    RosterPublishRevisionView as RosterPublishView,
+    RosterValidateRevisionView as RosterValidateView,
+)
+from workforce.roster.revisions import revision_summary
 from datetime import date, timedelta
 from django.core.exceptions import (
     PermissionDenied as DjangoPermissionDenied,
@@ -88,6 +91,7 @@ class RosterPeriodDetailView(APIView):
         if period:
             return Response({
                 "period_id": period.id,
+                **revision_summary(period),
                 "pharmacy_id": period.pharmacy_id,
                 "pharmacy_name": period.pharmacy.name,
                 "week_start": str(period.week_start),
@@ -105,6 +109,7 @@ class RosterPeriodDetailView(APIView):
         else:
             return Response({
                 "period_id": None,
+                **revision_summary(None),
                 "pharmacy_id": pharmacy.id,
                 "pharmacy_name": pharmacy.name,
                 "week_start": str(week_start),
@@ -140,6 +145,7 @@ class RosterPeriodDetailView(APIView):
             grid = get_roster_period_grid(pharmacy, period.week_start, period.week_end)
             return Response({
                 "period_id": period.id,
+                **revision_summary(period),
                 "pharmacy_id": period.pharmacy_id,
                 "pharmacy_name": period.pharmacy.name,
                 "week_start": str(period.week_start),
@@ -154,81 +160,6 @@ class RosterPeriodDetailView(APIView):
                 "staff_view": grid["staff_view"],
                 "stacked_view": grid["stacked_view"],
             }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
-        except DjangoValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class RosterValidateView(APIView):
-    """
-    POST /api/attendance/roster/validate/
-    Body: {"period_id": int} or {"pharmacy_id": int, "week_start": "YYYY-MM-DD"}
-    Runs pre-publish validation on a roster period.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        period_id = request.data.get("period_id")
-        if not period_id:
-            pharmacy_id = request.data.get("pharmacy_id")
-            week_start_str = request.data.get("week_start")
-            if pharmacy_id and week_start_str:
-                pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
-                if not is_authorized_attendance_manager(request.user, pharmacy):
-                    raise PermissionDenied("You are not authorized to validate rosters for this pharmacy.")
-                period, _ = get_or_create_roster_period(pharmacy, week_start_str, user=request.user)
-            else:
-                return Response({"error": "period_id or (pharmacy_id and week_start) is required."}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            period = get_object_or_404(RosterPeriod, pk=period_id)
-
-        if not is_authorized_attendance_manager(request.user, period.pharmacy):
-            raise PermissionDenied("You are not authorized to validate rosters for this pharmacy.")
-
-        validation = validate_roster_period(period)
-        return Response(validation)
-
-
-class RosterPublishView(APIView):
-    """
-    POST /api/attendance/roster/publish/
-    Body: {"period_id": int, "force_warnings": bool} or {"pharmacy_id": int, "week_start": "YYYY-MM-DD"}
-    Atomically publishes a roster period if validation passes.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        period_id = request.data.get("period_id")
-        force_warnings = bool(request.data.get("force_warnings", False))
-
-        if not period_id:
-            pharmacy_id = request.data.get("pharmacy_id")
-            week_start_str = request.data.get("week_start")
-            if pharmacy_id and week_start_str:
-                pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
-                if not is_authorized_attendance_manager(request.user, pharmacy):
-                    raise PermissionDenied("You are not authorized to publish rosters for this pharmacy.")
-                period, _ = get_or_create_roster_period(pharmacy, week_start_str, user=request.user)
-            else:
-                return Response({"error": "period_id or (pharmacy_id and week_start) is required."}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            period = get_object_or_404(RosterPeriod, pk=period_id)
-
-        if not is_authorized_attendance_manager(request.user, period.pharmacy):
-            raise PermissionDenied("You are not authorized to publish rosters for this pharmacy.")
-
-        try:
-            published_period, validation = publish_roster_period(
-                period,
-                published_by=request.user,
-                force_warnings=force_warnings,
-            )
-            return Response({
-                "status": "PUBLISHED",
-                "period_id": published_period.id,
-                "week_start": str(published_period.week_start),
-                "published_at": published_period.published_at.isoformat(),
-                "validation": validation,
-            })
         except DjangoValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -389,6 +320,7 @@ class WorkerAcknowledgeRosterView(APIView):
             return Response({
                 "status": "ACKNOWLEDGED",
                 "period_id": period.id,
+                **revision_summary(period),
                 "acknowledged_at": ack.acknowledged_at.isoformat(),
                 "notes": ack.notes,
             })
@@ -571,6 +503,7 @@ class RosterTemplateApplyView(APIView):
             return Response({
                 "status": "DRAFT",
                 "period_id": period.id,
+                **revision_summary(period),
                 "target_week_start": str(period.week_start),
                 "template_id": template.id,
                 "counts": counts,
@@ -615,6 +548,7 @@ class RosterBulkEditView(APIView):
             return Response({
                 "status": "SUCCESS",
                 "period_id": period.id,
+                **revision_summary(period),
                 "summary": summary,
             })
         except (DjangoValidationError, ValueError) as e:
