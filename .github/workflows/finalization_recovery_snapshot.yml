@@ -1,0 +1,45 @@
+name: Finalization Recovery Snapshots
+
+on:
+  push:
+    branches: [work/finalization-recovery-20261006]
+    paths: [.github/workflows/finalization_recovery_snapshot.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: f01
+            ref: f5ac6d7708523da12a348468a4bc2c5b46b74612
+          - label: f02
+            ref: f3c295cd68c151aecc7d59a28f590214ea0516e0
+          - label: f03
+            ref: 97335ebe436e7e8059101fe6c25e70c5d10a50cb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ matrix.ref }}
+          persist-credentials: false
+      - name: Export tracked source only
+        env:
+          EXPECTED_COMMIT: ${{ matrix.ref }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+          mkdir -p "$RUNNER_TEMP/source-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/source-evidence/COMMIT"
+          git archive --format=tar HEAD | gzip -n > "$RUNNER_TEMP/source-evidence/source.tar.gz"
+          cd "$RUNNER_TEMP/source-evidence"
+          sha256sum source.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-source-${{ matrix.label }}
+          path: ${{ runner.temp }}/source-evidence/
+          retention-days: 1
+          if-no-files-found: error
