@@ -51,7 +51,7 @@ class AdditionalAdminInvitationTests(TestCase):
         self.assertFalse(assignment.is_active)
 
         self.client.force_authenticate(user=target)
-        me_before = self.client.get('/api/users/me/')
+        me_before = self.client.get('/api/v1/users/me/')
         self.assertEqual(me_before.status_code, 200)
         self.assertEqual(me_before.data['admin_assignments'], [])
         memberships_before = self.client.get('/api/v1/my-memberships/')
@@ -67,7 +67,7 @@ class AdditionalAdminInvitationTests(TestCase):
         self.assertEqual(accepted.status_code, 200)
         assignment.refresh_from_db()
         self.assertTrue(assignment.is_active)
-        me_after = self.client.get('/api/users/me/')
+        me_after = self.client.get('/api/v1/users/me/')
         self.assertEqual(me_after.status_code, 200)
         self.assertEqual(len(me_after.data['admin_assignments']), 1)
         self.assertEqual(me_after.data['admin_assignments'][0]['pharmacy_id'], self.pharmacy.pk)
