@@ -21,7 +21,7 @@ from organizations.models import Organization, PharmacyAdmin
 from users.models import OrganizationMembership
 
 User = get_user_model()
-API = "/api/client-profile/"
+API = "/api/v1/"
 
 
 @contextmanager
