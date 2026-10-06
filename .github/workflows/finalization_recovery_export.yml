@@ -1,0 +1,89 @@
+name: Finalization Recovery Export
+on:
+  push:
+    branches: [work/finalization-resume-20261006]
+    paths: [.github/workflows/finalization_recovery_export.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Export only exact tracked trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovery-source
+          for spec in main:6add2bdd81689a619ba9e6f29ed5d5c208a5ff18 f02:7cd3969936df123e7b3c88d4baec77862c785062 f03:ec529306f39ba3d1a5c5e643a5d623c78322d929; do
+            name=${spec%%:*}; sha=${spec#*:}
+            git fetch --no-tags origin "$sha"
+            test "$(git rev-parse FETCH_HEAD)" = "$sha"
+            git archive --format=tar "$sha" | gzip > "recovery-source/${name}.tar.gz"
+            git show -s --format='%H %T %P' "$sha" > "recovery-source/${name}.commit"
+          done
+          (cd recovery-source && sha256sum *.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-source-recovery
+          path: recovery-source/
+          retention-days: 2
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 7cd3969936df123e7b3c88d4baec77862c785062
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Recover installed application runtime without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r backend/requirements.txt
+          python -m pip check
+          mkdir -p recovery-runtime
+          git rev-parse HEAD > recovery-runtime/COMMIT
+          python -m pip freeze > recovery-runtime/requirements.freeze
+          python -c "import json,sys,django; print(json.dumps({'prefix':sys.prefix,'version':sys.version,'django':django.get_version()}))" > recovery-runtime/runtime.json
+          tar -czf recovery-runtime/python-runtime.tar.gz -C "$pythonLocation" .
+          (cd recovery-runtime && sha256sum python-runtime.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-runtime-recovery
+          path: recovery-runtime/
+          retention-days: 2
+  shared-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ec529306f39ba3d1a5c5e643a5d623c78322d929
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+      - name: Recover public SDK test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd shared-core
+          npm ci
+          mkdir -p ../recovery-node
+          tar -czf ../recovery-node/node-modules.tar.gz node_modules
+          cp package-lock.json ../recovery-node/
+          cd ../recovery-node
+          sha256sum node-modules.tar.gz package-lock.json > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-node-recovery
+          path: recovery-node/
+          retention-days: 2
