@@ -198,3 +198,13 @@ Detailed mapping: `docs/architecture/API_V1_CUTOVER.md`.
 Run exact-head hosted shared-core, Vite, Next, Expo, backend SQLite/PostgreSQL, architecture,
 security and CodeQL gates. Any finding is F06 work until corrected. F07 begins only after guarded
 F06 merge and remains responsible for real end-to-end production acceptance.
+
+
+## F06 senior recovery checkpoint - 2026-10-06
+
+- PR #147 remains the single repair path; no restart PR and no compatibility /api/client-profile/ mount was restored.
+- Senior takeover verified reviewed head ee39eb5b1c47ebe3d7d04172906efcf8ba8fef6f after the junior repair sequence. The strict API-v1 source audit, boundary audit, shared-core, Vite, Next, mobile, kiosk, CodeQL and public-repository-security work had already progressed materially; exact-head gates remained authoritative.
+- CI exposed two architecture-ratchet failures caused by F06 successfully shrinking dependencies without tightening the baselines: client_profile runtime code measured 291 lines while the ceiling still said 296, and the mutual-dependency allowlist retained resolved pairs core-memberships, core-organizations and core-workforce. Commit 3a26d01dfbe21ea592e6ba915fe1461eca0bfd7c tightens those ratchets rather than widening them.
+- CI also exposed an incorrect route assertion for /api/v1/pill-rewards/. PillRewardsViewSet is intentionally action-only, so there is no collection-list route at that path. Production/shared-core calls use action routes such as /api/v1/pill-rewards/balance/. Commit a90801e7c67631033dee310828e31a2b0dab902a removes the false collection assertion and proves the real balance action resolves.
+- Senior wiring inspection confirmed: Django mounts application HTTP APIs only at /api/v1/; Vite and Expo normalize configured roots to /api/v1; Next's catch-all accepts only /api/v1/** and strips the browser-facing v1 before forwarding to the v1 upstream; WebSocket and media rewrites resolve against the backend origin outside API versioning; finance managed-invoice guards remain ordered before the generic invoice domain; kiosk remains on its separate signed/device transport.
+- Current exact head after senior corrections: a90801e7c67631033dee310828e31a2b0dab902a. CI is running on that head. Do not merge until every required exact-head gate is green and the final diff/head review is repeated.
