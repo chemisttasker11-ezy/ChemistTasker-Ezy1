@@ -1,0 +1,31 @@
+{
+  "base_sha": "6e3a9e78aa23f54a689cff1402722c48801259be",
+  "base_tree": "d09ea9c76fad8eb1086b73921f7c99d6ab9a72d2",
+  "expected_tree": "e44369c84e4709471cd2435d124daccfb50a7014",
+  "patch_sha256": "4342008fdbc55e43fb5d1e9611862abcc3da100654cf423dffba3d4624b47527",
+  "paths": [
+    "backend/attendance_tests/test_roster_api.py",
+    "backend/attendance_tests/test_roster_v2_acceptance.py",
+    "backend/workforce/roster/command_api.py",
+    "backend/workforce/roster/publication.py",
+    "backend/workforce/roster/publication_contract.py",
+    "backend/workforce/roster/revisions.py",
+    "backend/workforce/roster/v2_views.py",
+    "backend/workforce/tests/test_publication_contract.py",
+    "backend/workforce/views.py",
+    "docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md",
+    "docs/architecture/ROSTER_PUBLICATION_CONVERGENCE.md",
+    "frontend_mobile/features/parity/roster.tsx",
+    "frontend_web/src/components/roster/RosterPlanningToolbar.tsx",
+    "frontend_web/src/features/workforce/RosterPublishReviewDialog.tsx",
+    "frontend_web/src/features/workforce/RosterSafePublishButton.tsx",
+    "shared-core/src/api.ts",
+    "shared-core/src/domains/rosterPublication.test.ts",
+    "shared-core/src/domains/rosterPublication.ts",
+    "shared-core/src/index.ts",
+    "shared-core/src/operationalApi.test.ts"
+  ],
+  "chunks": 6,
+  "branch": "work/finalization-candidate-f04-20261006",
+  "message": "feat(f04-20261006): implement reviewed production finalization milestone"
+}
