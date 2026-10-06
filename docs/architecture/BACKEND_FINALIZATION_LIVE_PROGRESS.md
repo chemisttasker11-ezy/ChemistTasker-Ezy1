@@ -225,3 +225,14 @@ Corrections now on the PR branch:
 These changes are routing/test hardening only. They do not change database models or migrations, billing authority, handler permissions, serializers, finance ownership, or kiosk device-token signing semantics.
 
 Exact-head CI must be rerun from the final repaired head before merge.
+
+
+#### Exact-head CI repair after senior kiosk/caller correction
+
+The first integrated run after the senior native-kiosk repair reached the promoted-domain contract block and failed with four test-only errors:
+- three extraction contracts still imported the removed project-level `core.api_v1_urls.router` instead of their domain-owned routers;
+- the API-v1 composition contract still treated action-only `pill-rewards` as a collection route.
+
+The production URL composition itself was correct. The contracts were repaired to import `shifts.urls.router`, `memberships.urls.router` and `organizations.urls.router`, and rewards composition now asserts the real `/api/v1/pill-rewards/balance/` action route. No production handler, permission, serializer, model, migration or billing/finance policy changed.
+
+A fresh exact-head CI run is required before merge.
