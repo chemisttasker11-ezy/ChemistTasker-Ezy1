@@ -281,7 +281,7 @@ class RegionDelegationTests(TestCase):
         self.assertIn(foreign.status_code, (400, 403), foreign.content)
 
     def test_region_cannot_update_organization_record_but_chief_can(self):
-        update_url = f'/api/client-profile/organizations/{self.organization.id}/'
+        update_url = f'/api/v1/organizations/{self.organization.id}/'
         denied = self.client.patch(update_url, {'name': 'Region Rename'}, content_type='application/json')
         self.assertEqual(denied.status_code, 403)
         self.organization.refresh_from_db()
