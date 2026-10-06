@@ -14,7 +14,7 @@ owner = get_user_model().objects.get(email="owner@kiosk-acceptance.invalid")
 device, token = activate_kiosk_device(owner, pharmacy, "PIN Delivery Acceptance")
 session = requests.Session()
 session.trust_env = False
-base = "http://127.0.0.1:8001/api/client-profile/attendance/kiosk/"
+base = "http://127.0.0.1:8001/api/v1/attendance/kiosk/"
 response = session.post(base + "worker-pin/status/", headers={"X-Device-Token": token},
     json={"identifier": "chemisttasker@gmail.com"}, timeout=45)
 print(json.dumps({"http_status": response.status_code, "response": response.json()}))
