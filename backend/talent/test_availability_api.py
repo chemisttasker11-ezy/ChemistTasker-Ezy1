@@ -1,4 +1,4 @@
-"""Characterization of the availability API (/api/client-profile/user-availability/)."""
+"""Characterization of the availability API (/api/v1/user-availability/)."""
 from django.test import TestCase
 
 from talent.models import UserAvailability
