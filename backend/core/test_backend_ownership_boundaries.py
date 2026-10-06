@@ -184,11 +184,8 @@ ALLOWED_MUTUAL_APP_PAIRS = {
     ("attendance", "workforce"),
     # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
     ("chat", "core"),
-    ("core", "memberships"),
-    ("core", "organizations"),
     ("core", "shifts"),
     ("core", "users"),
-    ("core", "workforce"),
     # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
     ("client_profile", "onboarding"),
     # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them
@@ -199,7 +196,7 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 296
+KERNEL_CODE_LINE_CEILING = 291
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
