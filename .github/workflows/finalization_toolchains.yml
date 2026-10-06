@@ -1,0 +1,78 @@
+name: Finalization local test toolchains
+
+on:
+  push:
+    branches: [work/finalization-recovery-20261006-c]
+    paths: ['.github/workflows/finalization_toolchains.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  python-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 40914809d777630f84cb3b89b1883f5f3cb5c607
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r backend/requirements.txt
+      - name: Export installed runtime without repository credentials or data
+        run: |
+          mkdir -p "$RUNNER_TEMP/python-evidence"
+          python -m pip check
+          python -m pip freeze > "$RUNNER_TEMP/python-evidence/requirements.resolved.txt"
+          python -c 'import sys, django; print(sys.version); print(django.get_version())' > "$RUNNER_TEMP/python-evidence/runtime.txt"
+          prefix=$(python -c 'import sys; print(sys.prefix)')
+          tar -czf "$RUNNER_TEMP/python-evidence/python-runtime.tar.gz" -C "$prefix" .
+          cd "$RUNNER_TEMP/python-evidence"
+          sha256sum python-runtime.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-python-runtime
+          path: ${{ runner.temp }}/python-evidence/
+          retention-days: 3
+  client-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - client: vite
+            directory: frontend_web
+          - client: next
+            directory: frontend_web/landing_next
+          - client: expo
+            directory: frontend_mobile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 40914809d777630f84cb3b89b1883f5f3cb5c607
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm ci --prefix shared-core && npm run build --prefix shared-core
+      - run: npm ci
+        working-directory: ${{ matrix.directory }}
+      - name: Export dependency files only
+        env:
+          CLIENT: ${{ matrix.client }}
+          DIRECTORY: ${{ matrix.directory }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/client-evidence"
+          tar -czf "$RUNNER_TEMP/client-evidence/$CLIENT-node.tar.gz" "$DIRECTORY/node_modules"
+          node --version > "$RUNNER_TEMP/client-evidence/NODE"
+          git rev-parse HEAD > "$RUNNER_TEMP/client-evidence/COMMIT"
+          cd "$RUNNER_TEMP/client-evidence"
+          sha256sum "$CLIENT-node.tar.gz" > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-${{ matrix.client }}-toolchain
+          path: ${{ runner.temp }}/client-evidence/
+          retention-days: 3
