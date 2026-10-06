@@ -208,3 +208,20 @@ F06 merge and remains responsible for real end-to-end production acceptance.
 - CI also exposed an incorrect route assertion for /api/v1/pill-rewards/. PillRewardsViewSet is intentionally action-only, so there is no collection-list route at that path. Production/shared-core calls use action routes such as /api/v1/pill-rewards/balance/. Commit a90801e7c67631033dee310828e31a2b0dab902a removes the false collection assertion and proves the real balance action resolves.
 - Senior wiring inspection confirmed: Django mounts application HTTP APIs only at /api/v1/; Vite and Expo normalize configured roots to /api/v1; Next's catch-all accepts only /api/v1/** and strips the browser-facing v1 before forwarding to the v1 upstream; WebSocket and media rewrites resolve against the backend origin outside API versioning; finance managed-invoice guards remain ordered before the generic invoice domain; kiosk remains on its separate signed/device transport.
 - Current exact head after senior corrections: a90801e7c67631033dee310828e31a2b0dab902a. CI is running on that head. Do not merge until every required exact-head gate is green and the final diff/head review is repeated.
+
+
+### F06 senior cutover audit — native kiosk and residual caller correction
+
+Senior negative-space review of PR #147 found that the desktop Tauri kiosk had not been migrated with the Vite caller surface. The web kiosk now supplies a canonical `/api/v1` base, but the Rust transport still appended `/client-profile/attendance/kiosk/**`, which would have produced invalid `/api/v1/client-profile/attendance/kiosk/**` requests for pairing, QR, enrolment, config refresh, sync and self-revocation. This was a real release blocker missed by the previous kiosk build because those network URLs are not exercised end-to-end there.
+
+Corrections now on the PR branch:
+- Native Rust kiosk requests append only `attendance/kiosk/**` to the validated canonical `/api/v1` base.
+- The kiosk base validator requires the canonical `/api/v1` root. No legacy persisted-base migration was added because there are currently no paired deployed kiosks requiring compatibility.
+- Rust (`.rs`) is now included in the API-v1 cutover source ratchet.
+- Two maintained web API-client onboarding event detectors were updated from the obsolete `/client-profile/<role>/onboarding/` matcher to the canonical role-relative onboarding shape.
+- The ratchet now detects escaped legacy `client-profile` matchers as well as quoted local unversioned `/api/<domain>` strings, while explicitly preserving the intentional Next BFF roots `/api/platform/**` and `/api/hub/**`.
+- Direct-view attendance/workforce test request paths and in-code endpoint documentation were aligned to `/api/v1/**` so security/state-machine evidence no longer names nonexistent routes.
+
+These changes are routing/test hardening only. They do not change database models or migrations, billing authority, handler permissions, serializers, finance ownership, or kiosk device-token signing semantics.
+
+Exact-head CI must be rerun from the final repaired head before merge.
