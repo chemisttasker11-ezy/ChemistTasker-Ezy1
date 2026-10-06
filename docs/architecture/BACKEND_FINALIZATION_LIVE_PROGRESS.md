@@ -27,9 +27,9 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | F01 | Roster slot write-path correction (#140) | MERGED | Actual HTTP PATCH preserves slot/assignment identity, unpublished state, sibling records and cross-week period ownership; notification choices occur at republish; negative/rollback tests; PostgreSQL verification. |
 | F02 | Supported runtime baseline (#141) | MERGED | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
 | F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
-| F04 | Roster publication convergence | IMPLEMENTED - selection-lifetime correction awaiting exact-head CI | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
-| F05 | Shared-core transport and domain convergence | IMPLEMENTED - exact-head CI pending | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
-| F06 | Canonical /api/v1 domain cutover | PLANNED | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
+| F04 | Roster publication convergence | MERGED (#144) | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
+| F05 | Shared-core transport and domain convergence | MERGED (#146) | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
+| F06 | Canonical /api/v1 domain cutover | IMPLEMENTED - exact-head CI pending | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
 | F07 | Production acceptance and closure | PLANNED | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
 
 ## F01 active work
@@ -173,3 +173,28 @@ F05 now consolidates HTTP/auth into one instance-based transport and moves the a
 2. F06: build the complete old-to-canonical method/path/view/action/namespace/caller matrix; migrate domain URLs and reverse references, then every shipping Expo/Next/Vite consumer and restricted kiosk path. Only remove the legacy HTTP mounts after migration checks prove no active caller remains. Keep native signing credentials separate.
 3. F07: verify actual wired journeys, schema, populated PostgreSQL upgrade/fresh install, concurrency, production settings and security on the final integrated tree. No claim of complete production acceptance from source/type checks alone.
 4. Retire the isolated recovery/patch-tool branches after implementation is safe and recorded. They are not part of the release tree. PR #139 remains separate.
+
+
+## F06 implementation checkpoint - 2026-10-06
+
+F05 #146 is merged at `7fbbe2e0542b4bfedd83173b615b69a6cfd2f151`; F06 starts from that exact main.
+The canonical backend root is now `/api/v1/`. The historical `/api/client-profile/` mount and
+all other unversioned application mounts are removed. Domain handlers, router order, permissions and
+schemas are reused under `core.api_v1_urls`; Django reverse contracts use `api_v1:`.
+
+Shared-core domain paths, Vite, Expo and Next upstream/SSR configuration are migrated together.
+Next internal BFF routes remain frontend-internal and forward to v1. Kiosk URLs move to v1 while
+native device signing stays separate. The managed-invoice compatibility guard remains ahead of the
+canonical invoice editor. No model/table/migration, billing-policy, Celery identity or WebSocket
+route change.
+
+The obsolete `core.client_profile_api_urls` module is removed. Route contracts prove former
+application prefixes no longer resolve. The new `audit-api-v1-cutover.mjs` architecture ratchet
+blocks reintroduction of unversioned application paths or `client_profile:` URL reverses.
+Detailed mapping: `docs/architecture/API_V1_CUTOVER.md`.
+
+### NEXT ACTION
+
+Run exact-head hosted shared-core, Vite, Next, Expo, backend SQLite/PostgreSQL, architecture,
+security and CodeQL gates. Any finding is F06 work until corrected. F07 begins only after guarded
+F06 merge and remains responsible for real end-to-end production acceptance.
