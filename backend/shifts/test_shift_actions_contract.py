@@ -31,7 +31,7 @@ from shifts.models import (
     ShiftSlotAssignment,
 )
 
-API = "/api/client-profile/"
+API = "/api/v1/"
 DAY = date.today() + timedelta(days=10)
 
 
