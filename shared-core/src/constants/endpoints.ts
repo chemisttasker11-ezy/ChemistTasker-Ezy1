@@ -33,10 +33,6 @@ export const API_ENDPOINTS = {
         const safeRole = role === 'other_staff' ? 'otherstaff' : role;
         return `/client-profile/${safeRole}/onboarding/me/`;
     },
-    onboardingCreate: (role: string) => {
-        const safeRole = role === 'other_staff' ? 'otherstaff' : role;
-        return `/client-profile/${safeRole}/onboarding/`;
-    },
 
 
     // refereeConfirm: (pk: string | number, refIndex: string | number) =>

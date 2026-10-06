@@ -1461,21 +1461,6 @@ export interface UserAvailabilityPayload {
     notes?: string | null;
 }
 
-export interface ShiftApplicationApi {
-    id: number;
-    pharmacist_name: string;
-    pharmacist_email?: string | null;
-    pharmacist_phone?: string | null;
-    ahpra_number?: string | null;
-    experience_years?: number | null;
-    rating?: number | null;
-    cover_letter?: string | null;
-    applied_date: string;
-    status: string;
-}
-
-export type ShiftApplication = CamelCasedPropertiesDeep<ShiftApplicationApi>;
-
 export interface OwnerShiftSummaryApi {
     id: number;
     pharmacy_name: string;

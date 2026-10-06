@@ -310,7 +310,6 @@ const mapRosterAssignment = (api) => camelCaseKeysDeep(api);
 const mapWorkerShiftRequest = (api): WorkerShiftRequest => camelCaseKeysDeep(api);
 const mapOpenShift = (api) => camelCaseKeysDeep(api);
 const mapRosterPharmacyMember = (api): RosterPharmacyMember => camelCaseKeysDeep(api);
-const mapShiftApplication = (api) => camelCaseKeysDeep(api);
 const mapOwnerShiftSummary = (api) => camelCaseKeysDeep(api);
 const mapPharmacySummaryRecord = (api) => camelCaseKeysDeep(api);
 const mapChain = (api) => camelCaseKeysDeep(api);
@@ -629,10 +628,6 @@ export function updateOnboarding(role, data) {
     const safeRole = role === 'other_staff' ? 'otherstaff' : role;
     const body = data instanceof FormData || typeof data === 'string' ? data : JSON.stringify(data);
     return fetchApi(`/client-profile/${safeRole}/onboarding/me/`, { method: 'PATCH', body });
-}
-export function createOnboarding(role, data) {
-    const safeRole = role === 'other_staff' ? 'otherstaff' : role;
-    return fetchApi(`/client-profile/${safeRole}/onboarding/`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export function getOnboardingDetail(rawRole: string) {
@@ -1090,15 +1085,6 @@ export function createOwnerShift(data) {
 export function updateOwnerShift(id, data) {
     return fetchApi(`/client-profile/shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
-export function getShiftApplications(id) {
-    return fetchApi(`/client-profile/shifts/${id}/applications/`);
-}
-export function acceptShiftApplication(shiftId, applicationId) {
-    return fetchApi(`/client-profile/shifts/${shiftId}/applications/${applicationId}/accept/`, { method: 'POST' });
-}
-export function rejectShiftApplication(shiftId, applicationId) {
-    return fetchApi(`/client-profile/shifts/${shiftId}/applications/${applicationId}/reject/`, { method: 'POST' });
-}
 export function getPublicJobBoard(params?: { organization?: number | string }) {
     const query = buildQuery(params);
     return fetchApi(`/client-profile/public-job-board/${query}`, { skipAuth: true });
@@ -1347,16 +1333,6 @@ export async function createOwnerShiftService(payload) {
 }
 export async function updateOwnerShiftService(shiftId, payload) {
     await updateOwnerShift(shiftId, payload);
-}
-export async function fetchShiftApplicationsService(shiftId) {
-    const data = await getShiftApplications(shiftId);
-    return asList(data).map(mapShiftApplication);
-}
-export async function acceptShiftApplicationService(shiftId, applicationId) {
-    await acceptShiftApplication(shiftId, applicationId);
-}
-export async function rejectShiftApplicationService(shiftId, applicationId) {
-    await rejectShiftApplication(shiftId, applicationId);
 }
 const toRosterQueryParams = (filters) => ({
     pharmacy: filters?.pharmacyId,
