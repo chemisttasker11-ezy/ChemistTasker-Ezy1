@@ -40,7 +40,7 @@ class MarketplaceTestCase(TestCase):
         self.assertIn("MARKETPLACE_TERMS_REQUIRED", {row["code"] for row in decision.blockers})
 
     def test_terms_acceptance_requires_authentication_explicit_consent_and_current_version(self):
-        path = "/api/marketplace/me/terms/"
+        path = "/api/v1/marketplace/me/terms/"
         MarketplaceTermsAcceptance.objects.filter(user=self.user).delete()
         self.assertEqual(APIClient().post(path, {"accepted": True, "version": "2026-09"}, format="json").status_code, 401)
         client = APIClient(); client.force_authenticate(self.user)
@@ -58,9 +58,9 @@ class MarketplaceTestCase(TestCase):
         MarketplaceTermsAcceptance.objects.filter(user=self.user).delete()
         IdentityVerification.objects.filter(user=self.user).delete()
         client = APIClient(); client.force_authenticate(self.user)
-        response = client.post("/api/marketplace/me/terms/", {"accepted": True, "version": "2026-09"}, format="json")
+        response = client.post("/api/v1/marketplace/me/terms/", {"accepted": True, "version": "2026-09"}, format="json")
         self.assertEqual(response.status_code, 201)
-        blockers = {row["code"] for row in client.get("/api/marketplace/me/access/").data["blockers"]}
+        blockers = {row["code"] for row in client.get("/api/v1/marketplace/me/access/").data["blockers"]}
         self.assertIn("IDENTITY_UNVERIFIED", blockers)
         self.assertNotIn("MARKETPLACE_TERMS_REQUIRED", blockers)
 
@@ -105,7 +105,7 @@ class MarketplaceTestCase(TestCase):
     @override_settings(MARKETPLACE_READ_ENABLED=True)
     def test_public_list_api_is_anonymous_and_safe(self):
         self.listing()
-        response = APIClient().get("/api/marketplace/listings/")
+        response = APIClient().get("/api/v1/marketplace/listings/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
         rendered = str(response.data)
@@ -115,7 +115,7 @@ class MarketplaceTestCase(TestCase):
     @override_settings(MARKETPLACE_READ_ENABLED=True, FRONTEND_BASE_URL="https://example.test")
     def test_sitemap_contains_public_goods_but_no_ethical_inventory_route(self):
         listing = self.listing()
-        response = APIClient().get("/api/public-hub/sitemap/")
+        response = APIClient().get("/api/v1/public-hub/sitemap/")
         self.assertEqual(response.status_code, 200)
         urls = {row["loc"] for row in response.data}
         self.assertIn(f"https://example.test/marketplace/items/{listing.id}/{listing.slug}", urls)
@@ -128,7 +128,7 @@ class MarketplaceTestCase(TestCase):
         IdentityVerification.objects.create(user=stranger, status="VERIFIED", assurance_method="MANUAL")
         MarketplaceTermsAcceptance.objects.create(user=stranger, version="2026-09")
         client = APIClient(); client.force_authenticate(stranger)
-        response = client.post("/api/marketplace/listings/", {"seller_context":"PHARMACY","pharmacy":self.pharmacy.id,"category":self.category.id,"mode":"FREE","title":"Forged","description":"No","condition":"Used","quantity":1,"unit":"bundle","amount":"0","desired_swap":"","suburb":"Brisbane","state":"QLD","postcode":"4000","allowed_buyer_roles":["OWNER"],"delivery":{"method":"PICKUP"}}, format="json")
+        response = client.post("/api/v1/marketplace/listings/", {"seller_context":"PHARMACY","pharmacy":self.pharmacy.id,"category":self.category.id,"mode":"FREE","title":"Forged","description":"No","condition":"Used","quantity":1,"unit":"bundle","amount":"0","desired_swap":"","suburb":"Brisbane","state":"QLD","postcode":"4000","allowed_buyer_roles":["OWNER"],"delivery":{"method":"PICKUP"}}, format="json")
         self.assertEqual(response.status_code, 403)
 
     @override_settings(MARKETPLACE_NEW_LISTINGS_ENABLED=True, MARKETPLACE_ALL_WRITES_ENABLED=True)
@@ -154,8 +154,8 @@ class MarketplaceTestCase(TestCase):
             "allowed_buyer_roles": ["OWNER"],
             "delivery": {"method": "PICKUP"},
         }
-        first = client.post("/api/marketplace/listings/", payload, format="json")
-        replay = client.post("/api/marketplace/listings/", payload, format="json")
+        first = client.post("/api/v1/marketplace/listings/", payload, format="json")
+        replay = client.post("/api/v1/marketplace/listings/", payload, format="json")
         self.assertEqual(first.status_code, 201)
         self.assertEqual(replay.status_code, 200)
         self.assertEqual(first.data["id"], replay.data["id"])
@@ -184,8 +184,8 @@ class MarketplaceTestCase(TestCase):
             "allowed_buyer_roles": ["OWNER"],
             "delivery": {"method": "PICKUP"},
         }
-        self.assertEqual(client.post("/api/marketplace/listings/", payload, format="json").status_code, 201)
+        self.assertEqual(client.post("/api/v1/marketplace/listings/", payload, format="json").status_code, 201)
         payload["title"] = "Changed fixture"
-        response = client.post("/api/marketplace/listings/", payload, format="json")
+        response = client.post("/api/v1/marketplace/listings/", payload, format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(MarketplaceListing.objects.filter(creator=self.user).count(), 1)
