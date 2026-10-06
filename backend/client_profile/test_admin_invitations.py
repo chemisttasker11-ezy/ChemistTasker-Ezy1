@@ -24,7 +24,7 @@ class AdditionalAdminInvitationTests(TestCase):
 
     def invite(self, email, admin_level='MANAGER'):
         with patch('organizations.views.async_task'):
-            return self.client.post('/api/client-profile/pharmacy-admins/', {
+            return self.client.post('/api/v1/pharmacy-admins/', {
                 'pharmacy': self.pharmacy.id,
                 'email': email,
                 'admin_level': admin_level,
@@ -51,28 +51,28 @@ class AdditionalAdminInvitationTests(TestCase):
         self.assertFalse(assignment.is_active)
 
         self.client.force_authenticate(user=target)
-        me_before = self.client.get('/api/users/me/')
+        me_before = self.client.get('/api/v1/users/me/')
         self.assertEqual(me_before.status_code, 200)
         self.assertEqual(me_before.data['admin_assignments'], [])
-        memberships_before = self.client.get('/api/client-profile/my-memberships/')
+        memberships_before = self.client.get('/api/v1/my-memberships/')
         self.assertEqual(memberships_before.status_code, 200)
         current_membership = next(item for item in memberships_before.data['results'] if item['id'] == membership.id)
         self.assertFalse(current_membership['is_pharmacy_admin'])
         self.assertIsNone(current_membership['admin_level'])
         self.assertEqual(current_membership['admin_capabilities'], [])
-        pending = self.client.get('/api/client-profile/pharmacy-admins/my-pending-invitations/')
+        pending = self.client.get('/api/v1/pharmacy-admins/my-pending-invitations/')
         self.assertEqual(pending.status_code, 200)
         self.assertEqual(pending.data[0]['id'], assignment.id)
-        accepted = self.client.post(f'/api/client-profile/pharmacy-admins/{assignment.id}/accept-invitation/')
+        accepted = self.client.post(f'/api/v1/pharmacy-admins/{assignment.id}/accept-invitation/')
         self.assertEqual(accepted.status_code, 200)
         assignment.refresh_from_db()
         self.assertTrue(assignment.is_active)
-        me_after = self.client.get('/api/users/me/')
+        me_after = self.client.get('/api/v1/users/me/')
         self.assertEqual(me_after.status_code, 200)
         self.assertEqual(len(me_after.data['admin_assignments']), 1)
         self.assertEqual(me_after.data['admin_assignments'][0]['pharmacy_id'], self.pharmacy.pk)
         self.assertIn(PharmacyAdmin.CAPABILITY_MANAGE_ROSTER, me_after.data['admin_assignments'][0]['capabilities'])
-        memberships_after = self.client.get('/api/client-profile/my-memberships/')
+        memberships_after = self.client.get('/api/v1/my-memberships/')
         accepted_membership = next(item for item in memberships_after.data['results'] if item['id'] == membership.id)
         self.assertTrue(accepted_membership['is_pharmacy_admin'])
         self.assertEqual(accepted_membership['admin_level'], 'MANAGER')
@@ -91,7 +91,7 @@ class AdditionalAdminInvitationTests(TestCase):
         self.assertEqual(membership.status, Membership.Status.PENDING)
         self.assertFalse(assignment.is_active)
         self.client.force_authenticate(user=target)
-        accepted = self.client.post(f'/api/client-profile/pharmacy-admins/{assignment.id}/accept-invitation/')
+        accepted = self.client.post(f'/api/v1/pharmacy-admins/{assignment.id}/accept-invitation/')
         self.assertEqual(accepted.status_code, 200)
         membership.refresh_from_db()
         assignment.refresh_from_db()
@@ -111,7 +111,7 @@ class AdditionalAdminInvitationTests(TestCase):
         self.assertEqual(self.invite(target.email).status_code, 201)
         assignment = PharmacyAdmin.objects.get(user=target, pharmacy=self.pharmacy)
         self.client.force_authenticate(user=target)
-        rejected = self.client.post(f'/api/client-profile/pharmacy-admins/{assignment.id}/reject-invitation/')
+        rejected = self.client.post(f'/api/v1/pharmacy-admins/{assignment.id}/reject-invitation/')
         self.assertEqual(rejected.status_code, 200)
         self.assertFalse(PharmacyAdmin.objects.filter(pk=assignment.pk).exists())
         membership.refresh_from_db()

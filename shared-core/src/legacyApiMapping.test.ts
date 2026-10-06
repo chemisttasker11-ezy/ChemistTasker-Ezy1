@@ -18,7 +18,7 @@ afterEach(() => {
 function configure(fetchImpl: typeof fetch) {
   vi.stubGlobal('fetch', fetchImpl);
   configureApi({
-    baseURL: 'https://example.test/api',
+    baseURL: 'https://example.test/api/v1',
     credentials: 'include',
     getToken: async () => 'legacy-token',
   });
@@ -29,7 +29,7 @@ describe('legacy api.ts shared mappings', () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const page = new URL(String(input)).searchParams.get('page');
       return json(page === '1'
-        ? { next: 'https://example.test/api/client-profile/pharmacies/?page=2', results: [
+        ? { next: 'https://example.test/api/v1/pharmacies/?page=2', results: [
             { id: 11, name: 'North', organization: 4 },
             { id: 12, name: 'Personal', organization: null },
           ] }

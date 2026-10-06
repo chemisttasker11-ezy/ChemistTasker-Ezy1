@@ -26,14 +26,14 @@ export function getCalendarEvents(params: CalendarEventFilters) {
         date_to: params.dateTo,
         source: params.source,
     });
-    return fetchApi<Collection<CalendarEventApi>>(`/client-profile/calendar-events/${query}`);
+    return fetchApi<Collection<CalendarEventApi>>(`/calendar-events/${query}`);
 }
 export async function fetchCalendarEvents(params: CalendarEventFilters) {
     const data = await getCalendarEvents(params);
     return asList(data).map(mapCalendarEvent);
 }
 export function getCalendarEventDetail(id: number | string) {
-    return fetchApi<CalendarEventApi>(`/client-profile/calendar-events/${id}/`);
+    return fetchApi<CalendarEventApi>(`/calendar-events/${id}/`);
 }
 export async function fetchCalendarEventDetail(id: number | string) {
     const data = await getCalendarEventDetail(id);
@@ -49,7 +49,7 @@ export function createCalendarEvent(payload: {
     endTime?: string;
     allDay?: boolean;
 }) {
-    return fetchApi<CalendarEventApi>('/client-profile/calendar-events/', {
+    return fetchApi<CalendarEventApi>('/calendar-events/', {
         method: 'POST',
         body: JSON.stringify({
             pharmacy: payload.pharmacy,
@@ -68,7 +68,7 @@ export async function createCalendarEventService(payload: Parameters<typeof crea
     return mapCalendarEvent(data);
 }
 export function updateCalendarEvent(id: number | string, payload: Partial<Parameters<typeof createCalendarEvent>[0]>) {
-    return fetchApi<CalendarEventApi>(`/client-profile/calendar-events/${id}/`, {
+    return fetchApi<CalendarEventApi>(`/calendar-events/${id}/`, {
         method: 'PATCH',
         body: JSON.stringify({
             title: payload.title,
@@ -85,7 +85,7 @@ export async function updateCalendarEventService(id: number | string, payload: P
     return mapCalendarEvent(data);
 }
 export function deleteCalendarEvent(id: number | string) {
-    return fetchApi(`/client-profile/calendar-events/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/calendar-events/${id}/`, { method: 'DELETE' });
 }
 export async function deleteCalendarEventService(id: number | string) {
     await deleteCalendarEvent(id);
@@ -98,14 +98,14 @@ export function getWorkNotes(params: WorkNoteFilters) {
         status: params.status,
         assigned_to_me: params.assignedToMe ? 'true' : undefined,
     });
-    return fetchApi<Collection<WorkNoteApi>>(`/client-profile/work-notes/${query}`);
+    return fetchApi<Collection<WorkNoteApi>>(`/work-notes/${query}`);
 }
 export async function fetchWorkNotes(params: WorkNoteFilters) {
     const data = await getWorkNotes(params);
     return asList(data).map(mapWorkNote);
 }
 export function getWorkNoteDetail(id: number | string) {
-    return fetchApi<WorkNoteApi>(`/client-profile/work-notes/${id}/`);
+    return fetchApi<WorkNoteApi>(`/work-notes/${id}/`);
 }
 export async function fetchWorkNoteDetail(id: number | string) {
     const data = await getWorkNoteDetail(id);
@@ -121,7 +121,7 @@ export function createWorkNote(payload: {
     isGeneral?: boolean;
     assigneeMembershipIds?: number[];
 }) {
-    return fetchApi<WorkNoteApi>('/client-profile/work-notes/', {
+    return fetchApi<WorkNoteApi>('/work-notes/', {
         method: 'POST',
         body: JSON.stringify({
             pharmacy: payload.pharmacy,
@@ -140,7 +140,7 @@ export async function createWorkNoteService(payload: Parameters<typeof createWor
     return mapWorkNote(data);
 }
 export function updateWorkNote(id: number | string, payload: Partial<Parameters<typeof createWorkNote>[0]>) {
-    return fetchApi<WorkNoteApi>(`/client-profile/work-notes/${id}/`, {
+    return fetchApi<WorkNoteApi>(`/work-notes/${id}/`, {
         method: 'PATCH',
         body: JSON.stringify({
             title: payload.title,
@@ -157,20 +157,20 @@ export async function updateWorkNoteService(id: number | string, payload: Parame
     return mapWorkNote(data);
 }
 export function deleteWorkNote(id: number | string) {
-    return fetchApi(`/client-profile/work-notes/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/work-notes/${id}/`, { method: 'DELETE' });
 }
 export async function deleteWorkNoteService(id: number | string) {
     await deleteWorkNote(id);
 }
 export function markWorkNoteDone(id: number | string) {
-    return fetchApi<WorkNoteApi>(`/client-profile/work-notes/${id}/mark_done/`, { method: 'POST' });
+    return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_done/`, { method: 'POST' });
 }
 export async function markWorkNoteDoneService(id: number | string) {
     const data = await markWorkNoteDone(id);
     return mapWorkNote(data);
 }
 export function markWorkNoteOpen(id: number | string) {
-    return fetchApi<WorkNoteApi>(`/client-profile/work-notes/${id}/mark_open/`, { method: 'POST' });
+    return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_open/`, { method: 'POST' });
 }
 export async function markWorkNoteOpenService(id: number | string) {
     const data = await markWorkNoteOpen(id);
@@ -183,7 +183,7 @@ export function getCalendarFeed(params: CalendarEventFilters) {
         date_from: params.dateFrom,
         date_to: params.dateTo,
     });
-    return fetchApi<CalendarFeedApi>(`/client-profile/calendar-feed/${query}`);
+    return fetchApi<CalendarFeedApi>(`/calendar-feed/${query}`);
 }
 export async function fetchCalendarFeed(params: CalendarEventFilters) {
     const data = await getCalendarFeed(params);

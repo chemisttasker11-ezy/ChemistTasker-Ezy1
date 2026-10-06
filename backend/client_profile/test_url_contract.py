@@ -1,11 +1,11 @@
 from django.test import SimpleTestCase
+from django.urls import resolve
 
-from client_profile.urls import router as kernel_router
-from core.client_profile_api_urls import router as public_router
+from client_profile import urls as kernel_urls
 
 
-class ClientProfileRouterContractTests(SimpleTestCase):
-    """Public API ordering remains a compatibility contract inherited from main."""
+class ApiV1RouterContractTests(SimpleTestCase):
+    """Canonical domain routes exist without a client_profile public router."""
 
     expected_public_prefixes = [
         "organizations",
@@ -20,7 +20,6 @@ class ClientProfileRouterContractTests(SimpleTestCase):
         "public-shifts",
         "shift-description-templates",
         "user-availability",
-        "pill-rewards",
         "shifts/active",
         "shifts/confirmed",
         "shifts/history",
@@ -48,16 +47,15 @@ class ClientProfileRouterContractTests(SimpleTestCase):
         "calendar-feed",
     ]
 
-    expected_kernel_prefixes = []
+    def test_domain_routes_resolve_under_api_v1(self):
+        for prefix in self.expected_public_prefixes:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(resolve(f"/api/v1/{prefix}/"))
 
-    def test_public_router_registration_order_matches_main(self):
-        self.assertEqual(
-            [prefix for prefix, _viewset, _basename in public_router.registry],
-            self.expected_public_prefixes,
-        )
+    def test_action_only_domain_routes_resolve_under_api_v1(self):
+        # PillRewardsViewSet intentionally exposes only @action routes, not a
+        # collection-list endpoint at /pill-rewards/.
+        self.assertIsNotNone(resolve("/api/v1/pill-rewards/balance/"))
 
-    def test_client_profile_router_contains_only_kernel_owned_routes(self):
-        self.assertEqual(
-            [prefix for prefix, _viewset, _basename in kernel_router.registry],
-            self.expected_kernel_prefixes,
-        )
+    def test_client_profile_urlconf_is_intentionally_empty(self):
+        self.assertEqual(kernel_urls.urlpatterns, [])

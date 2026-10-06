@@ -47,7 +47,7 @@ jobs:
         shell: pwsh
         env:
           KIOSK_BUILD_PROFILE: acceptance
-          VITE_API_URL: http://127.0.0.1:8000
+          VITE_API_URL: http://127.0.0.1:8000/api/v1
           CARGO_BUILD_JOBS: '2'
           CARGO_INCREMENTAL: '0'
         run: node scripts/run-tauri.mjs build --no-bundle

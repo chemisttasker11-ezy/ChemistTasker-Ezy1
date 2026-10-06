@@ -73,7 +73,7 @@ export default function PillsPage() {
     setReferralsLoading(true);
 
     apiClient
-      .get("/client-profile/pill-rewards/balance/")
+      .get("/pill-rewards/balance/")
       .then((balanceRes) => {
         if (!mounted) return;
         setBalance({
@@ -90,7 +90,7 @@ export default function PillsPage() {
       });
 
     apiClient
-      .get("/client-profile/pill-rewards/history/")
+      .get("/pill-rewards/history/")
       .then((historyRes) => {
         if (!mounted) return;
         const rawEntries = Array.isArray(historyRes.data?.results)
@@ -109,7 +109,7 @@ export default function PillsPage() {
       });
 
     apiClient
-      .get("/client-profile/pill-rewards/referrals/")
+      .get("/pill-rewards/referrals/")
       .then((referralRes) => {
         if (!mounted) return;
         const rawReferrals = Array.isArray(referralRes.data?.results)

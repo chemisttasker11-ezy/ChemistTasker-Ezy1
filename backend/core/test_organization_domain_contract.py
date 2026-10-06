@@ -2,7 +2,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 
 from client_profile.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
-from core.client_profile_api_urls import router
+from organizations.urls import router
 
 
 class OrganizationDomainExtractionContractTests(SimpleTestCase):
@@ -34,12 +34,12 @@ class OrganizationDomainExtractionContractTests(SimpleTestCase):
         }
         self.assertEqual(actual, self.expected_router_contracts)
 
-    def test_fixed_organization_paths_keep_client_profile_namespace(self):
+    def test_fixed_organization_paths_keep_api_v1_namespace(self):
         self.assertEqual(
-            reverse("client_profile:organization-public-detail", kwargs={"slug": "demo-org"}),
-            "/api/client-profile/organizations/public/demo-org/",
+            reverse("api_v1:organization-public-detail", kwargs={"slug": "demo-org"}),
+            "/api/v1/organizations/public/demo-org/",
         )
         self.assertEqual(
-            reverse("client_profile:owneronboarding-claim"),
-            "/api/client-profile/owner-onboarding/claim/",
+            reverse("api_v1:owneronboarding-claim"),
+            "/api/v1/owner-onboarding/claim/",
         )

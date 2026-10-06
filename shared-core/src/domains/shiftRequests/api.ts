@@ -4,41 +4,41 @@ import type { Collection } from '../../contracts/common';
 import { fetchApi } from '../../transport/application';
 import { buildQuery, camelCaseKeysDeep } from '../../utils/serialization';
 export function getLeaveRequests() {
-    return fetchApi<Collection<LeaveRequestApi>>('/client-profile/leave-requests/');
+    return fetchApi<Collection<LeaveRequestApi>>('/leave-requests/');
 }
 export function createLeaveRequest(data: unknown) {
-    return fetchApi('/client-profile/leave-requests/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi('/leave-requests/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateLeaveRequest(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/leave-requests/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi(`/leave-requests/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function approveLeaveRequest(id: number | string) {
-    return fetchApi(`/client-profile/leave-requests/${id}/approve/`, { method: 'POST' });
+    return fetchApi(`/leave-requests/${id}/approve/`, { method: 'POST' });
 }
 export function rejectLeaveRequest(id: number | string) {
-    return fetchApi(`/client-profile/leave-requests/${id}/reject/`, { method: 'POST' });
+    return fetchApi(`/leave-requests/${id}/reject/`, { method: 'POST' });
 }
 export function deleteLeaveRequest(id: number | string) {
-    return fetchApi(`/client-profile/leave-requests/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/leave-requests/${id}/`, { method: 'DELETE' });
 }
 export function getWorkerShiftRequests(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<WorkerShiftRequestApi>>(`/client-profile/worker-shift-requests/${query}`);
+    return fetchApi<Collection<WorkerShiftRequestApi>>(`/worker-shift-requests/${query}`);
 }
 export function createWorkerShiftRequest(data: unknown) {
-    return fetchApi<WorkerShiftRequestApi>('/client-profile/worker-shift-requests/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<WorkerShiftRequestApi>('/worker-shift-requests/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateWorkerShiftRequest(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/worker-shift-requests/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi(`/worker-shift-requests/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function approveWorkerShiftRequest(id: number | string) {
-    return fetchApi(`/client-profile/worker-shift-requests/${id}/approve/`, { method: 'POST' });
+    return fetchApi(`/worker-shift-requests/${id}/approve/`, { method: 'POST' });
 }
 export function rejectWorkerShiftRequest(id: number | string) {
-    return fetchApi(`/client-profile/worker-shift-requests/${id}/reject/`, { method: 'POST' });
+    return fetchApi(`/worker-shift-requests/${id}/reject/`, { method: 'POST' });
 }
 export function deleteWorkerShiftRequest(id: number | string) {
-    return fetchApi(`/client-profile/worker-shift-requests/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/worker-shift-requests/${id}/`, { method: 'DELETE' });
 }
 export async function createLeaveRequestService(payload: unknown) {
     const data = await createLeaveRequest(payload);

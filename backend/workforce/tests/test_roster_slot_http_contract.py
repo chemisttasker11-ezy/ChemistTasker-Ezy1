@@ -58,7 +58,7 @@ class RosterSlotHTTPContractTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.owner)
         self.client.raise_request_exception = False
-        self.url = f"/api/client-profile/roster-shifts/{self.shift.pk}/"
+        self.url = f"/api/v1/roster-shifts/{self.shift.pk}/"
 
     def publish_fixture(self):
         # Build every slot while DRAFT, then exercise production unpublish/PATCH.
@@ -380,7 +380,7 @@ class RosterSlotHTTPContractTests(TestCase):
         with mock.patch("shifts.posting.send_shift_updated_notifications") as announce:
             with self.captureOnCommitCallbacks(execute=True):
                 response = self.client.patch(
-                    f"/api/client-profile/shifts/{self.shift.pk}/", self.payload(), format="json",
+                    f"/api/v1/shifts/{self.shift.pk}/", self.payload(), format="json",
                 )
         self.assertEqual(response.status_code, 400, response.content)
         self.slot.refresh_from_db()

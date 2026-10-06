@@ -27,9 +27,9 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | F01 | Roster slot write-path correction (#140) | MERGED | Actual HTTP PATCH preserves slot/assignment identity, unpublished state, sibling records and cross-week period ownership; notification choices occur at republish; negative/rollback tests; PostgreSQL verification. |
 | F02 | Supported runtime baseline (#141) | MERGED | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
 | F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
-| F04 | Roster publication convergence | IMPLEMENTED - selection-lifetime correction awaiting exact-head CI | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
-| F05 | Shared-core transport and domain convergence | IMPLEMENTED - exact-head CI pending | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
-| F06 | Canonical /api/v1 domain cutover | PLANNED | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
+| F04 | Roster publication convergence | MERGED (#144) | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
+| F05 | Shared-core transport and domain convergence | MERGED (#146) | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
+| F06 | Canonical /api/v1 domain cutover | IMPLEMENTED - exact-head CI pending | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
 | F07 | Production acceptance and closure | PLANNED | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
 
 ## F01 active work
@@ -173,3 +173,66 @@ F05 now consolidates HTTP/auth into one instance-based transport and moves the a
 2. F06: build the complete old-to-canonical method/path/view/action/namespace/caller matrix; migrate domain URLs and reverse references, then every shipping Expo/Next/Vite consumer and restricted kiosk path. Only remove the legacy HTTP mounts after migration checks prove no active caller remains. Keep native signing credentials separate.
 3. F07: verify actual wired journeys, schema, populated PostgreSQL upgrade/fresh install, concurrency, production settings and security on the final integrated tree. No claim of complete production acceptance from source/type checks alone.
 4. Retire the isolated recovery/patch-tool branches after implementation is safe and recorded. They are not part of the release tree. PR #139 remains separate.
+
+
+## F06 implementation checkpoint - 2026-10-06
+
+F05 #146 is merged at `7fbbe2e0542b4bfedd83173b615b69a6cfd2f151`; F06 starts from that exact main.
+The canonical backend root is now `/api/v1/`. The historical `/api/client-profile/` mount and
+all other unversioned application mounts are removed. Domain handlers, router order, permissions and
+schemas are reused under `core.api_v1_urls`; Django reverse contracts use `api_v1:`.
+
+Shared-core domain paths, Vite, Expo and Next upstream/SSR configuration are migrated together.
+Next internal BFF routes remain frontend-internal and forward to v1. Kiosk URLs move to v1 while
+native device signing stays separate. The managed-invoice compatibility guard remains ahead of the
+canonical invoice editor. No model/table/migration, billing-policy, Celery identity or WebSocket
+route change.
+
+The obsolete `core.client_profile_api_urls` module is removed. Route contracts prove former
+application prefixes no longer resolve. The new `audit-api-v1-cutover.mjs` architecture ratchet
+blocks reintroduction of unversioned application paths or `client_profile:` URL reverses.
+Detailed mapping: `docs/architecture/API_V1_CUTOVER.md`.
+
+### NEXT ACTION
+
+Run exact-head hosted shared-core, Vite, Next, Expo, backend SQLite/PostgreSQL, architecture,
+security and CodeQL gates. Any finding is F06 work until corrected. F07 begins only after guarded
+F06 merge and remains responsible for real end-to-end production acceptance.
+
+
+## F06 senior recovery checkpoint - 2026-10-06
+
+- PR #147 remains the single repair path; no restart PR and no compatibility /api/client-profile/ mount was restored.
+- Senior takeover verified reviewed head ee39eb5b1c47ebe3d7d04172906efcf8ba8fef6f after the junior repair sequence. The strict API-v1 source audit, boundary audit, shared-core, Vite, Next, mobile, kiosk, CodeQL and public-repository-security work had already progressed materially; exact-head gates remained authoritative.
+- CI exposed two architecture-ratchet failures caused by F06 successfully shrinking dependencies without tightening the baselines: client_profile runtime code measured 291 lines while the ceiling still said 296, and the mutual-dependency allowlist retained resolved pairs core-memberships, core-organizations and core-workforce. Commit 3a26d01dfbe21ea592e6ba915fe1461eca0bfd7c tightens those ratchets rather than widening them.
+- CI also exposed an incorrect route assertion for /api/v1/pill-rewards/. PillRewardsViewSet is intentionally action-only, so there is no collection-list route at that path. Production/shared-core calls use action routes such as /api/v1/pill-rewards/balance/. Commit a90801e7c67631033dee310828e31a2b0dab902a removes the false collection assertion and proves the real balance action resolves.
+- Senior wiring inspection confirmed: Django mounts application HTTP APIs only at /api/v1/; Vite and Expo normalize configured roots to /api/v1; Next's catch-all accepts only /api/v1/** and strips the browser-facing v1 before forwarding to the v1 upstream; WebSocket and media rewrites resolve against the backend origin outside API versioning; finance managed-invoice guards remain ordered before the generic invoice domain; kiosk remains on its separate signed/device transport.
+- Current exact head after senior corrections: a90801e7c67631033dee310828e31a2b0dab902a. CI is running on that head. Do not merge until every required exact-head gate is green and the final diff/head review is repeated.
+
+
+### F06 senior cutover audit — native kiosk and residual caller correction
+
+Senior negative-space review of PR #147 found that the desktop Tauri kiosk had not been migrated with the Vite caller surface. The web kiosk now supplies a canonical `/api/v1` base, but the Rust transport still appended `/client-profile/attendance/kiosk/**`, which would have produced invalid `/api/v1/client-profile/attendance/kiosk/**` requests for pairing, QR, enrolment, config refresh, sync and self-revocation. This was a real release blocker missed by the previous kiosk build because those network URLs are not exercised end-to-end there.
+
+Corrections now on the PR branch:
+- Native Rust kiosk requests append only `attendance/kiosk/**` to the validated canonical `/api/v1` base.
+- The kiosk base validator requires the canonical `/api/v1` root. No legacy persisted-base migration was added because there are currently no paired deployed kiosks requiring compatibility.
+- Rust (`.rs`) is now included in the API-v1 cutover source ratchet.
+- Two maintained web API-client onboarding event detectors were updated from the obsolete `/client-profile/<role>/onboarding/` matcher to the canonical role-relative onboarding shape.
+- The ratchet now detects escaped legacy `client-profile` matchers as well as quoted local unversioned `/api/<domain>` strings, while explicitly preserving the intentional Next BFF roots `/api/platform/**` and `/api/hub/**`.
+- Direct-view attendance/workforce test request paths and in-code endpoint documentation were aligned to `/api/v1/**` so security/state-machine evidence no longer names nonexistent routes.
+
+These changes are routing/test hardening only. They do not change database models or migrations, billing authority, handler permissions, serializers, finance ownership, or kiosk device-token signing semantics.
+
+Exact-head CI must be rerun from the final repaired head before merge.
+
+
+#### Exact-head CI repair after senior kiosk/caller correction
+
+The first integrated run after the senior native-kiosk repair reached the promoted-domain contract block and failed with four test-only errors:
+- three extraction contracts still imported the removed project-level `core.api_v1_urls.router` instead of their domain-owned routers;
+- the API-v1 composition contract still treated action-only `pill-rewards` as a collection route.
+
+The production URL composition itself was correct. The contracts were repaired to import `shifts.urls.router`, `memberships.urls.router` and `organizations.urls.router`, and rewards composition now asserts the real `/api/v1/pill-rewards/balance/` action route. No production handler, permission, serializer, model, migration or billing/finance policy changed.
+
+A fresh exact-head CI run is required before merge.

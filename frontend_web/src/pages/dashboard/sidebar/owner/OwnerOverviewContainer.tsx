@@ -169,7 +169,7 @@ export default function OwnerOverviewContainer() {
         ? { workspace: "internal", pharmacy_id: overviewPharmacyId }
         : { workspace: "platform" };
     apiClient
-      .get("/client-profile/dashboard/owner/", { params: dashboardParams })
+      .get("/dashboard/owner/", { params: dashboardParams })
       .then(({ data }) => {
         if (mounted) setDashboardData(data);
       })

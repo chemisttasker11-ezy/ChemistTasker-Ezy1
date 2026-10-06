@@ -17,125 +17,125 @@ import { fetchApi, fetchWithAuth } from '../../transport/application';
 import { asList, buildQuery, extractNext } from '../../utils/serialization';
 import { buildPostFormData, buildScopeParams, groupMemberDisplayName, mapComment, mapContext, mapGroup, mapOptionFromSource, mapOrganization, mapPharmacy, mapPoll, mapPost } from './mappers';
 export function getHubContext() {
-    return fetchApi<HubContextApi>('/client-profile/hub/context/');
+    return fetchApi<HubContextApi>('/hub/context/');
 }
 export function getHubGroups(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<HubGroupApi>>(`/client-profile/hub/groups/${query}`);
+    return fetchApi<Collection<HubGroupApi>>(`/hub/groups/${query}`);
 }
 export function getHubGroupDetail(id: number | string, includeMembers: boolean | undefined) {
     const params = includeMembers ? '?include_members=true' : '';
-    return fetchApi<HubGroupApi>(`/client-profile/hub/groups/${id}/${params}`);
+    return fetchApi<HubGroupApi>(`/hub/groups/${id}/${params}`);
 }
 export function createHubGroup(data: unknown) {
-    return fetchApi<HubGroupApi>('/client-profile/hub/groups/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<HubGroupApi>('/hub/groups/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateHubGroup(id: number | string, data: unknown) {
-    return fetchApi<HubGroupApi>(`/client-profile/hub/groups/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<HubGroupApi>(`/hub/groups/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteHubGroup(id: number | string) {
-    return fetchApi(`/client-profile/hub/groups/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/hub/groups/${id}/`, { method: 'DELETE' });
 }
 export function getHubPosts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<HubPostApi>>(`/client-profile/hub/posts/${query}`);
+    return fetchApi<Collection<HubPostApi>>(`/hub/posts/${query}`);
 }
 export function getHubPostDetail(id: number | string) {
-    return fetchApi<HubPostApi>(`/client-profile/hub/posts/${id}/`);
+    return fetchApi<HubPostApi>(`/hub/posts/${id}/`);
 }
 export function createHubPost(data: unknown) {
-    return fetchApi<HubPostApi>('/client-profile/hub/posts/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) });
+    return fetchApi<HubPostApi>('/hub/posts/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) });
 }
 export function updateHubPost(id: number | string, data: unknown) {
-    return fetchApi<HubPostApi>(`/client-profile/hub/posts/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) });
+    return fetchApi<HubPostApi>(`/hub/posts/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) });
 }
 export function deleteHubPost(id: number | string) {
-    return fetchApi(`/client-profile/hub/posts/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/hub/posts/${id}/`, { method: 'DELETE' });
 }
 export function pinHubPost(id: number | string) {
-    return fetchApi<HubPostApi>(`/client-profile/hub/posts/${id}/pin/`, { method: 'POST' });
+    return fetchApi<HubPostApi>(`/hub/posts/${id}/pin/`, { method: 'POST' });
 }
 export function unpinHubPost(id: number | string) {
-    return fetchApi<HubPostApi>(`/client-profile/hub/posts/${id}/unpin/`, { method: 'POST' });
+    return fetchApi<HubPostApi>(`/hub/posts/${id}/unpin/`, { method: 'POST' });
 }
 export function getHubPostComments(postId: number | string) {
-    return fetchApi<Collection<CommentApi>>(`/client-profile/hub/posts/${postId}/comments/`);
+    return fetchApi<Collection<CommentApi>>(`/hub/posts/${postId}/comments/`);
 }
 export function createHubComment(postId: number | string, data: unknown) {
-    return fetchApi<CommentApi>(`/client-profile/hub/posts/${postId}/comments/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<CommentApi>(`/hub/posts/${postId}/comments/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateHubComment(postId: number | string, commentId: number | string, data: unknown) {
-    return fetchApi<CommentApi>(`/client-profile/hub/posts/${postId}/comments/${commentId}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<CommentApi>(`/hub/posts/${postId}/comments/${commentId}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteHubComment(postId: number | string, commentId: number | string) {
-    return fetchApi(`/client-profile/hub/posts/${postId}/comments/${commentId}/`, { method: 'DELETE' });
+    return fetchApi(`/hub/posts/${postId}/comments/${commentId}/`, { method: 'DELETE' });
 }
 export function reactToHubPost(postId: number | string, reaction: string) {
-    return fetchApi<HubPostApi>(`/client-profile/hub/posts/${postId}/reactions/`, {
+    return fetchApi<HubPostApi>(`/hub/posts/${postId}/reactions/`, {
         method: 'POST',
         body: JSON.stringify({ reaction_type: reaction }),
     });
 }
 export function removeHubPostReaction(postId: number | string) {
-    return fetchApi(`/client-profile/hub/posts/${postId}/reactions/`, { method: 'DELETE' });
+    return fetchApi(`/hub/posts/${postId}/reactions/`, { method: 'DELETE' });
 }
 export function reactToHubComment(postId: number | string, commentId: number | string, reaction: string) {
-    return fetchApi<CommentApi>(`/client-profile/hub/posts/${postId}/comments/${commentId}/reactions/`, {
+    return fetchApi<CommentApi>(`/hub/posts/${postId}/comments/${commentId}/reactions/`, {
         method: 'POST',
         body: JSON.stringify({ reaction_type: reaction }),
     });
 }
 export function removeHubCommentReaction(postId: number | string, commentId: number | string) {
-    return fetchApi<CommentApi>(`/client-profile/hub/posts/${postId}/comments/${commentId}/reactions/`, { method: 'DELETE' });
+    return fetchApi<CommentApi>(`/hub/posts/${postId}/comments/${commentId}/reactions/`, { method: 'DELETE' });
 }
 export function getHubPolls(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<HubPollApi>>(`/client-profile/hub/polls/${query}`);
+    return fetchApi<Collection<HubPollApi>>(`/hub/polls/${query}`);
 }
 export function getHubPollDetail(id: number | string) {
-    return fetchApi<HubPollApi>(`/client-profile/hub/polls/${id}/`);
+    return fetchApi<HubPollApi>(`/hub/polls/${id}/`);
 }
 export function createHubPoll(data: unknown) {
-    return fetchApi<HubPollApi>('/client-profile/hub/polls/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<HubPollApi>('/hub/polls/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function voteOnHubPoll(id: number | string, optionId: number | string) {
-    return fetchApi<HubPollApi>(`/client-profile/hub/polls/${id}/vote/`, {
+    return fetchApi<HubPollApi>(`/hub/polls/${id}/vote/`, {
         method: 'POST',
         body: JSON.stringify({ option_id: optionId }),
     });
 }
 export function getHubPollComments(pollId: number | string) {
-    return fetchApi<Collection<PollCommentApi>>(`/client-profile/hub/polls/${pollId}/comments/`);
+    return fetchApi<Collection<PollCommentApi>>(`/hub/polls/${pollId}/comments/`);
 }
 export function createHubPollComment(pollId: number | string, data: unknown) {
-    return fetchApi<PollCommentApi>(`/client-profile/hub/polls/${pollId}/comments/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<PollCommentApi>(`/hub/polls/${pollId}/comments/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateHubPollComment(pollId: number | string, commentId: number | string, data: unknown) {
-    return fetchApi<PollCommentApi>(`/client-profile/hub/polls/${pollId}/comments/${commentId}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<PollCommentApi>(`/hub/polls/${pollId}/comments/${commentId}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteHubPollComment(pollId: number | string, commentId: number | string) {
-    return fetchApi(`/client-profile/hub/polls/${pollId}/comments/${commentId}/`, { method: 'DELETE' });
+    return fetchApi(`/hub/polls/${pollId}/comments/${commentId}/`, { method: 'DELETE' });
 }
 export function reactToHubPoll(pollId: number | string, reaction: string) {
-    return fetchApi<HubPollApi>(`/client-profile/hub/polls/${pollId}/reactions/`, {
+    return fetchApi<HubPollApi>(`/hub/polls/${pollId}/reactions/`, {
         method: 'POST',
         body: JSON.stringify({ reaction_type: reaction }),
     });
 }
 export function removeHubPollReaction(pollId: number | string) {
-    return fetchApi<HubPollApi>(`/client-profile/hub/polls/${pollId}/reactions/`, { method: 'DELETE' });
+    return fetchApi<HubPollApi>(`/hub/polls/${pollId}/reactions/`, { method: 'DELETE' });
 }
 export function updateHubPoll(id: number | string, data: unknown) {
-    return fetchApi<HubPollApi>(`/client-profile/hub/polls/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<HubPollApi>(`/hub/polls/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteHubPoll(id: number | string) {
-    return fetchApi(`/client-profile/hub/polls/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/hub/polls/${id}/`, { method: 'DELETE' });
 }
 export function updatePharmacyHubProfile(id: number | string, data: FormData) {
-    return fetchApi<PharmacyContextApi>(`/client-profile/hub/pharmacies/${id}/profile/`, { method: 'PATCH', body: data });
+    return fetchApi<PharmacyContextApi>(`/hub/pharmacies/${id}/profile/`, { method: 'PATCH', body: data });
 }
 export function updateOrganizationHubProfile(id: number | string, data: FormData) {
-    return fetchApi<OrganizationContextApi>(`/client-profile/hub/organizations/${id}/profile/`, { method: 'PATCH', body: data });
+    return fetchApi<OrganizationContextApi>(`/hub/organizations/${id}/profile/`, { method: 'PATCH', body: data });
 }
 export async function fetchHubContext() {
     const response = await getHubContext();
@@ -359,7 +359,7 @@ export async function fetchHubMemberDirectory(params: {
         query.set('search', params.search);
     if (params.limit)
         query.set('limit', String(params.limit));
-    const data = await fetchApi<Collection<HubDirectoryMemberApi>>(`/client-profile/hub/members/?${query.toString()}`);
+    const data = await fetchApi<Collection<HubDirectoryMemberApi>>(`/hub/members/?${query.toString()}`);
     return asList(data).map(member => ({
         ...mapOptionFromSource({
             membershipId: member.membership_id,

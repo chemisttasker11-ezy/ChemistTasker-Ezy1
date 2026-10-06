@@ -9,11 +9,11 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const envFile=resolve(root,'../env/web.dev.env');
 const env={...(existsSync(envFile)?parseEnv(readFileSync(envFile,'utf8')):{}),...process.env};
 const port=args.port||env.WEB_PORT||'3000', dashboardPort=args['dashboard-port']||env.DASHBOARD_PORT||'5173';
-const backend=args.api||env.PLATFORM_API_URL||'http://127.0.0.1:8000/api';
+const backend=args.api||env.PLATFORM_API_URL||'http://127.0.0.1:8000/api/v1';
 const origin=`http://localhost:${port}`;
 const dashboardOrigin=`http://localhost:${dashboardPort}`;
-Object.assign(env,{VITE_PUBLIC_SITE_ENABLED:'1',VITE_PUBLIC_SITE_URL:origin,VITE_API_URL:'/api',PLATFORM_API_URL:backend,HUB_API_URL:backend,
- VITE_DEV_PROXY_TARGET:backend.replace(/\/api\/?$/, ''),VITE_DEV_WS_PROXY_TARGET:backend.replace(/\/api\/?$/, '').replace(/^http/,'ws'),
+Object.assign(env,{VITE_PUBLIC_SITE_ENABLED:'1',VITE_PUBLIC_SITE_URL:origin,VITE_API_URL:'/api/v1',PLATFORM_API_URL:backend,HUB_API_URL:backend,
+ VITE_DEV_PROXY_TARGET:backend.replace(/\/api\/v1\/?$/, ''),VITE_DEV_WS_PROXY_TARGET:backend.replace(/\/api\/v1\/?$/, '').replace(/^http/,'ws'),
  NEXT_PUBLIC_SITE_URL:origin,NEXT_PUBLIC_PLATFORM_URL:origin,
  NEXT_PUBLIC_Maps_API_KEY:env.NEXT_PUBLIC_Maps_API_KEY||env.VITE_Maps_API_KEY||'',
  NEXT_PUBLIC_RECAPTCHA_SITE_KEY:env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY||env.VITE_RECAPTCHA_SITE_KEY||'',

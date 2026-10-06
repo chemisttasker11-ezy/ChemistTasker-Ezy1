@@ -1,5 +1,5 @@
-"""Roster API routes (V1 viewsets and V2 period, publication and worker-request endpoints). Mounted inside client_profile.urls, so public paths and the `client_profile:` route names are unchanged."""
-from django.urls import path
+"""Roster API routes owned by the workforce roster domain."""
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from workforce.roster.v2_views import (
     RosterAcknowledgementStatusView,
@@ -33,7 +33,7 @@ from workforce.roster.views import (
 
 
 router = DefaultRouter()
-router.include_root_view = False   # the API root view is provided once, by client_profile's router
+router.include_root_view = False
 router.register(r'roster-owner', RosterOwnerViewSet, basename='roster-owner')
 router.register(r'roster-worker', RosterWorkerViewSet, basename='roster-worker')
 router.register(r'roster-shifts', RosterShiftManageViewSet, basename='roster-shift')
@@ -61,4 +61,5 @@ urlpatterns = [
     path('attendance/roster/manager/release-worker/', RosterManagerReleaseWorkerView.as_view(), name='roster-manager-release-worker'),
     path('attendance/roster/manager/reject-request/', RosterManagerRejectRequestView.as_view(), name='roster-manager-reject-request'),
     path('attendance/roster/audits/', RosterActionAuditListView.as_view(), name='roster-action-audits'),
+    path('', include(router.urls)),
 ]

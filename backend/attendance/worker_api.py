@@ -16,7 +16,7 @@ from attendance.api_support import _unexpected_error_response
 
 class WorkerAttendanceStatusView(APIView):
     """
-    GET /api/attendance/worker/status/
+    GET /api/v1/attendance/worker/status/
     Authenticated worker fetches their active session, break state, and provisional status.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -48,7 +48,7 @@ class WorkerAttendanceStatusView(APIView):
 
 class WorkerClockInView(APIView):
     """
-    POST /api/attendance/worker/clock-in/
+    POST /api/v1/attendance/worker/clock-in/
     Worker scans a signed QR code displayed on the pharmacy kiosk.
     Body: {"qr_token": str}
     """
@@ -86,7 +86,7 @@ class WorkerClockInView(APIView):
 
 class WorkerBreakStartView(APIView):
     """
-    POST /api/attendance/worker/break-start/
+    POST /api/v1/attendance/worker/break-start/
     Worker initiates an in-app break.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -105,7 +105,7 @@ class WorkerBreakStartView(APIView):
 
 class WorkerBreakEndView(APIView):
     """
-    POST /api/attendance/worker/break-end/
+    POST /api/v1/attendance/worker/break-end/
     Worker ends their in-app break.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -124,7 +124,7 @@ class WorkerBreakEndView(APIView):
 
 class WorkerClockOutView(APIView):
     """
-    POST /api/attendance/worker/clock-out/
+    POST /api/v1/attendance/worker/clock-out/
     Worker scans a signed QR code at the pharmacy kiosk to finish their shift.
     Body: {"qr_token": str}
     """
@@ -157,7 +157,7 @@ class WorkerClockOutView(APIView):
 
 class WorkerUpdatePinView(APIView):
     """
-    POST /api/client-profile/attendance/worker/pin/update/
+    POST /api/v1/attendance/worker/pin/update/
     Logged-in worker sets or changes their attendance PIN from the web/mobile app.
     """
     permission_classes = [permissions.IsAuthenticated]

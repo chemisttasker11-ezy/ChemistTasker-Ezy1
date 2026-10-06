@@ -326,7 +326,7 @@ export default function SetAvailabilityPage() {
         form.append('coverage_radius_km', String(locationForm.coverageRadiusKm));
       }
 
-      const response = await fetch(`${API_BASE_URL}/client-profile/${safeRole}/onboarding/me/`, {
+      const response = await fetch(`${API_BASE_URL}/${safeRole}/onboarding/me/`, {
         method: 'PATCH',
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: form,

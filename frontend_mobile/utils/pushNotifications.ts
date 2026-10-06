@@ -67,7 +67,7 @@ export async function registerForPushNotificationsAsync() {
 
 export async function registerDeviceTokenWithBackend(token: string, platform: 'ios' | 'android' | 'web' = 'web') {
   try {
-    await apiClient.post('/client-profile/device-tokens/', {
+    await apiClient.post('/device-tokens/', {
       token,
       platform,
     });

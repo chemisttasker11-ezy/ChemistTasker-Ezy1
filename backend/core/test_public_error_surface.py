@@ -26,7 +26,7 @@ from memberships.models import Membership
 from shifts.models import Shift, ShiftSlot
 
 User = get_user_model()
-API = "/api/client-profile/"
+API = "/api/v1/"
 
 # Text that only an internal error produces. Each is specific enough not to occur in a legitimate message.
 UNSAFE_MARKERS = (

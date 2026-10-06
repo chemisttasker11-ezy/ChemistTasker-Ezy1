@@ -30,11 +30,11 @@ async function decode<T>(response:Response):Promise<T>{
  if(!response.ok)throw Object.assign(new Error(typeof data.detail==='string'?data.detail:Object.entries(data).map(([key,v])=>`${key}: ${Array.isArray(v)?v.join(' '):JSON.stringify(v)}`).join(' ')||'Request failed.'),{status:response.status});
  return data;
 }
-export async function csrfToken(root='/api') {const result=await decode<{csrfToken:string}>(await fetch(`${root}/users/csrf/`,{credentials:'include',cache:'no-store',headers:{'X-Client-Platform':'web'}}));return result.csrfToken;}
+export async function csrfToken(root='/api/v1') {const result=await decode<{csrfToken:string}>(await fetch(`${root}/users/csrf/`,{credentials:'include',cache:'no-store',headers:{'X-Client-Platform':'web'}}));return result.csrfToken;}
 let signingOut:Promise<void>|undefined;
 type BrowserRefresh={access:string;refresh?:string};
 let pending:Promise<BrowserRefresh>|undefined;
-export function refreshBrowserSession(root='/api') {
+export function refreshBrowserSession(root='/api/v1') {
  if(signingOut)return Promise.reject(Object.assign(new Error('You have signed out.'),{status:401}));
  if(pending)return pending;
  const renew=async()=>decode<BrowserRefresh>(await fetch(`${root}/users/token/refresh/`,{method:'POST',credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root),'X-Client-Platform':'web'},body:'{}'}));
@@ -67,7 +67,7 @@ export async function browserRequest<T>(url:string,method='GET',body?:unknown,re
  }
  return decode<T>(response);
 }
-export function logoutSession(root='/api'):Promise<void> {
+export function logoutSession(root='/api/v1'):Promise<void> {
  if(signingOut)return signingOut;
  const clear=async()=>{await decode(await fetch(`${root}/users/logout/`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root),'X-Client-Platform':'web'},body:'{}'}));announceSession('logout');};
  signingOut=(async()=>{if(pending)await pending.catch(()=>{});if(navigator.locks)await navigator.locks.request('chemisttasker-refresh',clear);else await refreshWithLease(clear);})().finally(()=>{signingOut=undefined;});

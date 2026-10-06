@@ -4,16 +4,16 @@ import type { Collection } from '../../contracts/common';
 import { fetchApi } from '../../transport/application';
 import { mapChatMessage, mapChatParticipantRecord, mapChatRoom } from './mappers';
 export function getRooms() {
-    return fetchApi<Collection<ChatRoomApi>>('/client-profile/rooms/');
+    return fetchApi<Collection<ChatRoomApi>>('/rooms/');
 }
 export function getRoomDetail(id: number | string) {
-    return fetchApi<ChatRoomApi>(`/client-profile/rooms/${id}/`);
+    return fetchApi<ChatRoomApi>(`/rooms/${id}/`);
 }
 export function getRoomMessages(id: number | string) {
-    return fetchApi<Collection<ChatMessageApi>>(`/client-profile/rooms/${id}/messages/`);
+    return fetchApi<Collection<ChatMessageApi>>(`/rooms/${id}/messages/`);
 }
 export function sendRoomMessage(id: number | string, data: unknown) {
-    return fetchApi<ChatMessageApi>(`/client-profile/rooms/${id}/messages/`, {
+    return fetchApi<ChatMessageApi>(`/rooms/${id}/messages/`, {
         method: 'POST',
         body: data instanceof FormData ? data : JSON.stringify(data),
     });
@@ -21,22 +21,22 @@ export function sendRoomMessage(id: number | string, data: unknown) {
 export function markRoomAsRead(id: number | string) {
     return fetchApi<{
         last_read_at: string | null;
-    }>(`/client-profile/rooms/${id}/read/`, { method: 'POST' });
+    }>(`/rooms/${id}/read/`, { method: 'POST' });
 }
 export function getChatParticipants() {
-    return fetchApi<Collection<Parameters<typeof mapChatParticipantRecord>[0]>>('/client-profile/chat-participants/');
+    return fetchApi<Collection<Parameters<typeof mapChatParticipantRecord>[0]>>('/chat-participants/');
 }
 export function startDm(data: unknown) {
     // Debug: verify DM endpoint and payload at runtime
     // This should be hitting get-or-create-dm; if you see start-dm in the network tab, the build is stale.
-    console.debug('shared-core startDm -> POST /client-profile/rooms/get-or-create-dm/', data);
-    return fetchApi<ChatRoomApi>('/client-profile/rooms/get-or-create-dm/', { method: 'POST', body: JSON.stringify(data) });
+    console.debug('shared-core startDm -> POST /rooms/get-or-create-dm/', data);
+    return fetchApi<ChatRoomApi>('/rooms/get-or-create-dm/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function getOrCreateGroup(data: unknown) {
-    return fetchApi<ChatRoomApi>('/client-profile/rooms/get-or-create-group/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<ChatRoomApi>('/rooms/get-or-create-group/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function getOrCreateDmByUser(data: unknown) {
-    return fetchApi<ChatRoomApi>('/client-profile/rooms/get-or-create-dm-by-user/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<ChatRoomApi>('/rooms/get-or-create-dm-by-user/', { method: 'POST', body: JSON.stringify(data) });
 }
 export interface ShiftContactApi {
     pharmacy_id: number | null;
@@ -51,22 +51,22 @@ export interface ShiftContactApi {
     user: ChatUserApi;
 }
 export function fetchShiftContacts() {
-    return fetchApi('/client-profile/rooms/shift-contacts/');
+    return fetchApi('/rooms/shift-contacts/');
 }
 export function updateMessage(messageId: number | string, data: unknown) {
-    return fetchApi<ChatMessageApi>(`/client-profile/messages/${messageId}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<ChatMessageApi>(`/messages/${messageId}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteMessage(messageId: number | string) {
-    return fetchApi(`/client-profile/messages/${messageId}/`, { method: 'DELETE' });
+    return fetchApi(`/messages/${messageId}/`, { method: 'DELETE' });
 }
 export function reactToMessage(messageId: number | string, data: unknown) {
-    return fetchApi<ChatMessageApi>(`/client-profile/messages/${messageId}/react/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<ChatMessageApi>(`/messages/${messageId}/react/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function toggleRoomPin(roomId: number | string, data: unknown) {
-    return fetchApi<ChatRoomApi>(`/client-profile/rooms/${roomId}/toggle-pin/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<ChatRoomApi>(`/rooms/${roomId}/toggle-pin/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function deleteRoomRequest(roomId: number | string) {
-    return fetchApi(`/client-profile/rooms/${roomId}/`, { method: 'DELETE' });
+    return fetchApi(`/rooms/${roomId}/`, { method: 'DELETE' });
 }
 export async function fetchRooms() {
     const data = await getRooms();

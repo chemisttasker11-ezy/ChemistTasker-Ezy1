@@ -1,8 +1,6 @@
 import logging
 
 from django.urls import path, include
-from users.views import DeleteAccountView
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from django.conf import settings
 from django.conf.urls.static import static
 from .sitemap import sitemap_web
@@ -11,7 +9,6 @@ from two_factor.urls import urlpatterns as two_factor_urlpatterns
 from .two_factor_views import AdminAwareLoginView
 from django.http import JsonResponse
 from django.db import connection
-from worker_finance import legacy as finance_legacy
 from public_hub.attachment_access import HubMediaAccess
 from public_hub.media import deny_raw_media
 
@@ -25,9 +22,9 @@ def health_check(request):
             cursor.fetchone()
         return JsonResponse({'status': 'healthy'})
     except Exception:
-        # the database error names hosts and settings: it goes to the log, not to the (anonymous) caller
         logger.exception("Health check: database query failed")
         return JsonResponse({'status': 'error', 'detail': 'Database unavailable.'}, status=500)
+
 
 two_factor_patterns, two_factor_app_name = two_factor_urlpatterns
 two_factor_patterns = list(two_factor_patterns)
@@ -40,24 +37,10 @@ urlpatterns = [
     path(settings.ADMIN_URL, otp_admin_site.urls),
     path('sitemap.xml', sitemap_web, name='sitemap-web'),
     path('health/', health_check, name='health'),
-    path('api/users/', include('users.urls')),
-    path('api/public-hub/', include('public_hub.urls')),
-    path('api/marketplace/', include('marketplace.urls')),
-    path('api/ethical/', include('ethical_marketplace.urls')),
-    path('api/content/', include('public_hub.content_urls')),
-    path('api/client-profile/finance/', include('worker_finance.urls')),
-    path('api/client-profile/invoices/<int:pk>/', finance_legacy.detail),
-    path('api/client-profile/invoices/<int:invoice_id>/pdf/', finance_legacy.pdf),
-    path('api/client-profile/invoices/<int:invoice_id>/send/', finance_legacy.send),
-    path('api/client-profile/', include(('core.client_profile_api_urls', 'client_profile'), namespace='client_profile')),
-    path('api/billing/', include('billing.urls', namespace='billing')),
-    path('api/account/', DeleteAccountView.as_view(), name='delete-account'),
+
+    # All application HTTP APIs are composed once beneath the versioned root.
+    path('api/v1/', include(('core.api_v1_urls', 'api_v1'), namespace='api_v1')),
 ]
 
-# append this in DEBUG mode so Django serves your uploads
 if settings.DEBUG:
-    urlpatterns += [
-        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema')),
-    ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

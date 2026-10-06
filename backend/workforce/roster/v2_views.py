@@ -48,10 +48,10 @@ User = get_user_model()
 
 class RosterPeriodDetailView(APIView):
     """
-    GET /api/attendance/roster/period/?pharmacy_id=X&week_start=YYYY-MM-DD
+    GET /api/v1/attendance/roster/period/?pharmacy_id=X&week_start=YYYY-MM-DD
     Side-effect-free view: retrieves weekly roster period details without mutating database or creating drafts.
 
-    POST /api/attendance/roster/period/
+    POST /api/v1/attendance/roster/period/
     Body: {"pharmacy_id": int, "week_start": "YYYY-MM-DD"}
     Explicit write action to initialize or retrieve a persisted RosterPeriod draft.
     """
@@ -166,7 +166,7 @@ class RosterPeriodDetailView(APIView):
 
 class RosterUnpublishView(APIView):
     """
-    POST /api/attendance/roster/unpublish/
+    POST /api/v1/attendance/roster/unpublish/
     Body: {"period_id": int}
     Reverts a published roster period to DRAFT.
     """
@@ -248,7 +248,7 @@ class RosterArchiveView(APIView):
 
 class WorkerPublishedRosterView(APIView):
     """
-    GET /api/attendance/roster/worker/
+    GET /api/v1/attendance/roster/worker/
     Params: ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
     Worker views their published roster shifts. Strictly excludes drafts.
     """
@@ -301,7 +301,7 @@ class WorkerPublishedRosterView(APIView):
 
 class WorkerAcknowledgeRosterView(APIView):
     """
-    POST /api/attendance/roster/acknowledge/
+    POST /api/v1/attendance/roster/acknowledge/
     Body: {"period_id": int, "notes": str}
     Worker records acknowledgement of their published shifts in a roster period.
     """
@@ -330,7 +330,7 @@ class WorkerAcknowledgeRosterView(APIView):
 
 class RosterAcknowledgementStatusView(APIView):
     """
-    GET /api/attendance/roster/acknowledgements/<int:period_id>/
+    GET /api/v1/attendance/roster/acknowledgements/<int:period_id>/
     Manager views worker acknowledgement breakdown for a published period.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -349,7 +349,7 @@ class RosterAcknowledgementStatusView(APIView):
 
 class RosterCopyWeekView(APIView):
     """
-    POST /api/attendance/roster/copy-week/
+    POST /api/v1/attendance/roster/copy-week/
     Body: {
         "source_period_id": int,
         "target_week_start": "YYYY-MM-DD",
@@ -397,10 +397,10 @@ class RosterCopyWeekView(APIView):
 
 class RosterTemplateView(APIView):
     """
-    GET /api/attendance/roster/templates/?pharmacy_id=<id>
+    GET /api/v1/attendance/roster/templates/?pharmacy_id=<id>
     Lists templates for a pharmacy.
 
-    POST /api/attendance/roster/templates/
+    POST /api/v1/attendance/roster/templates/
     Body:
       - Direct creation: {"pharmacy_id": int, "name": str, "template_data": list}
       - From existing period: {"from_period_id": int, "name": str, "include_users": bool}
@@ -464,7 +464,7 @@ class RosterTemplateView(APIView):
 
 class RosterTemplateApplyView(APIView):
     """
-    POST /api/attendance/roster/templates/apply/
+    POST /api/v1/attendance/roster/templates/apply/
     Body: {
         "template_id": int,
         "target_week_start": "YYYY-MM-DD",
@@ -514,7 +514,7 @@ class RosterTemplateApplyView(APIView):
 
 class RosterBulkEditView(APIView):
     """
-    POST /api/attendance/roster/bulk-edit/
+    POST /api/v1/attendance/roster/bulk-edit/
     Body: {
         "period_id": int,
         "operations": [
@@ -557,7 +557,7 @@ class RosterBulkEditView(APIView):
 
 class RosterWorkerSwapRequestView(APIView):
     """
-    POST /api/attendance/roster/worker/swap-request/
+    POST /api/v1/attendance/roster/worker/swap-request/
     Body: {"assignment_id": int, "target_user_id": int, "notes": str}
     Worker requests direct swap. Assignment is preserved until approval.
     """
@@ -600,7 +600,7 @@ class RosterWorkerSwapRequestView(APIView):
 
 class RosterWorkerCoverRequestView(APIView):
     """
-    POST /api/attendance/roster/worker/cover-request/
+    POST /api/v1/attendance/roster/worker/cover-request/
     Body: {"assignment_id": int, "reason": str}
     Worker requests shift cover ("can't work"). Assignment is preserved.
     """
@@ -639,7 +639,7 @@ class RosterWorkerCoverRequestView(APIView):
 
 class RosterManagerApproveSwapView(APIView):
     """
-    POST /api/attendance/roster/manager/approve-swap/
+    POST /api/v1/attendance/roster/manager/approve-swap/
     Body: {"request_id": int}
     Manager approves direct swap atomically.
     """
@@ -674,7 +674,7 @@ class RosterManagerApproveSwapView(APIView):
 
 class RosterManagerApproveReplacementView(APIView):
     """
-    POST /api/attendance/roster/manager/approve-replacement/
+    POST /api/v1/attendance/roster/manager/approve-replacement/
     Body: {"request_id": int, "replacement_user_id": int}
     Manager approves replacement worker for cover request atomically.
     """
@@ -715,7 +715,7 @@ class RosterManagerApproveReplacementView(APIView):
 
 class RosterManagerReleaseWorkerView(APIView):
     """
-    POST /api/attendance/roster/manager/release-worker/
+    POST /api/v1/attendance/roster/manager/release-worker/
     Body: {"request_id": int, "escalate_to_visibility": str | null}
     Manager releases worker; deletes assignment and optionally escalates existing shift.
     """
@@ -751,7 +751,7 @@ class RosterManagerReleaseWorkerView(APIView):
 
 class RosterManagerRejectRequestView(APIView):
     """
-    POST /api/attendance/roster/manager/reject-request/
+    POST /api/v1/attendance/roster/manager/reject-request/
     Body: {"request_id": int, "reason": str}
     Manager rejects request; assignment remains with original worker.
     """
@@ -785,7 +785,7 @@ class RosterManagerRejectRequestView(APIView):
 
 class RosterActionAuditListView(APIView):
     """
-    GET /api/attendance/roster/audits/?pharmacy_id=X
+    GET /api/v1/attendance/roster/audits/?pharmacy_id=X
     Returns recent roster action audit logs for authorized managers.
     """
     permission_classes = [permissions.IsAuthenticated]

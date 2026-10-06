@@ -212,7 +212,7 @@ export default function RosterPlanningToolbar({
     }
     setActionLoading(true);
     try {
-      await apiClient.post('/client-profile/attendance/roster/unpublish/', {
+      await apiClient.post('/attendance/roster/unpublish/', {
         period_id: period.period_id,
       });
       setFeedbackMessage({
@@ -237,7 +237,7 @@ export default function RosterPlanningToolbar({
     setActionLoading(true);
     try {
       const res = await apiClient.get(
-        `/client-profile/attendance/roster/acknowledgements/${period.period_id}/`
+        `/attendance/roster/acknowledgements/${period.period_id}/`
       );
       setAckData(res.data);
       setAckDialogOpen(true);
@@ -256,7 +256,7 @@ export default function RosterPlanningToolbar({
     if (!period) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.post('/client-profile/attendance/roster/copy-week/', {
+      const res = await apiClient.post('/attendance/roster/copy-week/', {
         source_period_id: period.period_id,
         target_week_start: targetWeekDate,
         include_assignments: copyIncludeAssignments,
@@ -286,7 +286,7 @@ export default function RosterPlanningToolbar({
     setTemplateDialogOpen(true);
     try {
       const res = await apiClient.get(
-        `/client-profile/attendance/roster/templates/?pharmacy_id=${pharmacyId}`
+        `/attendance/roster/templates/?pharmacy_id=${pharmacyId}`
       );
       setSavedTemplates(res.data);
       if (res.data.length > 0) {
@@ -301,7 +301,7 @@ export default function RosterPlanningToolbar({
     if (!period || !newTemplateName.trim()) return;
     setActionLoading(true);
     try {
-      await apiClient.post('/client-profile/attendance/roster/templates/', {
+      await apiClient.post('/attendance/roster/templates/', {
         from_period_id: period.period_id,
         name: newTemplateName.trim(),
         include_users: templateIncludeUsers,
@@ -326,7 +326,7 @@ export default function RosterPlanningToolbar({
     if (!selectedTemplateId) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.post('/client-profile/attendance/roster/templates/apply/', {
+      const res = await apiClient.post('/attendance/roster/templates/apply/', {
         template_id: selectedTemplateId,
         target_week_start: mondayStr,
         include_assignments: templateIncludeUsers,

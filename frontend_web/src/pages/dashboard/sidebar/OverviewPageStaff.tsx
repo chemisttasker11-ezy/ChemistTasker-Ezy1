@@ -111,9 +111,9 @@ export default function OverviewPageStaff() {
               ? { workspace: "internal", pharmacy_id: effectivePharmacyId }
             : { workspace: "platform" };
         const result = isPharmacist
-          ? (await apiClient.get("/client-profile/dashboard/pharmacist/", { params: dashboardParams })).data
+          ? (await apiClient.get("/dashboard/pharmacist/", { params: dashboardParams })).data
           : isOtherStaff
-            ? (await apiClient.get("/client-profile/dashboard/otherstaff/", { params: dashboardParams })).data
+            ? (await apiClient.get("/dashboard/otherstaff/", { params: dashboardParams })).data
             : await getExplorerDashboard();
         if (cancelled) return;
         setData(result as any);

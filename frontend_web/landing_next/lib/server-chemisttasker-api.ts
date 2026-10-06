@@ -14,7 +14,7 @@ export interface ServerApiContext {
  */
 export function createServerChemistTaskerApi(context: ServerApiContext = {}) {
   const config: ApiClientConfig = {
-    baseUrl: context.baseUrl ?? process.env.PLATFORM_API_URL ?? 'http://127.0.0.1:8000/api',
+    baseUrl: context.baseUrl ?? process.env.PLATFORM_API_URL ?? 'http://127.0.0.1:8000/api/v1',
     getAuthToken: () => context.authToken ?? null,
     ...(context.fetchImpl ? { fetchImpl: context.fetchImpl } : {}),
   };

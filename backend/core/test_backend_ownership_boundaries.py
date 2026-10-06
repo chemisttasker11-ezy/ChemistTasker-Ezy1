@@ -149,7 +149,6 @@ ALLOWED_LEGACY_IMPORTS = {
 # Literal strings starting with client_profile that are neither the app label, a model label nor a task name.
 ALLOWED_STRING_REFERENCES = {
     "client_profile.apps.ClientProfileConfig": "INSTALLED_APPS entry of the kernel app",
-    "client_profile.urls": "the kernel URLconf, included by core.client_profile_api_urls",
     "client_profile.tasks.verify_*": "Celery route pattern of the verification tasks (CELERY_TASK_ROUTES)",
 }
 
@@ -185,11 +184,8 @@ ALLOWED_MUTUAL_APP_PAIRS = {
     ("attendance", "workforce"),
     # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
     ("chat", "core"),
-    ("core", "memberships"),
-    ("core", "organizations"),
     ("core", "shifts"),
     ("core", "users"),
-    ("core", "workforce"),
     # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
     ("client_profile", "onboarding"),
     # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them
@@ -200,7 +196,7 @@ ALLOWED_MUTUAL_APP_PAIRS = {
 }
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 296
+KERNEL_CODE_LINE_CEILING = 291
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
@@ -217,7 +213,7 @@ KERNEL_DEFINITIONS = {
     "client_profile/models/orgs.py": set(),
     "client_profile/models/shifts.py": set(),
     "client_profile/tasks.py": set(),
-    "client_profile/urls.py": {"router", "urlpatterns"},
+    "client_profile/urls.py": {"urlpatterns"},
 }
 
 # label -> (db_table, module defining the class) of every model of the kernel and of the apps split from it.

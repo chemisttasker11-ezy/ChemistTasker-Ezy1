@@ -17,7 +17,7 @@ from client_profile.models import (
 )
 
 User = get_user_model()
-BASE = "/api/client-profile/"
+BASE = "/api/v1/"
 _seq = itertools.count(1)
 
 

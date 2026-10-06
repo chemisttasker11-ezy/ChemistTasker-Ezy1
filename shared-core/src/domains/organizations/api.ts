@@ -7,20 +7,20 @@ import { fetchApi } from '../../transport/application';
 import { asList, buildQuery } from '../../utils/serialization';
 import { mapChain, mapPharmacySummaryRecord } from './mappers';
 export function claimOnboarding(data: unknown) {
-    return fetchApi('/client-profile/owner-onboarding/claim/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi('/owner-onboarding/claim/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function getOrganizations() {
-    return fetchApi<Collection<OrganizationApi>>('/client-profile/organizations/');
+    return fetchApi<Collection<OrganizationApi>>('/organizations/');
 }
 export function getOrganizationById(id: number | string) {
-    return fetchApi<OrganizationApi>(`/client-profile/organizations/${id}/`);
+    return fetchApi<OrganizationApi>(`/organizations/${id}/`);
 }
 export function createOrganization(data: unknown) {
-    return fetchApi<OrganizationApi>('/client-profile/organizations/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<OrganizationApi>('/organizations/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function getPharmacies(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<PharmacyApi>>(`/client-profile/pharmacies/${query}`);
+    return fetchApi<Collection<PharmacyApi>>(`/pharmacies/${query}`);
 }
 export async function fetchPharmaciesService(params?: Record<string, unknown>) {
     const data = await getPharmacies(params);
@@ -69,47 +69,47 @@ export async function fetchChainPharmaciesService(chainId: number | string) {
     return asList(data).map(mapPharmacySummaryRecord);
 }
 export function getPharmacyById(id: number | string) {
-    return fetchApi<PharmacyApi>(`/client-profile/pharmacies/${id}/`);
+    return fetchApi<PharmacyApi>(`/pharmacies/${id}/`);
 }
 export function createPharmacy(data: unknown) {
     const body = data instanceof FormData ? data : JSON.stringify(data);
-    return fetchApi<PharmacyApi>('/client-profile/pharmacies/', { method: 'POST', body });
+    return fetchApi<PharmacyApi>('/pharmacies/', { method: 'POST', body });
 }
 export function updatePharmacy(id: number | string, data: unknown) {
     const body = data instanceof FormData ? data : JSON.stringify(data);
-    return fetchApi<PharmacyApi>(`/client-profile/pharmacies/${id}/`, { method: 'PATCH', body });
+    return fetchApi<PharmacyApi>(`/pharmacies/${id}/`, { method: 'PATCH', body });
 }
 export function lookupPharmacyAbn(data: unknown) {
-    return fetchApi<Partial<PharmacyApi>>('/client-profile/pharmacies/lookup-abn/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<Partial<PharmacyApi>>('/pharmacies/lookup-abn/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function deletePharmacy(id: number | string) {
-    return fetchApi(`/client-profile/pharmacies/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/pharmacies/${id}/`, { method: 'DELETE' });
 }
 export function getPharmacyClaims(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<PharmacyClaimApi>>(`/client-profile/pharmacy-claims/${query}`);
+    return fetchApi<Collection<PharmacyClaimApi>>(`/pharmacy-claims/${query}`);
 }
 export function getPharmacyClaimDetail(id: number | string) {
-    return fetchApi<PharmacyClaimApi>(`/client-profile/pharmacy-claims/${id}/`);
+    return fetchApi<PharmacyClaimApi>(`/pharmacy-claims/${id}/`);
 }
 export function approvePharmacyClaim(id: number | string) {
-    return fetchApi<PharmacyClaimApi>(`/client-profile/pharmacy-claims/${id}/approve/`, { method: 'POST' });
+    return fetchApi<PharmacyClaimApi>(`/pharmacy-claims/${id}/approve/`, { method: 'POST' });
 }
 export function updatePharmacyClaim(id: number | string, data: unknown) {
-    return fetchApi<PharmacyClaimApi>(`/client-profile/pharmacy-claims/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<PharmacyClaimApi>(`/pharmacy-claims/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function getPharmacyAdmins(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<PharmacyAdminApi>>(`/client-profile/pharmacy-admins/${query}`);
+    return fetchApi<Collection<PharmacyAdminApi>>(`/pharmacy-admins/${query}`);
 }
 export function getPharmacyAdminDetail(id: number | string) {
-    return fetchApi<PharmacyAdminApi>(`/client-profile/pharmacy-admins/${id}/`);
+    return fetchApi<PharmacyAdminApi>(`/pharmacy-admins/${id}/`);
 }
 export function createPharmacyAdmin(data: unknown) {
-    return fetchApi<PharmacyAdminApi>('/client-profile/pharmacy-admins/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<PharmacyAdminApi>('/pharmacy-admins/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function deletePharmacyAdmin(id: number | string) {
-    return fetchApi(`/client-profile/pharmacy-admins/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/pharmacy-admins/${id}/`, { method: 'DELETE' });
 }
 export async function fetchPharmacyAdminsService(params?: Record<string, unknown>) {
     const data = await getPharmacyAdmins(params);
@@ -128,39 +128,39 @@ export async function deletePharmacyAdminService(id: number | string) {
     await deletePharmacyAdmin(id);
 }
 export function getPendingPharmacyAdminInvitations() {
-    return fetchApi<PharmacyAdminInvitationApi[]>('/client-profile/pharmacy-admins/my-pending-invitations/');
+    return fetchApi<PharmacyAdminInvitationApi[]>('/pharmacy-admins/my-pending-invitations/');
 }
 export function respondToPharmacyAdminInvitation(id: number | string, accept: boolean) {
     const action = accept ? 'accept-invitation' : 'reject-invitation';
-    return fetchApi(`/client-profile/pharmacy-admins/${id}/${action}/`, { method: 'POST' });
+    return fetchApi(`/pharmacy-admins/${id}/${action}/`, { method: 'POST' });
 }
 export function getChains() {
-    return fetchApi<Collection<ChainApi>>('/client-profile/chains/');
+    return fetchApi<Collection<ChainApi>>('/chains/');
 }
 export function getChainDetail(id: number | string) {
-    return fetchApi<ChainApi>(`/client-profile/chains/${id}/`);
+    return fetchApi<ChainApi>(`/chains/${id}/`);
 }
 export function createChain(data: FormData | Record<string, unknown>) {
-    return fetchApi<ChainApi>('/client-profile/chains/', { method: 'POST', body: data });
+    return fetchApi<ChainApi>('/chains/', { method: 'POST', body: data });
 }
 export function updateChain(id: number | string, data: FormData | Record<string, unknown>) {
-    return fetchApi<ChainApi>(`/client-profile/chains/${id}/`, { method: 'PUT', body: data });
+    return fetchApi<ChainApi>(`/chains/${id}/`, { method: 'PUT', body: data });
 }
 export function deleteChain(id: number | string) {
-    return fetchApi(`/client-profile/chains/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/chains/${id}/`, { method: 'DELETE' });
 }
 export function getChainPharmacies(id: number | string) {
-    return fetchApi<Collection<PharmacyApi>>(`/client-profile/chains/${id}/pharmacies/`);
+    return fetchApi<Collection<PharmacyApi>>(`/chains/${id}/pharmacies/`);
 }
 export function addPharmacyToChain(chainId: number | string, pharmacyId: number | string) {
-    return fetchApi(`/client-profile/chains/${chainId}/add_pharmacy/`, { method: 'POST', body: JSON.stringify({ pharmacy_id: pharmacyId }) });
+    return fetchApi(`/chains/${chainId}/add_pharmacy/`, { method: 'POST', body: JSON.stringify({ pharmacy_id: pharmacyId }) });
 }
 export function removePharmacyFromChain(chainId: number | string, pharmacyId: number | string) {
-    return fetchApi(`/client-profile/chains/${chainId}/remove_pharmacy/`, { method: 'POST', body: JSON.stringify({ pharmacy_id: pharmacyId }) });
+    return fetchApi(`/chains/${chainId}/remove_pharmacy/`, { method: 'POST', body: JSON.stringify({ pharmacy_id: pharmacyId }) });
 }
 export function addUserToChain(chainId: number | string, userId: number | string) {
-    return fetchApi(`/client-profile/chains/${chainId}/add_user/`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+    return fetchApi(`/chains/${chainId}/add_user/`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
 }
 export function getPublicOrganization(slug: string) {
-    return fetchApi(`/client-profile/organizations/public/${slug}/`, { skipAuth: true });
+    return fetchApi(`/organizations/public/${slug}/`, { skipAuth: true });
 }

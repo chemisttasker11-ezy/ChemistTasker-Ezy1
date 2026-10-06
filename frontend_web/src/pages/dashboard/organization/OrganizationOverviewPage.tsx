@@ -65,7 +65,7 @@ export default function OrganizationOverviewPage() {
   useEffect(() => {
     let mounted = true;
     apiClient
-      .get("/client-profile/pill-rewards/balance/")
+      .get("/pill-rewards/balance/")
       .then(({ data }) => {
         if (!mounted) return;
         setPillSummary({

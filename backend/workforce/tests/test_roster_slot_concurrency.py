@@ -53,7 +53,7 @@ class RosterSlotConcurrencyTests(TransactionTestCase):
         client.force_authenticate(User.objects.get(pk=self.owner.pk))
         client.raise_request_exception = False
         response = client.patch(
-            f"/api/client-profile/roster-shifts/{shift_id or self.shift.pk}/",
+            f"/api/v1/roster-shifts/{shift_id or self.shift.pk}/",
             {"slots": [{"id": slot_id or self.slot.pk,
                         "date": str(work_date or self.week), "end_time": "18:00"}]},
             format="json",

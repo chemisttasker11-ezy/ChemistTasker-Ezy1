@@ -194,7 +194,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         setPillPayingShiftId(shift.id);
         try {
-            const { data: res } = await apiClient.post('/client-profile/pill-rewards/pay-shift/', {
+            const { data: res } = await apiClient.post('/pill-rewards/pay-shift/', {
                 shift_id: shift.id,
                 ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
             });
@@ -762,7 +762,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             if (!offerId) return;
             setBuzzLoadingOfferId(offerId);
             try {
-                const response = await apiClient.post(`/client-profile/shift-offers/${offerId}/buzz/`);
+                const response = await apiClient.post(`/shift-offers/${offerId}/buzz/`);
                 const result = response.data;
                 setBuzzDialog({
                     open: true,

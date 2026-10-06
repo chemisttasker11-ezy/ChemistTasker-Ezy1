@@ -283,7 +283,7 @@ export default function TopBarActions({
     const roleKey = (user?.role || "").toUpperCase();
     if (roleKey === "OWNER" || roleKey === "PHARMACY_ADMIN" || roleKey.startsWith("ORG")) {
       apiClient
-        .get("/client-profile/pharmacies/")
+        .get("/pharmacies/")
         .then((response) => {
           let count = 0;
           if (typeof response.data.count === "number") {

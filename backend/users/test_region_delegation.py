@@ -41,7 +41,7 @@ class RegionDelegationTests(TestCase):
         }
         payload.update(overrides)
         with patch('users.api_organizations.async_task'):
-            return self.client.post('/api/users/invite-org-user/', payload, content_type='application/json')
+            return self.client.post('/api/v1/users/invite-org-user/', payload, content_type='application/json')
 
     def test_region_can_invite_sub_region_within_same_scope_and_level(self):
         response = self.invite()
@@ -116,7 +116,7 @@ class RegionDelegationTests(TestCase):
         )
 
         listed = self.client.get(
-            f'/api/users/organization-memberships/?organization={self.organization.id}'
+            f'/api/v1/users/organization-memberships/?organization={self.organization.id}'
         )
         self.assertEqual(listed.status_code, 200, listed.data)
         rows = listed.data['results'] if isinstance(listed.data, dict) else listed.data
@@ -126,7 +126,7 @@ class RegionDelegationTests(TestCase):
         self.assertNotIn(hidden.id, listed_ids)
 
         hub = self.client.get(
-            f'/api/users/organization-memberships/?organization={self.organization.id}&for_hub=true'
+            f'/api/v1/users/organization-memberships/?organization={self.organization.id}&for_hub=true'
         )
         self.assertEqual(hub.status_code, 200, hub.data)
         hub_rows = hub.data['results'] if isinstance(hub.data, dict) else hub.data
@@ -209,7 +209,7 @@ class RegionDelegationTests(TestCase):
         self.assertFalse(membership.pharmacies.exists())
 
     def test_region_cannot_promote_self_or_expand_scope_through_patch(self):
-        path = f'/api/users/organization-memberships/{self.membership.id}/'
+        path = f'/api/v1/users/organization-memberships/{self.membership.id}/'
         promote = self.client.patch(path, {'role': 'ORG_ADMIN'}, content_type='application/json')
         expand = self.client.patch(
             path, {'pharmacy_ids': [self.pharmacy.id, self.other_pharmacy.id]},
@@ -230,7 +230,7 @@ class RegionDelegationTests(TestCase):
             admin_level='COMMUNICATION_MANAGER', region='North', job_title='Peer'
         )
         peer.pharmacies.add(self.pharmacy)
-        path = f'/api/users/organization-memberships/{peer.id}/'
+        path = f'/api/v1/users/organization-memberships/{peer.id}/'
         update = self.client.patch(path, {'job_title': 'Updated Peer'}, content_type='application/json')
         self.assertEqual(update.status_code, 200)
         peer.refresh_from_db()
@@ -244,7 +244,7 @@ class RegionDelegationTests(TestCase):
             admin_level='MANAGER', region='North', job_title='Chief'
         )
         chief.pharmacies.add(self.pharmacy)
-        deletion = self.client.delete(f'/api/users/organization-memberships/{chief.id}/')
+        deletion = self.client.delete(f'/api/v1/users/organization-memberships/{chief.id}/')
         self.assertEqual(deletion.status_code, 403)
         self.assertTrue(OrganizationMembership.objects.filter(id=chief.id).exists())
 
@@ -253,7 +253,7 @@ class RegionDelegationTests(TestCase):
         self.membership.admin_level = 'MANAGER'
         self.membership.save(update_fields=['role', 'admin_level'])
         response = self.client.patch(
-            f'/api/users/organization-memberships/{self.membership.id}/',
+            f'/api/v1/users/organization-memberships/{self.membership.id}/',
             {'role': 'ORG_ADMIN'}, content_type='application/json'
         )
         self.assertEqual(response.status_code, 403)
@@ -281,7 +281,7 @@ class RegionDelegationTests(TestCase):
         self.assertIn(foreign.status_code, (400, 403), foreign.content)
 
     def test_region_cannot_update_organization_record_but_chief_can(self):
-        update_url = f'/api/client-profile/organizations/{self.organization.id}/'
+        update_url = f'/api/v1/organizations/{self.organization.id}/'
         denied = self.client.patch(update_url, {'name': 'Region Rename'}, content_type='application/json')
         self.assertEqual(denied.status_code, 403)
         self.organization.refresh_from_db()
@@ -298,13 +298,13 @@ class RegionDelegationTests(TestCase):
     def test_org_admin_payload_lists_only_verified_org_pharmacies(self):
         outside_org = Organization.objects.create(name='Other Group')
         outside_pharmacy = Pharmacy.objects.create(name='Outside Pharmacy', organization=outside_org)
-        region_response = self.client.get('/api/users/me/')
+        region_response = self.client.get('/api/v1/users/me/')
         region_membership = next(item for item in region_response.data['memberships'] if item.get('role') == 'REGION_ADMIN')
         self.assertEqual(region_membership['organization_pharmacies'], [])
 
         self.membership.role = 'ORG_ADMIN'
         self.membership.save(update_fields=['role'])
-        response = self.client.get('/api/users/me/')
+        response = self.client.get('/api/v1/users/me/')
         self.assertEqual(response.status_code, 200)
         org_membership = next(item for item in response.data['memberships'] if item.get('role') == 'ORG_ADMIN')
         listed_ids = {item['id'] for item in org_membership['organization_pharmacies']}

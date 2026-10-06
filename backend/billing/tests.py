@@ -35,14 +35,14 @@ class StripeWebhookIdempotencyTests(TestCase):
         )
         finalize.side_effect = [RuntimeError('temporary assignment failure'), (0, [])]
         with patch('shifts.emails.send_shift_payment_finalized_notifications'):
-            first = self.client.post(reverse('billing:stripe_webhook'), b'{}', content_type='application/json')
+            first = self.client.post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
             self.assertEqual(first.status_code, 500)
             self.assertFalse(ShiftPayment.objects.exists())
             shift.refresh_from_db()
             self.assertEqual(shift.payment_status, 'PENDING')
-            second = self.client.post(reverse('billing:stripe_webhook'), b'{}', content_type='application/json')
+            second = self.client.post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
             self.assertEqual(second.status_code, 200)
-            replay = self.client.post(reverse('billing:stripe_webhook'), b'{}', content_type='application/json')
+            replay = self.client.post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
             self.assertEqual(replay.status_code, 200)
         self.assertEqual(ShiftPayment.objects.count(), 1)
         self.assertEqual(finalize.call_count, 2)
@@ -58,11 +58,11 @@ class StripeWebhookIdempotencyTests(TestCase):
         def completed_retry(*args, **kwargs):
             StripeWebhookEvent.objects.create(event_id='evt_interleaved', event_type='test.event', status=StripeWebhookEvent.Status.PROCESSED, processed_at=timezone.now())
         log.side_effect = completed_retry
-        response = self.client.post(reverse('billing:stripe_webhook'), b'{}', content_type='application/json')
+        response = self.client.post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
         self.assertEqual(response.status_code, 500)
         delivery = StripeWebhookEvent.objects.get(event_id='evt_interleaved')
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
-        replay = self.client.post(reverse('billing:stripe_webhook'), b'{}', content_type='application/json')
+        replay = self.client.post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
         self.assertEqual(replay.status_code, 200)
         self.assertEqual(process.call_count, 1)
 
@@ -79,13 +79,13 @@ class StripeWebhookIdempotencyTests(TestCase):
         construct_event.return_value = self._event()
 
         first = self.client.post(
-            reverse('billing:stripe_webhook'),
+            reverse('api_v1:billing:stripe_webhook'),
             data=b'{}',
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE='test-signature',
         )
         second = self.client.post(
-            reverse('billing:stripe_webhook'),
+            reverse('api_v1:billing:stripe_webhook'),
             data=b'{}',
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE='test-signature',
@@ -105,7 +105,7 @@ class StripeWebhookIdempotencyTests(TestCase):
         process_event.side_effect = [RuntimeError('synthetic failure'), None]
 
         first = self.client.post(
-            reverse('billing:stripe_webhook'),
+            reverse('api_v1:billing:stripe_webhook'),
             data=b'{}',
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE='test-signature',
@@ -116,7 +116,7 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertIsNotNone(delivery.failed_at)
 
         second = self.client.post(
-            reverse('billing:stripe_webhook'),
+            reverse('api_v1:billing:stripe_webhook'),
             data=b'{}',
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE='test-signature',

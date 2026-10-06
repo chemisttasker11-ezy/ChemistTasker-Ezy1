@@ -4,7 +4,7 @@ Routers are split so core can preserve the historical membership interleaving:
 organization/pharmacy routes, membership, pharmacy-admins, then membership
 invite/application routes.
 """
-from django.urls import path
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from organizations.claims import OwnerOnboardingClaim, PharmacyClaimViewSet
@@ -44,4 +44,5 @@ urlpatterns = [
         OwnerOnboardingClaim.as_view(),
         name="owneronboarding-claim",
     ),
+    path('', include(router.urls)),
 ]

@@ -11,7 +11,7 @@ export async function platformProxy(request: NextRequest, path: string, method =
   const headers = new Headers();
   for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform','x-device-token']) { const value=request.headers.get(name); if(value) headers.set(name,value); }
   headers.set('x-forwarded-proto',new URL(expected).protocol.replace(':',''));
-  const base=(baseOverride || process.env.PLATFORM_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/,'');
+  const base=(baseOverride || process.env.PLATFORM_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/,'');
   try {
     const body=['GET','HEAD','OPTIONS'].includes(method)?undefined:await request.arrayBuffer();
     // Hub attachments are validated by Django per file (currently 15 MiB).

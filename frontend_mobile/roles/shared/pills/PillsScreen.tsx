@@ -73,9 +73,9 @@ export default function PillsScreen() {
     setError('');
     try {
       const [balanceRes, historyRes, referralRes] = await Promise.all([
-        apiClient.get('/client-profile/pill-rewards/balance/'),
-        apiClient.get('/client-profile/pill-rewards/history/'),
-        apiClient.get('/client-profile/pill-rewards/referrals/'),
+        apiClient.get('/pill-rewards/balance/'),
+        apiClient.get('/pill-rewards/history/'),
+        apiClient.get('/pill-rewards/referrals/'),
       ]);
       setBalance({
         balance: Number(balanceRes.data?.balance ?? 0),

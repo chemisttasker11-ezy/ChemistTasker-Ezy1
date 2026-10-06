@@ -18,7 +18,7 @@ from django.test import TestCase, override_settings
 from client_profile.characterization_support import client_for, make_user
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
 
-API = "/api/client-profile/"
+API = "/api/v1/"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

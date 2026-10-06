@@ -149,7 +149,7 @@ jobs:
             nohup python manage.py runserver 0.0.0.0:8000 --noreload > /tmp/native-backend.log 2>&1 &
           )
           for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8000/api/users/mobile/app-config/ >/dev/null; then
+            if curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null; then
               exit 0
             fi
             sleep 1
@@ -163,7 +163,7 @@ jobs:
           set -euo pipefail
           curl -fsS -H "Content-Type: application/json" \
             -d '{"email":"native-smoke@example.test","password":"NativeSmoke1234"}' \
-            http://127.0.0.1:8000/api/users/login/ > /tmp/native-login.json
+            http://127.0.0.1:8000/api/v1/users/login/ > /tmp/native-login.json
           python - <<'PY'
           import json
           data=json.load(open("/tmp/native-login.json"))
@@ -314,7 +314,7 @@ jobs:
         run: |
           set -euo pipefail
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
-          curl -fsS http://127.0.0.1:8000/api/users/mobile/app-config/ >/dev/null
+          curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
@@ -510,7 +510,7 @@ jobs:
             nohup python manage.py runserver 127.0.0.1:8000 --noreload > /tmp/native-backend.log 2>&1 &
           )
           for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8000/api/users/mobile/app-config/ >/dev/null; then
+            if curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null; then
               exit 0
             fi
             sleep 1
@@ -524,7 +524,7 @@ jobs:
           set -euo pipefail
           curl -fsS -H "Content-Type: application/json" \
             -d '{"email":"native-smoke@example.test","password":"NativeSmoke1234"}' \
-            http://127.0.0.1:8000/api/users/login/ > /tmp/native-login.json
+            http://127.0.0.1:8000/api/v1/users/login/ > /tmp/native-login.json
           python - <<'PY'
           import json
           data=json.load(open("/tmp/native-login.json"))
@@ -646,7 +646,7 @@ jobs:
         run: |
           set -euo pipefail
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; fi' EXIT
-          curl -fsS http://127.0.0.1:8000/api/users/mobile/app-config/ >/dev/null
+          curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app

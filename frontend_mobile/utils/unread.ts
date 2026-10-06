@@ -2,7 +2,7 @@ import apiClient from './apiClient';
 
 export async function fetchUnreadCount(): Promise<number> {
   try {
-    const res = await apiClient.get('/client-profile/rooms/?unread=1');
+    const res = await apiClient.get('/rooms/?unread=1');
     // Expect unread count in response or count locally
     const data: any = res.data;
     if (typeof data?.unread_total === 'number') return data.unread_total;

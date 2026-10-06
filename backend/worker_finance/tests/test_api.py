@@ -19,7 +19,7 @@ from rest_framework.test import APIClient
 from worker_finance.models import Customer, CatalogueItem, InvoiceRevision, Payment
 Invoice = apps.get_model('invoicing', 'Invoice')
 
-BASE = '/api/client-profile/finance/'
+BASE = '/api/v1/finance/'
 
 
 @skipUnless(getattr(settings, 'FINANCE_CONTRACT_TESTS', False), 'Use the isolated finance contract settings.')
@@ -115,7 +115,7 @@ class FinanceApiTests(TestCase):
         )
 
         response = self.client.patch(
-            f'/api/client-profile/invoices/{record["invoice_id"]}/',
+            f'/api/v1/invoices/{record["invoice_id"]}/',
             {'total': '1'},
             format='json',
         )

@@ -26,7 +26,7 @@ from onboarding.models import OwnerOnboarding, PharmacistOnboarding
 from users.models import WebSocketTicket
 
 User = get_user_model()
-API = "/api/users/"
+API = "/api/v1/users/"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
@@ -282,7 +282,7 @@ class SessionTests(TestCase):
 @override_settings(STORAGES=STORAGES)
 class AccountDeletionTests(TestCase):
     def test_deletion_anonymises_revokes_and_removes_identity_documents(self):
-        path = "/api/account/"
+        path = "/api/v1/account/"
         pharmacist = make_user("PHARMACIST", mobile_number="61400000000", is_mobile_verified=True)
         onboarding = PharmacistOnboarding.objects.create(user=pharmacist, government_id_type="AUS_PASSPORT",
                                                          identity_meta={"expiry": "2030-01-01"})

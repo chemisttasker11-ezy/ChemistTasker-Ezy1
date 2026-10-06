@@ -21,23 +21,23 @@ describe('converged client security and compatibility', () => {
   ])('rejects unsafe URL %s before reading a token or using cookies', async (path) => {
     const token = vi.fn(() => 'secret');
     const fetchImpl = vi.fn(async () => json({}));
-    const client = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken: token, credentials: 'include', fetchImpl });
+    const client = createApiClient({ baseUrl: 'https://example.test/api/v1', getAuthToken: token, credentials: 'include', fetchImpl });
     await expect(client.get(path)).rejects.toThrow();
     expect(token).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it.each([
-    '/client-profile/finance/../users/',
-    '/client-profile/finance/%2e%2e/users/',
-    '/client-profile/finance/%252e%252e/users/',
-    '/client-profile/finance/%2f..%2fusers/',
-    '/client-profile/finance-elsewhere/',
+    '/finance/../users/',
+    '/finance/%2e%2e/users/',
+    '/finance/%252e%252e/users/',
+    '/finance/%2f..%2fusers/',
+    '/finance-elsewhere/',
   ])('confines finance before credentials: %s', async (path) => {
     const fetchImpl = vi.fn(async () => json({}));
     const token = vi.fn(() => 'secret');
-    configureApi({ baseURL: 'https://example.test/api', getToken: token, fetchImpl });
-    await expect(performApiRequest(path, {}, { allowedPathPrefix: '/client-profile/finance/' })).rejects.toThrow();
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: token, fetchImpl });
+    await expect(performApiRequest(path, {}, { allowedPathPrefix: '/finance/' })).rejects.toThrow();
     expect(token).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -47,9 +47,9 @@ describe('converged client security and compatibility', () => {
       expect(init?.redirect).toBe('error');
       return new Response('pdf-bytes', { headers: { 'Content-Type': 'application/pdf' } });
     }) as typeof fetch;
-    configureApi({ baseURL: 'https://example.test/api', getToken: () => 'a', fetchImpl });
-    const response = await performApiRequest('https://example.test/api/client-profile/finance/invoices/?page=2', {}, {
-      allowedPathPrefix: '/client-profile/finance/',
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'a', fetchImpl });
+    const response = await performApiRequest('https://example.test/api/v1/finance/invoices/?page=2', {}, {
+      allowedPathPrefix: '/finance/',
     });
     expect(await (await response.blob()).text()).toBe('pdf-bytes');
   });
@@ -61,13 +61,13 @@ describe('converged client security and compatibility', () => {
       calls.push([String(url), new Headers(init?.headers).get('Authorization')]);
       return json({});
     }) as typeof fetch;
-    configureApi({ baseURL: 'https://a.test/api', getToken: () => token.promise, fetchImpl });
+    configureApi({ baseURL: 'https://a.test/api/v1', getToken: () => token.promise, fetchImpl });
     const first = fetchApi('/users/me/');
-    configureApi({ baseURL: 'https://b.test/api', getToken: () => 'b-token', fetchImpl });
+    configureApi({ baseURL: 'https://b.test/api/v1', getToken: () => 'b-token', fetchImpl });
     token.resolve('a-token');
     await Promise.all([first, fetchApi('/users/me/')]);
-    expect(calls).toContainEqual(['https://a.test/api/users/me/', 'Bearer a-token']);
-    expect(calls).toContainEqual(['https://b.test/api/users/me/', 'Bearer b-token']);
+    expect(calls).toContainEqual(['https://a.test/api/v1/users/me/', 'Bearer a-token']);
+    expect(calls).toContainEqual(['https://b.test/api/v1/users/me/', 'Bearer b-token']);
   });
 
   it('shares an in-flight refresh only inside one client', async () => {
@@ -77,7 +77,7 @@ describe('converged client security and compatibility', () => {
       return new Headers(init?.headers).get('Authorization') === 'Bearer renewed'
         ? json({ ok: true }) : json({}, 401);
     }) as typeof fetch;
-    const client = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken: () => 'old', refreshAuthToken: refresh, fetchImpl });
+    const client = createApiClient({ baseUrl: 'https://example.test/api/v1', getAuthToken: () => 'old', refreshAuthToken: refresh, fetchImpl });
     const one = client.get('/one/');
     const two = client.get('/two/');
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
@@ -89,7 +89,7 @@ describe('converged client security and compatibility', () => {
 
   it('does not refresh or sign out on a public 401', async () => {
     const refresh = vi.fn(); const failure = vi.fn(); const getAuthToken = vi.fn();
-    const client = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken, refreshAuthToken: refresh, onAuthFailure: failure,
+    const client = createApiClient({ baseUrl: 'https://example.test/api/v1', getAuthToken, refreshAuthToken: refresh, onAuthFailure: failure,
       fetchImpl: async (_url, init) => {
         expect(new Headers(init?.headers).has('Authorization')).toBe(false);
         return json({ detail: 'Public token expired.' }, 401);
@@ -100,18 +100,18 @@ describe('converged client security and compatibility', () => {
   });
 
   it('sanitizes 5xx payloads but retains structured validation/conflict payloads', async () => {
-    const bad = createApiClient({ baseUrl: 'https://example.test/api', fetchImpl: async () => json({ detail: 'password=internal' }, 500) });
+    const bad = createApiClient({ baseUrl: 'https://example.test/api/v1', fetchImpl: async () => json({ detail: 'password=internal' }, 500) });
     await expect(bad.get('/x/')).rejects.toMatchObject({ status: 500, message: 'Request failed with status 500', payload: null });
     const payload = { error: { revision: ['Review the changed revision.'], code: 'STALE' } };
-    const conflict = createApiClient({ baseUrl: 'https://example.test/api', fetchImpl: async () => json(payload, 409) });
+    const conflict = createApiClient({ baseUrl: 'https://example.test/api/v1', fetchImpl: async () => json(payload, 409) });
     await expect(conflict.post('/publish/', {})).rejects.toMatchObject({ status: 409, message: 'Review the changed revision.', payload });
   });
 
   it('retains browser cookies/CSRF headers and native credentials omit', async () => {
     const seen: RequestInit[] = [];
     const fetchImpl = vi.fn(async (_url, init) => { seen.push(init!); return json({}); }) as typeof fetch;
-    const browser = createApiClient({ baseUrl: 'https://example.test/api', credentials: 'include', fetchImpl });
-    const native = createApiClient({ baseUrl: 'https://example.test/api', credentials: 'omit', fetchImpl });
+    const browser = createApiClient({ baseUrl: 'https://example.test/api/v1', credentials: 'include', fetchImpl });
+    const native = createApiClient({ baseUrl: 'https://example.test/api/v1', credentials: 'omit', fetchImpl });
     await browser.post('/x/', { a: 1 }, { headers: { 'X-CSRFToken': 'csrf-value', 'X-Client-Platform': 'web' } });
     await native.post('/x/', { a: 1 });
     expect(seen[0].credentials).toBe('include');
@@ -130,10 +130,10 @@ describe('converged client security and compatibility', () => {
     const bytes = new Uint8Array([1, 2, 3]);
     const calls: RequestInit[] = [];
     const fetchImpl = vi.fn(async (_url, init) => { calls.push(init!); return new Response(null, { status: 204 }); }) as typeof fetch;
-    const client = createApiClient({ baseUrl: 'https://example.test/api', fetchImpl });
+    const client = createApiClient({ baseUrl: 'https://example.test/api/v1', fetchImpl });
     await expect(client.post('/upload/', bytes)).resolves.toBeUndefined();
     expect(calls[0].body).toBe(bytes); expect(new Headers(calls[0].headers).has('Content-Type')).toBe(false);
-    configureApi({ baseURL: 'https://example.test/api', getToken: () => null, fetchImpl });
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => null, fetchImpl });
     await expect(fetchApi('/nothing/', { method: 'DELETE' })).resolves.toEqual({});
   });
 
@@ -143,7 +143,7 @@ describe('converged client security and compatibility', () => {
 });
 
 it('cannot enable credential-following redirects through per-request options',async()=>{
-  const client=createApiClient({baseUrl:'https://example.test/api',fetchImpl:async(_url,options)=>{
+  const client=createApiClient({baseUrl:'https://example.test/api/v1',fetchImpl:async(_url,options)=>{
     expect(options?.redirect).toBe('error');return json({});
   }});
   await client.get('/users/me/',undefined,{redirect:'follow'});
@@ -154,7 +154,7 @@ it('the exported refresh operation cannot recursively invoke the refresh callbac
   const recursive=vi.fn(()=>refreshToken('expired').then(()=> 'token'));
   const authFailure=vi.fn();const getToken=vi.fn(()=> 'old-token');
   const fetchImpl=vi.fn(async()=>json({detail:'Refresh expired.'},401));
-  configureApi({baseURL:'https://example.test/api',getToken,refreshToken:recursive,onAuthFailure:authFailure,fetchImpl});
+  configureApi({baseURL:'https://example.test/api/v1',getToken,refreshToken:recursive,onAuthFailure:authFailure,fetchImpl});
   await expect(refreshToken('expired')).rejects.toMatchObject({status:401});
   expect(recursive).not.toHaveBeenCalled();expect(getToken).not.toHaveBeenCalled();
   expect(authFailure).not.toHaveBeenCalled();expect(fetchImpl).toHaveBeenCalledOnce();

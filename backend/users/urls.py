@@ -7,7 +7,7 @@ from django.contrib.auth import views as auth_views
 
 
 router = DefaultRouter()
-# since we'll include this at /api/users/, register at the root
+# since we'll include this at /api/v1/users/, register at the root
 router.register('', UserViewSet, basename='user')
 router.register('organization-memberships', OrganizationMembershipViewSet, basename='organization-membership')
 

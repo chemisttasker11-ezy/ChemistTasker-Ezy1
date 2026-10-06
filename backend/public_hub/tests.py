@@ -28,7 +28,7 @@ class HubTests(TestCase):
         self.api = APIClient()
         self.article = Article.objects.create(title='A thoughtful handover', slug='thoughtful-handover', kind='blog', topic='practice',
             excerpt='Practical perspectives.', body='## A shared plan\n\nMake time for a conversation.', status='published', published_at=timezone.now())
-        self.url = f'/api/public-hub/articles/{self.article.slug}/'
+        self.url = f'/api/v1/public-hub/articles/{self.article.slug}/'
 
     def login(self, user=None):
         token = RefreshToken.for_user(user or self.user)
@@ -79,21 +79,21 @@ class HubTests(TestCase):
             self.article.status, self.article.published_at = status, date
             self.article.save()
             self.assertEqual(self.api.get(self.url).status_code, 404)
-            self.assertEqual(self.api.get('/api/public-hub/articles/').data['count'], 0)
+            self.assertEqual(self.api.get('/api/v1/public-hub/articles/').data['count'], 0)
             self.login()
             self.assertEqual(self.api.post(self.url + 'comments/', {'body': 'test'}).status_code, 404)
             self.assertEqual(self.api.put(self.url + 'reaction/', {'kind': 'like'}).status_code, 404)
 
     def test_filter_and_search(self):
-        self.assertEqual(self.api.get('/api/public-hub/articles/?kind=blog&topic=practice&q=handover').data['count'], 1)
-        self.assertEqual(self.api.get('/api/public-hub/articles/?kind=news').data['count'], 0)
+        self.assertEqual(self.api.get('/api/v1/public-hub/articles/?kind=blog&topic=practice&q=handover').data['count'], 1)
+        self.assertEqual(self.api.get('/api/v1/public-hub/articles/?kind=news').data['count'], 0)
 
     def test_anonymous_reads_but_cannot_write_or_publish(self):
         self.assertEqual(self.api.get(self.url).status_code, 200)
         self.assertEqual(self.api.post(self.url + 'comments/', {'body': 'Hello'}).status_code, 401)
         self.assertEqual(self.api.put(self.url + 'reaction/', {'kind': 'like'}).status_code, 401)
         self.login()
-        self.assertEqual(self.api.post('/api/public-hub/articles/', {'title': 'Unauthorised'}).status_code, 405)
+        self.assertEqual(self.api.post('/api/v1/public-hub/articles/', {'title': 'Unauthorised'}).status_code, 405)
         self.assertEqual(self.api.patch(self.url, {'status': 'published'}).status_code, 405)
 
     def test_comments_and_replies_validate_and_do_not_leak_identity(self):
@@ -118,15 +118,15 @@ class HubTests(TestCase):
         self.article.slug = 'another'
         self.article.save()
         self.login()
-        self.assertEqual(self.api.post('/api/public-hub/articles/another/comments/', {'body': 'Wrong article', 'parent': root.id}).status_code, 404)
+        self.assertEqual(self.api.post('/api/v1/public-hub/articles/another/comments/', {'body': 'Wrong article', 'parent': root.id}).status_code, 404)
 
     def test_author_delete_tombstones_without_destroying_replies(self):
         root = Comment.objects.create(article=self.article, author=self.user, body='Root')
         Comment.objects.create(article=self.article, author=self.other, parent=root, body='Reply')
         self.login(self.other)
-        self.assertEqual(self.api.delete(f'/api/public-hub/comments/{root.pk}/').status_code, 403)
+        self.assertEqual(self.api.delete(f'/api/v1/public-hub/comments/{root.pk}/').status_code, 403)
         self.login()
-        self.assertEqual(self.api.delete(f'/api/public-hub/comments/{root.pk}/').status_code, 204)
+        self.assertEqual(self.api.delete(f'/api/v1/public-hub/comments/{root.pk}/').status_code, 204)
         root.refresh_from_db()
         self.assertEqual(root.body, '')
         self.assertEqual(root.replies.count(), 1)
@@ -140,7 +140,7 @@ class HubTests(TestCase):
         self.assertEqual(self.api.get(self.url + f'comments/?parent={root.pk}').status_code, 404)
         self.assertEqual(self.api.get(self.url).data['comment_count'], 0)
         self.login()
-        self.assertEqual(self.api.put(f'/api/public-hub/comments/{reply.pk}/reaction/', {'kind': 'support'}).status_code, 403)
+        self.assertEqual(self.api.put(f'/api/v1/public-hub/comments/{reply.pk}/reaction/', {'kind': 'support'}).status_code, 403)
 
     def test_reactions_are_idempotent_changeable_and_removable(self):
         self.login()
@@ -166,7 +166,7 @@ class HubTests(TestCase):
     def test_reports_are_private_and_deduplicated(self):
         comment = Comment.objects.create(article=self.article, author=self.other, body='Review this')
         self.login()
-        path = f'/api/public-hub/comments/{comment.pk}/report/'
+        path = f'/api/v1/public-hub/comments/{comment.pk}/report/'
         self.assertEqual(self.api.post(path, {'reason': 'Personal information'}).status_code, 201)
         self.assertEqual(self.api.post(path, {'reason': 'Duplicate report'}).status_code, 200)
         self.assertEqual(Report.objects.count(), 1)

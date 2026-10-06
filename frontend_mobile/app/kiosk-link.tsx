@@ -24,7 +24,7 @@ export default function KioskLinkPrompt() {
     if (!prompted) { setLoading(false); return; }
     let active = true;
     setLoading(true); setError(null);
-    apiClient.get('/client-profile/attendance/kiosk/pairing/request/').then(({ data }) => {
+    apiClient.get('/attendance/kiosk/pairing/request/').then(({ data }) => {
       if (!active) return;
       const rows: Pharmacy[] = data.pharmacies || [];
       setPharmacies(rows);
@@ -44,7 +44,7 @@ export default function KioskLinkPrompt() {
     if (!pharmacy || !deviceName.trim()) return;
     setSaving(true); setError(null);
     try {
-      const { data } = await apiClient.post('/client-profile/attendance/kiosk/pairing/request/', {
+      const { data } = await apiClient.post('/attendance/kiosk/pairing/request/', {
         pharmacy_id: pharmacy.id, device_name: deviceName.trim(),
       });
       setCode(String(data.pairing_code)); setExpiresAt(Date.now() + data.expires_in_seconds * 1000);

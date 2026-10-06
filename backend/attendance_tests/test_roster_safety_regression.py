@@ -298,14 +298,14 @@ class RosterSafetyRegressionTests(unittest.TestCase):
 
     def test_owner_roster_period_get_is_side_effect_free(self):
         """
-        GET /api/attendance/roster/period/ must be completely read-only.
+        GET /api/v1/attendance/roster/period/ must be completely read-only.
         It must not create a RosterPeriod record in the database.
         """
         self.assertEqual(RosterPeriod.objects.filter(pharmacy=self.pharmacy, week_start=self.monday).count(), 0)
 
         view = RosterPeriodDetailView.as_view()
         request = self.factory.get(
-            f"/api/attendance/roster/period/?pharmacy_id={self.pharmacy.id}&week_start={self.monday.isoformat()}"
+            f"/api/v1/attendance/roster/period/?pharmacy_id={self.pharmacy.id}&week_start={self.monday.isoformat()}"
         )
         force_authenticate(request, user=self.owner_user)
         response = view(request)
@@ -320,13 +320,13 @@ class RosterSafetyRegressionTests(unittest.TestCase):
 
     def test_owner_roster_period_post_explicitly_creates_draft(self):
         """
-        POST /api/attendance/roster/period/ is the explicit write action to create a draft period.
+        POST /api/v1/attendance/roster/period/ is the explicit write action to create a draft period.
         """
         self.assertEqual(RosterPeriod.objects.filter(pharmacy=self.pharmacy, week_start=self.monday).count(), 0)
 
         view = RosterPeriodDetailView.as_view()
         request = self.factory.post(
-            "/api/attendance/roster/period/",
+            "/api/v1/attendance/roster/period/",
             {"pharmacy_id": self.pharmacy.id, "week_start": self.monday.isoformat()},
             format="json",
         )
@@ -377,7 +377,7 @@ class RosterSafetyRegressionTests(unittest.TestCase):
         # Worker calls RosterWorkerViewSet
         view = RosterWorkerViewSet.as_view({"get": "list"})
         request = self.factory.get(
-            f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
+            f"/api/v1/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
         )
         force_authenticate(request, user=self.worker1)
         response = view(request)
@@ -426,7 +426,7 @@ class RosterSafetyRegressionTests(unittest.TestCase):
         # 1. While DRAFT: hidden from worker in RosterWorkerViewSet
         view = RosterWorkerViewSet.as_view({"get": "list"})
         request = self.factory.get(
-            f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
+            f"/api/v1/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
         )
         force_authenticate(request, user=self.worker1)
         response = view(request)

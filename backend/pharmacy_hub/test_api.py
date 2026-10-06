@@ -1,4 +1,4 @@
-"""Characterization of the private pharmacy Hub API (/api/client-profile/hub/...), pharmacy scope.
+"""Characterization of the private pharmacy Hub API (/api/v1/hub/...), pharmacy scope.
 
 Group, organization and platform scopes share the same resolver and are exercised by the existing
 public_hub / membership tests; this file pins the pharmacy-scope contract end to end."""

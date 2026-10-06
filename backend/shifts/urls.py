@@ -1,9 +1,9 @@
 """URL ownership for the shift domain.
 
-The three routers are composed separately by core.client_profile_api_urls so
-the historical API-root registration order remains byte-for-byte compatible.
+The three routers are composed separately by core.api_v1_urls so
+the API-v1 registration order remains stable.
 """
-from django.urls import path
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from shifts.browse import (
@@ -62,4 +62,5 @@ router.registry.extend(engagement_router.registry)
 urlpatterns = [
     path("public-job-board/", PublicJobBoardView.as_view(), name="public-job-board"),
     path("view-shared-shift/", SharedShiftDetailView.as_view(), name="view-shared-shift"),
+    path('', include(router.urls)),
 ]

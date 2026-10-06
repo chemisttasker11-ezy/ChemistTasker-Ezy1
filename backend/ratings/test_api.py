@@ -1,4 +1,4 @@
-"""Characterization of the Ratings API (/api/client-profile/ratings/)."""
+"""Characterization of the Ratings API (/api/v1/ratings/)."""
 from django.test import TestCase
 
 from ratings.models import Rating, RatingReport

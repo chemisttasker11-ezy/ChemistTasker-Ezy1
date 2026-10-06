@@ -71,7 +71,7 @@ export default function OwnerDashboard() {
     try {
       const [dashboardPayload, pillRes] = await Promise.all([
         scope.fetchDashboard(),
-        apiClient.get('/client-profile/pill-rewards/balance/').catch(() => null),
+        apiClient.get('/pill-rewards/balance/').catch(() => null),
       ]);
 
       setDashboardData(dashboardPayload);

@@ -55,7 +55,7 @@ class PublicListingSerializer(serializers.ModelSerializer):
         for image in obj.images.filter(moderation_status="APPROVED"):
             if not image.derivative:
                 continue
-            rows.append({"derivative_url": request.build_absolute_uri(f"/api/marketplace/images/{image.pk}/") if request else f"/api/marketplace/images/{image.pk}/", "alt": image.alt_text})
+            rows.append({"derivative_url": request.build_absolute_uri(f"/api/v1/marketplace/images/{image.pk}/") if request else f"/api/v1/marketplace/images/{image.pk}/", "alt": image.alt_text})
         return rows
 
 

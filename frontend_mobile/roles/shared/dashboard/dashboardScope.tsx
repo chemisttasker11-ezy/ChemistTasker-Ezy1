@@ -102,9 +102,9 @@ export function collectDashboardPharmacies(user: any): PharmacyOption[] {
 
 export function dashboardEndpointForRole(role?: string | null) {
   const normalized = String(role || '').toUpperCase();
-  if (normalized === 'OWNER') return '/client-profile/dashboard/owner/';
-  if (normalized === 'PHARMACIST') return '/client-profile/dashboard/pharmacist/';
-  if (normalized === 'OTHER_STAFF') return '/client-profile/dashboard/otherstaff/';
+  if (normalized === 'OWNER') return '/dashboard/owner/';
+  if (normalized === 'PHARMACIST') return '/dashboard/pharmacist/';
+  if (normalized === 'OTHER_STAFF') return '/dashboard/otherstaff/';
   return null;
 }
 

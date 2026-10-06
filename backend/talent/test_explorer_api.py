@@ -1,4 +1,4 @@
-"""Characterization of the Talent/Explorer posts API (/api/client-profile/explorer-posts/)."""
+"""Characterization of the Talent/Explorer posts API (/api/v1/explorer-posts/)."""
 from datetime import timedelta
 
 from django.test import TestCase

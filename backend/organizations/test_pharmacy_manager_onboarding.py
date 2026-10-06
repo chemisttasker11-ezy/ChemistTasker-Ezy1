@@ -19,7 +19,7 @@ from organizations.access import CAPABILITY_MANAGE_STAFF, has_admin_capability
 from organizations.models import Organization, Pharmacy, PharmacyAdmin
 from users.models import OrganizationMembership
 
-CLAIM_URL = "/api/client-profile/owner-onboarding/claim/"
+CLAIM_URL = "/api/v1/owner-onboarding/claim/"
 
 
 class PharmacyManagerOnboardingTests(TestCase):
@@ -145,7 +145,7 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.client.force_authenticate(user=self.contact)
 
     def choose(self, role):
-        return self.client.post("/api/users/me/account-type/", {"role": role}, format="json")
+        return self.client.post("/api/v1/users/me/account-type/", {"role": role}, format="json")
 
     def test_dashboard_is_the_admin_dashboard_of_the_managed_pharmacy(self):
         from users.navigation import get_frontend_dashboard_url
@@ -165,7 +165,7 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.assertEqual(self.choose("OWNER").status_code, 200)
         self.contact.refresh_from_db()
         response = self.client.patch(
-            "/api/client-profile/owner/onboarding/me/",
+            "/api/v1/owner/onboarding/me/",
             {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
             format="json",
         )
@@ -186,7 +186,7 @@ class PharmacyManagerAccountTypeTests(TestCase):
         PharmacyAdmin.objects.create(user=self.contact, pharmacy=owned, admin_level=PharmacyAdmin.AdminLevel.MANAGER)
         self.choose("OWNER")
         self.client.patch(
-            "/api/client-profile/owner/onboarding/me/",
+            "/api/v1/owner/onboarding/me/",
             {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
             format="json",
         )
@@ -203,7 +203,7 @@ class SelfRegistrationRoleTests(TestCase):
                 mock.patch("users.api_auth.verify_recaptcha", return_value=True),
             ):
                 response = APIClient().post(
-                    "/api/users/register/",
+                    "/api/v1/users/register/",
                     {
                         "email": f"{role.lower()}@register.test",
                         "password": "Sufficiently-Long-9",

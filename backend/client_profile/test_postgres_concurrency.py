@@ -155,7 +155,7 @@ class MembershipLimitPostgresLockingTests(TransactionTestCase):
         client.force_authenticate(self.worker)
         with CaptureQueriesContext(connection) as captured:
             response = client.post(
-                f"/api/client-profile/my-memberships/{self.pending.pk}/accept/",
+                f"/api/v1/my-memberships/{self.pending.pk}/accept/",
                 {},
                 format="json",
             )
@@ -178,7 +178,7 @@ class MembershipLimitPostgresLockingTests(TransactionTestCase):
         client.force_authenticate(self.owner)
         with CaptureQueriesContext(connection) as captured:
             response = client.patch(
-                f"/api/client-profile/memberships/{self.pending.pk}/",
+                f"/api/v1/memberships/{self.pending.pk}/",
                 {"is_active": True, "status": Membership.Status.ACCEPTED},
                 format="json",
             )

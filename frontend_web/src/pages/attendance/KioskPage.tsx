@@ -196,7 +196,7 @@ export default function KioskPage() {
       const data = desktopRuntime
         ? await getDesktopOnlineQr()
         : (await kioskClient.post(
-            "/client-profile/attendance/kiosk/qr/",
+            "/attendance/kiosk/qr/",
             {},
             { headers: { "X-Device-Token": deviceToken } }
           )).data;
@@ -287,7 +287,7 @@ export default function KioskPage() {
     setIsActivating(true);
     setActivationError(null);
     try {
-      const res = await kioskClient.post("/client-profile/attendance/kiosk/activate/", {
+      const res = await kioskClient.post("/attendance/kiosk/activate/", {
         pharmacy_id: parseInt(activationPharmacyId),
         device_name: activationDeviceName,
       });
@@ -341,7 +341,7 @@ export default function KioskPage() {
         setPharmacyName(status.pharmacy_name || "Pharmacy Counter");
         return;
       }
-      const res = await kioskClient.post("/client-profile/attendance/kiosk/pairing/pair/", {
+      const res = await kioskClient.post("/attendance/kiosk/pairing/pair/", {
         pairing_code: cleanedCode,
         device_name: activationDeviceName,
       });
@@ -372,7 +372,7 @@ export default function KioskPage() {
     setActivationError(null);
     setRequestNotificationSuccess(null);
     try {
-      const res = await kioskClient.post("/client-profile/attendance/kiosk/pairing/request/", {
+      const res = await kioskClient.post("/attendance/kiosk/pairing/request/", {
         pharmacy_id: parseInt(activationPharmacyId),
         device_name: activationDeviceName,
       });
@@ -539,7 +539,7 @@ export default function KioskPage() {
     setPinError(null);
     try {
       const res = await kioskClient.post(
-        "/client-profile/attendance/kiosk/worker-pin/status/",
+        "/attendance/kiosk/worker-pin/status/",
         {
           identifier: identifier.trim(),
           reset: forceReset,
@@ -591,7 +591,7 @@ export default function KioskPage() {
     setPinError(null);
     try {
       const res = await kioskClient.post(
-        "/client-profile/attendance/kiosk/worker-pin/setup/",
+        "/attendance/kiosk/worker-pin/setup/",
         {
           identifier: identifier.trim(),
           verification_code: setupOtp.trim(),
@@ -677,7 +677,7 @@ export default function KioskPage() {
       }
 
       const res = await kioskClient.post(
-        "/client-profile/attendance/kiosk/pin-clock/",
+        "/attendance/kiosk/pin-clock/",
         {
           identifier: identifier.trim(),
           pin: pin,
@@ -715,7 +715,7 @@ export default function KioskPage() {
     setBreakError(null);
     try {
       const res = await kioskClient.post(
-        "/client-profile/attendance/kiosk/active-staff/",
+        "/attendance/kiosk/active-staff/",
         {},
         { headers: { "X-Device-Token": deviceToken } }
       );
@@ -762,7 +762,7 @@ export default function KioskPage() {
     try {
       const action = breakActionType === "END" ? "END" : "START";
       const res = await kioskClient.post(
-        "/client-profile/attendance/kiosk/break/",
+        "/attendance/kiosk/break/",
         {
           worker_id: selectedStaffForBreak.worker_id,
           action: action,

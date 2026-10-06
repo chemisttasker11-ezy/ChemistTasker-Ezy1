@@ -22,7 +22,7 @@ class LocalLogin(TokenObtainPairView):
     serializer_class = LocalLoginSerializer
 
 
-urlpatterns = [path('api/public-hub/', include('public_hub.urls')),
-               path('api/users/login/', LocalLogin.as_view()),
-               path('api/users/token/refresh/', TokenRefreshView.as_view()),
+urlpatterns = [path('api/v1/public-hub/', include('public_hub.urls')),
+               path('api/v1/users/login/', LocalLogin.as_view()),
+               path('api/v1/users/token/refresh/', TokenRefreshView.as_view()),
                path('admin/', admin.site.urls)]

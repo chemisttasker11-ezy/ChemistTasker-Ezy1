@@ -240,7 +240,7 @@ class TimesheetStateMachineTests(TestCase):
 
         Timesheet.objects.filter(pk=self.timesheet.pk).update(needs_rebuild=True)
         revision_count = self.timesheet.revisions.count()
-        request = APIRequestFactory().get(f"/api/workforce/timesheets/{self.timesheet.pk}/")
+        request = APIRequestFactory().get(f"/api/v1/workforce/timesheets/{self.timesheet.pk}/")
         force_authenticate(request, user=self.owner)
 
         response = TimesheetDetailView.as_view()(request, pk=self.timesheet.pk)

@@ -1,10 +1,10 @@
 from django.test import SimpleTestCase
-from django.urls import reverse
+from django.urls import Resolver404, resolve, reverse
 
-from core.client_profile_api_urls import router
+from worker_finance import legacy as finance_legacy
 
 
-class ClientProfileApiCompositionContractTests(SimpleTestCase):
+class ApiV1CompositionContractTests(SimpleTestCase):
     expected_prefixes = [
         "organizations",
         "chains",
@@ -18,7 +18,6 @@ class ClientProfileApiCompositionContractTests(SimpleTestCase):
         "public-shifts",
         "shift-description-templates",
         "user-availability",
-        "pill-rewards",
         "shifts/active",
         "shifts/confirmed",
         "shifts/history",
@@ -46,15 +45,37 @@ class ClientProfileApiCompositionContractTests(SimpleTestCase):
         "calendar-feed",
     ]
 
-    def test_composed_router_order_is_legacy_order(self):
-        self.assertEqual(
-            [prefix for prefix, _viewset, _basename in router.registry],
-            self.expected_prefixes,
-        )
+    def test_domain_owned_router_paths_are_composed_under_api_v1(self):
+        for prefix in self.expected_prefixes:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(resolve(f"/api/v1/{prefix}/"))
 
-    def test_namespace_and_representative_reverse_paths_are_unchanged(self):
-        self.assertEqual(reverse("client_profile:organization-list"), "/api/client-profile/organizations/")
-        self.assertEqual(reverse("client_profile:conversation-list"), "/api/client-profile/rooms/")
-        self.assertEqual(reverse("client_profile:message-list"), "/api/client-profile/messages/")
-        self.assertEqual(reverse("client_profile:calendar-feed-list"), "/api/client-profile/calendar-feed/")
-        self.assertEqual(reverse("client_profile:owner-onboarding-me"), "/api/client-profile/owner/onboarding/me/")
+    def test_action_only_reward_route_is_composed_under_api_v1(self):
+        self.assertIsNotNone(resolve("/api/v1/pill-rewards/balance/"))
+
+    def test_namespace_and_representative_reverse_paths_are_canonical(self):
+        self.assertEqual(reverse("api_v1:organization-list"), "/api/v1/organizations/")
+        self.assertEqual(reverse("api_v1:conversation-list"), "/api/v1/rooms/")
+        self.assertEqual(reverse("api_v1:message-list"), "/api/v1/messages/")
+        self.assertEqual(reverse("api_v1:calendar-feed-list"), "/api/v1/calendar-feed/")
+        self.assertEqual(reverse("api_v1:owner-onboarding-me"), "/api/v1/owner/onboarding/me/")
+
+    def test_removed_application_namespaces_do_not_resolve(self):
+        legacy_root = "/api/"
+        for path in (
+            legacy_root + "client-profile/pharmacies/",
+            legacy_root + "users/me/",
+            legacy_root + "public-hub/articles/",
+            legacy_root + "marketplace/categories/",
+            legacy_root + "ethical/me/access/",
+            legacy_root + "content/documents/",
+            legacy_root + "billing/plans/",
+            legacy_root + "account/",
+        ):
+            with self.subTest(path=path), self.assertRaises(Resolver404):
+                resolve(path)
+
+    def test_finance_compatibility_guard_precedes_canonical_invoice_editor(self):
+        self.assertIs(resolve("/api/v1/invoices/7/").func, finance_legacy.detail)
+        self.assertIs(resolve("/api/v1/invoices/7/pdf/").func, finance_legacy.pdf)
+        self.assertIs(resolve("/api/v1/invoices/7/send/").func, finance_legacy.send)

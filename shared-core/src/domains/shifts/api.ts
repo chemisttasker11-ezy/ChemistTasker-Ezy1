@@ -17,55 +17,55 @@ export function calculateShiftRates(payload: unknown) {
     return fetchApi<Array<{
         date?: string;
         rate: string | number;
-    }>>('/client-profile/shifts/calculate-rates/', {
+    }>>('/shifts/calculate-rates/', {
         method: 'POST',
         body: JSON.stringify(payload),
     });
 }
 export function getCommunityShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftApi>>(`/client-profile/community-shifts/${query}`);
+    return fetchApi<Collection<ShiftApi>>(`/community-shifts/${query}`);
 }
 export function getPublicShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftApi>>(`/client-profile/public-shifts/${query}`);
+    return fetchApi<Collection<ShiftApi>>(`/public-shifts/${query}`);
 }
 export function getActiveShifts() {
-    return fetchApi<Collection<ShiftApi>>('/client-profile/shifts/active/');
+    return fetchApi<Collection<ShiftApi>>('/shifts/active/');
 }
 export function getConfirmedShifts() {
-    return fetchApi<Collection<ShiftApi>>('/client-profile/shifts/confirmed/');
+    return fetchApi<Collection<ShiftApi>>('/shifts/confirmed/');
 }
 export function getHistoryShifts() {
-    return fetchApi<Collection<ShiftApi>>('/client-profile/shifts/history/');
+    return fetchApi<Collection<ShiftApi>>('/shifts/history/');
 }
 export function getMyConfirmedShifts() {
-    return fetchApi<Collection<ShiftApi>>('/client-profile/my-confirmed-shifts/');
+    return fetchApi<Collection<ShiftApi>>('/my-confirmed-shifts/');
 }
 export function getMyHistoryShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftApi>>(`/client-profile/my-history-shifts/${query}`);
+    return fetchApi<Collection<ShiftApi>>(`/my-history-shifts/${query}`);
 }
 export function getShiftInterests(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftInterestApi>>(`/client-profile/shift-interests/${query}`);
+    return fetchApi<Collection<ShiftInterestApi>>(`/shift-interests/${query}`);
 }
 export function getShiftRejections(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftInterestApi>>(`/client-profile/shift-rejections/${query}`);
+    return fetchApi<Collection<ShiftInterestApi>>(`/shift-rejections/${query}`);
 }
 export function getShiftCounterOffers(shiftId: number | string) {
-    return fetchApi<Collection<ShiftCounterOfferApi>>(`/client-profile/shifts/${shiftId}/counter-offers/`);
+    return fetchApi<Collection<ShiftCounterOfferApi>>(`/shifts/${shiftId}/counter-offers/`);
 }
 export function getShiftCounterOffersBatch(shiftIds: number[]) {
     const ids = Array.from(new Set((shiftIds || []).map(Number).filter(Number.isFinite)));
     if (ids.length === 0)
         return Promise.resolve<Record<string, ShiftCounterOfferApi[]>>({});
     const query = encodeURIComponent(ids.join(','));
-    return fetchApi<Record<string, ShiftCounterOfferApi[]>>(`/client-profile/shifts/counter-offers-batch/?shift_ids=${query}`);
+    return fetchApi<Record<string, ShiftCounterOfferApi[]>>(`/shifts/counter-offers-batch/?shift_ids=${query}`);
 }
 export function createShiftCounterOffer(shiftId: number | string, data: unknown) {
-    return fetchApi<ShiftCounterOfferApi>(`/client-profile/shifts/${shiftId}/counter-offers/`, {
+    return fetchApi<ShiftCounterOfferApi>(`/shifts/${shiftId}/counter-offers/`, {
         method: 'POST',
         body: JSON.stringify(data),
     });
@@ -76,16 +76,16 @@ export function acceptShiftCounterOffer(shiftId: number | string, offerId: numbe
 } | undefined) {
     const slotId = data?.slotId ?? data?.slot_id ?? null;
     const query = slotId != null ? `?slot_id=${encodeURIComponent(slotId)}` : '';
-    return fetchApi(`/client-profile/shifts/${shiftId}/counter-offers/${offerId}/accept/${query}`, {
+    return fetchApi(`/shifts/${shiftId}/counter-offers/${offerId}/accept/${query}`, {
         method: 'POST',
         body: slotId != null ? JSON.stringify({ slot_id: slotId }) : undefined,
     });
 }
 export function rejectShiftCounterOffer(shiftId: number | string, offerId: number | string) {
-    return fetchApi(`/client-profile/shifts/${shiftId}/counter-offers/${offerId}/reject/`, { method: 'POST' });
+    return fetchApi(`/shifts/${shiftId}/counter-offers/${offerId}/reject/`, { method: 'POST' });
 }
 export function fetchShiftOffers(query = '') {
-    return fetchApi<Collection<ShiftOfferApi>>(`/client-profile/shift-offers/${query}`);
+    return fetchApi<Collection<ShiftOfferApi>>(`/shift-offers/${query}`);
 }
 export function acceptShiftOffer(offerId: number | string, data: ShiftOfferAcceptancePayload & {
     engagement_terms_accepted?: boolean;
@@ -95,140 +95,140 @@ export function acceptShiftOffer(offerId: number | string, data: ShiftOfferAccep
         engagement_terms_accepted: data?.engagementTermsAccepted ?? data?.engagement_terms_accepted ?? false,
         independent_contractor_status_confirmed: data?.independentContractorStatusConfirmed ?? data?.independent_contractor_status_confirmed ?? false,
     };
-    return fetchApi(`/client-profile/shift-offers/${offerId}/accept/`, {
+    return fetchApi(`/shift-offers/${offerId}/accept/`, {
         method: 'POST',
         body: JSON.stringify(body),
     });
 }
 export function activateShiftOfferPayroll(offerId: number | string) {
-    return fetchApi(`/client-profile/shift-offers/${offerId}/activate-payroll/`, { method: 'POST' });
+    return fetchApi(`/shift-offers/${offerId}/activate-payroll/`, { method: 'POST' });
 }
 export function declineShiftOffer(offerId: number | string) {
-    return fetchApi(`/client-profile/shift-offers/${offerId}/decline/`, { method: 'POST' });
+    return fetchApi(`/shift-offers/${offerId}/decline/`, { method: 'POST' });
 }
 export function buzzShiftOffer(offerId: number | string) {
-    return fetchApi(`/client-profile/shift-offers/${offerId}/buzz/`, { method: 'POST' });
+    return fetchApi(`/shift-offers/${offerId}/buzz/`, { method: 'POST' });
 }
 export function getCommunityShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/client-profile/community-shifts/${id}`);
+    return fetchApi<ShiftApi>(`/community-shifts/${id}`);
 }
 export function getPublicShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/client-profile/public-shifts/${id}`);
+    return fetchApi<ShiftApi>(`/public-shifts/${id}`);
 }
 export function getActiveShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/client-profile/shifts/active/${id}`);
+    return fetchApi<ShiftApi>(`/shifts/active/${id}`);
 }
 export function deleteActiveShift(id: number | string) {
-    return fetchApi(`/client-profile/shifts/active/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/shifts/active/${id}/`, { method: 'DELETE' });
 }
 export function getActiveShiftMemberStatus(id: number | string, params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftMemberStatusApi>>(`/client-profile/shifts/${id}/member_status/${query}`);
+    return fetchApi<Collection<ShiftMemberStatusApi>>(`/shifts/${id}/member_status/${query}`);
 }
 export function getConfirmedShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/client-profile/shifts/confirmed/${id}/`);
+    return fetchApi<ShiftApi>(`/shifts/confirmed/${id}/`);
 }
 export function getWorkerShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/client-profile/shifts/${id}/`);
+    return fetchApi<ShiftApi>(`/shifts/${id}/`);
 }
 export function createShift(data: unknown) {
-    return fetchApi<ShiftApi>('/client-profile/community-shifts/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<ShiftApi>('/community-shifts/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateShift(id: number | string, data: unknown) {
-    return fetchApi<ShiftApi>(`/client-profile/community-shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<ShiftApi>(`/community-shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteShift(id: number | string) {
-    return fetchApi(`/client-profile/community-shifts/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/community-shifts/${id}/`, { method: 'DELETE' });
 }
 export function claimShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/community-shifts/${id}/claim-shift/`, {
+    return fetchApi(`/community-shifts/${id}/claim-shift/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function expressInterestInShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/shifts/${id}/express_interest/`, {
+    return fetchApi(`/shifts/${id}/express_interest/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function expressInterestInCommunityShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/community-shifts/${id}/express_interest/`, {
+    return fetchApi(`/community-shifts/${id}/express_interest/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function expressInterestInPublicShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/public-shifts/${id}/express_interest/`, {
+    return fetchApi(`/public-shifts/${id}/express_interest/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function revealProfile(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/shifts/${id}/reveal_profile/`, {
+    return fetchApi(`/shifts/${id}/reveal_profile/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function acceptUserToShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/shifts/${id}/accept_user/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi(`/shifts/${id}/accept_user/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function escalateCommunityShift(id: number | string) {
-    return fetchApi(`/client-profile/community-shifts/${id}/escalate/`, { method: 'POST' });
+    return fetchApi(`/community-shifts/${id}/escalate/`, { method: 'POST' });
 }
 export function getCommunityShiftMemberStatus(id: number | string, params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftMemberStatusApi>>(`/client-profile/community-shifts/${id}/member_status/${query}`);
+    return fetchApi<Collection<ShiftMemberStatusApi>>(`/community-shifts/${id}/member_status/${query}`);
 }
 export function rejectCommunityShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/community-shifts/${id}/reject/`, {
+    return fetchApi(`/community-shifts/${id}/reject/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function rejectShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/shifts/${id}/reject/`, {
+    return fetchApi(`/shifts/${id}/reject/`, {
         method: 'POST',
         body: JSON.stringify(data ?? {}),
     });
 }
 export function viewAssignedShiftProfile(type: string, id: number | string, data: unknown) {
-    return fetchApi<ShiftUserApi>(`/client-profile/shifts/${type}/${id}/view_assigned_profile/`, {
+    return fetchApi<ShiftUserApi>(`/shifts/${type}/${id}/view_assigned_profile/`, {
         method: 'POST',
         body: JSON.stringify(data),
     });
 }
 export function generateShareLink(id: number | string) {
-    return fetchApi<ShiftShareLinkApi>(`/client-profile/shifts/${id}/generate-share-link/`, { method: 'POST' });
+    return fetchApi<ShiftShareLinkApi>(`/shifts/${id}/generate-share-link/`, { method: 'POST' });
 }
 export function getOwnerShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<OwnerShiftSummaryApi>>(`/client-profile/shifts/owner/${query}`);
+    return fetchApi<Collection<OwnerShiftSummaryApi>>(`/shifts/owner/${query}`);
 }
 export function createOwnerShift(data: unknown) {
-    return fetchApi<ShiftApi>('/client-profile/shifts/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<ShiftApi>('/shifts/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateOwnerShift(id: number | string, data: unknown) {
-    return fetchApi<ShiftApi>(`/client-profile/shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi<ShiftApi>(`/shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function getShiftApplications(id: number | string) {
-    return fetchApi<Collection<ShiftApplicationApi>>(`/client-profile/shifts/${id}/applications/`);
+    return fetchApi<Collection<ShiftApplicationApi>>(`/shifts/${id}/applications/`);
 }
 export function acceptShiftApplication(shiftId: number | string, applicationId: number | string) {
-    return fetchApi(`/client-profile/shifts/${shiftId}/applications/${applicationId}/accept/`, { method: 'POST' });
+    return fetchApi(`/shifts/${shiftId}/applications/${applicationId}/accept/`, { method: 'POST' });
 }
 export function rejectShiftApplication(shiftId: number | string, applicationId: number | string) {
-    return fetchApi(`/client-profile/shifts/${shiftId}/applications/${applicationId}/reject/`, { method: 'POST' });
+    return fetchApi(`/shifts/${shiftId}/applications/${applicationId}/reject/`, { method: 'POST' });
 }
 export function getPublicJobBoard(params?: {
     organization?: number | string;
 }) {
     const query = buildQuery(params);
-    return fetchApi<Collection<ShiftApi>>(`/client-profile/public-job-board/${query}`, { skipAuth: true });
+    return fetchApi<Collection<ShiftApi>>(`/public-job-board/${query}`, { skipAuth: true });
 }
 export function getViewSharedShift(params: Record<string, string>) {
     const query = new URLSearchParams(params).toString();
-    return fetchApi(`/client-profile/view-shared-shift/?${query}`, { skipAuth: true });
+    return fetchApi(`/view-shared-shift/?${query}`, { skipAuth: true });
 }
 const toInterestParams = (filters?: Record<string, unknown>) => ({
     shift: filters?.shiftId,
@@ -438,7 +438,7 @@ export async function generateShiftShareLinkService(shiftId: number | string) {
 export async function escalateShiftService(shiftId: number | string, payload: {
     targetVisibility?: string;
 }) {
-    await fetchApi(`/client-profile/shifts/active/${shiftId}/escalate/`, {
+    await fetchApi(`/shifts/active/${shiftId}/escalate/`, {
         method: 'POST',
         body: JSON.stringify({ target_visibility: payload.targetVisibility }),
     });

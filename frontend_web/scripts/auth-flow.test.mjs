@@ -56,7 +56,7 @@ test('pharmacy admins inherit the owner-side workspace while capabilities remain
 
 test('public hub attachment URLs stay on the protected same-site endpoint',()=>{
  assert.equal(safeHubAttachmentUrl('/api/hub/attachments/42/',42),'/api/hub/attachments/42/');
- assert.equal(safeHubAttachmentUrl('/api/public-hub/attachments/42/',42),'/api/hub/attachments/42/');
+ assert.equal(safeHubAttachmentUrl('/api/v1/public-hub/attachments/42/',42),'/api/hub/attachments/42/');
  for(const value of ['javascript:alert(1)','https://evil.example/file.pdf','//evil.example/file.pdf','/api/hub/attachments/43/','/media/private.pdf','data:text/html,x']){
   assert.equal(safeHubAttachmentUrl(value,42),undefined);
  }

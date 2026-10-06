@@ -87,7 +87,7 @@ export default function ManageMembershipsPage() {
     setLoading(true);
     try {
       const [{ data }, invitations] = await Promise.all([
-        apiClient.get("/client-profile/my-memberships/"),
+        apiClient.get("/my-memberships/"),
         getPendingPharmacyAdminInvitations(),
       ]);
       setMemberships(Array.isArray(data) ? data : data?.results || []);
@@ -124,7 +124,7 @@ export default function ManageMembershipsPage() {
   const runAction = async (membership: Membership, action: "accept" | "reject" | "quit") => {
     setActingId(membership.id);
     try {
-      await apiClient.post(`/client-profile/my-memberships/${membership.id}/${action}/`);
+      await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
       await Promise.all([loadMemberships(), refreshUser()]);
       setQuitTarget(null);
     } catch (error: any) {

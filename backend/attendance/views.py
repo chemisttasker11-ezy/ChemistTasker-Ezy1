@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 class ManagerPendingAttendancesView(APIView):
     """
-    GET /api/attendance/manager/pending/?pharmacy_id=<id>
+    GET /api/v1/attendance/manager/pending/?pharmacy_id=<id>
     Authorized destination manager retrieves pending provisional attendances.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -115,7 +115,7 @@ class ManagerPendingAttendancesView(APIView):
 
 class ManagerApproveAttendanceView(APIView):
     """
-    POST /api/attendance/manager/approve/
+    POST /api/v1/attendance/manager/approve/
     Authorized manager approves provisional attendance and backfills shift/slot/assignment.
     Body: {"provisional_id": int, "reason": str}
     """
@@ -157,7 +157,7 @@ class ManagerApproveAttendanceView(APIView):
 
 class ManagerRejectAttendanceView(APIView):
     """
-    POST /api/attendance/manager/reject/
+    POST /api/v1/attendance/manager/reject/
     Authorized manager rejects provisional attendance with reason; retains evidence.
     Body: {"provisional_id": int, "reason": str}
     """
@@ -198,7 +198,7 @@ class ManagerRejectAttendanceView(APIView):
 
 class ManagerCreateCorrectionView(APIView):
     """
-    POST /api/attendance/manager/correct/
+    POST /api/v1/attendance/manager/correct/
     Authorized manager submits an append-only manual timestamp correction.
     Body: {"event_id": int, "corrected_timestamp": "ISO-8601", "reason": str}
     """
@@ -250,7 +250,7 @@ class ManagerCreateCorrectionView(APIView):
 
 class ManagerSessionTimelineView(APIView):
     """
-    GET /api/attendance/manager/timeline/<int:session_id>/
+    GET /api/v1/attendance/manager/timeline/<int:session_id>/
     Authorized manager views the full effective timeline and correction audit history.
     """
     permission_classes = [permissions.IsAuthenticated]

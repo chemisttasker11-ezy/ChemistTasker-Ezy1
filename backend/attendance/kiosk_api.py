@@ -40,7 +40,7 @@ User = get_user_model()
 
 class KioskActivateView(APIView):
     """
-    POST /api/attendance/kiosk/activate/
+    POST /api/v1/attendance/kiosk/activate/
     Owner or manager activates a new kiosk terminal for their pharmacy.
     Returns restricted device token (shown once to store locally).
     """
@@ -84,7 +84,7 @@ class KioskActivateView(APIView):
 
 class KioskRequestPairingCodeView(APIView):
     """
-    POST /api/client-profile/attendance/kiosk/pairing/request/
+    POST /api/v1/attendance/kiosk/pairing/request/
     Owner or Manager requests a single-use 6-digit pairing code.
     Dispatches a push notification to their mobile app and records an in-app alert.
     """
@@ -163,7 +163,7 @@ class KioskRequestPairingCodeView(APIView):
 
 class KioskPairWithCodeView(APIView):
     """
-    POST /api/client-profile/attendance/kiosk/pairing/pair/
+    POST /api/v1/attendance/kiosk/pairing/pair/
     Public terminal endpoint: Pairs a physical counter tablet using the 6-digit code.
     Single-use: The code is consumed immediately upon successful activation.
     """
@@ -388,7 +388,7 @@ class KioskWorkerEnrolView(APIView):
 
 class KioskQRView(APIView):
     """
-    POST /api/attendance/kiosk/qr/
+    POST /api/v1/attendance/kiosk/qr/
     Device requests a dynamic HMAC-signed QR token with TTL.
     Authenticated via device token.
     """
@@ -415,7 +415,7 @@ class KioskQRView(APIView):
 
 class KioskPinClockView(APIView):
     """
-    POST /api/attendance/kiosk/pin-clock/
+    POST /api/v1/attendance/kiosk/pin-clock/
     Staff enters personal PIN and identifier at kiosk to clock in or clock out.
     """
     authentication_classes = []
@@ -500,7 +500,7 @@ class KioskPinClockView(APIView):
 
 class KioskWorkerPinStatusView(APIView):
     """
-    POST /api/client-profile/attendance/kiosk/worker-pin/status/
+    POST /api/v1/attendance/kiosk/worker-pin/status/
     Kiosk checks if a worker entering their Email or Staff ID has an active PIN set.
     If no PIN is set, automatically generates and dispatches an OTP to their email.
     """
@@ -564,7 +564,7 @@ class KioskWorkerPinStatusView(APIView):
 
 class KioskWorkerSetupPinView(APIView):
     """
-    POST /api/client-profile/attendance/kiosk/worker-pin/setup/
+    POST /api/v1/attendance/kiosk/worker-pin/setup/
     Kiosk verifies email OTP, sets the worker's PIN, and immediately clocks them in.
     """
     authentication_classes = []
@@ -623,7 +623,7 @@ class KioskWorkerSetupPinView(APIView):
 
 class KioskActiveStaffView(APIView):
     """
-    POST or GET /api/client-profile/attendance/kiosk/active-staff/
+    POST or GET /api/v1/attendance/kiosk/active-staff/
     Returns list of all staff members currently clocked in at this kiosk's pharmacy,
     including their break status (working vs on-break) and break start time.
     """
@@ -722,7 +722,7 @@ class KioskActiveStaffView(APIView):
 
 class KioskStaffBreakActionView(APIView):
     """
-    POST /api/client-profile/attendance/kiosk/break/
+    POST /api/v1/attendance/kiosk/break/
     Kiosk staff member starts or ends their break (Lunch 30m or Tea 10m).
     """
     authentication_classes = []
