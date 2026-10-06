@@ -14,20 +14,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker pull postgres:16
-          image=$(docker image inspect postgres:16 --format '{{index .RepoDigests 0}}')
+          image='postgres@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54'
+          docker pull "$image"
           container=$(docker create "$image")
           trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
           mkdir -p pg-root/usr/lib/postgresql pg-root/usr/share/postgresql pg-root/native-libs pg-evidence
-          docker cp "$container:/usr/lib/postgresql/16" pg-root/usr/lib/postgresql/
-          docker cp "$container:/usr/share/postgresql/16" pg-root/usr/share/postgresql/
+          docker cp "$container:/usr/lib/postgresql/16" "$PWD/pg-root/usr/lib/postgresql/"
+          docker cp "$container:/usr/share/postgresql/16" "$PWD/pg-root/usr/share/postgresql/"
           docker run --rm --entrypoint bash "$image" -c 'ldd /usr/lib/postgresql/16/bin/* /usr/lib/postgresql/16/lib/*.so 2>/dev/null || true' > pg-evidence/ldd.txt
-          awk '/=> \/|^\s*\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' pg-evidence/ldd.txt | sort -u > pg-evidence/libraries.txt
+          awk '$2 == "=>" && $3 ~ /^\// { print $3 }' pg-evidence/ldd.txt | sort -u > pg-evidence/libraries.txt
           while read -r lib; do
             case "$lib" in
               /lib*/ld-linux*|*/libc.so.*|*/libpthread.so.*|*/libdl.so.*|*/libm.so.*|*/librt.so.*|*/libresolv.so.*) continue ;;
             esac
-            docker cp -L "$container:$lib" "pg-root/native-libs/$(basename "$lib")"
+            docker cp -L "$container:$lib" "$PWD/pg-root/native-libs/$(basename "$lib")"
           done < pg-evidence/libraries.txt
           printf '%s\n' "$image" > pg-evidence/IMAGE
           docker run --rm --entrypoint /usr/lib/postgresql/16/bin/postgres "$image" --version > pg-evidence/VERSION
