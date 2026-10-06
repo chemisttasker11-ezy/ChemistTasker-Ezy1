@@ -121,7 +121,7 @@ class TimesheetProjectionTests(TestCase):
             admin_level=PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
         )
         view = LeaveRequestViewSet.as_view({"get": "list"})
-        request = APIRequestFactory().get("/api/client-profile/leave-requests/")
+        request = APIRequestFactory().get("/api/v1/leave-requests/")
         force_authenticate(request, user=manager)
         self.assertEqual(view(request).data, [])
 
@@ -133,12 +133,12 @@ class TimesheetProjectionTests(TestCase):
             region="Brisbane", job_title="Regional Lead",
         )
         scoped.pharmacies.add(self.pharmacy)
-        request = APIRequestFactory().get("/api/client-profile/leave-requests/")
+        request = APIRequestFactory().get("/api/v1/leave-requests/")
         force_authenticate(request, user=manager)
         self.assertEqual([row["id"] for row in view(request).data], [leave.pk])
 
         scoped.pharmacies.clear()
-        request = APIRequestFactory().get("/api/client-profile/leave-requests/")
+        request = APIRequestFactory().get("/api/v1/leave-requests/")
         force_authenticate(request, user=manager)
         self.assertEqual(view(request).data, [])
 
@@ -221,7 +221,7 @@ class TimesheetProjectionTests(TestCase):
         })
         decide_leave(self.owner, leave.pk, "REJECTED", "Please choose another date.")
 
-        request = APIRequestFactory().get("/api/client-profile/workforce/leave/")
+        request = APIRequestFactory().get("/api/v1/workforce/leave/")
         force_authenticate(request, user=self.worker)
         response = WorkforceLeaveListCreateView.as_view()(request)
 
