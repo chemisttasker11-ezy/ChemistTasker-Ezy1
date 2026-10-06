@@ -1,4 +1,4 @@
-"""Characterization of pharmacy claims (/api/client-profile/pharmacy-claims/).
+"""Characterization of pharmacy claims (/api/v1/pharmacy-claims/).
 
 Claims are created through the owner-onboarding/claim flow, not by this viewset, so the tests create rows
 directly and pin listing scope plus the owner's accept/reject decision."""
