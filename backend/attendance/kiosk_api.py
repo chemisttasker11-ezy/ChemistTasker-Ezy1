@@ -40,7 +40,7 @@ User = get_user_model()
 
 class KioskActivateView(APIView):
     """
-    POST /api/attendance/kiosk/activate/
+    POST /api/v1/attendance/kiosk/activate/
     Owner or manager activates a new kiosk terminal for their pharmacy.
     Returns restricted device token (shown once to store locally).
     """
@@ -388,7 +388,7 @@ class KioskWorkerEnrolView(APIView):
 
 class KioskQRView(APIView):
     """
-    POST /api/attendance/kiosk/qr/
+    POST /api/v1/attendance/kiosk/qr/
     Device requests a dynamic HMAC-signed QR token with TTL.
     Authenticated via device token.
     """
@@ -415,7 +415,7 @@ class KioskQRView(APIView):
 
 class KioskPinClockView(APIView):
     """
-    POST /api/attendance/kiosk/pin-clock/
+    POST /api/v1/attendance/kiosk/pin-clock/
     Staff enters personal PIN and identifier at kiosk to clock in or clock out.
     """
     authentication_classes = []
