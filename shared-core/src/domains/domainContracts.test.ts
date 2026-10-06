@@ -15,7 +15,7 @@ import { startDirectMessageByUser } from './chat/api';
 import { attendance } from './attendance/api';
 import { financeApi } from './finance/api';
 
-const baseURL = 'https://example.test/api';
+const baseURL = 'https://example.test/api/v1';
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: {'Content-Type':'application/json'} });
 function responses(...payloads: unknown[]) {
   const calls: Array<{url:string;init?:RequestInit}> = [];
@@ -74,7 +74,7 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     expect(mapShift(row)).toMatchObject({id:2,roleNeeded:'PHARMACIST',pharmacyDetail:null,slots:[{id:5,startTime:'09:00:00'}],slotAssignments:[{id:8,slotId:5}],allowedEscalationLevels:[]});
   });
   it('keeps authoritative backend pagination links and counts',()=>{
-    expect(toPaginatedList({count:70,next:'https://example.test/api/items/?page=2',previous:null,results:[{record_id:3}]},camelCaseKeysDeep)).toEqual({count:70,next:'https://example.test/api/items/?page=2',previous:null,results:[{recordId:3}]});
+    expect(toPaginatedList({count:70,next:'https://example.test/api/v1/items/?page=2',previous:null,results:[{record_id:3}]},camelCaseKeysDeep)).toEqual({count:70,next:'https://example.test/api/v1/items/?page=2',previous:null,results:[{recordId:3}]});
   });
   it('maps records in a native runtime that does not define File',()=>{
     vi.stubGlobal('File',undefined);
@@ -87,7 +87,7 @@ describe('source-backed wire/domain contracts after extraction',()=>{
   });
   it('uses the backend PharmacyAdmin pharmacy query rather than a scalar ignored by buildQuery',async()=>{
     const calls=responses([]);await getPharmacyAdmins({pharmacy:4});
-    expect(calls[0].url).toBe(baseURL+'/client-profile/pharmacy-admins/?pharmacy=4');
+    expect(calls[0].url).toBe(baseURL+'/pharmacy-admins/?pharmacy=4');
   });
   it('retains the pending-invitation membership ID guaranteed by the endpoint queryset',async()=>{
     const row={id:4,membership_id:7,pharmacy_id:9,pharmacy_name:'Fixture Pharmacy',admin_level:'MANAGER',job_title:'',membership_status:'PENDING'};
