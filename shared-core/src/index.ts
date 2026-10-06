@@ -65,3 +65,6 @@ export * from './domains/rosterPublication';
 
 export { createAsyncScope, StaleAsyncScopeError } from "./utils/asyncScope";
 export type { AsyncScope, AsyncScopeTicket } from "./utils/asyncScope";
+
+export type {CurrentUserApi, OnboardingApi} from './contracts/accounts';
+export type {InvoiceDetailApi, InvoiceLineItemApi} from './contracts/invoiceDetail';

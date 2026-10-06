@@ -6,6 +6,8 @@ export {
   markNotificationsAsRead,
   fetchNotificationsPage,
   markNotificationsReadService,
+} from '../notifications/api';
+export {
   getRoomMessages,
   sendRoomMessage,
   getChatParticipants,
@@ -21,4 +23,4 @@ export {
   updateMessageService,
   deleteMessageService,
   reactToMessageService,
-} from '../../api';
+} from './api';

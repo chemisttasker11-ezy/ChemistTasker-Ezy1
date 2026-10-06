@@ -1,0 +1,119 @@
+import type { MembershipApplicationApi } from '../../types';
+import type { MembershipRecordApi, MembershipInviteLinkApi } from '../../contracts/membershipRecords';
+import type { Collection } from '../../contracts/common';
+/** Domain-owned operations extracted from the established shared API. */
+import { fetchApi } from '../../transport/application';
+import { buildQuery, camelCaseKeysDeep } from '../../utils/serialization';
+import { mapMembershipApplication, mapMembershipSummary } from './mappers';
+export function getMemberships(params?: Record<string, unknown>) {
+    const query = buildQuery(params);
+    return fetchApi<Collection<MembershipRecordApi>>(`/client-profile/memberships/${query}`);
+}
+export function getMyMemberships(params?: Record<string, unknown>) {
+    const query = buildQuery(params);
+    return fetchApi<Collection<MembershipRecordApi>>(`/client-profile/my-memberships/${query}`);
+}
+export function createMembership(data: unknown) {
+    return fetchApi<MembershipRecordApi>('/client-profile/memberships/', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function createMembershipInviteService(payload: unknown) {
+    const data = await createMembership(payload);
+    return mapMembershipSummary(data);
+}
+export function bulkInviteMembers(data: unknown) {
+    return fetchApi('/client-profile/memberships/bulk_invite/', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function bulkInviteMembersService(payload: unknown) {
+    const data = await bulkInviteMembers(payload);
+    return data;
+}
+export function deleteMembership(id: number | string) {
+    return fetchApi(`/client-profile/memberships/${id}/`, { method: 'DELETE' });
+}
+export async function deleteMembershipService(membershipId: number | string) {
+    await deleteMembership(membershipId);
+}
+export function getMembershipInviteLinks(params?: Record<string, unknown>) {
+    const query = buildQuery(params);
+    return fetchApi<Collection<MembershipInviteLinkApi>>(`/client-profile/membership-invite-links/${query}`);
+}
+export function createMembershipInviteLink(data: unknown) {
+    return fetchApi<MembershipInviteLinkApi>('/client-profile/membership-invite-links/', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function createMembershipInviteLinkService(payload: unknown) {
+    const data = await createMembershipInviteLink(payload);
+    return data;
+}
+export function getMembershipApplications(params?: Record<string, unknown>) {
+    const query = buildQuery(params);
+    return fetchApi<Collection<MembershipApplicationApi>>(`/client-profile/membership-applications/${query}`);
+}
+export function reviewMembershipApplication(id: number | string, data: unknown) {
+    return fetchApi<MembershipApplicationApi>(`/client-profile/membership-applications/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+export function previewMembershipApplicationAward(id: number | string, data: unknown) {
+    return fetchApi(`/client-profile/membership-applications/${id}/award-preview/`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+export function approveMembershipApplication(id: number | string, data: unknown) {
+    return fetchApi(`/client-profile/membership-applications/${id}/approve/`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+export function rejectMembershipApplication(id: number | string) {
+    return fetchApi(`/client-profile/membership-applications/${id}/reject/`, { method: 'POST' });
+}
+export function createMembershipInvite(data: unknown) {
+    return fetchApi<MembershipRecordApi>('/client-profile/memberships/', { method: 'POST', body: JSON.stringify(data) });
+}
+export function getMagicMembershipInfo(token: string) {
+    return fetchApi(`/client-profile/magic/memberships/${token}/`);
+}
+export function applyMagicMembership(token: string, data: unknown) {
+    return fetchApi(`/client-profile/magic/memberships/${token}/apply/`, { method: 'POST', body: JSON.stringify(data) });
+}
+export async function fetchMyMemberships(params?: Record<string, unknown>) {
+    const data = await getMyMemberships(params);
+    const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+            ? data
+            : [];
+    return list.map(mapMembershipSummary);
+}
+export async function fetchMembershipsByPharmacy(pharmacyId: number | string) {
+    const data = await getMemberships({ pharmacy_id: pharmacyId, page_size: 500 });
+    const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+            ? data
+            : [];
+    return list.map(mapMembershipSummary);
+}
+export async function fetchMembershipApplicationsService(params?: Record<string, unknown>) {
+    const data = await getMembershipApplications(params);
+    const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+            ? data
+            : [];
+    return list.map(item => mapMembershipApplication(item));
+}
+export async function reviewMembershipApplicationService(applicationId: number | string, payload: unknown) {
+    return mapMembershipApplication(await reviewMembershipApplication(applicationId, payload));
+}
+export async function previewMembershipApplicationAwardService(applicationId: number | string, payload: unknown) {
+    return camelCaseKeysDeep(await previewMembershipApplicationAward(applicationId, payload));
+}
+export async function approveMembershipApplicationService(applicationId: number | string, payload: unknown) {
+    return camelCaseKeysDeep(await approveMembershipApplication(applicationId, payload));
+}
+export async function rejectMembershipApplicationService(applicationId: number | string) {
+    await rejectMembershipApplication(applicationId);
+}

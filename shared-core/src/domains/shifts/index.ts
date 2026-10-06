@@ -28,4 +28,4 @@ export {
   acceptShiftCandidateService,
   expressInterestInShiftService,
   claimShiftService,
-} from '../../api';
+} from './api';

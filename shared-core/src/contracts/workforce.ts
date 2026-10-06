@@ -61,6 +61,7 @@ export interface WorkforceRosterWorkspace {
 }
 
 export interface WorkforceTimesheetPeriod {
+  created?: boolean;
   id: number;
   pharmacy_id: number;
   start_date: string;

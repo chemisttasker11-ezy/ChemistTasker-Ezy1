@@ -406,7 +406,7 @@ export default function LocumManager({
                 category: 'LOCUM_CASUAL',
                 expires_in_days: expires,
             });
-            const token = response?.token ?? response?.data?.token ?? response;
+            const token = response.token;
             const url = `${baseInviteUrl}/membership/apply/${token}`;
             setLinkValue(url);
             setToast({ message: 'Invite link generated', severity: 'success' });

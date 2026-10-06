@@ -28,7 +28,7 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | F02 | Supported runtime baseline (#141) | MERGED | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
 | F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
 | F04 | Roster publication convergence | IMPLEMENTED - selection-lifetime correction awaiting exact-head CI | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
-| F05 | Shared-core transport and domain convergence | PLANNED | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
+| F05 | Shared-core transport and domain convergence | IMPLEMENTED - exact-head CI pending | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
 | F06 | Canonical /api/v1 domain cutover | PLANNED | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
 | F07 | Production acceptance and closure | PLANNED | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
 
@@ -160,3 +160,16 @@ Source checkpoint: 32c86cbd9fc9c33d14ce6e64f067fc3c8c04177c. A recovery read/wri
 - A temporary contents:read recovery workflow exported only the exact tracked source and pinned shared-core node dependencies. Source tar SHA-256 f80ec0ca1fa2915051e0800fa15f45158b5dddf0884827f3e475cd33d336a5fa and reconstructed tree 67c895e8b627f343c6df516bb90733b3c6d60258 were verified before edits. Temporary recovery/patch tooling is not part of the release tree.
 
 Next: full exact-head checks and final review of F04, while implementing F05. F06 will carry a complete method/path/caller inventory and F07 must prove all three rewired clients, not merely update endpoint constants. No model/table/migration or billing-policy change.
+
+## F05 implementation checkpoint - 2026-10-06
+
+F04 #144 merged at `3b67975442b7dcb1acf40b60d1b86c0bbf2d6926`; signed merge tree `2216da7004126850de15f26834fd82ae6108d72f` equals tested `40914809d777630f84cb3b89b1883f5f3cb5c607`. Exact-head integration/release, CodeQL, repository security, serializer/finalization SQLite/PostgreSQL and all three client checks passed. The selection-lifetime finding is fixed. Older draft/pending statements above are historical checkpoints.
+
+F05 now consolidates HTTP/auth into one instance-based transport and moves the application operations into strictly checked domain modules. The old public exports remain. All 438 measured runtime exports are pinned to the new domain objects. Local shared-core 136 tests/typecheck/build, Vite typecheck/build, Expo typecheck/lint and Next typecheck pass. Local source-shaped contract corrections and limitations are detailed in SHARED_CORE_TRANSPORT_CONVERGENCE.md. No models/tables/migrations or billing-policy changes. Required architecture CI now enforces no new shared-core HTTP engine or file-wide type suppression.
+
+## NEXT ACTION - F05/F06/F07
+
+1. Run all exact-head F05 hosted gates and review the consolidated transport, mapper outputs and all Expo/Next/Vite callers before milestone merge.
+2. F06: build the complete old-to-canonical method/path/view/action/namespace/caller matrix; migrate domain URLs and reverse references, then every shipping Expo/Next/Vite consumer and restricted kiosk path. Only remove the legacy HTTP mounts after migration checks prove no active caller remains. Keep native signing credentials separate.
+3. F07: verify actual wired journeys, schema, populated PostgreSQL upgrade/fresh install, concurrency, production settings and security on the final integrated tree. No claim of complete production acceptance from source/type checks alone.
+4. Retire the isolated recovery/patch-tool branches after implementation is safe and recorded. They are not part of the release tree. PR #139 remains separate.

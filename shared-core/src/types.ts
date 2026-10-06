@@ -58,6 +58,7 @@ export interface AttachmentApi {
 export interface CommentApi {
     id: number;
     post: number;
+    poll?: never;
     body: string;
     created_at: string;
     updated_at: string;
@@ -71,10 +72,11 @@ export interface CommentApi {
     edited_by: UserSummaryApi | null;
     is_deleted: boolean;
     reaction_summary?: Record<string, number>;
-    viewer_reaction?: string | null;
+    viewer_reaction?: HubReactionType | null;
 }
 
 export interface HubPostApi {
+    platform_hub?: string | null;
     id: number;
     pharmacy: number | null;
     pharmacy_name: string | null;
@@ -92,7 +94,7 @@ export interface HubPostApi {
     deleted_at: string | null;
     comment_count: number;
     reaction_summary: Record<string, number>;
-    viewer_reaction: string | null;
+    viewer_reaction: HubReactionType | null;
     can_manage: boolean;
     author: MembershipApi;
     recent_comments: CommentApi[];
@@ -187,7 +189,7 @@ export interface HubPollApi {
     platform_hub?: string | null;
     scope_type: "pharmacy" | "group" | "organization" | null;
     scope_target_id: number | string | null;
-    author?: MembershipApi | null;
+    author: MembershipApi;
     created_by?: MembershipApi | null;
     created_at: string;
     updated_at: string;
@@ -201,7 +203,7 @@ export interface HubPollApi {
     can_manage?: boolean;
     comment_count?: number;
     reaction_summary?: Record<string, number>;
-    viewer_reaction?: string | null;
+    viewer_reaction?: HubReactionType | null;
     recent_comments?: PollCommentApi[];
 }
 
@@ -264,6 +266,10 @@ export interface HubContextApi {
 }
 
 export interface PollCommentApi {
+    post?: never;
+    parent_comment?: number | null;
+    reaction_summary?: Record<string, number>;
+    viewer_reaction?: HubReactionType | null;
     id: number;
     poll: number;
     body: string;
@@ -335,7 +341,7 @@ export type HubComment = {
     updatedAt: string;
     deletedAt: string | null;
     canEdit: boolean;
-    parentCommentId: number | null;
+    parentCommentId?: number | null;
     author: HubMembership;
     isEdited: boolean;
     originalBody: string;
@@ -739,6 +745,8 @@ export interface ShiftMemberStatusApi {
 }
 
 export interface ShiftInterestApi {
+    user_detail?: ShiftUserApi | null;
+    slot_id?: number | null;
     id: number;
     shift: number;
     slot: number | null;
@@ -995,7 +1003,7 @@ export type ShiftInterest = CamelCasedPropertiesDeep<ShiftInterestApi> & {
     averageRating: number | null;
     rating: number | null;
     slotId: number | null;
-    user: string;
+    user: string | CamelCasedPropertiesDeep<ShiftUserApi>;
 };
 export type ShiftShareLink = CamelCasedPropertiesDeep<ShiftShareLinkApi>;
 export type ShiftRatingSummary = CamelCasedPropertiesDeep<ShiftRatingSummaryApi>;
@@ -1213,7 +1221,7 @@ export type MembershipSummary = {
     pharmacyDetail?: PharmacySummary | null;
     role?: string | null;
     employmentType?: string | null;
-    userDetails?: ChatUserLite | null;
+    userDetails?: CamelCasedPropertiesDeep<UserSummaryApi> | null;
     invitedName?: string | null;
     isPharmacyOwner?: boolean;
 };

@@ -68,7 +68,7 @@ export interface Assignment {
     type?: string;
     label?: string;
     organizationName?: string | null;
-  };
+  } | null;
 }
 
 export interface OpenShift {
@@ -86,7 +86,7 @@ export const mapPharmacySummaryToView = (summary: PharmacySummary): Pharmacy => 
 
 export const mapAssignmentToView = (
   assignment: RosterAssignment & {
-    origin?: { type?: string; label?: string; organizationName?: string | null };
+    origin?: { type?: string; label?: string; organizationName?: string | null } | null;
   },
 ): Assignment => ({
   id: assignment.id,

@@ -48,18 +48,18 @@ export type PharmacyDTO = {
 
 export type MembershipDTO = {
     id: string | number;
-    user?: number;
-    role?: string;
-    employment_type?: string;
+    user?: number | null;
+    role?: string | null;
+    employment_type?: string | null;
     employmentType?: string | null;
     job_title?: string | null;
     jobTitle?: string | null;
-    invited_name?: string;
+    invited_name?: string | null;
     invitedName?: string | null;
-    name?: string;
-    email?: string;
-    user_details?: { email?: string; first_name?: string; last_name?: string };
-    userDetails?: { email?: string; firstName?: string; lastName?: string };
+    name?: string | null;
+    email?: string | null;
+    user_details?: { email?: string | null; first_name?: string | null; last_name?: string | null } | null;
+    userDetails?: { email?: string | null; firstName?: string | null; lastName?: string | null } | null;
     status?: string | null;
     is_active?: boolean;
     isActive?: boolean;
@@ -82,7 +82,7 @@ export type PharmacyAdminDTO = {
     admin_level: AdminLevel;
     staff_role?: AdminStaffRole | null;
     job_title?: string | null;
-    user_details?: { email?: string; first_name?: string; last_name?: string };
+    user_details?: { email?: string | null; first_name?: string | null; last_name?: string | null } | null;
     capabilities?: AdminCapability[];
     can_remove?: boolean;
     is_active?: boolean;
@@ -151,7 +151,7 @@ export const formatMembershipRole = (role: Role): string => ROLE_LABELS[role] ??
 
 export const formatUserPortalRole = (role: UserPortalRole): string => USER_ROLE_LABELS[role] ?? role;
 
-export function coerceRole(raw?: string): Role {
+export function coerceRole(raw?: string | null): Role {
     const r = (raw || '').toUpperCase();
     if (r.includes('INTERN')) return 'INTERN';
     if (r.includes('STUDENT')) return 'STUDENT';
@@ -162,7 +162,7 @@ export function coerceRole(raw?: string): Role {
     return 'ASSISTANT';
 }
 
-export function coerceWorkType(raw?: string): WorkType {
+export function coerceWorkType(raw?: string | null): WorkType {
     const r = (raw || '').toUpperCase().replace('-', '_');
     if (r.includes('FULL')) return 'FULL_TIME';
     if (r.includes('PART')) return 'PART_TIME';

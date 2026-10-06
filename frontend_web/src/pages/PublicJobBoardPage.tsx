@@ -20,7 +20,6 @@ import {
   expressInterestInPublicShiftService,
   fetchShiftInterests,
   getOnboardingDetail,
-  PaginatedResponse,
   getPublicJobBoard,
   submitShiftCounterOfferService,
 } from '@chemisttasker/shared-core';
@@ -210,7 +209,7 @@ export default function PublicJobBoardPage() {
         };
 
         const [publicShifts, interests] = await Promise.all([
-          getPublicJobBoard(payload) as Promise<PaginatedResponse<Shift>>,
+          getPublicJobBoard(payload),
           user?.id ? fetchShiftInterests({ userId: user.id }) : Promise.resolve([]),
         ]);
         const list = Array.isArray(publicShifts?.results)

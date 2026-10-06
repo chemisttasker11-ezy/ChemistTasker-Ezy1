@@ -494,7 +494,7 @@ export default function StaffManager({
                 category: 'FULL_PART_TIME',
                 expires_in_days: expires,
             });
-            const token = response?.token ?? response?.data?.token ?? response;
+            const token = response.token;
             const url = `${baseInviteUrl}/membership/apply/${token}`;
             setLinkValue(url);
             setToast({ message: 'Invite link generated', severity: 'success' });
