@@ -1,4 +1,4 @@
-"""URL routes of the invoicing app. Mounted inside client_profile.urls, so public paths and the `client_profile:` route names are unchanged."""
+"""URL ownership for the invoicing domain under the canonical API-v1 composition."""
 from django.urls import path
 from invoicing.views import (
     GenerateInvoiceView,

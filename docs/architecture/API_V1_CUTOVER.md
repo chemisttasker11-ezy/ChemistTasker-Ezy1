@@ -24,17 +24,21 @@ The cutover is lossless by suffix:
 | `/api/client-profile/attendance/kiosk/**` | `/api/v1/attendance/kiosk/**` | `attendance.urls` | URL changes only. Native kiosk device signing/token transport remains separate from user bearer transport. |
 
 All DRF router actions retain their existing method/action mapping because F06 reuses the same
-router registrations and view classes in the same order. Fixed `path()` declarations are included
-from the same domain URL modules. Therefore GET/POST/PUT/PATCH/DELETE method support, permission
-classes, serializer selection and response schemas remain owned by the pre-existing handlers.
+viewsets, basenames and fixed `path()` declarations. Router registration is now owned by each
+domain URL module instead of being rebuilt and interleaved in a project-level compatibility
+router. Project composition is therefore a plain include layer. GET/POST/PUT/PATCH/DELETE method
+support, permission classes, serializer selection and response schemas remain owned by the
+pre-existing handlers.
 
 ## Namespace and reverse-reference contract
 
-The project-level namespace for the composed domain API is now `api_v1:`.
-Representative reverse contracts are pinned for organizations, chat, calendar and onboarding.
-The former `client_profile:` URL namespace is not mounted. The Django app label
-`client_profile` remains intact for historical model/migration/Celery identity and is not an HTTP
-compatibility namespace.
+The complete application HTTP surface is mounted once at `/api/v1/` under the project-level
+`api_v1:` namespace. Domain URL modules own their routers and fixed paths; nested app namespaces
+such as billing remain nested beneath `api_v1:`. Representative reverse contracts are pinned for
+organizations, chat, calendar, onboarding and guarded finance resolution. The former
+`client_profile:` URL namespace is not mounted. The Django app label `client_profile` remains
+intact only for historical model/migration/Celery identity and is not an HTTP compatibility
+namespace.
 
 ## Shipping caller migration
 

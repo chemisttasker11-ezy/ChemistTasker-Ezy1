@@ -1,4 +1,4 @@
-"""URL routes of the attendance app. Mounted inside client_profile.urls, so public paths and the `client_profile:` route names are unchanged."""
+"""URL ownership for the attendance domain under the canonical API-v1 composition."""
 from django.urls import path
 from attendance.views import (
     KioskActivateView,

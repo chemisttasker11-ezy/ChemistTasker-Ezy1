@@ -1,4 +1,4 @@
-"""URL routes of the pharmacy_hub app. Mounted inside client_profile.urls, so public paths and the `client_profile:` route names are unchanged."""
+"""URL ownership for the Pharmacy Hub domain under the canonical API-v1 composition."""
 from django.urls import path
 from pharmacy_hub.views import (
     HubCommentReactionView,
