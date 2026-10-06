@@ -293,7 +293,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
 
         # 1. Approve
         req_approve = self.factory.post(
-            "/api/attendance/manager/approve/",
+            "/api/v1/attendance/manager/approve/",
             {"provisional_id": prov.id, "reason": "Unauthorized"},
             content_type="application/json",
         )
@@ -303,7 +303,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
 
         # 2. Reject
         req_reject = self.factory.post(
-            "/api/attendance/manager/reject/",
+            "/api/v1/attendance/manager/reject/",
             {"provisional_id": prov.id, "reason": "Unauthorized"},
             content_type="application/json",
         )
@@ -313,7 +313,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
 
         # 3. Correct
         req_correct = self.factory.post(
-            "/api/attendance/manager/correct/",
+            "/api/v1/attendance/manager/correct/",
             {
                 "event_id": in_event.id,
                 "corrected_timestamp": timezone.now().isoformat(),
