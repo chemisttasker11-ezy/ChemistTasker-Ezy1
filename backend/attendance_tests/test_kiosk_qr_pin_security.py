@@ -231,7 +231,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
 
         # Case A: Real user, incorrect PIN
         req_wrong_pin = self.factory.post(
-            "/api/attendance/kiosk/pin-clock/",
+            "/api/v1/attendance/kiosk/pin-clock/",
             {"identifier": self.worker_user.email, "pin": "0000"},
             content_type="application/json",
             HTTP_X_DEVICE_TOKEN=raw_token,
@@ -243,7 +243,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
 
         # Case B: Completely non-existent user identifier
         req_fake_user = self.factory.post(
-            "/api/attendance/kiosk/pin-clock/",
+            "/api/v1/attendance/kiosk/pin-clock/",
             {"identifier": "nonexistent_worker_xyz@test.com", "pin": "1234"},
             content_type="application/json",
             HTTP_X_DEVICE_TOKEN=raw_token,
@@ -293,7 +293,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
 
         # API returns generic locked message
         req_locked = self.factory.post(
-            "/api/attendance/kiosk/pin-clock/",
+            "/api/v1/attendance/kiosk/pin-clock/",
             {"identifier": self.worker_user.email, "pin": "0000"},
             content_type="application/json",
             HTTP_X_DEVICE_TOKEN=raw_token,
@@ -403,7 +403,7 @@ class KioskQrPinSecurityTests(unittest.TestCase):
         device, raw_token = activate_kiosk_device(self.manager_user, self.pharmacy, "Counter Kiosk")
 
         req = self.factory.post(
-            "/api/attendance/kiosk/qr/",
+            "/api/v1/attendance/kiosk/qr/",
             content_type="application/json",
             HTTP_X_DEVICE_TOKEN=raw_token,
         )
