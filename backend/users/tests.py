@@ -28,13 +28,13 @@ class LoginFailureAttemptCountTests(TestCase):
         )
 
         first = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "wrong-password@example.com", "password": "WrongPassword123!"},
             content_type="application/json",
             REMOTE_ADDR="192.0.2.55",
         )
         second = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "wrong-password@example.com", "password": "WrongPassword123!"},
             content_type="application/json",
             REMOTE_ADDR="192.0.2.55",
@@ -61,7 +61,7 @@ class LoginRememberMeTests(TestCase):
         )
 
         response = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "remember@example.com", "password": "CorrectPassword123!", "remember_me": True},
             content_type="application/json",
         )
@@ -83,7 +83,7 @@ class LoginRememberMeTests(TestCase):
         )
 
         response = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "session@example.com", "password": "CorrectPassword123!", "remember_me": False},
             content_type="application/json",
         )
@@ -107,7 +107,7 @@ class PasswordResetConfirmTests(TestCase):
             username=user.email,
             ip_address="192.168.1.3",
             user_agent="test-client",
-            path_info="/api/users/login/",
+            path_info="/api/v1/users/login/",
             failures_since_start=6,
         )
 
@@ -155,12 +155,12 @@ class OrganizationPermissionConfigurationTests(TestCase):
 
 class PublicAndPrivateRoutePreservationTests(TestCase):
     def test_public_reads_remain_anonymous(self):
-        for path in ('/api/marketplace/categories/', '/api/marketplace/listings/', '/api/public-hub/articles/', '/api/users/mobile/app-config/'):
+        for path in ('/api/v1/marketplace/categories/', '/api/v1/marketplace/listings/', '/api/v1/public-hub/articles/', '/api/v1/users/mobile/app-config/'):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200)
 
     def test_private_reads_require_authentication(self):
-        for path in ('/api/client-profile/pharmacies/', '/api/users/me/', '/api/content/documents/', '/api/marketplace/me/listings/'):
+        for path in ('/api/client-profile/pharmacies/', '/api/v1/users/me/', '/api/v1/content/documents/', '/api/v1/marketplace/me/listings/'):
             with self.subTest(path=path):
                 self.assertIn(self.client.get(path).status_code, (401, 403))
 
@@ -223,7 +223,7 @@ class BrowserTokenExposureTests(TestCase):
         user.save(update_fields=["mobile_otp_code", "mobile_otp_created_at"])
         access = str(RefreshToken.for_user(user).access_token)
         response = self.client.post(
-            "/api/users/mobile/verify-otp/", {"otp": "123456"},
+            "/api/v1/users/mobile/verify-otp/", {"otp": "123456"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {access}",
             HTTP_ORIGIN="http://localhost:8081",
@@ -245,18 +245,18 @@ class BrowserTokenExposureTests(TestCase):
         )
         credentials = {"email": "expo-browser@example.com", "password": "CorrectPassword123!"}
         browser = Client(enforce_csrf_checks=True)
-        csrf = browser.get("/api/users/csrf/").json()["csrfToken"]
+        csrf = browser.get("/api/v1/users/csrf/").json()["csrfToken"]
         browser_headers = {
             "HTTP_ORIGIN": "http://localhost:8081",
             "HTTP_X_CLIENT_PLATFORM": "mobile",
         }
         rejected = browser.post(
-            "/api/users/login/", credentials, content_type="application/json", **browser_headers
+            "/api/v1/users/login/", credentials, content_type="application/json", **browser_headers
         )
         self.assertEqual(rejected.status_code, 403)
 
         login = browser.post(
-            "/api/users/login/", credentials, content_type="application/json",
+            "/api/v1/users/login/", credentials, content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf, **browser_headers
         )
         self.assertEqual(login.status_code, 200)
@@ -265,22 +265,22 @@ class BrowserTokenExposureTests(TestCase):
         self.assertIn("ct_refresh", login.cookies)
 
         cookie_write = browser.post(
-            "/api/users/ws-ticket/", {}, content_type="application/json", **browser_headers
+            "/api/v1/users/ws-ticket/", {}, content_type="application/json", **browser_headers
         )
         self.assertEqual(cookie_write.status_code, 403)
         rejected_refresh = browser.post(
-            "/api/users/token/refresh/", {}, content_type="application/json", **browser_headers
+            "/api/v1/users/token/refresh/", {}, content_type="application/json", **browser_headers
         )
         self.assertEqual(rejected_refresh.status_code, 403)
         rejected_refresh_with_bearer = browser.post(
-            "/api/users/token/refresh/", {}, content_type="application/json",
+            "/api/v1/users/token/refresh/", {}, content_type="application/json",
             HTTP_AUTHORIZATION="Bearer arbitrary", **browser_headers
         )
         self.assertEqual(rejected_refresh_with_bearer.status_code, 403)
 
-        csrf = browser.get("/api/users/csrf/").json()["csrfToken"]
+        csrf = browser.get("/api/v1/users/csrf/").json()["csrfToken"]
         refreshed = browser.post(
-            "/api/users/token/refresh/", {}, content_type="application/json",
+            "/api/v1/users/token/refresh/", {}, content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf, **browser_headers
         )
         self.assertEqual(refreshed.status_code, 200)
@@ -288,17 +288,17 @@ class BrowserTokenExposureTests(TestCase):
         self.assertNotIn("refresh", refreshed.json())
 
         rejected_logout = browser.post(
-            "/api/users/logout/", {}, content_type="application/json", **browser_headers
+            "/api/v1/users/logout/", {}, content_type="application/json", **browser_headers
         )
         self.assertEqual(rejected_logout.status_code, 403)
         rejected_logout_with_bearer = browser.post(
-            "/api/users/logout/", {}, content_type="application/json",
+            "/api/v1/users/logout/", {}, content_type="application/json",
             HTTP_AUTHORIZATION="Bearer arbitrary", **browser_headers
         )
         self.assertEqual(rejected_logout_with_bearer.status_code, 403)
-        csrf = browser.get("/api/users/csrf/").json()["csrfToken"]
+        csrf = browser.get("/api/v1/users/csrf/").json()["csrfToken"]
         logout = browser.post(
-            "/api/users/logout/", {}, content_type="application/json",
+            "/api/v1/users/logout/", {}, content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf, **browser_headers
         )
         self.assertEqual(logout.status_code, 200)
@@ -314,7 +314,7 @@ class BrowserTokenExposureTests(TestCase):
         )
         native = Client(enforce_csrf_checks=True)
         login = native.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "native-token@example.com", "password": "CorrectPassword123!"},
             content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
         )
@@ -323,19 +323,19 @@ class BrowserTokenExposureTests(TestCase):
         # Native clients do not use cookies; send the token on a fresh client.
         native = Client(enforce_csrf_checks=True)
         refreshed = native.post(
-            "/api/users/token/refresh/", {"refresh": refresh_token},
+            "/api/v1/users/token/refresh/", {"refresh": refresh_token},
             content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
         )
         self.assertEqual(refreshed.status_code, 200)
         self.assertIn("refresh", refreshed.json())
         rotated_refresh = refreshed.json()["refresh"]
         logout = Client(enforce_csrf_checks=True).post(
-            "/api/users/logout/", {"refresh": rotated_refresh},
+            "/api/v1/users/logout/", {"refresh": rotated_refresh},
             content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
         )
         self.assertEqual(logout.status_code, 200)
         rejected = Client(enforce_csrf_checks=True).post(
-            "/api/users/token/refresh/", {"refresh": rotated_refresh},
+            "/api/v1/users/token/refresh/", {"refresh": rotated_refresh},
             content_type="application/json", HTTP_X_CLIENT_PLATFORM="mobile",
         )
         self.assertEqual(rejected.status_code, 401)
@@ -349,9 +349,9 @@ class BrowserTokenExposureTests(TestCase):
             is_otp_verified=True,
             is_mobile_verified=True,
         )
-        csrf = self.client.get("/api/users/csrf/").json()["csrfToken"]
+        csrf = self.client.get("/api/v1/users/csrf/").json()["csrfToken"]
         response = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {
                 "email": "web-cookie-only@example.com",
                 "password": "CorrectPassword123!",
@@ -377,18 +377,18 @@ class BrowserTokenExposureTests(TestCase):
             is_otp_verified=True,
             is_mobile_verified=True,
         )
-        csrf = self.client.get("/api/users/csrf/").json()["csrfToken"]
+        csrf = self.client.get("/api/v1/users/csrf/").json()["csrfToken"]
         login = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "web-refresh@example.com", "password": "CorrectPassword123!"},
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf,
             HTTP_X_CLIENT_PLATFORM="web",
         )
         self.assertEqual(login.status_code, 200)
-        csrf = self.client.get("/api/users/csrf/").json()["csrfToken"]
+        csrf = self.client.get("/api/v1/users/csrf/").json()["csrfToken"]
         response = self.client.post(
-            "/api/users/token/refresh/",
+            "/api/v1/users/token/refresh/",
             {},
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf,
@@ -409,7 +409,7 @@ class BrowserTokenExposureTests(TestCase):
             is_mobile_verified=True,
         )
         response = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "mobile-token@example.com", "password": "CorrectPassword123!"},
             content_type="application/json",
             HTTP_X_CLIENT_PLATFORM="mobile",
@@ -430,12 +430,12 @@ class LoginEnumerationSafetyTests(TestCase):
             is_mobile_verified=True,
         )
         unknown = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "missing@example.com", "password": "WrongPassword123!"},
             content_type="application/json",
         )
         wrong = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "known@example.com", "password": "WrongPassword123!"},
             content_type="application/json",
         )
@@ -455,12 +455,12 @@ class LoginEnumerationSafetyTests(TestCase):
             is_mobile_verified=False,
         )
         wrong = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "unverified@example.com", "password": "WrongPassword123!"},
             content_type="application/json",
         )
         correct = self.client.post(
-            "/api/users/login/",
+            "/api/v1/users/login/",
             {"email": "unverified@example.com", "password": "CorrectPassword123!"},
             content_type="application/json",
         )
@@ -485,7 +485,7 @@ class EmailOtpSecurityTests(TestCase):
         user.save(update_fields=["otp_code", "otp_created_at"])
 
         response = self.client.post(
-            "/api/users/verify-otp/",
+            "/api/v1/users/verify-otp/",
             {"email": user.email, "otp": "123456"},
             content_type="application/json",
             HTTP_X_CLIENT_PLATFORM="web",
@@ -512,7 +512,7 @@ class EmailOtpSecurityTests(TestCase):
         user.save(update_fields=["otp_code", "otp_created_at"])
 
         response = self.client.post(
-            "/api/users/verify-otp/",
+            "/api/v1/users/verify-otp/",
             {"email": user.email, "otp": "654321"},
             content_type="application/json",
             HTTP_X_CLIENT_PLATFORM="mobile",
@@ -534,12 +534,12 @@ class EmailOtpSecurityTests(TestCase):
         user.save(update_fields=["otp_code", "otp_created_at"])
 
         missing = self.client.post(
-            "/api/users/verify-otp/",
+            "/api/v1/users/verify-otp/",
             {"email": "otp-missing@example.com", "otp": "000000"},
             content_type="application/json",
         )
         wrong = self.client.post(
-            "/api/users/verify-otp/",
+            "/api/v1/users/verify-otp/",
             {"email": user.email, "otp": "000000"},
             content_type="application/json",
         )
