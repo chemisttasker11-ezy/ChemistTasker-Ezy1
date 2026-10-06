@@ -145,7 +145,7 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.client.force_authenticate(user=self.contact)
 
     def choose(self, role):
-        return self.client.post("/api/users/me/account-type/", {"role": role}, format="json")
+        return self.client.post("/api/v1/users/me/account-type/", {"role": role}, format="json")
 
     def test_dashboard_is_the_admin_dashboard_of_the_managed_pharmacy(self):
         from users.navigation import get_frontend_dashboard_url
@@ -203,7 +203,7 @@ class SelfRegistrationRoleTests(TestCase):
                 mock.patch("users.api_auth.verify_recaptcha", return_value=True),
             ):
                 response = APIClient().post(
-                    "/api/users/register/",
+                    "/api/v1/users/register/",
                     {
                         "email": f"{role.lower()}@register.test",
                         "password": "Sufficiently-Long-9",

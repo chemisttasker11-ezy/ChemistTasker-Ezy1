@@ -204,7 +204,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.post(
-            f"/client-profile/finance/received-invoices/{record.id}/approve-payment/",
+            f"/finance/received-invoices/{record.id}/approve-payment/",
             {"version": record.version, "note": "Approved after checking the shift."},
             format="json",
         )
@@ -221,7 +221,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         record.legacy_snapshot = True
         record.save(update_fields=["legacy_snapshot"])
 
-        request = APIRequestFactory().get("/client-profile/finance/received-invoices/")
+        request = APIRequestFactory().get("/finance/received-invoices/")
         force_authenticate(request, user=self.owner)
         response = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
 
@@ -243,13 +243,13 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         )
         factory = APIRequestFactory()
 
-        received_request = factory.get("/client-profile/finance/received-invoices/")
+        received_request = factory.get("/finance/received-invoices/")
         force_authenticate(received_request, user=self.owner)
         received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
         self.assertEqual(received.status_code, 200)
         self.assertEqual(received.data["count"], 0)
 
-        legacy_request = factory.get(f"/client-profile/invoices/{record.pk}/")
+        legacy_request = factory.get(f"/invoices/{record.pk}/")
         force_authenticate(legacy_request, user=self.owner)
         legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.pk)
         self.assertEqual(legacy.status_code, 404)
@@ -258,12 +258,12 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         delivery.sent_at = timezone.now()
         delivery.save(update_fields=["status", "sent_at"])
 
-        received_request = factory.get("/client-profile/finance/received-invoices/")
+        received_request = factory.get("/finance/received-invoices/")
         force_authenticate(received_request, user=self.owner)
         received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
         self.assertEqual(received.data["count"], 1)
 
-        legacy_request = factory.get(f"/client-profile/invoices/{record.pk}/")
+        legacy_request = factory.get(f"/invoices/{record.pk}/")
         force_authenticate(legacy_request, user=self.owner)
         legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.pk)
         self.assertEqual(legacy.status_code, 200)
@@ -275,7 +275,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(revised.version, 2)
         self.assertEqual(revised.status, "draft")
 
-        received_request = factory.get("/client-profile/finance/received-invoices/")
+        received_request = factory.get("/finance/received-invoices/")
         force_authenticate(received_request, user=self.owner)
         received = ReceivedInvoiceViewSet.as_view({"get": "list"})(received_request)
         self.assertEqual(received.data["count"], 1)
@@ -286,14 +286,14 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertTrue(visible["has_unsent_revision"])
         self.assertEqual([row["version"] for row in visible["revisions"]], [1])
 
-        detail_request = factory.get(f"/client-profile/finance/received-invoices/{record.id}/")
+        detail_request = factory.get(f"/finance/received-invoices/{record.id}/")
         force_authenticate(detail_request, user=self.owner)
         detail = ReceivedInvoiceViewSet.as_view({"get": "retrieve"})(detail_request, pk=record.id)
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.data["version"], 1)
         self.assertNotIn(2, [row["version"] for row in detail.data["revisions"]])
 
-        revision_request = factory.get(f"/client-profile/finance/received-invoices/{record.id}/revisions/1/")
+        revision_request = factory.get(f"/finance/received-invoices/{record.id}/revisions/1/")
         force_authenticate(revision_request, user=self.owner)
         revision = ReceivedInvoiceViewSet.as_view({"get": "revision"})(revision_request, pk=record.id, version="1")
         self.assertEqual(revision.status_code, 200)
@@ -302,7 +302,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual([row["version"] for row in revision.data["revisions"]], [1])
 
         hidden_revision_request = factory.get(
-            f"/client-profile/finance/received-invoices/{record.id}/revisions/2/"
+            f"/finance/received-invoices/{record.id}/revisions/2/"
         )
         force_authenticate(hidden_revision_request, user=self.owner)
         hidden_revision = ReceivedInvoiceViewSet.as_view({"get": "revision"})(
@@ -312,12 +312,12 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         )
         self.assertEqual(hidden_revision.status_code, 404)
 
-        legacy_request = factory.get(f"/client-profile/invoices/{record.pk}/")
+        legacy_request = factory.get(f"/invoices/{record.pk}/")
         force_authenticate(legacy_request, user=self.owner)
         legacy = InvoiceDetailView.as_view()(legacy_request, pk=record.pk)
         self.assertEqual(legacy.status_code, 404)
 
-        worker_request = factory.get(f"/client-profile/invoices/{record.pk}/")
+        worker_request = factory.get(f"/invoices/{record.pk}/")
         force_authenticate(worker_request, user=self.worker)
         worker_view = InvoiceDetailView.as_view()(worker_request, pk=record.pk)
         self.assertEqual(worker_view.status_code, 200)
@@ -330,7 +330,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.post(
-            f"/client-profile/finance/received-invoices/{record.id}/request-revision/",
+            f"/finance/received-invoices/{record.id}/request-revision/",
             {"version": record.version, "note": "Please use the actual 7.5 hours worked."},
             format="json",
         )
@@ -382,7 +382,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.post(
-            f"/client-profile/finance/received-invoices/{record.id}/request-revision/",
+            f"/finance/received-invoices/{record.id}/request-revision/",
             {"version": 1, "note": "This action came from a stale owner screen."},
             format="json",
         )
@@ -395,7 +395,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertFalse(revised.review_requests.exists())
 
         unsent_request = factory.post(
-            f"/client-profile/finance/received-invoices/{record.id}/approve-payment/",
+            f"/finance/received-invoices/{record.id}/approve-payment/",
             {"version": 2, "note": "Attempt to approve an unsent revision."},
             format="json",
         )
@@ -520,7 +520,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         factory = APIRequestFactory()
 
         def request():
-            req = factory.post(f"/client-profile/invoices/{invoice.id}/send/", {}, format="json")
+            req = factory.post(f"/invoices/{invoice.id}/send/", {}, format="json")
             force_authenticate(req, user=self.worker)
             return req
 
@@ -548,7 +548,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.patch(
-            f"/client-profile/invoices/{invoice.id}/",
+            f"/invoices/{invoice.id}/",
             {"cc_emails": "changed@example.com"},
             format="json",
         )
@@ -565,7 +565,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         factory = APIRequestFactory()
 
         worker_request = factory.patch(
-            f"/client-profile/invoices/{invoice.id}/",
+            f"/invoices/{invoice.id}/",
             {"status": "sent"},
             format="json",
         )
@@ -587,7 +587,7 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         invoice.save(update_fields=["status"])
 
         owner_request = factory.patch(
-            f"/client-profile/invoices/{invoice.id}/",
+            f"/invoices/{invoice.id}/",
             {"status": "paid"},
             format="json",
         )

@@ -152,7 +152,7 @@ class MembershipApplicationIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.patch(
-            f"/client-profile/membership-applications/{app.id}/",
+            f"/membership-applications/{app.id}/",
             {"job_title": "Senior Pharmacist"},
             format="json",
         )
@@ -181,7 +181,7 @@ class MembershipApplicationIntegrityTests(TestCase):
         payload = self._payload()
         payload.pop("invite_link")
         request = factory.post(
-            f"/client-profile/magic/memberships/{self.staff_link.token}/apply/",
+            f"/magic/memberships/{self.staff_link.token}/apply/",
             payload,
             format="json",
         )
@@ -253,7 +253,7 @@ class MembershipApplicationIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.post(
-            f"/client-profile/membership-applications/{app.id}/approve/",
+            f"/membership-applications/{app.id}/approve/",
             {"employment_type": "CASUAL"},
             format="json",
         )
@@ -272,7 +272,7 @@ class MembershipApplicationIntegrityTests(TestCase):
 
         factory = APIRequestFactory()
         request = factory.post(
-            f"/client-profile/membership-applications/{app.id}/approve/",
+            f"/membership-applications/{app.id}/approve/",
             {"employment_type": "CONTRACTOR"},
             format="json",
         )
@@ -830,7 +830,7 @@ class DeferredPayrollActivationTests(TestCase):
 
     def _activate(self):
         request = self.factory.post(
-            f"/client-profile/shift-offers/{self.offer.id}/activate-payroll/",
+            f"/shift-offers/{self.offer.id}/activate-payroll/",
             {},
             format="json",
         )
@@ -906,7 +906,7 @@ class DeferredPayrollActivationTests(TestCase):
         )
 
         request = self.factory.post(
-            f"/client-profile/shift-offers/{offer.id}/activate-payroll/",
+            f"/shift-offers/{offer.id}/activate-payroll/",
             {},
             format="json",
         )
