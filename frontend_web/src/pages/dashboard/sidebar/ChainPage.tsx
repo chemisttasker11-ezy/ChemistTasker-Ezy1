@@ -283,7 +283,7 @@ export default function ChainPage() {
                         <ListItemText
                           primary={
                             m.userDetails?.email ||
-                            `${m.userDetails?.first_name ?? ''} ${m.userDetails?.last_name ?? ''}`.trim() ||
+                            `${m.userDetails?.firstName ?? ''} ${m.userDetails?.lastName ?? ''}`.trim() ||
                             m.invitedName ||
                             'Member'
                           }

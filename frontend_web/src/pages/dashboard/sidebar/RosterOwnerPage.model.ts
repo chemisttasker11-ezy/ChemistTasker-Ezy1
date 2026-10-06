@@ -34,7 +34,7 @@ export type AssignmentViewModel = RosterAssignment & {
   isCoverRequest?: boolean;
   origin?: {
     label?: string;
-  };
+  } | null;
   originalShift?: OpenShiftViewModel;
 };
 

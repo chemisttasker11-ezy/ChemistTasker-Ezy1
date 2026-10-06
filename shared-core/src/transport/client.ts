@@ -1,14 +1,18 @@
-export type MaybePromise<T> = T | Promise<T>;
+import { apiUrl, assertAllowedPath } from './urls';
+import { responseError } from './errors';
+export { ApiError } from './errors';
 
+export type MaybePromise<T> = T | Promise<T>;
 export type ApiQueryValue = string | number | boolean | null | undefined;
 export type ApiQuery = Record<string, ApiQueryValue | ApiQueryValue[]>;
 
 export interface ApiClientConfig {
-  /** Base URL ending at the Django /api boundary, e.g. https://chemisttasker.com.au/api. */
+  /** Absolute Django API base, or a same-origin browser BFF base. */
   baseUrl: string;
-  getAuthToken?: () => MaybePromise<string | null>;
-  refreshAuthToken?: () => Promise<string | null>;
+  getAuthToken?: () => MaybePromise<string | null | undefined>;
+  refreshAuthToken?: () => MaybePromise<string | null | undefined>;
   onAuthFailure?: () => MaybePromise<void>;
+  credentials?: RequestCredentials;
   fetchImpl?: typeof fetch;
 }
 
@@ -19,31 +23,12 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
   retryAuth?: boolean;
 }
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly payload: unknown,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
-const ensureLeadingSlash = (value: string) => (value.startsWith('/') ? value : `/${value}`);
-
-function withQuery(path: string, query?: ApiQuery): string {
-  if (!query) return path;
-  const params = new URLSearchParams();
-  Object.entries(query).forEach(([key, raw]) => {
-    const values = Array.isArray(raw) ? raw : [raw];
-    values.forEach((value) => {
-      if (value !== undefined && value !== null) params.append(key, String(value));
-    });
-  });
-  const suffix = params.toString();
-  return suffix ? `${path}${path.includes('?') ? '&' : '?'}${suffix}` : path;
+export interface ApiRequestPolicy {
+  /** Finance and other scoped downloads may not escape this path. */
+  allowedPathPrefix?: string;
+  errorMessage?: string;
+  /** Compatibility for Django endpoints historically sent JSON on bodyless reads. */
+  jsonContentTypeWithoutBody?: boolean;
 }
 
 function isJsonBody(body: ApiRequestOptions['body']): body is object {
@@ -51,11 +36,14 @@ function isJsonBody(body: ApiRequestOptions['body']): body is object {
   if (typeof FormData !== 'undefined' && body instanceof FormData) return false;
   if (typeof Blob !== 'undefined' && body instanceof Blob) return false;
   if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) return false;
-  if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) return false;
+  if (typeof ArrayBuffer !== 'undefined' && (body instanceof ArrayBuffer || ArrayBuffer.isView(body))) return false;
+  if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) return false;
   return true;
 }
 
 export interface ApiClient {
+  /** The single HTTP engine. Raw response is used for PDFs and compatibility decoding. */
+  response(path: string, options?: ApiRequestOptions, policy?: ApiRequestPolicy): Promise<Response>;
   request<T = unknown>(path: string, options?: ApiRequestOptions): Promise<T>;
   get<T = unknown>(path: string, query?: ApiQuery, options?: ApiRequestOptions): Promise<T>;
   post<T = unknown>(path: string, body?: ApiRequestOptions['body'], options?: ApiRequestOptions): Promise<T>;
@@ -65,85 +53,85 @@ export interface ApiClient {
 }
 
 /**
- * Creates an isolated ChemistTasker API client.
- *
- * Use one instance per Next.js server request. React/Expo may keep one instance
- * per application process. This avoids sharing a user's token through module
- * globals during SSR while preserving one transport implementation everywhere.
+ * One transport implementation, NOT one global user session.
+ * Next SSR creates an instance per request. Vite/Expo retain a per-application
+ * instance. Refresh coordination is instance-local; unrelated users never share it.
  */
-export function createApiClient(config: ApiClientConfig): ApiClient {
+export function createApiClient(configuration: ApiClientConfig): ApiClient {
+  const config = { ...configuration };
   const fetchImpl = config.fetchImpl ?? globalThis.fetch;
   if (!fetchImpl) throw new Error('A fetch implementation is required');
-  const baseUrl = trimTrailingSlash(config.baseUrl);
+  let refreshInFlight: Promise<string | null | undefined> | undefined;
+  const refresh = (): Promise<string | null | undefined> => {
+    if (!refreshInFlight) {
+      const pending = Promise.resolve().then(() => config.refreshAuthToken?.());
+      refreshInFlight = pending;
+      // Use both handlers, not an ignored rejected finally() promise.
+      void pending.then(
+        () => { if (refreshInFlight === pending) refreshInFlight = undefined; },
+        () => { if (refreshInFlight === pending) refreshInFlight = undefined; },
+      );
+    }
+    return refreshInFlight;
+  };
 
-  const request = async <T = unknown>(path: string, options: ApiRequestOptions = {}): Promise<T> => {
-    const perform = async (tokenOverride?: string | null): Promise<Response> => {
-      const {
-        auth: _auth,
-        query: _query,
-        retryAuth: _retryAuth,
-        body: requestBody,
-        ...requestInit
-      } = options;
-      const headers = new Headers(options.headers ?? {});
-      const wantsAuth = options.auth !== false;
-      const token = tokenOverride !== undefined
-        ? tokenOverride
-        : wantsAuth && config.getAuthToken
-          ? await config.getAuthToken()
-          : null;
-      if (wantsAuth && token) headers.set('Authorization', `Bearer ${token}`);
-
-      let body = requestBody as BodyInit | null | undefined;
-      if (isJsonBody(requestBody)) {
-        headers.set('Content-Type', 'application/json');
-        body = JSON.stringify(requestBody);
-      }
-
-      return fetchImpl(`${baseUrl}${withQuery(ensureLeadingSlash(path), options.query)}`, {
+  const response = async (path: string, options: ApiRequestOptions = {}, policy: ApiRequestPolicy = {}): Promise<Response> => {
+    let url: URL;
+    try {
+      url = apiUrl(config.baseUrl, path, options.query);
+      if (policy.allowedPathPrefix) assertAllowedPath(config.baseUrl, url, policy.allowedPathPrefix, policy.errorMessage);
+    } catch (error) {
+      if (policy.errorMessage) throw new Error(policy.errorMessage);
+      throw error;
+    }
+    const { auth = true, retryAuth = true, query: _query, body: requestBody, ...requestInit } = options;
+    const headers = new Headers(options.headers ?? {});
+    let body = requestBody as BodyInit | null | undefined;
+    const multipart = typeof FormData !== 'undefined' && requestBody instanceof FormData;
+    if (isJsonBody(requestBody)) {
+      body = JSON.stringify(requestBody);
+      if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    } else if (!multipart && policy.jsonContentTypeWithoutBody && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    const send = async (token: string | null | undefined) => {
+      const attemptHeaders = new Headers(headers);
+      if (auth && token) attemptHeaders.set('Authorization', `Bearer ${token}`);
+      if (!auth) attemptHeaders.delete('Authorization');
+      return fetchImpl(url, {
         ...requestInit,
+        // API consumers must not transparently follow a redirect with credentials.
+        redirect: 'error',
+        credentials: requestInit.credentials ?? config.credentials,
         body,
-        headers,
+        headers: attemptHeaders,
       });
     };
-
-    let response = await perform();
-    if (
-      response.status === 401 &&
-      options.auth !== false &&
-      options.retryAuth !== false &&
-      config.refreshAuthToken
-    ) {
-      let refreshed: string | null;
-      try {
-        refreshed = await config.refreshAuthToken();
-      } catch (error) {
+    let result = await send(auth ? await config.getAuthToken?.() : null);
+    if (result.status === 401 && auth && retryAuth && config.refreshAuthToken) {
+      let refreshed: string | null | undefined;
+      try { refreshed = await refresh(); }
+      catch (error) {
         if (config.onAuthFailure) await config.onAuthFailure();
         throw error;
       }
-      if (refreshed) response = await perform(refreshed);
+      if (refreshed) result = await send(refreshed);
     }
-
-    if (response.status === 401 && config.onAuthFailure) await config.onAuthFailure();
-    if (response.status === 204) return undefined as T;
-
-    const contentType = response.headers.get('content-type') ?? '';
-    const payload: unknown = contentType.includes('application/json')
-      ? await response.json()
-      : await response.text();
-
-    if (!response.ok) {
-      const message =
-        payload && typeof payload === 'object' && 'detail' in payload
-          ? String((payload as { detail?: unknown }).detail ?? response.statusText)
-          : response.statusText || `HTTP ${response.status}`;
-      throw new ApiError(message, response.status, payload);
-    }
-    return payload as T;
+    if (result.status === 401 && auth && config.onAuthFailure) await config.onAuthFailure();
+    if (!result.ok) throw await responseError(result);
+    return result;
   };
 
+  const request = async <T = unknown>(path: string, options: ApiRequestOptions = {}): Promise<T> => {
+    const result = await response(path, options);
+    if (result.status === 204) return undefined as T;
+    const contentType = result.headers.get('content-type') ?? '';
+    const payload: unknown = contentType.includes('application/json') || contentType.includes('+json')
+      ? await result.json() : await result.text();
+    return payload as T;
+  };
   return {
-    request,
+    response, request,
     get: (path, query, options = {}) => request(path, { ...options, method: 'GET', query }),
     post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body }),
     put: (path, body, options = {}) => request(path, { ...options, method: 'PUT', body }),

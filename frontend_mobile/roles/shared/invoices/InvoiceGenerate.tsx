@@ -31,7 +31,7 @@ import { useAuth } from '@/context/AuthContext';
 
 type Shift = {
   id: number;
-  pharmacy_detail?: { id: number; name: string; abn?: string; street_address?: string; suburb?: string; state?: string; postcode?: string };
+  pharmacy_detail?: { id: number; name: string; abn?: string | null; street_address?: string | null; suburb?: string | null; state?: string | null; postcode?: string | null } | null;
   created_by_first_name?: string;
   created_by_last_name?: string;
   created_by_email?: string;

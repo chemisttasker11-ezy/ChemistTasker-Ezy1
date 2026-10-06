@@ -82,7 +82,7 @@ export async function startDirectChat(params: StartDmParams) {
     return startDirectMessageByMembership(params.membershipId, null);
   }
   if ('userId' in params && params.userId) {
-    return startDirectMessageByUser({ userId: params.userId });
+    return startDirectMessageByUser(params.userId);
   }
   throw new Error('Missing userId or membershipId for DM start');
 }

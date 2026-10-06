@@ -57,3 +57,6 @@ if (failures.length) {
 }
 
 console.log('Shared-core package convergence audit passed.');
+
+// Domain/transport convergence is part of the same required architecture check.
+await import('./audit-shared-core-transport.mjs');

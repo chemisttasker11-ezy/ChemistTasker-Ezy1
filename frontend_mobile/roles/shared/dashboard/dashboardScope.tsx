@@ -180,7 +180,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
       if (isOrganizationDashboard && organizationId == null) {
         throw new Error('Your organization membership is unavailable.');
       }
-      const payload = isOrganizationDashboard
+      const payload = isOrganizationDashboard && organizationId != null
         ? await getOrganizationDashboard(organizationId, params)
         : (await apiClient.get(endpoint!, { params })).data;
       const selected = payload?.selected_pharmacy;

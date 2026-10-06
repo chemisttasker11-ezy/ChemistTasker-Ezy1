@@ -59,21 +59,82 @@ export interface AttendanceTimeline {
   timeline: JsonValue[];
 }
 
+/** Wire projections from workforce.roster.periods.get_roster_period_grid. */
+export interface RosterGridSlot {
+  slot_id: number;
+  shift_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  role_needed: string;
+  editable: boolean;
+  planned_break_minutes: number;
+  is_unpublished: boolean;
+}
+export interface RosterGridAssignment extends RosterGridSlot {
+  id: number;
+  worker_id: number;
+  worker_name: string;
+  worker_role: string;
+  is_rostered: boolean;
+}
+export interface RosterStaffShift {
+  assignment_id: number;
+  slot_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  hours: number;
+  editable: boolean;
+  planned_break_minutes: number;
+  role: string;
+  is_unpublished: boolean;
+}
+export interface RosterStaffSummary {
+  worker_id: number;
+  worker_name: string;
+  role: string;
+  total_shifts: number;
+  total_hours: number;
+  shifts: RosterStaffShift[];
+}
+export interface RosterStackedSlot {
+  type: 'ASSIGNED' | 'VACANT';
+  slot_id: number;
+  editable: boolean;
+  planned_break_minutes: number;
+  assignment_id?: number;
+  worker_id?: number;
+  worker_name?: string;
+  start_time: string;
+  end_time: string;
+  role: string;
+  is_unpublished: boolean;
+}
+export interface RosterStackedDay {
+  date: string;
+  total_shifts: number;
+  vacant_count: number;
+  shifts: RosterStackedSlot[];
+}
+
 export interface RosterPeriod {
+  draft_revision: number;
+  published_revision: number;
   period_id: number | null;
   pharmacy_id: number;
   pharmacy_name: string;
   week_start: string;
   week_end: string;
-  status: string;
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   published_at: string | null;
   published_by: string | null;
   total_assignments: number;
   created: boolean;
-  assignments: JsonValue[];
-  vacant_slots: JsonValue[];
-  staff_view: JsonValue[];
-  stacked_view: JsonValue[];
+  assignments: RosterGridAssignment[];
+  vacant_slots: RosterGridSlot[];
+  staff_view: RosterStaffSummary[];
+  stacked_view: RosterStackedDay[];
 }
 
 export interface RosterTemplate {

@@ -76,12 +76,12 @@ export interface FinanceWorksheet {
 export type FinanceCustomerInput = Omit<FinanceCustomer, 'id' | 'abn_result' | 'abn_checked_at'>;
 export type FinanceItemInput = Omit<FinanceItem, 'id'>;
 export type FinanceExpenseInput = Omit<FinanceExpense, 'id' | 'gst_credit' | 'receipts'>;
-import { financeApi } from './api';
+import { financeApi } from './domains/finance/api';
 
 /**
  * Worker finance belongs to the established authenticated shared-core surface.
  * Keep the finance domain API and types stable, but delegate all network I/O
- * to api.ts so Vite/mobile use one authenticated request engine.
+ * to its domain operations so Vite/mobile use one authenticated request engine.
  */
 export const finance = financeApi;
 

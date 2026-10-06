@@ -185,7 +185,7 @@ export default function LocumManager({
         m.name ||
         [m.user_details?.first_name, m.user_details?.last_name].filter(Boolean).join(" ") ||
         "Favourite";
-      const email = m.user_details?.email || m.email;
+      const email = m.user_details?.email || m.email || undefined;
       return {
         id: m.id,
         name: fullName,
@@ -484,7 +484,7 @@ export default function LocumManager({
         category: "LOCUM_CASUAL",
         expires_in_days: expires,
       });
-      const token = res?.token ?? res?.data?.token ?? res;
+      const token = res.token;
       const url = `${window.location.origin}/membership/apply/${token}`;
       setLinkValue(url);
       setToast({ message: "Favourite link generated", severity: "success" });

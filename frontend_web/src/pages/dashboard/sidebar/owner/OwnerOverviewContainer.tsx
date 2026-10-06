@@ -46,7 +46,7 @@ export default function OwnerOverviewContainer() {
 
   const fetchAdmins = useCallback(
     async (pharmacyId: string) => {
-      const admins = await fetchPharmacyAdminsService(Number(pharmacyId));
+      const admins = await fetchPharmacyAdminsService({ pharmacy: Number(pharmacyId) });
       return admins;
     },
     []

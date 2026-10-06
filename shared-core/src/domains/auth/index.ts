@@ -14,9 +14,11 @@ export {
   getCurrentUser,
   passwordReset,
   passwordResetConfirm,
+} from './api';
+export {
   getOnboarding,
   updateOnboarding,
   createOnboarding,
   getOnboardingDetail,
   updateOnboardingForm,
-} from '../../api';
+} from '../onboarding/api';

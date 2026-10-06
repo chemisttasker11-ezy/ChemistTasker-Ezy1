@@ -212,7 +212,7 @@ export default function StaffManager({
         m.name ||
         [m.user_details?.first_name, m.user_details?.last_name].filter(Boolean).join(" ") ||
         "Team Member";
-      const email = m.user_details?.email || m.email;
+      const email = m.user_details?.email || m.email || undefined;
       return {
         id: m.id,
         name: fullName,
@@ -379,7 +379,7 @@ export default function StaffManager({
         category: "FULL_PART_TIME",
         expires_in_days: expires,
       });
-      const token = response?.token ?? response?.data?.token ?? response;
+      const token = response.token;
       const url = `${window.location.origin}/membership/apply/${token}`;
       setLinkValue(url);
       setToast({ message: "Invite link generated", severity: "success" });

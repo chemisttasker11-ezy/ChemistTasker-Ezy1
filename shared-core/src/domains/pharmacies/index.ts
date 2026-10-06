@@ -5,11 +5,6 @@ export {
   getOrganizations,
   getOrganizationById,
   createOrganization,
-  getOrganizationDashboard,
-  getOrganizationMemberships,
-  updateOrganizationMembership,
-  deleteOrganizationMembership,
-  getOrganizationRoleDefinitions,
   getPharmacies,
   fetchPharmaciesService,
   getPharmacyById,
@@ -17,15 +12,26 @@ export {
   updatePharmacy,
   deletePharmacy,
   lookupPharmacyAbn,
+  getChains,
+  getChainDetail,
+  createChain,
+  updateChain,
+  deleteChain,
+} from '../organizations/api';
+export {
+  getOrganizationDashboard,
+} from '../dashboards/api';
+export {
+  getOrganizationMemberships,
+  updateOrganizationMembership,
+  deleteOrganizationMembership,
+  getOrganizationRoleDefinitions,
+} from '../auth/api';
+export {
   getMemberships,
   getMyMemberships,
   createMembership,
   deleteMembership,
   fetchMyMemberships,
   fetchMembershipsByPharmacy,
-  getChains,
-  getChainDetail,
-  createChain,
-  updateChain,
-  deleteChain,
-} from '../../api';
+} from '../memberships/api';

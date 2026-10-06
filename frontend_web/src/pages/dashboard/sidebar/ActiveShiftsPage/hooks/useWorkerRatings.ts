@@ -21,8 +21,8 @@ export function useWorkerRatings() {
             });
 
             setSummary({
-                average: summaryData.average ?? summaryData.average_rating ?? 0,
-                count: summaryData.count ?? summaryData.total_reviews ?? 0,
+                average: summaryData.average ?? 0,
+                count: summaryData.count ?? 0,
             });
             setComments(pageData.results || []);
             setPage(pageNum);
