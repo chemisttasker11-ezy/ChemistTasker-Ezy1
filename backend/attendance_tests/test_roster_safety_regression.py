@@ -377,7 +377,7 @@ class RosterSafetyRegressionTests(unittest.TestCase):
         # Worker calls RosterWorkerViewSet
         view = RosterWorkerViewSet.as_view({"get": "list"})
         request = self.factory.get(
-            f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
+            f"/api/v1/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
         )
         force_authenticate(request, user=self.worker1)
         response = view(request)
@@ -426,7 +426,7 @@ class RosterSafetyRegressionTests(unittest.TestCase):
         # 1. While DRAFT: hidden from worker in RosterWorkerViewSet
         view = RosterWorkerViewSet.as_view({"get": "list"})
         request = self.factory.get(
-            f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
+            f"/api/v1/roster-worker/?pharmacy={self.pharmacy.id}&start_date={self.monday.isoformat()}"
         )
         force_authenticate(request, user=self.worker1)
         response = view(request)
