@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const dashboard=process.env.DASHBOARD_INTERNAL_URL||'http://127.0.0.1:5173';
 const dashboardPublic=process.env.DASHBOARD_PUBLIC_URL||'http://localhost:5173';
-const api=process.env.PLATFORM_API_URL||'http://127.0.0.1:8000/api';
+const api=process.env.PLATFORM_API_URL||'http://127.0.0.1:8000/api/v1';
 const isDev=process.env.NODE_ENV==='development';
 
 const viteOwnedPrefixes=['onboarding','setup','kiosk','membership'];
