@@ -82,7 +82,7 @@ class MarketplaceTestCase(TestCase):
         client = APIClient(); client.force_authenticate(self.user)
         with patch("onboarding.services.identity.async_task") as queue_task:
             response = client.patch(
-                "/api/client-profile/owner/onboarding/me/",
+                "/api/v1/owner/onboarding/me/",
                 {"tab": "identity", "government_id_type": "AUS_PASSPORT", "identity_meta": {"expiry": "2030-01-01"}, "submitted_for_verification": True},
                 format="json",
             )
