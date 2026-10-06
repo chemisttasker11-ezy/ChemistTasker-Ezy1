@@ -273,3 +273,28 @@ Detailed scope and evidence contract: `docs/architecture/PRODUCTION_ACCEPTANCE_F
 Open the F07 PR from the exact branch, run all exact-head F07 and existing repository gates, review
 every failure as a production finding rather than weakening the acceptance criteria, and merge only
 after exact-head/main revalidation. PR #139 remains separate.
+
+
+## F07 production acceptance checkpoint - 2026-10-06
+
+F06 #147 merged at `f1d94df72976a4f8df41e2ee7739401f9762288c`. F07 starts from that exact main on
+`test/finalization-f07-production-acceptance`.
+
+F07 is acceptance-only. Its CI scope guard rejects application-source changes and released migration changes.
+The candidate adds only acceptance workflow/tests/audits/docs.
+
+Required proof encoded in the branch:
+- real production-mode Next login -> Vite dashboard -> Django authenticated-session journey;
+- existing real Android and iOS native acceptance workflow as a required reusable F07 job;
+- PostgreSQL 16 fresh install from zero with no migration drift;
+- populated PostgreSQL upgrade built and seeded by exact F06 code, then verified under the F07 candidate;
+- DRF Spectacular OpenAPI generation on exact F06 and F07 against the same PostgreSQL-backed settings with an exact diff;
+- final PostgreSQL concurrency suites for client-profile races, attendance approval locking, roster slot edits and publication;
+- executable production deployment audit for canonical /api/v1, BFF/Nginx ordering, WebSocket separation, ASGI/Daphne,
+  migration ownership, secure cookies/HTTPS headers and non-root backend container;
+- Django `check --deploy --fail-level WARNING` under production-shaped settings;
+- one F07 release gate requiring PostgreSQL/schema/upgrade, real web, production security and native mobile acceptance.
+
+Real staging remains explicitly outside the gate. Existing CodeQL, repository security, backend finalization,
+serializer, shared-core/Vite/Next/mobile/kiosk workflows remain independently required before merge.
+PR #139 remains separate and no billing-policy change is included.
