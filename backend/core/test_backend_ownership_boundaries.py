@@ -149,7 +149,7 @@ ALLOWED_LEGACY_IMPORTS = {
 # Literal strings starting with client_profile that are neither the app label, a model label nor a task name.
 ALLOWED_STRING_REFERENCES = {
     "client_profile.apps.ClientProfileConfig": "INSTALLED_APPS entry of the kernel app",
-    "client_profile.urls": "the kernel URLconf, included by core.client_profile_api_urls",
+    "client_profile.urls": "the kernel URLconf, included by core.api_v1_urls",
     "client_profile.tasks.verify_*": "Celery route pattern of the verification tasks (CELERY_TASK_ROUTES)",
 }
 
