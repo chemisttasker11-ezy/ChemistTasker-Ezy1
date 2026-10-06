@@ -28,21 +28,21 @@ class OnboardingDomainExtractionContractTests(SimpleTestCase):
 
     def test_public_onboarding_paths_keep_client_profile_namespace(self):
         expected = {
-            "owner-onboarding-me": "/api/client-profile/owner/onboarding/me/",
-            "pharmacist-onboarding-me": "/api/client-profile/pharmacist/onboarding/me/",
-            "otherstaff-onboarding-me": "/api/client-profile/otherstaff/onboarding/me/",
-            "explorer-onboarding-me": "/api/client-profile/explorer/onboarding/me/",
+            "owner-onboarding-me": "/api/v1/owner/onboarding/me/",
+            "pharmacist-onboarding-me": "/api/v1/pharmacist/onboarding/me/",
+            "otherstaff-onboarding-me": "/api/v1/otherstaff/onboarding/me/",
+            "explorer-onboarding-me": "/api/v1/explorer/onboarding/me/",
         }
         for name, path in expected.items():
-            self.assertEqual(reverse(f"client_profile:{name}"), path)
+            self.assertEqual(reverse(f"api_v1:{name}"), path)
 
         self.assertEqual(
-            reverse("client_profile:submit-referee-response", kwargs={"token": "abc"}),
-            "/api/client-profile/onboarding/submit-reference/abc/",
+            reverse("api_v1:submit-referee-response", kwargs={"token": "abc"}),
+            "/api/v1/onboarding/submit-reference/abc/",
         )
         self.assertEqual(
-            reverse("client_profile:referee-reject", kwargs={"token": "abc"}),
-            "/api/client-profile/onboarding/referee-reject/abc/",
+            reverse("api_v1:referee-reject", kwargs={"token": "abc"}),
+            "/api/v1/onboarding/referee-reject/abc/",
         )
 
     def test_onboarding_celery_task_names_are_stable(self):
