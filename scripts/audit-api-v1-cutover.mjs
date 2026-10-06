@@ -23,7 +23,7 @@ function ignored(rel) {
 function visit(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    const rel = path.relative(root, full).replaceAll('\\\\', '/');
+    const rel = path.relative(root, full).replaceAll('\\', '/');
     if (ignored(rel)) continue;
     if (entry.isDirectory()) visit(full);
     else if (extensions.has(path.extname(entry.name))) {
