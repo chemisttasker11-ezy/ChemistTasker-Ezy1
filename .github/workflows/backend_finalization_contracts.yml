@@ -89,4 +89,7 @@ jobs:
           workforce.tests.test_roster_slot_concurrency
           workforce.tests.test_roster_shift_republish
           workforce.tests.test_roster_escalation
+          attendance.test_approval_locking
+          attendance.test_favourite_cover
+          core.test_public_error_surface.AttendanceErrorSurfaceTests
           --settings=${{ matrix.settings }} --verbosity=2 --noinput
