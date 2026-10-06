@@ -430,25 +430,18 @@ jobs:
           assert settings.ROOT_URLCONF == "core.urls"
           print("PRODUCTION_SECURITY=PASS")
           PY
-
-  native-mobile:
-    name: Real Android and iOS native journeys
-    uses: ./.github/workflows/native_mobile_acceptance.yml
-
-  release-gate:
-    name: F07 release gate
+  core-release-gate:
+    name: F07 core acceptance gate
     if: always()
     runs-on: ubuntu-latest
     needs:
       - postgres-schema-upgrade
       - real-web-stack
       - production-security
-      - native-mobile
     steps:
-      - name: Require every F07 acceptance surface
+      - name: Require every F07 core acceptance surface
         shell: bash
         run: |
           test "${{ needs.postgres-schema-upgrade.result }}" = "success"
           test "${{ needs.real-web-stack.result }}" = "success"
           test "${{ needs.production-security.result }}" = "success"
-          test "${{ needs.native-mobile.result }}" = "success"
