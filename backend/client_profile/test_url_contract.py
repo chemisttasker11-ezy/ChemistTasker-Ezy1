@@ -1,11 +1,11 @@
 from django.test import SimpleTestCase
 
 from client_profile.urls import router as kernel_router
-from core.client_profile_api_urls import router as public_router
+from core.api_v1_urls import router as public_router
 
 
-class ClientProfileRouterContractTests(SimpleTestCase):
-    """Public API ordering remains a compatibility contract inherited from main."""
+class ApiV1RouterContractTests(SimpleTestCase):
+    """API v1 router ordering remains a stable domain-composition contract."""
 
     expected_public_prefixes = [
         "organizations",
@@ -50,7 +50,7 @@ class ClientProfileRouterContractTests(SimpleTestCase):
 
     expected_kernel_prefixes = []
 
-    def test_public_router_registration_order_matches_main(self):
+    def test_api_v1_router_registration_order_is_stable(self):
         self.assertEqual(
             [prefix for prefix, _viewset, _basename in public_router.registry],
             self.expected_public_prefixes,
