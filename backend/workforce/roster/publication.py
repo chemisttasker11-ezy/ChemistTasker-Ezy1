@@ -8,6 +8,7 @@ from shifts.models import ShiftSlotAssignment
 from workforce.models import RosterPeriod, RosterPublicationAudit
 from workforce.roster.permissions import is_authorized_attendance_manager
 from workforce.roster.periods import get_roster_period_assignments, validate_roster_period
+from workforce.roster.slot_locking import locked_roster_slots, week_start
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -183,55 +184,95 @@ def _slot_worker_ids(slot):
     )
 
 
-def unpublish_roster_shift(slot, user):
-    """Take one shift of a published roster week back to draft so it can be edited; the week stays published.
+def _slot_audit_snapshot(slot):
+    return {
+        "date": str(slot.date),
+        "start_time": str(slot.start_time),
+        "end_time": str(slot.end_time),
+        "roster_period_id": slot.roster_period_id,
+        "planned_break_minutes": slot.planned_break_minutes,
+        "role_needed": slot.shift.role_needed,
+    }
 
-    Its workers stop seeing it on their published roster until it is republished.
-    """
+
+def unpublish_roster_shift(slot, user):
+    """Take one shift back to editable draft while leaving the week published."""
     from shifts.models import ShiftSlot, _published_period_for_slot
     from workforce.models import RosterActionAudit
+    from workforce.roster.revisions import bump_roster_revision
 
     _authorize_shift_change(user, slot)
-    with transaction.atomic():
-        locked = ShiftSlot.objects.select_for_update().select_related("shift__pharmacy").get(pk=slot.pk)
+    with locked_roster_slots(slot.shift_id, user, target_dates={slot.pk: None}) as graph:
+        _shift, slots, _assignments, periods, _workers = graph
+        locked = slots[slot.pk]
+        _authorize_shift_change(user, locked)
         if locked.unpublished_at:
             return locked
-        period = _published_period_for_slot(locked)
-        if period is None:
+        candidate = _published_period_for_slot(locked)
+        period = periods.get(candidate.pk) if candidate else None
+        if period is None or period.status != RosterPeriod.Status.PUBLISHED:
             raise ValidationError("Only a shift in a published roster week needs unpublishing; edit it directly.")
+        before = _slot_audit_snapshot(locked)
         now = timezone.now()
-        ShiftSlot.objects.filter(pk=locked.pk).update(unpublished_at=now)
+        ShiftSlot.objects.filter(pk=locked.pk).update(unpublished_at=now, roster_period=period)
         locked.unpublished_at = now
+        locked.roster_period = period
         RosterActionAudit.objects.create(
             pharmacy=locked.shift.pharmacy,
             action_type=RosterActionAudit.ActionType.SHIFT_UNPUBLISHED,
             performed_by=user,
-            details={"slot_id": locked.pk, "period_id": period.pk, "worker_ids": _slot_worker_ids(locked)},
+            details={"slot_id": locked.pk, "period_id": period.pk,
+                     "worker_ids": _slot_worker_ids(locked), "slot_before": before},
         )
+        bump_roster_revision(period.pk)
         return locked
 
 
 def republish_roster_shift(slot, user, notify="worker"):
-    """Publish an edited shift again; notify its worker, the whole rostered team of that week, or nobody."""
+    """Republish the locked current slot, optionally notifying worker/team."""
     from notifications.services import notify_users
-    from shifts.models import ShiftSlot, _published_roster_period
+    from shifts.models import ShiftSlot
     from workforce.models import RosterActionAudit
+    from workforce.roster.revisions import bump_roster_revision
+    from workforce.roster.validation import worker_issues
 
     if notify not in REPUBLISH_NOTIFY_CHOICES:
         raise ValidationError("notify must be one of: worker, team, none.")
     _authorize_shift_change(user, slot)
-    with transaction.atomic():
-        locked = ShiftSlot.objects.select_for_update().select_related("shift__pharmacy").get(pk=slot.pk)
+    with locked_roster_slots(slot.shift_id, user, target_dates={slot.pk: None}) as graph:
+        _shift, slots, assignments, periods, _workers = graph
+        locked = slots[slot.pk]
+        _authorize_shift_change(user, locked)
         if not locked.unpublished_at:
             raise ValidationError("This shift is not unpublished.")
         pharmacy = locked.shift.pharmacy
-        period = _published_roster_period(pharmacy.pk, locked.date)
+        period = next((item for item in periods.values()
+                       if item.pharmacy_id == pharmacy.pk
+                       and item.week_start == week_start(locked.date)
+                       and item.status == RosterPeriod.Status.PUBLISHED), None)
         if period is None:
             raise ValidationError(
                 "This shift must belong to a published roster week before it can be republished."
             )
-        ShiftSlot.objects.filter(pk=locked.pk).update(unpublished_at=None)
+        source_period = periods.get(locked.roster_period_id)
+        if source_period and source_period.status == RosterPeriod.Status.ARCHIVED:
+            raise ValidationError("Archived roster slots cannot be republished through the edit workflow.")
+        for assignment in assignments:
+            if assignment.slot_id != locked.pk or not assignment.is_rostered:
+                continue
+            if assignment.slot_date != locked.date:
+                raise ValidationError("Assignment dates do not match this slot. Save the roster edit before republishing.")
+            errors, _warnings = worker_issues(
+                pharmacy, assignment.user, locked.date, locked.start_time, locked.end_time,
+                locked.shift.role_needed, exclude_assignment_id=assignment.pk,
+            )
+            if errors:
+                raise ValidationError({"slots": [issue["message"] for issue in errors]})
+        # The period row is locked before the slot, shared with whole-week
+        # publication/unpublication and in-place edits. Preserve explicit ownership.
+        ShiftSlot.objects.filter(pk=locked.pk).update(unpublished_at=None, roster_period=period)
         locked.unpublished_at = None
+        locked.roster_period = period
         slot_workers = _slot_worker_ids(locked)
         if notify == "worker":
             recipients = slot_workers
@@ -248,8 +289,14 @@ def republish_roster_shift(slot, user, notify="worker"):
                 "period_id": period.pk,
                 "notify": notify,
                 "notified_user_ids": recipients,
+                "slot_after": _slot_audit_snapshot(locked),
             },
         )
+        affected_period_ids = {period.pk}
+        if source_period:
+            affected_period_ids.add(source_period.pk)
+        for period_id in sorted(affected_period_ids):
+            bump_roster_revision(period_id)
 
         def _notify():
             for worker in User.objects.filter(pk__in=recipients):
@@ -259,7 +306,7 @@ def republish_roster_shift(slot, user, notify="worker"):
                 body = (
                     f"Your shift at {pharmacy.name} on {locked.date} was updated."
                     if worker.pk in slot_workers
-                    else f"The roster at {pharmacy.name} for the week of {getattr(period, 'week_start', locked.date)} was updated."
+                    else f"The roster at {pharmacy.name} for the week of {period.week_start} was updated."
                 )
                 notify_users(
                     [worker.pk],
