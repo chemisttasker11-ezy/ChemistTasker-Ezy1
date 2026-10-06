@@ -112,7 +112,7 @@ class PasswordResetConfirmTests(TestCase):
         )
 
         response = self.client.post(
-            reverse("password_reset_confirm_api"),
+            reverse("api_v1:password_reset_confirm_api"),
             {
                 "uid": urlsafe_base64_encode(force_bytes(user.pk)),
                 "token": default_token_generator.make_token(user),
