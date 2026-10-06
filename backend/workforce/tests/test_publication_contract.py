@@ -15,8 +15,8 @@ from workforce.roster.revisions import bump_roster_revision, get_revision_state,
 
 
 BASES = (
-    '/api/client-profile/workforce/roster/',
-    '/api/client-profile/attendance/roster/',
+    '/api/v1/workforce/roster/',
+    '/api/v1/attendance/roster/',
 )
 
 
