@@ -1,0 +1,64 @@
+name: Finalization F02 Source Transport
+on:
+  push:
+    branches: [work/finalization-resume-20261006]
+    paths: [.github/workflows/finalization_f02_transport.yml]
+permissions:
+  contents: write
+jobs:
+  verified-source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Apply exact reviewed source delta without executing application code
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp recovery/f02_builder.py "$RUNNER_TEMP/f02_builder.py"
+          printf '%s  %s\n' 'a415fc3eb0c38566112074ab35d05b39cd9d2ecbb3133d3e690b0020061c37d5' "$RUNNER_TEMP/f02_builder.py" | sha256sum -c -
+          base='9dcf0a7a0cdb3753670ad394e94e9d6995ed788d'
+          prior='7cd3969936df123e7b3c88d4baec77862c785062'
+          candidate='work/finalization-candidate-f02-integrated-20261006'
+          test -z "$(git ls-remote --heads origin "$candidate")"
+          git fetch --no-tags origin "$base" "$prior"
+          test "$(git show -s --format=%T "$base")" = '60fe2649f9f69773cad2e728facf2e529d3bd4fb'
+          git checkout --detach "$base"
+          unset LOCAL_SOURCE
+          python "$RUNNER_TEMP/f02_builder.py"
+          git add -- backend/core/contracts/serializer_field_contracts.json backend/core/contracts/serializer_field_contracts.postgresql.json backend/core/settings.py backend/core/test_runtime_contract.py backend/requirements.txt docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md docs/architecture/BACKEND_RUNTIME_BASELINE.md docs/architecture/RUNTIME_DEPENDENCY_SELECTION.json docs/architecture/RUNTIME_SERIALIZER_CONTRACT_REVIEW.json scripts/collect_backend_runtime_releases.py
+          python - <<'PY'
+          import subprocess
+          expected = {
+              'backend/core/contracts/serializer_field_contracts.json',
+              'backend/core/contracts/serializer_field_contracts.postgresql.json',
+              'backend/core/settings.py', 'backend/core/test_runtime_contract.py',
+              'backend/requirements.txt',
+              'docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md',
+              'docs/architecture/BACKEND_RUNTIME_BASELINE.md',
+              'docs/architecture/RUNTIME_DEPENDENCY_SELECTION.json',
+              'docs/architecture/RUNTIME_SERIALIZER_CONTRACT_REVIEW.json',
+              'scripts/collect_backend_runtime_releases.py',
+          }
+          actual = set(subprocess.check_output(['git','diff','--cached','--name-only','-z']).decode().rstrip('\0').split('\0'))
+          assert actual == expected, (actual, expected)
+          PY
+          git diff --cached --check
+          tree=$(git write-tree)
+          test "$tree" = 'ae873d8e04bc19c0d7bb288aac4d2d055be1bb53'
+          git config user.name 'ChemistTasker finalization review'
+          git config user.email '329447138+chemisttasker11-ezy@users.noreply.github.com'
+          commit=$(printf '%s\n' 'fix(runtime): integrate supported dependencies with merged serializer contracts' | git commit-tree "$tree" -p "$prior" -p "$base")
+          git push origin "$commit:refs/heads/$candidate"
+          mkdir -p "$RUNNER_TEMP/transport-result"
+          printf '%s\n' "$commit" > "$RUNNER_TEMP/transport-result/COMMIT"
+          printf '%s\n' "$tree" > "$RUNNER_TEMP/transport-result/TREE"
+          printf '%s\n' "$candidate" > "$RUNNER_TEMP/transport-result/BRANCH"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-f02-source-result
+          path: ${{ runner.temp }}/transport-result/
+          retention-days: 2
