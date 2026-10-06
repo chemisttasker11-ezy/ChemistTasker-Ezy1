@@ -1,10 +1,10 @@
 from django.test import SimpleTestCase
 from django.urls import reverse
 
-from core.client_profile_api_urls import router
+from core.api_v1_urls import router
 
 
-class ClientProfileApiCompositionContractTests(SimpleTestCase):
+class ApiV1CompositionContractTests(SimpleTestCase):
     expected_prefixes = [
         "organizations",
         "chains",
@@ -53,8 +53,8 @@ class ClientProfileApiCompositionContractTests(SimpleTestCase):
         )
 
     def test_namespace_and_representative_reverse_paths_are_unchanged(self):
-        self.assertEqual(reverse("client_profile:organization-list"), "/api/client-profile/organizations/")
-        self.assertEqual(reverse("client_profile:conversation-list"), "/api/client-profile/rooms/")
-        self.assertEqual(reverse("client_profile:message-list"), "/api/client-profile/messages/")
-        self.assertEqual(reverse("client_profile:calendar-feed-list"), "/api/client-profile/calendar-feed/")
-        self.assertEqual(reverse("client_profile:owner-onboarding-me"), "/api/client-profile/owner/onboarding/me/")
+        self.assertEqual(reverse("api_v1:organization-list"), "/api/v1/organizations/")
+        self.assertEqual(reverse("api_v1:conversation-list"), "/api/v1/rooms/")
+        self.assertEqual(reverse("api_v1:message-list"), "/api/v1/messages/")
+        self.assertEqual(reverse("api_v1:calendar-feed-list"), "/api/v1/calendar-feed/")
+        self.assertEqual(reverse("api_v1:owner-onboarding-me"), "/api/v1/owner/onboarding/me/")
