@@ -48,7 +48,7 @@ describe('converged client security and compatibility', () => {
       return new Response('pdf-bytes', { headers: { 'Content-Type': 'application/pdf' } });
     }) as typeof fetch;
     configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'a', fetchImpl });
-    const response = await performApiRequest('https://example.test/api/v1/v1/finance/invoices/?page=2', {}, {
+    const response = await performApiRequest('https://example.test/api/v1/finance/invoices/?page=2', {}, {
       allowedPathPrefix: '/finance/',
     });
     expect(await (await response.blob()).text()).toBe('pdf-bytes');
