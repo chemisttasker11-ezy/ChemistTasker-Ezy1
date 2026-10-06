@@ -1,0 +1,83 @@
+name: Verified finalization patch transport
+
+on:
+  push:
+    branches: [work/finalization-recovery-20261006-c]
+    paths: ['.github/workflows/finalization_patch_transport.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 32c86cbd9fc9c33d14ce6e64f067fc3c8c04177c
+          persist-credentials: false
+      - name: Verify and apply the locally reviewed patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, gzip, hashlib, json, os, pathlib, subprocess, urllib.request
+          parent = '32c86cbd9fc9c33d14ce6e64f067fc3c8c04177c'
+          expected_tree = '2216da7004126850de15f26834fd82ae6108d72f'
+          expected_sha256 = 'ee0f9ecb7a76fd6062ec8835fcc0b5571890ab170933e12d0fd620eefe8810bb'
+          blob = '6bdf1e885cbf6780364e62b5707779cf801e5d66'
+          allowed = {
+              'docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md',
+              'frontend_mobile/features/parity/roster.tsx',
+              'frontend_web/src/features/workforce/RosterPublishReviewDialog.tsx',
+              'frontend_web/src/features/workforce/RosterSafePublishButton.tsx',
+              'shared-core/src/domains/rosterPublication.ts',
+              'shared-core/src/index.ts',
+              'shared-core/src/utils/asyncScope.test.ts',
+              'shared-core/src/utils/asyncScope.ts',
+          }
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          assert git('rev-parse', 'HEAD') == parent
+          assert not git('status', '--porcelain')
+          request = urllib.request.Request(
+              'https://api.github.com/repos/chemisttasker11-ezy/ChemistTasker-Ezy1/git/blobs/' + blob,
+              headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              data = json.load(response)
+          assert data['sha'] == blob and data['encoding'] == 'base64'
+          patch = gzip.decompress(base64.b64decode(data['content']))
+          assert hashlib.sha256(patch).hexdigest() == expected_sha256
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'reviewed.patch'
+          path.write_bytes(patch)
+          subprocess.run(['git', 'apply', '--check', str(path)], check=True)
+          subprocess.run(['git', 'apply', '--index', '--whitespace=error-all', str(path)], check=True)
+          changed = set(git('diff', '--cached', '--name-only').splitlines())
+          assert changed == allowed, sorted(changed ^ allowed)
+          assert not any(p.startswith('.github/') or '/migrations/' in p for p in changed)
+          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
+          actual = git('write-tree')
+          assert actual == expected_tree, (actual, expected_tree)
+          subprocess.run(['git', 'diff', '--cached', '--stat'], check=True)
+          print('VERIFIED_PARENT=' + parent)
+          print('VERIFIED_TREE=' + actual)
+          print('VERIFIED_PATCH_SHA256=' + expected_sha256)
+          PY
+      - name: Publish only a new isolated candidate branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          target=work/finalization-candidate-f04-scope-20261006-c
+          case "$target" in work/finalization-candidate-*) ;; *) exit 1 ;; esac
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(publication): isolate async review state by selection'
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          test -z "$(git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" ls-remote --heads origin "$target")"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$target"
+          printf 'CANDIDATE_COMMIT='; git rev-parse HEAD
+          printf 'CANDIDATE_TREE='; git rev-parse HEAD^{tree}
+          echo 'No PR branch or main was updated; connector-side review is still required.'
