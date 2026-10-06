@@ -661,6 +661,9 @@ jobs:
               permissions:
                 all: allow
           - openLink: "frontendmobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081%3FdisableOnboarding%3D1"
+          - tapOn:
+              text: "Open"
+              optional: true
           - extendedWaitUntil:
               visible: "Go to Login"
               timeout: 30000
