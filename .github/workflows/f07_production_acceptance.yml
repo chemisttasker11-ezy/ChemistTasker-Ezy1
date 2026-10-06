@@ -1,9 +1,7 @@
 name: F07 Production Acceptance
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -69,13 +67,11 @@ jobs:
           test "$(git rev-parse HEAD)" = "$TESTED_SHA"
           changed="$(git diff --name-only "$F06_BASE_SHA"...HEAD)"
           printf '%s\n' "$changed"
-
           if printf '%s\n' "$changed" | grep -E '^backend/.+/migrations/.+\.py$' >/dev/null; then
             echo "F07 must not modify released migration files." >&2
             exit 1
           fi
-
-          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/f07_production_acceptance\.yml|frontend_web/e2e/real-stack\.spec\.mjs|scripts/audit-production-deployment\.mjs|docs/architecture/PRODUCTION_ACCEPTANCE_F07\.md|docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS\.md)$' || true)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/f07_production_acceptance\.yml|\.github/workflows/frontend_e2e_manual\.yml|frontend_web/e2e/real-stack\.spec\.mjs|scripts/audit-production-deployment\.mjs|docs/architecture/PRODUCTION_ACCEPTANCE_F07\.md|docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS\.md)$' || true)"
           if [ -n "$unexpected" ]; then
             echo "F07 is acceptance-only; unexpected application/source changes detected:" >&2
             printf '%s\n' "$unexpected" >&2
@@ -119,7 +115,7 @@ jobs:
           GRANT ALL ON SCHEMA public TO public;
           SQL
 
-      - name: Build populated F06 database
+      - name: Build populated F06 database and schema
         shell: bash
         run: |
           set -euo pipefail
@@ -127,7 +123,6 @@ jobs:
           cat > /tmp/f07_seed.py <<'PY'
           from django.contrib.auth import get_user_model
           from client_profile.models import PharmacistOnboarding, Pharmacy, Membership, PharmacyAdmin
-
           User = get_user_model()
           user = User.objects.create_user(
               email="f07-upgrade@example.test",
@@ -141,11 +136,7 @@ jobs:
               accepted_terms=True,
           )
           PharmacistOnboarding.objects.create(user=user, verified=True, ahpra_verified=True)
-          pharmacy = Pharmacy.objects.create(
-              name="F07 Upgrade Pharmacy",
-              verified=True,
-              timezone="Australia/Brisbane",
-          )
+          pharmacy = Pharmacy.objects.create(name="F07 Upgrade Pharmacy", verified=True, timezone="Australia/Brisbane")
           membership = Membership.objects.create(
               user=user,
               pharmacy=pharmacy,
@@ -167,7 +158,7 @@ jobs:
           python .f06-baseline/backend/manage.py shell --settings=core.postgres_test_settings < /tmp/f07_seed.py
           python .f06-baseline/backend/manage.py spectacular --file /tmp/f06-openapi.yml --validate --settings=core.postgres_test_settings
 
-      - name: Upgrade populated database with F07 candidate
+      - name: Upgrade populated database and compare schema
         shell: bash
         run: |
           set -euo pipefail
@@ -175,14 +166,12 @@ jobs:
           cat > /tmp/f07_verify.py <<'PY'
           from django.contrib.auth import get_user_model
           from client_profile.models import PharmacistOnboarding, Pharmacy, Membership, PharmacyAdmin
-
           User = get_user_model()
           user = User.objects.get(email="f07-upgrade@example.test")
           pharmacy = Pharmacy.objects.get(name="F07 Upgrade Pharmacy")
           membership = Membership.objects.get(user=user, pharmacy=pharmacy)
           admin = PharmacyAdmin.objects.get(user=user, pharmacy=pharmacy)
           onboarding = PharmacistOnboarding.objects.get(user=user)
-
           assert user.role == "PHARMACIST"
           assert user.is_mobile_verified is True
           assert membership.status == Membership.Status.ACCEPTED
@@ -283,7 +272,6 @@ jobs:
           cat > /tmp/f07_web_seed.py <<'PY'
           from django.contrib.auth import get_user_model
           from client_profile.models import PharmacistOnboarding
-
           User = get_user_model()
           user = User.objects.create_user(
               email="f07-web@example.test",
@@ -428,7 +416,6 @@ jobs:
           import django
           django.setup()
           from django.conf import settings
-
           assert settings.DEBUG is False
           assert settings.SECURE_SSL_REDIRECT is True
           assert settings.SECURE_HSTS_SECONDS >= 31536000
