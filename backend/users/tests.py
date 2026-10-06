@@ -160,7 +160,7 @@ class PublicAndPrivateRoutePreservationTests(TestCase):
                 self.assertEqual(self.client.get(path).status_code, 200)
 
     def test_private_reads_require_authentication(self):
-        for path in ('/api/client-profile/pharmacies/', '/api/v1/users/me/', '/api/v1/content/documents/', '/api/v1/marketplace/me/listings/'):
+        for path in ('/api/v1/pharmacies/', '/api/v1/users/me/', '/api/v1/content/documents/', '/api/v1/marketplace/me/listings/'):
             with self.subTest(path=path):
                 self.assertIn(self.client.get(path).status_code, (401, 403))
 
@@ -173,7 +173,7 @@ class PublicAndPrivateRoutePreservationTests(TestCase):
         pharmacy = Pharmacy.objects.create(name='Private pharmacy', owner=profile)
         client = APIClient()
         client.force_authenticate(outsider)
-        path = f'/api/client-profile/pharmacies/{pharmacy.pk}/'
+        path = f'/api/v1/pharmacies/{pharmacy.pk}/'
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.patch(path, {'name': 'Changed'}, format='json').status_code, 404)
         client.force_authenticate(owner)
