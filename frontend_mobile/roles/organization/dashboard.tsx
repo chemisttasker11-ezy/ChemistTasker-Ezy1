@@ -51,7 +51,7 @@ export default function OrganizationDashboard() {
     try {
       const [dashboardPayload, pillRes] = await Promise.all([
         scope.fetchDashboard(),
-        apiClient.get('/client-profile/pill-rewards/balance/').catch(() => null),
+        apiClient.get('/pill-rewards/balance/').catch(() => null),
       ]);
 
       const list: any[] = Array.isArray(dashboardPayload?.shifts) ? dashboardPayload.shifts : [];

@@ -24,8 +24,8 @@ export default function AdminHomeScreen() {
       ? { workspace: 'internal', pharmacy_id: pharmacyId }
       : { workspace: 'internal' };
     Promise.all([
-      apiClient.get('/client-profile/pill-rewards/balance/').catch(() => null),
-      apiClient.get('/client-profile/dashboard/owner/', { params: dashboardParams }).catch(() => null),
+      apiClient.get('/pill-rewards/balance/').catch(() => null),
+      apiClient.get('/dashboard/owner/', { params: dashboardParams }).catch(() => null),
     ]).then(([pillRes, dashboardRes]) => {
       if (!mounted) return;
       if (pillRes?.data) {

@@ -69,7 +69,7 @@ export default function ManageMembershipsScreen() {
   const loadMemberships = useCallback(async () => {
     try {
       const [membershipsResult, invitationsResult] = await Promise.allSettled([
-        apiClient.get('/client-profile/my-memberships/'),
+        apiClient.get('/my-memberships/'),
         getPendingPharmacyAdminInvitations(),
       ]);
       if (membershipsResult.status === 'rejected') throw membershipsResult.reason;
@@ -97,7 +97,7 @@ export default function ManageMembershipsScreen() {
   const runAction = async (membership: Membership, action: 'accept' | 'reject' | 'quit') => {
     setActingKey(`membership-${membership.id}`);
     try {
-      await apiClient.post(`/client-profile/my-memberships/${membership.id}/${action}/`);
+      await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
       await Promise.all([loadMemberships(), refreshUser()]);
       setQuitTarget(null);
       setToast(

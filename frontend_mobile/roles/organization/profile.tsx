@@ -65,7 +65,7 @@ export default function OrganizationProfileScreen() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient.get('/client-profile/pill-rewards/balance/')
+    apiClient.get('/pill-rewards/balance/')
       .then(({ data }) => {
         if (!mounted) return;
         setPillSummary({
@@ -84,7 +84,7 @@ export default function OrganizationProfileScreen() {
   const shareFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data } = await apiClient.post('/client-profile/pill-rewards/refer-friend/', {});
+      const { data } = await apiClient.post('/pill-rewards/refer-friend/', {});
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;
