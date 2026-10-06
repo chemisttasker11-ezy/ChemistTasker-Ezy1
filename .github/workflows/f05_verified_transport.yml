@@ -1,0 +1,171 @@
+name: Verified F05 source transport
+on:
+  push:
+    branches: [work/finalization-recovery-20261006-c]
+    paths: ['.github/workflows/f05_verified_transport.yml']
+permissions:
+  contents: write
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 3b67975442b7dcb1acf40b60d1b86c0bbf2d6926
+          persist-credentials: false
+      - name: Verify exact parent, dictionary, decoded paths and resulting tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, pathlib, subprocess, urllib.request
+          parent = '3b67975442b7dcb1acf40b60d1b86c0bbf2d6926'
+          expected_tree = 'a198be1c8e1b90d23ac563ec812d45e1a48d37ac'
+          paths = '''docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md
+          docs/architecture/SHARED_API_EXTRACTION_REVIEW.json
+          docs/architecture/SHARED_CORE_TRANSPORT_CONVERGENCE.md
+          frontend_mobile/roles/shared/chat/hooks.ts
+          frontend_mobile/roles/shared/dashboard/dashboardScope.tsx
+          frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx
+          frontend_mobile/roles/shared/pharmacies/LocumManager.tsx
+          frontend_mobile/roles/shared/pharmacies/StaffManager.tsx
+          frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx
+          frontend_web/src/pages/PublicJobBoardPage.tsx
+          frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useWorkerRatings.ts
+          frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx
+          frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.model.ts
+          frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.model.ts
+          frontend_web/src/pages/dashboard/sidebar/owner/LocumManager.tsx
+          frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx
+          frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx
+          scripts/audit-shared-core-package.mjs
+          scripts/audit-shared-core-transport.mjs
+          shared-core/src/api.ts
+          shared-core/src/constants/endpoints.ts
+          shared-core/src/constants/roles.ts
+          shared-core/src/contracts/accounts.ts
+          shared-core/src/contracts/applicationExports.json
+          shared-core/src/contracts/attendanceRoster.ts
+          shared-core/src/contracts/calendar.ts
+          shared-core/src/contracts/common.ts
+          shared-core/src/contracts/invoiceDetail.ts
+          shared-core/src/contracts/membershipRecords.ts
+          shared-core/src/contracts/organizations.ts
+          shared-core/src/contracts/workforce.ts
+          shared-core/src/domains/attendance/api.ts
+          shared-core/src/domains/auth/api.ts
+          shared-core/src/domains/auth/index.ts
+          shared-core/src/domains/billing/api.ts
+          shared-core/src/domains/calendar/api.ts
+          shared-core/src/domains/calendar/mappers.ts
+          shared-core/src/domains/chat/api.ts
+          shared-core/src/domains/chat/index.ts
+          shared-core/src/domains/chat/mappers.ts
+          shared-core/src/domains/dashboards/api.ts
+          shared-core/src/domains/domainContracts.test.ts
+          shared-core/src/domains/finance/api.ts
+          shared-core/src/domains/invoicing/api.ts
+          shared-core/src/domains/memberships/api.ts
+          shared-core/src/domains/memberships/mappers.ts
+          shared-core/src/domains/notifications/api.ts
+          shared-core/src/domains/notifications/mappers.ts
+          shared-core/src/domains/onboarding/api.ts
+          shared-core/src/domains/organizations/api.ts
+          shared-core/src/domains/organizations/mappers.ts
+          shared-core/src/domains/pharmacies/index.ts
+          shared-core/src/domains/pharmacyHub/api.ts
+          shared-core/src/domains/pharmacyHub/mappers.ts
+          shared-core/src/domains/ratings/api.ts
+          shared-core/src/domains/rewards/api.ts
+          shared-core/src/domains/roster/api.ts
+          shared-core/src/domains/roster/mappers.ts
+          shared-core/src/domains/shiftRequests/api.ts
+          shared-core/src/domains/shifts/api.ts
+          shared-core/src/domains/shifts/index.ts
+          shared-core/src/domains/shifts/mappers.ts
+          shared-core/src/domains/talent/api.ts
+          shared-core/src/domains/talent/mappers.ts
+          shared-core/src/domains/workforce/api.ts
+          shared-core/src/finance.ts
+          shared-core/src/index.ts
+          shared-core/src/transport/application.ts
+          shared-core/src/transport/client.ts
+          shared-core/src/transport/convergence.test.ts
+          shared-core/src/transport/errors.ts
+          shared-core/src/transport/operational.ts
+          shared-core/src/transport/urls.ts
+          shared-core/src/types.ts
+          shared-core/src/utils/serialization.ts'''.splitlines()
+          paths = [p.strip() for p in paths]
+          parts = [
+              'e5932066d40c7a92bb9389acb05000006c27714d',
+              '990766733ce17f681a9a9207b87769fa0c32af75',
+              'fcf8c00b4ab7be94d86a8296470002a4b8148426',
+              '3eaba61bdf4d7657027d73383d9acdab0876b130',
+              '165239bb5d8ea1b302c7cea53ee60851b00400d3',
+              '7847d65c9f42e67703a9c9e47a497f598b37661b',
+              '973ae55e0b6fb619a003a66c4b79e85561e8d979',
+              'bc2be2784f1362da75df03faecdf6ef0d9e9257e',
+          ]
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          assert git('rev-parse', 'HEAD') == parent
+          assert not git('status', '--porcelain')
+          assert len(paths) == len(set(paths)) == 75
+          base = {}
+          for p in paths:
+              assert not p.startswith(('/', '.git')) and '..' not in pathlib.PurePosixPath(p).parts
+              assert '/migrations/' not in p
+              result = subprocess.run(['git', 'show', 'HEAD:' + p], capture_output=True)
+              if result.returncode == 0:
+                  base[p] = result.stdout.decode()
+          for p in ['shared-core/src/api.ts', 'shared-core/src/types.ts', 'shared-core/src/constants/endpoints.ts']:
+              base[p] = subprocess.check_output(['git', 'show', 'HEAD:' + p]).decode()
+          encoded = json.dumps(base, separators=(',', ':'), ensure_ascii=True, sort_keys=True).encode()
+          assert hashlib.sha256(encoded).hexdigest() == '20535422f3b89e4c947781ec42dced6d268c8d4bfc6a6c7e88480a13c19d5018'
+          folder = pathlib.Path(os.environ['RUNNER_TEMP'])
+          (folder / 'base.json').write_bytes(encoded)
+          decoded = []
+          for sha in parts:
+              request = urllib.request.Request('https://api.github.com/repos/chemisttasker11-ezy/ChemistTasker-Ezy1/git/blobs/' + sha, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  obj = json.load(response)
+              raw = base64.b64decode(obj['content'])
+              assert obj['sha'] == sha and obj['encoding'] == 'base64'
+              assert hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest() == sha
+              decoded.append(raw)
+          (folder / 'delta.zst').write_bytes(b''.join(decoded))
+          subprocess.run(['zstd', '-d', '--patch-from=' + str(folder / 'base.json'), str(folder / 'delta.zst'), '-o', str(folder / 'files.json')], check=True)
+          output = (folder / 'files.json').read_bytes()
+          assert hashlib.sha256(output).hexdigest() == 'c4d418b72dee72b348405982e4fb92b257c8c277e906390585acddc0d463f7ce'
+          files = json.loads(output)
+          assert set(files) == set(paths)
+          for p, content in files.items():
+              assert isinstance(content, str)
+              target = pathlib.Path(p)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content)
+          subprocess.run(['git', 'add', '--', *paths], check=True)
+          assert set(git('diff', '--cached', '--name-only').splitlines()) == set(paths)
+          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
+          assert git('write-tree') == expected_tree
+          print('VERIFIED_PARENT=' + parent)
+          print('VERIFIED_TREE=' + expected_tree)
+          subprocess.run(['git', 'diff', '--cached', '--stat'], check=True)
+          PY
+      - name: Push only a new isolated candidate, never main or a PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          target=work/finalization-candidate-f05-20261006-c
+          case "$target" in work/finalization-candidate-*) ;; *) exit 1 ;; esac
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'refactor(shared-core): converge typed domains on one isolated transport'
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          test -z "$(git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" ls-remote --heads origin "$target")"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$target"
+          printf 'CANDIDATE_COMMIT='; git rev-parse HEAD
+          printf 'CANDIDATE_TREE='; git rev-parse HEAD^{tree}
