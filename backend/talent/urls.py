@@ -1,4 +1,5 @@
-"""URL routes of the talent app. Mounted inside client_profile.urls, so public paths and the `client_profile:` route names are unchanged."""
+"""URL ownership for talent availability and explorer APIs."""
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from talent.views.availability import UserAvailabilityViewSet
 from talent.views.explorer import ExplorerPostViewSet
@@ -19,4 +20,4 @@ router.include_root_view = False
 router.registry.extend(availability_router.registry)
 router.registry.extend(explorer_router.registry)
 
-urlpatterns = []   # routes are declared on the routers; client_profile adopts them
+urlpatterns = [path('', include(router.urls))]

@@ -3,7 +3,7 @@
 Routers are intentionally split so core can preserve the historical API-root
 ordering around the organization-owned pharmacy-admin route.
 """
-from django.urls import path
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from memberships.views import (
@@ -50,4 +50,5 @@ urlpatterns = [
         SubmitMembershipApplication.as_view(),
         name="magic-membership-apply",
     ),
+    path('', include(router.urls)),
 ]
