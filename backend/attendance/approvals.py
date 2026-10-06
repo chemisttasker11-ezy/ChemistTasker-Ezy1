@@ -114,9 +114,11 @@ def approve_provisional_attendance(
     Clears session.is_provisional.
     Converts actual times using the destination pharmacy's timezone.
     """
+    # Lock both rows that this decision can mutate; source_membership is nullable
+    # and is presentation/source data, not a valid PostgreSQL outer-join lock target.
     with transaction.atomic():
         provisional = (
-            ProvisionalAttendance.objects.select_for_update()
+            ProvisionalAttendance.objects.select_for_update(of=("self", "session"))
             .select_related(
                 "session",
                 "session__pharmacy",
@@ -239,7 +241,7 @@ def reject_provisional_attendance(
 
     with transaction.atomic():
         provisional = (
-            ProvisionalAttendance.objects.select_for_update()
+            ProvisionalAttendance.objects.select_for_update(of=("self", "session"))
             .select_related("session", "session__pharmacy")
             .get(pk=provisional_id)
         )
