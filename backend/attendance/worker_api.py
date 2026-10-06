@@ -157,7 +157,7 @@ class WorkerClockOutView(APIView):
 
 class WorkerUpdatePinView(APIView):
     """
-    POST /api/client-profile/attendance/worker/pin/update/
+    POST /api/v1/attendance/worker/pin/update/
     Logged-in worker sets or changes their attendance PIN from the web/mobile app.
     """
     permission_classes = [permissions.IsAuthenticated]
