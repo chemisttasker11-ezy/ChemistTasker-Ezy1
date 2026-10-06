@@ -181,8 +181,8 @@ class CurrentUserView(APIView):
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    GET  /api/users/       → list all users (with ?search= support)
-    GET  /api/users/{id}/  → retrieve one user
+    GET  /api/v1/users/       → list all users (with ?search= support)
+    GET  /api/v1/users/{id}/  → retrieve one user
     """
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
