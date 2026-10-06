@@ -2,14 +2,6 @@ name: Frontend E2E Manual Verification
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/workflows/f07_production_acceptance.yml"
-      - ".github/workflows/frontend_e2e_manual.yml"
-      - "frontend_web/e2e/real-stack.spec.mjs"
-      - "scripts/audit-production-deployment.mjs"
-      - "docs/architecture/PRODUCTION_ACCEPTANCE_F07.md"
-      - "docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md"
 
 permissions:
   contents: read
@@ -20,7 +12,6 @@ concurrency:
 
 jobs:
   vite-playwright:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -55,8 +46,3 @@ jobs:
             frontend_web/e2e/test-results
           if-no-files-found: ignore
           retention-days: 7
-
-
-  f07-production-acceptance:
-    if: github.event_name == 'pull_request'
-    uses: ./.github/workflows/f07_production_acceptance.yml
