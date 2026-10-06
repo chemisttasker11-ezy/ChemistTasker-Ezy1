@@ -1,0 +1,40 @@
+name: Finalization PostgreSQL Recovery
+on:
+  push:
+    branches: [work/finalization-resume-20261006]
+    paths: [.github/workflows/finalization_pg_recovery.yml]
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Export the public PostgreSQL 16 test toolchain only
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:16
+          image=$(docker image inspect postgres:16 --format '{{index .RepoDigests 0}}')
+          container=$(docker create "$image")
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          mkdir -p pg-root/usr/lib/postgresql pg-root/usr/share/postgresql pg-root/native-libs pg-evidence
+          docker cp "$container:/usr/lib/postgresql/16" pg-root/usr/lib/postgresql/
+          docker cp "$container:/usr/share/postgresql/16" pg-root/usr/share/postgresql/
+          docker run --rm --entrypoint bash "$image" -c 'ldd /usr/lib/postgresql/16/bin/* /usr/lib/postgresql/16/lib/*.so 2>/dev/null || true' > pg-evidence/ldd.txt
+          awk '/=> \/|^\s*\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' pg-evidence/ldd.txt | sort -u > pg-evidence/libraries.txt
+          while read -r lib; do
+            case "$lib" in
+              /lib*/ld-linux*|*/libc.so.*|*/libpthread.so.*|*/libdl.so.*|*/libm.so.*|*/librt.so.*|*/libresolv.so.*) continue ;;
+            esac
+            docker cp -L "$container:$lib" "pg-root/native-libs/$(basename "$lib")"
+          done < pg-evidence/libraries.txt
+          printf '%s\n' "$image" > pg-evidence/IMAGE
+          docker run --rm --entrypoint /usr/lib/postgresql/16/bin/postgres "$image" --version > pg-evidence/VERSION
+          tar -czf pg-evidence/postgresql-runtime.tar.gz -C pg-root .
+          (cd pg-evidence && sha256sum postgresql-runtime.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-postgres-toolchain
+          path: pg-evidence/
+          retention-days: 2
