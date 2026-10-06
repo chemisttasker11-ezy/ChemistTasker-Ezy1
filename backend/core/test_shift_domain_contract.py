@@ -15,7 +15,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
     WorkerShiftRequest,
 )
-from core.api_v1_urls import router
+from shifts.urls import router
 
 
 class ShiftDomainExtractionContractTests(SimpleTestCase):
