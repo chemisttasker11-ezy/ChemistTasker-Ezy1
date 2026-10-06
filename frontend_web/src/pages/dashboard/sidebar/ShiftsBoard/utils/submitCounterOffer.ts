@@ -13,5 +13,5 @@ export async function submitCounterOfferDirect(payload: ShiftCounterOfferPayload
       proposed_rate: slot.proposedRate ?? null,
     })),
   };
-  await apiClient.post(`/client-profile/shifts/${payload.shiftId}/counter-offers/`, body);
+  await apiClient.post(`/shifts/${payload.shiftId}/counter-offers/`, body);
 }

@@ -202,7 +202,7 @@ export default function InvoiceManagePage() {
   const handleDownloadPdf = async () => {
     if (!menuInvoiceId) return;
     try {
-      const response = await apiClient.get(`/client-profile/invoices/${menuInvoiceId}/pdf/`, {
+      const response = await apiClient.get(`/invoices/${menuInvoiceId}/pdf/`, {
         responseType: 'blob',
       });
       const blob = new Blob([response.data], { type: 'application/pdf' });
