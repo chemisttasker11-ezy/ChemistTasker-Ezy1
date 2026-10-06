@@ -597,7 +597,20 @@ fn validated_api_base_url(value: &str) -> Result<String, String> {
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err("Kiosk API URL must not contain credentials".to_string());
     }
-    Ok(value.trim_end_matches('/').to_string())
+    let trimmed = value.trim_end_matches('/');
+    if !trimmed.ends_with("/api/v1") {
+        return Err("Kiosk API URL must use the canonical /api/v1 root".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
+fn kiosk_api_url(base: &str, suffix: &str) -> Result<String, String> {
+    let canonical = validated_api_base_url(base)?;
+    Ok(format!(
+        "{}/{}",
+        canonical.trim_end_matches('/'),
+        suffix.trim_start_matches('/')
+    ))
 }
 
 fn restricted_http_client() -> Result<reqwest::Client, String> {
@@ -657,10 +670,7 @@ async fn fetch_online_qr(app: AppHandle) -> Result<KioskQrResponse, String> {
         .get_password()
         .map_err(|error| format!("Device credential is unavailable: {error}"))?;
     let response = restricted_http_client()?
-        .post(format!(
-            "{}/client-profile/attendance/kiosk/qr/",
-            api_base_url.trim_end_matches('/')
-        ))
+        .post(kiosk_api_url(&api_base_url, "attendance/kiosk/qr/")?)
         .header("X-Device-Token", token)
         .send()
         .await
@@ -734,10 +744,7 @@ async fn pair_device(
             .sign(recovery_message.as_bytes())
             .to_bytes(),
     );
-    let url = format!(
-        "{}/client-profile/attendance/kiosk/pairing/pair/",
-        api_base_url
-    );
+    let url = kiosk_api_url(&api_base_url, "attendance/kiosk/pairing/pair/")?;
     let response = restricted_http_client()?
         .post(url)
         .json(&json!({
@@ -1143,10 +1150,7 @@ async fn enrol_worker_from_server(
         .get_password()
         .map_err(|error| format!("Device credential is unavailable: {error}"))?;
     let response = restricted_http_client()?
-        .post(format!(
-            "{}/client-profile/attendance/kiosk/workers/enrol/",
-            api_base_url.trim_end_matches('/')
-        ))
+        .post(kiosk_api_url(&api_base_url, "attendance/kiosk/workers/enrol/")?)
         .header("X-Device-Token", token)
         .json(&json!({ "identifier": identifier, "pin": pin }))
         .send()
@@ -1542,10 +1546,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
             .get_password()
             .map_err(|error| error.to_string())?;
         let response = restricted_http_client()?
-            .get(format!(
-                "{}/client-profile/attendance/kiosk/config/",
-                config.0.trim_end_matches('/')
-            ))
+            .get(kiosk_api_url(&config.0, "attendance/kiosk/config/")?)
             .header("X-Device-Token", token)
             .send()
             .await
@@ -1592,10 +1593,7 @@ async fn perform_sync(app: &AppHandle, runtime: &RuntimeState) -> Result<SyncRes
         .get_password()
         .map_err(|error| error.to_string())?;
     let response = restricted_http_client()?
-        .post(format!(
-            "{}/client-profile/attendance/kiosk/sync/batch/",
-            config.0.trim_end_matches('/')
-        ))
+        .post(kiosk_api_url(&config.0, "attendance/kiosk/sync/batch/")?)
         .header("X-Device-Token", token)
         .json(&json!({ "events": events, "app_version": config.1 }))
         .send()
@@ -1784,10 +1782,7 @@ async fn disconnect_device(
     );
 
     let response = restricted_http_client()?
-        .post(format!(
-            "{}/client-profile/attendance/kiosk/revoke-self/",
-            api_base_url.trim_end_matches('/')
-        ))
+        .post(kiosk_api_url(&api_base_url, "attendance/kiosk/revoke-self/")?)
         .header("X-Device-Token", token)
         .json(&json!({
             "issued_at": issued_at,
@@ -1879,6 +1874,24 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kiosk_api_urls_use_only_the_canonical_v1_root() {
+        assert_eq!(
+            validated_api_base_url("https://chemisttasker.com.au/api/v1/").unwrap(),
+            "https://chemisttasker.com.au/api/v1"
+        );
+        assert_eq!(
+            kiosk_api_url(
+                "https://chemisttasker.com.au/api/v1",
+                "attendance/kiosk/sync/batch/"
+            )
+            .unwrap(),
+            "https://chemisttasker.com.au/api/v1/attendance/kiosk/sync/batch/"
+        );
+        assert!(validated_api_base_url("https://chemisttasker.com.au/api").is_err());
+        assert!(validated_api_base_url("https://chemisttasker.com.au/api/v1/client-profile").is_err());
+    }
 
     #[test]
     fn device_authorization_lease_blocks_expired_and_revoked_kiosks() {
