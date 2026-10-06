@@ -97,16 +97,16 @@ async function installApiFixture(page, user) {
     if (isRefreshPath(path)) return json(route, { access: 'breadth-access', refresh: '' });
 
     if (path.includes('/chat/rooms')) return json(route, { results: [], count: 0, next: null, previous: null });
-    if (path.endsWith('/client-profile/rooms/shift-contacts/')) return json(route, []);
+    if (path.endsWith('/rooms/shift-contacts/')) return json(route, []);
     if (path.includes('/notifications')) return json(route, { results: [], unread_count: 0, count: 0 });
-    if (path.endsWith('/client-profile/pharmacies/')) return json(route, []);
-    if (path.endsWith('/client-profile/my-memberships/')) return json(route, []);
-    if (path.endsWith('/client-profile/attendance/worker/status/')) {
+    if (path.endsWith('/pharmacies/')) return json(route, []);
+    if (path.endsWith('/my-memberships/')) return json(route, []);
+    if (path.endsWith('/attendance/worker/status/')) {
       return json(route, { has_active_session: false, session_id: null, pharmacy_id: null, pharmacy_name: null });
     }
-    if (path.endsWith('/client-profile/attendance/roster/worker/')) return json(route, { shifts: [] });
-    if (path.endsWith('/client-profile/attendance/manager/pending/')) return json(route, []);
-    if (path.endsWith('/client-profile/workforce/roster/workspace/')) {
+    if (path.endsWith('/attendance/roster/worker/')) return json(route, { shifts: [] });
+    if (path.endsWith('/attendance/manager/pending/')) return json(route, []);
+    if (path.endsWith('/workforce/roster/workspace/')) {
       return json(route, {
         period_id: 501,
         draft_revision: 1,
@@ -116,9 +116,9 @@ async function installApiFixture(page, user) {
         coverage_view: [],
       });
     }
-    if (path.endsWith('/client-profile/workforce/leave/')) return json(route, []);
-    if (path.endsWith('/client-profile/workforce/timesheet-periods/')) return json(route, []);
-    if (path.endsWith('/client-profile/workforce/timesheets/')) return json(route, []);
+    if (path.endsWith('/workforce/leave/')) return json(route, []);
+    if (path.endsWith('/workforce/timesheet-periods/')) return json(route, []);
+    if (path.endsWith('/workforce/timesheets/')) return json(route, []);
     if (path.includes('/onboarding/')) {
       return json(route, {
         progress_percent: 100,
@@ -245,20 +245,20 @@ test('manager leave approval uses the existing pharmacy-scoped decision contract
   let decisionPosts = 0;
   let observedDecision = null;
 
-  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+  await page.route('**/api/v1/pharmacies/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+    if (request.method() === 'GET' && path.endsWith('/pharmacies/')) {
       return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
     }
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/workforce/leave/**', async (route) => {
+  await page.route('**/api/v1/workforce/leave/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
-    if (request.method() === 'GET' && url.pathname.endsWith('/client-profile/workforce/leave/')) {
+    if (request.method() === 'GET' && url.pathname.endsWith('/workforce/leave/')) {
       expect(url.searchParams.get('pharmacy_id')).toBe('101');
       expect(url.searchParams.get('status')).toBe('PENDING');
       return json(route, decided ? [] : [{
@@ -273,7 +273,7 @@ test('manager leave approval uses the existing pharmacy-scoped decision contract
       }]);
     }
 
-    if (request.method() === 'POST' && url.pathname.endsWith('/client-profile/workforce/leave/801/decision/')) {
+    if (request.method() === 'POST' && url.pathname.endsWith('/workforce/leave/801/decision/')) {
       decisionPosts += 1;
       observedDecision = {
         method: request.method(),
@@ -300,7 +300,7 @@ test('manager leave approval uses the existing pharmacy-scoped decision contract
   expect(decisionPosts).toBe(1);
   expect(observedDecision).toEqual({
     method: 'POST',
-    path: '/api/client-profile/workforce/leave/801/decision/',
+    path: '/api/v1/workforce/leave/801/decision/',
     body: {
       decision: 'APPROVED',
       manager_note: 'Approved in smoke',
@@ -314,15 +314,15 @@ test('worker leave form validates required fields and submits the established le
   let createPosts = 0;
   let observedCreate = null;
 
-  await page.route('**/api/client-profile/workforce/leave/**', async (route) => {
+  await page.route('**/api/v1/workforce/leave/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
-    if (request.method() === 'GET' && url.pathname.endsWith('/client-profile/workforce/leave/')) {
+    if (request.method() === 'GET' && url.pathname.endsWith('/workforce/leave/')) {
       return json(route, []);
     }
 
-    if (request.method() === 'POST' && url.pathname.endsWith('/client-profile/workforce/leave/')) {
+    if (request.method() === 'POST' && url.pathname.endsWith('/workforce/leave/')) {
       createPosts += 1;
       observedCreate = {
         method: request.method(),
@@ -351,7 +351,7 @@ test('worker leave form validates required fields and submits the established le
   expect(createPosts).toBe(1);
   expect(observedCreate).not.toBeNull();
   expect(observedCreate.method).toBe('POST');
-  expect(observedCreate.path).toBe('/api/client-profile/workforce/leave/');
+  expect(observedCreate.path).toBe('/api/v1/workforce/leave/');
   expect(observedCreate.body).toMatchObject({
     membership_id: 703,
     leave_type: 'ANNUAL',
@@ -368,7 +368,7 @@ test('worker QR clock-in uses the existing attendance contract once and renders 
   let clockInPosts = 0;
   let observedClockIn = null;
 
-  await page.route('**/api/client-profile/attendance/**', async (route) => {
+  await page.route('**/api/v1/attendance/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
@@ -400,7 +400,7 @@ test('worker QR clock-in uses the existing attendance contract once and renders 
   expect(clockInPosts).toBe(1);
   expect(observedClockIn).toEqual({
     method: 'POST',
-    path: '/api/client-profile/attendance/worker/clock-in/',
+    path: '/api/v1/attendance/worker/clock-in/',
     body: { qr_token: 'smoke-qr-token' },
   });
 });
@@ -410,7 +410,7 @@ test('worker QR clock-in handles server failure without duplicate submission or 
 
   let clockInPosts = 0;
 
-  await page.route('**/api/client-profile/attendance/**', async (route) => {
+  await page.route('**/api/v1/attendance/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
@@ -446,7 +446,7 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
   let acknowledgePosts = 0;
   let observedAcknowledge = null;
 
-  await page.route('**/api/client-profile/attendance/**', async (route) => {
+  await page.route('**/api/v1/attendance/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
@@ -490,7 +490,7 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
   expect(acknowledgePosts).toBe(1);
   expect(observedAcknowledge).toEqual({
     method: 'POST',
-    path: '/api/client-profile/attendance/roster/acknowledge/',
+    path: '/api/v1/attendance/roster/acknowledge/',
     body: {
       period_id: 501,
       notes: 'Acknowledged via Worker Attendance Dashboard',
