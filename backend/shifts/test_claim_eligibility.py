@@ -16,7 +16,7 @@ from client_profile.characterization_support import client_for, make_owner_with_
 from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, PHARMACY_STAFF_EMPLOYMENT_TYPES, Membership
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 
-API = "/api/client-profile/"
+API = "/api/v1/"
 
 
 class ClaimEligibilityTests(TestCase):
