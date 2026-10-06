@@ -18,7 +18,6 @@ class ApiV1CompositionContractTests(SimpleTestCase):
         "public-shifts",
         "shift-description-templates",
         "user-availability",
-        "pill-rewards",
         "shifts/active",
         "shifts/confirmed",
         "shifts/history",
@@ -50,6 +49,9 @@ class ApiV1CompositionContractTests(SimpleTestCase):
         for prefix in self.expected_prefixes:
             with self.subTest(prefix=prefix):
                 self.assertIsNotNone(resolve(f"/api/v1/{prefix}/"))
+
+    def test_action_only_reward_route_is_composed_under_api_v1(self):
+        self.assertIsNotNone(resolve("/api/v1/pill-rewards/balance/"))
 
     def test_namespace_and_representative_reverse_paths_are_canonical(self):
         self.assertEqual(reverse("api_v1:organization-list"), "/api/v1/organizations/")
