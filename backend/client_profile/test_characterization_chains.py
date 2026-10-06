@@ -1,4 +1,4 @@
-"""Chains (/api/client-profile/chains/): authentication, listing scope and who may create one."""
+"""Chains (/api/v1/chains/): authentication, listing scope and who may create one."""
 from django.test import TestCase
 
 from client_profile.characterization_support import BASE, client_for, make_owner_with_pharmacy, make_user
