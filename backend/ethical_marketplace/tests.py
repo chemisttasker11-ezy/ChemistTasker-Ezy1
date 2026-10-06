@@ -21,7 +21,7 @@ class EthicalMarketplaceTests(TestCase):
         user, owner = self.owner_user("apply@example.test")
         pharmacy = Pharmacy.objects.create(name="Applicant premises", owner=owner, verified=True, state="QLD")
         client = APIClient(); client.force_authenticate(user)
-        response = client.get(f"/api/ethical/pharmacies/{pharmacy.id}/approval/")
+        response = client.get(f"/api/v1/ethical/pharmacies/{pharmacy.id}/approval/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["status"], "NOT_SUBMITTED")
         self.assertEqual(response["Cache-Control"], "private, no-store")
@@ -31,7 +31,7 @@ class EthicalMarketplaceTests(TestCase):
         user, owner = self.owner_user("blocked@example.test")
         pharmacy = Pharmacy.objects.create(name="Blocked premises", owner=owner, verified=True, state="QLD")
         client = APIClient(); client.force_authenticate(user)
-        response = client.get(f"/api/ethical/catalogue/?pharmacy={pharmacy.id}")
+        response = client.get(f"/api/v1/ethical/catalogue/?pharmacy={pharmacy.id}")
         self.assertEqual(response.status_code, 403)
         self.assertNotIn("product", str(response.data).lower())
 
