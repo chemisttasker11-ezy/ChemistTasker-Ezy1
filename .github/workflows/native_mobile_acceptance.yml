@@ -12,6 +12,7 @@ permissions:
   contents: read
 
 env:
+  TESTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   DJANGO_SETTINGS_MODULE: "core.native_smoke_settings"
   APP_ENV: "test"
   SECRET_KEY: "native-smoke-only-not-production"
@@ -50,12 +51,12 @@ jobs:
       - name: Checkout workflow commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: "${{ github.sha }}"
+          ref: "${{ env.TESTED_SHA }}"
       - name: Verify source identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$TESTED_SHA"
           git diff --quiet
           git diff --cached --quiet
 
@@ -411,12 +412,12 @@ jobs:
       - name: Checkout workflow commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: "${{ github.sha }}"
+          ref: "${{ env.TESTED_SHA }}"
       - name: Verify source identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$TESTED_SHA"
           git diff --quiet
           git diff --cached --quiet
 
