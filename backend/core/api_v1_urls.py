@@ -40,7 +40,7 @@ router.registry.extend(membership_intake_router.registry)
 
 router.registry.extend(shift_discovery_router.registry)
 router.registry.extend(talent_availability_router.registry)
-router.registry.extend(rewards_router)
+router.registry.extend(rewards_router.registry)
 
 router.registry.extend(shift_lifecycle_router.registry)
 
