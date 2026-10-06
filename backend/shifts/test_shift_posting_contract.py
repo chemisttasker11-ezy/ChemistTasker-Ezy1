@@ -21,7 +21,7 @@ from organizations.models import Chain
 from shifts.models import Shift, ShiftInterest, ShiftOffer, ShiftSlot
 from talent.models import UserAvailability
 
-API = "/api/client-profile/"
+API = "/api/v1/"
 DAY = date.today() + timedelta(days=14)
 
 
