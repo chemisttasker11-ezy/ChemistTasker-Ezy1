@@ -17,8 +17,8 @@ services:
     env_file:
       - ./env/web.dev.env
     environment:
-      PLATFORM_API_URL: "http://web:8000/api"
-      HUB_API_URL: "http://web:8000/api"
+      PLATFORM_API_URL: "http://web:8000/api/v1"
+      HUB_API_URL: "http://web:8000/api/v1"
       NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
       DASHBOARD_INTERNAL_URL: "http://frontend_5173:5173"
       CT_SHARED_CORE_SKIP_PREPARE: "1"
@@ -243,7 +243,7 @@ services:
     env_file:
       - ./env/backend.dev.env
     entrypoint: ["/bin/sh", "-c"]
-    command: ["stripe listen --api-key \"$${STRIPE_SECRET_KEY}\" --events checkout.session.completed,invoice.paid,customer.subscription.deleted --forward-to http://web:8000/api/billing/webhook/"]
+    command: ["stripe listen --api-key \"$${STRIPE_SECRET_KEY}\" --events checkout.session.completed,invoice.paid,customer.subscription.deleted --forward-to http://web:8000/api/v1/billing/webhook/"]
     depends_on:
       web:
         condition: service_healthy
