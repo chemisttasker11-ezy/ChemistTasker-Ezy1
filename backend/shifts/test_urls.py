@@ -5,7 +5,7 @@ from shifts.urls import discovery_router, engagement_router, lifecycle_router, r
 
 
 class ShiftUrlOwnershipTests(SimpleTestCase):
-    def test_shift_router_groups_preserve_legacy_prefixes(self):
+    def test_shift_router_groups_preserve_canonical_prefixes(self):
         self.assertEqual(
             [prefix for prefix, _viewset, _basename in discovery_router.registry],
             ["community-shifts", "public-shifts", "shift-description-templates"],
@@ -30,5 +30,5 @@ class ShiftUrlOwnershipTests(SimpleTestCase):
         self.assertEqual(len(router.registry), 15)
 
     def test_fixed_shift_paths_keep_client_profile_namespace(self):
-        self.assertEqual(reverse("client_profile:public-job-board"), "/api/client-profile/public-job-board/")
-        self.assertEqual(reverse("client_profile:view-shared-shift"), "/api/client-profile/view-shared-shift/")
+        self.assertEqual(reverse("api_v1:public-job-board"), "/api/v1/public-job-board/")
+        self.assertEqual(reverse("api_v1:view-shared-shift"), "/api/v1/view-shared-shift/")
