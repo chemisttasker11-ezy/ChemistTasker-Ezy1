@@ -1,4 +1,4 @@
-"""Membership magic links (/api/client-profile/magic/memberships/<token>/ and .../apply/), used without login."""
+"""Membership magic links (/api/v1/magic/memberships/<token>/ and .../apply/), used without login."""
 import uuid
 from datetime import timedelta
 
