@@ -6,6 +6,8 @@ from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from memberships.serializers import MembershipSerializer
 from workforce.roster.serializers import RosterAssignmentSerializer
+from workforce.roster.slot_edit import edit_roster_slots, has_roster_ownership
+from workforce.roster.slot_edit_inputs import RosterSlotEditCommand
 from shifts.serializers import OpenShiftSerializer, ShiftSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -145,6 +147,14 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         It now supports re-assigning a new user at the same time.
         """
         shift_instance = self.get_object()
+        if "slots" in request.data and has_roster_ownership(shift_instance):
+            command = RosterSlotEditCommand(data=request.data)
+            command.is_valid(raise_exception=True)
+            try:
+                updated = edit_roster_slots(shift_instance, request.user, command.validated_data)
+            except DjangoValidationError as exc:
+                raise DRFValidationError(getattr(exc, "message_dict", {"detail": exc.messages})) from exc
+            return Response(self.get_serializer(updated).data)
         if any(_slot_locked_by_published_roster(slot) for slot in shift_instance.slots.select_related("shift")):
             raise DRFValidationError(
                 "Unpublish this shift for editing before changing or reassigning a published roster shift."
@@ -240,8 +250,8 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             qs = qs.filter(pharmacy_id=pharmacy_id)
 
         # Apply date filters if present
-        start_date_str = self.request.query_params.get('start_date')
-        end_date_str = self.request.query_params.get('end_date')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
 
         if start_date_str:
             start_date = date.fromisoformat(start_date_str)
