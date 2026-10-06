@@ -6,6 +6,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const roots = ['backend', 'shared-core', 'frontend_web', 'frontend_mobile', 'scripts', '.github'];
 const forbiddenHttp = /\/api\/(?:client-profile|users|public-hub|marketplace|ethical|content|billing|account)\//g;
 const forbiddenRelative = /\/client-profile\//g;
+const forbiddenEscapedRelative = /\\\\\/client-profile\\\\\//g;
 const forbiddenReverse = /reverse(?:_lazy)?\(\s*["']client_profile:/g;
 const extensions = new Set(['.py', '.ts', '.tsx', '.js', '.mjs', '.cjs', '.yml', '.yaml', '.sh', '.rs']);
 const failures = [];
@@ -31,6 +32,7 @@ function visit(dir) {
       const rules = [
         ['legacy unversioned application API', forbiddenHttp],
         ['legacy client-profile relative API', forbiddenRelative],
+        ['escaped legacy client-profile API matcher', forbiddenEscapedRelative],
         ['legacy Django client_profile URL namespace', forbiddenReverse],
       ];
       for (const [label, pattern] of rules) {
