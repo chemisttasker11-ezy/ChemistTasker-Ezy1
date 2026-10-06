@@ -30,7 +30,7 @@ describe('createApiClient', () => {
         headers: { 'content-type': 'application/json' },
       });
     });
-    const api = createApiClient({ baseUrl: 'https://example.test/api/v1/v1///', fetchImpl: fetchImpl as typeof fetch });
+    const api = createApiClient({ baseUrl: 'https://example.test/api/v1///', fetchImpl: fetchImpl as typeof fetch });
 
     await api.get('items/', {
       role: ['OWNER', null, 'PHARMACIST', undefined],
