@@ -304,6 +304,8 @@ AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
 
 REST_FRAMEWORK = {
+    # Preserve the established numeric ID wire contract through DRF 3.17's BigIntegerField mapping.
+    'COERCE_BIGINT_TO_STRING': False,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'users.authentication.CookieJWTAuthentication',

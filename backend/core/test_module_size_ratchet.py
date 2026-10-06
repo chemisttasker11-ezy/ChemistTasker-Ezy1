@@ -18,10 +18,7 @@ REVIEW_THRESHOLD = 999
 LOOSE_BASELINE_TOLERANCE = 0.10
 
 # path -> (baseline code lines, reason)
-LARGE_MODULES = {
-    "pharmacy_hub/serializers.py": (1161, "hub feed, post, comment, reaction, poll, group and profile serializers"),
-    "shifts/serializers.py": (1000, "shift, slot, interest, offer and counter-offer serializers"),
-}
+LARGE_MODULES = {}
 
 
 def module_sizes():

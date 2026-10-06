@@ -36,3 +36,26 @@ The first compatibility change is intentionally Django==5.2.17 only. Existing DR
 Daphne, Channels, Celery, the existing Django apps, shared-core package and native kiosk protocol remain. This PR creates no business model or table and does not change platform-billing or workforce/payroll authority. The separate billing-policy PR #139 is not incorporated here.
 
 The F01 programme recovery document records the overall sequence. This independent runtime branch can be tested while F01 receives its deeper concurrency review, but final integration must test their combined tree.
+
+## Combined-tree acceptance checkpoint (2026-10-06)
+
+The initial one-pin description above is historical. Compatible advisory remediation
+now changes the pins in RUNTIME_DEPENDENCY_SELECTION.json. The unused django-tenants
+requirement was removed after checking active settings/models/imports. Daphne,
+Channels and Celery remain; no application models or migrations are changed.
+
+F03 is merged at 9dcf0a7a0cdb3753670ad394e94e9d6995ed788d. This integration includes
+F01, the independent attendance-lock correction and the complete serializer extraction.
+The prior F02 strict resolved audit (37394183483) passed without suppressions; this
+combined tree requires new hosted acceptance, not reliance on the old branch results.
+
+DRF 3.17 maps BigAutoField IDs to BigIntegerField. All 27 original unsplit field objects
+were compared with the extracted code under this runtime and match on each database
+vendor. The 34 old/new differences are readonly ID field types; the review JSON records
+the affected serializers. Vendor fixtures are updated in this runtime PR, not in the
+structural split. COERCE_BIGINT_TO_STRING=False and RuntimeContractTests preserve the
+established numeric JSON ID contract. Arbitrary 64-bit JavaScript precision is not
+claimed; any future string-ID contract must be an explicit API decision.
+
+Focused local combined checks passed 24 tests. Hosted migration-backed SQLite/PG,
+full integration, resolved-dependency audit and security checks are still required.

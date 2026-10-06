@@ -1,0 +1,48 @@
+{
+  "original_source": "6add2bdd81689a619ba9e6f29ed5d5c208a5ff18",
+  "extracted_source": "ec529306f39ba3d1a5c5e643a5d623c78322d929",
+  "old_runtime": {
+    "Django": "5.1.8",
+    "DRF": "3.16.0"
+  },
+  "new_runtime": {
+    "Django": "5.2.17",
+    "DRF": "3.17.2"
+  },
+  "same_runtime_original_equals_extracted": {
+    "sqlite": true,
+    "postgresql": true
+  },
+  "review": "All 34 changed static field nodes are readonly id types: IntegerField -> BigIntegerField. No field names, choices, write flags or validators changed. Original same-runtime fixtures were independently captured before accepting the new hashes.",
+  "numeric_json_policy": "COERCE_BIGINT_TO_STRING=False; regression covers readonly IDs above 32-bit range.",
+  "changed_serializer_contracts": [
+    "pharmacy_hub.HubAttachmentSerializer",
+    "pharmacy_hub.HubCommentSerializer",
+    "pharmacy_hub.HubCommunityGroupSerializer",
+    "pharmacy_hub.HubMembershipSerializer",
+    "pharmacy_hub.HubOrganizationSerializer",
+    "pharmacy_hub.HubPharmacySerializer",
+    "pharmacy_hub.HubPollCommentSerializer",
+    "pharmacy_hub.HubPollOptionSerializer",
+    "pharmacy_hub.HubPollSerializer",
+    "pharmacy_hub.HubPostSerializer",
+    "pharmacy_hub.PharmacyCommunityGroupMemberSerializer",
+    "shifts.MyShiftSerializer",
+    "shifts.OpenShiftSerializer",
+    "shifts.SharedShiftSerializer",
+    "shifts.ShiftCounterOfferSerializer",
+    "shifts.ShiftCounterOfferSlotSerializer",
+    "shifts.ShiftDescriptionTemplateSerializer",
+    "shifts.ShiftInterestSerializer",
+    "shifts.ShiftOfferSerializer",
+    "shifts.ShiftRejectionSerializer",
+    "shifts.ShiftSavedSerializer",
+    "shifts.ShiftSerializer",
+    "shifts.ShiftSlotSerializer",
+    "shifts.WorkerShiftRequestSerializer"
+  ],
+  "sources": [
+    "https://www.django-rest-framework.org/api-guide/fields/#bigintegerfield",
+    "https://www.django-rest-framework.org/api-guide/settings/#coerce_bigint_to_string"
+  ]
+}
