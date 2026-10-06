@@ -7,7 +7,7 @@ const roots = ['backend', 'shared-core', 'frontend_web', 'frontend_mobile', 'scr
 const forbiddenHttp = /\/api\/(?:client-profile|users|public-hub|marketplace|ethical|content|billing|account)\//g;
 const forbiddenRelative = /\/client-profile\//g;
 const forbiddenReverse = /reverse(?:_lazy)?\(\s*["']client_profile:/g;
-const extensions = new Set(['.py', '.ts', '.tsx', '.js', '.mjs', '.cjs', '.yml', '.yaml', '.sh']);
+const extensions = new Set(['.py', '.ts', '.tsx', '.js', '.mjs', '.cjs', '.yml', '.yaml', '.sh', '.rs']);
 const failures = [];
 
 function ignored(rel) {
