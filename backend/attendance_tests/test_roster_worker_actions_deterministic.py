@@ -321,7 +321,7 @@ class RosterWorkerActionsDeterministicTests(unittest.TestCase):
 
         initial_shift_count = Shift.objects.filter(pharmacy=self.pharmacy).count()
 
-        request = factory.post(f"/api/client-profile/worker-shift-requests/{req.id}/approve/")
+        request = factory.post(f"/api/v1/worker-shift-requests/{req.id}/approve/")
         force_authenticate(request, user=self.owner_user)
         with patch("shifts.worker_requests.async_task"):
             response = view(request, pk=req.id)
