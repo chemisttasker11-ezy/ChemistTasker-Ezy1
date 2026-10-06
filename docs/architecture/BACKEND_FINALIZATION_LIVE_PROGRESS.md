@@ -29,8 +29,8 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
 | F04 | Roster publication convergence | MERGED (#144) | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
 | F05 | Shared-core transport and domain convergence | MERGED (#146) | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
-| F06 | Canonical /api/v1 domain cutover | IMPLEMENTED - exact-head CI pending | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
-| F07 | Production acceptance and closure | PLANNED | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
+| F06 | Canonical /api/v1 domain cutover | MERGED (#147) | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
+| F07 | Production acceptance and closure | IMPLEMENTED - exact-head CI pending | Real client-to-API journeys, schema generation/diff, populated PostgreSQL upgrade and fresh install, concurrency coverage, deployment checks, security, and exact-head release evidence. |
 
 ## F01 active work
 
@@ -236,3 +236,40 @@ The first integrated run after the senior native-kiosk repair reached the promot
 The production URL composition itself was correct. The contracts were repaired to import `shifts.urls.router`, `memberships.urls.router` and `organizations.urls.router`, and rewards composition now asserts the real `/api/v1/pill-rewards/balance/` action route. No production handler, permission, serializer, model, migration or billing/finance policy changed.
 
 A fresh exact-head CI run is required before merge.
+
+
+## F07 implementation checkpoint - 2026-10-06
+
+F06 #147 merged at `f1d94df72976a4f8df41e2ee7739401f9762288c`; its merge commit has the
+fully tested F06 head `189d30764e78e671caf5c01313a19252ade544d5` as the second parent. F07 starts
+from that exact merged main and is acceptance-only: no model/table, migration, billing-policy,
+Celery task identity, permission or business-rule change is planned.
+
+Branch: `test/finalization-f07-production-acceptance`.
+
+The F07 acceptance harness now adds:
+- a real production-mode browser journey in which Next owns the browser origin, the actual login UI
+  authenticates through `/api/platform/**`, the dashboard request is served by the Vite build, and
+  both `/api/v1/users/me/` and `/api/platform/users/me/` prove the same Django session;
+- required reusable Android and iOS native acceptance, using the existing compiled-app
+  emulator/simulator workflow rather than a source-only mobile check;
+- PostgreSQL 16 fresh-install proof with migration drift checking;
+- a populated PostgreSQL deployment upgrade built and seeded using the exact F06 merge, then opened
+  by the F07 candidate with user/onboarding/pharmacy/membership/admin authority state verified;
+- DRF Spectacular schema generation on F06 and F07 with a byte-for-byte diff;
+- final PostgreSQL concurrency coverage for established client-profile, attendance, roster-edit and
+  roster-publication races;
+- executable production deployment/security assertions for canonical API/BFF routing, WebSocket
+  separation, ASGI/Daphne, migration ownership, secure cookies/HTTPS, non-root backend execution and
+  Django deployment checks;
+- one F07 release gate requiring every acceptance surface above.
+
+Real staging remains explicitly outside the gate. Existing repository security, CodeQL, backend,
+serializer, shared-core, Vite, Next, mobile and kiosk workflows remain required independently.
+Detailed scope and evidence contract: `docs/architecture/PRODUCTION_ACCEPTANCE_F07.md`.
+
+### NEXT ACTION
+
+Open the F07 PR from the exact branch, run all exact-head F07 and existing repository gates, review
+every failure as a production finding rather than weakening the acceptance criteria, and merge only
+after exact-head/main revalidation. PR #139 remains separate.
