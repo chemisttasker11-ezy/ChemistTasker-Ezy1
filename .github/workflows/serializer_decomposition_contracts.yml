@@ -86,6 +86,7 @@ jobs:
         run: >-
           python backend/manage.py test
           core.test_serializer_decomposition
+          core.test_runtime_contract
           core.test_promoted_model_import_ownership
           core.test_module_size_ratchet
           core.test_backend_ownership_boundaries

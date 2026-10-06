@@ -26,7 +26,7 @@ PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67
 | --- | --- | --- | --- |
 | F01 | Roster slot write-path correction (#140) | MERGED | Actual HTTP PATCH preserves slot/assignment identity, unpublished state, sibling records and cross-week period ownership; notification choices occur at republish; negative/rollback tests; PostgreSQL verification. |
 | F02 | Supported runtime baseline (#141) | IN PROGRESS | Verify supported Django 5.2 LTS patch and dependency compatibility from official sources; isolated upgrade PR; full suites/migrations/security evidence. |
-| F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | IMPLEMENTED - expanded PostgreSQL acceptance pending | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
+| F03 | Shifts and Pharmacy Hub serializer decomposition (#142) | MERGED | Cohesive classes moved intact; explicit stable export facades; direct internal imports; output/schema/validation/logging/patch-target compatibility; remove large-module exceptions. |
 | F04 | Roster publication convergence | PLANNED | Existing revision/idempotency-aware publication contract becomes authoritative; no third publication engine; migrate clients deliberately. |
 | F05 | Shared-core transport and domain convergence | PLANNED | Reuse existing transport/client.ts seams; isolated client instances for SSR; retain auth/cookies/errors/multipart/finance restrictions; progressively typecheck implementations. |
 | F06 | Canonical /api/v1 domain cutover | PLANNED | Method/path/handler/permissions/schema/caller matrix; migrate Django namespaces/reverse references and consumers BEFORE removing legacy HTTP mounts; preserve finance adapters' protections. |
@@ -88,7 +88,7 @@ Primary runtime sources and acceptance notes live in docs/architecture/BACKEND_R
 - No billing policy/model/table/migration changes are included. #139 remains separate.
 - Exact tracked-source archives for F01/F02/F03 were recovered through a contents:read temporary CI export; checksum and reconstructed Git trees verified. A bounded patch transport may write only a new work/finalization-candidate-* branch after exact parent, patch SHA-256, allowed paths and expected Git tree verification. PR/main updates remain separate reviewed connector actions; temporary transport is not part of the release tree.
 
-## NEXT ACTION (current)
+## Previous next-action checkpoint (superseded)
 
 1. Verify the independent attendance correction on real PostgreSQL and SQLite; integrate only after all required gates pass.
 2. Reconcile F03 with current main and the attendance correction, preserving intact serializer extraction and exact original per-vendor contracts.
@@ -102,3 +102,24 @@ Primary runtime sources and acceptance notes live in docs/architecture/BACKEND_R
 3. Re-review direct mutation paths, publication locking, history guards and preserved accepted terms, then update #140 description/status. Check current main and exact reviewed head before any merge.
 4. Inspect #141's runtime/advisory evidence while F01 CI runs. Resolve dependency compatibility and advisories in that dedicated branch; do not mix runtime changes into F01.
 5. Start serializer extraction only from the final integrated implementation, moving intact classes and preserving public exports/patch targets. Continue F03-F07 according to the table above, recording real evidence per milestone.
+
+## Active resume checkpoint - 2026-10-06
+
+Approved GitHub writes were retried successfully. F03 #142 is merged at
+9dcf0a7a0cdb3753670ad394e94e9d6995ed788d; signed merge tree equals tested
+60fe2649f9f69773cad2e728facf2e529d3bd4fb. Integration/release, CodeQL, repository
+security and dedicated serializer/finalization SQLite/PostgreSQL checks passed.
+All 31 moved AST definitions were independently rechecked unchanged.
+
+F02's previous strict dependency audit is now green. Its integrated runtime adds a
+reviewed DRF field-metadata adaptation and explicit numeric-ID regression tests.
+Combined exact-head hosted acceptance is pending. No new tables/models/migrations
+or billing-policy change. Temporary recovery/transport helpers are not release files.
+
+## NEXT ACTION (current)
+
+1. Verify and review F02 on integrated F01/F03/attendance main before guarded merge.
+2. Complete F04 publication convergence using the existing revision/idempotency command.
+3. Complete F05 shared-core and F06 canonical /api/v1 migration with all callers verified.
+4. Complete F07 workflow/schema/populated-upgrade/concurrency/deployment evidence.
+F04-F07 are not complete. Do not describe a structural/refactor gate as final acceptance.
