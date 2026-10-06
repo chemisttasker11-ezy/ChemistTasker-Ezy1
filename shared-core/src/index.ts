@@ -62,3 +62,6 @@ export * from './utils/pricing';
 export * from './kioskProtocol';
 
 export * from './domains/rosterPublication';
+
+export { createAsyncScope, StaleAsyncScopeError } from "./utils/asyncScope";
+export type { AsyncScope, AsyncScopeTicket } from "./utils/asyncScope";

@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, prepareRosterPublication, updateRosterShiftService, workforce, type RosterPharmacyMember, type RosterPublicationAttempt, type RosterValidationResult, type WorkerShiftRequest } from '@chemisttasker/shared-core';
+import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, createAsyncScope, reviewRosterSelection, prepareRosterPublication, updateRosterShiftService, workforce, type RosterPharmacyMember, type RosterPublicationAttempt, type RosterValidationResult, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, idempotencyKey, replaceUnderscore, startOfWeek, toNumber } from './utils';
@@ -53,13 +53,36 @@ function slotSummary(row: any) {
 }
 
 export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
-  const router = useRouter();
   const params = useLocalSearchParams<{ pharmacyId?: string }>();
   const workspace = useWorkspace();
   const scopedPharmacyId = Number(params.pharmacyId || 0);
   const pharmacyId = Number.isFinite(scopedPharmacyId) && scopedPharmacyId > 0 ? scopedPharmacyId : workspace.selectedPharmacyId;
   const pharmacyName = pharmacyId === workspace.selectedPharmacyId ? workspace.selectedPharmacyName : null;
   const [weekStart, setWeekStart] = useState(startOfWeek());
+  // A new selection owns new state and request lifetimes, including A -> B -> A.
+  return <RosterSelectionScreen
+    key={`${pharmacyId}:${weekStart}:${screen}`}
+    screen={screen}
+    pharmacyId={pharmacyId}
+    pharmacyName={pharmacyName}
+    weekStart={weekStart}
+    setWeekStart={setWeekStart}
+  />;
+}
+
+function RosterSelectionScreen({ screen, pharmacyId, pharmacyName, weekStart, setWeekStart }: {
+  screen: RosterScreen;
+  pharmacyId: number | null;
+  pharmacyName: string | null;
+  weekStart: string;
+  setWeekStart: React.Dispatch<React.SetStateAction<string>>;
+}) {
+  const router = useRouter();
+  const requestScope = useRef(createAsyncScope()).current;
+  useEffect(() => {
+    requestScope.activate();
+    return () => requestScope.dispose();
+  }, [requestScope]);
   const [period, setPeriod] = useState<any>(null);
   const [coverage, setCoverage] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -71,65 +94,69 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const [reviewedPeriodId, setReviewedPeriodId] = useState<number | null>(null);
   const [warningAcknowledgements, setWarningAcknowledgements] = useState<string[]>([]);
   const publicationAttempt = useRef<RosterPublicationAttempt | undefined>(undefined);
-  const reviewScope = useRef('');
-  reviewScope.current = `${pharmacyId}:${weekStart}`;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [republishNotify, setRepublishNotify] = useState<'worker' | 'team' | 'none'>('worker');
 
-  const loadPeriod = useCallback(async () => {
-    if (!pharmacyId) return null;
-    const scope = `${pharmacyId}:${weekStart}`;
-    const result = await roster.getPeriod(pharmacyId, weekStart);
-    if (reviewScope.current !== scope) return null;
-    setPeriod(result);
-    return result;
-  }, [pharmacyId, weekStart]);
-
   const load = useCallback(async () => {
-    if (!pharmacyId) { setLoading(false); return; }
-    const scope = `${pharmacyId}:${weekStart}`;
-    setLoading(true);
+    const ticket = requestScope.begin('load');
+    if (!ticket.isCurrent()) return;
+    // Refresh invalidates a pending review/action; an old finally cannot clear a new busy state.
+    requestScope.cancel('action');
+    requestScope.cancel('initialization');
+    setBusy(false);
+    setLoading(Boolean(pharmacyId));
     setError('');
+    setPeriod(null);
+    setCoverage([]);
+    setTemplates([]);
+    setRequests([]);
+    setMembersByRole({});
+    setAudits([]);
+    setAcknowledgements(null);
     setValidation(null);
     setReviewedPeriodId(null);
     setWarningAcknowledgements([]);
     publicationAttempt.current = undefined;
+    if (!pharmacyId) { setRefreshing(false); return; }
     try {
-      const p = await loadPeriod();
-      if (reviewScope.current !== scope) return;
-      if (screen === 'coverage') setCoverage(asArray(await workforce.listCoverageRequirements(pharmacyId)));
-      if (screen === 'templates') setTemplates(asArray(await roster.getTemplates(pharmacyId)));
+      const p = await ticket.run(() => roster.getPeriod(pharmacyId, weekStart));
+      setPeriod(p);
+      if (screen === 'coverage') {
+        const rows = await ticket.run(() => workforce.listCoverageRequirements(pharmacyId));
+        setCoverage(asArray(rows));
+      }
+      if (screen === 'templates') {
+        const rows = await ticket.run(() => roster.getTemplates(pharmacyId));
+        setTemplates(asArray(rows));
+      }
       if (screen === 'approvals') {
-        const rows = asArray<WorkerShiftRequest>(
-          await fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any),
-        ).filter((row) => String(row.status || '').toUpperCase() === 'PENDING');
+        const result = await ticket.run(() => fetchWorkerShiftRequestsService({ pharmacyId, status: 'PENDING' } as any));
+        const rows = asArray<WorkerShiftRequest>(result)
+          .filter((row) => String(row.status || '').toUpperCase() === 'PENDING');
         setRequests(rows);
-
         const roles = [...new Set(rows.map((row) => String(row.role || '').toUpperCase()).filter(Boolean))];
-        const entries = await Promise.all(
-          roles.map(async (role) => [
-            role,
-            asArray<RosterPharmacyMember>(await fetchRosterOwnerMembersService(pharmacyId, role)),
-          ] as const),
-        );
+        const entries = await ticket.run(() => Promise.all(roles.map(async (role) => [
+          role, asArray<RosterPharmacyMember>(await fetchRosterOwnerMembersService(pharmacyId, role)),
+        ] as const)));
         setMembersByRole(Object.fromEntries(entries));
       }
       if (screen === 'audit') {
-        const result = await roster.getAudits(pharmacyId);
+        const result = await ticket.run(() => roster.getAudits(pharmacyId));
         setAudits(asArray((result as any)?.audits ?? result));
       }
       if (screen === 'acknowledgements' && p?.period_id) {
-        setAcknowledgements(await roster.getAcknowledgements(Number(p.period_id)));
+        const result = await ticket.run(() => roster.getAcknowledgements(Number(p.period_id)));
+        setAcknowledgements(result);
       }
     } catch (e) {
-      if (reviewScope.current === scope) setError(errorMessage(e, 'Unable to load roster data.'));
+      if (ticket.isCurrent()) setError(errorMessage(e, 'Unable to load roster data.'));
     } finally {
-      if (reviewScope.current === scope) { setLoading(false); setRefreshing(false); }
+      if (ticket.isCurrent()) { setLoading(false); setRefreshing(false); }
     }
-  }, [loadPeriod, pharmacyId, screen, weekStart]);
+  }, [requestScope, pharmacyId, screen, weekStart]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -142,8 +169,10 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
   const periodId = Number(period?.period_id || period?.id || 0);
 
   const ensurePeriod = async () => {
+    const ticket = requestScope.begin('initialization');
+    ticket.assertCurrent();
     if (periodId) return period;
-    const initialized = await roster.initializePeriod(pharmacyId, weekStart);
+    const initialized = await ticket.run(() => roster.initializePeriod(pharmacyId, weekStart));
     setPeriod(initialized);
     return initialized;
   };
@@ -153,7 +182,8 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     period?.status !== 'ARCHIVED';
 
   const runValidation = async () => {
-    const scope = reviewScope.current;
+    const ticket = requestScope.begin('action');
+    if (!ticket.isCurrent()) return;
     setBusy(true);
     setError('');
     setValidation(null);
@@ -161,19 +191,20 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
     setWarningAcknowledgements([]);
     publicationAttempt.current = undefined;
     try {
-      const p = await ensurePeriod();
-      const id = Number(p.period_id || p.id);
-      const result = await roster.validate({
-        period_id: id,
-        expected_revision: Number(p.draft_revision),
+      const reviewed = await reviewRosterSelection({
+        ticket,
+        period,
+        initialize: () => roster.initializePeriod(pharmacyId, weekStart),
+        validate: (command) => roster.validate(command),
+        onPeriod: setPeriod,
       });
-      if (reviewScope.current !== scope) return;
-      setReviewedPeriodId(id);
-      setValidation(result);
+      ticket.assertCurrent();
+      setReviewedPeriodId(Number(reviewed.period.period_id || reviewed.period.id));
+      setValidation(reviewed.validation);
     } catch (e) {
-      if (reviewScope.current === scope) setError(errorMessage(e, 'Roster validation failed.'));
+      if (ticket.isCurrent()) setError(errorMessage(e, 'Roster validation failed.'));
     } finally {
-      if (reviewScope.current === scope) setBusy(false);
+      if (ticket.isCurrent()) setBusy(false);
     }
   };
 
@@ -187,15 +218,17 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       setError('This roster shift is missing its slot id.');
       return;
     }
+    const ticket = requestScope.begin('action');
+    if (!ticket.isCurrent()) return;
     setBusy(true);
     setError('');
     try {
-      await roster.unpublishShift(slotId);
+      await ticket.run(() => roster.unpublishShift(slotId));
       await load();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to unpublish shift for editing.'));
+      if (ticket.isCurrent()) setError(errorMessage(e, 'Unable to unpublish shift for editing.'));
     } finally {
-      setBusy(false);
+      if (ticket.isCurrent()) setBusy(false);
     }
   };
 
@@ -205,15 +238,17 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
       setError('This roster shift is missing its slot id.');
       return;
     }
+    const ticket = requestScope.begin('action');
+    if (!ticket.isCurrent()) return;
     setBusy(true);
     setError('');
     try {
-      await roster.republishShift(slotId, republishNotify);
+      await ticket.run(() => roster.republishShift(slotId, republishNotify));
       await load();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to republish shift.'));
+      if (ticket.isCurrent()) setError(errorMessage(e, 'Unable to republish shift.'));
     } finally {
-      setBusy(false);
+      if (ticket.isCurrent()) setBusy(false);
     }
   };
 
@@ -344,6 +379,8 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
         setError('Review the current roster revision and acknowledge its warnings before publishing.');
         return;
       }
+      const ticket = requestScope.begin('action');
+      if (!ticket.isCurrent()) return;
       setBusy(true);
       setError('');
       try {
@@ -352,17 +389,20 @@ export function RosterParityScreen({ screen }: { screen: RosterScreen }) {
           () => idempotencyKey('roster-publication'), publicationAttempt.current,
         );
         publicationAttempt.current = attempt;
-        await roster.publish(attempt.command);
+        await ticket.run(() => roster.publish(attempt.command));
         await load();
       } catch (e) {
-        setError(errorMessage(e, 'Unable to publish roster. Refresh and review if the revision changed.'));
-      } finally { setBusy(false); }
+        if (ticket.isCurrent()) setError(errorMessage(e, 'Unable to publish roster. Refresh and review if the revision changed.'));
+      } finally { if (ticket.isCurrent()) setBusy(false); }
     };
     const unpublish = async () => {
       if (!periodId) return;
+      const ticket = requestScope.begin('action');
+      if (!ticket.isCurrent()) return;
       setBusy(true); setError('');
-      try { await roster.unpublish({ period_id: periodId }); await load(); }
-      catch(e){ setError(errorMessage(e)); } finally { setBusy(false); }
+      try { await ticket.run(() => roster.unpublish({ period_id: periodId })); await load(); }
+      catch(e){ if (ticket.isCurrent()) setError(errorMessage(e)); }
+      finally { if (ticket.isCurrent()) setBusy(false); }
     };
     const ready = reviewIsCurrent && validation && !validation.errors.length &&
       validation.warnings.every((warning) => warningAcknowledgements.includes(warning.warning_key));

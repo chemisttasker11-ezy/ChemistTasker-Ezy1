@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { prepareRosterPublication, type RosterPublicationAttempt } from '@chemisttasker/shared-core';
+import { createAsyncScope, prepareRosterPublication, type RosterPublicationAttempt } from '@chemisttasker/shared-core';
 import {
   Alert,
   Button,
@@ -26,6 +26,11 @@ export default function RosterPublishReviewDialog({
   onClose: () => void;
   onPublished: () => Promise<void> | void;
 }) {
+  const requestScope = useRef(createAsyncScope()).current;
+  useEffect(() => {
+    requestScope.activate();
+    return () => requestScope.dispose();
+  }, [requestScope]);
   const [warnings, setWarnings] = useState<RosterWarning[]>([]);
   const [errors, setErrors] = useState<Array<{ type: string; message: string }>>([]);
   const [ack, setAck] = useState<Set<string>>(new Set());
@@ -41,43 +46,52 @@ export default function RosterPublishReviewDialog({
     setErrors([]);
     setAck(new Set());
     attempt.current = undefined;
+    setBusy(false);
+    setMessage('');
+    requestScope.cancel('publish');
     if (!open || !workspace?.period_id) return;
-    let active = true;
+    const ticket = requestScope.begin('validate');
     setMessage('');
     setBusy(true);
-    validateRosterRevision(workspace.period_id, workspace.draft_revision)
+    ticket.run(() => validateRosterRevision(workspace.period_id!, workspace.draft_revision))
       .then((result) => {
-        if (!active) return;
+        if (!ticket.isCurrent()) return;
         const validation = result as { draft_revision: number; warnings?: RosterWarning[]; errors?: Array<{ type: string; message: string }> };
         setWarnings(validation.warnings || []);
         setErrors(validation.errors || []);
         setValidatedRevision(validation.draft_revision);
       })
-      .catch((err: any) => { if (active) setMessage(err?.message || 'Validation failed. Refresh before publishing.'); })
-      .finally(() => { if (active) setBusy(false); });
-    return () => { active = false; };
-  }, [open, workspace?.period_id, workspace?.draft_revision]);
+      .catch((err: any) => { if (ticket.isCurrent()) setMessage(err?.message || 'Validation failed. Refresh before publishing.'); })
+      .finally(() => { if (ticket.isCurrent()) setBusy(false); });
+    return () => { requestScope.cancel('validate'); };
+  }, [open, workspace?.period_id, workspace?.draft_revision, requestScope]);
 
   const publish = async () => {
-    if (!workspace?.period_id || validatedRevision !== workspace.draft_revision) return;
+    if (!workspace?.period_id || validatedRevision !== workspace.draft_revision ||
+        errors.length > 0 || allWarningKeys.some((key) => !ack.has(key))) return;
+    const ticket = requestScope.begin('publish');
+    if (!ticket.isCurrent()) return;
     setBusy(true);
     setMessage('');
     try {
       attempt.current = prepareRosterPublication(
         workspace.period_id, validatedRevision, Array.from(ack), () => crypto.randomUUID(), attempt.current,
       );
-      await publishRosterRevision({
-        periodId: attempt.current.command.period_id,
-        expectedRevision: attempt.current.command.expected_revision,
-        acknowledgedWarningKeys: attempt.current.command.acknowledged_warning_keys,
-        operationId: attempt.current.command.operation_id,
-      });
-      await onPublished();
+      const command = attempt.current.command;
+      await ticket.run(() => publishRosterRevision({
+        periodId: command.period_id,
+        expectedRevision: command.expected_revision,
+        acknowledgedWarningKeys: command.acknowledged_warning_keys,
+        operationId: command.operation_id,
+      }));
+      await ticket.run(async () => { await onPublished(); });
+      ticket.assertCurrent();
       onClose();
     } catch (err: any) {
+      if (!ticket.isCurrent()) return;
       const payload = err?.response?.data;
       setMessage(payload?.message || payload?.error || (payload ? JSON.stringify(payload) : err?.message) || 'Publish failed.');
-    } finally { setBusy(false); }
+    } finally { if (ticket.isCurrent()) setBusy(false); }
   };
 
   return (
