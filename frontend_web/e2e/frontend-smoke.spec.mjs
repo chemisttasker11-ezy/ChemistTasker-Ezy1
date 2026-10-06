@@ -301,21 +301,21 @@ test('timesheets Recalculate uses the established period recalculation contract'
     recalculate: null,
   };
 
-  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+  await page.route('**/api/v1/pharmacies/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+    if (request.method() === 'GET' && path.endsWith('/pharmacies/')) {
       return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
     }
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/workforce/timesheet-periods/**', async (route) => {
+  await page.route('**/api/v1/workforce/timesheet-periods/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
 
-    if (request.method() === 'GET' && path.endsWith('/client-profile/workforce/timesheet-periods/')) {
+    if (request.method() === 'GET' && path.endsWith('/workforce/timesheet-periods/')) {
       expect(url.searchParams.get('pharmacy_id')).toBe('101');
       return json(route, [{
         id: 501,
@@ -356,7 +356,7 @@ test('timesheets Recalculate uses the established period recalculation contract'
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/workforce/timesheets/**', async (route) => {
+  await page.route('**/api/v1/workforce/timesheets/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (request.method() === 'GET') {
@@ -379,7 +379,7 @@ test('timesheets Recalculate uses the established period recalculation contract'
 
   expect(observed.recalculate).toEqual({
     method: 'POST',
-    path: '/api/client-profile/workforce/timesheet-periods/501/recalculate/',
+    path: '/api/v1/workforce/timesheet-periods/501/recalculate/',
     body: { sync: true },
   });
 });
@@ -393,16 +393,16 @@ test('attendance approval uses existing pharmacy-scoped pending and approve cont
     approve: null,
   };
 
-  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+  await page.route('**/api/v1/pharmacies/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+    if (request.method() === 'GET' && path.endsWith('/pharmacies/')) {
       return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
     }
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/attendance/manager/pending/**', async (route) => {
+  await page.route('**/api/v1/attendance/manager/pending/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (request.method() === 'GET') {
@@ -425,7 +425,7 @@ test('attendance approval uses existing pharmacy-scoped pending and approve cont
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/attendance/manager/approve/**', async (route) => {
+  await page.route('**/api/v1/attendance/manager/approve/**', async (route) => {
     const request = route.request();
     if (request.method() === 'POST') {
       observed.approve = {
@@ -452,7 +452,7 @@ test('attendance approval uses existing pharmacy-scoped pending and approve cont
   expect(observed.pendingPharmacyId).toBe('101');
   expect(observed.approve).toEqual({
     method: 'POST',
-    path: '/api/client-profile/attendance/manager/approve/',
+    path: '/api/v1/attendance/manager/approve/',
     body: {
       provisional_id: 77,
       reason: 'Approved cover shift by pharmacy manager.',
@@ -467,11 +467,11 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
   let listReads = 0;
   let observed = null;
 
-  await page.route('**/api/client-profile/my-memberships/**', async (route) => {
+  await page.route('**/api/v1/my-memberships/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
-    if (request.method() === 'GET' && url.pathname.endsWith('/client-profile/my-memberships/')) {
+    if (request.method() === 'GET' && url.pathname.endsWith('/my-memberships/')) {
       listReads += 1;
       const status = listReads === 1 ? 'PENDING' : 'ACCEPTED';
       return json(route, [{
@@ -497,7 +497,7 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
       }]);
     }
 
-    if (request.method() === 'POST' && url.pathname.endsWith('/client-profile/my-memberships/701/accept/')) {
+    if (request.method() === 'POST' && url.pathname.endsWith('/my-memberships/701/accept/')) {
       observed = {
         method: request.method(),
         path: url.pathname,
@@ -522,7 +522,7 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
   await expect(page.getByText('Accepted')).toBeVisible();
   expect(observed).toEqual({
     method: 'POST',
-    path: '/api/client-profile/my-memberships/701/accept/',
+    path: '/api/v1/my-memberships/701/accept/',
     body: null,
   });
   expect(listReads).toBeGreaterThanOrEqual(2);
@@ -535,16 +535,16 @@ test('workforce kiosk revoke uses the existing scoped manager kiosk contract', a
   let revoked = false;
   let observed = null;
 
-  await page.route('**/api/client-profile/pharmacies/**', async (route) => {
+  await page.route('**/api/v1/pharmacies/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === 'GET' && path.endsWith('/client-profile/pharmacies/')) {
+    if (request.method() === 'GET' && path.endsWith('/pharmacies/')) {
       return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
     }
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/workforce/**', async (route) => {
+  await page.route('**/api/v1/workforce/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (request.method() !== 'GET') return route.fallback();
@@ -562,7 +562,7 @@ test('workforce kiosk revoke uses the existing scoped manager kiosk contract', a
     return route.fallback();
   });
 
-  await page.route('**/api/client-profile/attendance/manager/kiosk-devices/**', async (route) => {
+  await page.route('**/api/v1/attendance/manager/kiosk-devices/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
@@ -609,7 +609,7 @@ test('workforce kiosk revoke uses the existing scoped manager kiosk contract', a
   await expect(page.getByText('No kiosk terminals are registered for this pharmacy.')).toBeVisible();
   expect(observed).toEqual({
     method: 'POST',
-    path: '/api/client-profile/attendance/manager/kiosk-devices/',
+    path: '/api/v1/attendance/manager/kiosk-devices/',
     body: { device_id: 901 },
   });
 });
