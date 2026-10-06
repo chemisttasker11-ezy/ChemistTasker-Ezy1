@@ -16,7 +16,7 @@ from onboarding.models import PharmacistOnboarding
 from organizations.models import PharmacyAdmin
 from shifts.models import Shift, ShiftProfileAccessAudit, ShiftSlot, ShiftSlotAssignment
 
-API = "/api/client-profile/"
+API = "/api/v1/"
 SOON = date.today() + timedelta(days=7)
 PAST = date.today() - timedelta(days=7)
 
