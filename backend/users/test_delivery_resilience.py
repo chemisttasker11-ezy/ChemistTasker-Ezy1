@@ -61,7 +61,7 @@ class AccountDeletionFailureBoundaryTests(TestCase):
             "users.api_account.async_task",
             side_effect=ConnectionError("queue unavailable"),
         ):
-            response = client.delete("/api/account/")
+            response = client.delete("/api/v1/account/")
 
         self.assertEqual((response.status_code, response.data), (200, {"success": True}))
         user.refresh_from_db()
@@ -80,13 +80,13 @@ class EmailQueueFailureBoundaryTests(TestCase):
         ):
             cache.clear()
             known = APIClient().post(
-                "/api/users/password-reset/",
+                "/api/v1/users/password-reset/",
                 {"email": user.email},
                 format="json",
             )
             cache.clear()
             unknown = APIClient().post(
-                "/api/users/password-reset/",
+                "/api/v1/users/password-reset/",
                 {"email": "absent@example.invalid"},
                 format="json",
             )
@@ -121,13 +121,13 @@ class EmailQueueFailureBoundaryTests(TestCase):
         ):
             cache.clear()
             known = APIClient().post(
-                "/api/users/resend-otp/",
+                "/api/v1/users/resend-otp/",
                 {"email": user.email},
                 format="json",
             )
             cache.clear()
             unknown = APIClient().post(
-                "/api/users/resend-otp/",
+                "/api/v1/users/resend-otp/",
                 {"email": "absent@example.invalid"},
                 format="json",
             )
@@ -173,7 +173,7 @@ class MobileOtpDeliveryFailureTests(TestCase):
 
         with self.provider(500):
             failed = self.client_for(user).post(
-                "/api/users/mobile/request-otp/",
+                "/api/v1/users/mobile/request-otp/",
                 {"mobile_number": "0400000000", **self.IDENTITY},
                 format="json",
             )
@@ -190,7 +190,7 @@ class MobileOtpDeliveryFailureTests(TestCase):
         cache.clear()
         with self.provider(200):
             retry = self.client_for(user).post(
-                "/api/users/mobile/request-otp/",
+                "/api/v1/users/mobile/request-otp/",
                 {"mobile_number": "0400000000", **self.IDENTITY},
                 format="json",
             )
@@ -205,7 +205,7 @@ class MobileOtpDeliveryFailureTests(TestCase):
 
         with self.provider(500):
             failed = self.client_for(user).post(
-                "/api/users/mobile/resend-otp/",
+                "/api/v1/users/mobile/resend-otp/",
                 {},
                 format="json",
             )
@@ -217,7 +217,7 @@ class MobileOtpDeliveryFailureTests(TestCase):
         cache.clear()
         with self.provider(200):
             retry = self.client_for(user).post(
-                "/api/users/mobile/resend-otp/",
+                "/api/v1/users/mobile/resend-otp/",
                 {},
                 format="json",
             )
@@ -232,7 +232,7 @@ class MobileOtpDeliveryFailureTests(TestCase):
             side_effect=requests.RequestException(sensitive_provider_detail),
         ), self.assertLogs("users.views", level="WARNING") as logs:
             response = self.client_for(user).post(
-                "/api/users/mobile/request-otp/",
+                "/api/v1/users/mobile/request-otp/",
                 {"mobile_number": "0400000000", **self.IDENTITY},
                 format="json",
             )
