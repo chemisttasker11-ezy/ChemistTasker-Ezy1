@@ -30,13 +30,27 @@ function responses(...payloads: unknown[]) {
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('source-backed wire/domain contracts after extraction',()=>{
-  it('retains all 438 measured runtime exports as the original domain object',()=>{
+  it('retains all 431 maintained runtime exports as the original domain object',()=>{
     const modules=import.meta.glob('./**/api.ts',{eager:true});
-    expect(Object.keys(exportOwners)).toHaveLength(438);
+    expect(Object.keys(exportOwners)).toHaveLength(431);
     for(const [name,owner] of Object.entries(exportOwners)) {
       const path='./'+owner.replace(/^domains\//,'');
       expect(publicApi[name],name).toBe(modules[path][name]);
       expect(publicApi[name],name).toBeDefined();
+    }
+  });
+
+  it('does not re-export retired operations that point to nonexistent backend routes',()=>{
+    for (const name of [
+      'createOnboarding',
+      'getShiftApplications',
+      'acceptShiftApplication',
+      'rejectShiftApplication',
+      'fetchShiftApplicationsService',
+      'acceptShiftApplicationService',
+      'rejectShiftApplicationService',
+    ]) {
+      expect(publicApi).not.toHaveProperty(name);
     }
   });
 

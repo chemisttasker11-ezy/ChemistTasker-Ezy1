@@ -71,4 +71,8 @@ describe('legacy API_ENDPOINTS reconciliation', () => {
   it('exposes the current token-based referee rejection route', () => {
     expect(API_ENDPOINTS.refereeRejectByToken('signed-token')).toBe('/onboarding/referee-reject/signed-token/');
   });
+
+  it('does not expose the retired onboarding create route', () => {
+    expect('onboardingCreate' in API_ENDPOINTS).toBe(false);
+  });
 });

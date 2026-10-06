@@ -5,13 +5,13 @@ interface SlotSelection {
     slotId?: number | null;
     slotIds?: number[];
 }
-import type { ShiftApi, ShiftInterestApi, ShiftCounterOfferApi, ShiftOfferApi, ShiftMemberStatusApi, ShiftShareLinkApi, OwnerShiftSummaryApi, ShiftApplicationApi } from '../../types';
+import type { ShiftApi, ShiftInterestApi, ShiftCounterOfferApi, ShiftOfferApi, ShiftMemberStatusApi, ShiftShareLinkApi, OwnerShiftSummaryApi } from '../../types';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { fetchApi } from '../../transport/application';
 import { asList, buildQuery, camelCaseKeysDeep, toPaginatedList } from '../../utils/serialization';
-import { mapOwnerShiftSummary, mapShift, mapShiftApplication, mapShiftCounterOffer, mapShiftInterest, mapShiftMemberStatus, mapShiftShareLink } from './mappers';
+import { mapOwnerShiftSummary, mapShift, mapShiftCounterOffer, mapShiftInterest, mapShiftMemberStatus, mapShiftShareLink } from './mappers';
 import type { ShiftOfferAcceptancePayload } from '../../types';
 export function calculateShiftRates(payload: unknown) {
     return fetchApi<Array<{
@@ -210,15 +210,6 @@ export function createOwnerShift(data: unknown) {
 }
 export function updateOwnerShift(id: number | string, data: unknown) {
     return fetchApi<ShiftApi>(`/shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
-}
-export function getShiftApplications(id: number | string) {
-    return fetchApi<Collection<ShiftApplicationApi>>(`/shifts/${id}/applications/`);
-}
-export function acceptShiftApplication(shiftId: number | string, applicationId: number | string) {
-    return fetchApi(`/shifts/${shiftId}/applications/${applicationId}/accept/`, { method: 'POST' });
-}
-export function rejectShiftApplication(shiftId: number | string, applicationId: number | string) {
-    return fetchApi(`/shifts/${shiftId}/applications/${applicationId}/reject/`, { method: 'POST' });
 }
 export function getPublicJobBoard(params?: {
     organization?: number | string;
@@ -497,14 +488,4 @@ export async function createOwnerShiftService(payload: unknown) {
 }
 export async function updateOwnerShiftService(shiftId: number | string, payload: unknown) {
     await updateOwnerShift(shiftId, payload);
-}
-export async function fetchShiftApplicationsService(shiftId: number | string) {
-    const data = await getShiftApplications(shiftId);
-    return asList(data).map(mapShiftApplication);
-}
-export async function acceptShiftApplicationService(shiftId: number | string, applicationId: number | string) {
-    await acceptShiftApplication(shiftId, applicationId);
-}
-export async function rejectShiftApplicationService(shiftId: number | string, applicationId: number | string) {
-    await rejectShiftApplication(shiftId, applicationId);
 }

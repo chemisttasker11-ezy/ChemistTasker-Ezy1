@@ -32,7 +32,8 @@ This avoids two endpoint registries claiming the same authenticated operational 
 | Legacy shift detail builders | Corrected compatibility | Canonical trailing-slash DRF detail paths are retained under existing names. |
 | `refereeRejectByToken(token)` | Canonical | Matches the current single-token Django route. |
 | `refereeReject(pk, refIndex)` | Deprecated compatibility alias | Retained only for legacy compatibility; new code must use the token route. |
-| `onboardingCreate(role)` / `createOnboarding` | Deprecated compatibility alias | Current Django onboarding is `/{role}/onboarding/me/`; new code must use current named operations. |
+| `onboardingCreate(role)` / `createOnboarding` | Removed dead compatibility | No Django create route exists; onboarding is maintained through `/{role}/onboarding/me/`. The unused compatibility export was removed after F06. |
+| `get/accept/rejectShiftApplication*` | Removed dead compatibility | No `/shifts/{id}/applications/` backend family exists. Owner application review uses the `worker-shift-requests` operations instead. |
 
 ## Guardrails
 
