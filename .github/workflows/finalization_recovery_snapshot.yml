@@ -1,0 +1,58 @@
+name: Finalization recovery snapshot
+
+on:
+  push:
+    branches: [work/finalization-recovery-20261006-c]
+
+permissions:
+  contents: read
+
+jobs:
+  tracked-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 32c86cbd9fc9c33d14ce6e64f067fc3c8c04177c
+          persist-credentials: false
+      - name: Export only tracked source at the approved checkpoint
+        run: |
+          mkdir -p "$RUNNER_TEMP/source-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/source-evidence/COMMIT"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/source-evidence/TREE"
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/source-evidence/source.tar.gz"
+          cd "$RUNNER_TEMP/source-evidence"
+          sha256sum source.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-tracked-source
+          path: ${{ runner.temp }}/source-evidence/
+          retention-days: 3
+  shared-core-toolchain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 32c86cbd9fc9c33d14ce6e64f067fc3c8c04177c
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned shared-core test dependencies
+        working-directory: shared-core
+        run: npm ci
+      - name: Export dependencies only, never credentials or runtime data
+        run: |
+          mkdir -p "$RUNNER_TEMP/node-evidence"
+          tar -czf "$RUNNER_TEMP/node-evidence/shared-core-node.tar.gz" shared-core/node_modules
+          node --version > "$RUNNER_TEMP/node-evidence/NODE"
+          git rev-parse HEAD > "$RUNNER_TEMP/node-evidence/COMMIT"
+          cd "$RUNNER_TEMP/node-evidence"
+          sha256sum shared-core-node.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-shared-core-toolchain
+          path: ${{ runner.temp }}/node-evidence/
+          retention-days: 3
