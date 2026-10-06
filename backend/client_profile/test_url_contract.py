@@ -20,7 +20,6 @@ class ApiV1RouterContractTests(SimpleTestCase):
         "public-shifts",
         "shift-description-templates",
         "user-availability",
-        "pill-rewards",
         "shifts/active",
         "shifts/confirmed",
         "shifts/history",
@@ -52,6 +51,11 @@ class ApiV1RouterContractTests(SimpleTestCase):
         for prefix in self.expected_public_prefixes:
             with self.subTest(prefix=prefix):
                 self.assertIsNotNone(resolve(f"/api/v1/{prefix}/"))
+
+    def test_action_only_domain_routes_resolve_under_api_v1(self):
+        # PillRewardsViewSet intentionally exposes only @action routes, not a
+        # collection-list endpoint at /pill-rewards/.
+        self.assertIsNotNone(resolve("/api/v1/pill-rewards/balance/"))
 
     def test_client_profile_urlconf_is_intentionally_empty(self):
         self.assertEqual(kernel_urls.urlpatterns, [])
