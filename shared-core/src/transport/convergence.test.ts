@@ -28,16 +28,16 @@ describe('converged client security and compatibility', () => {
   });
 
   it.each([
-    '/client-profile/finance/../users/',
-    '/client-profile/finance/%2e%2e/users/',
-    '/client-profile/finance/%252e%252e/users/',
-    '/client-profile/finance/%2f..%2fusers/',
-    '/client-profile/finance-elsewhere/',
+    '/finance/../users/',
+    '/finance/%2e%2e/users/',
+    '/finance/%252e%252e/users/',
+    '/finance/%2f..%2fusers/',
+    '/finance-elsewhere/',
   ])('confines finance before credentials: %s', async (path) => {
     const fetchImpl = vi.fn(async () => json({}));
     const token = vi.fn(() => 'secret');
     configureApi({ baseURL: 'https://example.test/api', getToken: token, fetchImpl });
-    await expect(performApiRequest(path, {}, { allowedPathPrefix: '/client-profile/finance/' })).rejects.toThrow();
+    await expect(performApiRequest(path, {}, { allowedPathPrefix: '/finance/' })).rejects.toThrow();
     expect(token).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -48,8 +48,8 @@ describe('converged client security and compatibility', () => {
       return new Response('pdf-bytes', { headers: { 'Content-Type': 'application/pdf' } });
     }) as typeof fetch;
     configureApi({ baseURL: 'https://example.test/api', getToken: () => 'a', fetchImpl });
-    const response = await performApiRequest('https://example.test/api/client-profile/finance/invoices/?page=2', {}, {
-      allowedPathPrefix: '/client-profile/finance/',
+    const response = await performApiRequest('https://example.test/api/v1/finance/invoices/?page=2', {}, {
+      allowedPathPrefix: '/finance/',
     });
     expect(await (await response.blob()).text()).toBe('pdf-bytes');
   });
