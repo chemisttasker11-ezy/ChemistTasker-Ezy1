@@ -7,38 +7,38 @@ import { buildQuery, camelCaseKeysDeep } from '../../utils/serialization';
 import { mapMembershipApplication, mapMembershipSummary } from './mappers';
 export function getMemberships(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<MembershipRecordApi>>(`/client-profile/memberships/${query}`);
+    return fetchApi<Collection<MembershipRecordApi>>(`/memberships/${query}`);
 }
 export function getMyMemberships(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<MembershipRecordApi>>(`/client-profile/my-memberships/${query}`);
+    return fetchApi<Collection<MembershipRecordApi>>(`/my-memberships/${query}`);
 }
 export function createMembership(data: unknown) {
-    return fetchApi<MembershipRecordApi>('/client-profile/memberships/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<MembershipRecordApi>('/memberships/', { method: 'POST', body: JSON.stringify(data) });
 }
 export async function createMembershipInviteService(payload: unknown) {
     const data = await createMembership(payload);
     return mapMembershipSummary(data);
 }
 export function bulkInviteMembers(data: unknown) {
-    return fetchApi('/client-profile/memberships/bulk_invite/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi('/memberships/bulk_invite/', { method: 'POST', body: JSON.stringify(data) });
 }
 export async function bulkInviteMembersService(payload: unknown) {
     const data = await bulkInviteMembers(payload);
     return data;
 }
 export function deleteMembership(id: number | string) {
-    return fetchApi(`/client-profile/memberships/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/memberships/${id}/`, { method: 'DELETE' });
 }
 export async function deleteMembershipService(membershipId: number | string) {
     await deleteMembership(membershipId);
 }
 export function getMembershipInviteLinks(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<MembershipInviteLinkApi>>(`/client-profile/membership-invite-links/${query}`);
+    return fetchApi<Collection<MembershipInviteLinkApi>>(`/membership-invite-links/${query}`);
 }
 export function createMembershipInviteLink(data: unknown) {
-    return fetchApi<MembershipInviteLinkApi>('/client-profile/membership-invite-links/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<MembershipInviteLinkApi>('/membership-invite-links/', { method: 'POST', body: JSON.stringify(data) });
 }
 export async function createMembershipInviteLinkService(payload: unknown) {
     const data = await createMembershipInviteLink(payload);
@@ -46,37 +46,37 @@ export async function createMembershipInviteLinkService(payload: unknown) {
 }
 export function getMembershipApplications(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<MembershipApplicationApi>>(`/client-profile/membership-applications/${query}`);
+    return fetchApi<Collection<MembershipApplicationApi>>(`/membership-applications/${query}`);
 }
 export function reviewMembershipApplication(id: number | string, data: unknown) {
-    return fetchApi<MembershipApplicationApi>(`/client-profile/membership-applications/${id}/`, {
+    return fetchApi<MembershipApplicationApi>(`/membership-applications/${id}/`, {
         method: 'PATCH',
         body: JSON.stringify(data),
     });
 }
 export function previewMembershipApplicationAward(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/membership-applications/${id}/award-preview/`, {
+    return fetchApi(`/membership-applications/${id}/award-preview/`, {
         method: 'POST',
         body: JSON.stringify(data),
     });
 }
 export function approveMembershipApplication(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/membership-applications/${id}/approve/`, {
+    return fetchApi(`/membership-applications/${id}/approve/`, {
         method: 'POST',
         body: JSON.stringify(data),
     });
 }
 export function rejectMembershipApplication(id: number | string) {
-    return fetchApi(`/client-profile/membership-applications/${id}/reject/`, { method: 'POST' });
+    return fetchApi(`/membership-applications/${id}/reject/`, { method: 'POST' });
 }
 export function createMembershipInvite(data: unknown) {
-    return fetchApi<MembershipRecordApi>('/client-profile/memberships/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<MembershipRecordApi>('/memberships/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function getMagicMembershipInfo(token: string) {
-    return fetchApi(`/client-profile/magic/memberships/${token}/`);
+    return fetchApi(`/magic/memberships/${token}/`);
 }
 export function applyMagicMembership(token: string, data: unknown) {
-    return fetchApi(`/client-profile/magic/memberships/${token}/apply/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi(`/magic/memberships/${token}/apply/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export async function fetchMyMemberships(params?: Record<string, unknown>) {
     const data = await getMyMemberships(params);

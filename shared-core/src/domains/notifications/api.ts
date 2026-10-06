@@ -7,13 +7,13 @@ export function getNotifications(page = 1) {
     return fetchApi<Collection<NotificationApi> & {
         unread?: number;
         count_unread?: number;
-    }>(`/client-profile/notifications/?page=${page}`);
+    }>(`/notifications/?page=${page}`);
 }
 export function markNotificationsAsRead(ids: number[] | undefined) {
     return fetchApi<{
         marked?: number;
         unread?: number;
-    }>('/client-profile/notifications/mark-read/', { method: 'POST', body: JSON.stringify(ids ? { ids } : {}) });
+    }>('/notifications/mark-read/', { method: 'POST', body: JSON.stringify(ids ? { ids } : {}) });
 }
 export async function fetchNotificationsPage(page = 1) {
     const data = await getNotifications(page);
