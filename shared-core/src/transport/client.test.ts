@@ -4,7 +4,7 @@ import { ApiError, createApiClient } from './client';
 describe('createApiClient', () => {
   it('uses the configured base url, query and bearer token', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('https://example.test/api/marketplace/listings/?page=2&role=PHARMACIST');
+      expect(String(input)).toBe('https://example.test/api/v1/marketplace/listings/?page=2&role=PHARMACIST');
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token');
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -13,7 +13,7 @@ describe('createApiClient', () => {
     });
 
     const api = createApiClient({
-      baseUrl: 'https://example.test/api/',
+      baseUrl: 'https://example.test/api/v1/',
       getAuthToken: () => 'access-token',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -24,13 +24,13 @@ describe('createApiClient', () => {
 
   it('serializes query arrays and omits nullish values', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe('https://example.test/api/items/?role=OWNER&role=PHARMACIST&active=false&count=0');
+      expect(String(input)).toBe('https://example.test/api/v1/items/?role=OWNER&role=PHARMACIST&active=false&count=0');
       return new Response(JSON.stringify([]), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
     });
-    const api = createApiClient({ baseUrl: 'https://example.test/api///', fetchImpl: fetchImpl as typeof fetch });
+    const api = createApiClient({ baseUrl: 'https://example.test/api/v1/v1///', fetchImpl: fetchImpl as typeof fetch });
 
     await api.get('items/', {
       role: ['OWNER', null, 'PHARMACIST', undefined],
@@ -50,7 +50,7 @@ describe('createApiClient', () => {
     });
 
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: () => 'must-not-be-used',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -70,13 +70,13 @@ describe('createApiClient', () => {
     });
 
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: () => 'old-token',
       refreshAuthToken: async () => 'new-token',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
-    await expect(api.get('/client-profile/attendance/worker/status/')).resolves.toEqual({ ok: true });
+    await expect(api.get('/attendance/worker/status/')).resolves.toEqual({ ok: true });
     expect(seenTokens).toEqual(['Bearer old-token', 'Bearer new-token']);
   });
 
@@ -87,7 +87,7 @@ describe('createApiClient', () => {
       headers: { 'content-type': 'application/json' },
     }));
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: () => 'old-token',
       refreshAuthToken: async () => 'new-token',
       onAuthFailure,
@@ -104,7 +104,7 @@ describe('createApiClient', () => {
     const onAuthFailure = vi.fn();
     const fetchImpl = vi.fn(async () => new Response('', { status: 401 }));
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       refreshAuthToken: async () => { throw refreshError; },
       onAuthFailure,
       fetchImpl: fetchImpl as typeof fetch,
@@ -126,20 +126,20 @@ describe('createApiClient', () => {
       });
     });
     const clientA = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: async () => 'token-a',
       fetchImpl: fetchImpl as typeof fetch,
     });
     const clientB = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: async () => 'token-b',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
     await Promise.all([clientA.get('/request-a/'), clientB.get('/request-b/')]);
 
-    expect(seen.get('https://example.test/api/request-a/')).toBe('Bearer token-a');
-    expect(seen.get('https://example.test/api/request-b/')).toBe('Bearer token-b');
+    expect(seen.get('https://example.test/api/v1/request-a/')).toBe('Bearer token-a');
+    expect(seen.get('https://example.test/api/v1/request-b/')).toBe('Bearer token-b');
   });
 
   it('serializes plain objects as JSON', async () => {
@@ -149,8 +149,8 @@ describe('createApiClient', () => {
       return new Response(null, { status: 204 });
     });
 
-    const api = createApiClient({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
-    await api.post('/client-profile/attendance/roster/publish/', { period_id: 5 });
+    const api = createApiClient({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
+    await api.post('/attendance/roster/publish/', { period_id: 5 });
   });
 
   it('passes FormData through without forcing a content type', async () => {
@@ -164,14 +164,14 @@ describe('createApiClient', () => {
       expect(init).not.toHaveProperty('retryAuth');
       return new Response(null, { status: 204 });
     });
-    const api = createApiClient({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const api = createApiClient({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
 
     await expect(api.post('/content/media/', form)).resolves.toBeUndefined();
   });
 
   it('returns plain text responses', async () => {
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       fetchImpl: (async () => new Response('accepted', {
         status: 200,
         headers: { 'content-type': 'text/plain' },
@@ -184,7 +184,7 @@ describe('createApiClient', () => {
   it('preserves network failures', async () => {
     const networkError = new TypeError('network unavailable');
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       fetchImpl: (async () => { throw networkError; }) as typeof fetch,
     });
 
@@ -193,7 +193,7 @@ describe('createApiClient', () => {
 
   it('throws ApiError with the server payload', async () => {
     const api = createApiClient({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       fetchImpl: (async () => new Response(JSON.stringify({ detail: 'Denied' }), {
         status: 403,
         headers: { 'content-type': 'application/json' },
