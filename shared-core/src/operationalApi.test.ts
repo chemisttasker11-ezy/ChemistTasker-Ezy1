@@ -13,7 +13,7 @@ afterEach(() => {
 function configure(fetchImpl: typeof fetch) {
   vi.stubGlobal('fetch', fetchImpl);
   configureApi({
-    baseURL: 'https://example.test/api',
+    baseURL: 'https://example.test/api/v1',
     credentials: 'include',
     getToken: async () => 'operational-token',
   });
@@ -38,10 +38,10 @@ describe('authenticated operational api.ts domains', () => {
     await rosterV2.approveReplacement(5, 6);
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/v1/attendance/worker/pin/update/', method: 'POST', authorization: 'Bearer operational-token' },
-      { url: 'https://example.test/api/v1/attendance/manager/approve/', method: 'POST', authorization: 'Bearer operational-token' },
-      { url: 'https://example.test/api/v1/attendance/roster/copy-week/', method: 'POST', authorization: 'Bearer operational-token' },
-      { url: 'https://example.test/api/v1/attendance/roster/manager/approve-replacement/', method: 'POST', authorization: 'Bearer operational-token' },
+      { url: 'https://example.test/api/v1/v1/attendance/worker/pin/update/', method: 'POST', authorization: 'Bearer operational-token' },
+      { url: 'https://example.test/api/v1/v1/attendance/manager/approve/', method: 'POST', authorization: 'Bearer operational-token' },
+      { url: 'https://example.test/api/v1/v1/attendance/roster/copy-week/', method: 'POST', authorization: 'Bearer operational-token' },
+      { url: 'https://example.test/api/v1/v1/attendance/roster/manager/approve-replacement/', method: 'POST', authorization: 'Bearer operational-token' },
     ]);
   });
 
@@ -61,8 +61,8 @@ describe('authenticated operational api.ts domains', () => {
     await rosterV2.republishShift(7, 'team');
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/v1/attendance/roster/shift/unpublish/', method: 'POST', body: JSON.stringify({ slot_id: 7 }) },
-      { url: 'https://example.test/api/v1/attendance/roster/shift/republish/', method: 'POST', body: JSON.stringify({ slot_id: 7, notify: 'team' }) },
+      { url: 'https://example.test/api/v1/v1/attendance/roster/shift/unpublish/', method: 'POST', body: JSON.stringify({ slot_id: 7 }) },
+      { url: 'https://example.test/api/v1/v1/attendance/roster/shift/republish/', method: 'POST', body: JSON.stringify({ slot_id: 7, notify: 'team' }) },
     ]);
   });
 
@@ -81,7 +81,7 @@ describe('authenticated operational api.ts domains', () => {
     await rosterV2.publish(command);
     await workforce.publishRoster(command);
     expect(calls).toEqual(Array.from({length: 2}, () => ({
-      url: 'https://example.test/api/v1/workforce/roster/publish/',
+      url: 'https://example.test/api/v1/v1/workforce/roster/publish/',
       body: JSON.stringify(command),
     })));
   });
@@ -102,7 +102,7 @@ describe('authenticated operational api.ts domains', () => {
 
     vi.stubGlobal('fetch', fetchImpl);
     configureApi({
-      baseURL: 'https://example.test/api',
+      baseURL: 'https://example.test/api/v1',
       credentials: 'include',
       getToken: async () => 'expired-token',
       refreshToken,
@@ -131,10 +131,10 @@ describe('authenticated operational api.ts domains', () => {
     await workforce.previewEmploymentEngagementAward({ membership_id: 7, employment_type: 'FULL_TIME', award_classification: 'PHARMACIST' });
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/v1/workforce/roster/workspace/?pharmacy_id=2&week_start=2026-09-21', method: 'GET' },
-      { url: 'https://example.test/api/v1/workforce/leave/', method: 'POST' },
-      { url: 'https://example.test/api/v1/workforce/timesheets/4/submit/', method: 'POST' },
-      { url: 'https://example.test/api/v1/workforce/employment-engagements/award-preview/', method: 'POST' },
+      { url: 'https://example.test/api/v1/v1/workforce/roster/workspace/?pharmacy_id=2&week_start=2026-09-21', method: 'GET' },
+      { url: 'https://example.test/api/v1/v1/workforce/leave/', method: 'POST' },
+      { url: 'https://example.test/api/v1/v1/workforce/timesheets/4/submit/', method: 'POST' },
+      { url: 'https://example.test/api/v1/v1/workforce/employment-engagements/award-preview/', method: 'POST' },
     ]);
   });
 
@@ -166,7 +166,7 @@ describe('authenticated operational api.ts domains', () => {
 
     expect(calls).toEqual([
       {
-        url: 'https://example.test/api/v1/finance/customers/',
+        url: 'https://example.test/api/v1/v1/finance/customers/',
         method: 'POST',
         authorization: 'Bearer operational-token',
         credentials: 'include',
@@ -188,7 +188,7 @@ describe('authenticated operational api.ts domains', () => {
 
     const escapedFetch = vi.fn(async () => json({
       count: 1,
-      next: 'https://example.test/api/users/me/',
+      next: 'https://example.test/api/v1/users/me/',
       previous: null,
       results: [{ id: 1 }],
     })) as unknown as typeof fetch;
@@ -207,7 +207,7 @@ describe('authenticated operational api.ts domains', () => {
       if (calls.length === 1) {
         return json({
           count: 2,
-          next: 'https://example.test/api/v1/finance/customers/?page=2',
+          next: 'https://example.test/api/v1/v1/finance/customers/?page=2',
           previous: null,
           results: [{ id: 1 }],
         });
@@ -215,7 +215,7 @@ describe('authenticated operational api.ts domains', () => {
       return json({
         count: 2,
         next: null,
-        previous: 'https://example.test/api/v1/finance/customers/',
+        previous: 'https://example.test/api/v1/v1/finance/customers/',
         results: [{ id: 2 }],
       });
     }) as unknown as typeof fetch;
@@ -223,15 +223,15 @@ describe('authenticated operational api.ts domains', () => {
 
     await expect(financeApi.customers()).resolves.toEqual([{ id: 1 }, { id: 2 }]);
     expect(calls).toEqual([
-      'https://example.test/api/v1/finance/customers/',
-      'https://example.test/api/v1/finance/customers/?page=2',
+      'https://example.test/api/v1/v1/finance/customers/',
+      'https://example.test/api/v1/v1/finance/customers/?page=2',
     ]);
   });
 
   it('returns finance PDFs as blobs through the shared authenticated request engine', async () => {
     const pdf = new Blob(['%PDF-test'], { type: 'application/pdf' });
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('https://example.test/api/v1/finance/invoices/7/pdf/');
+      expect(String(input)).toBe('https://example.test/api/v1/v1/finance/invoices/7/pdf/');
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer operational-token');
       return new Response(pdf, { status: 200, headers: { 'content-type': 'application/pdf' } });
     }) as unknown as typeof fetch;
@@ -244,7 +244,7 @@ describe('authenticated operational api.ts domains', () => {
 
   it('keeps receipt uploads multipart without forcing a JSON content type', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('https://example.test/api/v1/finance/expenses/8/receipts/');
+      expect(String(input)).toBe('https://example.test/api/v1/v1/finance/expenses/8/receipts/');
       const headers = new Headers(init?.headers);
       expect(headers.get('Authorization')).toBe('Bearer operational-token');
       expect(headers.has('Content-Type')).toBe(false);
