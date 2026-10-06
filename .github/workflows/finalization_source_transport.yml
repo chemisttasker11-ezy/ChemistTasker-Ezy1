@@ -1,0 +1,71 @@
+name: Finalization Reviewed Source Transport
+on:
+  push:
+    branches: [work/finalization-resume-20261006]
+    paths: [recovery/publish.json]
+permissions:
+  contents: write
+jobs:
+  transport-reviewed-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Verify the patch, parent, paths and resulting tree before creating a new branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64, gzip, hashlib, json, os, re, subprocess
+          from pathlib import Path
+          def git(*args, **kwargs):
+              return subprocess.check_output(['git', *args], **kwargs).decode().strip()
+          request = json.loads(Path('recovery/publish.json').read_text())
+          name = request['milestone']
+          assert re.fullmatch(r'[a-z0-9-]{3,80}', name)
+          directory = Path('recovery/transfers') / name
+          raw = (directory / 'manifest.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest() == request['manifest_sha256']
+          manifest = json.loads(raw)
+          for key in ('base_sha', 'base_tree', 'expected_tree'):
+              assert re.fullmatch(r'[0-9a-f]{40}', manifest[key])
+          count = manifest['chunks']
+          assert isinstance(count, int) and 1 <= count <= 200
+          encoded = ''.join((directory / f'{index:02d}.b64').read_text().strip() for index in range(count))
+          assert len(encoded) < 8_000_000
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          assert len(patch) < 12_000_000
+          assert hashlib.sha256(patch).hexdigest() == manifest['patch_sha256']
+          paths = set(manifest['paths'])
+          assert paths and len(paths) < 2000
+          assert all(not p.startswith(('/', '.git', 'recovery/')) and '..' not in Path(p).parts for p in paths)
+          branch = manifest['branch']
+          assert branch == 'work/finalization-candidate-' + name
+          assert not git('ls-remote', '--heads', 'origin', branch)
+          base = manifest['base_sha']
+          git('fetch', '--no-tags', 'origin', base)
+          assert git('show', '-s', '--format=%T', base) == manifest['base_tree']
+          git('checkout', '--detach', base)
+          subprocess.run(['git', 'apply', '--index', '--binary', '-'], input=patch, check=True)
+          actual = set(git('diff', '--cached', '--name-only').splitlines())
+          assert actual == paths, (actual, paths)
+          git('diff', '--cached', '--check')
+          tree = git('write-tree')
+          assert tree == manifest['expected_tree'], (tree, manifest['expected_tree'])
+          git('config', 'user.name', 'ChemistTasker finalization review')
+          git('config', 'user.email', '329447138+chemisttasker11-ezy@users.noreply.github.com')
+          commit = git('commit-tree', tree, '-p', base, input=manifest['message'].encode())
+          git('push', 'origin', f'{commit}:refs/heads/{branch}')
+          result = Path(os.environ['RUNNER_TEMP']) / 'source-transport-result'
+          result.mkdir()
+          (result / 'result.json').write_text(json.dumps({'commit': commit, 'tree': tree, 'base': base, 'branch': branch}, indent=2))
+          print(json.dumps({'commit': commit, 'tree': tree, 'branch': branch}))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-reviewed-source-result
+          path: ${{ runner.temp }}/source-transport-result/
+          retention-days: 2
