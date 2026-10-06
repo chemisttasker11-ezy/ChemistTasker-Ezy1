@@ -1,4 +1,4 @@
-"""Characterization of the Pills rewards API (/api/client-profile/pill-rewards/)."""
+"""Characterization of the Pills rewards API (/api/v1/pill-rewards/)."""
 from django.test import TestCase
 
 from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
