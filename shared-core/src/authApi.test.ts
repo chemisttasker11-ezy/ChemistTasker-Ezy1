@@ -23,7 +23,7 @@ describe('logoutSession', () => {
 
     expect(fetchImpl).toHaveBeenCalledOnce();
     const [url, init] = vi.mocked(fetchImpl).mock.calls[0];
-    expect(String(url)).toBe('https://example.test/api/v1/v1/users/logout/');
+    expect(String(url)).toBe('https://example.test/api/v1/users/logout/');
     expect(init?.credentials).toBe('include');
     expect(init?.body).toBe('{}');
     expect(new Headers(init?.headers).get('X-CSRFToken')).toBe('csrf-value');
