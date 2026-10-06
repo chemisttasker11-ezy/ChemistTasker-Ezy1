@@ -1,0 +1,13 @@
+{
+  "base": "cc0c01b8b7a0f115a8c4272af6bc4735bd165de4",
+  "tree": "70c8c33161c058bddf36ac112fd9e6ee5e7ce136",
+  "patch_sha256": "a41fe4cd827ccb561b7a9f5a0d2dc9638453479c1a472b41bda63557ca18bc2f",
+  "destination": "work/finalization-candidate-a41fe4cd827c",
+  "paths": [
+    ".github/workflows/backend_finalization_contracts.yml",
+    "backend/attendance/approvals.py",
+    "backend/attendance/test_approval_locking.py",
+    "docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS.md"
+  ],
+  "message": "fix(attendance): lock review and session without nullable joins"
+}

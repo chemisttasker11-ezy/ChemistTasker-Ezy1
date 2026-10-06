@@ -1,0 +1,25 @@
+name: Bounded Finalization Patch Transport
+
+on:
+  push:
+    branches: [work/finalization-recovery-20261006]
+    paths:
+      - '.finalization-transfer/**'
+      - '.github/workflows/finalization_apply.yml'
+      - '.github/scripts/finalization_apply.py'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-reviewed-tree:
+    if: github.repository == 'chemisttasker11-ezy/ChemistTasker-Ezy1' && github.ref == 'refs/heads/work/finalization-recovery-20261006'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Apply reviewed patch only to a new candidate branch
+        run: python .github/scripts/finalization_apply.py
