@@ -5,7 +5,7 @@ from organizations.urls import admin_router, primary_router, router
 
 
 class OrganizationUrlOwnershipTests(SimpleTestCase):
-    def test_router_groups_preserve_legacy_organization_contract(self):
+    def test_router_groups_preserve_canonical_organization_contract(self):
         self.assertEqual(
             [(prefix, basename) for prefix, _viewset, basename in primary_router.registry],
             [
@@ -23,10 +23,10 @@ class OrganizationUrlOwnershipTests(SimpleTestCase):
 
     def test_fixed_paths_keep_client_profile_namespace(self):
         self.assertEqual(
-            reverse("client_profile:organization-public-detail", kwargs={"slug": "demo-org"}),
-            "/api/client-profile/organizations/public/demo-org/",
+            reverse("api_v1:organization-public-detail", kwargs={"slug": "demo-org"}),
+            "/api/v1/organizations/public/demo-org/",
         )
         self.assertEqual(
-            reverse("client_profile:owneronboarding-claim"),
-            "/api/client-profile/owner-onboarding/claim/",
+            reverse("api_v1:owneronboarding-claim"),
+            "/api/v1/owner-onboarding/claim/",
         )
