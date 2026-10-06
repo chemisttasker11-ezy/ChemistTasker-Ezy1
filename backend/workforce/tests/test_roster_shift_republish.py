@@ -154,7 +154,7 @@ class RosterShiftRepublishTests(TestCase):
         client.force_authenticate(self.owner)
 
         denied_assignment_update = client.patch(
-            f"/api/client-profile/roster-owner/{assignment.pk}/",
+            f"/api/v1/roster-owner/{assignment.pk}/",
             {"user": self.workers[1].pk},
             format="json",
         )
@@ -163,7 +163,7 @@ class RosterShiftRepublishTests(TestCase):
         self.assertEqual(assignment.user_id, self.workers[0].pk)
 
         denied_shift_update = client.patch(
-            f"/api/client-profile/roster-shifts/{self.slots[0].shift_id}/",
+            f"/api/v1/roster-shifts/{self.slots[0].shift_id}/",
             {"user_id": self.workers[1].pk},
             format="json",
         )
@@ -171,12 +171,12 @@ class RosterShiftRepublishTests(TestCase):
         assignment.refresh_from_db()
         self.assertEqual(assignment.user_id, self.workers[0].pk)
 
-        denied_delete = client.delete(f"/api/client-profile/roster-owner/{assignment.pk}/")
+        denied_delete = client.delete(f"/api/v1/roster-owner/{assignment.pk}/")
         self.assertEqual(denied_delete.status_code, 400, denied_delete.content)
         self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
 
         denied_escalate = client.post(
-            f"/api/client-profile/roster-shifts/{self.slots[0].shift_id}/escalate/",
+            f"/api/v1/roster-shifts/{self.slots[0].shift_id}/escalate/",
             {"target_visibility": "PLATFORM"},
             format="json",
         )
@@ -184,7 +184,7 @@ class RosterShiftRepublishTests(TestCase):
         self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
 
         unpublish_roster_shift(self.slots[0], self.owner)
-        allowed_delete = client.delete(f"/api/client-profile/roster-owner/{assignment.pk}/")
+        allowed_delete = client.delete(f"/api/v1/roster-owner/{assignment.pk}/")
         self.assertEqual(allowed_delete.status_code, 204, allowed_delete.content)
 
     def test_unpublished_shift_is_hidden_from_legacy_worker_and_open_shift_apis(self):
@@ -193,14 +193,14 @@ class RosterShiftRepublishTests(TestCase):
         client = APIClient()
         client.force_authenticate(worker)
 
-        visible = client.get(f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.pk}")
+        visible = client.get(f"/api/v1/roster-worker/?pharmacy={self.pharmacy.pk}")
         self.assertEqual(visible.status_code, 200, visible.content)
         visible_rows = visible.data.get("results", visible.data) if isinstance(visible.data, dict) else visible.data
         self.assertIn(assignment.pk, {row["id"] for row in visible_rows})
 
         unpublish_roster_shift(self.slots[0], self.owner)
 
-        hidden = client.get(f"/api/client-profile/roster-worker/?pharmacy={self.pharmacy.pk}")
+        hidden = client.get(f"/api/v1/roster-worker/?pharmacy={self.pharmacy.pk}")
         self.assertEqual(hidden.status_code, 200, hidden.content)
         hidden_rows = hidden.data.get("results", hidden.data) if isinstance(hidden.data, dict) else hidden.data
         self.assertNotIn(assignment.pk, {row["id"] for row in hidden_rows})
@@ -223,7 +223,7 @@ class RosterShiftRepublishTests(TestCase):
         )
         RosterPeriod.objects.filter(pk=self.period.pk).update(status=RosterPeriod.Status.PUBLISHED)
         open_before = client.get(
-            f"/api/client-profile/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
+            f"/api/v1/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
         )
         self.assertEqual(open_before.status_code, 200, open_before.content)
         open_before_rows = open_before.data.get("results", open_before.data) if isinstance(open_before.data, dict) else open_before.data
@@ -231,7 +231,7 @@ class RosterShiftRepublishTests(TestCase):
 
         unpublish_roster_shift(vacant_slot, self.owner)
         open_after = client.get(
-            f"/api/client-profile/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
+            f"/api/v1/community-shifts/?pharmacy={self.pharmacy.pk}&unassigned=true"
         )
         self.assertEqual(open_after.status_code, 200, open_after.content)
         open_after_rows = open_after.data.get("results", open_after.data) if isinstance(open_after.data, dict) else open_after.data
