@@ -9,10 +9,10 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 describe('createChemistTaskerApi public content', () => {
   it('exposes the current-user session route without client-local URL construction', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe('https://example.test/api/users/me/');
+      expect(String(input)).toBe('https://example.test/api/v1/users/me/');
       return json({ id: 1 });
     });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
 
     await api.account.getCurrentUser();
   });
@@ -29,12 +29,12 @@ describe('createChemistTaskerApi public content', () => {
         : { eligible_pharmacies: [] });
     });
     const first = createChemistTaskerApi({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: async () => 'request-one-token',
       fetchImpl: fetchImpl as typeof fetch,
     });
     const second = createChemistTaskerApi({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: async () => 'request-two-token',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -47,20 +47,20 @@ describe('createChemistTaskerApi public content', () => {
 
     expect(calls).toHaveLength(3);
     expect(calls).toEqual(expect.arrayContaining([
-      { url: 'https://example.test/api/marketplace/me/access/', authorization: 'Bearer request-one-token' },
-      { url: 'https://example.test/api/marketplace/me/access/', authorization: 'Bearer request-two-token' },
-      { url: 'https://example.test/api/public-hub/articles/', authorization: null },
+      { url: 'https://example.test/api/v1/marketplace/me/access/', authorization: 'Bearer request-one-token' },
+      { url: 'https://example.test/api/v1/marketplace/me/access/', authorization: 'Bearer request-two-token' },
+      { url: 'https://example.test/api/v1/public-hub/articles/', authorization: null },
     ]));
   });
 
   it('uses public reads without attaching the configured token', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('https://example.test/api/public-hub/articles/?kind=news');
+      expect(String(input)).toBe('https://example.test/api/v1/public-hub/articles/?kind=news');
       expect(new Headers(init?.headers).has('Authorization')).toBe(false);
       return json({ count: 0, next: null, previous: null, results: [] });
     });
     const api = createChemistTaskerApi({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       getAuthToken: () => 'private-token',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -78,7 +78,7 @@ describe('createChemistTaskerApi public content', () => {
       if (String(input).includes('/reaction/')) return json({ counts: { like: 1 }, mine: 'like' });
       return json({ detail: 'Report received.' }, 201);
     });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
 
     await api.publicContent.createArticleComment('hello', { body: 'Comment' });
     await api.publicContent.deleteArticleComment(10);
@@ -90,14 +90,14 @@ describe('createChemistTaskerApi public content', () => {
     await api.publicContent.reportArticleComment(9, { reason: 'unsafe' });
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/public-hub/articles/hello/comments/', method: 'POST', body: JSON.stringify({ body: 'Comment' }) },
-      { url: 'https://example.test/api/public-hub/comments/10/', method: 'DELETE', body: null },
-      { url: 'https://example.test/api/public-hub/articles/hello/reaction/', method: 'PUT', body: JSON.stringify({ kind: 'like' }) },
-      { url: 'https://example.test/api/public-hub/articles/hello/reaction/', method: 'DELETE', body: null },
-      { url: 'https://example.test/api/public-hub/comments/11/reaction/', method: 'PUT', body: JSON.stringify({ kind: 'support' }) },
-      { url: 'https://example.test/api/public-hub/comments/11/reaction/', method: 'DELETE', body: null },
-      { url: 'https://example.test/api/public-hub/posts/7/report/', method: 'POST', body: JSON.stringify({ reason: 'spam', comment_id: 8 }) },
-      { url: 'https://example.test/api/public-hub/comments/9/report/', method: 'POST', body: JSON.stringify({ reason: 'unsafe' }) },
+      { url: 'https://example.test/api/v1/public-hub/articles/hello/comments/', method: 'POST', body: JSON.stringify({ body: 'Comment' }) },
+      { url: 'https://example.test/api/v1/public-hub/comments/10/', method: 'DELETE', body: null },
+      { url: 'https://example.test/api/v1/public-hub/articles/hello/reaction/', method: 'PUT', body: JSON.stringify({ kind: 'like' }) },
+      { url: 'https://example.test/api/v1/public-hub/articles/hello/reaction/', method: 'DELETE', body: null },
+      { url: 'https://example.test/api/v1/public-hub/comments/11/reaction/', method: 'PUT', body: JSON.stringify({ kind: 'support' }) },
+      { url: 'https://example.test/api/v1/public-hub/comments/11/reaction/', method: 'DELETE', body: null },
+      { url: 'https://example.test/api/v1/public-hub/posts/7/report/', method: 'POST', body: JSON.stringify({ reason: 'spam', comment_id: 8 }) },
+      { url: 'https://example.test/api/v1/public-hub/comments/9/report/', method: 'POST', body: JSON.stringify({ reason: 'unsafe' }) },
     ]);
   });
 });
@@ -109,7 +109,7 @@ describe('createChemistTaskerApi named community operations', () => {
       calls.push({ url: String(input), method: init?.method ?? 'GET' });
       return json({ ok: true });
     });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
 
     await api.account.login({ email: 'user@example.test', password: 'secret' });
     await api.publicContent.createCommunityComment(4, { body: 'Reply', parent_comment: 2 });
@@ -118,11 +118,11 @@ describe('createChemistTaskerApi named community operations', () => {
     await api.publicContent.removeCommunityCommentReaction(4, 5);
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/users/login/', method: 'POST' },
-      { url: 'https://example.test/api/v1/hub/posts/4/comments/', method: 'POST' },
-      { url: 'https://example.test/api/v1/hub/posts/4/comments/5/', method: 'PATCH' },
-      { url: 'https://example.test/api/v1/hub/posts/4/reactions/', method: 'POST' },
-      { url: 'https://example.test/api/v1/hub/posts/4/comments/5/reactions/', method: 'DELETE' },
+      { url: 'https://example.test/api/v1/users/login/', method: 'POST' },
+      { url: 'https://example.test/api/v1/v1/hub/posts/4/comments/', method: 'POST' },
+      { url: 'https://example.test/api/v1/v1/hub/posts/4/comments/5/', method: 'PATCH' },
+      { url: 'https://example.test/api/v1/v1/hub/posts/4/reactions/', method: 'POST' },
+      { url: 'https://example.test/api/v1/v1/hub/posts/4/comments/5/reactions/', method: 'DELETE' },
     ]);
   });
 });
@@ -134,16 +134,16 @@ describe('createChemistTaskerApi content management', () => {
       urls.push(String(input));
       return json({ detail: 'ok' });
     });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/', fetchImpl: fetchImpl as typeof fetch });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/v1/', fetchImpl: fetchImpl as typeof fetch });
 
     await api.contentManagement.actOnDocument(3, 'submit', { version: 2 });
     await api.contentManagement.actOnInvitation(4, 'revoke');
     await api.contentManagement.moderate('hub', 5, 'hide');
 
     expect(urls).toEqual([
-      'https://example.test/api/content/documents/3/submit/',
-      'https://example.test/api/content/invitations/4/revoke/',
-      'https://example.test/api/content/moderation/hub/5/',
+      'https://example.test/api/v1/content/documents/3/submit/',
+      'https://example.test/api/v1/content/invitations/4/revoke/',
+      'https://example.test/api/v1/content/moderation/hub/5/',
     ]);
   });
 });
@@ -157,7 +157,7 @@ describe('createChemistTaskerApi Marketplace', () => {
         ? new Response(null, { status: 204 })
         : json({ id: 'result', state: 'ENQUIRY', version: 1 });
     });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
 
     await api.marketplace.createEnquiry('listing-id', { client_request_id: 'request-id', message: 'Hello' });
     await api.marketplace.sendExchangeMessage('exchange-id', 'Agreed');
@@ -165,10 +165,10 @@ describe('createChemistTaskerApi Marketplace', () => {
     await api.marketplace.unsaveListing('listing-id');
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/marketplace/listings/listing-id/enquiries/', method: 'POST' },
-      { url: 'https://example.test/api/marketplace/exchanges/exchange-id/messages/', method: 'POST' },
-      { url: 'https://example.test/api/marketplace/saved/listing-id/', method: 'POST' },
-      { url: 'https://example.test/api/marketplace/saved/listing-id/', method: 'DELETE' },
+      { url: 'https://example.test/api/v1/marketplace/listings/listing-id/enquiries/', method: 'POST' },
+      { url: 'https://example.test/api/v1/marketplace/exchanges/exchange-id/messages/', method: 'POST' },
+      { url: 'https://example.test/api/v1/marketplace/saved/listing-id/', method: 'POST' },
+      { url: 'https://example.test/api/v1/marketplace/saved/listing-id/', method: 'DELETE' },
     ]);
   });
 });
@@ -180,7 +180,7 @@ describe('createChemistTaskerApi Ethical Marketplace', () => {
       calls.push({ url: String(input), method: init?.method ?? 'GET' });
       return json({ id: 1, status: 'ok', state: 'ok', version: 2 });
     });
-    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api', fetchImpl: fetchImpl as typeof fetch });
+    const api = createChemistTaskerApi({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl as typeof fetch });
     const form = new FormData();
     form.append('file', new Blob(['barcode,batch_number']), 'stock.csv');
 
@@ -190,10 +190,10 @@ describe('createChemistTaskerApi Ethical Marketplace', () => {
     await api.ethicalMarketplace.actOnTransfer('transfer-id', 'dispatch', { expected_version: 1, client_request_id: 'request-id' });
 
     expect(calls).toEqual([
-      { url: 'https://example.test/api/ethical/inventory/imports/', method: 'POST' },
-      { url: 'https://example.test/api/ethical/inventory/lots/2/reconcile/', method: 'POST' },
-      { url: 'https://example.test/api/ethical/listings/listing-id/publish/', method: 'POST' },
-      { url: 'https://example.test/api/ethical/transfers/transfer-id/dispatch/', method: 'POST' },
+      { url: 'https://example.test/api/v1/ethical/inventory/imports/', method: 'POST' },
+      { url: 'https://example.test/api/v1/ethical/inventory/lots/2/reconcile/', method: 'POST' },
+      { url: 'https://example.test/api/v1/ethical/listings/listing-id/publish/', method: 'POST' },
+      { url: 'https://example.test/api/v1/ethical/transfers/transfer-id/dispatch/', method: 'POST' },
     ]);
     expect(api.ethicalMarketplace.transferDocumentPath('transfer-id', 9)).toBe('/ethical/transfers/transfer-id/documents/9/');
   });
@@ -202,7 +202,7 @@ describe('createChemistTaskerApi Ethical Marketplace', () => {
 describe('createChemistTaskerApi ownership boundary', () => {
   it('keeps authenticated operational domains out of the Next/platform facade', () => {
     const api = createChemistTaskerApi({
-      baseUrl: 'https://example.test/api',
+      baseUrl: 'https://example.test/api/v1',
       fetchImpl: vi.fn() as unknown as typeof fetch,
     }) as Record<string, unknown>;
 
