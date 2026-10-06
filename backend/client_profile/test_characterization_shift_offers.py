@@ -1,4 +1,4 @@
-"""Shift offers (/api/client-profile/shift-offers/): who sees which offer, and that offers are not created here."""
+"""Shift offers (/api/v1/shift-offers/): who sees which offer, and that offers are not created here."""
 from django.test import TestCase
 
 from client_profile.characterization_support import (
