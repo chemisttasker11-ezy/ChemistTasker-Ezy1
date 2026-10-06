@@ -47,7 +47,7 @@ export default function PublicTalentBoardPage() {
     setError(null);
     try {
       const list = await loadAllTalentPages(async (page) => {
-        const response = await fetch(`${API_BASE_URL}/client-profile/explorer-posts/public-feed/?page=${page}&page_size=200`);
+        const response = await fetch(`${API_BASE_URL}/explorer-posts/public-feed/?page=${page}&page_size=200`);
         if (!response.ok) {
           const err = await response.json().catch(() => ({ detail: "Failed to load talent feed." }));
           throw new Error(err.detail || `HTTP ${response.status}`);

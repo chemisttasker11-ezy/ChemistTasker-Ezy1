@@ -13,7 +13,7 @@ export default function PostEntry({post,feed=false,onChange}:{post:PublicPost;fe
  const [failed,setFailed]=useState<number[]>([]);
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const total=Object.values(post.reactions).reduce((sum,n)=>sum+n,0);
- async function like(){setBusy(true);setMessage('');try{await chemistTaskerApi.client.post(`/client-profile/hub/posts/${post.id}/reactions/`,{reaction_type:'LIKE'});await onChange?.();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
+ async function like(){setBusy(true);setMessage('');try{await chemistTaskerApi.client.post(`/hub/posts/${post.id}/reactions/`,{reaction_type:'LIKE'});await onChange?.();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
  async function share(){try{await navigator.clipboard.writeText(`${window.location.origin}/hubs/posts/${post.id}`);setMessage('Post link copied.');}catch{setMessage('Open the conversation and copy its address to share.');}}
  return <>
   <header className="ct-author"><span className="ct-avatar" aria-hidden="true">{post.author_name.split(/\s+/).filter(Boolean).slice(0,2).map(n=>n[0]).join('')}</span><div><strong>{post.author_name}</strong><div className="ct-post-meta"><time dateTime={post.created_at}>{new Date(post.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</time><span aria-hidden="true">·</span><Globe size={12}/><span>Public</span></div></div>{post.is_pinned&&<span className="ct-pinned"><Pin size={14}/>Pinned</span>}{post.editorial&&<span className="ct-status">Editorial</span>}</header>

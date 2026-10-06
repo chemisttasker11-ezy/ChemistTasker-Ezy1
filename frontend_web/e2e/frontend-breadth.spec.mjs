@@ -78,7 +78,7 @@ function json(route, value, status = 200) {
 }
 
 function isRefreshPath(path) {
-  return path === '/api/users/token/refresh/' || path.endsWith('/users/token/refresh/');
+  return path === '/api/v1/users/token/refresh/' || path.endsWith('/users/token/refresh/');
 }
 
 async function installApiFixture(page, user) {

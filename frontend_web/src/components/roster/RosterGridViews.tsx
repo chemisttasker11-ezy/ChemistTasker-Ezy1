@@ -200,7 +200,7 @@ export default function RosterGridViews({
     if (isPublished) throw new Error('This roster is read-only.');
     if (periodId) return periodId;
     if (!pharmacyId) throw new Error('Select a pharmacy first.');
-    const response = await apiClient.post('/client-profile/attendance/roster/period/', {
+    const response = await apiClient.post('/attendance/roster/period/', {
       pharmacy_id: pharmacyId, week_start: weekStart,
     });
     return response.data.period_id as number;
@@ -215,7 +215,7 @@ export default function RosterGridViews({
 
     setIsActionLoading(true);
     try {
-      await apiClient.post('/client-profile/attendance/roster/bulk-edit/', {
+      await apiClient.post('/attendance/roster/bulk-edit/', {
         period_id: await ensureDraftPeriod(),
         operations: [
           {
@@ -243,7 +243,7 @@ export default function RosterGridViews({
     if (!canEditSlot(slotId)) return;
     setIsActionLoading(true);
     try {
-      await apiClient.post('/client-profile/attendance/roster/bulk-edit/', {
+      await apiClient.post('/attendance/roster/bulk-edit/', {
         period_id: await ensureDraftPeriod(),
         operations: [{ action: 'delete_slot', slot_id: slotId }],
       });
@@ -268,7 +268,7 @@ export default function RosterGridViews({
 
     setIsActionLoading(true);
     try {
-      await apiClient.post('/client-profile/attendance/roster/bulk-edit/', {
+      await apiClient.post('/attendance/roster/bulk-edit/', {
         period_id: await ensureDraftPeriod(),
         operations: [
           {

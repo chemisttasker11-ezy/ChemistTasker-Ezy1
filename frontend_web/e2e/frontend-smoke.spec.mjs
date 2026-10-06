@@ -68,8 +68,8 @@ function json(route, value, status = 200) {
   });
 }
 
-const LOGIN_PATH = '/api/users/login/';
-const REFRESH_PATH = '/api/users/token/refresh/';
+const LOGIN_PATH = '/api/v1/users/login/';
+const REFRESH_PATH = '/api/v1/users/token/refresh/';
 
 function isPath(path, expected) {
   return path === expected || path.endsWith(expected.replace(/^\/api/, ''));
