@@ -169,8 +169,8 @@ services:
     container_name: chemisttasker_public_staging
     restart: unless-stopped
     environment:
-      PLATFORM_API_URL: "http://web:8000/api"
-      HUB_API_URL: "http://web:8000/api"
+      PLATFORM_API_URL: "http://web:8000/api/v1"
+      HUB_API_URL: "http://web:8000/api/v1"
       NEXT_PUBLIC_SITE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
       NEXT_PUBLIC_PLATFORM_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
       NEXT_PUBLIC_Maps_API_KEY: "${STAGING_WEB_MAPS_API_KEY:?STAGING_WEB_MAPS_API_KEY is required}"
