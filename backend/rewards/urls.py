@@ -1,5 +1,5 @@
 """URL routes of the rewards app. They are adopted by client_profile's router, so the public paths
-(/api/client-profile/pill-rewards/...) and the `client_profile:` route names are unchanged."""
+(/api/v1/pill-rewards/...) and the `client_profile:` route names are unchanged."""
 from rest_framework.routers import DefaultRouter
 
 from .views import PillRewardsViewSet
