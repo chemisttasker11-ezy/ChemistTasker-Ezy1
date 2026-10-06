@@ -45,20 +45,20 @@ const toRosterQueryParams = (filters?: Record<string, unknown>) => ({
 });
 export function getRosterOwner(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<RosterAssignmentApi>>(`/client-profile/roster-owner/${query}`);
+    return fetchApi<Collection<RosterAssignmentApi>>(`/roster-owner/${query}`);
 }
 export function getRosterWorker(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<RosterAssignmentApi>>(`/client-profile/roster-worker/${query}`);
+    return fetchApi<Collection<RosterAssignmentApi>>(`/roster-worker/${query}`);
 }
 export function createShiftAndAssign(data: unknown) {
-    return fetchApi('/client-profile/roster/create-and-assign-shift/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi('/roster/create-and-assign-shift/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function updateRosterShift(id: number | string, data: unknown) {
-    return fetchApi(`/client-profile/roster-shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    return fetchApi(`/roster-shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 export function deleteRosterShift(id: number | string) {
-    return fetchApi(`/client-profile/roster-shifts/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/roster-shifts/${id}/`, { method: 'DELETE' });
 }
 export function escalateRosterShift(id: number | string, data: unknown) {
     const options: {
@@ -68,24 +68,24 @@ export function escalateRosterShift(id: number | string, data: unknown) {
     if (data) {
         options.body = JSON.stringify(data);
     }
-    return fetchApi(`/client-profile/roster-shifts/${id}/escalate/`, options);
+    return fetchApi(`/roster-shifts/${id}/escalate/`, options);
 }
 export function getOwnerOpenShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
-    return fetchApi<Collection<OpenShiftApi>>(`/client-profile/roster-shifts/list-open-shifts/${query}`);
+    return fetchApi<Collection<OpenShiftApi>>(`/roster-shifts/list-open-shifts/${query}`);
 }
 export function createOpenShift(data: unknown) {
-    return fetchApi('/client-profile/roster-shifts/create-open-shift/', { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi('/roster-shifts/create-open-shift/', { method: 'POST', body: JSON.stringify(data) });
 }
 export function deleteRosterAssignment(id: number | string) {
-    return fetchApi(`/client-profile/roster-owner/${id}/`, { method: 'DELETE' });
+    return fetchApi(`/roster-owner/${id}/`, { method: 'DELETE' });
 }
 export function getRosterOwnerMembers(pharmacyId: number | string, role: string | null = null) {
     const query = buildQuery({ pharmacy_id: pharmacyId, ...(role ? { role } : {}) });
-    return fetchApi<Collection<RosterPharmacyMemberApi>>(`/client-profile/roster-owner/members-for-roster/${query}`);
+    return fetchApi<Collection<RosterPharmacyMemberApi>>(`/roster-owner/members-for-roster/${query}`);
 }
 export function getRosterWorkerPharmacies() {
-    return fetchApi<Collection<PharmacyApi>>('/client-profile/roster-worker/pharmacies/');
+    return fetchApi<Collection<PharmacyApi>>('/roster-worker/pharmacies/');
 }
 export async function fetchRosterOwnerAssignments(params?: Record<string, unknown>) {
     const data = await getRosterOwner(toRosterQueryParams(params));
