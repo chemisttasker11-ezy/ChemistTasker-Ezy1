@@ -1,0 +1,61 @@
+{
+  "baseline_source": "f5ac6d7708523da12a348468a4bc2c5b46b74612",
+  "extracted_source": "97335ebe436e7e8059101fe6c25e70c5d10a50cb",
+  "runtime": {
+    "Python": "3.12.14",
+    "Django": "5.1.8",
+    "DRF": "3.16.0"
+  },
+  "method": "Instantiate original and extracted classes with the same engine settings; compare complete field_contract objects without DB queries. Real migrated PostgreSQL suite remains independently required.",
+  "same_vendor_equal": {
+    "sqlite": true,
+    "postgresql": true
+  },
+  "differences_between_vendors": [
+    {
+      "path": "shifts.OpenShiftSerializer.fields.slots.child.fields.planned_break_minutes.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "32767"
+    },
+    {
+      "path": "shifts.ShiftCounterOfferSerializer.fields.slots.child.fields.slot.fields.planned_break_minutes.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "32767"
+    },
+    {
+      "path": "shifts.ShiftCounterOfferSlotSerializer.fields.slot.fields.planned_break_minutes.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "32767"
+    },
+    {
+      "path": "shifts.ShiftOfferSerializer.fields.shift_detail.fields.reveal_quota.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "2147483647"
+    },
+    {
+      "path": "shifts.ShiftOfferSerializer.fields.shift_detail.fields.reveal_quota.min_value",
+      "sqlite": "-9223372036854775808",
+      "postgresql": "-2147483648"
+    },
+    {
+      "path": "shifts.ShiftOfferSerializer.fields.slot_detail.fields.planned_break_minutes.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "32767"
+    },
+    {
+      "path": "shifts.ShiftSerializer.fields.reveal_quota.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "2147483647"
+    },
+    {
+      "path": "shifts.ShiftSerializer.fields.reveal_quota.min_value",
+      "sqlite": "-9223372036854775808",
+      "postgresql": "-2147483648"
+    },
+    {
+      "path": "shifts.ShiftSlotSerializer.fields.planned_break_minutes.max_value",
+      "sqlite": "9223372036854775807",
+      "postgresql": "32767"
+    }
+  ]
+}

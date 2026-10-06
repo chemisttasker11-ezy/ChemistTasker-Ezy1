@@ -9,6 +9,7 @@ import importlib
 import json
 from pathlib import Path
 
+from django.db import connection
 from django.test import SimpleTestCase
 from rest_framework import serializers
 
@@ -47,7 +48,15 @@ def field_contract(field, depth=0):
 
 class SerializerDecompositionContracts(SimpleTestCase):
     def test_original_field_contracts_remain_unchanged(self):
-        expected = json.loads((ROOT / "core/contracts/serializer_field_contracts.json").read_text())
+        # DRF derives integer bounds from the active database backend. Both
+        # snapshots were measured on the unsplit F01 tree, not accepted from
+        # this extraction's failing output. Unsupported vendors fail explicitly.
+        filenames = {
+            "sqlite": "serializer_field_contracts.json",
+            "postgresql": "serializer_field_contracts.postgresql.json",
+        }
+        self.assertIn(connection.vendor, filenames)
+        expected = json.loads((ROOT / "core/contracts" / filenames[connection.vendor]).read_text())
         self.assertEqual(len(expected), 27)
         for qualified, contract in expected.items():
             with self.subTest(serializer=qualified):
