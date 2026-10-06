@@ -1,0 +1,114 @@
+name: Finalization Local Verification Toolchain
+
+on:
+  push:
+    branches: [work/finalization-recovery-20261006]
+    paths: [.github/workflows/finalization_local_toolchain.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 7cd3969936df123e7b3c88d4baec77862c785062
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install and export application runtime only
+        run: |
+          python -m pip install -r backend/requirements.txt
+          python -m pip check
+          mkdir -p "$RUNNER_TEMP/python-evidence"
+          python -m pip freeze > "$RUNNER_TEMP/python-evidence/requirements.resolved.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/python-evidence/COMMIT"
+          cp backend/requirements.txt "$RUNNER_TEMP/python-evidence/requirements.input.txt"
+          prefix=$(python -c 'import sys; print(sys.prefix)')
+          tar --exclude='__pycache__' --exclude='*.pyc' -czf "$RUNNER_TEMP/python-evidence/python.tar.gz" -C "$prefix" .
+          cd "$RUNNER_TEMP/python-evidence"
+          sha256sum python.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-python-runtime
+          path: ${{ runner.temp }}/python-evidence/
+          retention-days: 1
+          if-no-files-found: error
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: cc0c01b8b7a0f115a8c4272af6bc4735bd165de4
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Export locked shared-core test dependencies only
+        working-directory: shared-core
+        run: |
+          npm ci
+          mkdir -p "$RUNNER_TEMP/node-evidence"
+          cp package-lock.json "$RUNNER_TEMP/node-evidence/"
+          node --version > "$RUNNER_TEMP/node-evidence/node-version.txt"
+          tar -czf "$RUNNER_TEMP/node-evidence/node_modules.tar.gz" node_modules
+          cd "$RUNNER_TEMP/node-evidence"
+          sha256sum node_modules.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-shared-core-test-dependencies
+          path: ${{ runner.temp }}/node-evidence/
+          retention-days: 1
+          if-no-files-found: error
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Export PostgreSQL tooling and system library dependencies only
+        shell: bash
+        run: |
+          test -x /usr/lib/postgresql/16/bin/postgres
+          export DEST="$RUNNER_TEMP/postgres-evidence"
+          mkdir -p "$DEST/root/usr/lib/postgresql" "$DEST/root/usr/share/postgresql" "$DEST/root/deps"
+          cp -a /usr/lib/postgresql/16 "$DEST/root/usr/lib/postgresql/"
+          cp -a /usr/share/postgresql/16 "$DEST/root/usr/share/postgresql/"
+          python - <<'PY'
+          import os, pathlib, re, shutil, subprocess
+          root=pathlib.Path(os.environ['DEST'])/'root'
+          pending=[p for p in (root/'usr/lib/postgresql/16').rglob('*') if p.is_file()]
+          seen=set()
+          skip=re.compile(r'^(ld-linux|libc\.so|libm\.so|libpthread\.so|libdl\.so|librt\.so|libresolv\.so|libutil\.so)')
+          while pending:
+              path=pending.pop()
+              if str(path) in seen:
+                  continue
+              seen.add(str(path))
+              output=subprocess.run(['ldd',str(path)],capture_output=True,text=True,check=False).stdout
+              for line in output.splitlines():
+                  match=re.search(r'=> (/\S+)',line)
+                  if not match:
+                      continue
+                  dependency=pathlib.Path(match.group(1))
+                  if skip.match(dependency.name):
+                      continue
+                  target=root/'deps'/dependency.name
+                  if not target.exists():
+                      shutil.copy2(dependency,target,follow_symlinks=True)
+                      pending.append(dependency)
+          PY
+          /usr/lib/postgresql/16/bin/postgres --version > "$DEST/VERSION"
+          tar -czf "$DEST/postgres.tar.gz" -C "$DEST/root" .
+          rm -rf "$DEST/root"
+          cd "$DEST"
+          sha256sum postgres.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finalization-postgres-toolchain
+          path: ${{ runner.temp }}/postgres-evidence/
+          retention-days: 1
+          if-no-files-found: error
