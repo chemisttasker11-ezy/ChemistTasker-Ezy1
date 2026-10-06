@@ -1,7 +1,7 @@
 """URL ownership for the shift domain.
 
-The three routers are composed separately by core.client_profile_api_urls so
-the historical API-root registration order remains byte-for-byte compatible.
+The three routers are composed separately by core.api_v1_urls so
+the API-v1 registration order remains stable.
 """
 from django.urls import path
 from rest_framework.routers import DefaultRouter
