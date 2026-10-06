@@ -1,8 +1,6 @@
 import logging
 
 from django.urls import path, include
-from users.views import DeleteAccountView
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from django.conf import settings
 from django.conf.urls.static import static
 from .sitemap import sitemap_web
@@ -11,7 +9,6 @@ from two_factor.urls import urlpatterns as two_factor_urlpatterns
 from .two_factor_views import AdminAwareLoginView
 from django.http import JsonResponse
 from django.db import connection
-from worker_finance import legacy as finance_legacy
 from public_hub.attachment_access import HubMediaAccess
 from public_hub.media import deny_raw_media
 
@@ -41,29 +38,9 @@ urlpatterns = [
     path('sitemap.xml', sitemap_web, name='sitemap-web'),
     path('health/', health_check, name='health'),
 
-    # Canonical versioned API. There are no unversioned /api/* application mounts.
-    path('api/v1/users/', include('users.urls')),
-    path('api/v1/public-hub/', include('public_hub.urls')),
-    path('api/v1/marketplace/', include('marketplace.urls')),
-    path('api/v1/ethical/', include('ethical_marketplace.urls')),
-    path('api/v1/content/', include('public_hub.content_urls')),
-
-    # Finance workspace and the guarded compatibility adapters intentionally
-    # precede the domain include. Managed finance invoices must never fall
-    # through to the legacy editor and lose revision/payment history.
-    path('api/v1/finance/', include('worker_finance.urls')),
-    path('api/v1/invoices/<int:pk>/', finance_legacy.detail),
-    path('api/v1/invoices/<int:invoice_id>/pdf/', finance_legacy.pdf),
-    path('api/v1/invoices/<int:invoice_id>/send/', finance_legacy.send),
-
+    # All application HTTP APIs are composed once beneath the versioned root.
     path('api/v1/', include(('core.api_v1_urls', 'api_v1'), namespace='api_v1')),
-    path('api/v1/billing/', include('billing.urls', namespace='billing')),
-    path('api/v1/account/', DeleteAccountView.as_view(), name='delete-account'),
 ]
 
 if settings.DEBUG:
-    urlpatterns += [
-        path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
-        path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema')),
-    ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
