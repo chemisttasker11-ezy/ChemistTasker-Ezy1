@@ -66,8 +66,8 @@ describe('converged client security and compatibility', () => {
     configureApi({ baseURL: 'https://b.test/api', getToken: () => 'b-token', fetchImpl });
     token.resolve('a-token');
     await Promise.all([first, fetchApi('/users/me/')]);
-    expect(calls).toContainEqual(['https://a.test/api/users/me/', 'Bearer a-token']);
-    expect(calls).toContainEqual(['https://b.test/api/users/me/', 'Bearer b-token']);
+    expect(calls).toContainEqual(['https://a.test/api/v1/users/me/', 'Bearer a-token']);
+    expect(calls).toContainEqual(['https://b.test/api/v1/users/me/', 'Bearer b-token']);
   });
 
   it('shares an in-flight refresh only inside one client', async () => {

@@ -8,7 +8,7 @@ describe('linear API URL normalization', () => {
   });
   it('retains slash runs inside a path rather than erasing resource identity', () => {
     expect(apiUrl('https://example.test/api/v1///nested/', '/resource/').pathname)
-      .toBe('/api///nested/resource/');
+      .toBe('/api/v1///nested/resource/');
   });
   it('rejects URL credentials after normalization', () => {
     expect(() => apiUrl('https://secret@example.test/api///', '/resource/')).toThrow('Invalid API base');

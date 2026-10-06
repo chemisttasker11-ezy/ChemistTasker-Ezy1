@@ -31,7 +31,7 @@ test('does not send a token to cross-origin pagination URLs', async () => {
 });
 test('does not follow pagination outside the finance path', async () => {
   const { finance, configureFinanceApi } = fresh(); configureFinanceApi(config); let calls = 0;
-  global.fetch = async () => { calls++; return page([], 'https://api.example.invalid/api/users/'); };
+  global.fetch = async () => { calls++; return page([], 'https://api.example.invalid/api/v1/users/'); };
   await assert.rejects(finance.items(), /cannot leave/); assert.equal(calls, 1);
 });
 test('sends decimal strings without converting them to floats', async () => {

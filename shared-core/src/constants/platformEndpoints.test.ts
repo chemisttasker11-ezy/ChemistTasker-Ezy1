@@ -30,8 +30,8 @@ describe('PLATFORM_ENDPOINTS', () => {
   });
 
   it('keeps only kiosk device routes in the platform catalogue', () => {
-    expect(PLATFORM_ENDPOINTS.kiosk.syncBatch).toBe('/client-profile/attendance/kiosk/sync/batch/');
-    expect(PLATFORM_ENDPOINTS.kiosk.workerEnrol).toBe('/client-profile/attendance/kiosk/workers/enrol/');
+    expect(PLATFORM_ENDPOINTS.kiosk.syncBatch).toBe('/attendance/kiosk/sync/batch/');
+    expect(PLATFORM_ENDPOINTS.kiosk.workerEnrol).toBe('/attendance/kiosk/workers/enrol/');
     expect('attendance' in PLATFORM_ENDPOINTS).toBe(false);
     expect('rosterV2' in PLATFORM_ENDPOINTS).toBe(false);
     expect('workforce' in PLATFORM_ENDPOINTS).toBe(false);
@@ -40,35 +40,35 @@ describe('PLATFORM_ENDPOINTS', () => {
 
 describe('legacy API_ENDPOINTS reconciliation', () => {
   it('owns authenticated Worker Finance routes in API_ENDPOINTS', () => {
-    expect(API_ENDPOINTS.finance.root).toBe('/client-profile/finance/');
-    expect(API_ENDPOINTS.finance.customer(3)).toBe('/client-profile/finance/customers/3/');
-    expect(API_ENDPOINTS.finance.invoiceRevisionPdf(4, 2)).toBe('/client-profile/finance/invoices/4/revisions/2/pdf/');
-    expect(API_ENDPOINTS.finance.receivedApprovePayment(5)).toBe('/client-profile/finance/received-invoices/5/approve-payment/');
-    expect(API_ENDPOINTS.finance.expenseReceipts(6)).toBe('/client-profile/finance/expenses/6/receipts/');
-    expect(API_ENDPOINTS.finance.basWorksheet).toBe('/client-profile/finance/bas-worksheet/');
+    expect(API_ENDPOINTS.finance.root).toBe('/finance/');
+    expect(API_ENDPOINTS.finance.customer(3)).toBe('/finance/customers/3/');
+    expect(API_ENDPOINTS.finance.invoiceRevisionPdf(4, 2)).toBe('/finance/invoices/4/revisions/2/pdf/');
+    expect(API_ENDPOINTS.finance.receivedApprovePayment(5)).toBe('/finance/received-invoices/5/approve-payment/');
+    expect(API_ENDPOINTS.finance.expenseReceipts(6)).toBe('/finance/expenses/6/receipts/');
+    expect(API_ENDPOINTS.finance.basWorksheet).toBe('/finance/bas-worksheet/');
   });
 
   it('owns authenticated attendance, roster and workforce routes', () => {
-    expect(API_ENDPOINTS.attendance.managerTimeline(11)).toBe('/client-profile/attendance/manager/timeline/11/');
-    expect(API_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/client-profile/attendance/roster/acknowledgements/12/');
-    expect(API_ENDPOINTS.rosterV2.managerApproveReplacement).toBe('/client-profile/attendance/roster/manager/approve-replacement/');
-    expect(API_ENDPOINTS.rosterV2.shiftUnpublish).toBe('/client-profile/attendance/roster/shift/unpublish/');
-    expect(API_ENDPOINTS.rosterV2.shiftRepublish).toBe('/client-profile/attendance/roster/shift/republish/');
-    expect(API_ENDPOINTS.workforce.rosterWorkspace).toBe('/client-profile/workforce/roster/workspace/');
-    expect(API_ENDPOINTS.workforce.leaveDecision(3)).toBe('/client-profile/workforce/leave/3/decision/');
-    expect(API_ENDPOINTS.workforce.timesheetPeriodSummary(4)).toBe('/client-profile/workforce/timesheet-periods/4/summary/');
-    expect(API_ENDPOINTS.workforce.timesheetSubmit(5)).toBe('/client-profile/workforce/timesheets/5/submit/');
-    expect(API_ENDPOINTS.workforce.timesheetCheckDecision(6)).toBe('/client-profile/workforce/timesheet-checks/6/decision/');
+    expect(API_ENDPOINTS.attendance.managerTimeline(11)).toBe('/attendance/manager/timeline/11/');
+    expect(API_ENDPOINTS.rosterV2.acknowledgements(12)).toBe('/attendance/roster/acknowledgements/12/');
+    expect(API_ENDPOINTS.rosterV2.managerApproveReplacement).toBe('/attendance/roster/manager/approve-replacement/');
+    expect(API_ENDPOINTS.rosterV2.shiftUnpublish).toBe('/attendance/roster/shift/unpublish/');
+    expect(API_ENDPOINTS.rosterV2.shiftRepublish).toBe('/attendance/roster/shift/republish/');
+    expect(API_ENDPOINTS.workforce.rosterWorkspace).toBe('/workforce/roster/workspace/');
+    expect(API_ENDPOINTS.workforce.leaveDecision(3)).toBe('/workforce/leave/3/decision/');
+    expect(API_ENDPOINTS.workforce.timesheetPeriodSummary(4)).toBe('/workforce/timesheet-periods/4/summary/');
+    expect(API_ENDPOINTS.workforce.timesheetSubmit(5)).toBe('/workforce/timesheets/5/submit/');
+    expect(API_ENDPOINTS.workforce.timesheetCheckDecision(6)).toBe('/workforce/timesheet-checks/6/decision/');
   });
 
   it('uses canonical Django detail routes', () => {
-    expect(API_ENDPOINTS.getCommunityShiftDetail(1)).toBe('/client-profile/community-shifts/1/');
-    expect(API_ENDPOINTS.getPublicShiftDetail(2)).toBe('/client-profile/public-shifts/2/');
-    expect(API_ENDPOINTS.getActiveShiftDetail(3)).toBe('/client-profile/shifts/active/3/');
-    expect(API_ENDPOINTS.hubCommentDetail(4, 5)).toBe('/client-profile/hub/posts/4/comments/5/');
+    expect(API_ENDPOINTS.getCommunityShiftDetail(1)).toBe('/community-shifts/1/');
+    expect(API_ENDPOINTS.getPublicShiftDetail(2)).toBe('/public-shifts/2/');
+    expect(API_ENDPOINTS.getActiveShiftDetail(3)).toBe('/shifts/active/3/');
+    expect(API_ENDPOINTS.hubCommentDetail(4, 5)).toBe('/hub/posts/4/comments/5/');
   });
 
   it('exposes the current token-based referee rejection route', () => {
-    expect(API_ENDPOINTS.refereeRejectByToken('signed-token')).toBe('/client-profile/onboarding/referee-reject/signed-token/');
+    expect(API_ENDPOINTS.refereeRejectByToken('signed-token')).toBe('/onboarding/referee-reject/signed-token/');
   });
 });
