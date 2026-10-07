@@ -101,30 +101,95 @@ class DeleteAccountView(APIView):
 
 
 class ChooseAccountTypeView(APIView):
-    """POST /api/v1/users/me/account-type/ {"role": "PHARMACIST" | "OTHER_STAFF"}.
+    """Optionally convert an admin-only PHARMACY_MANAGER account into a personal worker account.
 
-    A PHARMACY_MANAGER account created by organisation email onboarding may choose a personal worker account type once.
-    Its pharmacy-admin MANAGER access is kept. Ownership is a separate relationship and cannot be acquired here.
+    The pharmacy-manager account is a valid permanent admin identity. Conversion is one-time and
+    pharmacy-scoped: only the selected organisation-email CONTACT membership is converted to a
+    workforce role. Other pharmacies administered by the same account remain CONTACT + MANAGER.
     """
 
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        from memberships.models import Membership
+        from organizations.models import PharmacyAdmin
+        from onboarding.models import OtherStaffOnboarding
         from users.models import User
         from users.utils import get_frontend_onboarding_url
 
         role = str(request.data.get("role") or "").strip().upper()
         if role not in User.CHOOSABLE_ACCOUNT_TYPES:
             raise ValidationError({"role": "Choose PHARMACIST or OTHER_STAFF."})
+
+        staff_role = str(request.data.get("staff_role") or "").strip().upper()
+        allowed_other_staff_roles = {"INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"}
+        if role == "OTHER_STAFF" and staff_role not in allowed_other_staff_roles:
+            raise ValidationError({
+                "staff_role": "Choose INTERN, TECHNICIAN, ASSISTANT or STUDENT for an Other Staff profile."
+            })
+        if role == "PHARMACIST":
+            staff_role = "PHARMACIST"
+
+        raw_pharmacy_id = request.data.get("pharmacy_id")
+        try:
+            requested_pharmacy_id = int(raw_pharmacy_id) if raw_pharmacy_id not in (None, "") else None
+        except (TypeError, ValueError):
+            raise ValidationError({"pharmacy_id": "Choose a valid administered pharmacy."})
+
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
             if user.role != "PHARMACY_MANAGER":
                 raise ValidationError({"role": "Your account type is already set."})
+
+            candidates = (
+                Membership.objects.select_for_update()
+                .select_related("admin_assignment")
+                .filter(
+                    user=user,
+                    role="CONTACT",
+                    is_active=True,
+                    status=Membership.Status.ACCEPTED,
+                    pharmacy__organization__isnull=False,
+                    admin_assignment__is_active=True,
+                    admin_assignment__admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+                )
+                .order_by("pk")
+            )
+            if requested_pharmacy_id is not None:
+                membership = candidates.filter(pharmacy_id=requested_pharmacy_id).first()
+            else:
+                matches = list(candidates[:2])
+                membership = matches[0] if len(matches) == 1 else None
+
+            if membership is None:
+                raise ValidationError({
+                    "pharmacy_id": (
+                        "Choose the organisation pharmacy whose admin-only CONTACT membership "
+                        "should become your personal workforce membership."
+                    )
+                })
+
+            assignment = membership.admin_assignment
             user.role = role
             user.save(update_fields=["role"])
-            from memberships.profile_sync import sync_managed_pharmacy_memberships
-            sync_managed_pharmacy_memberships(user)
+
+            membership.role = staff_role
+            membership.save(update_fields=["role", "updated_at"])
+            assignment.staff_role = staff_role
+            assignment.save(update_fields=["staff_role", "updated_at"])
+
+            if role == "OTHER_STAFF":
+                profile, _ = OtherStaffOnboarding.objects.get_or_create(user=user)
+                if profile.role_type != staff_role:
+                    profile.role_type = staff_role
+                    profile.save(update_fields=["role_type"])
+
         return Response(
-            {"role": user.role, "onboarding_url": get_frontend_onboarding_url(user)},
+            {
+                "role": user.role,
+                "staff_role": staff_role,
+                "pharmacy_id": membership.pharmacy_id,
+                "onboarding_url": get_frontend_onboarding_url(user),
+            },
             status=status.HTTP_200_OK,
         )
