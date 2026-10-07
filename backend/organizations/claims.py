@@ -229,7 +229,7 @@ class OwnerOnboardingClaim(APIView):
             # The onboarded contact manages this one pharmacy through a full delegated MANAGER assignment.
             # Existing worker accounts keep a concrete pharmacy membership role immediately; a new
             # PHARMACY_MANAGER stays CONTACT until their personal worker type is known.
-            from memberships.profile_sync import personal_pharmacy_role
+            from memberships.role_resolution import personal_pharmacy_role
             worker_role = personal_pharmacy_role(user)
             pharmacy_membership, _ = Membership.objects.get_or_create(
                 user=user,
