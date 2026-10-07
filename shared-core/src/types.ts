@@ -759,6 +759,12 @@ export interface ShiftInterestApi {
     user_last_name?: string | null;
     average_rating?: number | null;
     rating?: number | null;
+    short_bio?: string | null;
+    expressed_at?: string | null;
+    pending_confirmation?: boolean;
+    pending_offer_id?: number | null;
+    awaiting_payment?: boolean;
+    awaiting_payment_offer_id?: number | null;
 }
 
 export interface ShiftShareLinkApi {
