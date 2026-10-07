@@ -33,7 +33,7 @@ From `backend-source/backend`:
 From this `landing_next` directory, in another terminal:
 
 ```powershell
-$env:HUB_API_URL='http://127.0.0.1:8000/api'
+$env:HUB_API_URL='http://127.0.0.1:8000/api/v1'
 $env:HUB_PREVIEW_MODE='1'
 $env:NEXT_PUBLIC_SITE_URL='http://127.0.0.1:3000'
 npm run dev -- --hostname 127.0.0.1
@@ -58,7 +58,7 @@ Public API responses omit private account identifiers, emails, role data and rep
 
 The Django production changes consist of the `public_hub` application and its initial swappable-user migration, one installed-app entry and one API include. Apply the migration through the existing deployment procedure in a staging environment first. The source repository does not contain migrations for every existing app; reconcile its existing migration history rather than generating unrelated migrations against production.
 
-The Next.js runtime needs a server-reachable `HUB_API_URL` ending in `/api`. Set `NEXT_PUBLIC_SITE_URL` to the exact public HTTPS origin and `NEXT_PUBLIC_PLATFORM_URL` to the existing Vite application origin. The configured site origin is also the expected write-request Origin. If the landing and platform share a host, route `/blog`, `/news`, `/community/sign-in`, `/api/hub`, `/sitemap.xml`, `/robots.txt` and Next assets to Next without disturbing existing Vite routes or Django APIs.
+The Next.js runtime needs a server-reachable `HUB_API_URL` ending in `/api/v1`. Set `NEXT_PUBLIC_SITE_URL` to the exact public HTTPS origin and `NEXT_PUBLIC_PLATFORM_URL` to the existing Vite application origin. The configured site origin is also the expected write-request Origin. If the landing and platform share a host, route `/blog`, `/news`, `/community/sign-in`, `/api/hub`, `/sitemap.xml`, `/robots.txt` and Next assets to Next without disturbing existing Vite routes or Django APIs.
 
 The `/api/hub` proxy only permits this feature's paths, validates write origins, hides tokens in scoped HttpOnly/SameSite cookies, forwards credentials only to the configured backend, refreshes sessions, and marks session-dependent responses no-store. The new marketing-site session uses the same account credentials; it does not automatically import Vite localStorage sessions across origins. Configure normal login rate limiting at the trusted ingress alongside the existing backend lockout protections.
 
