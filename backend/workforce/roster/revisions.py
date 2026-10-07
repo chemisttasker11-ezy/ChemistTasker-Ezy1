@@ -239,7 +239,10 @@ def publish_period_command(*, user, period: RosterPeriod, expected_revision: int
             .order_by("pk")
             .values_list("pk", flat=True)
         )
-        if unpublished_slot_ids:
+        # Reconciliation of a live week must not restore an individually
+        # withdrawn shift. Publishing a withdrawn whole week is an explicit
+        # publication of every shift, validated together by the service below.
+        if locked_period.status == RosterPeriod.Status.PUBLISHED and unpublished_slot_ids:
             raise RosterCommandConflict(
                 "ROSTER_SHIFT_REPUBLISH_REQUIRED",
                 "Republish each individually unpublished shift before publishing this roster revision.",

@@ -410,9 +410,10 @@ function RosterSelectionScreen({ screen, pharmacyId, pharmacyName, weekStart, se
       <ParityPage title={titles[screen]} subtitle="Publish exactly the roster revision you reviewed." loading={loading} error={error} onRetry={load}>
         <MetricGrid items={[{label:'Status',value:period?.status || 'DRAFT'},{label:'Assignments',value:period?.total_assignments ?? assignments.length},{label:'Vacancies',value:vacant.length,tone:vacant.length?'warning':'success'}]} />
         <InfoNote title="Reviewed publication">Review this revision first. A changed roster or warning requires a new review; a lost-response retry reuses the same operation ID.</InfoNote>
+        <InfoNote title="Whole-week publication">Unpublishing the week hides every shift for editing. Publishing the draft week restores all its shifts, including individually unpublished shifts. To change only one worker's shift, use that shift's unpublish action while the week stays published.</InfoNote>
         <ActionButtons>
           {period?.status === 'PUBLISHED'
-            ? <Button mode="outlined" loading={busy} disabled={busy || loading} onPress={() => void unpublish()}>Return to draft</Button>
+            ? <Button mode="outlined" loading={busy} disabled={busy || loading} onPress={() => void unpublish()}>Unpublish whole week</Button>
             : <>
               <Button mode="outlined" loading={busy} disabled={busy || loading || period?.status === 'ARCHIVED'} onPress={() => void runValidation()}>Review current revision</Button>
               <Button mode="contained" disabled={busy || loading || !ready} onPress={() => void publish()}>Publish reviewed revision</Button>

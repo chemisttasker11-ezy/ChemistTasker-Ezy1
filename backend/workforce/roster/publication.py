@@ -70,6 +70,11 @@ def publish_roster_period(roster_period, published_by, force_warnings=False, *, 
         period.published_by = published_by
         period.save(update_fields=["status", "published_at", "published_by", "updated_at"])
 
+        # Whole-week publication explicitly restores the entire validated week.
+        # Keep individual withdrawals while the week is draft, then clear them
+        # atomically with publication so worker visibility never changes early.
+        period.planned_slots.filter(unpublished_at__isnull=False).update(unpublished_at=None)
+
         # Determine revision number
         last_audit = period.publication_audits.order_by("-revision_number").first()
         rev = (last_audit.revision_number + 1) if last_audit else 1
