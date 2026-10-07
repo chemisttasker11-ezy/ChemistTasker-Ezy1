@@ -92,3 +92,12 @@ Its original acceptance-only file list prevented PostgreSQL upgrade/schema check
 from running on those corrections. The gate retains exact commit identity, the
 migration restriction and the F06 schema comparison; it runs the actual acceptance
 checks instead of rejecting application files before those checks start.
+
+### Gate frequency
+
+Ordinary pull requests use the existing Shared Core Consolidation release gate,
+Backend Finalization Contracts, Serializer Decomposition, static/mobile checks
+and repository security checks. F07 production/native acceptance is no longer
+triggered for every pull request. It remains available by manual dispatch and on
+main pushes for release acceptance. Native Mobile Acceptance retains its manual
+and reusable workflow entrypoints.
