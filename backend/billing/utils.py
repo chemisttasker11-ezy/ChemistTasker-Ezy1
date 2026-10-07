@@ -30,15 +30,73 @@ def is_in_free_trial(user) -> bool:
 
 
 def user_can_manage_billing_for_pharmacy(user, pharmacy) -> bool:
+    """Authority over the shared ChemistTasker billing account/subscription.
+
+    This is intentionally narrower than permission to pay a shift-specific platform
+    charge. Only the pharmacy owner or an Organisation Admin may create/view/change
+    the subscription or its seats.
+    """
+    if not user or not getattr(user, 'is_authenticated', False) or pharmacy is None:
+        return False
     if pharmacy.owner and getattr(pharmacy.owner, 'user', None) == user:
         return True
-    if OrganizationMembership.objects.filter(
+    if pharmacy.organization_id and OrganizationMembership.objects.filter(
         user=user,
         role='ORG_ADMIN',
         organization_id=pharmacy.organization_id,
     ).exists():
         return True
     return False
+
+
+def _admin_level_can_manage_roster(admin_level) -> bool:
+    from organizations.models import PharmacyAdmin
+
+    return PharmacyAdmin.CAPABILITY_MANAGE_ROSTER in PharmacyAdmin.CAPABILITY_MATRIX.get(admin_level, set())
+
+
+def user_can_pay_shift_charge_for_pharmacy(user, pharmacy) -> bool:
+    """Authority to pay a shift-specific ChemistTasker charge for one pharmacy.
+
+    Paying a fulfilment fee or cancellation penalty does not grant authority over
+    the shared subscription and does not make the payer the billing contact.
+    Operational payers are limited to the pharmacy scope they already manage.
+    """
+    if not user or not getattr(user, 'is_authenticated', False) or pharmacy is None:
+        return False
+
+    # Billing-account authorities may always pay charges for their own scope.
+    if user_can_manage_billing_for_pharmacy(user, pharmacy):
+        return True
+
+    organization_id = getattr(pharmacy, 'organization_id', None)
+    if organization_id:
+        # Chief Admin is organisation-wide by product policy, but still never becomes
+        # the billing contact merely by paying a shift charge.
+        if OrganizationMembership.objects.filter(
+            user=user,
+            role='CHIEF_ADMIN',
+            organization_id=organization_id,
+        ).exists():
+            return True
+
+        # Region Admin remains pharmacy-scoped and its selected admin level must
+        # actually include roster management; communication-only scope cannot pay.
+        region_membership = (
+            OrganizationMembership.objects.filter(
+                user=user,
+                role='REGION_ADMIN',
+                organization_id=organization_id,
+                pharmacies=pharmacy,
+            )
+            .order_by('id')
+            .first()
+        )
+        if region_membership and _admin_level_can_manage_roster(region_membership.admin_level):
+            return True
+
+    from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+    return has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER)
 
 
 def resolve_billing_account(pharmacy, acting_user=None) -> dict:
