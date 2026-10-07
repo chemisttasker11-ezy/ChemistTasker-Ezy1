@@ -36,6 +36,7 @@ type Membership = {
   employment_type: string;
   job_title?: string;
   staff_category?: string;
+  is_pharmacy_owner?: boolean;
   is_pharmacy_admin?: boolean;
   admin_level_label?: string | null;
   admin_capabilities?: string[];
@@ -238,7 +239,7 @@ export default function ManageMembershipsPage() {
                       </>
                     )}
                     {isPending && hasAdminInvitation && <Typography variant="body2" color="text.secondary">Respond to the admin invitation above.</Typography>}
-                    {isAccepted && membership.role !== "OWNER" && (
+                    {isAccepted && !membership.is_pharmacy_owner && membership.role !== "OWNER" && (
                       <Button variant="outlined" color="error" startIcon={<LogoutIcon />} disabled={actingId === membership.id} onClick={() => setQuitTarget(membership)}>
                         Quit membership
                       </Button>

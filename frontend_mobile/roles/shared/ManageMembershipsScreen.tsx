@@ -20,6 +20,7 @@ type Membership = {
   role: string;
   employment_type: string;
   job_title?: string;
+  is_pharmacy_owner?: boolean;
   is_pharmacy_admin?: boolean;
   admin_level_label?: string | null;
   admin_capabilities?: string[];
@@ -202,7 +203,7 @@ export default function ManageMembershipsScreen() {
                     </>
                   ) : null}
                   {pending && hasAdminInvitation ? <Text style={styles.detail}>Respond to the admin invitation above.</Text> : null}
-                  {accepted && membership.role !== 'OWNER' ? (
+                  {accepted && !membership.is_pharmacy_owner && membership.role !== 'OWNER' ? (
                     <Button mode="outlined" icon="logout" disabled={Boolean(actingKey)} onPress={() => setQuitTarget(membership)} textColor={theme.colors.error} style={styles.dangerOutline}>Quit membership</Button>
                   ) : null}
                 </View>

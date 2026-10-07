@@ -255,6 +255,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           clearTokens();
           clearLocalAuthState();
         } else {
+          // Keeping the mounted page is safe only while the authenticated identity is unchanged.
+          // A different account can be established in another tab / the shared Next site while this
+          // dashboard is still open. Reload before rendering that identity so no account-scoped
+          // chat, form or dialog state from the previous user survives into the new session.
+          if (user?.id != null && current.id != null && user.id !== current.id) {
+            window.location.reload();
+            return;
+          }
           setAccess(getAccessToken());
           setRefresh(getRefreshToken());
           // Keep the same object when nothing changed, so effects keyed on `user` do not refetch on every focus.
@@ -271,7 +279,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.addEventListener('focus', synchronizeSession);
     document.addEventListener('visibilitychange', onVisible);
     return () => { active = false; window.removeEventListener('focus', synchronizeSession); document.removeEventListener('visibilitychange', onVisible); };
-  }, [clearLocalAuthState, fetchSessionUser]);
+  }, [clearLocalAuthState, fetchSessionUser, user?.id]);
   useEffect(() => {
     if (!user) {
       setActivePersonaState("staff");

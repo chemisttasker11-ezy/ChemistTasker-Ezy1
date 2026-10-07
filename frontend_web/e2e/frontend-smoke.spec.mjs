@@ -192,6 +192,94 @@ async function openAuthenticatedRoute(page, user, path) {
   expect(pageErrors, `page errors while opening ${path}`).toEqual([]);
 }
 
+
+test.describe('session focus reconciliation', () => {
+  test('same authenticated user keeps the mounted dashboard on focus', async ({ page }) => {
+    const user = JSON.parse(JSON.stringify(roleUsers.pharmacist));
+    await installApiFixture(page, user);
+
+    await page.goto('/dashboard/pharmacist/overview');
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(() => {
+      const main = document.querySelector('main');
+      if (!main) throw new Error('Dashboard main element was not mounted');
+      window.__ctFocusDashboardMain = main;
+    });
+
+    // A fresh payload for the same account may legitimately contain updated fields,
+    // but it must not unmount the current page and destroy local chat/form/dialog state.
+    user.first_name = 'Fresh session payload';
+    const sessionResponse = page.waitForResponse(
+      (response) => new URL(response.url()).pathname.endsWith('/users/me/'),
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await sessionResponse;
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+    const preserved = await page.evaluate(
+      () => window.__ctFocusDashboardMain === document.querySelector('main') && Boolean(window.__ctFocusDashboardMain?.isConnected),
+    );
+    expect(preserved).toBe(true);
+  });
+
+  test('different authenticated user forces a full reload before continuing', async ({ page }) => {
+    const user = JSON.parse(JSON.stringify(roleUsers.pharmacist));
+    await installApiFixture(page, user);
+
+    await page.goto('/dashboard/pharmacist/overview');
+    await page.waitForLoadState('networkidle');
+
+    Object.assign(user, JSON.parse(JSON.stringify(roleUsers.otherstaff)));
+
+    const navigation = page.waitForNavigation({ waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await navigation;
+    await page.waitForLoadState('networkidle');
+
+    // The new document is the isolation boundary: account A's mounted page state cannot
+    // survive while requests are now authenticated as account B.
+    expect(new URL(page.url()).pathname).toBe('/dashboard/otherstaff/overview');
+  });
+});
+
+test('owner CONTACT membership never offers the quit action', async ({ page }) => {
+  const owner = JSON.parse(JSON.stringify(roleUsers.owner));
+  owner.memberships = [{
+    pharmacy_id: 101,
+    pharmacy_name: 'Smoke Pharmacy',
+    role: 'CONTACT',
+    employment_type: 'FULL_TIME',
+  }];
+  await installApiFixture(page, owner);
+
+  await page.route('**/api/v1/my-memberships/**', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    return json(route, [{
+      id: 1001,
+      role: 'CONTACT',
+      employment_type: 'FULL_TIME',
+      status: 'ACCEPTED',
+      is_pharmacy_owner: true,
+      is_pharmacy_admin: true,
+      admin_level_label: 'Owner',
+      pharmacy_detail: {
+        id: 101,
+        name: 'Smoke Pharmacy',
+        suburb: 'Southport',
+        state: 'QLD',
+        postcode: '4215',
+      },
+      invited_by_details: null,
+    }]);
+  });
+  await page.route('**/api/v1/pharmacy-admins/my-pending-invitations/**', async (route) => json(route, []));
+
+  await page.goto('/dashboard/admin-invitations');
+  await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Quit membership' })).toHaveCount(0);
+});
+
 test.describe('public/auth wiring', () => {
   test('login requires email and password before any auth request', async ({ page }) => {
     let authPostCount = 0;
