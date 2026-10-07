@@ -700,12 +700,33 @@ jobs:
             sleep "$((attempt * 10))"
           done
 
+      - name: Install ccache for the iOS native compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ccache
+          echo "CCACHE_DIR=$HOME/.ccache-ios" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.ccache-ios"
+
+      - name: Restore iOS native compile cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.ccache-ios
+          key: ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-
+            ios-ccache-${{ runner.os }}-
+
       - name: Prebuild and compile iOS simulator acceptance build with embedded JavaScript
         shell: bash
         run: |
           set -euo pipefail
           cd frontend_mobile
-          CI=1 npx expo prebuild --platform ios --clean
+          # Expo SDK 54's Podfile enables React Native's ccache wrappers when USE_CCACHE=1.
+          # buildReactNativeFromSource stays true (static frameworks), so caching the C++ compile matters.
+          ccache --max-size=5G
+          ccache --zero-stats
+          USE_CCACHE=1 CI=1 npx expo prebuild --platform ios --clean
           PLIST_PATH="ios/ChemistTasker/Info.plist"
           test -f "$PLIST_PATH"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST_PATH" 2>/dev/null || true
@@ -732,10 +753,12 @@ jobs:
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-ios-derived CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-ios-derived ONLY_ACTIVE_ARCH=YES ARCHS=arm64 EXCLUDED_ARCHS=x86_64 CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build
           APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP_PATH"
           test -s "$APP_PATH/main.jsbundle"
+          ccache --show-stats || true
+          lipo -archs "$APP_PATH/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Info.plist")"
           # Unsigned simulator apps have no entitlements, so every Keychain call fails with
           # -34018 and the stored session can never be read. Prove the ad-hoc signature exists.
           codesign --verify --verbose=1 "$APP_PATH"
