@@ -1,67 +1,106 @@
 import { ReactNode, useEffect, useMemo } from "react";
-import { Outlet, useNavigate, useParams } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CircularProgress, Stack, Typography } from "@mui/material";
+import { isAdminPersonaAssignment } from "@chemisttasker/shared-core";
 import { useAuth } from "../contexts/AuthContext";
 import { ColorModeProvider } from "../theme/sleekTheme";
 import { AdminScopeProvider } from "../contexts/AdminScopeContext";
+import { resolveDashboardPath } from "../utils/dashboardPath";
 import DashboardTopShell from "./DashboardTopShell";
 
 export default function AdminDashboardWrapper() {
   const { pharmacyId: pharmacyIdParam } = useParams<{ pharmacyId: string }>();
   const {
+    user,
     adminAssignments,
     selectAdminPersona,
     activeAdminAssignment,
     activePersona,
   } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  const targetPharmacyId = useMemo(() => {
+    const parsed = pharmacyIdParam ? Number(pharmacyIdParam) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [pharmacyIdParam]);
+
+  const delegatedAssignments = useMemo(
+    () => adminAssignments.filter((item) => isAdminPersonaAssignment(item)),
+    [adminAssignments],
+  );
+
+  // An explicit /admin/:pharmacyId route is authoritative. Never substitute a
+  // different assignment: doing so can silently cross pharmacy scope.
   const assignment = useMemo(() => {
-    const targetId = pharmacyIdParam ? Number(pharmacyIdParam) : NaN;
-    if (!Number.isFinite(targetId)) {
-      return adminAssignments[0] ?? null;
-    }
-    return (
-      adminAssignments.find((item) => item.pharmacy_id === targetId) ??
-      adminAssignments[0] ??
-      null
-    );
-  }, [adminAssignments, pharmacyIdParam]);
+    if (targetPharmacyId == null) return null;
+    return delegatedAssignments.find((item) => item.pharmacy_id === targetPharmacyId) ?? null;
+  }, [delegatedAssignments, targetPharmacyId]);
+
+  const ownerAuthorityAssignment = useMemo(() => {
+    if (targetPharmacyId == null) return null;
+    return adminAssignments.find(
+      (item) => item.pharmacy_id === targetPharmacyId && item.admin_level === "OWNER",
+    ) ?? null;
+  }, [adminAssignments, targetPharmacyId]);
 
   useEffect(() => {
-    if (assignment) {
+    if (assignment || targetPharmacyId == null) return;
+
+    if (user?.role === "OWNER") {
+      const params = new URLSearchParams(location.search);
+      // Preserve an explicit owner workspace selection (for example the
+      // reported /admin/16?...pharmacy_id=27 case). For a stale onboarding
+      // link with no query scope, carry the now-owned pharmacy into owner mode.
+      if (!params.has("pharmacy_id") && ownerAuthorityAssignment) {
+        params.set("pharmacy_id", String(targetPharmacyId));
+      }
+      const ownerPath = location.pathname.replace(
+        /^\/dashboard\/admin\/[^/]+/,
+        "/dashboard/owner",
+      );
+      const query = params.toString();
+      navigate(query ? `${ownerPath}?${query}` : ownerPath, { replace: true });
       return;
     }
-    const first = adminAssignments[0];
-    if (first?.pharmacy_id != null) {
-      navigate(`/dashboard/admin/${first.pharmacy_id}/overview`, { replace: true });
-    }
-  }, [assignment, adminAssignments, navigate]);
+
+    // Non-owners with no exact delegated assignment are returned to their own
+    // dashboard. We intentionally do not fall back to adminAssignments[0].
+    navigate(resolveDashboardPath(user?.role), { replace: true });
+  }, [
+    assignment,
+    location.pathname,
+    location.search,
+    navigate,
+    ownerAuthorityAssignment,
+    targetPharmacyId,
+    user?.role,
+  ]);
 
   useEffect(() => {
-    if (!assignment) {
-      return;
-    }
-    if (activePersona !== "admin") {
-      return;
-    }
-    if (assignment.id != null && activeAdminAssignment?.id !== assignment.id) {
+    if (!assignment || assignment.id == null) return;
+    if (activeAdminAssignment?.id !== assignment.id || activePersona !== "admin") {
       selectAdminPersona(assignment.id);
-    }
-    if (
-      assignment.pharmacy_id != null &&
-      (!pharmacyIdParam || Number(pharmacyIdParam) !== assignment.pharmacy_id)
-    ) {
-      navigate(`/dashboard/admin/${assignment.pharmacy_id}/overview`, { replace: true });
     }
   }, [
     assignment,
     activePersona,
     activeAdminAssignment?.id,
     selectAdminPersona,
-    navigate,
-    pharmacyIdParam,
   ]);
+
+  useEffect(() => {
+    if (!assignment || targetPharmacyId == null) return;
+    const params = new URLSearchParams(location.search);
+    const scopedId = Number(params.get("pharmacy_id"));
+    const workspace = params.get("workspace");
+    if (scopedId === targetPharmacyId && workspace === "internal") return;
+
+    params.set("workspace", "internal");
+    params.set("pharmacy_id", String(targetPharmacyId));
+    const query = params.toString();
+    navigate(query ? `${location.pathname}?${query}` : location.pathname, { replace: true });
+  }, [assignment, location.pathname, location.search, navigate, targetPharmacyId]);
 
   if (!assignment) {
     return null;
@@ -70,18 +109,7 @@ export default function AdminDashboardWrapper() {
   let layoutContent: ReactNode;
   let wrapWithScope = false;
 
-  if (activePersona !== "admin") {
-    layoutContent = (
-      <Stack spacing={2} sx={{ py: 6 }}>
-        <Typography variant="h6" fontWeight={600}>
-          Switch to the Admin persona to access this pharmacy workspace.
-        </Typography>
-        <Typography color="text.secondary">
-          Use the persona selector in the top bar to choose an admin assignment.
-        </Typography>
-      </Stack>
-    );
-  } else if (activeAdminAssignment?.pharmacy_id !== assignment.pharmacy_id) {
+  if (activePersona !== "admin" || activeAdminAssignment?.id !== assignment.id) {
     layoutContent = (
       <Stack
         spacing={2}
