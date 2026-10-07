@@ -330,6 +330,23 @@ export function normalizeAdminAssignments(user?: AuthorityUser | null): Normaliz
   return assignments;
 }
 
+/**
+ * An admin assignment represents an explicit dashboard persona only when it is
+ * delegated authority. OWNER-level rows remain authority records for the
+ * owner's own pharmacy and must never synthesize a separate Admin persona.
+ */
+export function isAdminPersonaAssignment(
+  assignment?: Pick<NormalizedAdminAssignment, 'admin_level'> | null,
+): boolean {
+  return Boolean(assignment && assignment.admin_level !== 'OWNER');
+}
+
+export function getAdminPersonaAssignments(
+  user?: AuthorityUser | null,
+): NormalizedAdminAssignment[] {
+  return normalizeAdminAssignments(user).filter(isAdminPersonaAssignment);
+}
+
 function orgMembershipHasCapability(
   membership: AuthorityMembership,
   capability: AdminCapability,
@@ -430,14 +447,18 @@ export function resolveAdminPersonaAssignmentId(
   user: AuthorityUser | null | undefined,
   preferredAssignmentId?: number | string | null,
 ): number | null {
-  if (!user || normalizeRole(user.role) === 'OWNER') return null;
+  if (!user) return null;
 
-  const assignments = normalizeAdminAssignments(user);
+  const assignments = getAdminPersonaAssignments(user);
   const preferredId = Number(preferredAssignmentId);
   if (Number.isFinite(preferredId)) {
     const preferred = assignments.find((assignment) => assignment.id === preferredId);
     if (preferred?.id != null) return preferred.id;
   }
+
+  // Owners default to their Owner dashboard. They only enter an Admin persona
+  // when an explicit delegated non-OWNER assignment was requested.
+  if (normalizeRole(user.role) === 'OWNER') return null;
 
   return assignments.find((assignment) => assignment.id != null)?.id ?? null;
 }
@@ -451,15 +472,21 @@ export function resolvePersonaSelection(
   user: AuthorityUser | null | undefined,
   storedSelection?: string | null,
 ): ResolvedPersonaSelection {
-  if (!user || normalizeRole(user.role) === 'OWNER') {
+  if (!user) {
     return { mode: 'staff', assignmentId: null };
   }
 
-  const assignments = normalizeAdminAssignments(user);
+  const assignments = getAdminPersonaAssignments(user);
   if (storedSelection?.startsWith('ADMIN:')) {
     const id = Number(storedSelection.split(':')[1]);
     const match = assignments.find((assignment) => assignment.id === id);
     if (match?.id != null) return { mode: 'admin', assignmentId: match.id };
+  }
+
+  // Owners default to the Owner dashboard, but a stored delegated assignment
+  // is allowed above. OWNER-level authority never becomes an Admin persona.
+  if (normalizeRole(user.role) === 'OWNER') {
+    return { mode: 'staff', assignmentId: null };
   }
 
   // A pharmacy-manager account has no persona of its own: it always works as the admin of its pharmacy.

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  getAdminPersonaAssignments,
   hasOrganizationAccess as sharedHasOrganizationAccess,
-  normalizeAdminAssignments,
   resolveAdminPersonaAssignmentId,
   resolvePersonaSelection,
   type AuthorityUser,
@@ -22,7 +22,9 @@ export function hasOrganizationAccess(user: AuthorityUser | null | undefined) {
 }
 
 export function getAdminAssignments(user: AuthorityUser | null | undefined): MobileAdminAssignment[] {
-  return normalizeAdminAssignments(user);
+  // Mobile admin workspaces, like web, expose only delegated admin personas.
+  // OWNER-level assignments remain authority records handled by owner routes.
+  return getAdminPersonaAssignments(user);
 }
 
 export function getAssignmentId(assignment?: MobileAdminAssignment | null) {
@@ -58,7 +60,7 @@ export function getRoleHome(role?: string | null) {
     case 'REGION_ADMIN':
       return '/organization/dashboard';
     case 'PHARMACY_MANAGER':
-      return '/admin';
+      return '/admin-invitations';
     default:
       return '/login';
   }

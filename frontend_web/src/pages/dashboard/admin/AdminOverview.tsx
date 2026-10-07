@@ -91,7 +91,7 @@ export default function AdminOverview() {
 
   return (
     <>
-    <ChooseAccountTypeCard />
+    <ChooseAccountTypeCard pharmacyId={pharmacyId} />
     <DashboardOverviewTemplate
       title="Admin Dashboard"
       badge="Internal workspace"

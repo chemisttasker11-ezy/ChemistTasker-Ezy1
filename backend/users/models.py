@@ -43,13 +43,15 @@ class User(AbstractUser):
         ('ORG_STAFF',   'Organization Staff'),
         ('EXPLORER',    'Explorer'),
         # Created only when an organisation onboards a pharmacy by email: the contact manages that pharmacy through a
-        # pharmacy-admin assignment and may later choose PHARMACIST, OTHER_STAFF or OWNER once (CHOOSABLE_ACCOUNT_TYPES).
+        # pharmacy-admin MANAGER assignment and may later choose PHARMACIST or OTHER_STAFF once.
         ('PHARMACY_MANAGER', 'Pharmacy Manager'),
     )
     # Account types a person may pick when registering; the others are created by an invitation.
     SELF_REGISTRATION_ROLES = ('OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER')
-    # Account types a PHARMACY_MANAGER may switch to, once, to add their own profile and onboarding.
-    CHOOSABLE_ACCOUNT_TYPES = ('PHARMACIST', 'OTHER_STAFF', 'OWNER')
+    # Account types a PHARMACY_MANAGER may switch to once. Ownership is never
+    # acquired by choosing a personal account type; MANAGER remains the highest
+    # delegated pharmacy-admin level.
+    CHOOSABLE_ACCOUNT_TYPES = ('PHARMACIST', 'OTHER_STAFF')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     USERNAME_FIELD = 'email'       # log in with email

@@ -80,9 +80,17 @@ export function getOrganizationRoleDefinitions() {
 export function searchUsers(query: string) {
     return fetchApi(`/users/?search=${encodeURIComponent(query)}`);
 }
-export function chooseAccountType(role: string) {
+export function chooseAccountType(
+    role: string,
+    options: { pharmacy_id?: number | null; staff_role?: string | null } = {},
+) {
     return fetchApi<{
         onboarding_url: string;
         role: string;
-    }>('/users/me/account-type/', { method: 'POST', body: JSON.stringify({ role }) });
+        staff_role: string;
+        pharmacy_id: number;
+    }>('/users/me/account-type/', {
+        method: 'POST',
+        body: JSON.stringify({ role, ...options }),
+    });
 }

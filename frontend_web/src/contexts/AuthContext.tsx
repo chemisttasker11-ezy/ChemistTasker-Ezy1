@@ -14,9 +14,11 @@ import {
 } from "react";
 import {
   getRooms,
+  getAdminPersonaAssignments,
   hasAdminCapability,
   normalizeAdminAssignments,
   normalizeAdminCapability,
+  resolvePersonaSelection,
   type PersonaMode,
   type AdminLevel,
 } from "@chemisttasker/shared-core";
@@ -192,20 +194,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return normalizeAdminAssignments(user);
   }, [user]);
 
+  const adminPersonaAssignments = useMemo<AdminAssignment[]>(() => {
+    return getAdminPersonaAssignments(user) as AdminAssignment[];
+  }, [user]);
+
   const activeAdminAssignment = useMemo<AdminAssignment | null>(() => {
     if (activeAdminAssignmentId == null) {
       return null;
     }
     return (
-      adminAssignments.find((assignment) => assignment.id === activeAdminAssignmentId) ?? null
+      adminPersonaAssignments.find((assignment) => assignment.id === activeAdminAssignmentId) ?? null
     );
-  }, [adminAssignments, activeAdminAssignmentId]);
+  }, [adminPersonaAssignments, activeAdminAssignmentId]);
 
   const activeAdminPharmacyId = activeAdminAssignment?.pharmacy_id ?? null;
 
-  // Only treat the user as having an admin persona when there is an explicit admin assignment.
-  // Owner memberships alone should not trigger the persona switcher.
-  const isAdminUser = adminAssignments.length > 0;
+  // OWNER-level rows are authority records, not a separate dashboard persona.
+  const isAdminUser = adminPersonaAssignments.length > 0;
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -300,54 +305,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     };
 
-    if (user.role === "OWNER") {
-      setActiveAdminAssignmentId(null);
-      setActivePersonaState("staff");
-      if (storageKey) {
-        localStorage.removeItem(storageKey);
-      }
+    const selection = resolvePersonaSelection(user, storedSelection);
+    if (selection.mode === "admin" && selection.assignmentId != null) {
+      applyAdmin(selection.assignmentId);
       return;
     }
 
-    const assignments = adminAssignments;
-    let applied = false;
-    if (storedSelection && storedSelection.startsWith("ADMIN:") && assignments.length > 0) {
-      const storedId = Number(storedSelection.split(":")[1]);
-      const match = assignments.find((assignment) => assignment.id === storedId);
-      if (match?.id != null) {
-        applyAdmin(match.id);
-        applied = true;
-      }
+    if (user.role === "PHARMACIST" || user.role === "OTHER_STAFF") {
+      applyRole(user.role);
+    } else {
+      applyRole(null);
     }
-
-    if (!applied && storedSelection && storedSelection.startsWith("ROLE:")) {
-      const storedRole = storedSelection.split(":")[1];
-      if (
-        (storedRole === "PHARMACIST" || storedRole === "OTHER_STAFF") &&
-        user.role === storedRole
-      ) {
-        applyRole(storedRole);
-        applied = true;
-      }
-    }
-
-    // A pharmacy-manager account has no persona of its own: it always works as the admin of its pharmacy.
-    if (!applied && user.role === "PHARMACY_MANAGER") {
-      const first = assignments.find((assignment) => assignment.id != null);
-      if (first?.id != null) {
-        applyAdmin(first.id);
-        applied = true;
-      }
-    }
-
-    if (!applied) {
-      if (user.role === "PHARMACIST" || user.role === "OTHER_STAFF") {
-        applyRole(user.role);
-      } else {
-        applyRole(null);
-      }
-    }
-  }, [user, adminAssignments]);
+  }, [user, adminPersonaAssignments]);
 
   const refreshUnreadCount = useCallback(() => {
     if (!user) {
@@ -394,7 +363,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const selectAdminPersona = useCallback(
     (assignmentId: number) => {
-      const exists = adminAssignments.some((assignment) => assignment.id === assignmentId);
+      const exists = adminPersonaAssignments.some((assignment) => assignment.id === assignmentId);
       if (!exists) {
         return;
       }
@@ -404,7 +373,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem(personaStorageKey(user.id), `ADMIN:${assignmentId}`);
       }
     },
-    [adminAssignments, user?.id]
+    [adminPersonaAssignments, user?.id]
   );
 
   const setActivePersona = useCallback(
@@ -412,7 +381,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (next === "admin") {
         const fallbackId =
           activeAdminAssignmentId ??
-          adminAssignments.find((assignment) => assignment.id != null)?.id ??
+          adminPersonaAssignments.find((assignment) => assignment.id != null)?.id ??
           null;
         if (fallbackId != null) {
           selectAdminPersona(fallbackId);
@@ -431,7 +400,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     },
     [
       activeAdminAssignmentId,
-      adminAssignments,
+      adminPersonaAssignments,
       selectAdminPersona,
       selectRolePersona,
       user,

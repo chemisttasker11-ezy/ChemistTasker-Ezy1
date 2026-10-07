@@ -15,6 +15,10 @@ export function resolveDashboardPath(role?: string | null) {
       return "/dashboard/otherstaff/overview";
     case "EXPLORER":
       return "/dashboard/explorer/overview";
+    case "PHARMACY_MANAGER":
+      // No generic pharmacy-manager dashboard exists. If every delegated
+      // assignment is gone, the invitations page is the safe valid landing.
+      return "/dashboard/admin-invitations";
     default:
       return "/dashboard";
   }

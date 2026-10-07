@@ -52,6 +52,7 @@ class PharmacyManagerOnboardingTests(TestCase):
 
         assignment = PharmacyAdmin.objects.get(user=contact, pharmacy=pharmacy)
         self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertIsNone(assignment.staff_role)
         self.assertTrue(assignment.is_active)
         self.assertEqual(body["pharmacy_admin_id"], assignment.id)
         membership = Membership.objects.get(user=contact, pharmacy=pharmacy)
@@ -64,6 +65,65 @@ class PharmacyManagerOnboardingTests(TestCase):
         self.assertTrue(context["dashboard_link"].endswith(f"/dashboard/admin/{pharmacy.id}"))
         self.assertEqual(context["pharmacies"], [pharmacy.name])
         self.assertEqual(context["role_label"], "Pharmacy Manager")
+
+    def test_existing_pharmacist_gets_concrete_pharmacy_membership_and_manager_assignment(self):
+        existing = make_user("PHARMACIST")
+
+        response, _ = self.onboard(self.org_admin(), email=existing.email)
+        self.assertEqual(response.status_code, 201, response.content)
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.role, "PHARMACIST")
+        onboarded = Pharmacy.objects.get(email__iexact=existing.email, organization=self.organization)
+        membership = Membership.objects.get(user=existing, pharmacy=onboarded)
+        assignment = PharmacyAdmin.objects.get(user=existing, pharmacy=onboarded)
+        self.assertEqual(membership.role, "PHARMACIST")
+        self.assertEqual(membership.status, Membership.Status.ACCEPTED)
+        self.assertTrue(membership.is_active)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(assignment.staff_role, "PHARMACIST")
+
+    def test_existing_owner_keeps_owner_role_and_can_manage_organization_onboarded_pharmacy(self):
+        existing_owner, owned_pharmacy = make_owner_with_pharmacy("Existing Owner Pharmacy")
+
+        response, _ = self.onboard(self.org_admin(), email=existing_owner.email)
+        self.assertEqual(response.status_code, 201, response.content)
+
+        existing_owner.refresh_from_db()
+        self.assertEqual(existing_owner.role, "OWNER")
+        self.assertEqual(owned_pharmacy.owner.user_id, existing_owner.id)
+
+        onboarded = Pharmacy.objects.get(email__iexact=existing_owner.email, organization=self.organization)
+        self.assertIsNone(onboarded.owner_id)
+        membership = Membership.objects.get(user=existing_owner, pharmacy=onboarded)
+        self.assertEqual((membership.role, membership.status, membership.is_active), ("CONTACT", "ACCEPTED", True))
+
+        assignment = PharmacyAdmin.objects.get(user=existing_owner, pharmacy=onboarded)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertTrue(assignment.is_active)
+        self.assertTrue(has_admin_capability(existing_owner, onboarded, CAPABILITY_MANAGE_STAFF))
+
+        # A later owner-profile submission must not turn delegated MANAGER
+        # authority into pharmacy ownership.
+        existing_owner.is_otp_verified = True
+        existing_owner.save(update_fields=["is_otp_verified"])
+        owner_client = APIClient()
+        owner_client.force_authenticate(user=existing_owner)
+        profile_response = owner_client.patch(
+            "/api/v1/owner/onboarding/me/",
+            {
+                "tab": "basic",
+                "phone_number": "0400000000",
+                "role": "MANAGER",
+                "submitted_for_verification": True,
+            },
+            format="json",
+        )
+        self.assertEqual(profile_response.status_code, 200, profile_response.content)
+        onboarded.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertIsNone(onboarded.owner_id)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
 
     def test_chief_admin_can_onboard_but_region_admin_cannot(self):
         chief_response, _ = self.onboard(self.org_admin("CHIEF_ADMIN"), email="chief@new-pharmacy.test")
@@ -144,54 +204,164 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.contact)
 
-    def choose(self, role):
-        return self.client.post("/api/v1/users/me/account-type/", {"role": role}, format="json")
+    def choose(self, role, *, pharmacy=None, staff_role=None):
+        payload = {
+            "role": role,
+            "pharmacy_id": (pharmacy or self.pharmacy).id,
+        }
+        if staff_role:
+            payload["staff_role"] = staff_role
+        return self.client.post("/api/v1/users/me/account-type/", payload, format="json")
 
     def test_dashboard_is_the_admin_dashboard_of_the_managed_pharmacy(self):
         from users.navigation import get_frontend_dashboard_url
 
         self.assertTrue(get_frontend_dashboard_url(self.contact).endswith(f"/dashboard/admin/{self.pharmacy.id}"))
 
+    def test_unassigned_pharmacy_manager_lands_on_admin_invitations(self):
+        from users.navigation import get_frontend_dashboard_url
+
+        PharmacyAdmin.objects.filter(user=self.contact, pharmacy=self.pharmacy).update(is_active=False)
+        self.assertTrue(get_frontend_dashboard_url(self.contact).endswith("/dashboard/admin-invitations"))
+
     def test_account_type_is_chosen_once_and_admin_access_is_kept(self):
         self.assertEqual(self.choose("EXPLORER").status_code, 400)
+        self.assertEqual(self.choose("OWNER").status_code, 400)
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.role, "PHARMACY_MANAGER")
+
         response = self.choose("PHARMACIST")
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json()["role"], "PHARMACIST")
         self.assertTrue(response.json()["onboarding_url"].endswith("/dashboard/pharmacist/onboarding"))
-        self.assertEqual(self.choose("OWNER").status_code, 400, "the account type can be chosen only once")
+
+        membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        self.assertEqual(membership.role, "PHARMACIST")
+        self.assertEqual(assignment.staff_role, "PHARMACIST")
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+
+        self.assertEqual(self.choose("OTHER_STAFF").status_code, 400, "the account type can be chosen only once")
         self.assertTrue(has_admin_capability(self.contact, self.pharmacy, CAPABILITY_MANAGE_STAFF))
 
-    def test_owner_onboarding_submission_makes_them_the_real_owner(self):
-        self.assertEqual(self.choose("OWNER").status_code, 200)
-        self.contact.refresh_from_db()
-        response = self.client.patch(
-            "/api/v1/owner/onboarding/me/",
-            {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
-            format="json",
+    def test_other_staff_conversion_sets_specific_role_once_and_profile_edits_do_not_rewrite_memberships(self):
+        second_pharmacy = Pharmacy.objects.create(name="Second Managed Site", organization=self.organization)
+        second_membership = Membership.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
         )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.pharmacy.refresh_from_db()
-        self.assertEqual(self.pharmacy.owner.user_id, self.contact.id)
-        self.assertEqual(self.pharmacy.organization_id, self.organization.id, "the pharmacy stays in its organisation")
-        self.assertEqual(
-            PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy).admin_level,
-            PharmacyAdmin.AdminLevel.OWNER,
+        second_assignment = PharmacyAdmin.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            membership=second_membership,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
         )
 
-    def test_owner_submission_never_takes_over_an_owned_pharmacy(self):
-        _owner, owned = make_owner_with_pharmacy("Already Owned")
-        owned.email = "manager@choice.test"
-        owned.organization = self.organization
-        owned.save(update_fields=["email", "organization"])
-        PharmacyAdmin.objects.create(user=self.contact, pharmacy=owned, admin_level=PharmacyAdmin.AdminLevel.MANAGER)
-        self.choose("OWNER")
-        self.client.patch(
-            "/api/v1/owner/onboarding/me/",
-            {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
+        response = self.choose("OTHER_STAFF", staff_role="ASSISTANT")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["staff_role"], "ASSISTANT")
+        self.assertEqual(response.json()["pharmacy_id"], self.pharmacy.id)
+
+        membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        second_membership.refresh_from_db()
+        second_assignment.refresh_from_db()
+        self.assertEqual(membership.role, "ASSISTANT")
+        self.assertEqual(assignment.staff_role, "ASSISTANT")
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(second_membership.role, "CONTACT")
+        self.assertIsNone(second_assignment.staff_role)
+
+        # force_authenticate keeps the original in-memory PHARMACY_MANAGER object,
+        # so refresh/re-authenticate before exercising an OTHER_STAFF-only endpoint.
+        self.contact.refresh_from_db()
+        self.client.force_authenticate(user=self.contact)
+        onboarding_response = self.client.patch(
+            "/api/v1/otherstaff/onboarding/me/",
+            {"tab": "basic", "first_name": "Updated"},
             format="json",
         )
-        owned.refresh_from_db()
-        self.assertNotEqual(owned.owner.user_id, self.contact.id)
+        self.assertEqual(onboarding_response.status_code, 200, onboarding_response.content)
+
+        membership.refresh_from_db()
+        assignment.refresh_from_db()
+        second_membership.refresh_from_db()
+        second_assignment.refresh_from_db()
+        self.assertEqual(membership.role, "ASSISTANT")
+        self.assertEqual(assignment.staff_role, "ASSISTANT")
+        self.assertEqual(second_membership.role, "CONTACT")
+        self.assertIsNone(second_assignment.staff_role)
+
+    def test_other_staff_requires_a_concrete_role_at_conversion(self):
+        response = self.choose("OTHER_STAFF")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("staff_role", response.json())
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.role, "PHARMACY_MANAGER")
+
+    def test_pharmacist_conversion_only_changes_the_selected_pharmacy(self):
+        second_pharmacy = Pharmacy.objects.create(name="Second Managed Pharmacy", organization=self.organization)
+        second_membership = Membership.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+        PharmacyAdmin.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            membership=second_membership,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
+        )
+
+        response = self.choose("PHARMACIST")
+        self.assertEqual(response.status_code, 200, response.content)
+
+        first_membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        second_membership.refresh_from_db()
+        self.assertEqual(first_membership.role, "PHARMACIST")
+        self.assertEqual(second_membership.role, "CONTACT")
+
+    def test_pharmacist_membership_enables_cross_site_org_kiosk_eligibility(self):
+        from attendance.eligibility import EligibilityType, resolve_attendance_eligibility
+
+        response = self.choose("PHARMACIST")
+        self.assertEqual(response.status_code, 200, response.content)
+        sibling = Pharmacy.objects.create(name="Sibling Site", organization=self.organization)
+
+        eligibility = resolve_attendance_eligibility(self.contact, sibling)
+        self.assertTrue(eligibility.is_eligible)
+        self.assertEqual(eligibility.eligibility_type, EligibilityType.CROSS_SITE_ORG)
+        self.assertEqual(eligibility.source_membership.pharmacy_id, self.pharmacy.id)
+
+    def test_owner_account_type_is_rejected_and_manager_authority_is_unchanged(self):
+        response = self.choose("OWNER")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("role", response.json())
+
+        self.contact.refresh_from_db()
+        self.pharmacy.refresh_from_db()
+        assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        self.assertEqual(self.contact.role, "PHARMACY_MANAGER")
+        self.assertIsNone(self.pharmacy.owner_id)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(
+            assignment.capabilities,
+            {
+                PharmacyAdmin.CAPABILITY_MANAGE_ADMINS,
+                PharmacyAdmin.CAPABILITY_MANAGE_STAFF,
+                PharmacyAdmin.CAPABILITY_MANAGE_ROSTER,
+                PharmacyAdmin.CAPABILITY_MANAGE_COMMS,
+            },
+        )
 
 
 class SelfRegistrationRoleTests(TestCase):

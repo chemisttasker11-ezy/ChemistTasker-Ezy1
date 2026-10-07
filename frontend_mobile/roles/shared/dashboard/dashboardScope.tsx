@@ -6,7 +6,13 @@ import apiClient from '@/utils/apiClient';
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { selectAdminPersona, selectRolePersona } from '@/utils/mobilePersona';
+import {
+  getAdminAssignments,
+  getAssignmentId,
+  getAssignmentPharmacyName,
+  selectAdminPersona,
+  selectRolePersona,
+} from '@/utils/mobilePersona';
 
 export type PharmacyOption = {
   id: number;
@@ -367,6 +373,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
   const { user } = useAuth();
   const { reloadWorkspace } = useWorkspace();
   const [pendingAdminCount, setPendingAdminCount] = useState(0);
+  const [adminPickerVisible, setAdminPickerVisible] = useState(false);
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -376,8 +383,7 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
     return () => { active = false; };
   }, [user?.id, pathname]);
   const normalizedRole = String(role || user?.role || '').toUpperCase();
-  const assignments = (Array.isArray((user as any)?.admin_assignments) ? (user as any).admin_assignments : [])
-    .filter((assignment: any) => assignment?.admin_level !== 'OWNER');
+  const assignments = getAdminAssignments(user).filter((assignment) => getAssignmentId(assignment) != null);
   const canSwitchToOrg = hasOrganizationAccess(user) &&
     !ORG_PORTAL_ROLES.includes(normalizedRole as (typeof ORG_PORTAL_ROLES)[number]);
 
@@ -396,11 +402,28 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
     router.replace(route as any);
   };
 
-  const openAdminWorkspace = async () => {
-    const selected = await selectAdminPersona(user);
+  const enterAdminWorkspace = async (assignmentId: number) => {
+    const selected = await selectAdminPersona(user, assignmentId);
     if (!selected) return;
+    setAdminPickerVisible(false);
     await reloadWorkspace();
     router.replace('/admin' as any);
+  };
+
+  const openAdminWorkspace = async () => {
+    if (assignments.length === 1) {
+      const assignmentId = getAssignmentId(assignments[0]);
+      if (assignmentId != null) {
+        await enterAdminWorkspace(assignmentId);
+      }
+      return;
+    }
+    if (assignments.length > 1) {
+      // Never guess between multiple delegated pharmacies. This is especially
+      // important for an OWNER who can legitimately be a delegated admin
+      // elsewhere while OWNER-level rows remain owner authority only.
+      setAdminPickerVisible(true);
+    }
   };
 
   return (
@@ -444,6 +467,33 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
         <Text style={[styles.personaButtonText, activeOrg && styles.personaButtonTextActive]}>Organization</Text>
       </TouchableOpacity> : null}
     </View> : null}
+    <Portal>
+      <Modal
+        visible={adminPickerVisible}
+        onDismiss={() => setAdminPickerVisible(false)}
+        contentContainerStyle={styles.modal}
+      >
+        <Text variant="titleMedium" style={styles.modalTitle}>Choose admin pharmacy</Text>
+        <Text style={styles.emptyText}>
+          Select the pharmacy whose delegated Admin workspace you want to open.
+        </Text>
+        {assignments.map((assignment) => {
+          const assignmentId = getAssignmentId(assignment);
+          return (
+            <Button
+              key={assignmentId ?? assignment.pharmacy_id}
+              mode="text"
+              icon="shield-account-outline"
+              contentStyle={styles.optionContent}
+              disabled={assignmentId == null}
+              onPress={() => assignmentId != null && void enterAdminWorkspace(assignmentId)}
+            >
+              {getAssignmentPharmacyName(assignment)}
+            </Button>
+          );
+        })}
+      </Modal>
+    </Portal>
     </>
   );
 }
