@@ -199,6 +199,8 @@ jobs:
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
         run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
+      - name: Real PDF rendering contract
+        run: python backend/manage.py test core.test_pdf_rendering_contract --settings=core.contract_test_settings
       - name: Kernel and domain app tests
         run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
