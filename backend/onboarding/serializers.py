@@ -706,7 +706,11 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):
-        return apply_otherstaff_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
+        instance = apply_otherstaff_basic_tab(instance, vdata, submit, initial_data=self.initial_data)
+        if instance.role_type:
+            from memberships.profile_sync import sync_managed_pharmacy_memberships
+            sync_managed_pharmacy_memberships(instance.user, explicit_role=instance.role_type)
+        return instance
 
     # ---------------- Identity TAB ----------------
     def _identity_tab(self, instance, vdata: dict, submit: bool):
@@ -714,7 +718,11 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # ---------------- Regulatory TAB ----------------
     def _regulatory_tab(self, instance, vdata: dict, submit: bool):
-        return apply_regulatory_tab(instance, vdata, submit)
+        instance = apply_regulatory_tab(instance, vdata, submit)
+        if instance.role_type:
+            from memberships.profile_sync import sync_managed_pharmacy_memberships
+            sync_managed_pharmacy_memberships(instance.user, explicit_role=instance.role_type)
+        return instance
 
     # ---------------- Payment TAB ----------------
     def _payment_tab(self, instance, vdata: dict, submit: bool):
