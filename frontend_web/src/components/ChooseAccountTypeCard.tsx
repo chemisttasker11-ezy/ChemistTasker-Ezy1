@@ -24,8 +24,11 @@ export default function ChooseAccountTypeCard() {
     try {
       const response = await chooseAccountType(role);
       const onboardingUrl: string = response?.onboarding_url ?? "";
+      const fallbackPath = role === "PHARMACIST"
+        ? "/dashboard/pharmacist/onboarding"
+        : "/dashboard/otherstaff/onboarding";
       setUser((previous) => (previous ? { ...previous, role } : previous));
-      navigate(onboardingUrl ? new URL(onboardingUrl, window.location.origin).pathname : "/dashboard");
+      navigate(onboardingUrl ? new URL(onboardingUrl, window.location.origin).pathname : fallbackPath);
     } catch (err: any) {
       setError(err?.response?.data?.role?.[0] ?? "Unable to save your account type.");
     } finally {
