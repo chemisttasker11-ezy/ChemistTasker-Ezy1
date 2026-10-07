@@ -28,7 +28,6 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useAuth } from '../../../contexts/AuthContext';
-import { canIssueInvoices } from '../../../utils/invoiceIssuer';
 import { deleteInvoice, getInvoicePdfUrl, getInvoices, sendInvoiceEmail } from '@chemisttasker/shared-core';
 
 dayjs.extend(utc);
@@ -197,15 +196,13 @@ export default function InvoiceManagePage() {
         mb={3}
       >
         <Typography variant="h4">Invoices</Typography>
-        {canIssueInvoices(auth.user.role) && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleNew}
-          >
-            New Invoice
-          </Button>
-        )}
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleNew}
+        >
+          New Invoice
+        </Button>
       </Box>
 
       {/* Table */}
