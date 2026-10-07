@@ -3,8 +3,9 @@ import { cache } from 'react';
 import { ApiError } from '@chemisttasker/shared-core';
 import type { Article, Kind, Page } from './hub';
 import { createServerChemistTaskerApi } from './server-chemisttasker-api';
+import { canonicalApiRoot } from './api-root.mjs';
 
-export const backend = (process.env.HUB_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+export const backend = canonicalApiRoot(process.env.HUB_API_URL);
 export class HubUnavailable extends Error {}
 
 async function publicCall<T>(operation: (api: ReturnType<typeof createServerChemistTaskerApi>) => Promise<T>): Promise<T | null> {

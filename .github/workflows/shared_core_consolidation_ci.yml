@@ -137,6 +137,9 @@ jobs:
         working-directory: frontend_web/landing_next
       - run: npm run typecheck
         working-directory: frontend_web/landing_next
+      - name: Canonical API root normalization
+        run: node --test lib/api-root.test.mjs
+        working-directory: frontend_web/landing_next
       - run: npm run build
         working-directory: frontend_web/landing_next
 

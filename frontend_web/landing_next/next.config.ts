@@ -1,9 +1,11 @@
 import type {NextConfig} from 'next';
 import path from 'node:path';
+import {backendOrigin, canonicalApiRoot} from './lib/api-root.mjs';
 
 const dashboard=process.env.DASHBOARD_INTERNAL_URL||'http://127.0.0.1:5173';
 const dashboardPublic=process.env.DASHBOARD_PUBLIC_URL||'http://localhost:5173';
-const api=process.env.PLATFORM_API_URL||'http://127.0.0.1:8000/api/v1';
+const api=canonicalApiRoot(process.env.PLATFORM_API_URL);
+const backend=backendOrigin(api);
 const isDev=process.env.NODE_ENV==='development';
 
 const viteOwnedPrefixes=['onboarding','setup','kiosk','membership'];
@@ -56,8 +58,8 @@ const config:NextConfig={
   ...['dashboard','onboarding','setup','kiosk','membership'].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
   {source:'/kiosk',destination:`${dashboard}/kiosk`},
   ...['dashboard-assets','js','assets','images',...(isDev?['src','@vite','@id','@fs','node_modules','@react-refresh','landing_next/shared']:[])].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
-  {source:'/ws/:path*',destination:`${api.replace(/\/api\/v1$/, '')}/ws/:path*`},
-  {source:'/media/:path*',destination:`${api.replace(/\/api\/v1$/, '')}/media/:path*`},
+  {source:'/ws/:path*',destination:`${backend}/ws/:path*`},
+  {source:'/media/:path*',destination:`${backend}/media/:path*`},
   {source:'/api/v1/:path*',destination:`${api}/:path*`},
  ]};},
 };

@@ -1,5 +1,6 @@
 import 'server-only';
 import { NextRequest } from 'next/server';
+import { canonicalApiRoot } from './api-root.mjs';
 export async function platformProxy(request: NextRequest, path: string, method = request.method, baseOverride?: string) {
   if (path.split('/').some(segment => segment === '..' || !/^[A-Za-z0-9_.~-]*$/.test(segment))) return Response.json({detail:'Invalid API path.'},{status:400});
   const expected = process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL).origin : `${request.nextUrl.protocol}//${request.headers.get('host')}`;
@@ -11,7 +12,7 @@ export async function platformProxy(request: NextRequest, path: string, method =
   const headers = new Headers();
   for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform','x-device-token']) { const value=request.headers.get(name); if(value) headers.set(name,value); }
   headers.set('x-forwarded-proto',new URL(expected).protocol.replace(':',''));
-  const base=(baseOverride || process.env.PLATFORM_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/,'');
+  const base=canonicalApiRoot(baseOverride || process.env.PLATFORM_API_URL);
   try {
     const body=['GET','HEAD','OPTIONS'].includes(method)?undefined:await request.arrayBuffer();
     // Hub attachments are validated by Django per file (currently 15 MiB).

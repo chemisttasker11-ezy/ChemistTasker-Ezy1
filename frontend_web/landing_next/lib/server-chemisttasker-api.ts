@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createChemistTaskerApi, type ApiClientConfig } from '@chemisttasker/shared-core';
+import { canonicalApiRoot } from './api-root.mjs';
 
 export interface ServerApiContext {
   authToken?: string | null;
@@ -14,7 +15,7 @@ export interface ServerApiContext {
  */
 export function createServerChemistTaskerApi(context: ServerApiContext = {}) {
   const config: ApiClientConfig = {
-    baseUrl: context.baseUrl ?? process.env.PLATFORM_API_URL ?? 'http://127.0.0.1:8000/api/v1',
+    baseUrl: context.baseUrl ?? canonicalApiRoot(process.env.PLATFORM_API_URL),
     getAuthToken: () => context.authToken ?? null,
     ...(context.fetchImpl ? { fetchImpl: context.fetchImpl } : {}),
   };
