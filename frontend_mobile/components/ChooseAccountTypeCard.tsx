@@ -5,13 +5,16 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { chooseAccountType } from '@chemisttasker/shared-core';
 
-// A pharmacy-manager account (a pharmacy contact onboarded by an organisation) may add its own profile once.
+// A pharmacy-manager account may remain a permanent admin-only identity.
 const ACCOUNT_TYPES = [
-  { role: 'PHARMACIST', label: 'Pharmacist', onboardingPath: '/pharmacist/onboarding' },
-  { role: 'OTHER_STAFF', label: 'Other staff', onboardingPath: '/otherstaff/onboarding' },
+  { role: 'PHARMACIST', staffRole: 'PHARMACIST', label: 'Pharmacist', onboardingPath: '/pharmacist/onboarding' },
+  { role: 'OTHER_STAFF', staffRole: 'INTERN', label: 'Intern pharmacist', onboardingPath: '/otherstaff/onboarding' },
+  { role: 'OTHER_STAFF', staffRole: 'TECHNICIAN', label: 'Dispensary technician', onboardingPath: '/otherstaff/onboarding' },
+  { role: 'OTHER_STAFF', staffRole: 'ASSISTANT', label: 'Pharmacy assistant', onboardingPath: '/otherstaff/onboarding' },
+  { role: 'OTHER_STAFF', staffRole: 'STUDENT', label: 'Pharmacy student', onboardingPath: '/otherstaff/onboarding' },
 ] as const;
 
-export default function ChooseAccountTypeCard() {
+export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: number | null }) {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
   const [saving, setSaving] = useState<string | null>(null);
@@ -19,13 +22,21 @@ export default function ChooseAccountTypeCard() {
 
   if (String(user?.role || '').toUpperCase() !== 'PHARMACY_MANAGER') return null;
 
-  const choose = async (role: (typeof ACCOUNT_TYPES)[number]['role'], onboardingPath: string) => {
-    setSaving(role);
+  const choose = async (item: (typeof ACCOUNT_TYPES)[number]) => {
+    if (!pharmacyId) {
+      setError('Select an administered pharmacy before adding a personal profile.');
+      return;
+    }
+    const savingKey = `${item.role}:${item.staffRole}`;
+    setSaving(savingKey);
     setError(null);
     try {
-      await chooseAccountType(role);
+      await chooseAccountType(item.role, {
+        pharmacy_id: pharmacyId,
+        staff_role: item.staffRole,
+      });
       await refreshUser();
-      router.replace(onboardingPath as any);
+      router.replace(item.onboardingPath as any);
     } catch (err: any) {
       setError(err?.response?.data?.role?.[0] || err?.message || 'Unable to save your account type.');
     } finally {
@@ -35,19 +46,20 @@ export default function ChooseAccountTypeCard() {
 
   return (
     <Surface style={styles.card}>
-      <Text variant="titleMedium" style={styles.title}>Complete your profile (optional)</Text>
+      <Text variant="titleMedium" style={styles.title}>Personal profile is optional</Text>
       <Text style={styles.body}>
-        You already manage this pharmacy with full delegated admin access. Add your personal ChemistTasker profile as
-        a pharmacist or other staff member. Your admin access is kept, and this choice can be made only once.
+        This account can remain permanently as a pharmacy-admin account. No action is required. Only choose a worker
+        type if this email belongs to you personally and you want the current pharmacy's CONTACT membership converted
+        into your own workforce membership.
       </Text>
       <View style={styles.actions}>
         {ACCOUNT_TYPES.map((item) => (
           <Button
             key={item.role}
             mode="outlined"
-            loading={saving === item.role}
+            loading={saving === `${item.role}:${item.staffRole}`}
             disabled={saving != null}
-            onPress={() => choose(item.role, item.onboardingPath)}
+            onPress={() => choose(item)}
           >
             {item.label}
           </Button>
