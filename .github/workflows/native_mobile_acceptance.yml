@@ -266,6 +266,13 @@ jobs:
               text = re.sub(r'android:usesCleartextTraffic="[^"]*"', 'android:usesCleartextTraffic="true"', text)
           else:
               text = text.replace("<application ", '<application android:usesCleartextTraffic="true" ', 1)
+          # Acceptance must execute this candidate's embedded bundle, never a published EAS update.
+          updates = '<meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>'
+          if "expo.modules.updates.ENABLED" in text:
+              text = re.sub(r'<meta-data android:name="expo.modules.updates.ENABLED" android:value="[^"]*"\s*/>', updates, text)
+          else:
+              text = text.replace("</application>", updates + "</application>", 1)
+          assert 'expo.modules.updates.ENABLED" android:value="false"' in text
           path.write_text(text)
           PY
           cd android
@@ -693,6 +700,11 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST_PATH" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST_PATH" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" "$PLIST_PATH"
+          # Acceptance must execute this candidate's embedded bundle, never a published EAS update.
+          EXPO_PLIST="ios/ChemistTasker/Supporting/Expo.plist"
+          test -f "$EXPO_PLIST"
+          /usr/libexec/PlistBuddy -c "Set :EXUpdatesEnabled false" "$EXPO_PLIST" 2>/dev/null ||             /usr/libexec/PlistBuddy -c "Add :EXUpdatesEnabled bool false" "$EXPO_PLIST"
+          test "$(/usr/libexec/PlistBuddy -c "Print :EXUpdatesEnabled" "$EXPO_PLIST")" = "false"
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
           SCHEME="ChemistTasker"
