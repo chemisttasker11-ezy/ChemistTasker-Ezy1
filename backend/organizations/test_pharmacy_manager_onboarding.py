@@ -204,8 +204,14 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.contact)
 
-    def choose(self, role):
-        return self.client.post("/api/v1/users/me/account-type/", {"role": role}, format="json")
+    def choose(self, role, *, pharmacy=None, staff_role=None):
+        payload = {
+            "role": role,
+            "pharmacy_id": (pharmacy or self.pharmacy).id,
+        }
+        if staff_role:
+            payload["staff_role"] = staff_role
+        return self.client.post("/api/v1/users/me/account-type/", payload, format="json")
 
     def test_dashboard_is_the_admin_dashboard_of_the_managed_pharmacy(self):
         from users.navigation import get_frontend_dashboard_url
@@ -238,28 +244,91 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.assertEqual(self.choose("OTHER_STAFF").status_code, 400, "the account type can be chosen only once")
         self.assertTrue(has_admin_capability(self.contact, self.pharmacy, CAPABILITY_MANAGE_STAFF))
 
-    def test_other_staff_membership_stays_contact_until_specific_role_then_synchronizes(self):
-        response = self.choose("OTHER_STAFF")
+    def test_other_staff_conversion_sets_specific_role_once_and_profile_edits_do_not_rewrite_memberships(self):
+        second_pharmacy = Pharmacy.objects.create(name="Second Managed Site", organization=self.organization)
+        second_membership = Membership.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+        second_assignment = PharmacyAdmin.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            membership=second_membership,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
+        )
+
+        response = self.choose("OTHER_STAFF", staff_role="ASSISTANT")
         self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["staff_role"], "ASSISTANT")
+        self.assertEqual(response.json()["pharmacy_id"], self.pharmacy.id)
 
         membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
         assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
-        self.assertEqual(membership.role, "CONTACT")
-        self.assertIsNone(assignment.staff_role)
+        second_membership.refresh_from_db()
+        second_assignment.refresh_from_db()
+        self.assertEqual(membership.role, "ASSISTANT")
+        self.assertEqual(assignment.staff_role, "ASSISTANT")
         self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(second_membership.role, "CONTACT")
+        self.assertIsNone(second_assignment.staff_role)
 
+        # force_authenticate keeps the original in-memory PHARMACY_MANAGER object,
+        # so refresh/re-authenticate before exercising an OTHER_STAFF-only endpoint.
+        self.contact.refresh_from_db()
+        self.client.force_authenticate(user=self.contact)
         onboarding_response = self.client.patch(
             "/api/v1/otherstaff/onboarding/me/",
-            {"tab": "basic", "role_type": "ASSISTANT"},
+            {"tab": "basic", "role_type": "TECHNICIAN"},
             format="json",
         )
         self.assertEqual(onboarding_response.status_code, 200, onboarding_response.content)
 
         membership.refresh_from_db()
         assignment.refresh_from_db()
+        second_membership.refresh_from_db()
+        second_assignment.refresh_from_db()
         self.assertEqual(membership.role, "ASSISTANT")
         self.assertEqual(assignment.staff_role, "ASSISTANT")
-        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(second_membership.role, "CONTACT")
+        self.assertIsNone(second_assignment.staff_role)
+
+    def test_other_staff_requires_a_concrete_role_at_conversion(self):
+        response = self.choose("OTHER_STAFF")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("staff_role", response.json())
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.role, "PHARMACY_MANAGER")
+
+    def test_pharmacist_conversion_only_changes_the_selected_pharmacy(self):
+        second_pharmacy = Pharmacy.objects.create(name="Second Managed Pharmacy", organization=self.organization)
+        second_membership = Membership.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            role="CONTACT",
+            employment_type="FULL_TIME",
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+        PharmacyAdmin.objects.create(
+            user=self.contact,
+            pharmacy=second_pharmacy,
+            membership=second_membership,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
+        )
+
+        response = self.choose("PHARMACIST")
+        self.assertEqual(response.status_code, 200, response.content)
+
+        first_membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        second_membership.refresh_from_db()
+        self.assertEqual(first_membership.role, "PHARMACIST")
+        self.assertEqual(second_membership.role, "CONTACT")
 
     def test_pharmacist_membership_enables_cross_site_org_kiosk_eligibility(self):
         from attendance.eligibility import EligibilityType, resolve_attendance_eligibility
