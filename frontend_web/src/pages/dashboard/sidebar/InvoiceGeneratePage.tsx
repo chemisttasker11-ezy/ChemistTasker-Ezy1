@@ -4,11 +4,12 @@ import {
   Container, Paper, Typography, Tabs, Tab,
   Box, TextField, MenuItem, Checkbox, FormControlLabel,
   Table, TableHead, TableRow, TableCell, TableBody,
-  Button, IconButton, TableContainer
+  Button, IconButton, TableContainer, Alert
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
+import { canIssueInvoices } from '../../../utils/invoiceIssuer';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
@@ -229,15 +230,9 @@ export default function InvoiceGeneratePage() {
 // ─── A) Load issuer details once on mount ─────────────
 useEffect(() => {
   if (!user) return;
-  const role = user.role.toLowerCase();
-  // Organisation staff have no onboarding record (no /org_staff/onboarding/ route exists);
-  // use the signed-in profile instead of requesting a guaranteed 404.
-  if (!['owner', 'pharmacist', 'other_staff', 'otherstaff', 'explorer'].includes(role)) {
-    setIssuerFirstName(user.first_name ?? user.firstName ?? '');
-    setIssuerLastName(user.last_name ?? user.lastName ?? '');
-    return;
-  }
-  getOnboarding(role)
+  // Only issuers (pharmacist / other staff) have the onboarding profile invoices are issued from.
+  if (!canIssueInvoices(user.role)) return;
+  getOnboarding(user.role.toLowerCase())
     .then((res: any) => {
       setIssuerFirstName(res.first_name);
       setIssuerLastName(res.last_name);
@@ -533,6 +528,20 @@ const handleGenerate = () => {
     .finally(() => setSubmitting(false));
 };
 
+
+  if (user && !canIssueInvoices(user.role)) {
+    return (
+      <Container maxWidth="lg">
+        <Paper sx={{ p:4, mt:4 }}>
+          <Typography variant="h5">Generate Invoice</Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Invoices are issued by pharmacists and other staff from their own profile. Invoices sent to your
+            pharmacies appear in your invoice list.
+          </Alert>
+        </Paper>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg">
