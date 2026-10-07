@@ -122,6 +122,8 @@ class ChooseAccountTypeView(APIView):
                 raise ValidationError({"role": "Your account type is already set."})
             user.role = role
             user.save(update_fields=["role"])
+            from memberships.profile_sync import sync_managed_pharmacy_memberships
+            sync_managed_pharmacy_memberships(user)
         return Response(
             {"role": user.role, "onboarding_url": get_frontend_onboarding_url(user)},
             status=status.HTTP_200_OK,
