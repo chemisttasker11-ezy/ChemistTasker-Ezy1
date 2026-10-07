@@ -290,7 +290,7 @@ function RosterSelectionScreen({ screen, pharmacyId, pharmacyName, weekStart, se
             Edit shift
           </Button>
         )}
-        {unpublished ? (
+        {unpublished && published ? (
           <>
             <InfoNote title="Unpublished">Hidden from workers until this shift is republished.</InfoNote>
             <ChoiceChips
@@ -306,7 +306,7 @@ function RosterSelectionScreen({ screen, pharmacyId, pharmacyName, weekStart, se
               Republish shift
             </Button>
           </>
-        ) : null}
+        ) : unpublished ? <InfoNote title="Draft week">Edit this shift, then review and publish the whole week to make it visible to workers.</InfoNote> : null}
       </View>
     );
   };
