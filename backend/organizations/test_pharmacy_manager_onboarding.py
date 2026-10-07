@@ -52,6 +52,7 @@ class PharmacyManagerOnboardingTests(TestCase):
 
         assignment = PharmacyAdmin.objects.get(user=contact, pharmacy=pharmacy)
         self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertIsNone(assignment.staff_role)
         self.assertTrue(assignment.is_active)
         self.assertEqual(body["pharmacy_admin_id"], assignment.id)
         membership = Membership.objects.get(user=contact, pharmacy=pharmacy)
@@ -64,6 +65,23 @@ class PharmacyManagerOnboardingTests(TestCase):
         self.assertTrue(context["dashboard_link"].endswith(f"/dashboard/admin/{pharmacy.id}"))
         self.assertEqual(context["pharmacies"], [pharmacy.name])
         self.assertEqual(context["role_label"], "Pharmacy Manager")
+
+    def test_existing_pharmacist_gets_concrete_pharmacy_membership_and_manager_assignment(self):
+        existing = make_user("PHARMACIST")
+
+        response, _ = self.onboard(self.org_admin(), email=existing.email)
+        self.assertEqual(response.status_code, 201, response.content)
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.role, "PHARMACIST")
+        onboarded = Pharmacy.objects.get(email__iexact=existing.email, organization=self.organization)
+        membership = Membership.objects.get(user=existing, pharmacy=onboarded)
+        assignment = PharmacyAdmin.objects.get(user=existing, pharmacy=onboarded)
+        self.assertEqual(membership.role, "PHARMACIST")
+        self.assertEqual(membership.status, Membership.Status.ACCEPTED)
+        self.assertTrue(membership.is_active)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(assignment.staff_role, "PHARMACIST")
 
     def test_existing_owner_keeps_owner_role_and_can_manage_organization_onboarded_pharmacy(self):
         existing_owner, owned_pharmacy = make_owner_with_pharmacy("Existing Owner Pharmacy")
@@ -210,8 +228,50 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json()["role"], "PHARMACIST")
         self.assertTrue(response.json()["onboarding_url"].endswith("/dashboard/pharmacist/onboarding"))
+
+        membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        self.assertEqual(membership.role, "PHARMACIST")
+        self.assertEqual(assignment.staff_role, "PHARMACIST")
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+
         self.assertEqual(self.choose("OTHER_STAFF").status_code, 400, "the account type can be chosen only once")
         self.assertTrue(has_admin_capability(self.contact, self.pharmacy, CAPABILITY_MANAGE_STAFF))
+
+    def test_other_staff_membership_stays_contact_until_specific_role_then_synchronizes(self):
+        response = self.choose("OTHER_STAFF")
+        self.assertEqual(response.status_code, 200, response.content)
+
+        membership = Membership.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        self.assertEqual(membership.role, "CONTACT")
+        self.assertIsNone(assignment.staff_role)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+
+        onboarding_response = self.client.patch(
+            "/api/v1/otherstaff/onboarding/me/",
+            {"tab": "basic", "role_type": "ASSISTANT"},
+            format="json",
+        )
+        self.assertEqual(onboarding_response.status_code, 200, onboarding_response.content)
+
+        membership.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(membership.role, "ASSISTANT")
+        self.assertEqual(assignment.staff_role, "ASSISTANT")
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+
+    def test_pharmacist_membership_enables_cross_site_org_kiosk_eligibility(self):
+        from attendance.eligibility import EligibilityType, resolve_attendance_eligibility
+
+        response = self.choose("PHARMACIST")
+        self.assertEqual(response.status_code, 200, response.content)
+        sibling = Pharmacy.objects.create(name="Sibling Site", organization=self.organization)
+
+        eligibility = resolve_attendance_eligibility(self.contact, sibling)
+        self.assertTrue(eligibility.is_eligible)
+        self.assertEqual(eligibility.eligibility_type, EligibilityType.CROSS_SITE_ORG)
+        self.assertEqual(eligibility.source_membership.pharmacy_id, self.pharmacy.id)
 
     def test_owner_account_type_is_rejected_and_manager_authority_is_unchanged(self):
         response = self.choose("OWNER")
