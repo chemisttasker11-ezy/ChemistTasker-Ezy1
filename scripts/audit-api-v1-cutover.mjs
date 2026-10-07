@@ -30,6 +30,8 @@ function ignored(rel) {
   return rel.startsWith('docs/') ||
     rel.includes('/migrations/') ||
     rel.includes('/node_modules/') ||
+    rel.includes('/.next/') ||
+    rel.includes('/target/') ||
     rel.includes('/dist/') ||
     rel.includes('/build/') ||
     rel.includes('/coverage/') ||

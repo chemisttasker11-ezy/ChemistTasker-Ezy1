@@ -18,6 +18,9 @@ test('bare API root ratchet distinguishes maintained callers from compatibility 
     put('frontend_web/scripts/ws-url.test.mjs', 'normalize("https://example.invalid/api");');
     put('frontend_web/src/utils/wsUrl.ts', '/**\n * accepts "https://example.invalid/api"\n */\nexport const path = "/ws/";');
     put('frontend_web/src-tauri/src/lib.rs', '#[cfg(test)]\nmod tests { reject("https://example.invalid/api"); }');
+    const generatedRoute = ['','api','users',''].join('/');
+    put('frontend_web/landing_next/.next/types/routes.d.ts', `type GeneratedRoute = '${generatedRoute}';`);
+    put('frontend_web/src-tauri/target/debug/generated.rs', `const GENERATED_ROUTE = "${generatedRoute}";`);
     const run = () => spawnSync(process.execPath, [path.join(root, 'scripts/audit-api-v1-cutover.mjs')], { encoding: 'utf8' });
     assert.equal(run().status, 0);
     for (const caller of ['shared-core/src/transport.ts', 'frontend_web/src/api.ts',
