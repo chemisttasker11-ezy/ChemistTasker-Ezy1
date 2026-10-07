@@ -26,6 +26,7 @@ requireText(compose, 'SECURE_SSL_REDIRECT: "True"', 'production backend must for
 requireText(compose, 'SESSION_COOKIE_SECURE: "True"', 'production session cookie must be Secure');
 requireText(compose, 'CSRF_COOKIE_SECURE: "True"', 'production CSRF cookie must be Secure');
 requireText(compose, 'JWT_COOKIE_SECURE: "True"', 'production JWT cookies must be Secure');
+requireText(compose, 'JWT_COOKIE_PATH: "/"', 'production JWT cookie path must remain root-scoped');
 requireText(compose, 'APP_ENV: "vps"', 'production backend must run with non-development APP_ENV');
 requireText(compose, 'command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "core.asgi:application"]', 'production HTTP/WebSocket server must use ASGI/Daphne');
 requireText(compose, 'RUN_MIGRATIONS: "1"', 'web deployment must own migration execution');
