@@ -317,10 +317,10 @@ jobs:
             echo "Android emulator did not complete boot within 240 seconds after ADB registration"
             exit 1
           fi
-          "$ADB" reverse tcp:8000 tcp:8000
-          "$ADB" reverse tcp:8081 tcp:8081
-          "$ADB" uninstall com.chemisttasker.app >/dev/null 2>&1 || true
-          "$ADB" install frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          timeout 30 "$ADB" reverse tcp:8000 tcp:8000
+          timeout 30 "$ADB" reverse tcp:8081 tcp:8081
+          timeout 30 "$ADB" uninstall com.chemisttasker.app >/dev/null 2>&1 || true
+          timeout 90 "$ADB" install frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Start Metro and open Android development project
         shell: bash
@@ -347,12 +347,14 @@ jobs:
           adb shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
           sleep 15
 
-      - name: Install Maestro
+      - name: Install pinned Maestro
         shell: bash
         run: |
           set -euo pipefail
+          export MAESTRO_VERSION=2.11.0
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version | tee /tmp/maestro-version-android.txt
 
       - name: Run Android restart, persona, deep-link and camera smoke
         shell: bash
@@ -432,8 +434,8 @@ jobs:
         if: always()
         shell: bash
         run: |
-          adb devices -l > /tmp/adb-devices.txt 2>&1 || true
-          adb logcat -d > /tmp/android-logcat.txt 2>&1 || true
+          timeout 15 adb devices -l > /tmp/adb-devices.txt 2>&1 || true
+          timeout 30 adb logcat -d > /tmp/android-logcat.txt 2>&1 || true
 
       - name: Upload Android diagnostics
         if: always()
@@ -448,6 +450,7 @@ jobs:
             /tmp/android-logcat.txt
             /tmp/metro.log
             /tmp/dev-client-url-android.txt
+            /tmp/maestro-version-android.txt
             ~/.maestro/tests
           if-no-files-found: ignore
 
@@ -661,7 +664,7 @@ jobs:
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
-      - name: Start Metro for iOS development project
+      - name: Start Metro, prewarm bundle and launch iOS development project
         shell: bash
         run: |
           set -euo pipefail
@@ -676,6 +679,14 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
+
+          # Prewarm the first Expo Router bundle before UI acceptance. In the
+          # previous iOS run, cold compilation started only after Maestro had
+          # already exhausted its assertion timeout.
+          BUNDLE_URL="http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&minify=false"
+          curl --fail --show-error --silent --max-time 240 "$BUNDLE_URL" -o /tmp/ios-entry.bundle
+          test -s /tmp/ios-entry.bundle
+
           MANIFEST_URL=$(python3 - <<'PY'
           from urllib.parse import quote
           print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
@@ -684,14 +695,21 @@ jobs:
           DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
           printf '%s\n' "$DEV_URL" | tee /tmp/dev-client-url-ios.txt
 
-      - name: Install Maestro
+          # simctl owns the dev-client handoff. Maestro only validates the
+          # ChemistTasker UI after the native launcher has opened the project.
+          xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
+          sleep 10
+
+      - name: Install pinned Maestro
         shell: bash
         run: |
           set -euo pipefail
           export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || /usr/libexec/java_home)
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          export MAESTRO_VERSION=2.11.0
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version | tee /tmp/maestro-version-ios.txt
 
       - name: Run iOS restart, persona, deep-link and camera smoke
         shell: bash
@@ -703,18 +721,9 @@ jobs:
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
-          - launchApp:
-              stopApp: true
-              permissions:
-                all: allow
-          - openLink: "frontendmobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081%3FdisableOnboarding%3D1&disableFab=1&disableAutoLaunch=1"
-          - extendedWaitUntil:
-              visible: "Open"
-              timeout: 30000
-          - tapOn: "Open"
           - extendedWaitUntil:
               visible: "Go to Login"
-              timeout: 90000
+              timeout: 120000
           - tapOn: "Go to Login"
           - extendedWaitUntil:
               visible: "Welcome back"
@@ -793,6 +802,7 @@ jobs:
             /tmp/native-backend.log
             /tmp/metro.log
             /tmp/dev-client-url-ios.txt
+            /tmp/maestro-version-ios.txt
             /tmp/ios-simulator.png
             /tmp/chemisttasker-ios.log
             ~/.maestro/tests
