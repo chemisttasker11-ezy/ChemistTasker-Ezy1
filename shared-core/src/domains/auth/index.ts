@@ -18,7 +18,6 @@ export {
 export {
   getOnboarding,
   updateOnboarding,
-  createOnboarding,
   getOnboardingDetail,
   updateOnboardingForm,
 } from '../onboarding/api';
