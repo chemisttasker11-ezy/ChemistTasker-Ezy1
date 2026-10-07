@@ -1,5 +1,5 @@
 """Actual HTTP contracts for one revision-aware roster publication authority."""
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from queue import Queue
 from threading import Barrier, Thread
 from unittest import mock, skipUnless
@@ -10,6 +10,7 @@ from django.test import TestCase, TransactionTestCase
 from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy
+from shifts.models import Shift, ShiftSlot
 from workforce.models import RosterOperation, RosterPeriod, RosterPublicationAudit, RosterRevisionState
 from workforce.roster.revisions import bump_roster_revision, get_revision_state, warning_key
 
@@ -163,6 +164,61 @@ class PublicationHttpContracts(PublicationFixture, TestCase):
         refused = self.client.post(BASES[1] + 'publish/', stale, format='json')
         self.assertEqual(refused.status_code, 409, refused.data)
         self.assertEqual(RosterPublicationAudit.objects.count(), 1)
+
+    def test_whole_week_publish_requires_explicit_republish_of_individually_unpublished_shift(self):
+        from workforce.roster.publication import unpublish_roster_shift
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, role_needed='PHARMACIST', created_by=self.owner, is_roster_container=True,
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=self.period.week_start,
+            start_time=time(9),
+            end_time=time(17),
+            roster_period=self.period,
+        )
+
+        first = self.client.post(BASES[0] + 'publish/', self.payload(), format='json')
+        self.assertEqual(first.status_code, 200, first.data)
+        first_published_revision = first.data['published_revision']
+
+        unpublish_roster_shift(slot, self.owner)
+        slot.refresh_from_db()
+        self.assertIsNotNone(slot.unpublished_at)
+
+        command = self.payload()
+        review = self.client.post(BASES[1] + 'validate/', {
+            'period_id': command['period_id'],
+            'expected_revision': command['expected_revision'],
+        }, format='json')
+        self.assertEqual(review.status_code, 200, review.data)
+        refused = self.client.post(BASES[1] + 'publish/', command, format='json')
+        self.assertEqual(refused.status_code, 409, refused.data)
+        self.assertEqual(refused.data['code'], 'ROSTER_SHIFT_REPUBLISH_REQUIRED')
+        self.assertEqual(refused.data['unpublished_slot_ids'], [slot.pk])
+        state = get_revision_state(self.period)
+        self.assertEqual(state.published_revision, first_published_revision)
+        self.assertGreater(state.draft_revision, first_published_revision)
+        self.assertEqual(RosterOperation.objects.count(), 1)
+
+        republished = self.client.post(BASES[1] + 'shift/republish/', {
+            'slot_id': slot.pk,
+            'notify': 'none',
+        }, format='json')
+        self.assertEqual(republished.status_code, 200, republished.data)
+        slot.refresh_from_db()
+        self.assertIsNone(slot.unpublished_at)
+
+        command = self.payload()
+        review = self.client.post(BASES[1] + 'validate/', {
+            'period_id': command['period_id'],
+            'expected_revision': command['expected_revision'],
+        }, format='json')
+        self.assertEqual(review.status_code, 200, review.data)
+        reconciled = self.client.post(BASES[1] + 'publish/', command, format='json')
+        self.assertEqual(reconciled.status_code, 200, reconciled.data)
+        self.assertEqual(reconciled.data['published_revision'], reconciled.data['draft_revision'])
 
     def test_invalid_commands_and_actual_blockers_create_no_durable_operation(self):
         validation = {'is_valid': False, 'errors': [{'type': 'OVERLAP', 'message': 'Overlap'}],
