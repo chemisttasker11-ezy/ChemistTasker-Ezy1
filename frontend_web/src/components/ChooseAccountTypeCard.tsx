@@ -8,7 +8,6 @@ import { chooseAccountType } from "@chemisttasker/shared-core";
 const ACCOUNT_TYPES = [
   { role: "PHARMACIST", label: "Pharmacist" },
   { role: "OTHER_STAFF", label: "Other staff" },
-  { role: "OWNER", label: "Pharmacy owner" },
 ] as const;
 
 export default function ChooseAccountTypeCard() {
@@ -41,8 +40,8 @@ export default function ChooseAccountTypeCard() {
           Complete your profile (optional)
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          You manage this pharmacy already. Add your own profile to use ChemistTasker as a pharmacist, staff member or
-          pharmacy owner too. You keep your admin access, and this choice can be made only once.
+          You already manage this pharmacy with full delegated admin access. Add your personal ChemistTasker profile as
+          a pharmacist or other staff member. Your admin access is kept, and this choice can be made only once.
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           {ACCOUNT_TYPES.map((item) => (
