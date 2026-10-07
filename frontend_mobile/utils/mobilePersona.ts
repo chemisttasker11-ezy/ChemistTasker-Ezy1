@@ -60,7 +60,7 @@ export function getRoleHome(role?: string | null) {
     case 'REGION_ADMIN':
       return '/organization/dashboard';
     case 'PHARMACY_MANAGER':
-      return '/admin';
+      return '/admin-invitations';
     default:
       return '/login';
   }
