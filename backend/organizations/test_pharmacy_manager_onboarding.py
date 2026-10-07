@@ -194,6 +194,12 @@ class PharmacyManagerAccountTypeTests(TestCase):
 
         self.assertTrue(get_frontend_dashboard_url(self.contact).endswith(f"/dashboard/admin/{self.pharmacy.id}"))
 
+    def test_unassigned_pharmacy_manager_lands_on_admin_invitations(self):
+        from users.navigation import get_frontend_dashboard_url
+
+        PharmacyAdmin.objects.filter(user=self.contact, pharmacy=self.pharmacy).update(is_active=False)
+        self.assertTrue(get_frontend_dashboard_url(self.contact).endswith("/dashboard/admin-invitations"))
+
     def test_account_type_is_chosen_once_and_admin_access_is_kept(self):
         self.assertEqual(self.choose("EXPLORER").status_code, 400)
         self.assertEqual(self.choose("OWNER").status_code, 400)
