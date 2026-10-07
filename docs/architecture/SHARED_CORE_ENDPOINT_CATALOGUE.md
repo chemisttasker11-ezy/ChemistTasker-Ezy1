@@ -32,7 +32,6 @@ This avoids two endpoint registries claiming the same authenticated operational 
 | Legacy shift detail builders | Corrected compatibility | Canonical trailing-slash DRF detail paths are retained under existing names. |
 | `refereeRejectByToken(token)` | Canonical | Matches the current single-token Django route. |
 | `refereeReject(pk, refIndex)` | Deprecated compatibility alias | Retained only for legacy compatibility; new code must use the token route. |
-| `onboardingCreate(role)` / `createOnboarding` | Deprecated compatibility alias | Current Django onboarding is `/{role}/onboarding/me/`; new code must use current named operations. |
 
 ## Guardrails
 
