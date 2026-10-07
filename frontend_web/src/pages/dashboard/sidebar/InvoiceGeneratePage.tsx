@@ -229,7 +229,15 @@ export default function InvoiceGeneratePage() {
 // ─── A) Load issuer details once on mount ─────────────
 useEffect(() => {
   if (!user) return;
-  getOnboarding(user.role.toLowerCase())
+  const role = user.role.toLowerCase();
+  // Organisation staff have no onboarding record (no /org_staff/onboarding/ route exists);
+  // use the signed-in profile instead of requesting a guaranteed 404.
+  if (!['owner', 'pharmacist', 'other_staff', 'otherstaff', 'explorer'].includes(role)) {
+    setIssuerFirstName(user.first_name ?? user.firstName ?? '');
+    setIssuerLastName(user.last_name ?? user.lastName ?? '');
+    return;
+  }
+  getOnboarding(role)
     .then((res: any) => {
       setIssuerFirstName(res.first_name);
       setIssuerLastName(res.last_name);
