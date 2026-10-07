@@ -735,6 +735,18 @@ test.describe('owner/admin persona routing hardening', () => {
     expect(url.searchParams.get('pharmacy_id')).toBe('155');
   });
 
+  test('pharmacy manager with a bad admin pharmacy id returns to their real admin home', async ({ page }) => {
+    await installApiFixture(page, roleUsers.pharmacyManager);
+
+    await page.goto('/dashboard/admin/999/invoice?workspace=internal&pharmacy_id=999');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/admin/155/overview');
+    expect(url.searchParams.get('workspace')).toBe('internal');
+    expect(url.searchParams.get('pharmacy_id')).toBe('155');
+  });
+
   test('old onboarding admin link becomes owner route after the contact becomes the owner', async ({ page }) => {
     await installApiFixture(page, roleUsers.ownerWithAuthority);
 
