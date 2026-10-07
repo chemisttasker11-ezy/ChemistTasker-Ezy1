@@ -266,6 +266,13 @@ jobs:
               text = re.sub(r'android:usesCleartextTraffic="[^"]*"', 'android:usesCleartextTraffic="true"', text)
           else:
               text = text.replace("<application ", '<application android:usesCleartextTraffic="true" ', 1)
+          # Acceptance must execute this candidate's embedded bundle, never a published EAS update.
+          updates = '<meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>'
+          if "expo.modules.updates.ENABLED" in text:
+              text = re.sub(r'<meta-data android:name="expo.modules.updates.ENABLED" android:value="[^"]*"\s*/>', updates, text)
+          else:
+              text = text.replace("</application>", updates + "</application>", 1)
+          assert 'expo.modules.updates.ENABLED" android:value="false"' in text
           path.write_text(text)
           PY
           cd android
@@ -294,10 +301,20 @@ jobs:
           test -x "$SDKMANAGER"
           test -x "$AVDMANAGER"
           test -x "$ADB"
+          # SDK command-line tools and emulator versions may choose different
+          # default user directories. Give both the same explicit AVD location.
+          export ANDROID_USER_HOME="$RUNNER_TEMP/chemisttasker-android"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           timeout 300 "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
           test -x "$EMULATOR"
-          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native -k "system-images;android-35;google_apis;x86_64"
+          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native \
+            --path "$ANDROID_AVD_HOME/chemisttasker-native.avd" \
+            -k "system-images;android-35;google_apis;x86_64"
+          test -s "$ANDROID_AVD_HOME/chemisttasker-native.ini"
+          test -s "$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          "$EMULATOR" -list-avds | grep -Fx chemisttasker-native
 
           dump_android_failure() {
             echo "=== adb devices -l ==="
@@ -356,6 +373,9 @@ jobs:
           echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
           timeout 30 "$ADB" -s emulator-5554 reverse tcp:8000 tcp:8000
           timeout 30 "$ADB" -s emulator-5554 shell input keyevent 82
+          # Disable the disposable image's launcher, whose boot ANR can cover
+          # the app. Application ANR detection and camera services stay active.
+          timeout 30 "$ADB" -s emulator-5554 shell pm disable-user --user 0 com.google.android.apps.nexuslauncher
           timeout 30 "$ADB" -s emulator-5554 uninstall com.chemisttasker.app >/dev/null 2>&1 || true
           timeout 90 "$ADB" -s emulator-5554 install frontend_mobile/android/app/build/outputs/apk/release/app-release.apk
 
@@ -382,9 +402,13 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
-              visible: "Go to Login"
+              visible: "Go to Login|Welcome back"
               timeout: 30000
-          - tapOn: "Go to Login"
+          - runFlow:
+              when:
+                visible: "Go to Login"
+              commands:
+                - tapOn: "Go to Login"
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
@@ -676,6 +700,11 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST_PATH" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST_PATH" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" "$PLIST_PATH"
+          # Acceptance must execute this candidate's embedded bundle, never a published EAS update.
+          EXPO_PLIST="ios/ChemistTasker/Supporting/Expo.plist"
+          test -f "$EXPO_PLIST"
+          /usr/libexec/PlistBuddy -c "Set :EXUpdatesEnabled false" "$EXPO_PLIST" 2>/dev/null ||             /usr/libexec/PlistBuddy -c "Add :EXUpdatesEnabled bool false" "$EXPO_PLIST"
+          test "$(/usr/libexec/PlistBuddy -c "Print :EXUpdatesEnabled" "$EXPO_PLIST")" = "false"
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
           SCHEME="ChemistTasker"
@@ -717,9 +746,13 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
-              visible: "Go to Login"
+              visible: "Go to Login|Welcome back"
               timeout: 120000
-          - tapOn: "Go to Login"
+          - runFlow:
+              when:
+                visible: "Go to Login"
+              commands:
+                - tapOn: "Go to Login"
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
