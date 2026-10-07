@@ -16,9 +16,16 @@ Authoritative recovery record for the programme authorized on 2026-10-06. The ea
 - Never call a planned, inspected or merely compiled change runtime-tested. Record exact commits and checks.
 - Never merge a failing/draft evidence branch. Recheck current main, reviewed head, required checks and review findings before each merge.
 
-## Integration warning: existing PR #139
+## PR #139 resolution in closeout PR #150
 
-PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67ec4551b2feee0521) changes platform billing payer access, removes unused shared-core exports, and adds CI suites. Its description asserts a newer owner decision broadening payers. This conflicts with the last confirmed policy in this conversation. It is NOT incorporated or merged here. Review its changes separately before any future rebase; do not overwrite the branch or silently resolve its policy assertion. Its shared-core/CI edits overlap later milestones.
+PR #139 (fix/billing-payers-and-dead-api, head observed 042b81d379b8b9ddb461de67ec4551b2feee0521) was re-read by WHY and HOW before closeout. Its dead shared-core cleanup and missing marketplace CI suites are retained in PR #150 and adapted to the post-F05/F06 architecture.
+
+Its billing intent is retained with a stricter authority split rather than cherry-picking the original broad predicate:
+- **Billing account/subscription administration:** pharmacy Owner + Organisation Admin only. This controls subscription creation/view, seats and the canonical billing contact/account.
+- **Shift-specific ChemistTasker charges:** the above plus Chief Admin, an assigned Region Admin whose selected admin level includes roster management, and an active pharmacy admin with roster-management capability. Communication-only admins and unassigned Region Admins are refused.
+- An operational payer never becomes the billing contact merely by paying. Organisation billing stays attached to the Organisation Admin (with existing owner fallback), and delegated payment cannot manufacture an owner for an ownerless standalone pharmacy.
+
+This distinction is an explicit product/security boundary. Do not collapse subscription administration and shift-charge payment back into one permission predicate.
 
 ## Programme and dependency order
 
