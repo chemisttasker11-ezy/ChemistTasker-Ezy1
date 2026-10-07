@@ -64,7 +64,6 @@ export {
 export {
   getOnboarding,
   updateOnboarding,
-  createOnboarding,
   getOnboardingDetail,
   updateOnboardingForm,
   submitRefereeResponse,
@@ -120,9 +119,6 @@ export {
   getOwnerShifts,
   createOwnerShift,
   updateOwnerShift,
-  getShiftApplications,
-  acceptShiftApplication,
-  rejectShiftApplication,
   getPublicJobBoard,
   getViewSharedShift,
   fetchActiveShifts,
@@ -169,9 +165,6 @@ export {
   fetchOwnerShiftsService,
   createOwnerShiftService,
   updateOwnerShiftService,
-  fetchShiftApplicationsService,
-  acceptShiftApplicationService,
-  rejectShiftApplicationService,
 } from './domains/shifts/api';
 export {
   claimOnboarding,
