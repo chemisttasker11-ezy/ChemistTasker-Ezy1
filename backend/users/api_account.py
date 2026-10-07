@@ -101,10 +101,10 @@ class DeleteAccountView(APIView):
 
 
 class ChooseAccountTypeView(APIView):
-    """POST /api/v1/users/me/account-type/ {"role": "PHARMACIST" | "OTHER_STAFF" | "OWNER"}.
+    """POST /api/v1/users/me/account-type/ {"role": "PHARMACIST" | "OTHER_STAFF"}.
 
-    A PHARMACY_MANAGER account (created when an organisation onboards a pharmacy by email) may choose its own account
-    type once. Its pharmacy-admin access is kept; the response names the onboarding page of the chosen type.
+    A PHARMACY_MANAGER account created by organisation email onboarding may choose a personal worker account type once.
+    Its pharmacy-admin MANAGER access is kept. Ownership is a separate relationship and cannot be acquired here.
     """
 
     permission_classes = [permissions.IsAuthenticated]
@@ -115,7 +115,7 @@ class ChooseAccountTypeView(APIView):
 
         role = str(request.data.get("role") or "").strip().upper()
         if role not in User.CHOOSABLE_ACCOUNT_TYPES:
-            raise ValidationError({"role": "Choose PHARMACIST, OTHER_STAFF or OWNER."})
+            raise ValidationError({"role": "Choose PHARMACIST or OTHER_STAFF."})
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
             if user.role != "PHARMACY_MANAGER":
