@@ -370,6 +370,7 @@ jobs:
       SESSION_COOKIE_SECURE: "True"
       CSRF_COOKIE_SECURE: "True"
       JWT_COOKIE_SECURE: "True"
+      JWT_COOKIE_PATH: "/"
       USE_PROD_DB: "False"
       DJANGO_CACHE_URL: redis://127.0.0.1:6379/4
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -425,6 +426,7 @@ jobs:
           assert settings.SESSION_COOKIE_SECURE is True
           assert settings.CSRF_COOKIE_SECURE is True
           assert settings.JWT_COOKIE_SECURE is True
+          assert settings.JWT_COOKIE_PATH == "/"
           assert settings.USE_REDIS_CHANNEL_LAYER is True
           assert "rest_framework.permissions.IsAuthenticated" in settings.REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"]
           assert settings.ROOT_URLCONF == "core.urls"
