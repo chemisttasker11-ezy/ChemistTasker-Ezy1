@@ -74,7 +74,7 @@ export default function AdminHomeScreen() {
           </View>
         </Surface> : null}
 
-        <ChooseAccountTypeCard />
+        <ChooseAccountTypeCard pharmacyId={pharmacyId} />
 
         <Surface style={styles.hero}>
           <Text variant="labelLarge" style={styles.eyebrow}>Admin workspace</Text>
