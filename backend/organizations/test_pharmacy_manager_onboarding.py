@@ -283,7 +283,7 @@ class PharmacyManagerAccountTypeTests(TestCase):
         self.client.force_authenticate(user=self.contact)
         onboarding_response = self.client.patch(
             "/api/v1/otherstaff/onboarding/me/",
-            {"tab": "basic", "role_type": "TECHNICIAN"},
+            {"tab": "basic", "first_name": "Updated"},
             format="json",
         )
         self.assertEqual(onboarding_response.status_code, 200, onboarding_response.content)
