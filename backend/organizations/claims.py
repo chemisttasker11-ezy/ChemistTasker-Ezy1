@@ -181,7 +181,7 @@ class OwnerOnboardingClaim(APIView):
 
     def _ensure_org_user_account(self, email: str):
         # A new account starts as a PHARMACY_MANAGER: admin dashboard first, no onboarding; the person may later
-        # choose their own account type (pharmacist, other staff or owner). An existing account keeps its type.
+        # choose Pharmacist or Other Staff once. An existing account keeps its type.
         user, created = User.objects.get_or_create(
             email=email,
             defaults={'role': 'PHARMACY_MANAGER'}
@@ -226,13 +226,16 @@ class OwnerOnboardingClaim(APIView):
                 verified=False,
             )
             user, temp_password = self._ensure_org_user_account(email)
-            # The onboarded contact manages this one pharmacy: a pharmacy-level MANAGER admin (the owner's
-            # capabilities without being the owner), never an organisation role that would reach every pharmacy.
+            # The onboarded contact manages this one pharmacy through a full delegated MANAGER assignment.
+            # Existing worker accounts keep a concrete pharmacy membership role immediately; a new
+            # PHARMACY_MANAGER stays CONTACT until their personal worker type is known.
+            from memberships.profile_sync import personal_pharmacy_role
+            worker_role = personal_pharmacy_role(user)
             pharmacy_membership, _ = Membership.objects.get_or_create(
                 user=user,
                 pharmacy=pharmacy,
                 defaults={
-                    'role': 'CONTACT',
+                    'role': worker_role or 'CONTACT',
                     'employment_type': 'FULL_TIME',
                     'status': Membership.Status.ACCEPTED,
                     'is_active': True,
@@ -245,7 +248,7 @@ class OwnerOnboardingClaim(APIView):
                 defaults={
                     'membership': pharmacy_membership,
                     'admin_level': PharmacyAdmin.AdminLevel.MANAGER,
-                    'staff_role': 'OTHER',
+                    'staff_role': worker_role,
                     'job_title': 'Pharmacy Manager',
                     'is_active': True,
                     'created_by': request.user,
