@@ -72,7 +72,10 @@ export default function ProtectedRoute({
       userRole: user.role,
       requiredRole,
       requireAdmin,
-      isAdminUser,
+      // OWNER routes are allowed through the admin shell only so that
+      // AdminDashboardWrapper can canonicalize stale owner-facing /admin links.
+      // Actual delegated admin access is still exact-assignment checked there.
+      isAdminUser: isAdminUser || (requireAdmin && user.role === "OWNER"),
       hasOrgRole,
       requiresCapability: capabilityRequirementPresent,
       hasRequiredCapability: capabilityRequirementSatisfied,
