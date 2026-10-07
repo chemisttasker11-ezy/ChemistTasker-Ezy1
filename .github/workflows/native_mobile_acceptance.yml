@@ -796,6 +796,7 @@ jobs:
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
+          # iOS exposes each workspace switch as one element labelled "<Role> workspace".
           - launchApp:
               stopApp: true
               permissions:
@@ -821,10 +822,10 @@ jobs:
               text: "Not now"
               optional: true
           - extendedWaitUntil:
-              visible: "Admin"
+              visible: "Admin( workspace)?"
               timeout: 30000
           - assertVisible: "Welcome Native,"
-          - tapOn: "Admin"
+          - tapOn: "Admin( workspace)?"
           - extendedWaitUntil:
               visible: "Admin workspace"
               timeout: 30000
@@ -837,7 +838,7 @@ jobs:
               visible: "Admin workspace"
               timeout: 30000
           - assertVisible: "Native Pharmacy B"
-          - tapOn: "Pharmacist"
+          - tapOn: "Pharmacist( workspace)?"
           - extendedWaitUntil:
               visible: "Welcome Native,"
               timeout: 30000
@@ -846,7 +847,7 @@ jobs:
           - extendedWaitUntil:
               visible: "Welcome Native,"
               timeout: 30000
-          - assertVisible: "Admin"
+          - assertVisible: "Admin( workspace)?"
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
               visible: "Shift Center"
