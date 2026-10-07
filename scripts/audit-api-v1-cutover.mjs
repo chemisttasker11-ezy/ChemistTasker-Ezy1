@@ -8,6 +8,7 @@ const forbiddenHttp = /\/api\/(?:client-profile|users|public-hub|marketplace|eth
 const forbiddenRelative = /\/client-profile\//g;
 const forbiddenEscapedRelative = /\\\/client-profile\\\//g;
 const forbiddenUnversionedString = /(?:["'`])\/api\/(?!v1(?:\/|["'`])|platform(?:\/|["'`])|hub(?:\/|["'`]))[A-Za-z0-9_-]+(?:\/|["'`])/g;
+const forbiddenBareHttpApiRoot = /https?:\/\/[^"'`\s]+\/api(?=["'`])/g;
 const forbiddenReverse = /reverse(?:_lazy)?\(\s*["']client_profile:/g;
 const extensions = new Set(['.py', '.ts', '.tsx', '.js', '.mjs', '.cjs', '.yml', '.yaml', '.sh', '.rs']);
 const failures = [];
@@ -35,6 +36,7 @@ function visit(dir) {
         ['legacy client-profile relative API', forbiddenRelative],
         ['escaped legacy client-profile API matcher', forbiddenEscapedRelative],
         ['unversioned local application API string', forbiddenUnversionedString],
+        ['bare legacy HTTP API root', forbiddenBareHttpApiRoot],
         ['legacy Django client_profile URL namespace', forbiddenReverse],
       ];
       for (const [label, pattern] of rules) {
