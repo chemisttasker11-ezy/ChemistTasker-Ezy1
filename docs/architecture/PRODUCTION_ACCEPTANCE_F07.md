@@ -97,7 +97,8 @@ checks instead of rejecting application files before those checks start.
 
 Ordinary pull requests use the existing Shared Core Consolidation release gate,
 Backend Finalization Contracts, Serializer Decomposition, static/mobile checks
-and repository security checks. F07 production/native acceptance is no longer
-triggered for every pull request. It remains available by manual dispatch and on
-main pushes for release acceptance. Native Mobile Acceptance retains its manual
-and reusable workflow entrypoints.
+and repository security checks. F07 production/native acceptance was the one-off
+acceptance package for PR #149 and is now manual-only (`workflow_dispatch`): it no
+longer runs on pull requests or on pushes to main. Native Mobile Acceptance is reached
+only through F07 or its own manual/reusable entrypoints. A release candidate therefore
+receives F07/native evidence only when F07 is dispatched on that exact SHA.
