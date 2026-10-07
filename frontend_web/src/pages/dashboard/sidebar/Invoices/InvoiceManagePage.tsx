@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../../../contexts/AuthContext';
 import FinanceWorkspace from '../../../finance/FinanceWorkspace';
 import FinanceTheme from '../../../finance/FinanceTheme';
-import { canIssueInvoices } from '../../../../utils/invoiceIssuer';
+import { isIssuerWorkspace } from '../../../../utils/invoiceIssuer';
 
 export default function InvoiceManagePage() {
   const auth = useAuth();
@@ -12,9 +12,9 @@ export default function InvoiceManagePage() {
   return (
     <FinanceTheme>
       <FinanceWorkspace
-        // Owners, organisation staff and the pharmacy-admin workspace receive invoices; only
-        // workers issue them. Same rule as the Expo InvoiceList (owner/organization/admin).
-        receivedMode={!canIssueInvoices(auth.user.role) || pathname.startsWith('/dashboard/admin/')}
+        // Persona, not base role: only a worker dashboard issues invoices. Owner, organisation and
+        // pharmacy-admin dashboards receive them, as in the Expo InvoiceList (owner/organization/admin).
+        receivedMode={!isIssuerWorkspace(pathname, auth.user.role)}
       />
     </FinanceTheme>
   );

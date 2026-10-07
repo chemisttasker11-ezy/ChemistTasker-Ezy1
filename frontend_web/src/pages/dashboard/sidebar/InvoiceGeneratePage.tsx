@@ -7,9 +7,9 @@ import {
   Button, IconButton, TableContainer, Alert
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { canIssueInvoices } from '../../../utils/invoiceIssuer';
+import { isIssuerWorkspace } from '../../../utils/invoiceIssuer';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
@@ -104,6 +104,8 @@ const shiftLabel = (s: any) => {
 
 export default function InvoiceGeneratePage() {
     const { user } = useAuth();
+    const { pathname } = useLocation();
+    const issuerWorkspace = isIssuerWorkspace(pathname, user?.role);
     const navigate = useNavigate();
     const [search] = useSearchParams();
     const prefillShiftId = search.get('shiftId');
@@ -230,8 +232,8 @@ export default function InvoiceGeneratePage() {
 // ─── A) Load issuer details once on mount ─────────────
 useEffect(() => {
   if (!user) return;
-  // Only issuers (pharmacist / other staff) have the onboarding profile invoices are issued from.
-  if (!canIssueInvoices(user.role)) return;
+  // Only a worker persona of an issuer account has the onboarding profile invoices are issued from.
+  if (!issuerWorkspace) return;
   getOnboarding(user.role.toLowerCase())
     .then((res: any) => {
       setIssuerFirstName(res.first_name);
@@ -241,7 +243,7 @@ useEffect(() => {
     .catch(() => {
       // handle error if needed
     });
-}, [user]);
+}, [user, issuerWorkspace]);
 
 // ─── 1) Fetch shifts whenever we enter internal mode ────
 useEffect(() => {
@@ -529,7 +531,7 @@ const handleGenerate = () => {
 };
 
 
-  if (user && !canIssueInvoices(user.role)) {
+  if (user && !issuerWorkspace) {
     return (
       <Container maxWidth="lg">
         <Paper sx={{ p:4, mt:4 }}>
