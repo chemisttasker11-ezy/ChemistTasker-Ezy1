@@ -44,8 +44,33 @@ export default function AdminDashboardWrapper() {
     ) ?? null;
   }, [adminAssignments, targetPharmacyId]);
 
+  const pharmacyManagerHomeAssignment = useMemo(() => {
+    return [...delegatedAssignments]
+      .filter((item) => Number.isFinite(Number(item.pharmacy_id)))
+      .sort((left, right) => {
+        const leftId = left.id == null ? Number.MAX_SAFE_INTEGER : Number(left.id);
+        const rightId = right.id == null ? Number.MAX_SAFE_INTEGER : Number(right.id);
+        return leftId - rightId || left.pharmacy_id - right.pharmacy_id;
+      })[0] ?? null;
+  }, [delegatedAssignments]);
+
   useEffect(() => {
     if (assignment || targetPharmacyId == null) return;
+
+    if (user?.role === "PHARMACY_MANAGER" && pharmacyManagerHomeAssignment) {
+      // A bad/stale admin pharmacy id must not fall through to the non-existent
+      // generic /dashboard route or silently reuse the requested subpage with a
+      // different pharmacy. Return to the deterministic home of the manager's
+      // real assignment instead (matching backend navigation's first-id rule).
+      const params = new URLSearchParams();
+      params.set("workspace", "internal");
+      params.set("pharmacy_id", String(pharmacyManagerHomeAssignment.pharmacy_id));
+      navigate(
+        `/dashboard/admin/${pharmacyManagerHomeAssignment.pharmacy_id}/overview?${params.toString()}`,
+        { replace: true },
+      );
+      return;
+    }
 
     if (user?.role === "OWNER") {
       const params = new URLSearchParams(location.search);
@@ -73,6 +98,7 @@ export default function AdminDashboardWrapper() {
     location.search,
     navigate,
     ownerAuthorityAssignment,
+    pharmacyManagerHomeAssignment,
     targetPharmacyId,
     user?.role,
   ]);
