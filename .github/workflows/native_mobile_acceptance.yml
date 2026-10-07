@@ -3,6 +3,10 @@ name: Native Mobile Acceptance
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      tested_sha:
+        required: false
+        type: string
 
 concurrency:
   group: native-mobile-acceptance-${{ github.ref }}
@@ -12,6 +16,7 @@ permissions:
   contents: read
 
 env:
+  TESTED_SHA: ${{ inputs.tested_sha || github.event.pull_request.head.sha || github.sha }}
   DJANGO_SETTINGS_MODULE: "core.native_smoke_settings"
   APP_ENV: "test"
   SECRET_KEY: "native-smoke-only-not-production"
@@ -40,6 +45,11 @@ env:
   EXPO_PUBLIC_WS_URL: "ws://127.0.0.1:8000"
   EXPO_PUBLIC_WEB_URL: "http://127.0.0.1:8081"
   EXPO_PUBLIC_SSL_PINNING_ENABLED: "false"
+  # Also inherited by the shared-core preinstall subprocess.
+  npm_config_fetch_retries: "4"
+  npm_config_fetch_retry_mintimeout: "10000"
+  npm_config_fetch_retry_maxtimeout: "30000"
+  npm_config_fetch_timeout: "120000"
 
 jobs:
   android-native:
@@ -50,12 +60,12 @@ jobs:
       - name: Checkout workflow commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: "${{ github.sha }}"
+          ref: "${{ env.TESTED_SHA }}"
       - name: Verify source identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$TESTED_SHA"
           git diff --quiet
           git diff --cached --quiet
 
@@ -178,6 +188,7 @@ jobs:
           PY
 
       - name: Install mobile dependencies and test-only Firebase descriptors
+        timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
@@ -203,7 +214,7 @@ jobs:
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
-          <key>API_KEY</key><string>NativeSmokeOnly</string>
+          <key>API_KEY</key><string>AIzaSyNativeSmokeOnly000000000000000000</string>
           <key>GCM_SENDER_ID</key><string>1234567890</string>
           <key>PLIST_VERSION</key><string>1</string>
           <key>BUNDLE_ID</key><string>com.chemisttasker.app</string>
@@ -217,7 +228,22 @@ jobs:
           <key>GOOGLE_APP_ID</key><string>1:1234567890:ios:0123456789abcdef</string>
           </dict></plist>
           PLIST
-          npm ci
+          # Retry only transport failures; never conceal lockfile/lifecycle errors.
+          for attempt in 1 2 3; do
+            install_log="/tmp/native-npm-install-${attempt}.log"
+            if npm ci --no-audit --no-fund > "$install_log" 2>&1; then
+              cat "$install_log"
+              break
+            else
+              install_status=$?
+              cat "$install_log"
+            fi
+            if [ "$attempt" -eq 3 ] || ! grep -Eq 'npm (error|ERR!) code (ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|E502|E503|E504)([[:space:]]|$)' "$install_log"; then
+              exit "$install_status"
+            fi
+            echo "Transient npm transport failure; retrying clean lockfile install ($attempt/3)."
+            sleep "$((attempt * 10))"
+          done
 
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
@@ -225,7 +251,7 @@ jobs:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
           log-accepted-android-sdk-licenses: "false"
 
-      - name: Prebuild and compile Android development build
+      - name: Prebuild and compile Android acceptance build with embedded JavaScript
         shell: bash
         run: |
           set -euo pipefail
@@ -233,17 +259,36 @@ jobs:
           CI=1 npx expo prebuild --platform android --clean
           python - <<'PY'
           from pathlib import Path
+          import re
           path = Path("android/app/src/main/AndroidManifest.xml")
           text = path.read_text()
-          if "android:usesCleartextTraffic" not in text:
+          if "android:usesCleartextTraffic" in text:
+              text = re.sub(r'android:usesCleartextTraffic="[^"]*"', 'android:usesCleartextTraffic="true"', text)
+          else:
               text = text.replace("<application ", '<application android:usesCleartextTraffic="true" ', 1)
+          # Acceptance must execute this candidate's embedded bundle, never a published EAS update.
+          updates = '<meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>'
+          if "expo.modules.updates.ENABLED" in text:
+              text = re.sub(r'<meta-data android:name="expo.modules.updates.ENABLED" android:value="[^"]*"\s*/>', updates, text)
+          else:
+              text = text.replace("</application>", updates + "</application>", 1)
+          assert 'expo.modules.updates.ENABLED" android:value="false"' in text
           path.write_text(text)
           PY
           cd android
-          ./gradlew assembleDebug --no-daemon --max-workers=2
-          test -f app/build/outputs/apk/debug/app-debug.apk
+          # Release embeds the Expo Router bundle. Restart acceptance must not
+          # depend on a Metro connection or the development launcher UI.
+          # This gate installs on an x86_64 emulator. Avoid compiling three unused
+          # ABIs and give release lint enough metaspace for the native module graph.
+          ./gradlew assembleRelease --no-daemon --max-workers=2 \
+            -PreactNativeArchitectures=x86_64 \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8'
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          unzip -l "$APK" | grep 'assets/index.android.bundle'
 
       - name: Boot Android emulator and install app
+        timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
@@ -256,66 +301,107 @@ jobs:
           test -x "$SDKMANAGER"
           test -x "$AVDMANAGER"
           test -x "$ADB"
+          # SDK command-line tools and emulator versions may choose different
+          # default user directories. Give both the same explicit AVD location.
+          export ANDROID_USER_HOME="$RUNNER_TEMP/chemisttasker-android"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
+          timeout 300 "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
           test -x "$EMULATOR"
-          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native -k "system-images;android-35;google_apis;x86_64"
-          nohup "$EMULATOR" -avd chemisttasker-native -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
-          "$ADB" wait-for-device
-          for attempt in $(seq 1 120); do
-            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native \
+            --path "$ANDROID_AVD_HOME/chemisttasker-native.avd" \
+            -k "system-images;android-35;google_apis;x86_64"
+          test -s "$ANDROID_AVD_HOME/chemisttasker-native.ini"
+          test -s "$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          # Without a device profile the AVD boots at 320x640, which pushes the camera
+          # guidance and controls below the fold. Use a realistic Pixel 6-class screen.
+          CONFIG_INI="$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          sed -i -E '/^hw\.lcd\.(width|height|density)=/d' "$CONFIG_INI"
+          echo "hw.lcd.width=1080" >> "$CONFIG_INI"
+          echo "hw.lcd.height=2400" >> "$CONFIG_INI"
+          echo "hw.lcd.density=420" >> "$CONFIG_INI"
+          grep -E '^hw\.lcd\.' "$CONFIG_INI"
+          "$EMULATOR" -list-avds | grep -Fx chemisttasker-native
+
+          dump_android_failure() {
+            echo "=== adb devices -l ==="
+            timeout 15 "$ADB" devices -l || true
+            echo "=== emulator process ==="
+            if [ -n "${EMULATOR_PID:-}" ]; then
+              ps -p "$EMULATOR_PID" -o pid=,ppid=,stat=,etime=,command= || true
+            else
+              echo "emulator PID not captured"
+            fi
+            echo "=== /tmp/android-emulator.log ==="
+            cat /tmp/android-emulator.log || true
+          }
+          trap 'status=$?; if [ "$status" -ne 0 ]; then dump_android_failure; fi' EXIT
+
+          timeout 15 "$ADB" start-server
+          nohup "$EMULATOR" -avd chemisttasker-native -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot-load -no-snapshot-save -gpu swiftshader_indirect -cores 2 -memory 2048 -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          printf '%s\n' "$EMULATOR_PID" > /tmp/android-emulator.pid
+
+          adb_ready=0
+          adb_deadline=$((SECONDS + 180))
+          while [ "$SECONDS" -lt "$adb_deadline" ]; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before ADB registration"
+              exit 1
+            fi
+            if [ "$(timeout 5 "$ADB" -s emulator-5554 get-state 2>/dev/null || true)" = "device" ]; then
+              adb_ready=1
               break
             fi
             sleep 2
           done
-          if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; then
-            cat /tmp/android-emulator.log || true
+          if [ "$adb_ready" -ne 1 ]; then
+            echo "Android emulator did not register with ADB within 180 seconds"
             exit 1
           fi
-          "$ADB" reverse tcp:8000 tcp:8000
-          "$ADB" reverse tcp:8081 tcp:8081
-          "$ADB" uninstall com.chemisttasker.app >/dev/null 2>&1 || true
-          "$ADB" install frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Start Metro and open Android development project
-        shell: bash
-        run: |
-          set -euo pipefail
-          (
-            cd frontend_mobile
-            CI=1 nohup npx expo start --dev-client --localhost --port 8081 > /tmp/metro.log 2>&1 &
-          )
-          for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8081/status 2>/dev/null | grep -q "packager-status:running"; then
+          boot_ready=0
+          boot_deadline=$((SECONDS + 240))
+          while [ "$SECONDS" -lt "$boot_deadline" ]; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before sys.boot_completed"
+              exit 1
+            fi
+            if [ "$(timeout 5 "$ADB" -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; then
+              boot_ready=1
               break
             fi
             sleep 2
           done
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          MANIFEST_URL=$(python3 - <<'PY'
-          from urllib.parse import quote
-          print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
-          PY
-          )
-          DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
-          printf '%s\n' "$DEV_URL" | tee /tmp/dev-client-url-android.txt
-          adb shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
-          sleep 15
+          if [ "$boot_ready" -ne 1 ]; then
+            echo "Android emulator did not complete boot within 240 seconds after ADB registration"
+            exit 1
+          fi
+          echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
+          timeout 30 "$ADB" -s emulator-5554 reverse tcp:8000 tcp:8000
+          timeout 30 "$ADB" -s emulator-5554 shell input keyevent 82
+          # Disable the disposable image's launcher, whose boot ANR can cover
+          # the app. Application ANR detection and camera services stay active.
+          timeout 30 "$ADB" -s emulator-5554 shell pm disable-user --user 0 com.google.android.apps.nexuslauncher
+          timeout 30 "$ADB" -s emulator-5554 uninstall com.chemisttasker.app >/dev/null 2>&1 || true
+          timeout 90 "$ADB" -s emulator-5554 install frontend_mobile/android/app/build/outputs/apk/release/app-release.apk
 
-      - name: Install Maestro
+      - name: Install pinned Maestro
         shell: bash
         run: |
           set -euo pipefail
+          export MAESTRO_VERSION=2.11.0
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version | tee /tmp/maestro-version-android.txt
 
       - name: Run Android restart, persona, deep-link and camera smoke
         shell: bash
         run: |
           set -euo pipefail
-          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
@@ -324,9 +410,13 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
-              visible: "Go to Login"
+              visible: "Go to Login|Welcome back"
               timeout: 30000
-          - tapOn: "Go to Login"
+          - runFlow:
+              when:
+                visible: "Go to Login"
+              commands:
+                - tapOn: "Go to Login"
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
@@ -375,13 +465,24 @@ jobs:
               visible: "Clock & breaks"
               timeout: 30000
           - tapOn: "Open camera"
-          - extendedWaitUntil:
-              visible: "Centre the kiosk QR inside the frame"
+          - scrollUntilVisible:
+              element:
+                text: "Centre the kiosk QR inside the frame"
+              direction: DOWN
               timeout: 30000
+          - assertVisible: "Attendance QR camera"
           YAML
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
-          maestro test /tmp/native-acceptance.yaml
+          maestro --device "$ANDROID_SERIAL" test /tmp/native-acceptance.yaml
+
+      - name: Capture Android diagnostics
+        if: always()
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          timeout 15 adb devices -l > /tmp/adb-devices.txt 2>&1 || true
+          timeout 30 adb logcat -d > /tmp/android-logcat.txt 2>&1 || true
 
       - name: Upload Android diagnostics
         if: always()
@@ -390,9 +491,12 @@ jobs:
           name: native-android-diagnostics
           path: |
             /tmp/native-backend.log
+            /tmp/native-npm-install-*.log
             /tmp/android-emulator.log
-            /tmp/metro.log
-            /tmp/dev-client-url-android.txt
+            /tmp/android-emulator.pid
+            /tmp/adb-devices.txt
+            /tmp/android-logcat.txt
+            /tmp/maestro-version-android.txt
             ~/.maestro/tests
           if-no-files-found: ignore
 
@@ -411,12 +515,12 @@ jobs:
       - name: Checkout workflow commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: "${{ github.sha }}"
+          ref: "${{ env.TESTED_SHA }}"
       - name: Verify source identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$TESTED_SHA"
           git diff --quiet
           git diff --cached --quiet
 
@@ -539,6 +643,7 @@ jobs:
           PY
 
       - name: Install mobile dependencies and test-only Firebase descriptors
+        timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
@@ -564,7 +669,7 @@ jobs:
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
-          <key>API_KEY</key><string>NativeSmokeOnly</string>
+          <key>API_KEY</key><string>AIzaSyNativeSmokeOnly000000000000000000</string>
           <key>GCM_SENDER_ID</key><string>1234567890</string>
           <key>PLIST_VERSION</key><string>1</string>
           <key>BUNDLE_ID</key><string>com.chemisttasker.app</string>
@@ -578,19 +683,68 @@ jobs:
           <key>GOOGLE_APP_ID</key><string>1:1234567890:ios:0123456789abcdef</string>
           </dict></plist>
           PLIST
-          npm ci
+          # Retry only transport failures; never conceal lockfile/lifecycle errors.
+          for attempt in 1 2 3; do
+            install_log="/tmp/native-npm-install-${attempt}.log"
+            if npm ci --no-audit --no-fund > "$install_log" 2>&1; then
+              cat "$install_log"
+              break
+            else
+              install_status=$?
+              cat "$install_log"
+            fi
+            if [ "$attempt" -eq 3 ] || ! grep -Eq 'npm (error|ERR!) code (ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|E502|E503|E504)([[:space:]]|$)' "$install_log"; then
+              exit "$install_status"
+            fi
+            echo "Transient npm transport failure; retrying clean lockfile install ($attempt/3)."
+            sleep "$((attempt * 10))"
+          done
 
-      - name: Prebuild and compile iOS simulator development build
+      - name: Install ccache for the iOS native compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ccache
+          echo "CCACHE_DIR=$HOME/.ccache-ios" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.ccache-ios"
+
+      - name: Restore iOS native compile cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.ccache-ios
+          key: ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-
+            ios-ccache-${{ runner.os }}-
+
+      - name: Prebuild and compile iOS simulator acceptance build with embedded JavaScript
         shell: bash
         run: |
           set -euo pipefail
           cd frontend_mobile
-          CI=1 npx expo prebuild --platform ios --clean
+          # Expo SDK 54's Podfile enables React Native's ccache wrappers when USE_CCACHE=1.
+          # buildReactNativeFromSource stays true (static frameworks), so caching the C++ compile matters.
+          ccache --max-size=5G
+          ccache --zero-stats
+          USE_CCACHE=1 CI=1 npx expo prebuild --platform ios --clean
           PLIST_PATH="ios/ChemistTasker/Info.plist"
           test -f "$PLIST_PATH"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST_PATH" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST_PATH" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" "$PLIST_PATH"
+          # Acceptance must execute this candidate's embedded bundle, never a published EAS update.
+          EXPO_PLIST="ios/ChemistTasker/Supporting/Expo.plist"
+          test -f "$EXPO_PLIST"
+          /usr/libexec/PlistBuddy -c "Set :EXUpdatesEnabled false" "$EXPO_PLIST" 2>/dev/null ||             /usr/libexec/PlistBuddy -c "Add :EXUpdatesEnabled bool false" "$EXPO_PLIST"
+          test "$(/usr/libexec/PlistBuddy -c "Print :EXUpdatesEnabled" "$EXPO_PLIST")" = "false"
+          # The simulator grants Keychain access only to an app whose embedded entitlements name
+          # an access group. expo-secure-store stores the session in the default (first) group.
+          ENTITLEMENTS=$(find ios/ChemistTasker -maxdepth 1 -name '*.entitlements' -print -quit)
+          test -n "$ENTITLEMENTS" || { echo "No app entitlements file after prebuild"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Delete :keychain-access-groups" "$ENTITLEMENTS" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :keychain-access-groups array" "$ENTITLEMENTS"
+          /usr/libexec/PlistBuddy -c "Add :keychain-access-groups:0 string com.chemisttasker.app" "$ENTITLEMENTS"
+          cat "$ENTITLEMENTS"
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
           SCHEME="ChemistTasker"
@@ -599,69 +753,62 @@ jobs:
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcodebuild             -workspace "$WORKSPACE"             -scheme "$SCHEME"             -configuration Debug             -sdk iphonesimulator             -destination "platform=iOS Simulator,id=$SIM_UDID"             -derivedDataPath /tmp/native-ios-derived             CODE_SIGNING_ALLOWED=NO             build
-          APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-ios-derived ONLY_ACTIVE_ARCH=YES ARCHS=arm64 EXCLUDED_ARCHS=x86_64 CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build
+          APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP_PATH"
+          test -s "$APP_PATH/main.jsbundle"
+          ccache --show-stats || true
+          lipo -archs "$APP_PATH/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Info.plist")"
+          # Unsigned simulator apps have no entitlements, so every Keychain call fails with
+          # -34018 and the stored session can never be read. Prove the ad-hoc signature exists.
+          codesign --verify --verbose=1 "$APP_PATH"
+          codesign -d --entitlements - "$APP_PATH" 2>/dev/null | tee /tmp/ios-entitlements.txt || true
+          # Simulator entitlements are linked into the binary's __TEXT,__entitlements section; that is
+          # what the simulator's Keychain checks. Fail here, not 30 minutes later in Maestro.
+          APP_BINARY="$APP_PATH/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Info.plist")"
+          otool -l "$APP_BINARY" | grep -A2 "sectname __entitlements" | tee -a /tmp/ios-entitlements.txt
+          if ! LC_ALL=C grep -a -q "<key>keychain-access-groups</key>" "$APP_BINARY"; then
+            echo "Simulator build has no embedded keychain-access-groups entitlement; Keychain calls would fail with -34018." >&2
+            exit 1
+          fi
+          echo "Embedded simulator Keychain entitlement present."
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
-      - name: Start Metro and open iOS development project
-        shell: bash
-        run: |
-          set -euo pipefail
-          (
-            cd frontend_mobile
-            CI=1 nohup npx expo start --dev-client --localhost --port 8081 > /tmp/metro.log 2>&1 &
-          )
-          for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8081/status 2>/dev/null | grep -q "packager-status:running"; then
-              break
-            fi
-            sleep 2
-          done
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          MANIFEST_URL=$(python3 - <<'PY'
-          from urllib.parse import quote
-          print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
-          PY
-          )
-          DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
-          printf '%s\n' "$DEV_URL" | tee /tmp/dev-client-url-ios.txt
-          xcrun simctl launch "$SIM_UDID" com.chemisttasker.app -EXDevMenuIsOnboardingFinished 1 -EXDevMenuShowsAtLaunch 0 -EXDevMenuShowFloatingActionButton 0 >/dev/null 2>&1 || true
-          xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
-          sleep 15
-
-      - name: Install Maestro
+      - name: Install pinned Maestro
         shell: bash
         run: |
           set -euo pipefail
           export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || /usr/libexec/java_home)
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          export MAESTRO_VERSION=2.11.0
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version | tee /tmp/maestro-version-ios.txt
 
       - name: Run iOS restart, persona, deep-link and camera smoke
         shell: bash
         run: |
           set -euo pipefail
-          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; fi' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
+          # iOS exposes each workspace switch as one element labelled "<Role> workspace".
           - launchApp:
               stopApp: true
               permissions:
                 all: allow
-          - tapOn:
-              text: "Open"
-              optional: true
           - extendedWaitUntil:
-              visible: "Go to Login"
-              timeout: 30000
-          - tapOn: "Go to Login"
+              visible: "Go to Login|Welcome back"
+              timeout: 120000
+          - runFlow:
+              when:
+                visible: "Go to Login"
+              commands:
+                - tapOn: "Go to Login"
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
@@ -675,10 +822,10 @@ jobs:
               text: "Not now"
               optional: true
           - extendedWaitUntil:
-              visible: "Admin"
+              visible: "Admin( workspace)?"
               timeout: 30000
           - assertVisible: "Welcome Native,"
-          - tapOn: "Admin"
+          - tapOn: "Admin( workspace)?"
           - extendedWaitUntil:
               visible: "Admin workspace"
               timeout: 30000
@@ -691,7 +838,7 @@ jobs:
               visible: "Admin workspace"
               timeout: 30000
           - assertVisible: "Native Pharmacy B"
-          - tapOn: "Pharmacist"
+          - tapOn: "Pharmacist( workspace)?"
           - extendedWaitUntil:
               visible: "Welcome Native,"
               timeout: 30000
@@ -700,21 +847,47 @@ jobs:
           - extendedWaitUntil:
               visible: "Welcome Native,"
               timeout: 30000
-          - assertVisible: "Admin"
+          - assertVisible: "Admin( workspace)?"
           - openLink: "frontendmobile://admin/shifts"
+          # Accept iOS's first-use custom-scheme security confirmation.
+          - runFlow:
+              when:
+                visible: 'Open in .*ChemistTasker.*'
+              commands:
+                - tapOn: "Open"
           - extendedWaitUntil:
               visible: "Shift Center"
               timeout: 30000
           - openLink: "frontendmobile://attendance/clock"
+          # Accept iOS's first-use custom-scheme security confirmation.
+          - runFlow:
+              when:
+                visible: 'Open in .*ChemistTasker.*'
+              commands:
+                - tapOn: "Open"
           - extendedWaitUntil:
               visible: "Clock & breaks"
               timeout: 30000
-          - assertVisible: "Open camera"
+          - tapOn: "Open camera"
+          - extendedWaitUntil:
+              visible: "Centre the kiosk QR inside the frame"
+              timeout: 30000
           YAML
           export JAVA_HOME="$JAVA_HOME"
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
           maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
+
+      - name: Capture iOS diagnostics
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${SIM_UDID:-}" ]; then
+            xcrun simctl io "$SIM_UDID" screenshot /tmp/ios-simulator.png || true
+            xcrun simctl spawn "$SIM_UDID" log show --style compact --last 30m --predicate 'process == "ChemistTasker"' > /tmp/chemisttasker-ios.log 2>&1 || true
+          else
+            echo "SIM_UDID was not set; simulator diagnostics unavailable" > /tmp/chemisttasker-ios.log
+          fi
 
       - name: Upload iOS diagnostics
         if: always()
@@ -723,7 +896,10 @@ jobs:
           name: native-ios-diagnostics
           path: |
             /tmp/native-backend.log
-            /tmp/metro.log
-            /tmp/dev-client-url-ios.txt
+            /tmp/native-npm-install-*.log
+            /tmp/maestro-version-ios.txt
+            /tmp/ios-simulator.png
+            /tmp/chemisttasker-ios.log
+            /tmp/ios-entitlements.txt
             ~/.maestro/tests
           if-no-files-found: ignore
