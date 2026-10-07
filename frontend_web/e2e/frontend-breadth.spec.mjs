@@ -147,14 +147,17 @@ async function openAuthenticatedRoute(page, user, path) {
   });
 
   await installApiFixture(page, user);
-  await page.goto(path);
-  await page.waitForLoadState('networkidle');
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#root')).not.toBeEmpty({ timeout: 15_000 });
 
   const expectedPath =
     path.split('?')[0].endsWith('/pharmacy-hub')
       ? '/dashboard/pharmacy-hub'
       : path.split('?')[0];
-  expect(new URL(page.url()).pathname).toBe(expectedPath);
+  await expect.poll(
+    () => new URL(page.url()).pathname,
+    { timeout: 15_000, message: `route did not settle at ${expectedPath}` },
+  ).toBe(expectedPath);
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Page not found');
   await expect(page.locator('body')).not.toContainText('Not Found');

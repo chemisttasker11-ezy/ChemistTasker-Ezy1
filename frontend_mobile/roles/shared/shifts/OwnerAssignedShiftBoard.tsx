@@ -9,7 +9,7 @@ import {
     Surface,
     Text,
 } from 'react-native-paper';
-import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
+import { getShiftAudience, getShiftJourneyStatus, type Shift, type ShiftAssignment } from '@chemisttasker/shared-core';
 import { customTheme } from './ActiveShiftsPage/theme';
 
 type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
@@ -237,6 +237,7 @@ export default function OwnerAssignedShiftBoard({
                             </View>
 
                             {location ? <Text style={styles.locationText}>{location}</Text> : null}
+                            <Text>{getShiftJourneyStatus(shift, { section: mode }).label} · {getShiftAudience(shift.visibility)?.label ?? 'Audience unavailable'}</Text>
 
                             <View style={styles.statsRow}>
                                 <StatPill icon="calendar-month" label="Slots" value={totalSlots} />
@@ -249,7 +250,7 @@ export default function OwnerAssignedShiftBoard({
                                     <View style={styles.sectionHeader}>
                                         <Text style={styles.sectionTitle}>{mode === 'history' ? 'Shift Slot Grid' : 'Assigned Slot Grid'}</Text>
                                         <Chip compact style={[styles.stateChip, { backgroundColor: modeColors.chipBg }]} textStyle={[styles.metaChipText, { color: modeColors.chipFg }]}>
-                                            {mode === 'history' ? 'Completed' : 'Assigned'}
+                                            {getShiftJourneyStatus(shift, { section: mode }).label}
                                         </Chip>
                                     </View>
                                     <Text style={styles.sectionCopy}>

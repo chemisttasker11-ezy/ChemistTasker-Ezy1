@@ -152,7 +152,7 @@ const PublicCandidateCard: React.FC<{
                     <Typography color="text.secondary" sx={{ fontWeight: 800, lineHeight: 1.25, fontSize: { xs: 13, sm: 16 } }}>
                         {emptyTitle}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, lineHeight: 1.35, fontSize: { xs: 10.5, sm: 12 } }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, lineHeight: 1.35, fontSize: 13 }}>
                         {emptySubtitle}
                     </Typography>
                 </Box>
@@ -334,7 +334,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                     sx={{
                                         fontWeight: 800,
                                         lineHeight: 1.2,
-                                        fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                        fontSize: 14,
                                         flex: '1 1 auto',
                                         minWidth: 0,
                                         maxWidth: '100%',
@@ -349,7 +349,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                         size="small"
                                         variant={isRevealLabel ? 'contained' : 'outlined'}
                                         color="secondary"
-                                        sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
+                                        sx={{ flexShrink: 0, minHeight: 44, borderRadius: 1.5, fontWeight: 800 }}
                                         onClick={() => onReviewOffer(shift, offer, offerSlotId)}
                                     >
                                         {label}
@@ -393,7 +393,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                         sx={{
                                             fontWeight: 800,
                                             lineHeight: 1.2,
-                                            fontSize: 'clamp(0.72rem, 0.95vw, 0.95rem)',
+                                            fontSize: 14,
                                             flex: '1 1 auto',
                                             minWidth: 0,
                                             maxWidth: '100%',
@@ -415,7 +415,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                         size="small"
                                         variant={interest.revealed ? 'outlined' : 'contained'}
                                         color="secondary"
-                                        sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
+                                        sx={{ flexShrink: 0, minHeight: 44, borderRadius: 1.5, fontWeight: 800 }}
                                         onClick={() => onReveal(shift, interest)}
                                         disabled={revealingInterestId === interest.id}
                                         startIcon={
@@ -432,7 +432,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                             variant="contained"
                                             sx={{
                                                 flexShrink: 0,
-                                                minHeight: 36,
+                                                minHeight: 44,
                                                 borderRadius: 1.5,
                                                 fontWeight: 800,
                                                 bgcolor: '#F9F295',
@@ -452,7 +452,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                                 ) : undefined
                                             }
                                         >
-                                            Buzz
+                                            Send reminder
                                         </Button>
                                     )}
                                 </Stack>

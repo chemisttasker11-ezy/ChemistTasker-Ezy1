@@ -3,12 +3,11 @@ import {
     Accordion,
     AccordionDetails,
     AccordionSummary,
-    alpha,
     Box,
+    Alert,
     Button,
     Card,
     CardContent,
-    CardHeader,
     Checkbox,
     Chip,
     CircularProgress,
@@ -23,11 +22,7 @@ import {
     Edit,
     Delete as Trash2,
     Share as Share2,
-    Business as Building,
     CalendarToday as CalendarDays,
-    FavoriteBorder,
-    Groups,
-    LocationOn,
     ExpandMore,
 } from '@mui/icons-material';
 import type {
@@ -45,7 +40,9 @@ import {
     deriveLevelSequence,
 } from './utils/shiftHelpers';
 import { dedupeMembers } from './utils/candidateHelpers';
-import { getCardBorderColor, getLocationText } from './utils/displayHelpers';
+import { getLocationText } from './utils/displayHelpers';
+import { formatShiftLabel, getShiftJourneyStatus } from '@chemisttasker/shared-core';
+import { ShiftAudienceChip, ShiftStatusChip } from '../../shiftCenter/ShiftJourneyUI';
 import {
     toFiniteNumber,
     resolveSlotId,
@@ -63,6 +60,7 @@ type ActiveShiftCardData = {
     tabData: Record<string, any>;
     counterOffersByShift: Record<number, any[]>;
     counterOffersLoadingByShift: Record<number, boolean>;
+    counterOffersErrorByShift: Record<number, boolean>;
 };
 
 type ActiveShiftCardState = {
@@ -93,6 +91,7 @@ type ActiveShiftCardActions = {
     handleEscalate: (shiftId: number, levelKey: any) => Promise<boolean>;
     loadTabDataForShift: (shift: Shift, levelKey: EscalationLevelKey) => Promise<any>;
     loadShifts: () => Promise<any>;
+    loadCounterOffers: (shiftId: number) => Promise<void>;
     handleRevealInterest: (shift: Shift, interest: any) => Promise<void>;
     handleSlotSelection: (shiftId: number, slotId: number) => void;
     handleReviewOffer: (shift: Shift, offer: any, tabData: any, slotId: number | null) => Promise<void>;
@@ -117,7 +116,6 @@ type Props = {
 export default function ActiveShiftCard({
     shift,
     dedicated,
-    isDarkMode,
     data,
     state,
     actions,
@@ -126,6 +124,7 @@ export default function ActiveShiftCard({
         tabData,
         counterOffersByShift,
         counterOffersLoadingByShift,
+        counterOffersErrorByShift,
     } = data;
     const {
         expandedShifts,
@@ -154,6 +153,7 @@ export default function ActiveShiftCard({
         handleEscalate,
         loadTabDataForShift,
         loadShifts,
+        loadCounterOffers,
         handleRevealInterest,
         handleSlotSelection,
         handleReviewOffer,
@@ -197,7 +197,8 @@ export default function ActiveShiftCard({
                 .map(getCandidateUserId)
                 .filter((id): id is number => id != null)
         );
-        const publicInterests = (currentTabData.interestsAll || []).filter((interest: any) => {
+        const publicTabData = tabData[getTabKey(shift.id, PUBLIC_LEVEL_KEY)];
+        const publicInterests = (publicTabData?.interestsAll || []).filter((interest: any) => {
             const userId = getCandidateUserId(interest);
             return userId == null || !knownCommunityUserIds.has(userId);
         });
@@ -209,10 +210,8 @@ export default function ActiveShiftCard({
             ? consolidatedMembers
             : consolidatedMembersBySlot[selectedSlotId ?? -1] || [];
 
-        const cardBorderColor = getCardBorderColor((shift as any).visibility ?? 'PLATFORM');
         const summaryText = getShiftSummary(shift);
         const location = getLocationText(shift);
-        const labelOverrides = undefined;
         const roleNeeded = (shift as any).roleNeeded ?? (shift as any).role_needed;
         const employmentType = (shift as any).employmentType ?? (shift as any).employment_type;
         const isUrgent = Boolean((shift as any).isUrgent ?? (shift as any).is_urgent);
@@ -344,276 +343,67 @@ export default function ActiveShiftCard({
                 noResponse: countUniquePeople(selectedMembers.filter((member: any) => member?.status === 'no_response')),
             };
         }
-        const metricItems = [
-            { label: 'Slots', value: slotsCount || '-', icon: <CalendarDays fontSize="small" /> },
-            { label: 'Candidates', value: candidatesCount, icon: <Groups fontSize="small" /> },
-            { label: 'Interests', value: interestsCount, icon: <FavoriteBorder fontSize="small" /> },
-        ];
-        const headerActions = (
-            <Box
-                onClick={(event) => event.stopPropagation()}
-                sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'flex-end' }}
-            >
-                <Tooltip title="Share">
-                    <span>
-                        <IconButton
-                            size="small"
-                            sx={{
-                                color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
-                                bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
-                                border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
-                                '&:hover': {
-                                    bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
-                                    color: isDarkMode ? '#FFFFFF' : '#6D28D9',
-                                },
-                                '&.Mui-disabled': {
-                                    color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
-                                },
-                            }}
-                            onClick={e => {
-                                e.stopPropagation();
-                                handleShare(shift);
-                            }}
-                            disabled={sharingShiftId === shift.id}
-                        >
-                            <Share2 fontSize="small" />
-                        </IconButton>
-                    </span>
-                </Tooltip>
-                <Tooltip title="Edit">
-                    <IconButton
-                        size="small"
-                        sx={{
-                            color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
-                            bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
-                            border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
-                            '&:hover': {
-                                bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
-                                color: isDarkMode ? '#FFFFFF' : '#6D28D9',
-                            },
-                        }}
-                        onClick={e => {
-                            e.stopPropagation();
-                            handleEditShift(shift.id);
-                        }}
-                    >
-                        <Edit fontSize="small" />
-                    </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete">
-                    <IconButton
-                        size="small"
-                        sx={{
-                            color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
-                            bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
-                            border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
-                            '&:hover': {
-                                bgcolor: isDarkMode ? alpha('#EF4444', 0.2) : alpha('#EF4444', 0.08),
-                                color: isDarkMode ? '#FCA5A5' : '#DC2626',
-                            },
-                            '&.Mui-disabled': {
-                                color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
-                            },
-                        }}
-                        onClick={e => {
-                            e.stopPropagation();
-                            setDeleteConfirmDialog({ open: true, shiftId: shift.id });
-                        }}
-                        disabled={actionLoading[`delete_${shift.id}`]}
-                    >
-                        <Trash2 fontSize="small" />
-                    </IconButton>
-                </Tooltip>
-            </Box>
-        );
-
+        const responseDataError = counterOffersErrorByShift[shift.id] || communityTabData.some((item) => item?.error) || publicTabData?.error;
+        const responsesReady = !communityDataLoading && counterOffersLoaded && !counterOffersLoading && !responseDataError &&
+            (shiftLevel !== PUBLIC_LEVEL_KEY || (publicTabData && !publicTabData.loading));
+        const isAwaiting = (item: any) => item.pendingConfirmation || item.pending_confirmation || item.awaitingPayment || item.awaiting_payment;
+        const actionableCount = countUniquePeople([
+            ...allMembers.filter((item: any) => item.status === 'interested' && !isAwaiting(item)),
+            ...allInterests.filter((item: any) => !isAwaiting(item)),
+            ...allOffers.filter(isActiveCounterOffer),
+        ]);
+        const pendingCount = countUniquePeople([...allMembers, ...allInterests].filter((item: any) => item.pendingConfirmation || item.pending_confirmation));
+        const journeyStatus = getShiftJourneyStatus(shift, { paymentRequired: showPaymentRequired, interestedCount: responsesReady ? actionableCount : 0,
+            pendingConfirmationCount: responsesReady ? pendingCount : 0, responsesReady });
+        const retryResponses = () => {
+            void loadCounterOffers(shift.id);
+            viewableLevelKeys.forEach((level) => void loadTabDataForShift(shift, level));
+        };
         return (
-            <Card
-                id={`active-shift-card-${shift.id}`}
-                key={shift.id}
-                onClick={() => toggleShiftExpansion(shift.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        toggleShiftExpansion(shift.id);
-                    }
-                }}
-                sx={{
-                    position: 'relative',
-                    overflow: 'hidden',
-                    maxWidth: '100%',
-                    borderRadius: 6,
-                    border: '1px solid #D9E2F2',
-                    background: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
-                    boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
-                    '&:hover': {
-                        transform: 'translateY(-1px)',
-                        borderColor: '#C7D2FE',
-                        boxShadow: '0 28px 66px rgba(15, 23, 42, 0.10)',
-                    },
-                    '&:focus-visible': {
-                        outline: '3px solid rgba(124,58,237,.28)',
-                        outlineOffset: 3,
-                    },
-                    '&:before': {
-                        content: '""',
-                        position: 'absolute',
-                        inset: 0,
-                        pointerEvents: 'none',
-                        background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
-                    },
-                }}
-            >
-                <CardHeader
-                    disableTypography
-                    sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 1.5, minWidth: 0, position: 'relative' }}
-                    title={
-                        <Stack direction={{ xs: 'column', xl: 'row' }} spacing={{ xs: 1.5, md: 2 }} justifyContent="space-between" alignItems={{ xs: 'stretch', xl: 'flex-start' }} sx={{ width: '100%', minWidth: 0 }}>
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.25, sm: 2 }} sx={{ minWidth: 0, width: { xs: '100%', xl: 'auto' }, maxWidth: { xl: '52%' } }}>
-                                <Box
-                                    sx={{
-                                        width: { xs: 54, sm: 58 },
-                                        height: { xs: 54, sm: 58 },
-                                        flexShrink: 0,
-                                        display: 'grid',
-                                        placeItems: 'center',
-                                        borderRadius: 3.5,
-                                        color: '#fff',
-                                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
-                                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
-                                    }}
-                                >
-                                    <Building />
-                                </Box>
-                                <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="h6" component="div" sx={{ fontWeight: 900, color: '#111827', fontSize: { xs: 21, sm: 24 }, lineHeight: 1.18, overflowWrap: 'anywhere' }}>
-                                        {(shift as any).pharmacyDetail?.name ?? "Unnamed Pharmacy"}
-                                    </Typography>
-                                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-                                        {roleNeeded && (
-                                            <Chip label={roleNeeded} size="small" sx={{ bgcolor: cardBorderColor, color: '#fff', fontWeight: 800 }} />
-                                        )}
-                                        {employmentType && (
-                                            <Chip label={employmentType} size="small" sx={{ bgcolor: '#F8FAFC', border: '1px solid #E5E7EB', fontWeight: 700 }} />
-                                        )}
-                                        {isUrgent && <Chip label="Urgent" color="error" size="small" sx={{ fontWeight: 800 }} />}
-                                        {summaryText && (
-                                            <Chip
-                                                icon={<CalendarDays sx={{ fontSize: 15 }} />}
-                                                label={summaryText}
-                                                size="small"
-                                                variant="outlined"
-                                                sx={{ color: '#475569', fontWeight: 600 }}
-                                            />
-                                        )}
-                                        {showPaymentRequired && (
-                                            <Chip label="Payment Required" color="error" size="small" sx={{ fontWeight: 800 }} />
-                                        )}
-                                    </Stack>
-                                </Box>
-                            </Stack>
-                            <Stack sx={{ ml: { xl: 'auto' }, width: '100%', maxWidth: { xs: '100%', xl: 520 }, alignItems: { xs: 'stretch', xl: 'flex-end' }, minWidth: 0 }}>
-                                {headerActions}
-                                <Box
-                                    sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                                        gap: { xs: 0.75, sm: 1.25 },
-                                        width: '100%',
-                                        mt: 1.25,
-                                    }}
-                                >
-                                    {metricItems.map((item) => (
-                                        <Box
-                                            key={item.label}
-                                            sx={{
-                                                borderRadius: 3,
-                                                border: `1px solid ${isDarkMode ? alpha('#FFFFFF', 0.14) : '#D9E2F2'}`,
-                                                background: isDarkMode ? alpha('#FFFFFF', 0.075) : '#FFFFFFCC',
-                                                minWidth: 0,
-                                                width: '100%',
-                                                px: { xs: 1.25, sm: 2 },
-                                                py: { xs: 1.25, sm: 1.75 },
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: { xs: 0.75, sm: 1.25 },
-                                                boxShadow: isDarkMode
-                                                    ? `0 12px 28px ${alpha('#000000', 0.16)}`
-                                                    : '0 12px 24px rgba(15,23,42,.05)',
-                                            }}
-                                        >
-                                            <Box
-                                                sx={{
-                                                    width: { xs: 30, sm: 36 },
-                                                    height: { xs: 30, sm: 36 },
-                                                    borderRadius: '50%',
-                                                    bgcolor: isDarkMode ? alpha('#A78BFA', 0.18) : '#F3E8FF',
-                                                    color: isDarkMode ? '#C4B5FD' : '#7C3AED',
-                                                    display: 'grid',
-                                                    placeItems: 'center',
-                                                    flexShrink: 0,
-                                                    '& svg': { fontSize: { xs: 18, sm: 20 } },
-                                                }}
-                                            >
-                                                {item.icon}
-                                            </Box>
-                                            <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-                                                <Typography sx={{ fontWeight: 800, color: isDarkMode ? '#F8FAFC' : '#0F172A', lineHeight: 1.05, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                                                    {item.value}
-                                                </Typography>
-                                                <Typography
-                                                    variant="caption"
-                                                    sx={{
-                                                        color: isDarkMode ? alpha('#FFFFFF', 0.72) : '#64748B',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: { xs: 0.2, sm: 0.6 },
-                                                        fontSize: { xs: '0.62rem', sm: '0.75rem' },
-                                                        fontWeight: 400,
-                                                    }}
-                                                >
-                                                    {item.label}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                    ))}
-                                </Box>
-                            </Stack>
-                        </Stack>
-                    }
-                />
-                <CardContent sx={{ px: { xs: 2, md: 3 }, pt: 0, minWidth: 0, position: 'relative' }}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            gap: 1,
-                            alignItems: 'center',
-                            mb: 2,
-                            color: isDarkMode ? alpha('#FFFFFF', 0.66) : '#64748B',
-                        }}
-                    >
-                        <LocationOn sx={{ fontSize: 17 }} />
-                        <Typography variant="body2" sx={{ color: 'inherit' }}>
-                            {location}
-                        </Typography>
-                    </Box>
-
-                    {dedicated && (
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
-                            <Chip label="Direct / Private" color="info" size="small" />
-                            <Chip label="Pending" variant="outlined" size="small" />
+            <Card component="article" id={`active-shift-card-${shift.id}`} aria-labelledby={`shift-title-${shift.id}`} elevation={0}
+                sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', minWidth: 0 }}>
+                <CardContent sx={{ p: { xs: 2, md: 3 }, '&:last-child': { pb: { xs: 2, md: 3 } } }}>
+                    <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="flex-start">
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>Shift #{shift.id}</Typography>
+                            <Typography id={`shift-title-${shift.id}`} component="h3" variant="h6" fontWeight={700} sx={{ overflowWrap: 'anywhere' }}>
+                                {shift.pharmacyDetail?.name ?? shift.pharmacyName ?? 'Pharmacy'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{formatShiftLabel(roleNeeded)} · {formatShiftLabel(employmentType)}</Typography>
                         </Box>
-                    )}
-
+                        <Stack direction="row" spacing={0.25}>
+                            <Tooltip title="Share shift"><span><IconButton aria-label={`Share shift ${shift.id}`} onClick={() => void handleShare(shift)} disabled={sharingShiftId === shift.id} sx={{ minWidth: 44, minHeight: 44 }}><Share2 fontSize="small" /></IconButton></span></Tooltip>
+                            <Tooltip title="Edit shift"><IconButton aria-label={`Edit shift ${shift.id}`} onClick={() => handleEditShift(shift.id)} sx={{ minWidth: 44, minHeight: 44 }}><Edit fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete shift"><IconButton aria-label={`Delete shift ${shift.id}`} onClick={() => setDeleteConfirmDialog({ open: true, shiftId: shift.id })} disabled={actionLoading[`delete_${shift.id}`]} sx={{ minWidth: 44, minHeight: 44 }}><Trash2 fontSize="small" /></IconButton></Tooltip>
+                        </Stack>
+                    </Stack>
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ my: 2 }}>
+                        <ShiftStatusChip status={journeyStatus} />
+                        <ShiftAudienceChip shift={shift} dedicated={dedicated} />
+                        {isUrgent && <Chip label="Urgent" size="small" color="error" variant="outlined" />}
+                    </Stack>
+                    <Stack spacing={0.5}>
+                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><CalendarDays fontSize="small" color="action" />{summaryText}</Typography>
+                        <Typography variant="body2" color="text.secondary">{location}</Typography>
+                    </Stack>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}
+                        sx={{ mt: 2.5, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                        <Box>
+                            <Typography variant="body2" fontWeight={600}>{responsesReady
+                                ? `${interestsCount} interested · ${candidatesCount} people · ${slotsCount} slot${slotsCount === 1 ? '' : 's'}`
+                                : responseDataError ? 'Some responses could not be loaded' : 'Loading candidate responses…'}</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{journeyStatus.description}</Typography>
+                        </Box>
+                        <Button variant={showPaymentRequired ? 'contained' : 'outlined'} onClick={() => toggleShiftExpansion(shift.id)}
+                            aria-expanded={isExpanded} aria-controls={`shift-responses-${shift.id}`}
+                            endIcon={<ExpandMore sx={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }} />}
+                            sx={{ minHeight: 44, flexShrink: 0 }}>
+                            {isExpanded ? 'Hide details' : showPaymentRequired ? 'Review payment' : 'View responses'}
+                        </Button>
+                    </Stack>
                     {isExpanded && (
-                        <Box
-                            onClick={(event) => event.stopPropagation()}
-                            onKeyDown={(event) => event.stopPropagation()}
-                        >
+                        <Box id={`shift-responses-${shift.id}`}>
+                            {responseDataError && <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={retryResponses}>Try again</Button>}>Some candidate responses could not be loaded.</Alert>}
                             <Divider sx={{ my: 2.5 }} />
 
                             <EscalationStepper
@@ -630,7 +420,6 @@ export default function ActiveShiftCard({
                                     await loadShifts();
                                 }}
                                 escalating={actionLoading[`escalate_${shift.id}`]}
-                                labelOverrides={labelOverrides}
                                 showPrivateFirst={dedicated}
                             />
 
@@ -745,7 +534,7 @@ export default function ActiveShiftCard({
 
                             <Divider sx={{ my: 2.5 }} />
 
-                            {currentTabData.loading ? (
+                            {responseDataError ? null : currentTabData.loading ? (
                                 <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
                                     <CircularProgress />
                                 </Box>
@@ -798,7 +587,7 @@ export default function ActiveShiftCard({
                                     />
                                 )
                             )}
-                            {selectedLevel === PUBLIC_LEVEL_KEY && (
+                            {!responseDataError && selectedLevel === PUBLIC_LEVEL_KEY && (
                                 <Box sx={{ mt: 2.5 }}>
                                     {communityDataLoading ? (
                                         <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>

@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import dayjs from 'dayjs';
+import { SHIFT_ESCALATION_STAGES } from '@chemisttasker/shared-core';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -40,13 +41,7 @@ type Props = {
   setEscalationDates: Setter<Record<string, string>>;
 };
 
-const ESCALATION_LABELS: Record<string, string> = {
-  FULL_PART_TIME: 'Pharmacy Members',
-  LOCUM_CASUAL: 'Favourite Staff',
-  OWNER_CHAIN: 'Owner Chain',
-  ORG_CHAIN: 'Organization',
-  PLATFORM: 'Platform (Public)',
-};
+const ESCALATION_LABELS: Record<string, string> = Object.fromEntries(SHIFT_ESCALATION_STAGES.map((stage) => [stage.key, stage.label]));
 
 const VISIBILITY_META: Record<
   string,

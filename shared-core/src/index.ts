@@ -14,6 +14,7 @@ export * from './finance';
 export * from './financePresentation';
 export * from './api';
 export * from './talent';
+export * from './shiftJourney';
 
 // Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi
 // for new cross-platform work (especially Next.js SSR).

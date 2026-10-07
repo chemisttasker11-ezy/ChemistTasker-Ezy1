@@ -16,6 +16,7 @@ import {
     createOwnerShiftService,
     updateOwnerShiftService,
     calculateShiftRates,
+    getShiftAudience,
 } from '@chemisttasker/shared-core';
 import apiClient from '@/utils/apiClient';
 
@@ -142,7 +143,7 @@ export default function PostShiftScreen() {
         [roleNeeded]
     );
     const stepOrder = useMemo<StepKey[]>(
-        () => [...BASE_STEP_ORDER, ...(isLocumLike ? (['timetable'] as StepKey[]) : []), 'payrate'],
+        () => [...BASE_STEP_ORDER, ...(isLocumLike ? (['timetable'] as StepKey[]) : []), 'payrate', 'review'],
         [isLocumLike]
     );
     const canSubmit = useMemo(() => Boolean(pharmacyId && (!isLocumLike || slots.length > 0)), [pharmacyId, isLocumLike, slots.length]);
@@ -1215,6 +1216,29 @@ export default function PostShiftScreen() {
                         handleSlotRateChange={handleSlotRateChange}
                     />
                 );
+            case 'review':
+                return (
+                    <View style={{ gap: 12, paddingVertical: 16 }}>
+                        <Text variant="titleLarge">Review your shift</Text>
+                        <Text variant="bodyMedium">Check the audience, dates and pay before {editingId ? 'updating' : 'posting'}.</Text>
+                        <Text variant="titleMedium">{pharmacies.find((item) => item.id === pharmacyId)?.name ?? 'Choose a pharmacy'}</Text>
+                        <Text>{roleNeeded.replace(/_/g, ' ')} · {getEmploymentLabel(employmentType)}</Text>
+                        <Button mode="text" onPress={() => setActiveStep('details')}>Edit shift details</Button>
+                        <Text variant="titleMedium">Audience</Text>
+                        <Text>{isEmbedded ? 'Favourite staff' : getShiftAudience(initialAudience)?.label ?? 'Choose an audience'}</Text>
+                        <Button mode="text" onPress={() => setActiveStep('visibility')}>Edit audience</Button>
+                        {isLocumLike ? (
+                            <>
+                                <Text variant="titleMedium">{slots.length} {slots.length === 1 ? 'slot' : 'slots'}</Text>
+                                {slots.map((slot, index) => <Text key={`${slot.date}-${index}`}>{slot.date} · {slot.startTime}–{slot.endTime}</Text>)}
+                                <Button mode="text" onPress={() => setActiveStep('timetable')}>Edit timetable</Button>
+                            </>
+                        ) : null}
+                        <Text variant="titleMedium">Pay</Text>
+                        <Text>{isLocumLike ? `${paymentPreference} · ${rateType.replace(/_/g, ' ').toLowerCase()}` : ftptPayMode === 'HOURLY' ? `$${minHourly}–$${maxHourly}/hr` : `$${minAnnual}–$${maxAnnual}/year`}</Text>
+                        <Button mode="text" onPress={() => setActiveStep('payrate')}>Edit pay</Button>
+                    </View>
+                );
             default: return null;
         }
     };
@@ -1227,6 +1251,27 @@ export default function PostShiftScreen() {
 
     const stepIndex = stepOrder.indexOf(activeStep);
     const goNext = () => {
+        setError('');
+        if (activeStep === 'details' && (!pharmacyId || !roleNeeded || !employmentType)) {
+            setError('Choose a pharmacy, role and employment type to continue.');
+            return;
+        }
+        if (activeStep === 'visibility' && !isEmbedded && !initialAudience) {
+            setError('Choose who can see this shift to continue.');
+            return;
+        }
+        if (activeStep === 'timetable' && slots.length === 0) {
+            setError('Please add at least one timetable entry.');
+            return;
+        }
+        if (activeStep === 'payrate' && !isLocumLike && ftptPayMode === 'HOURLY' && (!minHourly || !maxHourly)) {
+            setError('Please enter min and max hourly rates.');
+            return;
+        }
+        if (activeStep === 'payrate' && !isLocumLike && ftptPayMode === 'ANNUAL' && (!minAnnual || !maxAnnual || !superPercent)) {
+            setError('Please enter min/max annual and super %.');
+            return;
+        }
         if (stepIndex < stepOrder.length - 1) setActiveStep(stepOrder[stepIndex + 1]);
     };
     const goBack = () => {
@@ -1252,11 +1297,14 @@ export default function PostShiftScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={[styles.stepper, isEmbedded && styles.stepperEmbedded]}
                 >
-                    {stepOrder.map((step) => (
+                    {stepOrder.map((step, index) => (
                         <TouchableOpacity
                             key={step}
                             style={[styles.stepPill, isEmbedded && styles.stepPillEmbedded, activeStep === step && styles.stepPillActive]}
-                            onPress={() => setActiveStep(step)}
+                            onPress={() => { if (index <= stepIndex) { setError(''); setActiveStep(step); } }}
+                            accessibilityRole="button"
+                            accessibilityState={{ disabled: index > stepIndex, selected: activeStep === step }}
+                            accessibilityLabel={`Step ${index + 1} of ${stepOrder.length}: ${step === 'payrate' ? 'Pay and rate' : step}`}
                         >
                             <Text style={[styles.stepPillText, activeStep === step && styles.stepPillTextActive]}>
                                 {step.replace('-', ' ')}
@@ -1264,6 +1312,7 @@ export default function PostShiftScreen() {
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
+                <Text variant="labelMedium">Step {stepIndex + 1} of {stepOrder.length}</Text>
 
                 {error ? <HelperText type="error">{error}</HelperText> : null}
 
@@ -1274,17 +1323,11 @@ export default function PostShiftScreen() {
                     {stepIndex < stepOrder.length - 1 ? (
                         <Button
                             mode="contained"
-                            onPress={() => {
-                                if (activeStep === 'timetable' && slots.length === 0) {
-                                    setError('Please add at least one timetable entry.');
-                                    return;
-                                }
-                                goNext();
-                            }}
+                            onPress={goNext}
                             style={styles.primaryBtn}
                             labelStyle={styles.primaryBtnText}
                         >
-                            Next
+                            {stepOrder[stepIndex + 1] === 'review' ? 'Review shift' : 'Continue'}
                         </Button>
                     ) : (
                         <Button mode="contained" onPress={handleSubmit} disabled={!canSubmit || loading} loading={loading} style={styles.primaryBtn} labelStyle={styles.primaryBtnText}>
