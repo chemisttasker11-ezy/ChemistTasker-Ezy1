@@ -31,7 +31,7 @@ export default function OwnerOverviewContainer() {
   const [membershipsByPharmacy, setMembershipsByPharmacy] = useState<Record<string, MembershipDTO[]>>({});
   const [adminAssignmentsByPharmacy, setAdminAssignmentsByPharmacy] = useState<Record<string, PharmacyAdminDTO[]>>({});
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activePersona, activeAdminPharmacyId } = useAuth();
+  const { activePersona, activeAdminPharmacyId, adminAssignments } = useAuth();
   const { selectedPharmacyId: workspacePharmacyId, workspace } = useWorkspace();
   const scopedPharmacyId =
     activePersona === "admin" && typeof activeAdminPharmacyId === "number"
@@ -74,10 +74,19 @@ export default function OwnerOverviewContainer() {
         if (!mounted) return;
 
         // FIX: Extract the array from the 'results' property if it exists.
-        const normalizedPharmacies: PharmacyDTO[] = res.map((item: any) => ({
-          ...item,
-          id: String(item.id),
-        }));
+        // The owner overview lists the pharmacies this owner owns (OWNER-level authority rows), not every pharmacy
+        // the account can open: a delegated MANAGER assignment elsewhere belongs to the Admin persona.
+        const ownedIds = new Set(
+          adminAssignments
+            .filter((assignment) => String(assignment.admin_level ?? "").toUpperCase() === "OWNER")
+            .map((assignment) => Number(assignment.pharmacy_id)),
+        );
+        const normalizedPharmacies: PharmacyDTO[] = res
+          .filter((item) => activePersona === "admin" || !ownedIds.size || ownedIds.has(Number(item.id)))
+          .map((item: any) => ({
+            ...item,
+            id: String(item.id),
+          }));
         const scopedPharmacies =
           scopedPharmacyId != null
             ? normalizedPharmacies.filter((pharmacy) => Number(pharmacy.id) === scopedPharmacyId)
@@ -107,7 +116,7 @@ export default function OwnerOverviewContainer() {
     return () => {
       mounted = false;
     };
-  }, [fetchMemberships, fetchAdmins, scopedPharmacyId]);
+  }, [fetchMemberships, fetchAdmins, scopedPharmacyId, adminAssignments, activePersona]);
 
   const setViewParam = useCallback(
     (nextView: View, options?: { pharmacyId?: string | null; replace?: boolean }) => {

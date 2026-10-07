@@ -446,9 +446,9 @@ class ResolverAndPermissionTests(HubFixture):
         rows = response.json()
         self.assertEqual(
             set(rows[0]),
-            {"membership_id", "user_id", "full_name", "role", "employment_type", "job_title",
+            {"membership_id", "user_id", "full_name", "profile_photo_url", "role", "employment_type", "job_title",
              "pharmacy_id", "pharmacy_name", "is_own_pharmacy"},
-            "the directory never returns contact details",
+            "the directory returns the avatar but never contact details",
         )
         pharmacies = [row["pharmacy_id"] for row in rows]
         self.assertIn(self.sibling.id, pharmacies, "organisation scope lists sibling pharmacies' staff")

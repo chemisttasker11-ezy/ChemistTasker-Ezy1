@@ -295,7 +295,7 @@ class MembershipVisibilityTests(MembershipFixture):
                 self.assertEqual(deleted.status_code, 403, getattr(deleted, "data", None))
 
         owner_membership.refresh_from_db()
-        self.assertEqual(owner_membership.role, "OWNER")
+        self.assertEqual(owner_membership.role, "CONTACT")
         self.assertEqual(owner_membership.status, Membership.Status.ACCEPTED)
         self.assertTrue(owner_membership.is_active)
 
@@ -464,6 +464,19 @@ class ApplicationDecisionTests(MembershipFixture):
 
 
 class MyMembershipTests(MembershipFixture):
+    def test_listing_keeps_the_owner_membership_a_valid_contact(self):
+        Membership.objects.filter(user=self.owner, pharmacy=self.pharmacy).delete()
+        response, _ = self.call(self.owner, "get", "my-memberships/")
+        self.assertEqual(response.status_code, 200, response.data)
+        created = Membership.objects.get(user=self.owner, pharmacy=self.pharmacy)
+        self.assertEqual(created.role, "CONTACT", "the repair creates what pharmacy creation creates")
+
+        Membership.objects.filter(pk=created.pk).update(role="OWNER", is_active=False)
+        self.call(self.owner, "get", "my-memberships/")
+        created.refresh_from_db()
+        self.assertEqual((created.role, created.is_active), ("CONTACT", True), "the legacy OWNER role is not a choice")
+        created.full_clean()
+
     def test_accept_reject_and_quit_notify_the_pharmacy(self):
         worker, membership = self.member(status=Membership.Status.PENDING, active=False)
         response, work = self.call(worker, "post", f"my-memberships/{membership.id}/accept/")
@@ -497,7 +510,7 @@ class MyMembershipTests(MembershipFixture):
 
         response, _ = self.call(self.owner, "get", "my-memberships/")
         owner_membership = Membership.objects.get(user=self.owner, pharmacy=self.pharmacy)
-        self.assertEqual((owner_membership.role, owner_membership.status), ("OWNER", Membership.Status.ACCEPTED))
+        self.assertEqual((owner_membership.role, owner_membership.status), ("CONTACT", Membership.Status.ACCEPTED))
         quit_owner, _ = self.call(self.owner, "post", f"my-memberships/{owner_membership.id}/quit/")
         self.assertEqual(quit_owner.data["detail"], "Pharmacy owners cannot quit their owner membership.")
 

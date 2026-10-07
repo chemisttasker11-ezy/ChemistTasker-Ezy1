@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from pharmacy_hub.access import HubScopeResolver
 from pharmacy_hub.models import PharmacyCommunityGroupMembership
+from users.presentation import _build_absolute_media_url, _resolve_user_profile_photo
 
 DEFAULT_LIMIT = 200
 MAX_LIMIT = 200
@@ -67,7 +68,15 @@ def directory_memberships(user, scope, *, search="", limit=DEFAULT_LIMIT):
         ).values_list("pharmacy_id", flat=True)
     )
     return (
-        queryset.select_related("user", "pharmacy")
+        queryset.select_related(
+            "user",
+            "pharmacy",
+            # Profile photos live on the onboarding profile; join them so the directory stays one query.
+            "user__pharmacistonboarding",
+            "user__otherstaffonboarding",
+            "user__exploreronboarding",
+            "user__owneronboarding",
+        )
         .annotate(
             is_own_pharmacy=Case(
                 When(pharmacy_id__in=own_pharmacy_ids, then=Value(1)),
@@ -86,7 +95,7 @@ def _full_name(membership):
 
 
 class HubMemberDirectoryView(APIView):
-    """GET hub/members/?scope=pharmacy|organization|group&<scope>_id=&search=&limit= (names only, no contact details)."""
+    """GET hub/members/?scope=pharmacy|organization|group&<scope>_id=&search=&limit= (name, photo and role; no contact details)."""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -103,6 +112,7 @@ class HubMemberDirectoryView(APIView):
                 "membership_id": membership.id,
                 "user_id": membership.user_id,
                 "full_name": _full_name(membership),
+                "profile_photo_url": _build_absolute_media_url(request, _resolve_user_profile_photo(membership.user)),
                 "role": membership.role,
                 "employment_type": membership.employment_type,
                 "job_title": membership.job_title or "",

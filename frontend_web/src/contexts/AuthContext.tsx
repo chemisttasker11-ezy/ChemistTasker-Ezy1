@@ -244,7 +244,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const synchronizeSession = async () => {
       if (inFlight) return;
       inFlight = true;
-      setIsLoading(true);
+      // A background re-check on focus/visibility must not toggle isLoading: ProtectedRoute would replace the
+      // dashboard with a spinner and unmount every page, losing open chats, forms and dialogs.
       try {
         // The cookie is shared by the Next site, Vite dashboard and playground.
         // A cached Bearer token can still belong to the previously opened user.
@@ -254,23 +255,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
           clearTokens();
           clearLocalAuthState();
         } else {
+          // Keeping the mounted page is safe only while the authenticated identity is unchanged.
+          // A different account can be established in another tab / the shared Next site while this
+          // dashboard is still open. Reload before rendering that identity so no account-scoped
+          // chat, form or dialog state from the previous user survives into the new session.
+          if (user?.id != null && current.id != null && user.id !== current.id) {
+            window.location.reload();
+            return;
+          }
           setAccess(getAccessToken());
           setRefresh(getRefreshToken());
-          setUser(current);
+          // Keep the same object when nothing changed, so effects keyed on `user` do not refetch on every focus.
+          setUser((previous) => (previous && JSON.stringify(previous) === JSON.stringify(current) ? previous : current));
           setSessionError('');
         }
       } catch {
-        if (active) setSessionError('Unable to connect to your account. Please retry.');
+        // A failed background re-check keeps the current session on screen; the next focus or request retries.
       } finally {
         inFlight = false;
-        if (active) setIsLoading(false);
       }
     };
     const onVisible = () => { if (document.visibilityState === 'visible') void synchronizeSession(); };
     window.addEventListener('focus', synchronizeSession);
     document.addEventListener('visibilitychange', onVisible);
     return () => { active = false; window.removeEventListener('focus', synchronizeSession); document.removeEventListener('visibilitychange', onVisible); };
-  }, [clearLocalAuthState, fetchSessionUser]);
+  }, [clearLocalAuthState, fetchSessionUser, user?.id]);
   useEffect(() => {
     if (!user) {
       setActivePersonaState("staff");

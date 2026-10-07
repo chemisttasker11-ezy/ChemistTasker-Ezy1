@@ -202,9 +202,9 @@ def visible_applications(user, query_params):
 def own_memberships(user):
     """A worker's pending and accepted memberships, newest first.
 
-    CURRENT BEHAVIOUR kept: listing also makes sure an owner has an active OWNER membership at each pharmacy
-    they own (created or repaired on read)."""
-    # Ensure owners always retain an active OWNER membership for their pharmacies.
+    Listing also makes sure an owner has an active membership at each pharmacy they own (created or repaired on
+    read). It is the same CONTACT membership pharmacy creation makes; a legacy "OWNER" role, which is not a
+    Membership role choice, is repaired to CONTACT."""
     if hasattr(user, 'owneronboarding'):
         owned_pharmacies = Pharmacy.objects.filter(owner=user.owneronboarding)
         for pharmacy in owned_pharmacies:
@@ -212,7 +212,7 @@ def own_memberships(user):
                 user=user,
                 pharmacy=pharmacy,
                 defaults={
-                    'role': 'OWNER',
+                    'role': 'CONTACT',
                     'employment_type': 'FULL_TIME',
                     'is_active': True,
                     'status': Membership.Status.ACCEPTED,
@@ -221,8 +221,8 @@ def own_memberships(user):
             )
             if not created:
                 updated = False
-                if membership.role != 'OWNER':
-                    membership.role = 'OWNER'
+                if membership.role == 'OWNER':
+                    membership.role = 'CONTACT'
                     updated = True
                 if not membership.is_active:
                     membership.is_active = True
