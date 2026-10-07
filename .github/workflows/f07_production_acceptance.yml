@@ -1,8 +1,8 @@
 name: F07 Production Acceptance
 
+# F07 is the one-off production acceptance package for PR #149. Later changes use the
+# standard pre-F07 CI; run this manually (workflow_dispatch) only when a release needs it.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
