@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
+      platform:
+        required: false
+        type: string
+        default: both
       tested_sha:
         required: false
         type: string
@@ -54,6 +58,7 @@ env:
 jobs:
   android-native:
     name: Android native acceptance
+    if: ${{ inputs.platform != 'ios' }}
     runs-on: ubuntu-latest
     timeout-minutes: 80
     steps:
@@ -502,6 +507,7 @@ jobs:
 
   ios-native:
     name: iOS native acceptance
+    if: ${{ inputs.platform != 'android' }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -793,6 +799,30 @@ jobs:
           set -euo pipefail
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
+          export JAVA_HOME="$JAVA_HOME"
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
+          export MAESTRO_CLI_NO_ANALYTICS=1
+
+          # On a fresh iOS simulator, accepting a custom-scheme confirmation does
+          # not deliver the URL until the XCUITest session disconnects. Complete
+          # that one-time consent in its own session before testing deep links.
+          cat > /tmp/native-link-consent.yaml <<'YAML'
+          appId: com.chemisttasker.app
+          ---
+          - launchApp:
+              stopApp: true
+              permissions:
+                all: allow
+          - openLink: "frontendmobile://admin/shifts"
+          - runFlow:
+              when:
+                visible: 'Open in .*ChemistTasker.*'
+              commands:
+                - tapOn: "Open"
+          YAML
+          maestro --device "$SIM_UDID" test /tmp/native-link-consent.yaml
+          sleep 5
+
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
@@ -873,9 +903,6 @@ jobs:
               visible: "Centre the kiosk QR inside the frame"
               timeout: 30000
           YAML
-          export JAVA_HOME="$JAVA_HOME"
-          export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
-          export MAESTRO_CLI_NO_ANALYTICS=1
           maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
 
       - name: Capture iOS diagnostics

@@ -1,0 +1,21 @@
+name: iOS Native Repair Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-native-repair-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-acceptance:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'fix/ios-native-acceptance'
+    uses: ./.github/workflows/native_mobile_acceptance.yml
+    with:
+      platform: ios
+      tested_sha: ${{ github.event.pull_request.head.sha || github.sha }}
