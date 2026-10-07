@@ -56,8 +56,8 @@ export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: numb
       <Text variant="titleMedium" style={styles.title}>Personal profile is optional</Text>
       <Text style={styles.body}>
         This account can remain permanently as a pharmacy-admin account. No action is required. Only choose a worker
-        type if this email belongs to you personally and you want the current pharmacy's CONTACT membership converted
-        into your own workforce membership.
+        type if this email belongs to you personally and you want the CONTACT membership at the current pharmacy
+        converted into your own workforce membership.
       </Text>
       <View style={styles.actions}>
         {ACCOUNT_TYPES.map((item) => (
