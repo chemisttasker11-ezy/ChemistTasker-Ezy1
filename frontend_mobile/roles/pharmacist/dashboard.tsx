@@ -124,10 +124,12 @@ export default function PharmacistOverviewScreen() {
   }, [loadDashboard]);
 
   const shifts = useMemo(() => data?.shifts ?? [], [data?.shifts]);
+  // Prefer a real first name from either source before falling back to a username;
+  // the dashboard payload carries no first_name, so it must not win with username.
   const displayName =
     data?.user?.first_name ||
-    data?.user?.username ||
     (user as any)?.first_name ||
+    data?.user?.username ||
     (user as any)?.username ||
     'there';
 
