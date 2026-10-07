@@ -38,7 +38,14 @@ export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: numb
       await refreshUser();
       router.replace(item.onboardingPath as any);
     } catch (err: any) {
-      setError(err?.response?.data?.role?.[0] || err?.message || 'Unable to save your account type.');
+      const data = err?.response?.data;
+      setError(
+        data?.role?.[0]
+        || data?.staff_role?.[0]
+        || data?.pharmacy_id?.[0]
+        || err?.message
+        || 'Unable to save your account type.',
+      );
     } finally {
       setSaving(null);
     }
@@ -55,7 +62,7 @@ export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: numb
       <View style={styles.actions}>
         {ACCOUNT_TYPES.map((item) => (
           <Button
-            key={item.role}
+            key={`${item.role}:${item.staffRole}`}
             mode="outlined"
             loading={saving === `${item.role}:${item.staffRole}`}
             disabled={saving != null}
