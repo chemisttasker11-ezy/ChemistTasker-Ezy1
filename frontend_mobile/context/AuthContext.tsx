@@ -176,7 +176,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // handled below
       }
 
-      const latestSession = await readStoredSession();
+      // Secure storage can fail (e.g. Keychain unavailable/locked). Never leave the app on the
+      // loading screen: an unreadable session is treated as signed out.
+      const latestSession = await readStoredSession().catch(() => null);
       const latestAccess = latestSession?.access || latestSession?.tokens?.access || null;
       const latestRefresh = latestSession?.refresh || latestSession?.tokens?.refresh || null;
       const latestUser = latestSession?.user ? normalizeUser(latestSession.user) : null;
@@ -196,7 +198,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRefresh(latestRefresh);
         setUser(latestUser);
       } else {
-        await clearStoredSession();
+        await clearStoredSession().catch(() => undefined);
         setAccess(null);
         setRefresh(null);
         setUser(null);

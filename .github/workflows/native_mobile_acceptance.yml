@@ -314,6 +314,14 @@ jobs:
             -k "system-images;android-35;google_apis;x86_64"
           test -s "$ANDROID_AVD_HOME/chemisttasker-native.ini"
           test -s "$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          # Without a device profile the AVD boots at 320x640, which pushes the camera
+          # guidance and controls below the fold. Use a realistic Pixel 6-class screen.
+          CONFIG_INI="$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          sed -i -E '/^hw\.lcd\.(width|height|density)=/d' "$CONFIG_INI"
+          echo "hw.lcd.width=1080" >> "$CONFIG_INI"
+          echo "hw.lcd.height=2400" >> "$CONFIG_INI"
+          echo "hw.lcd.density=420" >> "$CONFIG_INI"
+          grep -E '^hw\.lcd\.' "$CONFIG_INI"
           "$EMULATOR" -list-avds | grep -Fx chemisttasker-native
 
           dump_android_failure() {
@@ -457,9 +465,12 @@ jobs:
               visible: "Clock & breaks"
               timeout: 30000
           - tapOn: "Open camera"
-          - extendedWaitUntil:
-              visible: "Centre the kiosk QR inside the frame"
+          - scrollUntilVisible:
+              element:
+                text: "Centre the kiosk QR inside the frame"
+              direction: DOWN
               timeout: 30000
+          - assertVisible: "Attendance QR camera"
           YAML
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
@@ -713,10 +724,14 @@ jobs:
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-ios-derived CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-ios-derived CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build
           APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP_PATH"
           test -s "$APP_PATH/main.jsbundle"
+          # Unsigned simulator apps have no entitlements, so every Keychain call fails with
+          # -34018 and the stored session can never be read. Prove the ad-hoc signature exists.
+          codesign --verify --verbose=1 "$APP_PATH"
+          codesign -d --entitlements - "$APP_PATH" 2>/dev/null | tee /tmp/ios-entitlements.txt || true
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
