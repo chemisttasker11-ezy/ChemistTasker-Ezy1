@@ -262,19 +262,59 @@ jobs:
           test -x "$AVDMANAGER"
           test -x "$ADB"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
+          timeout 300 "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
           test -x "$EMULATOR"
           echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native -k "system-images;android-35;google_apis;x86_64"
-          nohup "$EMULATOR" -avd chemisttasker-native -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
-          "$ADB" wait-for-device
-          for attempt in $(seq 1 120); do
-            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+
+          dump_android_failure() {
+            echo "=== adb devices -l ==="
+            "$ADB" devices -l || true
+            echo "=== emulator process ==="
+            if [ -n "${EMULATOR_PID:-}" ]; then
+              ps -p "$EMULATOR_PID" -o pid=,ppid=,stat=,etime=,command= || true
+            else
+              echo "emulator PID not captured"
+            fi
+            echo "=== /tmp/android-emulator.log ==="
+            cat /tmp/android-emulator.log || true
+          }
+          trap 'status=$?; if [ "$status" -ne 0 ]; then dump_android_failure; fi' EXIT
+
+          nohup "$EMULATOR" -avd chemisttasker-native -no-window -no-audio -no-boot-anim -no-snapshot-load -no-snapshot-save -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          printf '%s\n' "$EMULATOR_PID" > /tmp/android-emulator.pid
+
+          adb_ready=0
+          for attempt in $(seq 1 90); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before ADB registration"
+              exit 1
+            fi
+            if [ "$("$ADB" get-state 2>/dev/null || true)" = "device" ]; then
+              adb_ready=1
               break
             fi
             sleep 2
           done
-          if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; then
-            cat /tmp/android-emulator.log || true
+          if [ "$adb_ready" -ne 1 ]; then
+            echo "Android emulator did not register with ADB within 180 seconds"
+            exit 1
+          fi
+
+          boot_ready=0
+          for attempt in $(seq 1 120); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before sys.boot_completed"
+              exit 1
+            fi
+            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; then
+              boot_ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$boot_ready" -ne 1 ]; then
+            echo "Android emulator did not complete boot within 240 seconds after ADB registration"
             exit 1
           fi
           "$ADB" reverse tcp:8000 tcp:8000
@@ -388,6 +428,13 @@ jobs:
           export MAESTRO_CLI_NO_ANALYTICS=1
           maestro test /tmp/native-acceptance.yaml
 
+      - name: Capture Android diagnostics
+        if: always()
+        shell: bash
+        run: |
+          adb devices -l > /tmp/adb-devices.txt 2>&1 || true
+          adb logcat -d > /tmp/android-logcat.txt 2>&1 || true
+
       - name: Upload Android diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -396,6 +443,9 @@ jobs:
           path: |
             /tmp/native-backend.log
             /tmp/android-emulator.log
+            /tmp/android-emulator.pid
+            /tmp/adb-devices.txt
+            /tmp/android-logcat.txt
             /tmp/metro.log
             /tmp/dev-client-url-android.txt
             ~/.maestro/tests
@@ -611,7 +661,7 @@ jobs:
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
-      - name: Start Metro and open iOS development project
+      - name: Start Metro for iOS development project
         shell: bash
         run: |
           set -euo pipefail
@@ -633,9 +683,6 @@ jobs:
           )
           DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
           printf '%s\n' "$DEV_URL" | tee /tmp/dev-client-url-ios.txt
-          xcrun simctl launch "$SIM_UDID" com.chemisttasker.app -EXDevMenuIsOnboardingFinished 1 -EXDevMenuShowsAtLaunch 0 -EXDevMenuShowFloatingActionButton 0 >/dev/null 2>&1 || true
-          xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
-          sleep 15
 
       - name: Install Maestro
         shell: bash
@@ -660,14 +707,14 @@ jobs:
               stopApp: true
               permissions:
                 all: allow
-          - openLink: "frontendmobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081%3FdisableOnboarding%3D1"
+          - openLink: "frontendmobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081%3FdisableOnboarding%3D1&disableFab=1&disableAutoLaunch=1"
           - extendedWaitUntil:
               visible: "Open"
-              timeout: 10000
+              timeout: 30000
           - tapOn: "Open"
           - extendedWaitUntil:
               visible: "Go to Login"
-              timeout: 30000
+              timeout: 90000
           - tapOn: "Go to Login"
           - extendedWaitUntil:
               visible: "Welcome back"
@@ -716,12 +763,26 @@ jobs:
           - extendedWaitUntil:
               visible: "Clock & breaks"
               timeout: 30000
-          - assertVisible: "Open camera"
+          - tapOn: "Open camera"
+          - extendedWaitUntil:
+              visible: "Centre the kiosk QR inside the frame"
+              timeout: 30000
           YAML
           export JAVA_HOME="$JAVA_HOME"
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
           maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
+
+      - name: Capture iOS diagnostics
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${SIM_UDID:-}" ]; then
+            xcrun simctl io "$SIM_UDID" screenshot /tmp/ios-simulator.png || true
+            xcrun simctl spawn "$SIM_UDID" log show --style compact --last 30m --predicate 'process == "ChemistTasker"' > /tmp/chemisttasker-ios.log 2>&1 || true
+          else
+            echo "SIM_UDID was not set; simulator diagnostics unavailable" > /tmp/chemisttasker-ios.log
+          fi
 
       - name: Upload iOS diagnostics
         if: always()
@@ -732,5 +793,7 @@ jobs:
             /tmp/native-backend.log
             /tmp/metro.log
             /tmp/dev-client-url-ios.txt
+            /tmp/ios-simulator.png
+            /tmp/chemisttasker-ios.log
             ~/.maestro/tests
           if-no-files-found: ignore
