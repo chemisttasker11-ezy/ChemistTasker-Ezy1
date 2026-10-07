@@ -743,9 +743,13 @@ test.describe('owner/admin persona routing hardening', () => {
     expect(url.searchParams.get('workspace')).toBe('internal');
     expect(url.searchParams.get('pharmacy_id')).toBe('155');
 
-    await expect(page.getByText('Complete your profile (optional)')).toBeVisible();
+    await expect(page.getByText('Personal profile is optional')).toBeVisible();
+    await expect(page.getByText(/remain permanently as a pharmacy-admin account/i)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Pharmacist' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Other staff' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Intern pharmacist' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dispensary technician' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pharmacy assistant' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pharmacy student' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Pharmacy owner' })).toHaveCount(0);
   });
 
