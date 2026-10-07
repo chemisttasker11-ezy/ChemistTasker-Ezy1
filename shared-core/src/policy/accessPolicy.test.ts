@@ -14,6 +14,7 @@ import {
   isInternalPharmacyMembership,
   resolveWorkspaceMode,
   normalizeAdminAssignments,
+  getAdminPersonaAssignments,
   resolveAdminPersonaAssignmentId,
   resolvePersonaSelection,
 } from './accessPolicy';
@@ -117,13 +118,52 @@ describe('shared access policy', () => {
       id: 1,
       role: 'OWNER',
       memberships: [{ pharmacy_id: 10, role: 'OWNER' }],
+      admin_assignments: [{
+        id: 11,
+        pharmacy_id: 10,
+        admin_level: 'OWNER',
+        capabilities: ['MANAGE_STAFF'],
+      }],
     };
 
     expect(hasAdminCapability(user, 'MANAGE_STAFF', { pharmacyId: 10 })).toBe(true);
     expect(hasAdminCapability(user, 'MANAGE_STAFF', { pharmacyId: 11 })).toBe(false);
     expect(hasAdminCapability(user, 'MANAGE_STAFF', { pharmacyId: 'not-a-pharmacy' })).toBe(false);
     expect(hasAdminCapability(user, 'MANAGE_STAFF')).toBe(true);
+    expect(getAdminPersonaAssignments(user)).toEqual([]);
+    expect(resolveAdminPersonaAssignmentId(user, 11)).toBeNull();
+    expect(resolvePersonaSelection(user, 'ADMIN:11')).toEqual({ mode: 'staff', assignmentId: null });
+  });
+
+  it('allows an owner to select a genuinely delegated admin assignment elsewhere', () => {
+    const user = {
+      id: 7,
+      role: 'OWNER',
+      memberships: [{ pharmacy_id: 10, role: 'OWNER' }],
+      admin_assignments: [
+        {
+          id: 71,
+          pharmacy_id: 10,
+          admin_level: 'OWNER',
+          capabilities: ['MANAGE_STAFF', 'MANAGE_ROSTER'],
+        },
+        {
+          id: 72,
+          pharmacy_id: 20,
+          admin_level: 'MANAGER',
+          capabilities: ['MANAGE_STAFF', 'MANAGE_ROSTER'],
+        },
+      ],
+    };
+
+    expect(getAdminPersonaAssignments(user)).toEqual([
+      expect.objectContaining({ id: 72, pharmacy_id: 20, admin_level: 'MANAGER' }),
+    ]);
+    expect(resolveAdminPersonaAssignmentId(user)).toBeNull();
+    expect(resolveAdminPersonaAssignmentId(user, 72)).toBe(72);
     expect(resolvePersonaSelection(user, null)).toEqual({ mode: 'staff', assignmentId: null });
+    expect(resolvePersonaSelection(user, 'ADMIN:71')).toEqual({ mode: 'staff', assignmentId: null });
+    expect(resolvePersonaSelection(user, 'ADMIN:72')).toEqual({ mode: 'admin', assignmentId: 72 });
   });
 
   it('normalizes explicit admin assignments', () => {
