@@ -8,6 +8,7 @@ const compose = read('docker-compose.yml');
 const nginx = read('nginx/templates/default.conf.template');
 const viteDocker = read('frontend_web/Dockerfile');
 const nextConfig = read('frontend_web/landing_next/next.config.ts');
+const nextApiRoot = read('frontend_web/landing_next/lib/api-root.mjs');
 const backendDocker = read('backend/Dockerfile');
 
 const failures = [];
@@ -26,6 +27,7 @@ requireText(compose, 'SECURE_SSL_REDIRECT: "True"', 'production backend must for
 requireText(compose, 'SESSION_COOKIE_SECURE: "True"', 'production session cookie must be Secure');
 requireText(compose, 'CSRF_COOKIE_SECURE: "True"', 'production CSRF cookie must be Secure');
 requireText(compose, 'JWT_COOKIE_SECURE: "True"', 'production JWT cookies must be Secure');
+requireText(compose, 'JWT_COOKIE_PATH: "/"', 'production JWT cookie path must remain root-scoped');
 requireText(compose, 'APP_ENV: "vps"', 'production backend must run with non-development APP_ENV');
 requireText(compose, 'command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "core.asgi:application"]', 'production HTTP/WebSocket server must use ASGI/Daphne');
 requireText(compose, 'RUN_MIGRATIONS: "1"', 'web deployment must own migration execution');
@@ -34,7 +36,11 @@ if ((compose.match(/RUN_MIGRATIONS: "0"/g) || []).length < 2) {
 }
 
 requireText(viteDocker, 'ARG VITE_API_URL=/api/v1', 'Vite production build must default to /api/v1');
-requireText(nextConfig, "const api=process.env.PLATFORM_API_URL||'http://127.0.0.1:8000/api/v1';", 'Next default backend root must be /api/v1');
+requireText(nextConfig, "const api=canonicalApiRoot(process.env.PLATFORM_API_URL);", 'Next backend root must be normalized to /api/v1');
+requireText(nextApiRoot, "export const DEFAULT_API_ROOT = 'http://127.0.0.1:8000/api/v1';", 'Next default backend root must be /api/v1');
+for (const name of ['lib/platform-proxy.ts', 'lib/hub-server.ts', 'lib/server-chemisttasker-api.ts']) {
+  requireText(read(`frontend_web/landing_next/${name}`), 'canonicalApiRoot(', `Next ${name} must normalize its backend root to /api/v1`);
+}
 requireText(nextConfig, "{source:'/api/v1/:path*',destination:`${api}/:path*`}", 'Next canonical same-origin API rewrite must be /api/v1');
 requireText(nextConfig, "{source:'/ws/:path*'", 'Next WebSocket rewrite must remain outside API versioning');
 requireText(nextConfig, "{source:'/media/:path*'", 'Next media rewrite must remain outside API versioning');

@@ -647,3 +647,33 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(updated.version, 2)
         self.assertEqual(updated.status, "draft")
         self.assertEqual(InvoiceRevision.objects.filter(invoice=updated).count(), 2)
+
+
+class InvoiceIssuerProfileTests(TestCase):
+    """Only workers issue invoices; other accounts get a clear 400, never a 500."""
+
+    def _generate(self, user):
+        from invoicing.views import GenerateInvoiceView
+        request = APIRequestFactory().post("/api/v1/invoices/generate/", {
+            "issuer_abn": "", "gst_registered": False, "super_rate_snapshot": "0",
+            "bank_account_name": "Acceptance", "bsb": "000000", "account_number": "00000000",
+            "bill_to_email": "billing@example.test", "cc_emails": "",
+            "external": True, "shift_ids": "[]", "line_items": "[]",
+        }, format="json")
+        force_authenticate(request, user=user)
+        return GenerateInvoiceView.as_view()(request)
+
+    def test_accounts_without_a_worker_profile_get_a_clean_validation_error(self):
+        owner = User.objects.create_user(email="issuer-owner@example.com", password="x", role="OWNER")
+        OwnerOnboarding.objects.create(user=owner)
+        org_staff = User.objects.create_user(email="issuer-org@example.com", password="x", role="ORG_STAFF")
+        for user in (owner, org_staff):
+            with self.subTest(role=user.role):
+                response = self._generate(user)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("issuer", response.data)
+
+    def test_service_raises_validation_error_not_does_not_exist(self):
+        org_staff = User.objects.create_user(email="issuer-org-svc@example.com", password="x", role="ORG_STAFF")
+        with self.assertRaises(ValidationError):
+            generate_invoice_from_shifts(user=org_staff, pharmacy_id=None, shift_ids=[], custom_lines=[], external=True)

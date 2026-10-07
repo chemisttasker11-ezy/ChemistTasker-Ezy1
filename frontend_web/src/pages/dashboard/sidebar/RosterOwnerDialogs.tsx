@@ -441,7 +441,10 @@ export default function RosterOwnerDialogs({
                 Edit Shift / Re-Assign
               </Button>
             )}
-            {isUnpublished && (
+            {isUnpublished && !isPublishedRoster && (
+              <Typography color="text.secondary">Edit this shift, then review and publish the whole week to make it visible to workers.</Typography>
+            )}
+            {isUnpublished && isPublishedRoster && (
               <>
                 <FormControl fullWidth size="small">
                   <InputLabel>Republish notification</InputLabel>

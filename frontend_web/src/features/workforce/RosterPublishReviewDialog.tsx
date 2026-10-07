@@ -100,6 +100,7 @@ export default function RosterPublishReviewDialog({
       <DialogContent dividers>
         <Stack spacing={1.5}>
           <Typography color="text.secondary">This publishes draft revision {workspace?.draft_revision}. If another manager changes the roster first, the server returns a revision conflict instead of overwriting their work.</Typography>
+          <Alert severity="info">Publishing a draft week publishes all its shifts, including individually unpublished shifts. While the week stays published, an individually unpublished shift must be republished separately.</Alert>
           {message && <Alert severity="error">{message}</Alert>}
           {errors.map((row, i) => <Alert severity="error" key={`${row.type}-${i}`}><strong>{row.type}</strong> · {row.message}</Alert>)}
           {warnings.map((row, i) => {

@@ -12,6 +12,7 @@ x-backend-environment: &backend-environment
   SESSION_COOKIE_SECURE: "True"
   CSRF_COOKIE_SECURE: "True"
   JWT_COOKIE_SECURE: "True"
+  JWT_COOKIE_PATH: "/"
   APP_ENV: "staging"
   FRONTEND_BASE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
   BACKEND_BASE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"

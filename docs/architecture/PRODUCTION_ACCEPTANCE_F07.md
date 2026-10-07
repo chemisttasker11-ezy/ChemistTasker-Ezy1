@@ -72,3 +72,33 @@ journeys still require fresh hosted execution on the repaired commit.
 - No Celery task identity changes.
 - No compatibility restoration for removed unversioned HTTP APIs.
 - PR #139 remains separate and must not be silently incorporated.
+
+## F08 roster withdrawal and release acceptance
+
+A manager can select one worker's roster slot, unpublish it, edit it in place and
+republish it independently while the remainder of the week stays published.
+Reconciliation of an already published week continues to reject individually
+withdrawn slots instead of silently restoring them.
+
+Unpublishing the whole week hides every shift and makes the week editable.
+Explicit publication of that draft week validates the entire current roster and
+atomically restores all shifts, including slots individually withdrawn earlier.
+Validation failure leaves both the week and individual withdrawals unpublished.
+Existing assignment identities, worker bindings and contract snapshots survive.
+The web and Expo flows explain the difference before whole-week publication.
+
+The F07 acceptance workflow now also runs on stacked F08 application corrections.
+Its original acceptance-only file list prevented PostgreSQL upgrade/schema checks
+from running on those corrections. The gate retains exact commit identity, the
+migration restriction and the F06 schema comparison; it runs the actual acceptance
+checks instead of rejecting application files before those checks start.
+
+### Gate frequency
+
+Ordinary pull requests use the existing Shared Core Consolidation release gate,
+Backend Finalization Contracts, Serializer Decomposition, static/mobile checks
+and repository security checks. F07 production/native acceptance was the one-off
+acceptance package for PR #149 and is now manual-only (`workflow_dispatch`): it no
+longer runs on pull requests or on pushes to main. Native Mobile Acceptance is reached
+only through F07 or its own manual/reusable entrypoints. A release candidate therefore
+receives F07/native evidence only when F07 is dispatched on that exact SHA.

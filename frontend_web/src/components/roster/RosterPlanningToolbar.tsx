@@ -207,7 +207,7 @@ export default function RosterPlanningToolbar({
   // 3. Unpublish Roster (Revert to Draft)
   const handleUnpublish = async () => {
     if (!period) return;
-    if (!window.confirm('Reverting to Draft will hide this schedule from staff until re-published. Continue?')) {
+    if (!window.confirm('Unpublish the whole week? All shifts will be hidden and editable. Publishing the week again will publish all its shifts, including any individually unpublished shifts. Continue?')) {
       return;
     }
     setActionLoading(true);
@@ -548,7 +548,7 @@ export default function RosterPlanningToolbar({
                   disabled={actionLoading || !period}
                   sx={{ fontWeight: 600, borderRadius: '8px' }}
                 >
-                  Unpublish to Draft
+                  Unpublish whole week
                 </Button>
               )}
 

@@ -260,7 +260,14 @@ def generate_invoice_from_shifts(
     try:
         ob = PharmacistOnboarding.objects.get(user=user)
     except PharmacistOnboarding.DoesNotExist:
-        ob = OtherStaffOnboarding.objects.get(user=user)
+        try:
+            ob = OtherStaffOnboarding.objects.get(user=user)
+        except OtherStaffOnboarding.DoesNotExist:
+            # Invoices are issued from a worker's own ABN/bank profile. Owners and
+            # organisation staff receive invoices; they have no issuer profile.
+            raise ValidationError({
+                "issuer": "Invoices are issued from a pharmacist or other-staff profile; this account has none."
+            })
 
     gst_registered = billing_data.get("gst_registered", False)
     if isinstance(gst_registered, str):

@@ -43,6 +43,7 @@ services:
       SESSION_COOKIE_SECURE: "True"
       CSRF_COOKIE_SECURE: "True"
       JWT_COOKIE_SECURE: "True"
+      JWT_COOKIE_PATH: "/"
       COLLECT_STATIC: "1"
       RUN_MIGRATIONS: "1"
       APP_ENV: "vps"

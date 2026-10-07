@@ -11,10 +11,6 @@ export function updateOnboarding(role: string, data: unknown) {
     const body = data instanceof FormData || typeof data === 'string' ? data : JSON.stringify(data);
     return fetchApi(`/${safeRole}/onboarding/me/`, { method: 'PATCH', body });
 }
-export function createOnboarding(role: string, data: unknown) {
-    const safeRole = role === 'other_staff' ? 'otherstaff' : role;
-    return fetchApi(`/${safeRole}/onboarding/`, { method: 'POST', body: JSON.stringify(data) });
-}
 export function getOnboardingDetail(rawRole: string) {
     const safeRole = rawRole === 'other_staff' ? 'otherstaff' : rawRole;
     return fetchApi<OnboardingApi>(`/${safeRole}/onboarding/me/`);

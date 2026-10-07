@@ -759,6 +759,12 @@ export interface ShiftInterestApi {
     user_last_name?: string | null;
     average_rating?: number | null;
     rating?: number | null;
+    short_bio?: string | null;
+    expressed_at?: string | null;
+    pending_confirmation?: boolean;
+    pending_offer_id?: number | null;
+    awaiting_payment?: boolean;
+    awaiting_payment_offer_id?: number | null;
 }
 
 export interface ShiftShareLinkApi {
@@ -1468,21 +1474,6 @@ export interface UserAvailabilityPayload {
     notify_new_shifts?: boolean;
     notes?: string | null;
 }
-
-export interface ShiftApplicationApi {
-    id: number;
-    pharmacist_name: string;
-    pharmacist_email?: string | null;
-    pharmacist_phone?: string | null;
-    ahpra_number?: string | null;
-    experience_years?: number | null;
-    rating?: number | null;
-    cover_letter?: string | null;
-    applied_date: string;
-    status: string;
-}
-
-export type ShiftApplication = CamelCasedPropertiesDeep<ShiftApplicationApi>;
 
 export interface OwnerShiftSummaryApi {
     id: number;

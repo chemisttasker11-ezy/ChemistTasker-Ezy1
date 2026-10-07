@@ -137,6 +137,9 @@ jobs:
         working-directory: frontend_web/landing_next
       - run: npm run typecheck
         working-directory: frontend_web/landing_next
+      - name: Canonical API root normalization
+        run: node --test lib/api-root.test.mjs
+        working-directory: frontend_web/landing_next
       - run: npm run build
         working-directory: frontend_web/landing_next
 
@@ -192,13 +195,15 @@ jobs:
       - name: Auth and account contracts
         run: python backend/manage.py test users billing.tests --settings=core.contract_test_settings
       - name: Marketplace contracts
-        run: python backend/manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
+        run: python backend/manage.py test marketplace.tests marketplace.test_listing_policy ethical_marketplace.tests ethical_marketplace.test_finalisation --settings=core.contract_test_settings
       - name: Large-module ratchet
         run: python backend/manage.py test core.test_module_size_ratchet --settings=core.contract_test_settings
       - name: Public content contracts
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
         run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
+      - name: Real PDF rendering contract
+        run: python backend/manage.py test core.test_pdf_rendering_contract --settings=core.contract_test_settings
       - name: Kernel and domain app tests
         run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
@@ -307,6 +312,7 @@ jobs:
           node-version: "22"
       - run: node scripts/audit-architecture-boundaries.mjs
       - run: node scripts/audit-shared-core-package.mjs
+      - run: node --test scripts/audit-api-v1-cutover.test.mjs
       - run: node scripts/audit-api-v1-cutover.mjs
 
   kiosk:

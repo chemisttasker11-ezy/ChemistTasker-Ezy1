@@ -129,46 +129,197 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertIsNotNone(delivery.processed_at)
 
 class OrganizationBillingScopeTests(TestCase):
-    def test_only_owner_and_org_admin_can_manage_billing(self):
-        from billing.utils import resolve_billing_account, user_can_manage_billing_for_pharmacy
+    def setUp(self):
         from client_profile.characterization_support import make_owner_with_pharmacy, make_user
         from organizations.models import Organization, PharmacyAdmin
         from users.models import OrganizationMembership
 
-        organization = Organization.objects.create(name="Billing Org")
-        owner, pharmacy = make_owner_with_pharmacy("Billing Org Pharmacy")
-        pharmacy.organization = organization
-        pharmacy.save(update_fields=["organization"])
+        self.OrganizationMembership = OrganizationMembership
+        self.PharmacyAdmin = PharmacyAdmin
+        self.organization = Organization.objects.create(name="Billing Org")
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Billing Org Pharmacy")
+        self.pharmacy.organization = self.organization
+        self.pharmacy.save(update_fields=["organization"])
 
-        self.assertTrue(user_can_manage_billing_for_pharmacy(owner, pharmacy))
-
-        org_admin = make_user("ORG_STAFF")
-        OrganizationMembership.objects.create(user=org_admin, organization=organization, role="ORG_ADMIN")
-        self.assertTrue(user_can_manage_billing_for_pharmacy(org_admin, pharmacy))
-
-        chief = make_user("ORG_STAFF")
-        chief_membership = OrganizationMembership.objects.create(
-            user=chief, organization=organization, role="CHIEF_ADMIN", admin_level="MANAGER",
+        self.org_admin = make_user("ORG_STAFF")
+        OrganizationMembership.objects.create(
+            user=self.org_admin, organization=self.organization, role="ORG_ADMIN",
         )
-        chief_membership.pharmacies.add(pharmacy)
-        self.assertFalse(user_can_manage_billing_for_pharmacy(chief, pharmacy))
-
-        region = make_user("ORG_STAFF")
-        region_membership = OrganizationMembership.objects.create(
-            user=region, organization=organization, role="REGION_ADMIN", admin_level="MANAGER",
+        self.chief = make_user("ORG_STAFF")
+        OrganizationMembership.objects.create(
+            user=self.chief, organization=self.organization, role="CHIEF_ADMIN", admin_level="MANAGER",
         )
-        region_membership.pharmacies.add(pharmacy)
-        self.assertFalse(user_can_manage_billing_for_pharmacy(region, pharmacy))
+        self.region_manager = make_user("ORG_STAFF")
+        self.region_manager_membership = OrganizationMembership.objects.create(
+            user=self.region_manager, organization=self.organization, role="REGION_ADMIN", admin_level="MANAGER",
+        )
+        self.region_manager_membership.pharmacies.add(self.pharmacy)
+        self.region_comms = make_user("ORG_STAFF")
+        self.region_comms_membership = OrganizationMembership.objects.create(
+            user=self.region_comms, organization=self.organization, role="REGION_ADMIN",
+            admin_level="COMMUNICATION_MANAGER",
+        )
+        self.region_comms_membership.pharmacies.add(self.pharmacy)
+        self.unassigned_region = make_user("ORG_STAFF")
+        OrganizationMembership.objects.create(
+            user=self.unassigned_region, organization=self.organization, role="REGION_ADMIN", admin_level="MANAGER",
+        )
 
-        pharmacy_manager = make_user("PHARMACY_MANAGER")
+        self.pharmacy_manager = make_user("PHARMACY_MANAGER")
         PharmacyAdmin.objects.create(
-            user=pharmacy_manager,
-            pharmacy=pharmacy,
-            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+            user=self.pharmacy_manager, pharmacy=self.pharmacy,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER, is_active=True,
+        )
+        self.roster_manager = make_user("PHARMACIST")
+        PharmacyAdmin.objects.create(
+            user=self.roster_manager, pharmacy=self.pharmacy,
+            admin_level=PharmacyAdmin.AdminLevel.ROSTER_MANAGER, is_active=True,
+        )
+        self.comms_admin = make_user("PHARMACIST")
+        PharmacyAdmin.objects.create(
+            user=self.comms_admin, pharmacy=self.pharmacy,
+            admin_level=PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER, is_active=True,
+        )
+        self.unrelated = make_user("PHARMACIST")
+
+    def test_subscription_authority_stays_owner_and_org_admin_only(self):
+        from billing.utils import user_can_manage_billing_for_pharmacy
+
+        self.assertTrue(user_can_manage_billing_for_pharmacy(self.owner, self.pharmacy))
+        self.assertTrue(user_can_manage_billing_for_pharmacy(self.org_admin, self.pharmacy))
+        for user in (
+            self.chief,
+            self.region_manager,
+            self.region_comms,
+            self.unassigned_region,
+            self.pharmacy_manager,
+            self.roster_manager,
+            self.comms_admin,
+            self.unrelated,
+        ):
+            with self.subTest(user=user.email):
+                self.assertFalse(user_can_manage_billing_for_pharmacy(user, self.pharmacy))
+
+    def test_shift_charge_payers_follow_operational_scope(self):
+        from billing.utils import user_can_pay_shift_charge_for_pharmacy
+
+        for user in (
+            self.owner,
+            self.org_admin,
+            self.chief,
+            self.region_manager,
+            self.pharmacy_manager,
+            self.roster_manager,
+        ):
+            with self.subTest(allowed=user.email):
+                self.assertTrue(user_can_pay_shift_charge_for_pharmacy(user, self.pharmacy))
+
+        for user in (
+            self.region_comms,
+            self.unassigned_region,
+            self.comms_admin,
+            self.unrelated,
+        ):
+            with self.subTest(refused=user.email):
+                self.assertFalse(user_can_pay_shift_charge_for_pharmacy(user, self.pharmacy))
+
+        from client_profile.characterization_support import make_user
+        ownerless = Pharmacy.objects.create(name="Ownerless Billing Pharmacy")
+        ownerless_manager = make_user("PHARMACY_MANAGER")
+        self.PharmacyAdmin.objects.create(
+            user=ownerless_manager,
+            pharmacy=ownerless,
+            admin_level=self.PharmacyAdmin.AdminLevel.MANAGER,
             is_active=True,
         )
-        self.assertFalse(user_can_manage_billing_for_pharmacy(pharmacy_manager, pharmacy))
+        self.assertFalse(
+            user_can_pay_shift_charge_for_pharmacy(ownerless_manager, ownerless),
+            "delegated payer authority must not manufacture a billing owner for an ownerless standalone pharmacy",
+        )
 
-        account = resolve_billing_account(pharmacy, acting_user=chief)
-        self.assertEqual(account["billing_contact"], org_admin, "Chief Admin must never become the billing account holder")
+    def test_operational_payer_never_becomes_billing_contact(self):
+        from billing.utils import resolve_billing_account
+
+        for payer in (self.chief, self.region_manager, self.pharmacy_manager, self.roster_manager):
+            with self.subTest(payer=payer.email):
+                account = resolve_billing_account(self.pharmacy, acting_user=payer)
+                self.assertEqual(account["scope"], "organization")
+                self.assertEqual(account["billing_contact"], self.org_admin)
+
+    @patch('billing.views.get_billing_state_for_account', return_value='PRE_LIVE')
+    @patch('billing.views._finalize_pending_offers_for_shift', return_value=(0, []))
+    @patch('shifts.emails.send_shift_payment_finalized_notifications')
+    def test_http_shift_charge_allows_operational_payer_but_subscription_stays_restricted(
+        self, notify, finalize, billing_state,
+    ):
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.owner,
+            role_needed='ASSISTANT',
+            employment_type='LOCUM',
+            payment_status='PENDING',
+        )
+        client = APIClient()
+        client.force_authenticate(self.chief)
+
+        subscription = client.get(
+            reverse('api_v1:billing:current_subscription'),
+            {'pharmacy_id': self.pharmacy.pk},
+        )
+        self.assertEqual(subscription.status_code, 403, subscription.data)
+
+        charge = client.post(
+            reverse('api_v1:billing:charge_fulfillment', args=[shift.pk]),
+            {},
+            format='json',
+        )
+        self.assertEqual(charge.status_code, 200, charge.data)
+        finalize.assert_called_once()
+        notify.assert_called_once()
+
+    def test_http_cancellation_penalty_follows_the_shift_charge_payer_policy(self):
+        """charge_penalty uses the same payer authority as fulfilment, at the HTTP boundary."""
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.owner,
+            role_needed='ASSISTANT',
+            employment_type='LOCUM',
+            payment_status='PENDING',
+        )
+        url = reverse('api_v1:billing:charge_penalty', args=[shift.pk])
+        allowed = [self.owner, self.org_admin, self.chief, self.region_manager, self.pharmacy_manager, self.roster_manager]
+        refused = [self.region_comms, self.unassigned_region, self.comms_admin, self.unrelated]
+        for user in allowed + refused:
+            with self.subTest(user=user.email):
+                client = APIClient()
+                client.force_authenticate(user)
+                response = client.post(url, {}, format='json')
+                # No assignments means no penalty: authorised payers get 200 without reaching Stripe.
+                self.assertEqual(response.status_code, 200 if user in allowed else 403, response.data)
+
+    def test_http_shift_charge_rejects_communication_only_region_admin(self):
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.owner,
+            role_needed='ASSISTANT',
+            employment_type='LOCUM',
+            payment_status='PENDING',
+        )
+        client = APIClient()
+        client.force_authenticate(self.region_comms)
+        response = client.post(
+            reverse('api_v1:billing:charge_fulfillment', args=[shift.pk]),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403, response.data)
 

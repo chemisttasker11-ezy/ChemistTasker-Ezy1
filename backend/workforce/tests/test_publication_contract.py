@@ -1,5 +1,5 @@
 """Actual HTTP contracts for one revision-aware roster publication authority."""
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from queue import Queue
 from threading import Barrier, Thread
 from unittest import mock, skipUnless
@@ -10,6 +10,7 @@ from django.test import TestCase, TransactionTestCase
 from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy
+from shifts.models import Shift, ShiftSlot
 from workforce.models import RosterOperation, RosterPeriod, RosterPublicationAudit, RosterRevisionState
 from workforce.roster.revisions import bump_roster_revision, get_revision_state, warning_key
 
@@ -162,6 +163,130 @@ class PublicationHttpContracts(PublicationFixture, TestCase):
         stale = {**command, 'operation_id': str(uuid4())}
         refused = self.client.post(BASES[1] + 'publish/', stale, format='json')
         self.assertEqual(refused.status_code, 409, refused.data)
+        self.assertEqual(RosterPublicationAudit.objects.count(), 1)
+
+    def test_whole_week_publish_requires_explicit_republish_of_individually_unpublished_shift(self):
+        from workforce.roster.publication import unpublish_roster_shift
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, role_needed='PHARMACIST', created_by=self.owner, is_roster_container=True,
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=self.period.week_start,
+            start_time=time(9),
+            end_time=time(17),
+            roster_period=self.period,
+        )
+
+        first = self.client.post(BASES[0] + 'publish/', self.payload(), format='json')
+        self.assertEqual(first.status_code, 200, first.data)
+        first_published_revision = first.data['published_revision']
+
+        unpublish_roster_shift(slot, self.owner)
+        slot.refresh_from_db()
+        self.assertIsNotNone(slot.unpublished_at)
+
+        command = self.payload()
+        review = self.client.post(BASES[1] + 'validate/', {
+            'period_id': command['period_id'],
+            'expected_revision': command['expected_revision'],
+        }, format='json')
+        self.assertEqual(review.status_code, 200, review.data)
+        refused = self.client.post(BASES[1] + 'publish/', command, format='json')
+        self.assertEqual(refused.status_code, 409, refused.data)
+        self.assertEqual(refused.data['code'], 'ROSTER_SHIFT_REPUBLISH_REQUIRED')
+        self.assertEqual(refused.data['unpublished_slot_ids'], [slot.pk])
+        state = get_revision_state(self.period)
+        self.assertEqual(state.published_revision, first_published_revision)
+        self.assertGreater(state.draft_revision, first_published_revision)
+        self.assertEqual(RosterOperation.objects.count(), 1)
+
+        republished = self.client.post(BASES[1] + 'shift/republish/', {
+            'slot_id': slot.pk,
+            'notify': 'none',
+        }, format='json')
+        self.assertEqual(republished.status_code, 200, republished.data)
+        slot.refresh_from_db()
+        self.assertIsNone(slot.unpublished_at)
+
+        command = self.payload()
+        review = self.client.post(BASES[1] + 'validate/', {
+            'period_id': command['period_id'],
+            'expected_revision': command['expected_revision'],
+        }, format='json')
+        self.assertEqual(review.status_code, 200, review.data)
+        reconciled = self.client.post(BASES[1] + 'publish/', command, format='json')
+        self.assertEqual(reconciled.status_code, 200, reconciled.data)
+        self.assertEqual(reconciled.data['published_revision'], reconciled.data['draft_revision'])
+
+    def test_withdraw_edit_and_republish_whole_week_restores_individual_shift(self):
+        from client_profile.characterization_support import make_user
+        from memberships.models import Membership
+        from shifts.models import ShiftSlotAssignment
+        from workforce.roster.publication import (
+            get_worker_published_roster, unpublish_roster_period, unpublish_roster_shift,
+        )
+
+        workers = [make_user('PHARMACIST'), make_user('PHARMACIST')]
+        slots, assignments = [], []
+        for index, worker in enumerate(workers):
+            Membership.objects.create(user=worker, pharmacy=self.pharmacy, role='PHARMACIST',
+                                      employment_type='FULL_TIME', status=Membership.Status.ACCEPTED,
+                                      is_active=True)
+            shift = Shift.objects.create(pharmacy=self.pharmacy, role_needed='PHARMACIST',
+                                         created_by=self.owner, is_roster_container=True)
+            slot = ShiftSlot.objects.create(shift=shift, date=self.period.week_start + timedelta(days=index),
+                                           start_time=time(9), end_time=time(17), roster_period=self.period)
+            slots.append(slot)
+            assignments.append(ShiftSlotAssignment.objects.create(
+                shift=shift, slot=slot, slot_date=slot.date, user=worker, is_rostered=True,
+            ))
+        published = self.client.post(BASES[0] + 'publish/', self.payload(), format='json')
+        self.assertEqual(published.status_code, 200, published.data)
+        unpublish_roster_shift(slots[0], self.owner)
+        self.assertEqual(get_worker_published_roster(workers[0]), [])
+        self.assertEqual([row.pk for row in get_worker_published_roster(workers[1])], [assignments[1].pk])
+
+        unpublish_roster_period(self.period, self.owner)
+        self.assertEqual(get_worker_published_roster(workers[1]), [])
+        slots[0].refresh_from_db()
+        self.assertIsNotNone(slots[0].unpublished_at)
+        # Use the same targeted editor request as the clients. Assignment identity
+        # and the other worker's shift must survive the whole-week withdrawal.
+        edited = self.client.patch(f'/api/v1/roster-shifts/{slots[0].shift_id}/',
+                                  {'slots': [{'id': slots[0].pk, 'end_time': '18:00'}]}, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        republished = self.client.post(BASES[1] + 'publish/', self.payload(), format='json')
+        self.assertEqual(republished.status_code, 200, republished.data)
+        slots[0].refresh_from_db()
+        slots[1].refresh_from_db()
+        self.assertIsNone(slots[0].unpublished_at)
+        self.assertEqual(slots[0].end_time, time(18))
+        self.assertEqual(slots[1].end_time, time(17))
+        for worker, assignment in zip(workers, assignments):
+            self.assertEqual([row.pk for row in get_worker_published_roster(worker)], [assignment.pk])
+        self.assertEqual(RosterPublicationAudit.objects.count(), 2)
+
+    def test_invalid_whole_week_republication_keeps_individual_withdrawal(self):
+        from workforce.roster.publication import unpublish_roster_period, unpublish_roster_shift
+
+        shift = Shift.objects.create(pharmacy=self.pharmacy, role_needed='PHARMACIST',
+                                     created_by=self.owner, is_roster_container=True)
+        slot = ShiftSlot.objects.create(shift=shift, date=self.period.week_start,
+                                       start_time=time(9), end_time=time(17), roster_period=self.period)
+        self.assertEqual(self.client.post(BASES[0] + 'publish/', self.payload(), format='json').status_code, 200)
+        unpublish_roster_shift(slot, self.owner)
+        unpublish_roster_period(self.period, self.owner)
+        validation = {'is_valid': False, 'errors': [{'type': 'OVERLAP', 'message': 'Overlap'}],
+                      'warnings': [], 'total_assignments': 0, 'total_workers': 0}
+        with mock.patch('workforce.roster.publication.validate_roster_period', return_value=validation):
+            refused = self.client.post(BASES[1] + 'publish/', self.payload(), format='json')
+        self.assertEqual(refused.status_code, 409, refused.data)
+        self.period.refresh_from_db()
+        slot.refresh_from_db()
+        self.assertEqual(self.period.status, RosterPeriod.Status.DRAFT)
+        self.assertIsNotNone(slot.unpublished_at)
         self.assertEqual(RosterPublicationAudit.objects.count(), 1)
 
     def test_invalid_commands_and_actual_blockers_create_no_durable_operation(self):

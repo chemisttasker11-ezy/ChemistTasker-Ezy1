@@ -1,4 +1,4 @@
-import type { OwnerShiftSummaryApi, ShiftApi, ShiftApplicationApi, ShiftAssignmentApi, ShiftCounterOfferApi, ShiftCounterOfferSlotApi, ShiftInterestApi, ShiftMemberStatusApi, ShiftRatingCommentApi, ShiftRatingSummaryApi, ShiftShareLinkApi, ShiftSlotApi } from '../../types';
+import type { OwnerShiftSummaryApi, ShiftApi, ShiftAssignmentApi, ShiftCounterOfferApi, ShiftCounterOfferSlotApi, ShiftInterestApi, ShiftMemberStatusApi, ShiftRatingCommentApi, ShiftRatingSummaryApi, ShiftShareLinkApi, ShiftSlotApi } from '../../types';
 /** Domain-owned operations extracted from the established shared API. */
 import { camelCaseKeysDeep, ensureArray } from '../../utils/serialization';
 const mapShiftSlot = (api: ShiftSlotApi) => camelCaseKeysDeep(api);
@@ -67,5 +67,4 @@ export const mapShift = (api: ShiftApi) => {
         superPercent: api.super_percent ?? base.superPercent ?? null,
     };
 };
-export const mapShiftApplication = (api: ShiftApplicationApi) => camelCaseKeysDeep(api);
 export const mapOwnerShiftSummary = (api: OwnerShiftSummaryApi) => camelCaseKeysDeep(api);
