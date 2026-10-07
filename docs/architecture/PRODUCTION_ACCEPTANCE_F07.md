@@ -34,6 +34,25 @@ is explicitly not a gate; controlled CI is the acceptance authority.
    Existing repository security, CodeQL, backend, serializer, shared-core, Vite, Next, mobile and
    kiosk workflows remain independently required before merge.
 
+## Native harness repair — 2026-10-07
+
+Run `37554644023`, head `7c89e1b`, failed on iOS before application login.
+The uploaded simulator screenshot shows the Expo development-server launcher;
+Metro had not produced the application bundle during the failed assertion.
+Android failed in emulator startup and then stalled in unbounded ADB diagnostics.
+
+Native acceptance now builds Android Release and iOS simulator Release with
+embedded JavaScript, asserts the bundle exists, and launches the installed app
+directly. No Metro server or Expo launcher handoff participates in login or
+restart persistence. Simulator signing and test-only Firebase descriptors remain
+isolated; generated HTTP allowances apply only to the loopback smoke backend.
+Android uses an explicit emulator serial, bounded ADB calls and boot deadlines,
+with bounded failure diagnostics. The pinned Maestro version and all login,
+persona, pharmacy-selection persistence, deep-link and camera assertions remain.
+
+This is a harness correction, not runtime acceptance evidence. Real Android and
+iOS CI must pass on the final repaired head before F07 can close.
+
 ## Non-goals
 
 - No database model/table additions.
