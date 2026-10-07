@@ -1,112 +1,140 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { Text, Surface, Avatar, Button, Chip, Divider, List } from 'react-native-paper';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Avatar, Button, Chip, Divider, List, Surface, Text } from 'react-native-paper';
 import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getWorkerShiftRequests, approveWorkerShiftRequest, rejectWorkerShiftRequest } from '@chemisttasker/shared-core';
+import {
+    acceptShiftCandidateService,
+    fetchShiftInterests,
+    revealShiftInterestService,
+    type ShiftInterest,
+} from '@chemisttasker/shared-core';
 
-interface Application {
-    id: number;
-    pharmacist_name: string;
-    pharmacist_email?: string;
-    pharmacist_phone?: string;
-    ahpra_number?: string;
-    experience_years?: number;
-    rating?: number;
-    cover_letter?: string;
-    applied_date: string;
-    status: string;
+function formatDateTime(value?: string | null) {
+    if (!value) return 'Not recorded';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('en-AU', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
+function isAnonymousInterest(interest: ShiftInterest) {
+    if (interest.revealed || interest.userDetail) return false;
+    const userLabel = typeof interest.user === 'string' ? interest.user : '';
+    return userLabel === 'Anonymous Interest User' || interest.displayName === 'Anonymous Interest User';
+}
+
+function candidateName(interest: ShiftInterest) {
+    if (isAnonymousInterest(interest)) return 'Anonymous candidate';
+
+    const detail = interest.userDetail;
+    if (detail) {
+        const fullName = [detail.firstName, detail.lastName].filter(Boolean).join(' ').trim();
+        if (fullName) return fullName;
+    }
+
+    if (typeof interest.user === 'string' && interest.user.trim()) return interest.user;
+    return interest.displayName || 'Candidate';
+}
+
+function initials(name: string) {
+    if (name === 'Anonymous candidate') return '?';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('') || 'C';
 }
 
 export default function ShiftApplicationsScreen() {
-    const { id } = useLocalSearchParams();
-    const [applications, setApplications] = useState<Application[]>([]);
+    const { id } = useLocalSearchParams<{ id?: string }>();
+    const [interests, setInterests] = useState<ShiftInterest[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [actionKey, setActionKey] = useState<string | null>(null);
 
-    const fetchApplications = useCallback(async () => {
+    const shiftId = Number(id);
+
+    const fetchCandidates = useCallback(async () => {
+        if (!Number.isFinite(shiftId)) {
+            setError('Invalid shift.');
+            setLoading(false);
+            return;
+        }
+
         try {
             setError('');
-            const response = await getWorkerShiftRequests({});
-            const list = Array.isArray((response as any)?.results)
-                ? (response as any).results
-                : Array.isArray(response)
-                    ? (response as any)
-                    : [];
-            const filtered = list.filter((req: any) => {
-                const shiftId = (req as any).shift_id ?? (req as any).shift ?? (req as any).shift?.id;
-                return String(shiftId) === String(id);
-            });
-            setApplications(filtered as any);
-        } catch (err: any) {
-            console.error('Error fetching applications:', err);
-            setError('Failed to load applications');
+            const response = await fetchShiftInterests({ shiftId });
+            setInterests(response);
+        } catch (err) {
+            console.error('Error fetching shift interests:', err);
+            setError('Failed to load candidate responses.');
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [shiftId]);
 
     useEffect(() => {
-        void fetchApplications();
-    }, [fetchApplications]);
+        void fetchCandidates();
+    }, [fetchCandidates]);
 
-    const handleAccept = (applicationId: number) => {
+    const handleReveal = async (interest: ShiftInterest) => {
+        if (interest.userId == null || !Number.isFinite(shiftId)) {
+            Alert.alert('Unable to reveal', 'This candidate response is missing its worker identity.');
+            return;
+        }
+
+        const key = `reveal_${interest.id}`;
+        setActionKey(key);
+        try {
+            await revealShiftInterestService(shiftId, {
+                userId: interest.userId,
+                slotId: interest.slotId ?? null,
+            });
+            await fetchCandidates();
+        } catch (err) {
+            console.error('Failed to reveal candidate:', err);
+            Alert.alert('Error', 'Failed to reveal candidate.');
+        } finally {
+            setActionKey(null);
+        }
+    };
+
+    const handleSendOffer = (interest: ShiftInterest) => {
+        if (interest.userId == null || !Number.isFinite(shiftId)) {
+            Alert.alert('Unable to continue', 'This candidate response is missing its worker identity.');
+            return;
+        }
+
         Alert.alert(
-            'Accept Application',
-            'Are you sure you want to accept this application?',
+            'Send offer',
+            `Send an offer to ${candidateName(interest)} for this shift?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Accept',
+                    text: 'Send offer',
                     onPress: async () => {
+                        const key = `offer_${interest.id}`;
+                        setActionKey(key);
                         try {
-                            await approveWorkerShiftRequest(applicationId);
-                            fetchApplications();
-                            Alert.alert('Success', 'Application accepted!');
-                        } catch (err: any) {
-                            console.error('Failed to accept application', err);
-                            Alert.alert('Error', 'Failed to accept application');
+                            await acceptShiftCandidateService(shiftId, {
+                                userId: interest.userId as number,
+                                slotId: interest.slotId ?? null,
+                            });
+                            await fetchCandidates();
+                            Alert.alert('Offer sent', 'Waiting for the candidate to confirm the offer.');
+                        } catch (err) {
+                            console.error('Failed to send candidate offer:', err);
+                            Alert.alert('Error', 'Failed to send offer.');
+                        } finally {
+                            setActionKey(null);
                         }
                     },
                 },
-            ]
+            ],
         );
-    };
-
-    const handleReject = (applicationId: number) => {
-        Alert.alert(
-            'Reject Application',
-            'Are you sure you want to reject this application?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Reject',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await rejectWorkerShiftRequest(applicationId);
-                            fetchApplications();
-                        } catch (err: any) {
-                            console.error('Failed to reject application', err);
-                            Alert.alert('Error', 'Failed to reject application');
-                        }
-                    },
-                },
-            ]
-        );
-    };
-
-    const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-AU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-        });
-    };
-
-    const getInitials = (name: string) => {
-        return name.split(' ').map(n => n[0]).join('').toUpperCase();
     };
 
     if (loading) {
@@ -114,7 +142,7 @@ export default function ShiftApplicationsScreen() {
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#1976d2" />
-                    <Text style={styles.loadingText}>Loading applications...</Text>
+                    <Text style={styles.loadingText}>Loading candidate responses...</Text>
                 </View>
             </SafeAreaView>
         );
@@ -124,141 +152,130 @@ export default function ShiftApplicationsScreen() {
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
             <View style={styles.header}>
                 <Text variant="headlineSmall" style={styles.title}>
-                    Applications ({applications.length})
+                    Candidate responses ({interests.length})
                 </Text>
                 <Text variant="bodyMedium" style={styles.subtitle}>
-                    Review and manage shift applications
+                    Review expressions of interest and send offers from the live shift workflow.
                 </Text>
             </View>
 
             {error ? (
                 <Surface style={styles.errorContainer} elevation={1}>
                     <Text style={styles.errorText}>{error}</Text>
-                    <Button onPress={fetchApplications}>Retry</Button>
+                    <Button onPress={fetchCandidates}>Retry</Button>
                 </Surface>
             ) : null}
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                {applications.length === 0 ? (
+                {interests.length === 0 ? (
                     <Surface style={styles.emptyContainer} elevation={0}>
                         <Text variant="titleMedium" style={styles.emptyTitle}>
-                            No Applications Yet
+                            No candidate responses yet
                         </Text>
                         <Text variant="bodyMedium" style={styles.emptyText}>
-                            Qualified pharmacists will be able to apply once your shift is posted
+                            Expressions of interest will appear here when workers respond to this shift.
                         </Text>
                     </Surface>
                 ) : (
-                    applications.map((application) => (
-                        <Surface key={application.id} style={styles.card} elevation={2}>
-                            {/* Header */}
-                            <View style={styles.cardHeader}>
-                                <View style={styles.applicantInfo}>
-                                    <Avatar.Text
-                                        size={50}
-                                        label={getInitials(application.pharmacist_name)}
-                                        style={styles.avatar}
-                                    />
-                                    <View style={styles.applicantDetails}>
-                                        <Text variant="titleMedium" style={styles.applicantName}>
-                                            {application.pharmacist_name}
-                                        </Text>
-                                        <View style={styles.badges}>
-                                            {application.rating && (
-                                                <Chip icon="star" style={styles.ratingChip} compact>
-                                                    {application.rating.toFixed(1)}
-                                                </Chip>
-                                            )}
-                                            {application.experience_years && (
-                                                <Chip icon="briefcase" compact>
-                                                    {application.experience_years} yrs
-                                                </Chip>
-                                            )}
+                    interests.map((interest) => {
+                        const name = candidateName(interest);
+                        const anonymous = isAnonymousInterest(interest);
+                        const pendingConfirmation = Boolean(interest.pendingConfirmation);
+                        const awaitingPayment = Boolean(interest.awaitingPayment);
+                        const busyReveal = actionKey === `reveal_${interest.id}`;
+                        const busyOffer = actionKey === `offer_${interest.id}`;
+
+                        return (
+                            <Surface key={interest.id} style={styles.card} elevation={2}>
+                                <View style={styles.cardHeader}>
+                                    <View style={styles.applicantInfo}>
+                                        <Avatar.Text
+                                            size={50}
+                                            label={initials(name)}
+                                            style={styles.avatar}
+                                        />
+                                        <View style={styles.applicantDetails}>
+                                            <Text variant="titleMedium" style={styles.applicantName}>
+                                                {name}
+                                            </Text>
+                                            <View style={styles.badges}>
+                                                {awaitingPayment ? (
+                                                    <Chip compact style={styles.awaitingPaymentChip}>Awaiting payment</Chip>
+                                                ) : pendingConfirmation ? (
+                                                    <Chip compact style={styles.pendingChip}>Offer pending</Chip>
+                                                ) : (
+                                                    <Chip compact style={styles.interestedChip}>Interested</Chip>
+                                                )}
+                                            </View>
                                         </View>
                                     </View>
                                 </View>
-                            </View>
 
-                            <Divider style={styles.divider} />
+                                <Divider style={styles.divider} />
 
-                            {/* Details */}
-                            <List.Section style={styles.details}>
-                                {application.ahpra_number && (
+                                <List.Section style={styles.details}>
                                     <List.Item
-                                        title="AHPRA Number"
-                                        description={application.ahpra_number}
-                                        left={props => <List.Icon {...props} icon="certificate" />}
+                                        title="Requested slot"
+                                        description={interest.slotTime || 'Whole shift'}
+                                        left={props => <List.Icon {...props} icon="calendar-clock" />}
                                     />
-                                )}
-                                <List.Item
-                                    title="Applied"
-                                    description={formatDate(application.applied_date)}
-                                    left={props => <List.Icon {...props} icon="calendar" />}
-                                />
-                                {application.pharmacist_email && (
                                     <List.Item
-                                        title="Email"
-                                        description={application.pharmacist_email}
-                                        left={props => <List.Icon {...props} icon="email" />}
+                                        title="Expressed interest"
+                                        description={formatDateTime(interest.expressedAt)}
+                                        left={props => <List.Icon {...props} icon="clock-outline" />}
                                     />
-                                )}
-                            </List.Section>
+                                    {interest.userDetail?.email ? (
+                                        <List.Item
+                                            title="Email"
+                                            description={interest.userDetail.email}
+                                            left={props => <List.Icon {...props} icon="email" />}
+                                        />
+                                    ) : null}
+                                </List.Section>
 
-                            {/* Cover Letter */}
-                            {application.cover_letter && (
-                                <>
-                                    <Divider style={styles.divider} />
-                                    <View style={styles.coverLetterContainer}>
-                                        <Text variant="labelMedium" style={styles.coverLetterLabel}>
-                                            Cover Letter
-                                        </Text>
-                                        <Text variant="bodyMedium" style={styles.coverLetter}>
-                                            {application.cover_letter}
-                                        </Text>
-                                    </View>
-                                </>
-                            )}
+                                {interest.shortBio ? (
+                                    <>
+                                        <Divider style={styles.divider} />
+                                        <View style={styles.bioContainer}>
+                                            <Text variant="labelMedium" style={styles.bioLabel}>Profile</Text>
+                                            <Text variant="bodyMedium" style={styles.bioText}>{interest.shortBio}</Text>
+                                        </View>
+                                    </>
+                                ) : null}
 
-                            {/* Actions */}
-                            {application.status === 'PENDING' && (
-                                <>
-                                    <Divider style={styles.divider} />
-                                    <View style={styles.actions}>
-                                        <Button
-                                            mode="outlined"
-                                            textColor="#d32f2f"
-                                            onPress={() => handleReject(application.id)}
-                                            style={styles.actionButton}
-                                        >
-                                            Reject
-                                        </Button>
+                                <Divider style={styles.divider} />
+                                <View style={styles.actions}>
+                                    {anonymous ? (
                                         <Button
                                             mode="contained"
-                                            onPress={() => handleAccept(application.id)}
-                                            style={[styles.actionButton, styles.acceptButton]}
+                                            onPress={() => void handleReveal(interest)}
+                                            loading={busyReveal}
+                                            disabled={actionKey !== null}
+                                            style={styles.primaryAction}
                                         >
-                                            Accept
+                                            Reveal candidate
                                         </Button>
-                                    </View>
-                                </>
-                            )}
-
-                            {application.status !== 'PENDING' && (
-                                <>
-                                    <Divider style={styles.divider} />
-                                    <Chip
-                                        icon={application.status === 'ACCEPTED' ? 'check-circle' : 'close-circle'}
-                                        style={[
-                                            styles.statusChipBottom,
-                                            application.status === 'ACCEPTED' ? styles.acceptedChip : styles.rejectedChip
-                                        ]}
-                                    >
-                                        {application.status}
-                                    </Chip>
-                                </>
-                            )}
-                        </Surface>
-                    ))
+                                    ) : pendingConfirmation || awaitingPayment ? (
+                                        <Text style={styles.statusText}>
+                                            {awaitingPayment
+                                                ? 'Candidate accepted the offer. Payment is required to finalise the shift.'
+                                                : 'Offer sent. Waiting for candidate confirmation.'}
+                                        </Text>
+                                    ) : (
+                                        <Button
+                                            mode="contained"
+                                            onPress={() => handleSendOffer(interest)}
+                                            loading={busyOffer}
+                                            disabled={actionKey !== null}
+                                            style={styles.primaryAction}
+                                        >
+                                            Send offer
+                                        </Button>
+                                    )}
+                                </View>
+                            </Surface>
+                        );
+                    })
                 )}
             </ScrollView>
         </SafeAreaView>
@@ -332,14 +349,20 @@ const styles = StyleSheet.create({
     },
     applicantName: {
         fontWeight: 'bold',
-        marginBottom: 4,
+        marginBottom: 6,
     },
     badges: {
         flexDirection: 'row',
         gap: 8,
     },
-    ratingChip: {
-        backgroundColor: '#fff3e0',
+    interestedChip: {
+        backgroundColor: '#e3f2fd',
+    },
+    pendingChip: {
+        backgroundColor: '#fff8e1',
+    },
+    awaitingPaymentChip: {
+        backgroundColor: '#f3e5f5',
     },
     divider: {
         marginVertical: 12,
@@ -347,38 +370,28 @@ const styles = StyleSheet.create({
     details: {
         marginVertical: -8,
     },
-    coverLetterContainer: {
+    bioContainer: {
         padding: 12,
         backgroundColor: '#f5f5f5',
         borderRadius: 8,
     },
-    coverLetterLabel: {
+    bioLabel: {
         color: '#666',
         marginBottom: 8,
     },
-    coverLetter: {
+    bioText: {
         lineHeight: 20,
         color: '#424242',
     },
     actions: {
-        flexDirection: 'row',
-        gap: 8,
         marginTop: 4,
     },
-    actionButton: {
-        flex: 1,
+    primaryAction: {
+        alignSelf: 'stretch',
     },
-    acceptButton: {
-        flex: 1.5,
-    },
-    statusChipBottom: {
-        alignSelf: 'flex-start',
-    },
-    acceptedChip: {
-        backgroundColor: '#e8f5e9',
-    },
-    rejectedChip: {
-        backgroundColor: '#ffebee',
+    statusText: {
+        color: '#555',
+        lineHeight: 20,
     },
     emptyContainer: {
         alignItems: 'center',
