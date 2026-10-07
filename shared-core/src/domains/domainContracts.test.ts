@@ -30,9 +30,16 @@ function responses(...payloads: unknown[]) {
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('source-backed wire/domain contracts after extraction',()=>{
-  it('retains all 438 measured runtime exports as the original domain object',()=>{
+  it('retains 431 runtime exports after retiring seven unused onboarding/application operations',()=>{
     const modules=import.meta.glob('./**/api.ts',{eager:true});
-    expect(Object.keys(exportOwners)).toHaveLength(438);
+    const retiredExports = ['createOnboarding', 'getShiftApplications',
+      'acceptShiftApplication', 'rejectShiftApplication', 'fetchShiftApplicationsService',
+      'acceptShiftApplicationService', 'rejectShiftApplicationService'];
+    expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length);
+    for (const name of retiredExports) {
+      expect(exportOwners).not.toHaveProperty(name);
+      expect(publicApi).not.toHaveProperty(name);
+    }
     for(const [name,owner] of Object.entries(exportOwners)) {
       const path='./'+owner.replace(/^domains\//,'');
       expect(publicApi[name],name).toBe(modules[path][name]);

@@ -13,6 +13,19 @@ const forbiddenReverse = /reverse(?:_lazy)?\(\s*["']client_profile:/g;
 const extensions = new Set(['.py', '.ts', '.tsx', '.js', '.mjs', '.cjs', '.yml', '.yaml', '.sh', '.rs']);
 const failures = [];
 
+// Compatibility/negative tests deliberately exercise legacy inputs. Keep the
+// namespace rules above on those files, but apply the new root ratchet to callers.
+function maintainedHttpSource(source, rel) {
+  if (/(^|\/)(tests?|__tests__)\//.test(rel) ||
+      /(?:[.-]test|[.-]spec)\.[^.]+$/.test(rel) ||
+      /\/test_[^/]+\.py$/.test(rel)) return '';
+  // Rust keeps rejection tests alongside production code in a cfg(test) module.
+  if (rel.endsWith('.rs')) source = source.split(/#\[cfg\(test\)\]/)[0];
+  return source.split('\n').map(line =>
+    /^\s*(?:\/\/|\/\*|\*|#)/.test(line) ? '' : line
+  ).join('\n');
+}
+
 function ignored(rel) {
   return rel.startsWith('docs/') ||
     rel.includes('/migrations/') ||
@@ -41,8 +54,10 @@ function visit(dir) {
       ];
       for (const [label, pattern] of rules) {
         pattern.lastIndex = 0;
-        for (const match of source.matchAll(pattern)) {
-          const line = source.slice(0, match.index).split('\n').length;
+        const auditedSource = pattern === forbiddenBareHttpApiRoot
+          ? maintainedHttpSource(source, rel) : source;
+        for (const match of auditedSource.matchAll(pattern)) {
+          const line = auditedSource.slice(0, match.index).split('\n').length;
           failures.push(`${rel}:${line}: ${label}: ${match[0]}`);
         }
       }
