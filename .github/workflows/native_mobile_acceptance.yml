@@ -716,6 +716,14 @@ jobs:
           test -f "$EXPO_PLIST"
           /usr/libexec/PlistBuddy -c "Set :EXUpdatesEnabled false" "$EXPO_PLIST" 2>/dev/null ||             /usr/libexec/PlistBuddy -c "Add :EXUpdatesEnabled bool false" "$EXPO_PLIST"
           test "$(/usr/libexec/PlistBuddy -c "Print :EXUpdatesEnabled" "$EXPO_PLIST")" = "false"
+          # The simulator grants Keychain access only to an app whose embedded entitlements name
+          # an access group. expo-secure-store stores the session in the default (first) group.
+          ENTITLEMENTS=$(find ios/ChemistTasker -maxdepth 1 -name '*.entitlements' -print -quit)
+          test -n "$ENTITLEMENTS" || { echo "No app entitlements file after prebuild"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Delete :keychain-access-groups" "$ENTITLEMENTS" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :keychain-access-groups array" "$ENTITLEMENTS"
+          /usr/libexec/PlistBuddy -c "Add :keychain-access-groups:0 string com.chemisttasker.app" "$ENTITLEMENTS"
+          cat "$ENTITLEMENTS"
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
           SCHEME="ChemistTasker"
@@ -732,6 +740,15 @@ jobs:
           # -34018 and the stored session can never be read. Prove the ad-hoc signature exists.
           codesign --verify --verbose=1 "$APP_PATH"
           codesign -d --entitlements - "$APP_PATH" 2>/dev/null | tee /tmp/ios-entitlements.txt || true
+          # Simulator entitlements are linked into the binary's __TEXT,__entitlements section; that is
+          # what the simulator's Keychain checks. Fail here, not 30 minutes later in Maestro.
+          APP_BINARY="$APP_PATH/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Info.plist")"
+          otool -l "$APP_BINARY" | grep -A2 "sectname __entitlements" | tee -a /tmp/ios-entitlements.txt
+          if ! LC_ALL=C grep -a -q "<key>keychain-access-groups</key>" "$APP_BINARY"; then
+            echo "Simulator build has no embedded keychain-access-groups entitlement; Keychain calls would fail with -34018." >&2
+            exit 1
+          fi
+          echo "Embedded simulator Keychain entitlement present."
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
@@ -847,5 +864,6 @@ jobs:
             /tmp/maestro-version-ios.txt
             /tmp/ios-simulator.png
             /tmp/chemisttasker-ios.log
+            /tmp/ios-entitlements.txt
             ~/.maestro/tests
           if-no-files-found: ignore
