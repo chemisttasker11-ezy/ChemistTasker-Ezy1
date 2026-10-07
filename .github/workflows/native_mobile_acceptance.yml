@@ -314,6 +314,14 @@ jobs:
             -k "system-images;android-35;google_apis;x86_64"
           test -s "$ANDROID_AVD_HOME/chemisttasker-native.ini"
           test -s "$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          # Without a device profile the AVD boots at 320x640, which pushes the camera
+          # guidance and controls below the fold. Use a realistic Pixel 6-class screen.
+          CONFIG_INI="$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          sed -i -E '/^hw\.lcd\.(width|height|density)=/d' "$CONFIG_INI"
+          echo "hw.lcd.width=1080" >> "$CONFIG_INI"
+          echo "hw.lcd.height=2400" >> "$CONFIG_INI"
+          echo "hw.lcd.density=420" >> "$CONFIG_INI"
+          grep -E '^hw\.lcd\.' "$CONFIG_INI"
           "$EMULATOR" -list-avds | grep -Fx chemisttasker-native
 
           dump_android_failure() {
@@ -457,9 +465,12 @@ jobs:
               visible: "Clock & breaks"
               timeout: 30000
           - tapOn: "Open camera"
-          - extendedWaitUntil:
-              visible: "Centre the kiosk QR inside the frame"
+          - scrollUntilVisible:
+              element:
+                text: "Centre the kiosk QR inside the frame"
+              direction: DOWN
               timeout: 30000
+          - assertVisible: "Attendance QR camera"
           YAML
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
