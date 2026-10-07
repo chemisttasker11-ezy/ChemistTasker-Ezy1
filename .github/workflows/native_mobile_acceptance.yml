@@ -230,7 +230,7 @@ jobs:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
           log-accepted-android-sdk-licenses: "false"
 
-      - name: Prebuild and compile Android development build
+      - name: Prebuild and compile Android acceptance build with embedded JavaScript
         shell: bash
         run: |
           set -euo pipefail
@@ -238,17 +238,25 @@ jobs:
           CI=1 npx expo prebuild --platform android --clean
           python - <<'PY'
           from pathlib import Path
+          import re
           path = Path("android/app/src/main/AndroidManifest.xml")
           text = path.read_text()
-          if "android:usesCleartextTraffic" not in text:
+          if "android:usesCleartextTraffic" in text:
+              text = re.sub(r'android:usesCleartextTraffic="[^"]*"', 'android:usesCleartextTraffic="true"', text)
+          else:
               text = text.replace("<application ", '<application android:usesCleartextTraffic="true" ', 1)
           path.write_text(text)
           PY
           cd android
-          ./gradlew assembleDebug --no-daemon --max-workers=2
-          test -f app/build/outputs/apk/debug/app-debug.apk
+          # Release embeds the Expo Router bundle. Restart acceptance must not
+          # depend on a Metro connection or the development launcher UI.
+          ./gradlew assembleRelease --no-daemon --max-workers=2
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          unzip -l "$APK" | grep 'assets/index.android.bundle'
 
       - name: Boot Android emulator and install app
+        timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
@@ -268,7 +276,7 @@ jobs:
 
           dump_android_failure() {
             echo "=== adb devices -l ==="
-            "$ADB" devices -l || true
+            timeout 15 "$ADB" devices -l || true
             echo "=== emulator process ==="
             if [ -n "${EMULATOR_PID:-}" ]; then
               ps -p "$EMULATOR_PID" -o pid=,ppid=,stat=,etime=,command= || true
@@ -280,17 +288,19 @@ jobs:
           }
           trap 'status=$?; if [ "$status" -ne 0 ]; then dump_android_failure; fi' EXIT
 
-          nohup "$EMULATOR" -avd chemisttasker-native -no-window -no-audio -no-boot-anim -no-snapshot-load -no-snapshot-save -gpu swiftshader_indirect -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
+          timeout 15 "$ADB" start-server
+          nohup "$EMULATOR" -avd chemisttasker-native -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot-load -no-snapshot-save -gpu swiftshader_indirect -cores 2 -memory 2048 -camera-back virtualscene -camera-front none > /tmp/android-emulator.log 2>&1 &
           EMULATOR_PID=$!
           printf '%s\n' "$EMULATOR_PID" > /tmp/android-emulator.pid
 
           adb_ready=0
-          for attempt in $(seq 1 90); do
+          adb_deadline=$((SECONDS + 180))
+          while [ "$SECONDS" -lt "$adb_deadline" ]; do
             if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
               echo "Android emulator exited before ADB registration"
               exit 1
             fi
-            if [ "$("$ADB" get-state 2>/dev/null || true)" = "device" ]; then
+            if [ "$(timeout 5 "$ADB" -s emulator-5554 get-state 2>/dev/null || true)" = "device" ]; then
               adb_ready=1
               break
             fi
@@ -302,12 +312,13 @@ jobs:
           fi
 
           boot_ready=0
-          for attempt in $(seq 1 120); do
+          boot_deadline=$((SECONDS + 240))
+          while [ "$SECONDS" -lt "$boot_deadline" ]; do
             if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
               echo "Android emulator exited before sys.boot_completed"
               exit 1
             fi
-            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; then
+            if [ "$(timeout 5 "$ADB" -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; then
               boot_ready=1
               break
             fi
@@ -317,35 +328,11 @@ jobs:
             echo "Android emulator did not complete boot within 240 seconds after ADB registration"
             exit 1
           fi
-          timeout 30 "$ADB" reverse tcp:8000 tcp:8000
-          timeout 30 "$ADB" reverse tcp:8081 tcp:8081
-          timeout 30 "$ADB" uninstall com.chemisttasker.app >/dev/null 2>&1 || true
-          timeout 90 "$ADB" install frontend_mobile/android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Start Metro and open Android development project
-        shell: bash
-        run: |
-          set -euo pipefail
-          (
-            cd frontend_mobile
-            CI=1 nohup npx expo start --dev-client --localhost --port 8081 > /tmp/metro.log 2>&1 &
-          )
-          for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8081/status 2>/dev/null | grep -q "packager-status:running"; then
-              break
-            fi
-            sleep 2
-          done
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-          MANIFEST_URL=$(python3 - <<'PY'
-          from urllib.parse import quote
-          print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
-          PY
-          )
-          DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
-          printf '%s\n' "$DEV_URL" | tee /tmp/dev-client-url-android.txt
-          adb shell am start -W -a android.intent.action.VIEW -d "$DEV_URL" com.chemisttasker.app
-          sleep 15
+          echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
+          timeout 30 "$ADB" -s emulator-5554 reverse tcp:8000 tcp:8000
+          timeout 30 "$ADB" -s emulator-5554 shell input keyevent 82
+          timeout 30 "$ADB" -s emulator-5554 uninstall com.chemisttasker.app >/dev/null 2>&1 || true
+          timeout 90 "$ADB" -s emulator-5554 install frontend_mobile/android/app/build/outputs/apk/release/app-release.apk
 
       - name: Install pinned Maestro
         shell: bash
@@ -360,9 +347,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
@@ -428,10 +414,11 @@ jobs:
           YAML
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
-          maestro test /tmp/native-acceptance.yaml
+          maestro --device "$ANDROID_SERIAL" test /tmp/native-acceptance.yaml
 
       - name: Capture Android diagnostics
         if: always()
+        timeout-minutes: 2
         shell: bash
         run: |
           timeout 15 adb devices -l > /tmp/adb-devices.txt 2>&1 || true
@@ -448,8 +435,6 @@ jobs:
             /tmp/android-emulator.pid
             /tmp/adb-devices.txt
             /tmp/android-logcat.txt
-            /tmp/metro.log
-            /tmp/dev-client-url-android.txt
             /tmp/maestro-version-android.txt
             ~/.maestro/tests
           if-no-files-found: ignore
@@ -638,7 +623,7 @@ jobs:
           PLIST
           npm ci
 
-      - name: Prebuild and compile iOS simulator development build
+      - name: Prebuild and compile iOS simulator acceptance build with embedded JavaScript
         shell: bash
         run: |
           set -euo pipefail
@@ -657,48 +642,13 @@ jobs:
           echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcodebuild             -workspace "$WORKSPACE"             -scheme "$SCHEME"             -configuration Debug             -sdk iphonesimulator             -destination "platform=iOS Simulator,id=$SIM_UDID"             -derivedDataPath /tmp/native-ios-derived             CODE_SIGNING_ALLOWED=NO             build
-          APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-ios-derived CODE_SIGNING_ALLOWED=NO build
+          APP_PATH=$(find /tmp/native-ios-derived/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP_PATH"
+          test -s "$APP_PATH/main.jsbundle"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
-
-      - name: Start Metro, prewarm bundle and launch iOS development project
-        shell: bash
-        run: |
-          set -euo pipefail
-          (
-            cd frontend_mobile
-            CI=1 nohup npx expo start --dev-client --localhost --port 8081 > /tmp/metro.log 2>&1 &
-          )
-          for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8081/status 2>/dev/null | grep -q "packager-status:running"; then
-              break
-            fi
-            sleep 2
-          done
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
-
-          # Prewarm the first Expo Router bundle before UI acceptance. In the
-          # previous iOS run, cold compilation started only after Maestro had
-          # already exhausted its assertion timeout.
-          BUNDLE_URL="http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&minify=false"
-          curl --fail --show-error --silent --max-time 240 "$BUNDLE_URL" -o /tmp/ios-entry.bundle
-          test -s /tmp/ios-entry.bundle
-
-          MANIFEST_URL=$(python3 - <<'PY'
-          from urllib.parse import quote
-          print(quote("http://127.0.0.1:8081?disableOnboarding=1", safe=""))
-          PY
-          )
-          DEV_URL="frontendmobile://expo-development-client/?url=$MANIFEST_URL&disableFab=1&disableAutoLaunch=1"
-          printf '%s\n' "$DEV_URL" | tee /tmp/dev-client-url-ios.txt
-
-          # simctl owns the dev-client handoff. Maestro only validates the
-          # ChemistTasker UI after the native launcher has opened the project.
-          xcrun simctl openurl "$SIM_UDID" "$DEV_URL"
-          sleep 10
 
       - name: Install pinned Maestro
         shell: bash
@@ -715,12 +665,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== metro ==="; cat /tmp/metro.log || true; fi' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
-          curl -fsS http://127.0.0.1:8081/status | grep -q "packager-status:running"
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
+          - launchApp:
+              stopApp: true
+              permissions:
+                all: allow
           - extendedWaitUntil:
               visible: "Go to Login"
               timeout: 120000
@@ -800,8 +753,6 @@ jobs:
           name: native-ios-diagnostics
           path: |
             /tmp/native-backend.log
-            /tmp/metro.log
-            /tmp/dev-client-url-ios.txt
             /tmp/maestro-version-ios.txt
             /tmp/ios-simulator.png
             /tmp/chemisttasker-ios.log
