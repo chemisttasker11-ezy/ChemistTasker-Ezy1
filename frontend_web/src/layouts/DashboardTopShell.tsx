@@ -21,7 +21,7 @@ import { useWorkspace } from "../contexts/WorkspaceContext";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
 import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
 
 const DNA = {
@@ -70,6 +70,7 @@ function workerOverviewPath(role?: string | null) {
   if (normalized === "PHARMACIST") return "/dashboard/pharmacist/overview";
   if (normalized === "OTHER_STAFF") return "/dashboard/otherstaff/overview";
   if (normalized === "EXPLORER") return "/dashboard/explorer/overview";
+  if (normalized === "OWNER") return "/dashboard/owner/overview";
   return "/dashboard";
 }
 
@@ -113,15 +114,22 @@ function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[]
     if (!byId.has(id)) byId.set(id, { id, name, helper });
   };
 
+  // Owner authority comes from OWNER-level admin rows; the owner's own membership is a CONTACT membership.
+  const ownedIds = new Set(
+    (adminAssignments ?? [])
+      .filter((assignment) => String(assignment?.admin_level ?? "").toUpperCase() === "OWNER")
+      .map((assignment) => Number(assignment?.pharmacy_id)),
+  );
   const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
   memberships.forEach((membership: any) => {
     const role = String(membership?.role ?? "").toUpperCase();
+    const pharmacyId = Number(membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id);
     const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
     if (isInternalPharmacyMembership(membership)) {
       add(
         membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
         membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-        role === "OWNER" || role === "PHARMACY_OWNER"
+        role === "OWNER" || role === "PHARMACY_OWNER" || membership?.is_pharmacy_owner === true || ownedIds.has(pharmacyId)
           ? "Owner"
           : employmentType === "LOCUM"
             ? "Locum"
@@ -306,6 +314,7 @@ export default function DashboardTopShell({
     isAdminUser,
     selectRolePersona,
     selectAdminPersona,
+    setActivePersona,
   } = useAuth();
   const {
     workspace,
@@ -343,11 +352,28 @@ export default function DashboardTopShell({
   const pharmacies = useMemo(() => {
     const byId = new Map(collectPharmacies(user, adminAssignments).map((item) => [item.id, item]));
     organizationPharmacies.forEach((item) => byId.set(item.id, { ...item, helper: "Organization pharmacy" }));
-    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+    let options = [...byId.values()];
+    // The Owner workspace is scoped to pharmacies the owner owns. A pharmacy they only manage for someone else is
+    // reached through the Admin switch, not listed as one of their own stores.
+    if (String(user?.role || "").toUpperCase() === "OWNER") {
+      const ownedIds = new Set(
+        adminAssignments
+          .filter((assignment) => String(assignment?.admin_level ?? "").toUpperCase() === "OWNER")
+          .map((assignment) => Number(assignment.pharmacy_id)),
+      );
+      if (ownedIds.size) options = options.filter((item) => ownedIds.has(item.id) || item.helper === "Organization pharmacy");
+    }
+    return options.sort((a, b) => a.name.localeCompare(b.name));
   }, [user, adminAssignments, organizationPharmacies]);
   const isOrgUser = hasOrganizationAccess(user);
   const isOwner = String(user?.role || "").toUpperCase() === "OWNER";
   const isWorker = ["PHARMACIST", "OTHER_STAFF"].includes(String(user?.role || "").toUpperCase());
+  // Owners and explorers can also hold a delegated admin assignment at another pharmacy; they switch the same way.
+  const hasOwnPersona = isWorker || ["OWNER", "EXPLORER"].includes(String(user?.role || "").toUpperCase());
+  const delegatedAdminAssignments = useMemo(
+    () => adminAssignments.filter((assignment) => isAdminPersonaAssignment(assignment)),
+    [adminAssignments],
+  );
   const isFavoriteStaff = useMemo(() => hasFavoriteStaffMembership(user), [user]);
   const canUsePlatformWorkspace = isWorker && (workerVerified || isFavoriteStaff) && activePersona !== "admin" && !forceAdminScope;
   const hidePharmacyScope = forceAdminScope || activePersona === "admin";
@@ -407,7 +433,10 @@ export default function DashboardTopShell({
   useEffect(() => {
     if (canUsePlatformWorkspace || workspace !== "platform") return;
     setWorkspace("internal");
-    const fallbackPharmacyId = isOrgUser ? null : selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
+    // A valid pharmacy already named in the URL (for example a canonicalised stale link) wins over remembered state.
+    const urlPharmacyId = Number(searchParams.get("pharmacy_id") ?? searchParams.get("pharmacy"));
+    const urlPharmacy = pharmacies.some((pharmacy) => pharmacy.id === urlPharmacyId) ? urlPharmacyId : null;
+    const fallbackPharmacyId = isOrgUser ? null : urlPharmacy ?? selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
     setSelectedPharmacyId(fallbackPharmacyId);
     setWorkspacePharmacyId(fallbackPharmacyId);
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -715,12 +744,13 @@ export default function DashboardTopShell({
             </>
           )}
 
-          {isWorker && isAdminUser && (
+          {hasOwnPersona && isAdminUser && (
             <Stack direction="row" alignItems="center" sx={{ height: { xs: 48, md: 58 }, border: "1px solid var(--ct-border-color)", bgcolor: "var(--ct-surface-bg)", borderRadius: 999, p: 0.5, flexShrink: 0 }}>
               <Button
                 onClick={() => {
-                  const role = String(user?.role).toUpperCase() as "PHARMACIST" | "OTHER_STAFF";
-                  selectRolePersona(role);
+                  const role = String(user?.role).toUpperCase();
+                  if (role === "PHARMACIST" || role === "OTHER_STAFF") selectRolePersona(role);
+                  else setActivePersona("staff");
                   navigate(workerOverviewPath(role), { replace: true });
                 }}
                 sx={{
@@ -752,7 +782,7 @@ export default function DashboardTopShell({
                 <AdminPanelSettingsIcon sx={{ fontSize: 16, mr: 0.75 }} /> Admin
               </Button>
               <Menu anchorEl={adminAnchor} open={Boolean(adminAnchor)} onClose={() => setAdminAnchor(null)}>
-                {adminAssignments.map((assignment) => (
+                {delegatedAdminAssignments.map((assignment) => (
                   <MenuItem
                     key={assignment.id ?? assignment.pharmacy_id}
                     onClick={() => {

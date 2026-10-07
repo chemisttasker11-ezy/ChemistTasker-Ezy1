@@ -22,7 +22,7 @@ import { ORG_ROLES } from '../constants/roles';
 import { useAuth } from '../contexts/AuthContext';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
-import { resolveDashboardPath } from '../utils/dashboardPath';
+import { resolveUserHomePath } from '../utils/dashboardPath';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { setRobotsMeta } from '../utils/seo';
 
@@ -156,7 +156,7 @@ export default function Login() {
       }
 
       if (!redirectPath) {
-        redirectPath = resolveDashboardPath(userInfo.role);
+        redirectPath = resolveUserHomePath(userInfo);
       }
 
       navigate(redirectPath);

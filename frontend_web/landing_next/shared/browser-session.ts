@@ -1,5 +1,5 @@
 // Shared by the public Next.js site and the Vite dashboard. No tokens in storage.
-export type SessionUser={id:number;email:string;first_name?:string;last_name?:string;role:string;content_capabilities?:{administrator:boolean;areas:Record<string,string>}};
+export type SessionUser={id:number;email:string;first_name?:string;last_name?:string;role:string;admin_assignments?:{id?:number|null;pharmacy_id?:number|null;admin_level?:string|null}[];content_capabilities?:{administrator:boolean;areas:Record<string,string>}};
 export const SESSION_EVENT='ct:session-changed';
 const EVENT_KEY='ct:session-event';
 export function announceSession(action:'login'|'logout') {
