@@ -3,6 +3,7 @@ interface HubDirectoryMemberApi {
     membership_id: number;
     user_id: number | null;
     full_name: string;
+    profile_photo_url?: string | null;
     role: string | null;
     employment_type: string | null;
     pharmacy_id: number | null;
@@ -365,6 +366,7 @@ export async function fetchHubMemberDirectory(params: {
             membershipId: member.membership_id,
             userId: member.user_id ?? null,
             fullName: member.full_name,
+            profilePhotoUrl: member.profile_photo_url ?? null,
             email: null,
             role: member.role ?? null,
             employmentType: member.employment_type ?? null,
