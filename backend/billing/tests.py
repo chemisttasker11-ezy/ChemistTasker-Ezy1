@@ -280,6 +280,29 @@ class OrganizationBillingScopeTests(TestCase):
         finalize.assert_called_once()
         notify.assert_called_once()
 
+    def test_http_cancellation_penalty_follows_the_shift_charge_payer_policy(self):
+        """charge_penalty uses the same payer authority as fulfilment, at the HTTP boundary."""
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy,
+            created_by=self.owner,
+            role_needed='ASSISTANT',
+            employment_type='LOCUM',
+            payment_status='PENDING',
+        )
+        url = reverse('api_v1:billing:charge_penalty', args=[shift.pk])
+        allowed = [self.owner, self.org_admin, self.chief, self.region_manager, self.pharmacy_manager, self.roster_manager]
+        refused = [self.region_comms, self.unassigned_region, self.comms_admin, self.unrelated]
+        for user in allowed + refused:
+            with self.subTest(user=user.email):
+                client = APIClient()
+                client.force_authenticate(user)
+                response = client.post(url, {}, format='json')
+                # No assignments means no penalty: authorised payers get 200 without reaching Stripe.
+                self.assertEqual(response.status_code, 200 if user in allowed else 403, response.data)
+
     def test_http_shift_charge_rejects_communication_only_region_admin(self):
         from rest_framework.test import APIClient
         from shifts.models import Shift
