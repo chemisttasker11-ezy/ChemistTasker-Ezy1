@@ -13,6 +13,49 @@ const roleUsers = {
     pharmacies: [{ id: 101, name: 'Smoke Pharmacy' }],
     admin_assignments: [],
   },
+  ownerWithAuthority: {
+    id: 7,
+    username: 'owner-authority-smoke',
+    email: 'owner-authority@example.test',
+    role: 'OWNER',
+    is_mobile_verified: true,
+    memberships: [
+      { pharmacy_id: 101, pharmacy_name: 'Owned Pharmacy', role: 'OWNER' },
+      { pharmacy_id: 127, pharmacy_name: 'Selected Owned Pharmacy', role: 'OWNER' },
+    ],
+    pharmacies: [
+      { id: 101, name: 'Owned Pharmacy' },
+      { id: 127, name: 'Selected Owned Pharmacy' },
+    ],
+    admin_assignments: [
+      { id: 701, pharmacy_id: 101, pharmacy_name: 'Owned Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities },
+      { id: 727, pharmacy_id: 127, pharmacy_name: 'Selected Owned Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities },
+    ],
+  },
+  ownerWithDelegatedAdmin: {
+    id: 8,
+    username: 'owner-delegated-smoke',
+    email: 'owner-delegated@example.test',
+    role: 'OWNER',
+    is_mobile_verified: true,
+    memberships: [{ pharmacy_id: 101, pharmacy_name: 'Owned Pharmacy', role: 'OWNER' }],
+    pharmacies: [{ id: 101, name: 'Owned Pharmacy' }],
+    admin_assignments: [
+      { id: 801, pharmacy_id: 101, pharmacy_name: 'Owned Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities },
+      { id: 844, pharmacy_id: 144, pharmacy_name: 'Delegated Pharmacy', admin_level: 'MANAGER', capabilities: baseCapabilities },
+    ],
+  },
+  pharmacyManager: {
+    id: 9,
+    username: 'pharmacy-manager-smoke',
+    email: 'pharmacy-manager@example.test',
+    role: 'PHARMACY_MANAGER',
+    is_mobile_verified: true,
+    memberships: [{ pharmacy_id: 155, pharmacy_name: 'Managed Pharmacy', role: 'CONTACT' }],
+    admin_assignments: [
+      { id: 955, pharmacy_id: 155, pharmacy_name: 'Managed Pharmacy', admin_level: 'MANAGER', capabilities: baseCapabilities },
+    ],
+  },
   admin: {
     id: 2,
     username: 'admin-smoke',
@@ -629,4 +672,77 @@ test('delegated admin direct route preserves requested pharmacy scope', async ({
   expect(adminUrl.pathname).toBe('/dashboard/admin/101/overview');
   expect(adminUrl.searchParams.get('pharmacy_id')).toBe('101');
   expect(adminUrl.searchParams.get('workspace')).toBe('internal');
+});
+
+
+test.describe('owner/admin persona routing hardening', () => {
+  test('genuine owner stale admin URL canonicalizes to owner route and preserves selected pharmacy query', async ({ page }) => {
+    await installApiFixture(page, roleUsers.ownerWithAuthority);
+
+    await page.goto('/dashboard/admin/116/shift-center/active?workspace=internal&pharmacy_id=127');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/owner/shift-center/active');
+    expect(url.searchParams.get('workspace')).toBe('internal');
+    expect(url.searchParams.get('pharmacy_id')).toBe('127');
+  });
+
+  test('owner-level admin assignment is authority and canonicalizes to owner route', async ({ page }) => {
+    await installApiFixture(page, roleUsers.ownerWithAuthority);
+
+    await page.goto('/dashboard/admin/101/invoice');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/owner/invoice');
+    expect(url.searchParams.get('pharmacy_id')).toBe('101');
+  });
+
+  test('owner with a delegated manager assignment can use that exact admin route', async ({ page }) => {
+    await installApiFixture(page, roleUsers.ownerWithDelegatedAdmin);
+
+    await page.goto('/dashboard/admin/144/overview?pharmacy_id=101');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/admin/144/overview');
+    expect(url.searchParams.get('workspace')).toBe('internal');
+    expect(url.searchParams.get('pharmacy_id')).toBe('144');
+    await expect(page.locator('body')).not.toContainText('Switch to the Admin persona');
+  });
+
+  test('delegated admin cannot silently fall back from an unassigned pharmacy route', async ({ page }) => {
+    await installApiFixture(page, roleUsers.admin);
+
+    await page.goto('/dashboard/admin/999/overview?pharmacy_id=101');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/pharmacist/overview');
+    expect(url.pathname).not.toContain('/dashboard/admin/101');
+  });
+
+  test('pharmacy manager keeps the existing exact admin workspace behaviour', async ({ page }) => {
+    await installApiFixture(page, roleUsers.pharmacyManager);
+
+    await page.goto('/dashboard/admin/155/overview');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/admin/155/overview');
+    expect(url.searchParams.get('workspace')).toBe('internal');
+    expect(url.searchParams.get('pharmacy_id')).toBe('155');
+  });
+
+  test('old onboarding admin link becomes owner route after the contact becomes the owner', async ({ page }) => {
+    await installApiFixture(page, roleUsers.ownerWithAuthority);
+
+    await page.goto('/dashboard/admin/101');
+    await page.waitForLoadState('networkidle');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/dashboard/owner');
+    expect(url.searchParams.get('pharmacy_id')).toBe('101');
+  });
 });
