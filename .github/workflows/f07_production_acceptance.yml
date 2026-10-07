@@ -74,8 +74,9 @@ jobs:
             exit 1
           fi
           # The two mobile dashboards carry the greeting defect found by the F07 Android
-          # native journey (username shown instead of first name); nothing else may change.
-          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/f07_production_acceptance\.yml|\.github/workflows/native_mobile_acceptance\.yml|frontend_web/e2e/real-stack\.spec\.mjs|scripts/audit-production-deployment\.mjs|docs/architecture/PRODUCTION_ACCEPTANCE_F07\.md|docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS\.md|frontend_mobile/roles/(pharmacist|otherstaff)/dashboard\.tsx)$' || true)"
+          # native journey (username shown instead of first name) and AuthContext carries the
+          # startup hang it found when secure storage is unreadable; nothing else may change.
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/f07_production_acceptance\.yml|\.github/workflows/native_mobile_acceptance\.yml|frontend_web/e2e/real-stack\.spec\.mjs|scripts/audit-production-deployment\.mjs|docs/architecture/PRODUCTION_ACCEPTANCE_F07\.md|docs/architecture/BACKEND_FINALIZATION_LIVE_PROGRESS\.md|frontend_mobile/roles/(pharmacist|otherstaff)/dashboard\.tsx|frontend_mobile/context/AuthContext\.tsx)$' || true)"
           if [ -n "$unexpected" ]; then
             echo "F07 is acceptance-only; unexpected application/source changes detected:" >&2
             printf '%s\n' "$unexpected" >&2
