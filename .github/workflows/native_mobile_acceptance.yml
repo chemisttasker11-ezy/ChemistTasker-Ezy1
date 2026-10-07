@@ -294,10 +294,20 @@ jobs:
           test -x "$SDKMANAGER"
           test -x "$AVDMANAGER"
           test -x "$ADB"
+          # SDK command-line tools and emulator versions may choose different
+          # default user directories. Give both the same explicit AVD location.
+          export ANDROID_USER_HOME="$RUNNER_TEMP/chemisttasker-android"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           timeout 300 "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
           test -x "$EMULATOR"
-          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native -k "system-images;android-35;google_apis;x86_64"
+          echo no | "$AVDMANAGER" create avd --force -n chemisttasker-native \
+            --path "$ANDROID_AVD_HOME/chemisttasker-native.avd" \
+            -k "system-images;android-35;google_apis;x86_64"
+          test -s "$ANDROID_AVD_HOME/chemisttasker-native.ini"
+          test -s "$ANDROID_AVD_HOME/chemisttasker-native.avd/config.ini"
+          "$EMULATOR" -list-avds | grep -Fx chemisttasker-native
 
           dump_android_failure() {
             echo "=== adb devices -l ==="
