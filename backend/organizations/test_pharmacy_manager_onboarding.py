@@ -65,6 +65,26 @@ class PharmacyManagerOnboardingTests(TestCase):
         self.assertEqual(context["pharmacies"], [pharmacy.name])
         self.assertEqual(context["role_label"], "Pharmacy Manager")
 
+    def test_existing_owner_keeps_owner_role_and_can_manage_organization_onboarded_pharmacy(self):
+        existing_owner, owned_pharmacy = make_owner_with_pharmacy("Existing Owner Pharmacy")
+
+        response, _ = self.onboard(self.org_admin(), email=existing_owner.email)
+        self.assertEqual(response.status_code, 201, response.content)
+
+        existing_owner.refresh_from_db()
+        self.assertEqual(existing_owner.role, "OWNER")
+        self.assertEqual(owned_pharmacy.owner.user_id, existing_owner.id)
+
+        onboarded = Pharmacy.objects.get(email__iexact=existing_owner.email, organization=self.organization)
+        self.assertIsNone(onboarded.owner_id)
+        membership = Membership.objects.get(user=existing_owner, pharmacy=onboarded)
+        self.assertEqual((membership.role, membership.status, membership.is_active), ("CONTACT", "ACCEPTED", True))
+
+        assignment = PharmacyAdmin.objects.get(user=existing_owner, pharmacy=onboarded)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertTrue(assignment.is_active)
+        self.assertTrue(has_admin_capability(existing_owner, onboarded, CAPABILITY_MANAGE_STAFF))
+
     def test_chief_admin_can_onboard_but_region_admin_cannot(self):
         chief_response, _ = self.onboard(self.org_admin("CHIEF_ADMIN"), email="chief@new-pharmacy.test")
         self.assertEqual(chief_response.status_code, 201, chief_response.content)
