@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Card, CardContent, Stack, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { chooseAccountType } from "@chemisttasker/shared-core";
+import { chooseAccountType, getCurrentUser } from "@chemisttasker/shared-core";
 
 // A pharmacy-manager account is a valid permanent admin-only identity. These
 // options are only for a person deliberately converting this pharmacy mailbox/account
@@ -36,7 +36,14 @@ export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: numb
       const fallbackPath = item.role === "PHARMACIST"
         ? "/dashboard/pharmacist/onboarding"
         : "/dashboard/otherstaff/onboarding";
-      setUser((previous) => (previous ? { ...previous, role: item.role } : previous));
+      // The conversion changed this pharmacy's membership and admin staff role too, so reload the whole user.
+      try {
+        const refreshed = await getCurrentUser();
+        setUser(refreshed as Parameters<typeof setUser>[0]);
+      } catch {
+        // The conversion is already saved; keep the new role and let the next session sync fill in the rest.
+        setUser((previous) => (previous ? { ...previous, role: item.role } : previous));
+      }
       navigate(onboardingUrl ? new URL(onboardingUrl, window.location.origin).pathname : fallbackPath);
     } catch (err: any) {
       const data = err?.response?.data;
