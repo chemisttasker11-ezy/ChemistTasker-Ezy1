@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
+      platform:
+        required: false
+        type: string
+        default: both
       tested_sha:
         required: false
         type: string
@@ -54,6 +58,7 @@ env:
 jobs:
   android-native:
     name: Android native acceptance
+    if: ${{ inputs.platform != 'ios' }}
     runs-on: ubuntu-latest
     timeout-minutes: 80
     steps:
@@ -502,6 +507,7 @@ jobs:
 
   ios-native:
     name: iOS native acceptance
+    if: ${{ inputs.platform != 'android' }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -874,7 +880,7 @@ jobs:
               timeout: 30000
           YAML
           export JAVA_HOME="$JAVA_HOME"
-          export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
           export MAESTRO_CLI_NO_ANALYTICS=1
           maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
 
