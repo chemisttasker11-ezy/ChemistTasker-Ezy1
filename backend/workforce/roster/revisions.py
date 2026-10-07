@@ -234,6 +234,17 @@ def publish_period_command(*, user, period: RosterPeriod, expected_revision: int
             return operation.result_json
 
         state = validate_revision(locked_period, revision)
+        unpublished_slot_ids = list(
+            locked_period.planned_slots.filter(unpublished_at__isnull=False)
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        if unpublished_slot_ids:
+            raise RosterCommandConflict(
+                "ROSTER_SHIFT_REPUBLISH_REQUIRED",
+                "Republish each individually unpublished shift before publishing this roster revision.",
+                unpublished_slot_ids=unpublished_slot_ids,
+            )
         # The underlying publication service validates the exact current warning
         # keys after acquiring the period and worker locks. No force-warnings escape.
         published, validation = publish_roster_period(
