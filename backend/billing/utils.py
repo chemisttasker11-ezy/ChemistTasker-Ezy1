@@ -70,6 +70,11 @@ def user_can_pay_shift_charge_for_pharmacy(user, pharmacy) -> bool:
         return True
 
     organization_id = getattr(pharmacy, 'organization_id', None)
+    owner_user = getattr(getattr(pharmacy, 'owner', None), 'user', None)
+    if not organization_id and owner_user is None:
+        # A manager cannot manufacture a billing owner for an ownerless standalone pharmacy.
+        return False
+
     if organization_id:
         # Chief Admin is organisation-wide by product policy, but still never becomes
         # the billing contact merely by paying a shift charge.
