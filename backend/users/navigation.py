@@ -36,5 +36,5 @@ def _pharmacy_manager_dashboard_url(user):
         .first()
     )
     if pharmacy_id is None:
-        return f"{settings.FRONTEND_BASE_URL}/dashboard/"
+        return f"{settings.FRONTEND_BASE_URL}/dashboard/admin-invitations"
     return f"{settings.FRONTEND_BASE_URL}/dashboard/admin/{pharmacy_id}"
