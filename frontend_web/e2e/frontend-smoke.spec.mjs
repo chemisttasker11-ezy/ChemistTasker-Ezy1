@@ -56,6 +56,15 @@ const roleUsers = {
       { id: 955, pharmacy_id: 155, pharmacy_name: 'Managed Pharmacy', admin_level: 'MANAGER', capabilities: baseCapabilities },
     ],
   },
+  pharmacyManagerNoAssignment: {
+    id: 10,
+    username: 'pharmacy-manager-unassigned-smoke',
+    email: 'pharmacy-manager-unassigned@example.test',
+    role: 'PHARMACY_MANAGER',
+    is_mobile_verified: true,
+    memberships: [],
+    admin_assignments: [],
+  },
   admin: {
     id: 2,
     username: 'admin-smoke',
@@ -733,6 +742,20 @@ test.describe('owner/admin persona routing hardening', () => {
     expect(url.pathname).toBe('/dashboard/admin/155/overview');
     expect(url.searchParams.get('workspace')).toBe('internal');
     expect(url.searchParams.get('pharmacy_id')).toBe('155');
+
+    await expect(page.getByText('Complete your profile (optional)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pharmacist' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Other staff' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pharmacy owner' })).toHaveCount(0);
+  });
+
+  test('unassigned pharmacy manager lands on admin invitations instead of dead dashboard', async ({ page }) => {
+    await installApiFixture(page, roleUsers.pharmacyManagerNoAssignment);
+
+    await page.goto('/dashboard/admin/155/overview');
+    await page.waitForLoadState('networkidle');
+
+    expect(new URL(page.url()).pathname).toBe('/dashboard/admin-invitations');
   });
 
   test('pharmacy manager with a bad admin pharmacy id returns to their real admin home', async ({ page }) => {
@@ -747,7 +770,7 @@ test.describe('owner/admin persona routing hardening', () => {
     expect(url.searchParams.get('pharmacy_id')).toBe('155');
   });
 
-  test('old onboarding admin link becomes owner route after the contact becomes the owner', async ({ page }) => {
+  test('stale admin link for owner authority becomes the equivalent owner route', async ({ page }) => {
     await installApiFixture(page, roleUsers.ownerWithAuthority);
 
     await page.goto('/dashboard/admin/101');
