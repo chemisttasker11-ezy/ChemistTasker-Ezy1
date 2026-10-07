@@ -85,6 +85,28 @@ class PharmacyManagerOnboardingTests(TestCase):
         self.assertTrue(assignment.is_active)
         self.assertTrue(has_admin_capability(existing_owner, onboarded, CAPABILITY_MANAGE_STAFF))
 
+        # A later owner-profile submission must not turn delegated MANAGER
+        # authority into pharmacy ownership.
+        existing_owner.is_otp_verified = True
+        existing_owner.save(update_fields=["is_otp_verified"])
+        owner_client = APIClient()
+        owner_client.force_authenticate(user=existing_owner)
+        profile_response = owner_client.patch(
+            "/api/v1/owner/onboarding/me/",
+            {
+                "tab": "basic",
+                "phone_number": "0400000000",
+                "role": "MANAGER",
+                "submitted_for_verification": True,
+            },
+            format="json",
+        )
+        self.assertEqual(profile_response.status_code, 200, profile_response.content)
+        onboarded.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertIsNone(onboarded.owner_id)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+
     def test_chief_admin_can_onboard_but_region_admin_cannot(self):
         chief_response, _ = self.onboard(self.org_admin("CHIEF_ADMIN"), email="chief@new-pharmacy.test")
         self.assertEqual(chief_response.status_code, 201, chief_response.content)
@@ -174,44 +196,37 @@ class PharmacyManagerAccountTypeTests(TestCase):
 
     def test_account_type_is_chosen_once_and_admin_access_is_kept(self):
         self.assertEqual(self.choose("EXPLORER").status_code, 400)
+        self.assertEqual(self.choose("OWNER").status_code, 400)
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.role, "PHARMACY_MANAGER")
+
         response = self.choose("PHARMACIST")
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json()["role"], "PHARMACIST")
         self.assertTrue(response.json()["onboarding_url"].endswith("/dashboard/pharmacist/onboarding"))
-        self.assertEqual(self.choose("OWNER").status_code, 400, "the account type can be chosen only once")
+        self.assertEqual(self.choose("OTHER_STAFF").status_code, 400, "the account type can be chosen only once")
         self.assertTrue(has_admin_capability(self.contact, self.pharmacy, CAPABILITY_MANAGE_STAFF))
 
-    def test_owner_onboarding_submission_makes_them_the_real_owner(self):
-        self.assertEqual(self.choose("OWNER").status_code, 200)
-        self.contact.refresh_from_db()
-        response = self.client.patch(
-            "/api/v1/owner/onboarding/me/",
-            {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.pharmacy.refresh_from_db()
-        self.assertEqual(self.pharmacy.owner.user_id, self.contact.id)
-        self.assertEqual(self.pharmacy.organization_id, self.organization.id, "the pharmacy stays in its organisation")
-        self.assertEqual(
-            PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy).admin_level,
-            PharmacyAdmin.AdminLevel.OWNER,
-        )
+    def test_owner_account_type_is_rejected_and_manager_authority_is_unchanged(self):
+        response = self.choose("OWNER")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("role", response.json())
 
-    def test_owner_submission_never_takes_over_an_owned_pharmacy(self):
-        _owner, owned = make_owner_with_pharmacy("Already Owned")
-        owned.email = "manager@choice.test"
-        owned.organization = self.organization
-        owned.save(update_fields=["email", "organization"])
-        PharmacyAdmin.objects.create(user=self.contact, pharmacy=owned, admin_level=PharmacyAdmin.AdminLevel.MANAGER)
-        self.choose("OWNER")
-        self.client.patch(
-            "/api/v1/owner/onboarding/me/",
-            {"tab": "basic", "phone_number": "0400000000", "role": "MANAGER", "submitted_for_verification": True},
-            format="json",
+        self.contact.refresh_from_db()
+        self.pharmacy.refresh_from_db()
+        assignment = PharmacyAdmin.objects.get(user=self.contact, pharmacy=self.pharmacy)
+        self.assertEqual(self.contact.role, "PHARMACY_MANAGER")
+        self.assertIsNone(self.pharmacy.owner_id)
+        self.assertEqual(assignment.admin_level, PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertEqual(
+            assignment.capabilities,
+            {
+                PharmacyAdmin.CAPABILITY_MANAGE_ADMINS,
+                PharmacyAdmin.CAPABILITY_MANAGE_STAFF,
+                PharmacyAdmin.CAPABILITY_MANAGE_ROSTER,
+                PharmacyAdmin.CAPABILITY_MANAGE_COMMS,
+            },
         )
-        owned.refresh_from_db()
-        self.assertNotEqual(owned.owner.user_id, self.contact.id)
 
 
 class SelfRegistrationRoleTests(TestCase):
