@@ -223,6 +223,20 @@ class OrganizationBillingScopeTests(TestCase):
             with self.subTest(refused=user.email):
                 self.assertFalse(user_can_pay_shift_charge_for_pharmacy(user, self.pharmacy))
 
+        from client_profile.characterization_support import make_user
+        ownerless = Pharmacy.objects.create(name="Ownerless Billing Pharmacy")
+        ownerless_manager = make_user("PHARMACY_MANAGER")
+        self.PharmacyAdmin.objects.create(
+            user=ownerless_manager,
+            pharmacy=ownerless,
+            admin_level=self.PharmacyAdmin.AdminLevel.MANAGER,
+            is_active=True,
+        )
+        self.assertFalse(
+            user_can_pay_shift_charge_for_pharmacy(ownerless_manager, ownerless),
+            "delegated payer authority must not manufacture a billing owner for an ownerless standalone pharmacy",
+        )
+
     def test_operational_payer_never_becomes_billing_contact(self):
         from billing.utils import resolve_billing_account
 
