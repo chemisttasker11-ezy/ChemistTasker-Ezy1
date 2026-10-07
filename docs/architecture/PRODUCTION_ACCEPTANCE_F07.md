@@ -53,6 +53,17 @@ persona, pharmacy-selection persistence, deep-link and camera assertions remain.
 This is a harness correction, not runtime acceptance evidence. Real Android and
 iOS CI must pass on the final repaired head before F07 can close.
 
+Run `37560295352`, head `0f3a9c3`, passed deployment security, populated
+PostgreSQL upgrade/schema and the real browser journey. iOS stopped during
+`npm ci` with `ECONNRESET`; Android release compilation stopped in AsyncStorage
+release lint with `Metaspace`, after Gradle warned its limit was 512 MiB.
+Dependency installation now retries only recognized network failures, at most
+three clean lockfile installs within a 15-minute step deadline. Deterministic
+install failures still fail immediately. npm fetch settings are inherited by
+the shared-core preinstall. Android builds the emulator's x86_64 ABI with a
+3 GiB heap and 1536 MiB metaspace; release lint remains enabled. Both native
+journeys still require fresh hosted execution on the repaired commit.
+
 ## Non-goals
 
 - No database model/table additions.
