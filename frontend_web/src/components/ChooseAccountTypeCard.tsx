@@ -39,7 +39,13 @@ export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: numb
       setUser((previous) => (previous ? { ...previous, role: item.role } : previous));
       navigate(onboardingUrl ? new URL(onboardingUrl, window.location.origin).pathname : fallbackPath);
     } catch (err: any) {
-      setError(err?.response?.data?.role?.[0] ?? "Unable to save your account type.");
+      const data = err?.response?.data;
+      setError(
+        data?.role?.[0]
+        ?? data?.staff_role?.[0]
+        ?? data?.pharmacy_id?.[0]
+        ?? "Unable to save your account type.",
+      );
     } finally {
       setSaving(null);
     }
@@ -59,7 +65,7 @@ export default function ChooseAccountTypeCard({ pharmacyId }: { pharmacyId: numb
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           {ACCOUNT_TYPES.map((item) => (
             <Button
-              key={item.role}
+              key={`${item.role}:${item.staffRole}`}
               variant="outlined"
               disabled={saving != null}
               onClick={() => choose(item)}
