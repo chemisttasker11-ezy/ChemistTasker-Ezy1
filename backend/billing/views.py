@@ -19,6 +19,7 @@ from .utils import (
     get_billing_state_for_account,
     resolve_billing_account,
     user_can_manage_billing_for_pharmacy,
+    user_can_pay_shift_charge_for_pharmacy,
 )
 
 # NOTE: Will be importing shared-core pricing methods shortly
@@ -555,8 +556,8 @@ def charge_shift_fulfillment(request, shift_id):
     shift = get_object_or_404(Shift, id=shift_id)
 
     # 0. Authorization check
-    if not user_can_manage_billing_for_pharmacy(user, shift.pharmacy):
-        return Response({'error': 'Not authorized to charge this shift.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user_can_pay_shift_charge_for_pharmacy(user, shift.pharmacy):
+        return Response({'error': 'Not authorized to pay charges for this shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     account = resolve_billing_account(shift.pharmacy, acting_user=user)
     billing_state = get_billing_state_for_account(account)
@@ -708,8 +709,8 @@ def charge_penalty(request, shift_id):
     shift = get_object_or_404(Shift, id=shift_id)
 
     # 0. Authorization check
-    if not user_can_manage_billing_for_pharmacy(user, shift.pharmacy):
-        return Response({'error': 'Not authorized to penalize this shift.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user_can_pay_shift_charge_for_pharmacy(user, shift.pharmacy):
+        return Response({'error': 'Not authorized to pay charges for this shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     account = resolve_billing_account(shift.pharmacy, acting_user=user)
     sub = _get_subscription_for_account(account)
