@@ -141,9 +141,11 @@ export default function AdminOverview() {
       primaryAction={primaryAction}
       secondaryAction={secondaryAction}
       pillSummary={
-        pillSummary
-          ? { balance: pillSummary.balance, shiftPostCost: pillSummary.shift_post_cost }
-          : { balance: 0, loading: true }
+        canManageRoster
+          ? pillSummary
+            ? { balance: pillSummary.balance, shiftPostCost: pillSummary.shift_post_cost }
+            : { balance: 0, loading: true }
+          : undefined
       }
       actions={actions}
       upcoming={{
