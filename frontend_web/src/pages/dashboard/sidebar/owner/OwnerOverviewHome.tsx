@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Box, Button, Paper, Stack, Typography, Skeleton } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import ListAltIcon from "@mui/icons-material/ListAlt";
@@ -93,29 +94,29 @@ export default function OwnerOverviewHome({
       tone: "blue",
     },
     {
-      title: "Internal Roster",
-      description: "Plan coverage for your pharmacy team",
+      title: "Review roster",
+      description: "Check team coverage and upcoming shifts",
       icon: <CalendarMonthIcon />,
       onClick: onOpenRoster,
       tone: "purple",
     },
     {
-      title: "Post Shift",
-      description: "Fill an uncovered staffing requirement",
+      title: "Post a shift",
+      description: "Arrange cover where it is needed",
       icon: <ListAltIcon />,
       onClick: onPostShift,
       tone: "pink",
     },
     {
-      title: "Shift Centre",
-      description: "Resolve active, confirmed and historical work",
+      title: "Manage shift responses",
+      description: "Review active shifts and staffing responses",
       icon: <WorkOutlineIcon />,
       onClick: onOpenShifts,
       tone: "cyan",
     },
     {
-      title: "Workforce Settings",
-      description: "Attendance, payroll and workforce configuration",
+      title: "Workforce controls",
+      description: "Attendance and payroll settings",
       icon: <SettingsIcon />,
       onClick: onOpenSettings,
       tone: "purple",
@@ -154,8 +155,62 @@ export default function OwnerOverviewHome({
     },
   ];
 
+  const hasDashboardData = Boolean(dashboardData?.shift_summary);
+  const focusItems = [
+    {
+      title: "Shifts needing cover",
+      value: openShiftCount,
+      detail: "Open shifts across the selected scope",
+      action: onOpenShifts,
+      actionLabel: "Review open shifts",
+      tone: "#5222B8",
+    },
+    {
+      title: "Coverage confirmed",
+      value: confirmedShiftCount,
+      detail: "Confirmed staffing commitments",
+      action: onOpenRoster,
+      actionLabel: "View roster",
+      tone: "#075B75",
+    },
+    {
+      title: "Invoices to review",
+      value: unpaidInvoiceCount,
+      detail: unpaidInvoiceTotal + " outstanding",
+      action: () => navigate("/dashboard/owner/invoice"),
+      actionLabel: "Review invoices",
+      tone: "#8A2765",
+    },
+  ];
+
   return (
-    <DashboardOverviewTemplate
+    <Stack spacing={2.5}>
+      <Box component="section" aria-label="Owner operational snapshot">
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "end" }} gap={1} sx={{ mb: 1.5 }}>
+          <Box>
+            <Typography component="h2" sx={{ color: "#06123A", fontSize: 23, fontWeight: 800, lineHeight: 1.25 }}>What needs attention</Typography>
+            <Typography sx={{ color: "#445474", fontSize: 14, mt: 0.5 }}>Live snapshot for {scopeName}. Select a panel to act.</Typography>
+          </Box>
+          <Typography sx={{ color: "#52617C", fontSize: 12, fontWeight: 700 }}>{selectedPharmacy ? "Selected pharmacy" : "Current owner scope"}</Typography>
+        </Stack>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0,1fr))" }, gap: 1.5 }}>
+          {focusItems.map((item) => (
+            <Paper key={item.title} variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2.5, borderColor: "#DCE4F0", boxShadow: "none" }}>
+              <Typography sx={{ color: "#344563", fontSize: 13, fontWeight: 750 }}>{item.title}</Typography>
+              {hasDashboardData ? (
+                <Typography sx={{ color: item.tone, fontSize: 32, lineHeight: 1.35, fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>{item.value}</Typography>
+              ) : (
+                <Skeleton width={75} height={44} aria-label="Loading operational snapshot" />
+              )}
+              <Typography sx={{ color: "#52617C", fontSize: 13, mb: 1.5 }}>{hasDashboardData ? item.detail : "Waiting for current data"}</Typography>
+              <Button size="small" onClick={item.action} sx={{ px: 0, textTransform: "none", fontWeight: 800, justifyContent: "flex-start", minHeight: 44 }}>
+                {item.actionLabel}
+              </Button>
+            </Paper>
+          ))}
+        </Box>
+      </Box>
+      <DashboardOverviewTemplate
       title="Owner Dashboard"
       badge={selectedPharmacy ? "Internal workspace" : "Owner workspace"}
       subtitle={
@@ -205,6 +260,7 @@ export default function OwnerOverviewHome({
       }}
       onOpenShifts={onOpenShifts}
       onOpenActivity={onOpenShifts}
-    />
+      />
+    </Stack>
   );
 }
