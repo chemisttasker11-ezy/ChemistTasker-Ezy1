@@ -109,7 +109,7 @@ export default function OrganizationOverviewPage() {
   const metrics: DashboardMetric[] = [
     { label: "Pending Claims", value: pendingClaims, helper: "Awaiting approval", icon: <HowToRegIcon />, tone: "purple" },
     { label: "Approved Claims", value: acceptedClaims, helper: "Connected stores", icon: <StoreIcon />, tone: "blue" },
-    { label: "Open Shifts", value: data?.shift_summary?.open_count ?? 0, helper: selectedPharmacy ? scopeName : "Public platform", icon: <CalendarMonthIcon />, tone: "cyan" },
+    { label: "Open Shifts", value: data?.shift_summary?.open_count ?? 0, helper: selectedPharmacy ? scopeName : "All organization pharmacies", icon: <CalendarMonthIcon />, tone: "cyan" },
     { label: "Count of Shifts", value: data?.shift_summary?.all_count ?? activeShifts, helper: "Active shift records", icon: <CalendarMonthIcon />, tone: "blue" },
     { label: "Confirmed Shifts", value: data?.shift_summary?.confirmed_count ?? data?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <GroupsIcon />, tone: "pink" },
   ];
@@ -123,7 +123,7 @@ export default function OrganizationOverviewPage() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <DashboardOverviewTemplate
         title="Organization Dashboard"
-        badge={selectedPharmacy ? "Internal workspace" : "Public platform"}
+        badge={selectedPharmacy ? "Internal pharmacy" : "Organization workspace"}
         subtitle="See organization-wide staffing, pharmacy coverage and exceptions"
         heroTitle="Welcome back!"
         heroSubtitle={`Focus on staffing coverage, claims and shift activity across ${selectedPharmacy ? scopeName : "your organization"}.`}
