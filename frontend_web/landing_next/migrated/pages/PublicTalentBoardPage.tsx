@@ -5,11 +5,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Alert,
+  Box,
   Button,
+  Stack,
   Typography,
 } from "@mui/material";
 import AuthLayout from "../layouts/AuthLayout";
-import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import {useAuth} from "../contexts/AuthContext";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
 import { API_BASE_URL } from "../constants/api";
@@ -115,9 +117,36 @@ export default function PublicTalentBoardPage() {
         : "You need an account to contact talent, view profiles, or save preferences.";
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <AuthLayout title="Find Talent" maxWidth={false} noCard showTitle={false}>
+    <AuthLayout title="Find Talent" maxWidth={false} noCard showTitle={false}>
+      <Box sx={{ py: { xs: 1.5, md: 2.5 } }}>
+        <Box
+          sx={{
+            mb: 2,
+            p: { xs: 2, md: 2.5 },
+            border: '1px solid #E5ECF7',
+            borderRadius: 3,
+            bgcolor: '#fff',
+            boxShadow: '0 10px 28px rgba(6,18,58,.045)',
+          }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
+            <Box>
+              <Typography sx={{ fontWeight: 900, color: 'text.primary' }}>
+                {loading && !user ? 'Finding pharmacy talent…' : user ? 'Explore available pharmacy talent' : `${posts.length} public ${posts.length === 1 ? 'profile' : 'profiles'} available`}
+              </Typography>
+              <Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}>
+                Compare role, location, pharmacy skills, dispensing-software experience and published availability. Sign in only when you need an account action.
+              </Typography>
+            </Box>
+            {!user && (
+              <Stack direction="row" spacing={1}>
+                <Button component={RouterLink} to="/register?next=%2Ftalent%2Fpublic-board" variant="outlined">Create account</Button>
+                <Button component={RouterLink} to="/login?next=%2Ftalent%2Fpublic-board" variant="contained">Log in</Button>
+              </Stack>
+            )}
+          </Stack>
+        </Box>
+        {error && !user && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <TalentBoard
           publicMode={!user}
           externalPosts={user?undefined:posts}
@@ -125,6 +154,7 @@ export default function PublicTalentBoardPage() {
           externalError={user?undefined:error}
           onRequireLogin={openLoginDialog}
         />
+      </Box>
 
         <Dialog open={loginDialogOpen} onClose={closeLoginDialog}>
           <DialogTitle>{dialogTitle}</DialogTitle>
@@ -144,6 +174,5 @@ export default function PublicTalentBoardPage() {
           </DialogActions>
         </Dialog>
       </AuthLayout>
-    </>
   );
 }
