@@ -223,7 +223,7 @@ export default function OwnerOverviewContainer() {
     navigate(resolvePath("manage-pharmacies/my-pharmacies"));
   };
   const goToPills = () => navigate("/dashboard/owner/pills");
-  const goToSettings = () => undefined;
+  const goToSettings = () => navigate("/dashboard/workforce/settings");
   const goToPharmacyManager = (query: string) =>
     navigate(`${resolvePath("manage-pharmacies/my-pharmacies")}${query}`);
   const handleEditPharmacy = (pharmacy: PharmacyDTO) => {
