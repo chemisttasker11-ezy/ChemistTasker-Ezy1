@@ -176,12 +176,10 @@ def _worker_visible_pharmacy_shifts(user, pharmacy_ids):
     if not eligible_filter:
         return Shift.objects.none()
 
-    role = str(getattr(user, "role", "") or "").upper()
-    qs = Shift.objects.filter(eligible_filter)
-    if role == "PHARMACIST":
-        qs = qs.filter(role_needed="PHARMACIST")
-    elif role == "OTHER_STAFF":
-        qs = qs.exclude(role_needed="PHARMACIST")
+    qs = Shift.objects.filter(
+        eligible_filter,
+        role_needed__in=_shift_roles_visible_to_user(user),
+    )
     return qs.distinct()
 
 
