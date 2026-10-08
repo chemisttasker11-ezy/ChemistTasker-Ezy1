@@ -558,6 +558,7 @@ const router = createBrowserRouter([
               { path: 'community', element: <CommunityShiftsPage /> },
             ],
           },
+          { path: 'availability', element: <SetAvailabilityPage /> },
           { path: 'interests', element: <TalentBoard /> },
           { path: 'chat', element: <ChatPage /> },
           { path: 'learning', element: <LearningMaterialsPage /> },
