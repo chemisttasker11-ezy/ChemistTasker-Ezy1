@@ -147,6 +147,7 @@ export default function DashboardOverviewTemplate({
   metrics,
   invoicePanel,
   onOpenShifts,
+  onOpenActivity,
 }: {
   title: string;
   badge: string;
@@ -170,6 +171,7 @@ export default function DashboardOverviewTemplate({
   metrics: DashboardMetric[];
   invoicePanel?: DashboardInvoicePanel;
   onOpenShifts?: () => void;
+  onOpenActivity?: () => void;
 }) {
   const navigate = useNavigate();
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
@@ -181,6 +183,7 @@ export default function DashboardOverviewTemplate({
     }
   };
   const handleOpenActivity = () => {
+    onOpenActivity?.();
     setActivityDialogLoading(true);
     setActivityDialogOpen(true);
     window.setTimeout(() => setActivityDialogLoading(false), 250);
