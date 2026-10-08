@@ -108,8 +108,8 @@ export default function AdminOverview() {
   const metrics: DashboardMetric[] = [
     { label: "Open Shifts", value: dashboardData?.shift_summary?.open_count ?? 0, helper: pharmacyName, icon: <CalendarMonthIcon />, tone: "blue" },
     { label: "Confirmed Shifts", value: dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <WorkOutlineIcon />, tone: "purple" },
-    { label: "Count of Shifts", value: dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? 0, helper: "Active shift records", icon: <ManageAccountsIcon />, tone: "cyan" },
-    { label: "Unpaid Invoices", value: dashboardData?.invoice_summary?.unpaid_count ?? 0, helper: dashboardData?.invoice_summary?.unpaid_total ?? "$0.00", icon: <StoreIcon />, tone: "pink" },
+    { label: "Active Shifts", value: dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? 0, helper: "Current staffing work", icon: <ManageAccountsIcon />, tone: "cyan" },
+    { label: "Today", value: dashboardData?.upcoming_stats?.today ?? 0, helper: "Shifts needing today's attention", icon: <AccessTimeIcon />, tone: "pink" },
   ];
   const activityItems = Array.isArray(dashboardData?.activity)
     ? dashboardData.activity.map((item: any) => ({
