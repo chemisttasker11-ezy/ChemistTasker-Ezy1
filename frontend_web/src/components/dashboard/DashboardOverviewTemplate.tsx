@@ -64,6 +64,17 @@ export type DashboardActivity = {
   actionUrl?: string;
 };
 
+export type DashboardShiftPreview = {
+  id: number;
+  pharmacy_name?: string;
+  suburb?: string | null;
+  date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  status?: string;
+  reason?: string | null;
+};
+
 type PillSummary = {
   balance: number;
   shiftPostCost?: number | null;
@@ -123,6 +134,11 @@ export default function DashboardOverviewTemplate({
   secondaryAction,
   pillSummary,
   actions,
+  workerShifts,
+  recommendedShifts,
+  onOpenWorkerShift,
+  onBrowseRecommendations,
+  onUpdateAvailability,
   upcoming,
   upcomingTitle = "Upcoming Shifts",
   activity = [],
@@ -140,6 +156,11 @@ export default function DashboardOverviewTemplate({
   secondaryAction?: { label: string; icon?: React.ReactNode; onClick: () => void };
   pillSummary?: PillSummary;
   actions: DashboardAction[];
+  workerShifts?: DashboardShiftPreview[];
+  recommendedShifts?: DashboardShiftPreview[];
+  onOpenWorkerShift?: (shift: DashboardShiftPreview) => void;
+  onBrowseRecommendations?: () => void;
+  onUpdateAvailability?: () => void;
   upcoming: UpcomingStat;
   upcomingTitle?: string;
   activity?: DashboardActivity[];
@@ -271,6 +292,110 @@ export default function DashboardOverviewTemplate({
               )}
             </Stack>
           </Paper>
+
+          {(workerShifts || recommendedShifts) && (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", lg: "repeat(2, minmax(0, 1fr))" },
+                gap: { xs: 1.5, md: 2.5 },
+                minWidth: 0,
+              }}
+            >
+              <Paper sx={{ borderRadius: { xs: "16px", md: "20px" }, border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2, md: 2.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 1.5 }}>
+                  <Box>
+                    <Typography sx={{ fontSize: { xs: 19, md: 21 }, fontWeight: 950, color: DNA.ink }}>My next shifts</Typography>
+                    <Typography sx={{ mt: 0.35, color: DNA.muted, fontSize: 13, fontWeight: 700 }}>
+                      Only shifts you applied to, showed interest in, committed to, or have confirmed.
+                    </Typography>
+                  </Box>
+                  <CalendarMonthIcon sx={{ color: DNA.violet, flexShrink: 0 }} />
+                </Stack>
+                <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
+                  {(workerShifts ?? []).length === 0 ? (
+                    <Box sx={{ py: 2 }}>
+                      <Typography sx={{ color: DNA.ink, fontWeight: 900, fontSize: 14 }}>Nothing pending or committed yet.</Typography>
+                      <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5 }}>
+                        Your matched opportunities stay separate so they are never mistaken for booked work.
+                      </Typography>
+                    </Box>
+                  ) : (workerShifts ?? []).slice(0, 4).map((shift) => (
+                    <ButtonBase
+                      key={shift.id}
+                      onClick={() => onOpenWorkerShift?.(shift)}
+                      sx={{ width: "100%", textAlign: "left", borderRadius: 1.5, "&:hover": { bgcolor: alpha(DNA.violet, 0.045) } }}
+                    >
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ width: "100%", py: 1.45, px: 0.5, minWidth: 0 }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14.5 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
+                          <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 12.5 }}>
+                            {[shift.date, shift.start_time && shift.end_time ? `${shift.start_time}–${shift.end_time}` : null, shift.suburb].filter(Boolean).join(" · ")}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={shift.status || "In progress"}
+                          sx={{ flexShrink: 0, bgcolor: shift.status === "Confirmed" ? "#E8F7EF" : "#EFE7FF", color: shift.status === "Confirmed" ? "#137A43" : DNA.violet, fontWeight: 900 }}
+                        />
+                      </Stack>
+                    </ButtonBase>
+                  ))}
+                </Stack>
+              </Paper>
+
+              <Paper sx={{ borderRadius: { xs: "16px", md: "20px" }, border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2, md: 2.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 1.5 }}>
+                  <Box>
+                    <Typography sx={{ fontSize: { xs: 19, md: 21 }, fontWeight: 950, color: DNA.ink }}>Recommended for you</Typography>
+                    <Typography sx={{ mt: 0.35, color: DNA.muted, fontSize: 13, fontWeight: 700 }}>
+                      Open shifts matching your declared availability and travel area.
+                    </Typography>
+                  </Box>
+                  <FavoriteBorderIcon sx={{ color: DNA.magenta, flexShrink: 0 }} />
+                </Stack>
+                <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
+                  {(recommendedShifts ?? []).length === 0 ? (
+                    <Box sx={{ py: 2 }}>
+                      <Typography sx={{ color: DNA.ink, fontWeight: 900, fontSize: 14 }}>No current availability match.</Typography>
+                      <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5 }}>
+                        Keep your availability and travel preferences current for better matches.
+                      </Typography>
+                    </Box>
+                  ) : (recommendedShifts ?? []).slice(0, 4).map((shift) => (
+                    <ButtonBase
+                      key={shift.id}
+                      onClick={() => onOpenWorkerShift?.(shift)}
+                      sx={{ width: "100%", textAlign: "left", borderRadius: 1.5, "&:hover": { bgcolor: alpha(DNA.magenta, 0.04) } }}
+                    >
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ width: "100%", py: 1.45, px: 0.5, minWidth: 0 }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14.5 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
+                          <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 12.5 }}>
+                            {[shift.date, shift.start_time && shift.end_time ? `${shift.start_time}–${shift.end_time}` : null, shift.suburb].filter(Boolean).join(" · ")}
+                          </Typography>
+                          {shift.reason && <Typography noWrap sx={{ color: "#008EA6", fontWeight: 800, fontSize: 12, mt: 0.25 }}>{shift.reason}</Typography>}
+                        </Box>
+                        <ArrowForwardIcon sx={{ color: DNA.blue, flexShrink: 0 }} />
+                      </Stack>
+                    </ButtonBase>
+                  ))}
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
+                  {onBrowseRecommendations && (
+                    <Button onClick={onBrowseRecommendations} endIcon={<ArrowForwardIcon />} sx={{ px: 0, justifyContent: "flex-start", color: DNA.blue, fontWeight: 950, textTransform: "none" }}>
+                      Browse matching shifts
+                    </Button>
+                  )}
+                  {onUpdateAvailability && (
+                    <Button onClick={onUpdateAvailability} sx={{ px: { xs: 0, sm: 1.25 }, justifyContent: "flex-start", color: DNA.muted, fontWeight: 900, textTransform: "none" }}>
+                      Update availability
+                    </Button>
+                  )}
+                </Stack>
+              </Paper>
+            </Box>
+          )}
 
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: { xs: 1.5, md: 2.5 }, minWidth: 0 }}>
             {actions.map((action) => {
