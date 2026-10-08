@@ -29,7 +29,6 @@ import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
 import type { AdminAssignment } from "./contexts/AuthContext";
 import {
-  ADMIN_CAPABILITY_MANAGE_ADMINS,
   ADMIN_CAPABILITY_MANAGE_COMMUNICATIONS,
   ADMIN_CAPABILITY_MANAGE_ROSTER,
   ADMIN_CAPABILITY_MANAGE_STAFF,
@@ -308,8 +307,6 @@ export function getAdminNav({
   const buildPath = (suffix: string) => `${adminBase}/${suffix}`.replace(/\/+/g, "/");
 
   const isOwner = userRole === "OWNER";
-  const canManageAdmins =
-    capabilitySet.has(ADMIN_CAPABILITY_MANAGE_ADMINS) || isOwner || !hasAnyAssignments;
   const canManageStaff =
     capabilitySet.has(ADMIN_CAPABILITY_MANAGE_STAFF) || isOwner || !hasAnyAssignments;
   const canManageRoster =
@@ -339,23 +336,25 @@ export function getAdminNav({
     );
   }
 
-  if (canManageAdmins) {
-  }
-
   navigation.push({ kind: "divider" as const });
 
   if (canManageStaff || canManageRoster) {
     navigation.push({ kind: "header" as const, title: "Manage Pharmacies and Shifts" });
     if (canManageStaff) {
+      const manageChildren: Navigation = [
+        { segment: "my-pharmacies", title: "My Pharmacies", icon: <StoreIcon /> },
+      ];
+      if (canManageRoster) {
+        manageChildren.push(
+          { segment: "roster", title: "Internal Roster", icon: <EventAvailableIcon /> },
+          { segment: "attendance-reviews", title: "Attendance Approvals", icon: <CheckCircleIcon /> },
+        );
+      }
       navigation.push({
         segment: buildPath("manage-pharmacies"),
         title: "Manage Pharmacies",
         icon: <MedicationLiquidIcon />,
-        children: [
-          { segment: "my-pharmacies", title: "My Pharmacies", icon: <StoreIcon /> },
-          { segment: "roster", title: "Internal Roster", icon: <EventAvailableIcon /> },
-          { segment: "attendance-reviews", title: "Attendance Approvals", icon: <CheckCircleIcon /> },
-        ],
+        children: manageChildren,
       });
       navigation.push(
         { segment: "dashboard/workforce/settings", title: "Workforce & Payroll", icon: <ManageAccountsSharpIcon /> },
@@ -547,11 +546,8 @@ export function getExplorerNav(_progress_percent: number, hasUnreadMessages: boo
       children: [
         { segment: 'public', title: 'Public Shifts', icon: <PublicIcon /> },
         { segment: 'community', title: 'Community Shifts', icon: <GroupsIcon /> },
-        { segment: 'confirmed', title: 'Confirmed Shifts', icon: <CheckCircleIcon /> },
-        { segment: 'history', title: 'Shifts History', icon: <HistoryIcon /> },
       ],
     },
-    { segment: 'dashboard/explorer/availability', title: 'Availability', icon: <EventAvailableIcon /> },
     { segment: 'dashboard/explorer/interests', title: 'Talent Hub', icon: <PersonSearchIcon /> },
     { kind: 'divider' as const },
     { kind: 'header' as const, title: 'Learning & Community' },
