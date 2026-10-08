@@ -43,6 +43,7 @@ export default function OrganizationOverviewPage() {
     orgCapabilities.has("view_all_pharmacies") ||
     orgCapabilities.has("assign_pharmacies");
   const canManageCommunications = orgCapabilities.has("manage_communications");
+  const canManageBilling = orgMembership?.role === "ORG_ADMIN";
 
   useEffect(() => {
     if (!orgId) return;
@@ -178,10 +179,24 @@ export default function OrganizationOverviewPage() {
         }
         actions={actions}
         upcoming={upcoming}
+        showUpcoming={canManageRoster}
         activity={activityItems}
         metrics={metrics}
-        onOpenShifts={() => navigate("/dashboard/organization/shift-center")}
-        onOpenActivity={() => navigate("/dashboard/organization/shift-center")}
+        invoicePanel={
+          canManageBilling
+            ? {
+                title: "Invoices",
+                total: data?.invoice_summary?.total_billed ?? data?.bills_summary?.total_billed ?? "$0.00",
+                totalLabel: selectedPharmacy ? `Invoice value for ${scopeName}` : "Invoice value across the organization",
+                unpaidCount: data?.invoice_summary?.unpaid_count ?? 0,
+                unpaidTotal: data?.invoice_summary?.unpaid_total ?? "$0.00",
+                buttonLabel: "Review invoices",
+                onClick: () => navigate("/dashboard/organization/invoice"),
+              }
+            : undefined
+        }
+        onOpenShifts={canManageRoster ? () => navigate("/dashboard/organization/shift-center") : undefined}
+        onOpenActivity={canManageRoster ? () => navigate("/dashboard/organization/shift-center") : undefined}
       />
       {!data && !error && <CircularProgress size={24} />}
       {error && <Alert severity="error">{error}</Alert>}
