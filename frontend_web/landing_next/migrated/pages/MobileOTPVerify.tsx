@@ -12,7 +12,6 @@ import {
   Stack,
 } from '@mui/material';
 import AuthLayout from '../layouts/AuthLayout';
-import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,6 +26,13 @@ export default function MobileOTPVerify() {
   const [status, setStatus]   = useState('');
   const [error, setError]     = useState('');
   const [identityLocked, setIdentityLocked] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (!user) return;
@@ -61,6 +67,7 @@ export default function MobileOTPVerify() {
         mobile_number: mobile,
       });
       setStatus('We sent a code to your mobile.');
+      setResendCooldown(30);
     } catch (err) {
       setError(extractError(err, 'Failed to send code.'));
     } finally {
@@ -109,6 +116,7 @@ export default function MobileOTPVerify() {
     try {
       await apiClient.post('/users/mobile/resend-otp/', {});
       setStatus('A new code has been sent to your mobile.');
+      setResendCooldown(30);
     } catch (err) {
       setError(extractError(err, 'Could not resend code.'));
     } finally {
@@ -117,8 +125,6 @@ export default function MobileOTPVerify() {
   };
 
   return (
-    <>
-      <PublicLogoTopBar />
       <AuthLayout title="Mobile Verification">
         <Box
           sx={{
@@ -146,6 +152,7 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="First Legal Name"
+              autoComplete="given-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               required
@@ -156,6 +163,7 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="Last Legal Name"
+              autoComplete="family-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
@@ -166,6 +174,7 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="Username"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -176,6 +185,8 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="Mobile Number"
+              type="tel"
+              autoComplete="tel"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               placeholder="e.g., 041x xxx xxx"
@@ -199,9 +210,11 @@ export default function MobileOTPVerify() {
             <TextField
               fullWidth
               margin="normal"
-              label="Enter OTP Code"
+              label="Verification code"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
+              autoComplete="one-time-code"
+              inputProps={{ inputMode: 'numeric' }}
               required
             />
           </Stack>
@@ -212,7 +225,7 @@ export default function MobileOTPVerify() {
               type="submit"
               variant="contained"
               disabled={loading}
-              sx={{ py: 1.5, backgroundColor: '#5222B8', '&:hover': { backgroundColor: '#00877d' } }}
+              sx={{ py: 1.5 }}
             >
               {loading ? <CircularProgress size={24} color="inherit" /> : 'Verify'}
             </Button>
@@ -220,8 +233,8 @@ export default function MobileOTPVerify() {
         </form>
 
         <Box mt={2} textAlign="center">
-          <Link component="button" onClick={handleResend} disabled={loading} color="#5222B8">
-            Resend Code
+          <Link component="button" onClick={handleResend} disabled={loading || resendCooldown > 0} color="primary.main">
+            {resendCooldown > 0 ? `Resend available in ${resendCooldown}s` : 'Resend code'}
           </Link>
         </Box>
 
@@ -232,6 +245,5 @@ export default function MobileOTPVerify() {
           </Link>
         </Typography>
       </AuthLayout>
-    </>
   );
 }
