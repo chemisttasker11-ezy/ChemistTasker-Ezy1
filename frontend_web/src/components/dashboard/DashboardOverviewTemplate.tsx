@@ -171,7 +171,7 @@ export default function DashboardOverviewTemplate({
         mx: "auto",
         maxWidth: 1660,
         color: DNA.ink,
-        fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
+        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
         display: "flex",
         flexDirection: "column",
         gap: { xs: 2, md: 3.5 },
@@ -179,7 +179,7 @@ export default function DashboardOverviewTemplate({
     >
       <Box>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-          <Typography sx={{ fontSize: { xs: 26, md: 34 }, lineHeight: 1.08, fontWeight: 950, color: DNA.ink, overflowWrap: "anywhere" }}>
+          <Typography sx={{ fontSize: { xs: 25, md: 32 }, lineHeight: 1.08, fontWeight: 950, color: DNA.ink, overflowWrap: "anywhere" }}>
             {title}
           </Typography>
           <Chip
@@ -211,8 +211,8 @@ export default function DashboardOverviewTemplate({
         <Stack spacing={{ xs: 2, md: 3 }} sx={{ minWidth: 0 }}>
           <Paper
             sx={{
-              p: { xs: 2, sm: 3, md: 4 },
-              minHeight: { xs: "auto", md: 290 },
+              p: { xs: 2, sm: 2.75, md: 3.25 },
+              minHeight: { xs: "auto", md: 224 },
               borderRadius: { xs: "18px", md: "22px" },
               backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
               color: "#fff",
@@ -236,14 +236,14 @@ export default function DashboardOverviewTemplate({
             />
             <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 2.25, md: 5 }} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between" sx={{ position: "relative", zIndex: 1, minWidth: 0 }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h4" fontWeight={950} gutterBottom sx={{ fontSize: { xs: 28, sm: 38, md: 50 }, lineHeight: 1.08, overflowWrap: "anywhere" }}>
+                <Typography variant="h4" fontWeight={950} gutterBottom sx={{ fontSize: { xs: 28, sm: 34, md: 40 }, lineHeight: 1.08, overflowWrap: "anywhere" }}>
                   {heroTitle}
                 </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 800, fontSize: { xs: 15, md: 18 }, lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 800, fontSize: { xs: 14, md: 14.5 }, lineHeight: 1.45, overflowWrap: "anywhere" }}>
                   {heroSubtitle}
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: { xs: 2, md: 3 }, "& > *": { width: { xs: "100%", sm: "auto" } } }}>
-                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: DNA.blue, borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
+                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: DNA.blue, borderRadius: "12px", fontWeight: 950, minHeight: { xs: 46, md: 48 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
                     {primaryAction.label}
                   </Button>
                   {secondaryAction && (
@@ -276,13 +276,13 @@ export default function DashboardOverviewTemplate({
             {actions.map((action) => {
               const tone = toneStyles[action.tone];
               return (
-                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ minHeight: { xs: 132, md: 196 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
+                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ minHeight: { xs: 124, md: 148 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
                   <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
-                    <Box sx={{ width: { xs: 52, md: 64 }, height: { xs: 52, md: 64 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 28, md: 34 } } }}>
+                    <Box sx={{ width: { xs: 48, md: 54 }, height: { xs: 48, md: 54 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 26, md: 30 } } }}>
                       {action.icon}
                     </Box>
                     <Stack spacing={{ xs: 0.75, md: 1.15 }} sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography fontWeight={950} color={DNA.ink} sx={{ fontSize: { xs: 20, md: 22 }, lineHeight: 1.12, overflowWrap: "anywhere" }}>{action.title}</Typography>
+                      <Typography fontWeight={950} color={DNA.ink} sx={{ fontSize: { xs: 18, md: 19 }, lineHeight: 1.12, overflowWrap: "anywhere" }}>{action.title}</Typography>
                       <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.32, maxWidth: action.wide ? 360 : { xs: "none", md: 220 }, overflowWrap: "anywhere" }}>{action.description}</Typography>
                     </Stack>
                   </Stack>
