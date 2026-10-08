@@ -210,8 +210,6 @@ export default function OwnerOverviewContainer() {
   const goToRoster = () => navigate(resolvePath("manage-pharmacies/roster"));
   const goToShifts = () => navigate(resolvePath("shift-center"));
   const goToPostShift = () => navigate(resolvePath("post-shift"));
-  const goToProfile = () => navigate(resolvePath("onboarding"));
-  const goToInterests = () => navigate(resolvePath("interests"));
   const goToManagePharmacies = () => {
     if (pharmacies.length === 1) {
       const pharmacyId = pharmacies[0].id;
@@ -257,8 +255,6 @@ export default function OwnerOverviewContainer() {
             onOpenRoster={goToRoster}
             onOpenShifts={goToShifts}
             onPostShift={goToPostShift}
-            onOpenProfile={goToProfile}
-            onOpenInterests={goToInterests}
             onOpenSettings={goToSettings}
             onOpenPills={goToPills}
           />
