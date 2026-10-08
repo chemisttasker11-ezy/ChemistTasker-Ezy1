@@ -525,14 +525,12 @@ export function getExplorerNav(_progress_percent: number, hasUnreadMessages: boo
   return [
     { kind: 'header' as const, title: 'Profile settings' },
     { segment: 'dashboard/explorer/overview', title: 'Overview', icon: <DashboardIcon /> },
-
     {
       segment: 'dashboard/explorer/onboarding',
       title: 'Profile',
       icon: <ManageAccountsSharpIcon />,
       action: <ProfileStatusAction onboardingKey="explorer" progressPercent={_progress_percent} />,
     },
-
     {
       segment: 'dashboard/explorer/chat',
       title: 'Chat',
@@ -540,9 +538,21 @@ export function getExplorerNav(_progress_percent: number, hasUnreadMessages: boo
       action: hasUnreadMessages ? <NewMessagesChip /> : null,
     },
     { kind: 'divider' as const },
-    { kind: 'header' as const, title: 'Learning & Explorer Hub' },
-    { segment: 'dashboard/explorer/calendar', title: 'Calendar', icon: <CalendarMonthIcon /> },
+    { kind: 'header' as const, title: 'Opportunities' },
+    {
+      segment: 'dashboard/explorer/shifts',
+      title: 'Shifts',
+      icon: <WorkOutlineIcon />,
+      children: [
+        { segment: 'public', title: 'Public Shifts', icon: <PublicIcon /> },
+        { segment: 'community', title: 'Community Shifts', icon: <GroupsIcon /> },
+      ],
+    },
+    { segment: 'dashboard/explorer/availability', title: 'Availability', icon: <EventAvailableIcon /> },
     { segment: 'dashboard/explorer/interests', title: 'Talent Hub', icon: <PersonSearchIcon /> },
+    { kind: 'divider' as const },
+    { kind: 'header' as const, title: 'Learning & Community' },
+    { segment: 'dashboard/explorer/calendar', title: 'Calendar', icon: <CalendarMonthIcon /> },
     { segment: 'dashboard/explorer/learning', title: 'Learning Materials', icon: <SchoolIcon /> },
     { kind: 'divider' as const },
     { segment: 'dashboard/explorer/logout', title: 'Logout', icon: <LogoutIcon /> },
