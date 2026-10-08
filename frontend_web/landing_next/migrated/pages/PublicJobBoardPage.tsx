@@ -9,10 +9,10 @@ import {
   DialogContent,
   DialogTitle,
   Snackbar,
+  Stack,
   Typography,
 } from '@mui/material';
 import ShiftsBoard from './dashboard/sidebar/ShiftsBoard';
-import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import {
   Shift,
   ShiftCounterOfferPayload,
@@ -364,15 +364,43 @@ export default function PublicJobBoardPage() {
   const handleCloseError = () => setErrorOpen(false);
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <AuthLayout title="Public Job Board" maxWidth={false} noCard showTitle={false}>
-        <Box sx={{ px: { xs: 2, lg: 3 }, py: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
-          {error && (
-            <Typography color="error" sx={{ mb: 1 }}>
-              {error}
-            </Typography>
-          )}
+    <AuthLayout title="Public Job Board" maxWidth={false} noCard showTitle={false}>
+      <Box sx={{ px: { xs: 0, md: 1 }, py: { xs: 1.5, md: 2.5 } }}>
+        <Box
+          sx={{
+            mb: 2,
+            p: { xs: 2, md: 2.5 },
+            border: '1px solid #E5ECF7',
+            borderRadius: 3,
+            bgcolor: '#fff',
+            boxShadow: '0 10px 28px rgba(6,18,58,.045)',
+          }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
+            <Box>
+              <Typography sx={{ fontWeight: 900, color: 'text.primary' }}>
+                {loading ? 'Finding current pharmacy opportunities…' : `${totalCount ?? shifts.length} current ${(totalCount ?? shifts.length) === 1 ? 'opportunity' : 'opportunities'}`}
+              </Typography>
+              <Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}>
+                Filter by role, location, date, work type and shift preferences. You can explore without signing in; applying and counter offers use your ChemistTasker account.
+              </Typography>
+            </Box>
+            {!user && (
+              <Stack direction="row" spacing={1}>
+                <Button component={RouterLink} to="/register?next=%2Fshifts%2Fpublic-board" variant="outlined">Create account</Button>
+                <Button component={RouterLink} to="/login?next=%2Fshifts%2Fpublic-board" variant="contained">Log in</Button>
+              </Stack>
+            )}
+          </Stack>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error} You can retry from the board without losing your filters.
+          </Alert>
+        )}
+
+        <Box sx={{ borderRadius: 3, overflow: 'hidden' }}>
           <ShiftsBoard
             title="Public Job Board"
             shifts={shifts}
@@ -401,6 +429,7 @@ export default function PublicJobBoardPage() {
             onRefresh={() => loadShifts(filters, page)}
           />
         </Box>
+      </Box>
 
         <Dialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)}>
           <DialogTitle>Log in to apply</DialogTitle>
@@ -426,6 +455,5 @@ export default function PublicJobBoardPage() {
           </Alert>
         </Snackbar>
       </AuthLayout>
-    </>
   );
 }
