@@ -102,8 +102,6 @@ export default function OwnerOverviewHome({
   onOpenRoster,
   onOpenShifts,
   onPostShift,
-  onOpenProfile,
-  onOpenInterests,
   onOpenSettings,
   onOpenPills,
   dashboardData,
@@ -116,8 +114,6 @@ export default function OwnerOverviewHome({
   onOpenRoster: () => void;
   onOpenShifts: () => void;
   onPostShift: () => void;
-  onOpenProfile: () => void;
-  onOpenInterests: () => void;
   onOpenSettings: () => void;
   onOpenPills: () => void;
 }) {
