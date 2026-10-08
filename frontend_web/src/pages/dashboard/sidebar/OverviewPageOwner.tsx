@@ -111,6 +111,21 @@ export default function OverviewPageOwner() {
   }, [effectivePharmacyId, workspace]);
 
   const shifts = useMemo(() => data?.shifts ?? [], [data?.shifts]);
+  const scopedInvoices = useMemo(() => {
+    if (!effectivePharmacyId) return invoices;
+    const matches = invoices.filter((invoice: any) => {
+      const invoicePharmacyId = Number(
+        invoice?.pharmacy_id ??
+          invoice?.pharmacyId ??
+          invoice?.pharmacy?.id ??
+          invoice?.pharmacy_id_snapshot,
+      );
+      return Number.isFinite(invoicePharmacyId) && invoicePharmacyId === effectivePharmacyId;
+    });
+    // Some legacy invoice payloads expose only a pharmacy-name snapshot. In that
+    // case retain the received list rather than incorrectly hiding valid invoices.
+    return matches.length > 0 ? matches : invoices;
+  }, [effectivePharmacyId, invoices]);
 
   if (loading) {
     return (
@@ -372,12 +387,12 @@ export default function OverviewPageOwner() {
         <Divider sx={{ my: 2 }} />
 
         <Stack spacing={1.5}>
-          {invoices.length === 0 ? (
+          {scopedInvoices.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               No received invoices yet. When pharmacists submit an invoice for your pharmacy, it will appear here.
             </Typography>
           ) : (
-            invoices.slice(0, 5).map((inv) => {
+            scopedInvoices.slice(0, 5).map((inv) => {
               const status = String(inv.status || "sent").toLowerCase();
               const isPaid = status === "paid";
               return (
