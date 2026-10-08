@@ -16,6 +16,7 @@ from organizations.models import Chain
 from organizations.serializers import user_can_view_full_pharmacy
 from shifts.emails import build_shift_email_context
 from shifts.pricing import expand_shift_slots
+from shifts.access import _user_can_perform_shift_role
 from shifts.travel import haversine_km
 from talent.models import UserAvailability
 
@@ -314,7 +315,7 @@ def find_availability_matched_shifts(user, shifts_qs, *, limit=6):
     )
 
     for shift in candidates[:80]:
-        if not _role_matches_shift(role, shift.role_needed):
+        if not _user_can_perform_shift_role(user, shift.role_needed):
             continue
         if not _user_can_travel_to_shift(pref_row, shift):
             continue
