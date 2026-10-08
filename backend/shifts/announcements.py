@@ -28,7 +28,6 @@ SHIFT_EMAIL_RECIPIENT_CAP = 50
 def _collect_membership_users(shift, pharmacy_ids, employment_types):
     qs = Membership.objects.filter(
         pharmacy_id__in=pharmacy_ids,
-        role=shift.role_needed,
         employment_type__in=employment_types,
         is_active=True,
         user__is_active=True,
@@ -39,6 +38,8 @@ def _collect_membership_users(shift, pharmacy_ids, employment_types):
         if not user or not user.email:
             continue
         if shift.created_by_id and user.id == shift.created_by_id:
+            continue
+        if not _user_can_perform_shift_role(user, shift.role_needed):
             continue
         users.append(user)
     return users
