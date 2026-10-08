@@ -115,8 +115,8 @@ function ProfileStatusAction({
   );
 }
 
-export function getOrganizationNav(hasUnreadMessages: boolean, capabilities: string[] = []): Navigation {
-  const capabilitySet = new Set(capabilities);
+export function getOrganizationNav(hasUnreadMessages: boolean, capabilities: unknown[] = []): Navigation {
+  const capabilitySet = new Set(capabilities.map((capability) => String(capability)));
   const canManageRoster = capabilitySet.has("manage_roster");
   const canManageStaff = capabilitySet.has("manage_staff");
   const canManageComms = capabilitySet.has("manage_communications");
