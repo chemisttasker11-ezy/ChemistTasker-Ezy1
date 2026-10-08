@@ -6,12 +6,14 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
   Menu,
   MenuItem,
   Stack,
   Typography,
 } from "@mui/material";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import StoreIcon from "@mui/icons-material/Store";
 import PublicIcon from "@mui/icons-material/Public";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
@@ -352,6 +354,12 @@ export default function DashboardTopShell({
   const selectedPharmacy = pharmacies.find((item) => item.id === selectedPharmacyId) ?? null;
   const title = titleOverride ?? dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType);
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
+  const dashboardHomePath =
+    forceAdminScope && activeAdminPharmacyId
+      ? `/dashboard/admin/${activeAdminPharmacyId}/overview`
+      : isOrgUser && location.pathname.startsWith("/dashboard/organization/")
+        ? "/dashboard/organization/overview"
+        : workerOverviewPath(user?.role);
 
   useEffect(() => {
     const initialVerified = hasVerifiedWorkerProfile(user);
@@ -514,7 +522,7 @@ export default function DashboardTopShell({
           minHeight: "100vh",
           bgcolor: "var(--ct-page-bg)",
           color: "var(--ct-text-primary)",
-          fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
+          fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
           position: "relative",
           isolation: "isolate",
           "&::before": {
@@ -546,34 +554,12 @@ export default function DashboardTopShell({
           display: "flex",
           justifyContent: "center",
           alignItems: "stretch",
-          minHeight: { xs: 76, md: 82 },
-          background: "rgba(255,255,255,0.94)",
-          backdropFilter: "blur(16px)",
-          borderBottom: "1px solid var(--ct-border-color)",
-          boxShadow: "0 8px 24px rgba(6,18,58,0.05)",
+          minHeight: { xs: 72, md: 85 },
+          background: "rgba(255,255,255,0.93)",
+          backdropFilter: "blur(15px)",
+          borderBottom: "1px solid #EDF0F5",
+          boxShadow: "0 6px 18px rgba(6,18,58,0.035)",
           overflow: "hidden",
-          "&::before": {
-            content: '""',
-            position: "absolute",
-            left: "18%",
-            top: -120,
-            width: 320,
-            height: 320,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 72%)",
-            pointerEvents: "none",
-          },
-          "&::after": {
-            content: '""',
-            position: "absolute",
-            right: -60,
-            bottom: -140,
-            width: 360,
-            height: 360,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(139,28,246,0.18) 0%, rgba(139,28,246,0) 72%)",
-            pointerEvents: "none",
-          },
         }}
       >
         <Stack
@@ -583,32 +569,49 @@ export default function DashboardTopShell({
           sx={{
             width: "100%",
             maxWidth: 1660,
-            minHeight: { xs: 76, md: 82 },
-            px: { xs: 0.75, sm: 1.5, md: 2, xl: 3 },
+            minHeight: { xs: 72, md: 85 },
+            px: { xs: 2.25, md: 3, xl: 4 },
             overflow: "hidden",
           }}
         >
-        <Button
-          onClick={(event) => setMenuAnchor(event.currentTarget)}
+        <Box
           sx={{
-            position: "relative",
-            width: { xs: 76, sm: 184, md: 220, xl: 238 },
-            minHeight: { xs: 76, md: 82 },
-            flexShrink: 0,
-            borderRadius: 0,
-            background: "transparent",
-            borderRight: "1px solid var(--ct-border-color)",
-            boxShadow: "none",
-            p: { xs: 0.75, sm: 1, md: 1.25 },
-            "&:hover": {
-              background: "var(--ct-hover-bg)",
-            },
-
+            width: { xs: 112, md: 132 },
+            flex: "0 0 auto",
+            display: "flex",
+            alignItems: "center",
           }}
         >
-          <Box component="img" src={menuLogo} alt="ChemistTasker" sx={{ maxWidth: "100%", maxHeight: { xs: 46, md: 54 }, objectFit: "contain" }} />
-          <KeyboardArrowDownIcon sx={{ ml: { xs: 0.25, md: 1 }, fontSize: { xs: 18, md: 24 }, color: "var(--ct-text-primary)", transform: menuAnchor ? "rotate(180deg)" : "none", transition: "transform .18s" }} />
-        </Button>
+          <Button
+            onClick={() => navigate(dashboardHomePath)}
+            aria-label="ChemistTasker dashboard home"
+            sx={{
+              width: "100%",
+              minWidth: 0,
+              minHeight: 44,
+              p: 0,
+              justifyContent: "flex-start",
+              borderRadius: 1.5,
+              "&:hover": { bgcolor: "transparent", opacity: 0.88 },
+              "&:focus-visible": {
+                outline: "3px solid rgba(0,141,219,.28)",
+                outlineOffset: 3,
+              },
+            }}
+          >
+            <Box
+              component="img"
+              src={menuLogo}
+              alt="ChemistTasker"
+              sx={{
+                display: "block",
+                width: { xs: 112, md: 132 },
+                height: "auto",
+                objectFit: "contain",
+              }}
+            />
+          </Button>
+        </Box>
         <MegaMenu
           anchorEl={menuAnchor}
           open={Boolean(menuAnchor)}
@@ -635,7 +638,7 @@ export default function DashboardTopShell({
             alignItems: "center",
             columnGap: { xs: 0.75, md: 1.25, xl: 2 },
             px: { xs: 0.75, md: 1.5, xl: 2.5 },
-            minHeight: { xs: 76, md: 82 },
+            minHeight: { xs: 72, md: 85 },
             overflow: "hidden",
           }}
         >
@@ -654,6 +657,27 @@ export default function DashboardTopShell({
               "&::-webkit-scrollbar": { display: "none" },
             }}
           >
+          <IconButton
+            aria-label="Open dashboard navigation"
+            aria-expanded={Boolean(menuAnchor)}
+            onClick={(event) => setMenuAnchor(event.currentTarget)}
+            sx={{
+              display: { xs: "inline-flex", lg: "none" },
+              width: 44,
+              height: 44,
+              flex: "0 0 auto",
+              color: "var(--ct-text-primary)",
+              border: "1px solid var(--ct-border-color)",
+              bgcolor: "var(--ct-surface-bg)",
+              "&:hover": { bgcolor: "var(--ct-hover-bg)" },
+              "&:focus-visible": {
+                outline: "3px solid rgba(0,141,219,.28)",
+                outlineOffset: 1,
+              },
+            }}
+          >
+            <MenuRoundedIcon />
+          </IconButton>
           {showPharmacySelector && (
             <>
               <Button
@@ -794,12 +818,11 @@ export default function DashboardTopShell({
               minWidth: 0,
               justifySelf: "end",
               display: "flex",
-              width: { xs: "auto", md: 390, lg: 420, xl: 460 },
+              width: { xs: "auto", md: 390, lg: 520, xl: 560 },
               maxWidth: "100%",
             }}
           >
             <TopBarActions
-              hideSearch
               iconSx={{
                 width: { xs: 38, md: 46 },
                 height: { xs: 38, md: 46 },
