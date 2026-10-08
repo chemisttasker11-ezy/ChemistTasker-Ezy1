@@ -79,8 +79,8 @@ export default function DashboardSideNav({
         component="nav"
         sx={{
           position: "sticky",
-          top: 94,
-          height: "calc(100dvh - 94px)",
+          top: 85,
+          height: "calc(100dvh - 85px)",
           overflowY: "auto",
           px: 1.5,
           py: 2.25,
