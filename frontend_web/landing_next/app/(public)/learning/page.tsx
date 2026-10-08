@@ -121,7 +121,7 @@ export default function LearningPage() {
             {articles.map((article) => {
               const cover = safeWebUrl(article.cover_url);
               return (
-                <Link href={\`/\${article.kind}/\${article.slug}\`} key={article.id} className={styles.card}>
+                <Link href={`/${article.kind}/${article.slug}`} key={article.id} className={styles.card}>
                   {cover && (
                     <div className={styles.cardImage}>
                       <img src={cover} alt={article.cover_alt || article.title} loading="lazy" />
