@@ -38,8 +38,8 @@ export default function RefereeRejectPage() {
   }, [pk, refIndex]);
 
   return (
-    <AuthLayout title="Reference Declined">
-      <Box sx={{ textAlign: 'center', width: '100%' }}>
+    <AuthLayout title="Reference Declined" maxWidth="md" noCard showTitle={false}>
+      <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 720, mx: 'auto', py: { xs: 4, md: 8 } }}>
         {status === "loading" && (
           <>
             <CircularProgress />
