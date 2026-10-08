@@ -364,6 +364,21 @@ const explorerOptions: SearchOption[] = [
     keywords: ["community", "platform shifts"],
   },
   {
+    label: "Confirmed Shifts",
+    path: "/dashboard/explorer/shifts/confirmed",
+    keywords: ["confirmed", "booked work", "commitments"],
+  },
+  {
+    label: "Shift History",
+    path: "/dashboard/explorer/shifts/history",
+    keywords: ["history", "past shifts"],
+  },
+  {
+    label: "Availability",
+    path: "/dashboard/explorer/availability",
+    keywords: ["availability", "schedule", "when can i work"],
+  },
+  {
     label: "Chat",
     path: "/dashboard/explorer/chat",
     keywords: ["messages", "inbox"],
