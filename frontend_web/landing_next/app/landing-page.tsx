@@ -12,7 +12,7 @@ import { MeasuringCylinder } from '@/features/paediatric-calculator/components/m
 import TierExplainer from './tier-explainer';
 import FeatureCatalogue from './feature-catalogue';
 import JournalTeaser from './journal-teaser';
-import { ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCheck, ChevronDown, Clock3, Building2, Users, MessageCircle, FileText, GraduationCap, Smartphone, ShieldCheck, Menu, X, Plus, MapPin, BriefcaseBusiness, Bell, LayoutDashboard, Pause, Play } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCheck, Clock3, Building2, Users, MessageCircle, FileText, GraduationCap, Smartphone, ShieldCheck, Plus, BriefcaseBusiness, Bell } from 'lucide-react';
 
 const features = [
   { icon: CalendarDays, title: 'A calmer calendar.', text: 'Keep tasks, events and your pharmacy’s day-to-day plans in one place.', colour: 'purple' },
