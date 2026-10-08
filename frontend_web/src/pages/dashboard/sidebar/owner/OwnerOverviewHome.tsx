@@ -13,8 +13,6 @@ import StoreIcon from "@mui/icons-material/Store";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import AppsIcon from "@mui/icons-material/Apps";
-import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
@@ -168,7 +166,7 @@ export default function OwnerOverviewHome({
     {
       title: totalPharmacies > 1 ? "Manage Pharmacies" : "Manage Pharmacy",
       icon: <StoreIcon />,
-      description: totalPharmacies > 1 ? "Create, edit and configure stores" : "Manage staff",
+      description: totalPharmacies > 1 ? "Create, edit and configure stores" : "Staff, access and pharmacy details",
       onClick: onOpenManage,
       tone: "blue",
     },
@@ -201,22 +199,8 @@ export default function OwnerOverviewHome({
       tone: "purple",
     },
     {
-      title: "Talent Hub",
-      description: "Training & recommended topics",
-      icon: <AppsIcon />,
-      onClick: onOpenInterests,
-      tone: "blue",
-    },
-    {
-      title: "Profile & Verification",
-      description: "Manage your organisation profile",
-      icon: <PeopleIcon />,
-      onClick: onOpenProfile,
-      tone: "pink",
-    },
-    {
-      title: "Settings",
-      description: "Hours, rates and configurations",
+      title: "Workforce & Payroll",
+      description: "Timesheets, workforce settings and pay operations",
       icon: <SettingsIcon />,
       onClick: onOpenSettings,
       tone: "purple",
@@ -262,7 +246,7 @@ export default function OwnerOverviewHome({
         maxWidth: 1660,
         py: { xs: 1.5, md: 3 },
         color: DNA.ink,
-        fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
+        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
         display: "flex",
         flexDirection: "column",
         gap: { xs: 2, md: 3.5 },
