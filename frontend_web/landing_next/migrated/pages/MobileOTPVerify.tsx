@@ -126,20 +126,9 @@ export default function MobileOTPVerify() {
 
   return (
       <AuthLayout title="Mobile Verification">
-        <Box
-          sx={{
-            mb: 3,
-            p: 2.25,
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, rgba(0,169,157,0.12), rgba(15,23,42,0.04))',
-            border: '1px solid rgba(148,163,184,0.22)',
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Confirm your mobile number
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            This step happens after email verification and login when your mobile number has not been verified yet. We use it to lock your legal name, username, and mobile number for account security.
+        <Box sx={{ mb: 2.5 }}>
+          <Typography variant="body1" sx={{ color: '#243451', lineHeight: 1.55 }}>
+            Enter your mobile details and use the code we send to confirm your number.
           </Typography>
         </Box>
 
