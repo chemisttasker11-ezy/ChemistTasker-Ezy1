@@ -541,9 +541,18 @@ class OrganizationDashboardView(APIView):
         now = timezone.now().time()
         future_shifts = shifts_qs.filter(_future_shift_filter(today, now)).distinct()
         confirmed_shifts = _user_confirmed_platform_shifts(request.user, today, now) if workspace == "platform" else shifts_qs.filter(slot_assignments__isnull=False).distinct()
-        invoices_qs = Invoice.objects.filter(user=request.user, pharmacy__isnull=True) if workspace == "platform" else Invoice.objects.filter(pharmacy__organization=org)
-        if workspace != "platform" and requested_pharmacy_id is not None:
-            invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
+        if workspace == "platform":
+            invoices_qs = Invoice.objects.filter(user=request.user, pharmacy__isnull=True)
+        elif membership.role == "ORG_ADMIN":
+            # Subscription/billing authority is intentionally narrower than
+            # organization-wide operational authority. Chief and Region Admins
+            # can operate shifts within their scope but do not receive finance
+            # totals merely because they can open the organization dashboard.
+            invoices_qs = Invoice.objects.filter(pharmacy__organization=org)
+            if requested_pharmacy_id is not None:
+                invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
+        else:
+            invoices_qs = Invoice.objects.none()
         open_shifts = _open_active_shifts(shifts_qs, today, now)
         all_active_shifts = _all_active_shifts(shifts_qs, today, now)
         extras = _dashboard_payload_extras(
