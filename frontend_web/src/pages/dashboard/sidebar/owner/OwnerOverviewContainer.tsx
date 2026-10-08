@@ -63,7 +63,7 @@ export default function OwnerOverviewContainer() {
     } catch (error) {
       console.error("Failed to reload memberships", error);
     }
-  }, [fetchMemberships, fetchAdmins, scopedPharmacyId]);
+  }, [fetchMemberships, fetchAdmins]);
 
   // Fetch pharmacies + memberships (like your Pharmacy page)
   useEffect(() => {
