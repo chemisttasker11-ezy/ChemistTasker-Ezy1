@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import ChatIcon from "@mui/icons-material/Chat";
-import LogoutIcon from "@mui/icons-material/Logout";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import StoreIcon from "@mui/icons-material/Store";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
@@ -63,12 +61,10 @@ export default function AdminOverview() {
   const pharmacyName = assignment.pharmacy_name || `Pharmacy #${pharmacyId}`;
 
   const actions: DashboardAction[] = [
-    { title: "Manage Pharmacies", description: "Edit profile and staff", icon: <ManageAccountsIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`), tone: "blue" },
-    { title: "Internal Roster", description: "Review assignments", icon: <CalendarMonthIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies/roster`), tone: "purple" },
-    { title: "Post Shift", description: "Create a new shift", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/post-shift`), tone: "pink" },
-    { title: "Shift Centre", description: "Active and confirmed shifts", icon: <AccessTimeIcon />, onClick: () => navigate(`${adminBasePath}/shift-center`), tone: "cyan" },
-    { title: "Chat", description: "Talk with the team", icon: <ChatIcon />, onClick: () => navigate(`${adminBasePath}/chat`), tone: "purple" },
-    { title: "Logout Admin View", description: "Return to your account", icon: <LogoutIcon />, onClick: () => navigate(`${adminBasePath}/logout`), tone: "blue", wide: true },
+    { title: "Post Shift", description: "Fill an immediate staffing gap", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/post-shift`), tone: "pink" },
+    { title: "Internal Roster", description: "Review upcoming pharmacy coverage", icon: <CalendarMonthIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies/roster`), tone: "purple" },
+    { title: "Shift Centre", description: "Resolve active and confirmed shift work", icon: <AccessTimeIcon />, onClick: () => navigate(`${adminBasePath}/shift-center`), tone: "cyan" },
+    { title: "Manage Pharmacy", description: "Staff, access and pharmacy details", icon: <ManageAccountsIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`), tone: "blue" },
   ];
 
   const metrics: DashboardMetric[] = [
@@ -97,7 +93,7 @@ export default function AdminOverview() {
       badge="Internal workspace"
       subtitle="Manage staffing, rosters and operations for this pharmacy"
       heroTitle={`Welcome back, ${dashboardGreetingName(user)}!`}
-      heroSubtitle={`Here's what's happening at ${pharmacyName} today.`}
+      heroSubtitle={`Focus on staffing coverage, confirmed work and exceptions at ${pharmacyName}.`}
       primaryAction={{ label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate(`${adminBasePath}/post-shift`) }}
       secondaryAction={{ label: "Manage pharmacy", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`) }}
       pillSummary={
