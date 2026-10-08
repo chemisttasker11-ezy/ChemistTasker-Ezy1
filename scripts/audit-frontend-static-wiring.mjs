@@ -124,6 +124,24 @@ requireWebContains('layouts/DashboardSideNav.tsx', [
 requireWebAbsent('pages/dashboard/organization/OrganizationOverviewPage.tsx', [
   ['all-pharmacy organization scope mislabeled as public platform', /badge=\{selectedPharmacy \? "Internal workspace" : "Public platform"\}/],
 ]);
+requireWebContains('App.tsx', [
+  ['organization membership capability source', /getOrganizationMembership\(user\)/],
+  ['organization capabilities passed to navigation', /getOrganizationNav\(hasUnreadMessages, orgMembership\?\.capabilities \?\? \[\]\)/],
+]);
+requireWebContains('navigation.tsx', [
+  ['organization roster capability gate', /capabilitySet\.has\("manage_roster"\)/],
+  ['organization invite capability gate', /capabilitySet\.has\("invite_staff"\)/],
+  ['organization communications capability gate', /capabilitySet\.has\("manage_communications"\)/],
+]);
+requireWebAbsent('pages/dashboard/admin/AdminOverview.tsx', [
+  ['delegated admin invoice billing KPI', /label:\s*"Unpaid Invoices"/],
+]);
+requireWebContains('pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx', [
+  ['working owner workforce settings route', /navigate\("\/dashboard\/workforce\/settings"\)/],
+]);
+requireWebAbsent('pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx', [
+  ['dead owner settings action', /goToSettings\s*=\s*\(\)\s*=>\s*undefined/],
+]);
 
 console.log(JSON.stringify({ metrics, routePatterns: routePatterns.length, failures }, null, 2));
 if (failures.length) process.exit(1);
