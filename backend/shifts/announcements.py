@@ -203,15 +203,6 @@ def _build_shift_email_slot_meta(shift, slot_entries, *, user=None):
         "rate_summary": rate_summary,
     }
 
-def _role_matches_shift(user_role, shift_role):
-    if shift_role == "PHARMACIST":
-        return user_role == "PHARMACIST"
-    if shift_role in ["ASSISTANT", "TECHNICIAN", "INTERN", "STUDENT"]:
-        return user_role == "OTHER_STAFF"
-    if shift_role == "EXPLORER":
-        return user_role == "EXPLORER"
-    return False
-
 def _availability_matches_slot(availability, slot_date, slot_start, slot_end):
     if not slot_date or not slot_start or not slot_end:
         return False
@@ -497,7 +488,7 @@ def announce_availability_matches(shift):
     user_ids_by_role = {"PHARMACIST": set(), "OTHER_STAFF": set(), "EXPLORER": set()}
     for availability in user_availabilities:
         user = availability.user
-        if not user or not _role_matches_shift(getattr(user, "role", None), shift.role_needed):
+        if not user or not _user_can_perform_shift_role(user, shift.role_needed):
             continue
         user_availability_map.setdefault(user.id, []).append(availability)
         if user.role in user_ids_by_role:
