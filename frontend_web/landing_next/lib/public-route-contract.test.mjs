@@ -7,53 +7,77 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const landing = read('app/landing-page.tsx');
 const header = read('public/header.tsx');
 const personas = read('app/persona-data.ts');
+const routes = read('public/routes.ts');
 
-test('public landing keeps canonical route and account wiring', () => {
-  const requiredHeaderRoutes = [
-    '/marketplace',
-    '/marketplace/new',
-    '/shifts/public-board',
-    '/talent/public-board',
-    '/hubs',
-    '/news',
-    '/pricing',
-    '/learning',
-    '/blog',
-    '/calculator',
-    '/pricing/organization',
-    '/contact',
-  ];
+const routeContract = {
+  home: '/',
+  register: '/register',
+  dashboard: '/dashboard',
+  marketplace: '/marketplace',
+  marketplaceNew: '/marketplace/new',
+  publicShifts: '/shifts/public-board',
+  publicTalent: '/talent/public-board',
+  hubs: '/hubs',
+  news: '/news',
+  pricing: '/pricing',
+  learning: '/learning',
+  blog: '/blog',
+  calculator: '/calculator',
+  organizationPricing: '/pricing/organization',
+  contact: '/contact',
+  privacy: '/privacy-policy',
+  terms: '/terms-of-service',
+};
 
-  for (const route of requiredHeaderRoutes) {
-    assert.match(header, new RegExp(route.replaceAll('/', '\\/')));
+test('canonical public route registry keeps production destinations', () => {
+  for (const [key, route] of Object.entries(routeContract)) {
+    assert.match(routes, new RegExp(`${key}: '${route.replaceAll('/', '\\/')}'`));
+  }
+});
+
+test('public header and landing use the canonical route registry and account wiring', () => {
+  for (const key of [
+    'marketplace',
+    'marketplaceNew',
+    'publicShifts',
+    'publicTalent',
+    'hubs',
+    'news',
+    'pricing',
+    'learning',
+    'blog',
+    'calculator',
+    'organizationPricing',
+    'contact',
+  ]) {
+    assert.match(header, new RegExp(`publicRoutes\\.${key}`));
   }
 
-  const requiredLandingRoutes = [
-    '/register',
-    '/dashboard',
-    '/shifts/public-board',
-    '/talent/public-board',
-    '/calculator',
-    '/hubs',
-    '/learning',
-    '/pricing',
-    '/pricing/organization',
-    '/privacy-policy',
-    '/terms-of-service',
-  ];
-
-  for (const route of requiredLandingRoutes) {
-    assert.match(landing, new RegExp(route.replaceAll('/', '\\/')));
+  for (const key of [
+    'register',
+    'dashboard',
+    'publicShifts',
+    'publicTalent',
+    'calculator',
+    'hubs',
+    'pricing',
+    'organizationPricing',
+    'privacy',
+    'terms',
+  ]) {
+    assert.match(landing, new RegExp(`publicRoutes\\.${key}`));
   }
 
-  assert.match(landing, /const startPath=status==='anonymous'\?'\/register':'\/dashboard';/);
+  assert.match(landing, /const startPath=status==='anonymous'\?publicRoutes\.register:publicRoutes\.dashboard;/);
   assert.match(landing, /<AccountControls\/>/);
   assert.match(header, /<AccountControls\/>/);
 });
 
-test('public landing keeps the production app-store destinations and one app promo', () => {
-  assert.match(landing, /https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.chemisttasker\.app/);
-  assert.match(landing, /https:\/\/apps\.apple\.com\/sb\/app\/chemisttasker\/id6759088580/);
+test('public landing keeps production app-store destinations and one app promo', () => {
+  assert.match(routes, /googlePlay: 'https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.chemisttasker\.app'/);
+  assert.match(routes, /appStore: 'https:\/\/apps\.apple\.com\/sb\/app\/chemisttasker\/id6759088580'/);
+  assert.match(landing, /mobileAppLinks\.googlePlay/);
+  assert.match(landing, /mobileAppLinks\.appStore/);
 
   const appPromoCount = (landing.match(/Take ChemistTasker with you/g) || []).length;
   assert.equal(appPromoCount, 1);
