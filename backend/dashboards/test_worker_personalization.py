@@ -109,7 +109,6 @@ class ExplorerDashboardPersonalizationTests(TestCase):
             role_needed="EXPLORER",
             employment_type="CASUAL",
             visibility="PLATFORM",
-            rate_type="FLEXIBLE",
         )
         ShiftSlot.objects.create(
             shift=shift,
