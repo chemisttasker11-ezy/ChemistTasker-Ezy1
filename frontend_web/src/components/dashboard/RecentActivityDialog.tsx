@@ -58,7 +58,7 @@ export default function RecentActivityDialog({
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ pr: 7 }}>
         Recent Activity
-        <IconButton onClick={onClose} sx={{ position: "absolute", right: 12, top: 10 }}>
+        <IconButton aria-label="Close recent activity" onClick={onClose} sx={{ position: "absolute", right: 12, top: 10 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
