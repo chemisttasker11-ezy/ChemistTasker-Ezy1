@@ -30,6 +30,9 @@ const resourceLinks = [
 export default function PublicHeader({ skipTarget = 'public-content' }: { skipTarget?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const isFocusedExternalTask =
+    pathname.startsWith('/referee/') ||
+    pathname.startsWith('/onboarding/referee-reject/');
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -46,34 +49,42 @@ export default function PublicHeader({ skipTarget = 'public-content' }: { skipTa
           <img src="/assets/calculator-wordmark.png" alt="ChemistTasker" />
         </Link>
 
-        <nav className="desktop-nav public-primary-nav" aria-label="Main navigation">
-          {primaryLinks.map(([label, url]) => (
-            <Link key={url} href={url} aria-current={current(url) ? 'page' : undefined}>
-              {label}
-            </Link>
-          ))}
-          <details className="ct-resources public-resources">
-            <summary>
-              Resources <ChevronDown size={14} aria-hidden="true" />
-            </summary>
-            <nav aria-label="Public resources">
-              {resourceLinks.map(([label, url]) => (
-                <Link
-                  key={url}
-                  href={url}
-                  aria-current={current(url) ? 'page' : undefined}
-                  onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}
-                >
-                  {label === 'Add marketplace item' && <PackagePlus size={14} aria-hidden="true" />}
-                  {label}
-                </Link>
-              ))}
-            </nav>
-          </details>
-        </nav>
+        {!isFocusedExternalTask && (
+          <nav className="desktop-nav public-primary-nav" aria-label="Main navigation">
+            {primaryLinks.map(([label, url]) => (
+              <Link key={url} href={url} aria-current={current(url) ? 'page' : undefined}>
+                {label}
+              </Link>
+            ))}
+            <details className="ct-resources public-resources">
+              <summary>
+                Resources <ChevronDown size={14} aria-hidden="true" />
+              </summary>
+              <nav aria-label="Public resources">
+                {resourceLinks.map(([label, url]) => (
+                  <Link
+                    key={url}
+                    href={url}
+                    aria-current={current(url) ? 'page' : undefined}
+                    onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}
+                  >
+                    {label === 'Add marketplace item' && <PackagePlus size={14} aria-hidden="true" />}
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+            </details>
+          </nav>
+        )}
 
-        <div className="nav-actions public-account-actions"><AccountControls /></div>
-        <button
+        <div className="nav-actions public-account-actions">
+          {isFocusedExternalTask ? (
+            <Link className="button secondary small" href={publicRoutes.contact}>Need help?</Link>
+          ) : (
+            <AccountControls />
+          )}
+        </div>
+        {!isFocusedExternalTask && <button
           className="menu-toggle"
           type="button"
           aria-label={open ? 'Close menu' : 'Open menu'}
@@ -82,10 +93,10 @@ export default function PublicHeader({ skipTarget = 'public-content' }: { skipTa
           onClick={() => setOpen((value) => !value)}
         >
           {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-        </button>
+        </button>}
       </div>
 
-      {open && (
+      {!isFocusedExternalTask && open && (
         <nav id="public-mobile-nav" className="mobile-nav public-mobile-nav" aria-label="Mobile navigation">
           <div className="public-mobile-group">
             <span>Explore ChemistTasker</span>
