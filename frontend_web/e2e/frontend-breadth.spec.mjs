@@ -223,6 +223,11 @@ test.describe('authenticated route breadth', () => {
     ['Other Staff pharmacy hub', roleUsers.otherstaff, '/dashboard/otherstaff/pharmacy-hub'],
 
     ['Explorer onboarding', roleUsers.explorer, '/dashboard/explorer/onboarding'],
+    ['Explorer public shifts', roleUsers.explorer, '/dashboard/explorer/shifts/public'],
+    ['Explorer community shifts', roleUsers.explorer, '/dashboard/explorer/shifts/community'],
+    ['Explorer confirmed shifts', roleUsers.explorer, '/dashboard/explorer/shifts/confirmed'],
+    ['Explorer history', roleUsers.explorer, '/dashboard/explorer/shifts/history'],
+    ['Explorer availability', roleUsers.explorer, '/dashboard/explorer/availability'],
     ['Explorer talent', roleUsers.explorer, '/dashboard/explorer/interests'],
     ['Explorer learning', roleUsers.explorer, '/dashboard/explorer/learning'],
     ['Explorer calendar', roleUsers.explorer, '/dashboard/explorer/calendar'],
