@@ -81,7 +81,7 @@ export default function LandingPage() {
               <h1>Locum shifts.<br/>Pharmacy teams.<br/><span>Better together.</span></h1>
               <p className="hero-description">Find pharmacy work, discover talent and keep availability, teams and everyday workforce admin connected in one pharmacy-focused platform.</p>
               <div className="button-row"><LinkButton path={publicRoutes.publicShifts}>Find a Shift</LinkButton><LinkButton path={publicRoutes.publicTalent} secondary>Find Talent</LinkButton></div>
-              <div className="hero-personas" aria-label="ChemistTasker personas"><span data-persona="owner"><i/>Owner</span><span data-persona="pharmacist"><i/>Pharmacist</span><span data-persona="other-staff"><i/>Other staff</span><span data-persona="explorer"><i/>Explorer</span></div>
+              <div className="hero-personas" aria-label="Explore ChemistTasker workspaces"><a href="#workspaces" data-persona="owner" onClick={()=>{setStaffRole(0);setStaffAuto(false)}}><i/>Owner</a><a href="#workspaces" data-persona="pharmacist" onClick={()=>{setStaffRole(2);setStaffAuto(false)}}><i/>Pharmacist</a><a href="#workspaces" data-persona="other-staff" onClick={()=>{setStaffRole(4);setStaffAuto(false)}}><i/>Other staff</a><a href="#workspaces" data-persona="explorer" onClick={()=>{setStaffRole(6);setStaffAuto(false)}}><i/>Explorer</a></div>
             </div>
             <div className="hero-visual">
               <div className="photo-main"><Image src="/assets/pharmacist-priya.jpg" alt="Pharmacy professional in a bright community pharmacy" fill priority sizes="(max-width: 880px) 86vw, 44vw"/><span className="photo-caption"><span className="tiny-dot"/> People at the heart of pharmacy.</span></div>
