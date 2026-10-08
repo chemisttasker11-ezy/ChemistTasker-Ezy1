@@ -84,20 +84,9 @@ export default function OTPVerify() {
 
   return (
       <AuthLayout title="Email Verification">
-        <Box
-          sx={{
-            mb: 3,
-            p: 2.25,
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, rgba(0,169,157,0.12), rgba(15,23,42,0.04))',
-            border: '1px solid rgba(148,163,184,0.22)',
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Confirm your email
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            This is the email verification step. We ask for it after registration, or when you try to log in before your email has been verified. Enter the code sent to your inbox to activate email login for this account.
+        <Box sx={{ mb: 2.5 }}>
+          <Typography variant="body1" sx={{ color: '#243451', lineHeight: 1.55 }}>
+            Enter the code sent to your email address to continue.
           </Typography>
         </Box>
 
