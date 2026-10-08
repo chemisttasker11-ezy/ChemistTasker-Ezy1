@@ -20,6 +20,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
+import DashboardSideNav from "./DashboardSideNav";
+import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
 import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
@@ -72,37 +74,6 @@ function workerOverviewPath(role?: string | null) {
   if (normalized === "EXPLORER") return "/dashboard/explorer/overview";
   if (normalized === "OWNER") return "/dashboard/owner/overview";
   return "/dashboard";
-}
-
-function addScopedParams(path: string, selectedPharmacyId: number | null) {
-  if (!selectedPharmacyId) return path;
-  const [pathname, query = ""] = path.split("?");
-  const params = new URLSearchParams(query);
-  const isRoster = pathname.includes("/manage-pharmacies/roster") || pathname.includes("/shifts/roster");
-  const isCalendar = pathname.endsWith("/calendar");
-  const isPostShift = pathname.endsWith("/post-shift");
-  const isMyPharmacies = pathname.includes("/manage-pharmacies/my-pharmacies");
-
-  params.set("workspace", "internal");
-  params.set("pharmacy_id", String(selectedPharmacyId));
-
-  if (isCalendar || isPostShift || isRoster) {
-    params.set("pharmacy", String(selectedPharmacyId));
-  }
-  if (isMyPharmacies) {
-    params.set("view", "detail");
-    params.set("pharmacyId", String(selectedPharmacyId));
-  }
-
-  const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
-
-function normalizeSegment(parentPath: string, item: any) {
-  const segment = String(item?.segment || "").replace(/^\/+/, "");
-  if (!segment) return parentPath;
-  if (segment.startsWith("dashboard/")) return `/${segment}`;
-  return `${parentPath.replace(/\/+$/, "")}/${segment}`.replace(/\/+/g, "/");
 }
 
 function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[] {
@@ -189,11 +160,11 @@ function MegaMenu({
         current = { title: "Navigation", items: [] };
         result.push(current);
       }
-      const path = normalizeSegment(parentPath, item);
+      const path = normalizeDashboardSegment(parentPath, item);
       current.items.push({ label: item.title, icon: item.icon, path });
       if (Array.isArray(item.children)) {
         item.children.forEach((child: any) => {
-          const childPath = normalizeSegment(path, child);
+          const childPath = normalizeDashboardSegment(path, child);
           current?.items.push({ label: child.title, icon: child.icon, path: childPath, child: true });
         });
       }
@@ -204,7 +175,7 @@ function MegaMenu({
   }, [nav]);
 
   const handleNavigate = (path: string) => {
-    navigate(addScopedParams(path, selectedPharmacyId));
+    navigate(addDashboardScopeParams(path, selectedPharmacyId));
     onClose();
   };
 
@@ -478,7 +449,7 @@ export default function DashboardTopShell({
   }, [activeAdminPharmacyId, hidePharmacyScope, isOrgUser, pharmacies, selectedPharmacyId, setWorkspacePharmacyId, workspace]);
 
   const applyScopeToCurrentUrl = (pharmacyId: number | null) => {
-    const scoped = addScopedParams(`${location.pathname}?${searchParams.toString()}`, pharmacyId);
+    const scoped = addDashboardScopeParams(`${location.pathname}?${searchParams.toString()}`, pharmacyId);
     const [, query = ""] = scoped.split("?");
     const nextParams = new URLSearchParams(query);
     if (nextParams.toString() !== searchParams.toString()) {
@@ -575,11 +546,11 @@ export default function DashboardTopShell({
           display: "flex",
           justifyContent: "center",
           alignItems: "stretch",
-          minHeight: { xs: 86, md: 104 },
-          background: "linear-gradient(90deg, rgba(6,59,218,0.12) 0%, rgba(109,40,217,0.11) 42%, rgba(234,10,142,0.10) 72%, rgba(8,190,234,0.10) 100%)",
-          backdropFilter: "blur(18px)",
-          borderBottom: "1px solid rgba(109,40,217,0.16)",
-          boxShadow: "0 12px 34px rgba(6,18,58,0.07)",
+          minHeight: { xs: 76, md: 82 },
+          background: "rgba(255,255,255,0.94)",
+          backdropFilter: "blur(16px)",
+          borderBottom: "1px solid var(--ct-border-color)",
+          boxShadow: "0 8px 24px rgba(6,18,58,0.05)",
           overflow: "hidden",
           "&::before": {
             content: '""',
@@ -612,7 +583,7 @@ export default function DashboardTopShell({
           sx={{
             width: "100%",
             maxWidth: 1660,
-            minHeight: { xs: 86, md: 104 },
+            minHeight: { xs: 76, md: 82 },
             px: { xs: 0.75, sm: 1.5, md: 2, xl: 3 },
             overflow: "hidden",
           }}
@@ -621,30 +592,21 @@ export default function DashboardTopShell({
           onClick={(event) => setMenuAnchor(event.currentTarget)}
           sx={{
             position: "relative",
-            width: { xs: 84, sm: 190, md: 250, xl: 300 },
-            minHeight: { xs: 86, md: 104 },
+            width: { xs: 76, sm: 184, md: 220, xl: 238 },
+            minHeight: { xs: 76, md: 82 },
             flexShrink: 0,
-            borderRadius: "0 0 30px 0",
-            background: "linear-gradient(135deg, rgba(6,59,218,0.13) 0%, rgba(109,40,217,0.11) 52%, rgba(234,10,142,0.09) 100%)",
-            borderRight: "1px solid rgba(109,40,217,0.16)",
-            boxShadow: "0 18px 46px rgba(6, 26, 61, 0.12)",
-            p: { xs: 0.75, sm: 1.25, md: 2 },
+            borderRadius: 0,
+            background: "transparent",
+            borderRight: "1px solid var(--ct-border-color)",
+            boxShadow: "none",
+            p: { xs: 0.75, sm: 1, md: 1.25 },
             "&:hover": {
-              background: "linear-gradient(135deg, rgba(6,59,218,0.18) 0%, rgba(109,40,217,0.15) 52%, rgba(234,10,142,0.12) 100%)",
-              filter: "brightness(1.02)",
+              background: "var(--ct-hover-bg)",
             },
-            "&:after": {
-              content: '""',
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 4,
-              background: `linear-gradient(90deg, ${DNA.violet}, ${DNA.magenta}, ${DNA.cyan})`,
-            },
+
           }}
         >
-          <Box component="img" src={menuLogo} alt="ChemistTasker menu" sx={{ maxWidth: "100%", maxHeight: { xs: 54, md: 74 }, objectFit: "contain" }} />
+          <Box component="img" src={menuLogo} alt="ChemistTasker" sx={{ maxWidth: "100%", maxHeight: { xs: 46, md: 54 }, objectFit: "contain" }} />
           <KeyboardArrowDownIcon sx={{ ml: { xs: 0.25, md: 1 }, fontSize: { xs: 18, md: 24 }, color: "var(--ct-text-primary)", transform: menuAnchor ? "rotate(180deg)" : "none", transition: "transform .18s" }} />
         </Button>
         <MegaMenu
@@ -662,8 +624,8 @@ export default function DashboardTopShell({
             gridTemplateColumns: {
               xs: "minmax(0, 1fr) auto",
               md: "minmax(0, 1fr) auto",
-              lg: "minmax(260px, 440px) minmax(210px, 1fr) auto",
-              xl: "minmax(360px, 520px) minmax(260px, 1fr) auto",
+              lg: "minmax(260px, 420px) minmax(210px, 1fr) auto",
+              xl: "minmax(320px, 460px) minmax(240px, 1fr) auto",
             },
             gridTemplateAreas: {
               xs: '"scope actions"',
@@ -673,7 +635,7 @@ export default function DashboardTopShell({
             alignItems: "center",
             columnGap: { xs: 0.75, md: 1.25, xl: 2 },
             px: { xs: 0.75, md: 1.5, xl: 2.5 },
-            minHeight: { xs: 86, md: 104 },
+            minHeight: { xs: 76, md: 82 },
             overflow: "hidden",
           }}
         >
@@ -852,24 +814,27 @@ export default function DashboardTopShell({
         </Stack>
       </Box>
 
-      <Box
-        component="main"
-        sx={{
-          width: "100%",
-          maxWidth: "1660px",
-          minWidth: 0,
-          mx: "auto",
-          px: { xs: 1.5, sm: 2, md: 3 },
-          py: { xs: 1.5, md: 3 },
-          overflowX: "hidden",
-          position: "relative",
-          zIndex: 1,
-          "& .MuiPaper-root": {
-            borderColor: "var(--ct-border-color)",
-          },
-        }}
-      >
-        {children}
+      <Box sx={{ display: "flex", width: "100%", minWidth: 0 }}>
+        <DashboardSideNav selectedPharmacyId={selectedPharmacyId} />
+        <Box
+          component="main"
+          sx={{
+            width: "100%",
+            maxWidth: { xs: "100%", lg: "calc(100% - 276px)" },
+            minWidth: 0,
+            mx: "auto",
+            px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+            py: { xs: 2, md: 3.5 },
+            overflowX: "hidden",
+            position: "relative",
+            zIndex: 1,
+            "& .MuiPaper-root": {
+              borderColor: "var(--ct-border-color)",
+            },
+          }}
+        >
+          {children}
+        </Box>
       </Box>
       </Box>
     </LocalizationProvider>
