@@ -98,7 +98,7 @@ export default function OverviewPageOwner() {
     return (
       <Box
         sx={{
-          maxWidth: 1200,
+          maxWidth: 1440,
           mx: "auto",
           px: { xs: 2, md: 4 },
           py: { xs: 2, md: 4 },
@@ -153,7 +153,7 @@ export default function OverviewPageOwner() {
       <Paper
         elevation={0}
         sx={{
-          p: { xs: 3, md: 4 },
+          p: { xs: 2.5, md: 3.25 },
           borderRadius: { xs: 3, md: 4 },
           backgroundImage: "var(--ct-dashboard-gradient, linear-gradient(135deg, #063BDA 0%, #6D28D9 52%, #EA0A8E 100%))",
           color: "#fff",
@@ -172,8 +172,7 @@ export default function OverviewPageOwner() {
               Hello, {welcomeName}!
             </Typography>
             <Typography variant="body1" sx={{ opacity: 0.92, maxWidth: 560, mb: 3 }}>
-              Track your pharmacy network, manage shifts, and keep everything on schedule. Use the
-              quick actions below to jump back into your workflow.
+              Start with staffing coverage, shift activity and invoices that may need your attention.
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <Button
