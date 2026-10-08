@@ -20,6 +20,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from organizations.access import pharmacies_user_admins
 from users.serializers import UserProfileSerializer
 from django.db.models import Q, Sum
+from billing.utils import user_can_manage_billing_for_pharmacy
 from django.utils import timezone
 from users.role_labels import other_staff_role_label
 from datetime import date
@@ -682,7 +683,12 @@ class OwnerDashboard(APIView):
                 'date': shift_date,
             })
 
-        invoices_qs = Invoice.objects.filter(pharmacy__in=pharmacies)
+        billing_pharmacy_ids = [
+            pharmacy.id
+            for pharmacy in pharmacies.select_related("owner__user", "organization")
+            if user_can_manage_billing_for_pharmacy(user, pharmacy)
+        ]
+        invoices_qs = Invoice.objects.filter(pharmacy_id__in=billing_pharmacy_ids)
         extras = _dashboard_payload_extras(
             shifts_qs=upcoming_shifts,
             confirmed_qs=confirmed_shifts,
