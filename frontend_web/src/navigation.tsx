@@ -546,6 +546,8 @@ export function getExplorerNav(_progress_percent: number, hasUnreadMessages: boo
       children: [
         { segment: 'public', title: 'Public Shifts', icon: <PublicIcon /> },
         { segment: 'community', title: 'Community Shifts', icon: <GroupsIcon /> },
+        { segment: 'confirmed', title: 'Confirmed Shifts', icon: <CheckCircleIcon /> },
+        { segment: 'history', title: 'Shifts History', icon: <HistoryIcon /> },
       ],
     },
     { segment: 'dashboard/explorer/availability', title: 'Availability', icon: <EventAvailableIcon /> },
