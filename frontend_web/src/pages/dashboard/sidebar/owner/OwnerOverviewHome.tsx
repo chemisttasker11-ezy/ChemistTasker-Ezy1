@@ -1,5 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { Box, Button, Paper, Stack, Typography, Skeleton } from "@mui/material";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  ButtonBase,
+  Chip,
+  Paper,
+  Skeleton,
+  Stack,
+  Typography,
+} from "@mui/material";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import ListAltIcon from "@mui/icons-material/ListAlt";
@@ -8,31 +19,93 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import StoreIcon from "@mui/icons-material/Store";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import { useNavigate } from "react-router-dom";
-import DashboardOverviewTemplate, {
-  type DashboardAction,
-  type DashboardMetric,
-} from "../../../../components/dashboard/DashboardOverviewTemplate";
 import { useAuth } from "../../../../contexts/AuthContext";
 import apiClient from "../../../../utils/apiClient";
 import { dashboardGreetingName } from "../../../../utils/displayName";
 import type { PharmacyDTO } from "./types";
 
+type ShiftRecord = {
+  id: number;
+  pharmacy_name?: string | null;
+  date?: string | null;
+};
+type ActivityRecord = {
+  title: string;
+  description?: string;
+  time?: string;
+  kind?: string;
+  action_url?: string;
+  actionUrl?: string;
+};
+type OwnerData = {
+  shift_summary?: {
+    open_count?: number;
+    confirmed_count?: number;
+    all_count?: number;
+  };
+  upcoming_stats?: { today?: number; week?: number; month?: number };
+  invoice_summary?: {
+    unpaid_count?: number;
+    unpaid_total?: string;
+    total_billed?: string;
+  };
+  shifts?: ShiftRecord[];
+  activity?: ActivityRecord[];
+};
+type Metric = {
+  label: string;
+  value: number | undefined;
+  description: string;
+  icon: ReactNode;
+  action: () => void;
+  accent: string;
+};
+
+const ink = "#06123A";
+const muted = "#445474";
+const line = "#DFE6F1";
+
+function readableCount(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("en-AU") : "—";
+}
+
+function readableDate(raw?: string | null): string {
+  if (!raw) return "Date not provided";
+  const parsed = new Date(raw.slice(0, 10) + "T12:00:00");
+  return Number.isNaN(parsed.getTime())
+    ? raw
+    : parsed.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function safeActivityUrl(record: ActivityRecord): string | null {
+  const path = record.actionUrl || record.action_url || "";
+  return path.startsWith("/dashboard/") && !path.startsWith("//") ? path : null;
+}
+
 export default function OwnerOverviewHome({
   totalPharmacies,
   pharmacies,
   selectedPharmacyId,
+  workspace,
+  dashboardData,
+  dashboardLoading,
+  dashboardError,
+  onRetryDashboard,
   onOpenManage,
   onOpenRoster,
   onOpenShifts,
   onPostShift,
   onOpenSettings,
   onOpenPills,
-  dashboardData,
 }: {
   totalPharmacies: number;
   pharmacies: PharmacyDTO[];
   selectedPharmacyId: number | null;
-  dashboardData?: any;
+  workspace: "internal" | "platform";
+  dashboardData?: OwnerData | null;
+  dashboardLoading: boolean;
+  dashboardError: string | null;
+  onRetryDashboard: () => void;
   onOpenManage: () => void;
   onOpenRoster: () => void;
   onOpenShifts: () => void;
@@ -40,227 +113,299 @@ export default function OwnerOverviewHome({
   onOpenSettings: () => void;
   onOpenPills: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, activePersona } = useAuth();
   const navigate = useNavigate();
-  const [pillSummary, setPillSummary] = useState<{ balance: number; shift_post_cost: number } | null>(null);
+  const canSeeOwnerFinance = activePersona !== "admin";
+  const [pillBalance, setPillBalance] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!canSeeOwnerFinance) return;
     let mounted = true;
-    apiClient
-      .get("/pill-rewards/balance/")
+    setPillBalance(null);
+    apiClient.get("/pill-rewards/balance/")
       .then(({ data }) => {
-        if (!mounted) return;
-        setPillSummary({
-          balance: Number(data?.balance ?? 0),
-          shift_post_cost: Number(data?.shift_post_cost ?? 0),
-        });
+        const amount = Number(data?.balance);
+        if (mounted) setPillBalance(Number.isFinite(amount) ? amount : null);
       })
       .catch(() => {
-        if (mounted) setPillSummary({ balance: 0, shift_post_cost: 0 });
+        if (mounted) setPillBalance(null);
       });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    return () => { mounted = false; };
+  }, [canSeeOwnerFinance]);
 
   const selectedPharmacy = useMemo(
     () => pharmacies.find((pharmacy) => Number(pharmacy.id) === Number(selectedPharmacyId)) ?? null,
-    [pharmacies, selectedPharmacyId]
+    [pharmacies, selectedPharmacyId],
   );
-  const scopeName = selectedPharmacy?.name ?? "All pharmacies";
+  const scopeName = selectedPharmacy?.name || (workspace === "platform" ? "Public platform" : "All pharmacies");
+  const shiftSummary = dashboardData?.shift_summary;
+  const upcoming = dashboardData?.upcoming_stats;
+  const invoiceSummary = dashboardData?.invoice_summary;
+  const upcomingShifts = Array.isArray(dashboardData?.shifts) ? dashboardData.shifts.slice(0, 5) : [];
+  const activity = Array.isArray(dashboardData?.activity) ? dashboardData.activity.slice(0, 5) : [];
+  const ready = !dashboardLoading && !dashboardError && Boolean(dashboardData);
 
-  const openShiftCount = Number(dashboardData?.shift_summary?.open_count ?? 0);
-  const confirmedShiftCount = Number(
-    dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0
-  );
-  const allShiftCount = Number(
-    dashboardData?.shift_summary?.all_count ??
-      dashboardData?.shift_summary?.upcoming_count ??
-      dashboardData?.upcoming_shifts_count ??
-      0
-  );
-  const unpaidInvoiceCount = Number(dashboardData?.invoice_summary?.unpaid_count ?? 0);
-  const unpaidInvoiceTotal = dashboardData?.invoice_summary?.unpaid_total ?? "$0.00";
-
-  const actions: DashboardAction[] = [
+  const metrics: Metric[] = [
     {
-      title: totalPharmacies > 1 ? "Manage Pharmacies" : "Manage Pharmacy",
-      description:
-        totalPharmacies > 1
-          ? "Staff, access and store configuration"
-          : "Staff, access and pharmacy details",
-      icon: <StoreIcon />,
-      onClick: onOpenManage,
-      tone: "blue",
-    },
-    {
-      title: "Review roster",
-      description: "Check team coverage and upcoming shifts",
-      icon: <CalendarMonthIcon />,
-      onClick: onOpenRoster,
-      tone: "purple",
-    },
-    {
-      title: "Post a shift",
-      description: "Arrange cover where it is needed",
-      icon: <ListAltIcon />,
-      onClick: onPostShift,
-      tone: "pink",
-    },
-    {
-      title: "Manage shift responses",
-      description: "Review active shifts and staffing responses",
+      label: "Open shifts",
+      value: shiftSummary?.open_count,
+      description: "Review staffing requests",
       icon: <WorkOutlineIcon />,
-      onClick: onOpenShifts,
-      tone: "cyan",
-    },
-    {
-      title: "Workforce controls",
-      description: "Attendance and payroll settings",
-      icon: <SettingsIcon />,
-      onClick: onOpenSettings,
-      tone: "purple",
-      wide: true,
-    },
-  ];
-
-  const metrics: DashboardMetric[] = [
-    {
-      label: "Open Shifts",
-      value: openShiftCount,
-      helper: scopeName,
-      icon: <CalendarMonthIcon />,
-      tone: "blue",
-    },
-    {
-      label: "Confirmed Shifts",
-      value: confirmedShiftCount,
-      helper: "Booked work",
-      icon: <ShieldOutlinedIcon />,
-      tone: "purple",
-    },
-    {
-      label: "Active Shifts",
-      value: allShiftCount,
-      helper: "Current staffing work",
-      icon: <WorkOutlineIcon />,
-      tone: "cyan",
-    },
-    {
-      label: "Unpaid Invoices",
-      value: unpaidInvoiceCount,
-      helper: unpaidInvoiceTotal,
-      icon: <CreditCardIcon />,
-      tone: "pink",
-    },
-  ];
-
-  const hasDashboardData = Boolean(dashboardData?.shift_summary);
-  const focusItems = [
-    {
-      title: "Shifts needing cover",
-      value: openShiftCount,
-      detail: "Open shifts across the selected scope",
       action: onOpenShifts,
-      actionLabel: "Review open shifts",
-      tone: "#5222B8",
+      accent: "#5222B8",
     },
     {
-      title: "Coverage confirmed",
-      value: confirmedShiftCount,
-      detail: "Confirmed staffing commitments",
+      label: "Confirmed shifts",
+      value: shiftSummary?.confirmed_count,
+      description: "View staffing commitments",
+      icon: <ShieldOutlinedIcon />,
+      action: onOpenShifts,
+      accent: "#036D82",
+    },
+    {
+      label: "Due today",
+      value: upcoming?.today,
+      description: "Upcoming shift commitments",
+      icon: <CalendarMonthIcon />,
       action: onOpenRoster,
-      actionLabel: "View roster",
-      tone: "#075B75",
+      accent: "#1855B0",
     },
-    {
-      title: "Invoices to review",
-      value: unpaidInvoiceCount,
-      detail: unpaidInvoiceTotal + " outstanding",
-      action: () => navigate("/dashboard/owner/invoice"),
-      actionLabel: "Review invoices",
-      tone: "#8A2765",
-    },
+    canSeeOwnerFinance
+      ? {
+          label: "Unpaid invoices",
+          value: invoiceSummary?.unpaid_count,
+          description: "Review outstanding invoices",
+          icon: <CreditCardIcon />,
+          action: () => navigate("/dashboard/owner/invoice"),
+          accent: "#9A227A",
+        }
+      : {
+          label: "Active shifts",
+          value: shiftSummary?.all_count,
+          description: "View current shift work",
+          icon: <ListAltIcon />,
+          action: onOpenShifts,
+          accent: "#9A227A",
+        },
+  ];
+
+  const shortcuts = [
+    { label: "Manage pharmacy", icon: <StoreIcon />, action: onOpenManage },
+    { label: "Internal Roster", icon: <CalendarMonthIcon />, action: onOpenRoster },
+    { label: "Shift Centre", icon: <WorkOutlineIcon />, action: onOpenShifts },
+    ...(canSeeOwnerFinance
+      ? [{ label: "Workforce Settings", icon: <SettingsIcon />, action: onOpenSettings }]
+      : []),
   ];
 
   return (
-    <Stack spacing={2.5}>
-      <Box component="section" aria-label="Owner operational snapshot">
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "end" }} gap={1} sx={{ mb: 1.5 }}>
-          <Box>
-            <Typography component="h2" sx={{ color: "#06123A", fontSize: 23, fontWeight: 800, lineHeight: 1.25 }}>What needs attention</Typography>
-            <Typography sx={{ color: "#445474", fontSize: 14, mt: 0.5 }}>Live snapshot for {scopeName}. Select a panel to act.</Typography>
-          </Box>
-          <Typography sx={{ color: "#52617C", fontSize: 12, fontWeight: 700 }}>{selectedPharmacy ? "Selected pharmacy" : "Current owner scope"}</Typography>
-        </Stack>
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0,1fr))" }, gap: 1.5 }}>
-          {focusItems.map((item) => (
-            <Paper key={item.title} variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2.5, borderColor: "#DCE4F0", boxShadow: "none" }}>
-              <Typography sx={{ color: "#344563", fontSize: 13, fontWeight: 750 }}>{item.title}</Typography>
-              {hasDashboardData ? (
-                <Typography sx={{ color: item.tone, fontSize: 32, lineHeight: 1.35, fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>{item.value}</Typography>
-              ) : (
-                <Skeleton width={75} height={44} aria-label="Loading operational snapshot" />
-              )}
-              <Typography sx={{ color: "#52617C", fontSize: 13, mb: 1.5 }}>{hasDashboardData ? item.detail : "Waiting for current data"}</Typography>
-              <Button size="small" onClick={item.action} sx={{ px: 0, textTransform: "none", fontWeight: 800, justifyContent: "flex-start", minHeight: 44 }}>
-                {item.actionLabel}
-              </Button>
-            </Paper>
-          ))}
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ maxWidth: 1600, mx: "auto", minWidth: 0 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        alignItems={{ xs: "stretch", md: "center" }}
+        justifyContent="space-between"
+        spacing={2}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" sx={{ color: ink, fontSize: { xs: 27, md: 32 }, fontWeight: 850, lineHeight: 1.18 }}>
+            Owner Dashboard
+          </Typography>
+          <Typography sx={{ color: muted, fontSize: 15, lineHeight: 1.55, mt: 0.6 }}>
+            Welcome back, {dashboardGreetingName(user)}. Here is what needs attention at {scopeName}.
+          </Typography>
+          <Chip
+            size="small"
+            label={workspace === "platform" ? "Platform shifts" : selectedPharmacy ? "Selected pharmacy" : "Your pharmacy network"}
+            sx={{ mt: 1.5, bgcolor: "#EBEEFF", color: "#4220A0", fontWeight: 800 }}
+          />
         </Box>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flexShrink: 0 }}>
+          <Button onClick={onPostShift} variant="contained" startIcon={<ListAltIcon />} sx={{ minHeight: 46, textTransform: "none", bgcolor: "#5222B8", "&:hover": { bgcolor: "#421A94" } }}>
+            Post Shift
+          </Button>
+          <Button onClick={onOpenShifts} variant="outlined" endIcon={<ArrowForwardRoundedIcon />} sx={{ minHeight: 46, textTransform: "none", color: "#5222B8", borderColor: "#C8B5E9" }}>
+            Shift Centre
+          </Button>
+        </Stack>
+      </Stack>
+
+      {dashboardError && (
+        <Alert
+          severity="error"
+          action={<Button color="inherit" onClick={onRetryDashboard} sx={{ minHeight: 44, fontWeight: 800 }}>Retry</Button>}
+        >
+          {dashboardError} You can still use your workspace actions below.
+        </Alert>
+      )}
+
+      <Paper
+        component="section"
+        aria-label="Operational overview"
+        variant="outlined"
+        sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", lg: "repeat(4,minmax(0,1fr))" }, bgcolor: "#FFFFFF", borderColor: line, borderRadius: 3, overflow: "hidden", boxShadow: "none" }}
+      >
+        {metrics.map((metric, index) => (
+          <ButtonBase
+            key={metric.label}
+            onClick={metric.action}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              width: "100%",
+              minWidth: 0,
+              textAlign: "left",
+              gap: 0.7,
+              p: { xs: 1.75, sm: 2.25, lg: 2.5 },
+              borderRight: { xs: index % 2 === 0 ? "1px solid " + line : "none", lg: index < 3 ? "1px solid " + line : "none" },
+              borderBottom: { xs: index < 2 ? "1px solid " + line : "none", lg: "none" },
+              "&:hover": { bgcolor: "#F5F7FF" },
+              "&:focus-visible": { outline: "3px solid #008DDB", outlineOffset: -3 },
+            }}
+          >
+            <Stack direction="row" spacing={0.8} alignItems="center">
+              <Box sx={{ color: metric.accent, display: "flex", "& svg": { fontSize: 20 } }}>{metric.icon}</Box>
+              <Typography sx={{ color: muted, fontSize: { xs: 12, sm: 13 }, fontWeight: 800 }}>{metric.label}</Typography>
+            </Stack>
+            {dashboardLoading ? (
+              <Skeleton variant="text" width={72} height={49} />
+            ) : (
+              <Typography sx={{ color: ink, fontSize: { xs: 30, md: 38 }, lineHeight: 1.12, fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>
+                {ready ? readableCount(metric.value) : "—"}
+              </Typography>
+            )}
+            <Typography sx={{ color: muted, fontSize: 12.5, fontWeight: 600, lineHeight: 1.45 }}>
+              {metric.description}
+            </Typography>
+          </ButtonBase>
+        ))}
+      </Paper>
+
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", lg: "minmax(0,1.45fr) minmax(310px,1fr)" }, gap: 2.5, alignItems: "start" }}>
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+          <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5} sx={{ mb: 2.25 }}>
+              <Box>
+                <Typography component="h2" sx={{ color: ink, fontSize: 21, fontWeight: 800 }}>Upcoming shifts</Typography>
+                <Typography sx={{ color: muted, fontSize: 13.5 }}>The next commitments in your selected workspace.</Typography>
+              </Box>
+              <Button onClick={onOpenShifts} endIcon={<ArrowForwardRoundedIcon />} sx={{ color: "#5222B8", flexShrink: 0, fontWeight: 800 }}>View all</Button>
+            </Stack>
+            {dashboardLoading && <Stack spacing={1.2}>{[1,2,3].map((n) => <Skeleton key={n} height={61} />)}</Stack>}
+            {!dashboardLoading && !ready && <Typography sx={{ color: muted, fontSize: 14 }}>Shift details are unavailable. Retry the overview to see current work.</Typography>}
+            {ready && upcomingShifts.length === 0 && (
+              <Box sx={{ bgcolor: "#F4F7FC", px: 2, py: 2.75, borderRadius: 2 }}>
+                <Typography sx={{ color: ink, fontWeight: 800 }}>No upcoming shifts in this view.</Typography>
+                <Typography sx={{ color: muted, fontSize: 14, mt: 0.5 }}>Use Shift Centre to check other staffing activity.</Typography>
+              </Box>
+            )}
+            {ready && upcomingShifts.map((shift) => (
+              <ButtonBase key={shift.id} onClick={onOpenShifts} sx={{ display: "flex", width: "100%", textAlign: "left", justifyContent: "space-between", gap: 2, py: 1.5, px: 0.75, borderTop: "1px solid " + line, "&:hover": { bgcolor: "#F5F7FF" }, "&:focus-visible": { outline: "3px solid #008DDB" } }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ color: ink, fontSize: 15, fontWeight: 800, overflowWrap: "anywhere" }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
+                  <Typography sx={{ color: muted, fontSize: 13.5 }}>{readableDate(shift.date)}</Typography>
+                </Box>
+                <ArrowForwardRoundedIcon sx={{ color: "#5222B8", flexShrink: 0 }} />
+              </ButtonBase>
+            ))}
+          </Paper>
+
+          <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
+            <Typography component="h2" sx={{ color: ink, fontSize: 21, fontWeight: 800, mb: 1.5 }}>Recent Activity</Typography>
+            {dashboardLoading && <Stack spacing={1.2}>{[1,2].map((n) => <Skeleton key={n} height={55} />)}</Stack>}
+            {!dashboardLoading && !ready && <Typography sx={{ color: muted, fontSize: 14 }}>Activity could not be loaded.</Typography>}
+            {ready && activity.length === 0 && <Typography sx={{ color: muted, fontSize: 14 }}>No recent activity to show in this workspace.</Typography>}
+            {ready && activity.map((record, index) => {
+              const url = safeActivityUrl(record);
+              return (
+                <ButtonBase
+                  key={index}
+                  disabled={!url}
+                  onClick={url ? () => navigate(url) : undefined}
+                  sx={{ display: "flex", gap: 1.5, width: "100%", textAlign: "left", alignItems: "flex-start", py: 1.4, borderTop: index > 0 ? "1px solid " + line : "none", cursor: url ? "pointer" : "default", "&:focus-visible": { outline: "3px solid #008DDB" } }}
+                >
+                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#5222B8", mt: 0.8, flexShrink: 0 }} />
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography sx={{ color: ink, fontSize: 14, fontWeight: 800 }}>{record.title}</Typography>
+                    {record.description && <Typography sx={{ color: muted, fontSize: 13.5, mt: 0.35, overflowWrap: "anywhere" }}>{record.description}</Typography>}
+                    {record.time && <Typography sx={{ color: muted, fontSize: 12, mt: 0.35 }}>{record.time}</Typography>}
+                  </Box>
+                  {url && <ArrowForwardRoundedIcon sx={{ color: "#5222B8", fontSize: 18 }} />}
+                </ButtonBase>
+              );
+            })}
+          </Paper>
+        </Stack>
+
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+          <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+              <CalendarMonthIcon sx={{ color: "#5222B8" }} />
+              <Typography component="h2" sx={{ color: ink, fontSize: 20, fontWeight: 800 }}>Shift calendar snapshot</Typography>
+            </Stack>
+            {[
+              ["Today", upcoming?.today],
+              ["Next 7 days", upcoming?.week],
+              ["Next 30 days", upcoming?.month],
+            ].map(([label, count]) => (
+              <Stack key={String(label)} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.15, borderBottom: "1px solid " + line }}>
+                <Typography sx={{ color: muted, fontWeight: 700, fontSize: 14 }}>{label}</Typography>
+                <Typography sx={{ color: ink, fontWeight: 850, fontSize: 20, fontVariantNumeric: "tabular-nums" }}>
+                  {dashboardLoading ? <Skeleton width={42} /> : ready ? readableCount(typeof count === "number" ? count : undefined) : "—"}
+                </Typography>
+              </Stack>
+            ))}
+            <Button onClick={onOpenRoster} endIcon={<ArrowForwardRoundedIcon />} sx={{ mt: 1.5, px: 0, color: "#5222B8", fontWeight: 800 }}>Open roster</Button>
+          </Paper>
+
+          {canSeeOwnerFinance && (
+            <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.75 }}>
+                <CreditCardIcon sx={{ color: "#5222B8" }} />
+                <Typography component="h2" sx={{ color: ink, fontSize: 20, fontWeight: 800 }}>Invoices</Typography>
+              </Stack>
+              <Typography sx={{ color: muted, fontSize: 13 }}>Outstanding total</Typography>
+              <Typography sx={{ color: ink, fontWeight: 850, fontSize: 27, fontVariantNumeric: "tabular-nums", mb: 1 }}>
+                {dashboardLoading ? <Skeleton width={120} /> : ready ? invoiceSummary?.unpaid_total ?? "—" : "—"}
+              </Typography>
+              <Typography sx={{ color: muted, fontSize: 13.5 }}>
+                {ready ? readableCount(invoiceSummary?.unpaid_count) : "—"} unpaid invoices in this workspace
+              </Typography>
+              <Button onClick={() => navigate("/dashboard/owner/invoice")} endIcon={<ArrowForwardRoundedIcon />} sx={{ mt: 1.5, px: 0, color: "#5222B8", fontWeight: 800 }}>Review invoices</Button>
+            </Paper>
+          )}
+
+          {canSeeOwnerFinance && (
+            <Paper component="section" variant="outlined" sx={{ px: { xs: 2, md: 2.75 }, py: 2, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+                <Box>
+                  <Typography sx={{ color: muted, fontSize: 13, fontWeight: 800 }}>Pill balance</Typography>
+                  <Typography sx={{ color: ink, fontWeight: 850, fontSize: 24, fontVariantNumeric: "tabular-nums" }}>
+                    {pillBalance === null ? "—" : readableCount(pillBalance)}
+                  </Typography>
+                </Box>
+                <Button onClick={onOpenPills} sx={{ color: "#5222B8", fontWeight: 800 }}>View balance</Button>
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
       </Box>
-      <DashboardOverviewTemplate
-      title="Owner Dashboard"
-      badge={selectedPharmacy ? "Internal workspace" : "Owner workspace"}
-      subtitle={
-        selectedPharmacy
-          ? `Operate ${scopeName}: staffing, roster coverage, shifts and invoices`
-          : `Operate ${totalPharmacies} active ${totalPharmacies === 1 ? "pharmacy" : "pharmacies"} from one workspace`
-      }
-      heroTitle={`Welcome back, ${dashboardGreetingName(user)}!`}
-      heroSubtitle={
-        selectedPharmacy
-          ? `Start with the work needing attention now at ${scopeName}.`
-          : "Start with staffing coverage, confirmed commitments and operational exceptions across your pharmacies."
-      }
-      primaryAction={{
-        label: "Post a shift",
-        icon: <CalendarMonthIcon />,
-        onClick: onPostShift,
-      }}
-      secondaryAction={{
-        label: totalPharmacies > 1 ? "Manage pharmacies" : "Manage pharmacy",
-        icon: <StoreIcon />,
-        onClick: onOpenManage,
-      }}
-      pillSummary={
-        pillSummary
-          ? { balance: pillSummary.balance, shiftPostCost: pillSummary.shift_post_cost }
-          : { balance: 0, loading: true }
-      }
-      onOpenPills={onOpenPills}
-      actions={actions}
-      upcoming={{
-        today: Number(dashboardData?.upcoming_stats?.today ?? 0),
-        week: Number(dashboardData?.upcoming_stats?.week ?? dashboardData?.upcoming_shifts_count ?? 0),
-        month: Number(dashboardData?.upcoming_stats?.month ?? dashboardData?.upcoming_shifts_count ?? 0),
-      }}
-      upcomingTitle="Staffing Commitments"
-      activity={Array.isArray(dashboardData?.activity) ? dashboardData.activity : []}
-      metrics={metrics}
-      invoicePanel={{
-        title: "Invoices",
-        total: dashboardData?.invoice_summary?.total_billed ?? dashboardData?.bills_summary?.total_billed ?? "$0.00",
-        totalLabel: selectedPharmacy ? `Invoice value for ${scopeName}` : "Invoice value across your current scope",
-        unpaidCount: unpaidInvoiceCount,
-        unpaidTotal: unpaidInvoiceTotal,
-        buttonLabel: "Review invoices",
-        onClick: () => navigate("/dashboard/owner/invoice"),
-      }}
-      onOpenShifts={onOpenShifts}
-      onOpenActivity={onOpenShifts}
-      />
+
+      <Paper component="section" variant="outlined" sx={{ px: { xs: 2, md: 2.75 }, py: 2, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1.5}>
+          <Typography component="h2" sx={{ color: ink, fontSize: 16, fontWeight: 800 }}>Workspace tools</Typography>
+          <Stack direction="row" flexWrap="wrap" useFlexGap gap={1}>
+            {shortcuts.map((link) => (
+              <Button key={link.label} size="small" variant="outlined" onClick={link.action} startIcon={link.icon} sx={{ minHeight: 44, textTransform: "none", color: "#32246B", borderColor: "#D2D9E6", fontWeight: 700 }}>
+                {link.label}
+              </Button>
+            ))}
+          </Stack>
+        </Stack>
+      </Paper>
+      {totalPharmacies === 0 && workspace === "internal" && (
+        <Alert severity="info">No pharmacies are linked to this workspace yet. Add a pharmacy to begin managing its staffing.</Alert>
+      )}
     </Stack>
   );
 }
