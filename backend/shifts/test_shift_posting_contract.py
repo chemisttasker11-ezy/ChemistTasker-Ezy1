@@ -133,6 +133,8 @@ class PostedShiftAnnouncementTests(ShiftPostingFixture):
                     role_needed=role_needed,
                     employment_type="FULL_TIME",
                     visibility="FULL_PART_TIME",
+                    min_hourly_rate="30.00",
+                    max_hourly_rate="35.00",
                     notify_pharmacy_staff=True,
                 )
                 self.assertEqual(response.status_code, 201, response.data)
