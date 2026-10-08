@@ -135,7 +135,7 @@ export default function PublicTalentBoardPage() {
                 {loading && !user ? 'Finding pharmacy talent…' : user ? 'Explore available pharmacy talent' : `${posts.length} public ${posts.length === 1 ? 'profile' : 'profiles'} available`}
               </Typography>
               <Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}>
-                Compare role, location, pharmacy skills, dispensing-software experience and published availability. Sign in only when you need an account action.
+                Find the right pharmacy professionals by role, location, skills and availability.
               </Typography>
             </Box>
             {!user && (
@@ -146,7 +146,7 @@ export default function PublicTalentBoardPage() {
             )}
           </Stack>
         </Box>
-        {error && !user && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && !user && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => void load()}>Retry</Button>}>{error}</Alert>}
         <TalentBoard
           publicMode={!user}
           externalPosts={user?undefined:posts}
