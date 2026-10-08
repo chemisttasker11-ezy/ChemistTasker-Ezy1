@@ -172,11 +172,14 @@ export default function RefereeQuestionnairePage() {
         );
       case "error":
         return (
-          <Alert severity="error" sx={{ textAlign: "left" }}>
-            <Typography variant="h6" gutterBottom>
-              Submission Failed
+          <Alert severity="error" sx={{ textAlign: "left", p: 2.5 }}>
+            <Typography variant="h5" gutterBottom>
+              We could not submit this reference
             </Typography>
             <Typography>{message}</Typography>
+            <Button variant="outlined" color="error" sx={{ mt: 2 }} onClick={() => setStatus("form")}>
+              Review answers and try again
+            </Button>
           </Alert>
         );
       case "form":
@@ -184,19 +187,23 @@ export default function RefereeQuestionnairePage() {
         return (
           <Box sx={{ maxWidth: 980, mx: "auto", width: "100%" }}>
             <Paper
-              elevation={3}
+              variant="outlined"
               sx={{
                 maxWidth: 1000,
                 mx: "auto",
-                p: { xs: 2, md: 5 },
+                p: { xs: 2.5, md: 4.5 },
+                borderRadius: 4,
+                boxShadow: "0 18px 48px rgba(6,18,58,.06)",
               }}
             >
-              <Typography variant="h4" component="h1" gutterBottom align="center">
-                ChemistTasker Reference Questionnaire
+              <Typography sx={{ color: "primary.main", fontSize: 11, fontWeight: 900, letterSpacing: ".1em", textTransform: "uppercase" }}>
+                Professional reference
               </Typography>
-              <Typography variant="body1" align="center" sx={{ mb: 4 }}>
-                Thank you for assisting with this reference. All responses are confidential and will be used solely for
-                recruitment purposes.
+              <Typography variant="h4" component="h1" sx={{ mt: 1, mb: 1 }}>
+                Reference questionnaire
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 760, lineHeight: 1.7 }}>
+                Thank you for assisting with this reference. Complete the requested questions in one session. Your response is submitted only after the server confirms it.
               </Typography>
               <Box
                 component="form"
@@ -408,8 +415,8 @@ export default function RefereeQuestionnairePage() {
   };
 
   return (
-    <AuthLayout title="Reference Questionnaire" maxWidth="lg">
-      <Box sx={{ width: "100%", overflowY: "auto", p: 2 }}>
+    <AuthLayout title="Reference Questionnaire" maxWidth={false} noCard showTitle={false}>
+      <Box sx={{ width: "100%", py: { xs: 1, md: 2 } }}>
         <Container maxWidth="lg">{renderContent()}</Container>
       </Box>
     </AuthLayout>
