@@ -142,6 +142,7 @@ export default function DashboardOverviewTemplate({
   onUpdateAvailability,
   upcoming,
   upcomingTitle = "Upcoming Shifts",
+  showUpcoming = true,
   activity = [],
   metrics,
   invoicePanel,
@@ -165,6 +166,7 @@ export default function DashboardOverviewTemplate({
   onUpdateAvailability?: () => void;
   upcoming: UpcomingStat;
   upcomingTitle?: string;
+  showUpcoming?: boolean;
   activity?: DashboardActivity[];
   metrics: DashboardMetric[];
   invoicePanel?: DashboardInvoicePanel;
@@ -461,25 +463,27 @@ export default function DashboardOverviewTemplate({
         </Stack>
 
         <Stack spacing={{ xs: 2.5, md: 3 }}>
-          <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
-              <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>{upcomingTitle}</Typography>
-            </Stack>
-            <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-              {[["Today", upcoming.today], ["This Week", upcoming.week], ["This Month", upcoming.month]].map(([label, value]) => (
-                <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
-                  <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
-                  <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-            {onOpenShifts && (
-              <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-                View all shifts
-              </Button>
-            )}
-          </Paper>
+          {showUpcoming && (
+            <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+                <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
+                <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>{upcomingTitle}</Typography>
+              </Stack>
+              <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
+                {[["Today", upcoming.today], ["This Week", upcoming.week], ["This Month", upcoming.month]].map(([label, value]) => (
+                  <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
+                    <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
+                    <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
+                  </Stack>
+                ))}
+              </Stack>
+              {onOpenShifts && (
+                <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+                  View all shifts
+                </Button>
+              )}
+            </Paper>
+          )}
 
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
