@@ -81,5 +81,49 @@ for (const file of webFiles) {
   if (/on(?:Click|Submit)\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/.test(executableSource)) failures.push(path.relative(repoRoot, file) + ' contains an empty interactive handler');
 }
 
+function readWeb(relativePath) {
+  return fs.readFileSync(path.join(webRoot, relativePath), 'utf8');
+}
+
+function requireWebContains(relativePath, patterns) {
+  const source = readWeb(relativePath);
+  for (const [label, pattern] of patterns) {
+    if (!pattern.test(source)) {
+      failures.push(`frontend_web/src/${relativePath} lost dashboard shell contract: ${label}`);
+    }
+  }
+}
+
+function requireWebAbsent(relativePath, patterns) {
+  const source = readWeb(relativePath);
+  for (const [label, pattern] of patterns) {
+    if (pattern.test(source)) {
+      failures.push(`frontend_web/src/${relativePath} violates dashboard shell contract: ${label}`);
+    }
+  }
+}
+
+// Dashboard redesign contract: preserve working Vite controls while moving desktop
+// navigation into one shared sidebar. These checks deliberately verify wiring,
+// not visual implementation details.
+requireWebContains('layouts/DashboardTopShell.tsx', [
+  ['shared sidebar', /<DashboardSideNav\b/],
+  ['pharmacy or workspace selector', /showPharmacySelector/],
+  ['persona and admin switching', /selectAdminPersona/],
+  ['top-bar actions', /<TopBarActions\b/],
+  ['mobile dashboard menu trigger', /Open dashboard navigation/],
+]);
+requireWebAbsent('layouts/DashboardTopShell.tsx', [
+  ['dashboard search hidden', /<TopBarActions[\s\S]{0,180}\bhideSearch\b/],
+]);
+requireWebContains('layouts/DashboardSideNav.tsx', [
+  ['authoritative navigation context', /useDashboardNavigation\(\)/],
+  ['scoped route helper', /addDashboardScopeParams/],
+  ['accessible current-page state', /aria-current=/],
+]);
+requireWebAbsent('pages/dashboard/organization/OrganizationOverviewPage.tsx', [
+  ['all-pharmacy organization scope mislabeled as public platform', /badge=\{selectedPharmacy \? "Internal workspace" : "Public platform"\}/],
+]);
+
 console.log(JSON.stringify({ metrics, routePatterns: routePatterns.length, failures }, null, 2));
 if (failures.length) process.exit(1);
