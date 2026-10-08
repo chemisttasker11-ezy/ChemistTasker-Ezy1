@@ -1,5 +1,6 @@
 import PublicHeader from '@/public/header';
 import PublicFooter from '@/public/footer';
+import '../(public)/public.css';
 import './hub.css';
 
 export default function HubLayout({ children }: { children: React.ReactNode }) {
