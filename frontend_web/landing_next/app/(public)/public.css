@@ -23,7 +23,7 @@
 .public-account-actions{margin-left:auto}
 .public-mobile-nav{background:white;border-top:1px solid var(--public-line);box-shadow:0 20px 30px rgba(6,18,58,.08)}
 .public-mobile-group{display:grid;padding:10px 0}
-.public-mobile-group>span{padding:8px 12px 4px;color:#7A86A3;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.public-mobile-group>span{padding:8px 12px 4px;color:#445474;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
 .public-mobile-group a{border-radius:10px;font-weight:700;color:#263754}
 .public-mobile-group a:hover,.public-mobile-group a[aria-current="page"]{background:#F4F0FC;color:var(--public-purple)}
 .public-mobile-account{padding:14px 12px;border-top:1px solid var(--public-line)}
@@ -40,22 +40,22 @@
 .public-hero h1{font-size:clamp(40px,4.8vw,66px);max-width:780px;line-height:1.03}
 .public-intro{margin-top:20px;max-width:650px;font-size:16px;line-height:1.8;color:var(--public-muted)}
 .board-hero .public-hero-grid{grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr)}
-.public-benefits{display:flex;flex-wrap:wrap;gap:14px 24px;margin-top:24px;font-size:12px;font-weight:700;color:#51617d}
+.public-benefits{display:flex;flex-wrap:wrap;gap:14px 24px;margin-top:24px;font-size:14px;font-weight:700;color:#51617d}
 .public-benefits span{display:flex;align-items:center;gap:8px}
 .public-benefits svg{color:var(--public-purple)}
 .board-art{position:relative;height:300px;margin:0 0 16px 32px}
 .board-art>img{width:80%;height:264px;object-fit:cover;object-position:50% 30%;border-radius:118px 22px 22px 22px;margin-left:auto;box-shadow:0 20px 55px rgba(6,18,58,.12)}
 .board-art-label{position:absolute;left:-18px;bottom:44px;display:flex;gap:12px;align-items:center;padding:15px 17px;background:#fff;border:1px solid var(--public-line);border-radius:16px;box-shadow:var(--public-shadow)}
 .board-art-label strong{font:600 17px Outfit,sans-serif;color:var(--public-ink)}
-.board-art-label small{display:block;color:var(--public-muted);font-size:10px;margin-top:3px}
+.board-art-label small{display:block;color:var(--public-muted);font-size:13px;margin-top:3px}
 .skill-legend{position:absolute;bottom:-4px;left:0;display:flex;flex-wrap:wrap;gap:8px}
 .skill-badge{display:inline-flex;align-items:center;gap:7px;font:700 11px Inter,sans-serif;background:#F0EAFA;color:#5222B8;border:1px solid #E3D8F6;padding:7px 10px;border-radius:999px}
 .skill-badge:nth-child(3n+2){background:#E9FAFF;color:#006B82;border-color:#CDEBF2}
 .skill-badge:nth-child(3n){background:#FFF0FD;color:#96238F;border-color:#F3D9F0}
 
-.public-migrated{background:var(--public-soft);padding:28px 0 64px;min-height:350px}
+.public-migrated{background:var(--public-soft);color:var(--public-ink);padding:28px 0 64px;min-height:350px}
 .public-migrated .MuiAppBar-root,.public-migrated footer{display:none!important}
-.public-migrated h1,.public-migrated h2,.public-migrated h3,.public-migrated h4,.public-migrated h5,.public-migrated h6{font-family:Outfit,sans-serif;font-weight:600;color:var(--public-ink);letter-spacing:-.025em}
+.public-migrated h1,.public-migrated h2,.public-migrated h3,.public-migrated h4,.public-migrated h5,.public-migrated h6{font-family:Outfit,sans-serif;font-weight:600;letter-spacing:-.025em}
 .public-migrated .MuiContainer-root{max-width:1240px}
 .public-migrated .MuiPaper-root,.public-migrated .MuiCard-root{border-color:var(--public-line)}
 .public-migrated .MuiPaper-root{box-shadow:0 10px 32px rgba(6,18,58,.05)}
@@ -77,11 +77,11 @@
 .public-footer-brand p{color:#B9C6DB;font-size:12px;line-height:1.7;margin-top:14px}
 .public-footer-groups{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:24px}
 .public-footer-groups nav{display:grid;align-content:start;gap:10px}
-.public-footer-groups strong{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8FA3C1}
+.public-footer-groups strong{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8FA3C1}
 .public-footer-groups a{font-size:13px;color:#E6ECF5}
 .public-footer-groups a:hover{color:white}
 .public-footer-bottom{grid-column:1/-1;display:flex;justify-content:space-between;gap:20px;align-items:center;padding-top:24px;border-top:1px solid #1D2D49;color:#91A4C1}
-.public-footer-bottom small{font-size:10px}
+.public-footer-bottom small{font-size:12px}
 .public-footer-bottom div{display:flex;gap:8px;align-items:center;font-size:11px}
 .public-footer-bottom a:hover{color:white}
 
