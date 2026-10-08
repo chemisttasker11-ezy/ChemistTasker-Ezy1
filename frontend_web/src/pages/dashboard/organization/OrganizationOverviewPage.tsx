@@ -6,6 +6,7 @@ import HowToRegIcon from "@mui/icons-material/HowToReg";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import StoreIcon from "@mui/icons-material/Store";
+import ForumIcon from "@mui/icons-material/Forum";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getOrganizationDashboard, getOrganizationMembership } from "@chemisttasker/shared-core";
 import DashboardOverviewTemplate, {
@@ -34,6 +35,14 @@ export default function OrganizationOverviewPage() {
 
   const orgMembership = getOrganizationMembership(user);
   const orgId = orgMembership?.organization_id ?? null;
+  const orgCapabilities = new Set<string>(orgMembership?.capabilities ?? []);
+  const canManageRoster = orgCapabilities.has("manage_roster");
+  const canInviteStaff = orgCapabilities.has("invite_staff");
+  const canManagePharmacies =
+    orgCapabilities.has("manage_staff") ||
+    orgCapabilities.has("view_all_pharmacies") ||
+    orgCapabilities.has("assign_pharmacies");
+  const canManageCommunications = orgCapabilities.has("manage_communications");
 
   useEffect(() => {
     if (!orgId) return;
@@ -99,12 +108,42 @@ export default function OrganizationOverviewPage() {
     month: Number(data?.upcoming_stats?.month ?? activeShifts),
   };
 
-  const actions: DashboardAction[] = [
-    { title: "Post Shift", description: "Cover an open workforce need", icon: <PostAddIcon />, onClick: () => navigate("/dashboard/organization/post-shift"), tone: "pink" },
-    { title: "Shift Centre", description: "Review active and confirmed work", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center"), tone: "cyan" },
-    { title: "Invite Staff", description: "Add people to the organization", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite"), tone: "blue" },
-    { title: "Manage Pharmacies", description: "Stores, claims and organization coverage", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies"), tone: "purple" },
-  ];
+  const actions: DashboardAction[] = [];
+  if (canManageRoster) {
+    actions.push(
+      { title: "Post Shift", description: "Cover an open workforce need", icon: <PostAddIcon />, onClick: () => navigate("/dashboard/organization/post-shift"), tone: "pink" },
+      { title: "Shift Centre", description: "Review active and confirmed work", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center"), tone: "cyan" },
+    );
+  }
+  if (canInviteStaff) {
+    actions.push(
+      { title: "Invite Staff", description: "Add people within your organization authority", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite"), tone: "blue" },
+    );
+  }
+  if (canManagePharmacies) {
+    actions.push(
+      { title: "Manage Pharmacies", description: "Stores, claims and organization coverage", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies"), tone: "purple" },
+    );
+  }
+  if (canManageCommunications && actions.length < 4) {
+    actions.push(
+      { title: "Pharmacy Hub", description: "Open organization communication and updates", icon: <ForumIcon />, onClick: () => navigate("/dashboard/pharmacy-hub"), tone: "blue" },
+    );
+  }
+
+  const primaryAction = canManageRoster
+    ? { label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/post-shift") }
+    : canManagePharmacies
+      ? { label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }
+      : canInviteStaff
+        ? { label: "Invite staff", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite") }
+        : { label: "Open Pharmacy Hub", icon: <ForumIcon />, onClick: () => navigate("/dashboard/pharmacy-hub") };
+
+  const secondaryAction = canManageRoster && canManagePharmacies
+    ? { label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }
+    : canManageRoster
+      ? { label: "Shift Centre", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center") }
+      : undefined;
 
   const metrics: DashboardMetric[] = [
     { label: "Pending Claims", value: pendingClaims, helper: "Awaiting approval", icon: <HowToRegIcon />, tone: "purple" },
@@ -125,9 +164,13 @@ export default function OrganizationOverviewPage() {
         badge={selectedPharmacy ? "Internal pharmacy" : "Organization workspace"}
         subtitle="See organization-wide staffing, pharmacy coverage and exceptions"
         heroTitle="Welcome back!"
-        heroSubtitle={`Focus on staffing coverage, claims and shift activity across ${selectedPharmacy ? scopeName : "your organization"}.`}
-        primaryAction={{ label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/post-shift") }}
-        secondaryAction={{ label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }}
+        heroSubtitle={
+          canManageRoster
+            ? `Focus on staffing coverage, claims and shift activity across ${selectedPharmacy ? scopeName : "your organization"}.`
+            : `Focus on the organization tools and pharmacy scope available to your role across ${selectedPharmacy ? scopeName : "your organization"}.`
+        }
+        primaryAction={primaryAction}
+        secondaryAction={secondaryAction}
         pillSummary={
           pillSummary
             ? { balance: pillSummary.balance, shiftPostCost: pillSummary.shift_post_cost }
