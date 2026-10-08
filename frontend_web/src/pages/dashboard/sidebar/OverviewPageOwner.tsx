@@ -14,9 +14,8 @@ import {
 import { alpha } from "@mui/material/styles";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import { Link as RouterLink, useSearchParams } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
-import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import { getOwnerDashboard, getInvoices, getInvoicePdfUrl } from "@chemisttasker/shared-core";
 import { dashboardGreetingName } from "../../../utils/displayName";
 
@@ -48,19 +47,6 @@ type DashboardData = {
 
 export default function OverviewPageOwner() {
   const { user } = useAuth() as { user: User };
-  const { selectedPharmacyId, workspace } = useWorkspace();
-  const [searchParams] = useSearchParams();
-  const urlPharmacyId = Number(
-    searchParams.get("pharmacy_id") ??
-      searchParams.get("pharmacy") ??
-      searchParams.get("pharmacyId"),
-  );
-  const effectivePharmacyId =
-    workspace === "internal" && selectedPharmacyId
-      ? selectedPharmacyId
-      : workspace === "internal" && Number.isFinite(urlPharmacyId) && urlPharmacyId > 0
-        ? urlPharmacyId
-        : null;
   const primary = "var(--ct-dashboard-accent, #4A16B8)";
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -73,11 +59,7 @@ export default function OverviewPageOwner() {
     setLoading(true);
 
     Promise.allSettled([
-      getOwnerDashboard(
-        effectivePharmacyId
-          ? { workspace: "internal", pharmacy_id: effectivePharmacyId }
-          : { workspace: workspace === "internal" ? "internal" : "platform" },
-      ),
+      getOwnerDashboard({ workspace: "platform" }),
       getInvoices(),
     ]).then(([dashResult, invResult]) => {
       if (!active) return;
@@ -108,34 +90,15 @@ export default function OverviewPageOwner() {
     return () => {
       active = false;
     };
-  }, [effectivePharmacyId, workspace]);
+  }, []);
 
   const shifts = useMemo(() => data?.shifts ?? [], [data?.shifts]);
-  const scopedInvoices = useMemo(() => {
-    if (!effectivePharmacyId) return invoices;
-    const pharmacyIdForInvoice = (invoice: any) => {
-      const raw =
-        invoice?.pharmacy_id ??
-        invoice?.pharmacyId ??
-        invoice?.pharmacy?.id ??
-        invoice?.pharmacy_id_snapshot;
-      const value = Number(raw);
-      return Number.isFinite(value) && value > 0 ? value : null;
-    };
-    const payloadHasPharmacyIds = invoices.some((invoice: any) => pharmacyIdForInvoice(invoice) != null);
-    if (!payloadHasPharmacyIds) {
-      // Legacy payloads may expose only a pharmacy-name snapshot. In that case
-      // retain the received list rather than guessing which pharmacy owns it.
-      return invoices;
-    }
-    return invoices.filter((invoice: any) => pharmacyIdForInvoice(invoice) === effectivePharmacyId);
-  }, [effectivePharmacyId, invoices]);
 
   if (loading) {
     return (
       <Box
         sx={{
-          maxWidth: 1440,
+          maxWidth: 1200,
           mx: "auto",
           px: { xs: 2, md: 4 },
           py: { xs: 2, md: 4 },
@@ -190,7 +153,7 @@ export default function OverviewPageOwner() {
       <Paper
         elevation={0}
         sx={{
-          p: { xs: 2.5, md: 3.25 },
+          p: { xs: 3, md: 4 },
           borderRadius: { xs: 3, md: 4 },
           backgroundImage: "var(--ct-dashboard-gradient, linear-gradient(135deg, #063BDA 0%, #6D28D9 52%, #EA0A8E 100%))",
           color: "#fff",
@@ -209,7 +172,8 @@ export default function OverviewPageOwner() {
               Hello, {welcomeName}!
             </Typography>
             <Typography variant="body1" sx={{ opacity: 0.92, maxWidth: 560, mb: 3 }}>
-              Start with staffing coverage, shift activity and invoices that may need your attention.
+              Track your pharmacy network, manage shifts, and keep everything on schedule. Use the
+              quick actions below to jump back into your workflow.
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <Button
@@ -391,12 +355,12 @@ export default function OverviewPageOwner() {
         <Divider sx={{ my: 2 }} />
 
         <Stack spacing={1.5}>
-          {scopedInvoices.length === 0 ? (
+          {invoices.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               No received invoices yet. When pharmacists submit an invoice for your pharmacy, it will appear here.
             </Typography>
           ) : (
-            scopedInvoices.slice(0, 5).map((inv) => {
+            invoices.slice(0, 5).map((inv) => {
               const status = String(inv.status || "sent").toLowerCase();
               const isPaid = status === "paid";
               return (
