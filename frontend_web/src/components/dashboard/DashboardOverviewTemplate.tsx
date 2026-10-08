@@ -133,6 +133,7 @@ export default function DashboardOverviewTemplate({
   primaryAction,
   secondaryAction,
   pillSummary,
+  onOpenPills,
   actions,
   workerShifts,
   recommendedShifts,
@@ -155,6 +156,7 @@ export default function DashboardOverviewTemplate({
   primaryAction: { label: string; icon?: React.ReactNode; onClick: () => void };
   secondaryAction?: { label: string; icon?: React.ReactNode; onClick: () => void };
   pillSummary?: PillSummary;
+  onOpenPills?: () => void;
   actions: DashboardAction[];
   workerShifts?: DashboardShiftPreview[];
   recommendedShifts?: DashboardShiftPreview[];
@@ -166,7 +168,7 @@ export default function DashboardOverviewTemplate({
   activity?: DashboardActivity[];
   metrics: DashboardMetric[];
   invoicePanel?: DashboardInvoicePanel;
-  onOpenShifts: () => void;
+  onOpenShifts?: () => void;
   onOpenActivity?: () => void;
 }) {
   const navigate = useNavigate();
@@ -275,7 +277,26 @@ export default function DashboardOverviewTemplate({
                 </Stack>
               </Box>
               {pillSummary && (
-                <Stack role="button" direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: "100%", md: "auto" }, minWidth: { xs: 0, md: 320 }, p: { xs: 1.5, md: 2.5 }, borderRadius: { xs: "16px", md: "24px" }, bgcolor: alpha("#ffffff", 0.13), border: `1px solid ${alpha("#ffffff", 0.26)}`, boxShadow: `inset 0 1px 0 ${alpha("#ffffff", 0.18)}` }}>
+                <Stack
+                  component={onOpenPills ? ButtonBase : "div"}
+                  onClick={onOpenPills}
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="center"
+                  sx={{
+                    width: { xs: "100%", md: "auto" },
+                    minWidth: { xs: 0, md: 320 },
+                    p: { xs: 1.5, md: 2.5 },
+                    borderRadius: { xs: "16px", md: "24px" },
+                    bgcolor: alpha("#ffffff", 0.13),
+                    border: `1px solid ${alpha("#ffffff", 0.26)}`,
+                    boxShadow: `inset 0 1px 0 ${alpha("#ffffff", 0.18)}`,
+                    textAlign: "left",
+                    cursor: onOpenPills ? "pointer" : "default",
+                    transition: "transform 0.18s ease, background-color 0.18s ease",
+                    "&:hover": onOpenPills ? { transform: "translateY(-2px)", bgcolor: alpha("#ffffff", 0.2) } : undefined,
+                  }}
+                >
                   <Box component="img" src="/images/drugs.png" alt="" sx={{ width: { xs: 58, sm: 78, md: 98 }, height: { xs: 58, sm: 78, md: 98 }, objectFit: "contain", flexShrink: 0, filter: `contrast(1.08) saturate(1.08) drop-shadow(0 14px 22px ${alpha("#111827", 0.26)})` }} />
                   <Stack spacing={0.75} sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ textTransform: "uppercase", letterSpacing: ".08em", opacity: 0.72, fontSize: { xs: 12, md: 14 } }}>Pill balance</Typography>
@@ -401,7 +422,29 @@ export default function DashboardOverviewTemplate({
             {actions.map((action) => {
               const tone = toneStyles[action.tone];
               return (
-                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ minHeight: { xs: 124, md: 148 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
+                <Paper
+                  key={action.title}
+                  component={ButtonBase}
+                  onClick={action.onClick}
+                  sx={{
+                    width: "100%",
+                    minHeight: { xs: 124, md: 148 },
+                    gridColumn: { lg: action.wide ? "span 2" : "span 1" },
+                    borderRadius: { xs: "16px", md: "20px" },
+                    bgcolor: "#FFFFFF",
+                    border: `1px solid ${DNA.line}`,
+                    boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
+                    transition: "all 0.2s ease",
+                    cursor: "pointer",
+                    p: { xs: 2, md: 3 },
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    textAlign: "left",
+                    "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" },
+                    "&:focus-visible": { outline: "3px solid #008DDB", outlineOffset: "3px" },
+                  }}
+                >
                   <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
                     <Box sx={{ width: { xs: 48, md: 54 }, height: { xs: 48, md: 54 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 26, md: 30 } } }}>
                       {action.icon}
@@ -431,9 +474,11 @@ export default function DashboardOverviewTemplate({
                 </Stack>
               ))}
             </Stack>
-            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-              View all shifts
-            </Button>
+            {onOpenShifts && (
+              <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
+                View all shifts
+              </Button>
+            )}
           </Paper>
 
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
