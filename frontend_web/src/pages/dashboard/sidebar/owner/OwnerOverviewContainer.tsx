@@ -28,6 +28,9 @@ export default function OwnerOverviewContainer() {
   const navigate = useNavigate();
   const [pharmacies, setPharmacies] = useState<PharmacyDTO[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [dashboardReloadToken, setDashboardReloadToken] = useState(0);
   const [membershipsByPharmacy, setMembershipsByPharmacy] = useState<Record<string, MembershipDTO[]>>({});
   const [adminAssignmentsByPharmacy, setAdminAssignmentsByPharmacy] = useState<Record<string, PharmacyAdminDTO[]>>({});
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,10 +176,14 @@ export default function OwnerOverviewContainer() {
 
   useEffect(() => {
     let mounted = true;
-    const dashboardParams =
-      overviewPharmacyId
-        ? { workspace: "internal", pharmacy_id: overviewPharmacyId }
-        : { workspace: "platform" };
+    // An all-pharmacies internal view must not accidentally request platform-only shifts.
+    const isInternalScope = workspace === "internal" || scopedPharmacyId != null;
+    const dashboardParams = isInternalScope
+      ? { workspace: "internal", ...(overviewPharmacyId != null ? { pharmacy_id: overviewPharmacyId } : {}) }
+      : { workspace: "platform" };
+    setDashboardLoading(true);
+    setDashboardError(null);
+    setDashboardData(null);
     apiClient
       .get("/dashboard/owner/", { params: dashboardParams })
       .then(({ data }) => {
@@ -184,12 +191,18 @@ export default function OwnerOverviewContainer() {
       })
       .catch((error: any) => {
         console.error("Owner dashboard analytics fetch error:", error);
-        if (mounted) setDashboardData(null);
+        if (mounted) {
+          setDashboardData(null);
+          setDashboardError("Your current overview could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setDashboardLoading(false);
       });
     return () => {
       mounted = false;
     };
-  }, [overviewPharmacyId, workspace]);
+  }, [overviewPharmacyId, workspace, scopedPharmacyId, dashboardReloadToken]);
 
   const goHome = () => setViewParam("overview");
   const openPharmacies = (options?: { replace?: boolean }) => setViewParam("pharmacies", { replace: options?.replace });
@@ -251,6 +264,10 @@ export default function OwnerOverviewContainer() {
             pharmacies={pharmacies}
             selectedPharmacyId={overviewPharmacyId}
             dashboardData={dashboardData}
+            dashboardLoading={dashboardLoading}
+            dashboardError={dashboardError}
+            onRetryDashboard={() => setDashboardReloadToken((value) => value + 1)}
+            workspace={workspace}
             onOpenManage={goToManagePharmacies}
             onOpenRoster={goToRoster}
             onOpenShifts={goToShifts}
