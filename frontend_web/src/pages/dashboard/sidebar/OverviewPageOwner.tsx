@@ -113,18 +113,22 @@ export default function OverviewPageOwner() {
   const shifts = useMemo(() => data?.shifts ?? [], [data?.shifts]);
   const scopedInvoices = useMemo(() => {
     if (!effectivePharmacyId) return invoices;
-    const matches = invoices.filter((invoice: any) => {
-      const invoicePharmacyId = Number(
+    const pharmacyIdForInvoice = (invoice: any) => {
+      const raw =
         invoice?.pharmacy_id ??
-          invoice?.pharmacyId ??
-          invoice?.pharmacy?.id ??
-          invoice?.pharmacy_id_snapshot,
-      );
-      return Number.isFinite(invoicePharmacyId) && invoicePharmacyId === effectivePharmacyId;
-    });
-    // Some legacy invoice payloads expose only a pharmacy-name snapshot. In that
-    // case retain the received list rather than incorrectly hiding valid invoices.
-    return matches.length > 0 ? matches : invoices;
+        invoice?.pharmacyId ??
+        invoice?.pharmacy?.id ??
+        invoice?.pharmacy_id_snapshot;
+      const value = Number(raw);
+      return Number.isFinite(value) && value > 0 ? value : null;
+    };
+    const payloadHasPharmacyIds = invoices.some((invoice: any) => pharmacyIdForInvoice(invoice) != null);
+    if (!payloadHasPharmacyIds) {
+      // Legacy payloads may expose only a pharmacy-name snapshot. In that case
+      // retain the received list rather than guessing which pharmacy owns it.
+      return invoices;
+    }
+    return invoices.filter((invoice: any) => pharmacyIdForInvoice(invoice) === effectivePharmacyId);
   }, [effectivePharmacyId, invoices]);
 
   if (loading) {
