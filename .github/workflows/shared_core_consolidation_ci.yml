@@ -140,6 +140,9 @@ jobs:
       - name: Canonical API root normalization
         run: node --test lib/api-root.test.mjs
         working-directory: frontend_web/landing_next
+      - name: Public landing route contract
+        run: node --test lib/public-route-contract.test.mjs
+        working-directory: frontend_web/landing_next
       - run: npm run build
         working-directory: frontend_web/landing_next
 
