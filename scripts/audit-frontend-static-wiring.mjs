@@ -121,6 +121,19 @@ requireWebContains('layouts/DashboardSideNav.tsx', [
   ['scoped route helper', /addDashboardScopeParams/],
   ['accessible current-page state', /aria-current=/],
 ]);
+requireWebContains('layouts/TopBarActions.tsx', [
+  ['authoritative dashboard search navigation', /useDashboardNavigation\(\)/],
+  ['search route normalization', /normalizeDashboardSegment/],
+  ['search pharmacy scope propagation', /addDashboardScopeParams/],
+]);
+requireWebAbsent('layouts/TopBarActions.tsx', [
+  ['duplicate static dashboard search routes', /ROLE_SEARCH_OPTIONS|CHAT_ROUTES|DASHBOARD_ROUTES/],
+]);
+requireWebAbsent('navigation.tsx', [
+  ['dead Explorer availability route', /dashboard\/explorer\/availability/],
+  ['dead Explorer confirmed route', /dashboard\/explorer\/shifts\/confirmed/],
+  ['dead Explorer history route', /dashboard\/explorer\/shifts\/history/],
+]);
 requireWebAbsent('pages/dashboard/organization/OrganizationOverviewPage.tsx', [
   ['all-pharmacy organization scope mislabeled as public platform', /badge=\{selectedPharmacy \? "Internal workspace" : "Public platform"\}/],
 ]);
