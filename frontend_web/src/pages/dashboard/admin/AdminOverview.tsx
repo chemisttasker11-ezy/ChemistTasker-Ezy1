@@ -114,7 +114,7 @@ export default function AdminOverview() {
       ]
     : [
         { label: "Workspace", value: pharmacyName, helper: "Current pharmacy", icon: <StoreIcon />, tone: "blue" },
-        { label: "Admin access", value: assignment.admin_level?.replaceAll("_", " ") ?? "Admin", helper: "Current permission scope", icon: <ManageAccountsIcon />, tone: "purple" },
+        { label: "Admin access", value: assignment.admin_level?.replace(/_/g, " ") ?? "Admin", helper: "Current permission scope", icon: <ManageAccountsIcon />, tone: "purple" },
         { label: "Unread messages", value: unreadCount, helper: "Conversations needing attention", icon: <ForumIcon />, tone: "pink" },
       ];
   const activityItems = Array.isArray(dashboardData?.activity)
