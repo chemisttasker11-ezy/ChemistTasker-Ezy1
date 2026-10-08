@@ -70,7 +70,7 @@ test('public header and landing use the canonical route registry and account wir
 
   assert.match(landing, /const startPath=status==='anonymous'\?publicRoutes\.register:publicRoutes\.dashboard;/);
   assert.match(landing, /<AccountControls\/>/);
-  assert.match(header, /<AccountControls\/>/);
+  assert.match(header, /<AccountControls\s*\/>/);
 });
 
 test('public landing keeps production app-store destinations and one app promo', () => {
