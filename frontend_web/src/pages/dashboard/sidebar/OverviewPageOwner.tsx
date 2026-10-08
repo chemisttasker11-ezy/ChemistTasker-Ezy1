@@ -14,8 +14,9 @@ import {
 import { alpha } from "@mui/material/styles";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import { getOwnerDashboard, getInvoices, getInvoicePdfUrl } from "@chemisttasker/shared-core";
 import { dashboardGreetingName } from "../../../utils/displayName";
 
@@ -47,6 +48,19 @@ type DashboardData = {
 
 export default function OverviewPageOwner() {
   const { user } = useAuth() as { user: User };
+  const { selectedPharmacyId, workspace } = useWorkspace();
+  const [searchParams] = useSearchParams();
+  const urlPharmacyId = Number(
+    searchParams.get("pharmacy_id") ??
+      searchParams.get("pharmacy") ??
+      searchParams.get("pharmacyId"),
+  );
+  const effectivePharmacyId =
+    workspace === "internal" && selectedPharmacyId
+      ? selectedPharmacyId
+      : workspace === "internal" && Number.isFinite(urlPharmacyId) && urlPharmacyId > 0
+        ? urlPharmacyId
+        : null;
   const primary = "var(--ct-dashboard-accent, #4A16B8)";
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -59,7 +73,11 @@ export default function OverviewPageOwner() {
     setLoading(true);
 
     Promise.allSettled([
-      getOwnerDashboard({ workspace: "platform" }),
+      getOwnerDashboard(
+        effectivePharmacyId
+          ? { workspace: "internal", pharmacy_id: effectivePharmacyId }
+          : { workspace: workspace === "internal" ? "internal" : "platform" },
+      ),
       getInvoices(),
     ]).then(([dashResult, invResult]) => {
       if (!active) return;
@@ -90,7 +108,7 @@ export default function OverviewPageOwner() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [effectivePharmacyId, workspace]);
 
   const shifts = useMemo(() => data?.shifts ?? [], [data?.shifts]);
 
