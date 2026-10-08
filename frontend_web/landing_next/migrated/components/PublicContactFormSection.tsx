@@ -1,21 +1,7 @@
-import React, { useState } from 'react';
-import { Alert, Box, Button, Container, Snackbar, TextField, Typography, styled } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Container, Stack, TextField, Typography } from '@mui/material';
 import { contactSupport } from '@chemisttasker/shared-core';
 import ReCAPTCHA from 'react-google-recaptcha';
-
-const CtaButton = styled(Button)(({ theme }) => ({
-  transition: 'all 0.3s ease',
-  boxShadow: `0 4px 6px rgba(0, 0, 0, 0.1), 0 10px 20px ${theme.palette.primary.main}33`,
-  backgroundColor: theme.palette.primary.main,
-  color: 'white',
-  borderRadius: '8px',
-  fontWeight: 600,
-  '&:hover': {
-    backgroundColor: theme.palette.primary.dark,
-    transform: 'translateY(-5px) scale(1.05)',
-    boxShadow: `0 7px 14px rgba(0, 0, 0, 0.1), 0 15px 30px ${theme.palette.primary.main}4D`,
-  },
-}));
 
 type Props = {
   id?: string;
@@ -36,7 +22,7 @@ export default function PublicContactFormSection({
   subjectPlaceholder = 'Subject',
   defaultSubject = '',
   defaultMessage = '',
-  submitLabel = 'Send Message',
+  submitLabel = 'Send message',
   source = 'web',
   pageUrl,
 }: Props) {
@@ -48,25 +34,38 @@ export default function PublicContactFormSection({
     message: defaultMessage,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const [captchaValue, setCaptchaValue] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ open: boolean; severity: 'success' | 'error'; message: string }>({
-    open: false,
-    severity: 'success',
-    message: '',
-  });
+  const [serverState, setServerState] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY as string | undefined;
+
+  const errors = useMemo(() => ({
+    name: attempted && !form.name.trim() ? 'Enter your name.' : '',
+    email: attempted && !form.email.trim() ? 'Enter your email address.' : '',
+    subject: attempted && !form.subject.trim() ? 'Enter a subject.' : '',
+    message: attempted && !form.message.trim() ? 'Enter a message.' : '',
+  }), [attempted, form]);
 
   const handleChange = (field: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+    setServerState(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAttempted(true);
+    setServerState(null);
+
+    if (!recaptchaSiteKey) {
+      setServerState({ type: 'error', message: 'Contact is temporarily unavailable because the verification service is not configured.' });
+      return;
+    }
     if (!form.name.trim() || !form.email.trim() || !form.subject.trim() || !form.message.trim()) {
-      setToast({ open: true, severity: 'error', message: 'Please complete all required fields.' });
+      setServerState({ type: 'error', message: 'Check the required fields below and try again.' });
       return;
     }
     if (!captchaValue) {
-      setToast({ open: true, severity: 'error', message: 'Please complete the reCAPTCHA challenge.' });
+      setServerState({ type: 'error', message: 'Complete the reCAPTCHA challenge before sending your message.' });
       return;
     }
 
@@ -78,64 +77,136 @@ export default function PublicContactFormSection({
         page_url: pageUrl || window.location.href,
         captcha_token: captchaValue,
       });
-      setToast({ open: true, severity: 'success', message: 'Thanks! Your message has been sent.' });
-      setForm({
-        name: '',
-        email: '',
-        phone: '',
-        subject: defaultSubject,
-        message: defaultMessage,
-      });
+      setServerState({ type: 'success', message: 'Thanks — your message has been sent.' });
+      setForm({ name: '', email: '', phone: '', subject: defaultSubject, message: defaultMessage });
       setCaptchaValue(null);
+      setAttempted(false);
     } catch (err: any) {
-      setToast({ open: true, severity: 'error', message: err?.message || 'Failed to send message.' });
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'We could not send your message. Please try again.';
+      setServerState({ type: 'error', message: String(message) });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Box id={id} component="section" sx={{ py: { xs: 10, md: 12 }, bgcolor: '#f4f7fb' }}>
-      <Container>
-        <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <Typography variant="h2" component="h2">{title}</Typography>
-          <Typography color="text.primary" sx={{ mt: 2, maxWidth: '42rem', mx: 'auto' }}>
-            {subtitle}
-          </Typography>
-        </Box>
-        <Box sx={{ maxWidth: 720, mx: 'auto', bgcolor: '#ffffff', borderRadius: 3, p: { xs: 3, md: 4 }, boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)' }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-            <TextField label="Full Name" value={form.name} onChange={handleChange('name')} required />
-            <TextField label="Email" type="email" value={form.email} onChange={handleChange('email')} required />
-            <TextField label="Phone (optional)" value={form.phone} onChange={handleChange('phone')} />
-            <TextField label={subjectPlaceholder} value={form.subject} onChange={handleChange('subject')} required />
-          </Box>
-          <TextField
-            label="Message"
-            value={form.message}
-            onChange={handleChange('message')}
-            required
-            multiline
-            minRows={5}
-            sx={{ mt: 2 }}
-            fullWidth
-          />
-          {recaptchaSiteKey ? (
-            <Box sx={{ mt: 2 }}>
-              <ReCAPTCHA sitekey={recaptchaSiteKey} onChange={setCaptchaValue} />
+    <Box id={id} component="section" sx={{ py: { xs: 7, md: 10 }, bgcolor: '#F7F9FC' }}>
+      <Container maxWidth="lg">
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(260px,.8fr) minmax(0,1.2fr)' }, gap: { xs: 3, md: 6 }, alignItems: 'start' }}>
+          <Box sx={{ pt: { md: 2 } }}>
+            <Typography variant="h2" component="h2" sx={{ fontSize: { xs: 34, md: 46 } }}>{title}</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1.75, maxWidth: 500, lineHeight: 1.75 }}>
+              {subtitle}
+            </Typography>
+            <Box sx={{ mt: 3, p: 2.25, borderRadius: 3, bgcolor: '#fff', border: '1px solid #E5ECF7' }}>
+              <Typography sx={{ fontWeight: 900, color: 'text.primary' }}>What happens next?</Typography>
+              <Typography sx={{ mt: .7, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.65 }}>
+                Your request is only treated as sent after the server confirms submission. If verification or delivery fails, the form stays available so you can correct it and retry.
+              </Typography>
             </Box>
-          ) : null}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-            <CtaButton onClick={handleSubmit} disabled={submitting} sx={{ px: 4, py: 1.2 }}>
-              {submitting ? 'Sending...' : submitLabel}
-            </CtaButton>
+          </Box>
+
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            noValidate
+            sx={{
+              bgcolor: '#fff',
+              border: '1px solid #E5ECF7',
+              borderRadius: 4,
+              p: { xs: 2.5, md: 4 },
+              boxShadow: '0 18px 48px rgba(6,18,58,.07)',
+            }}
+          >
+            <Stack spacing={2}>
+              {serverState && (
+                <Alert severity={serverState.type} role={serverState.type === 'error' ? 'alert' : 'status'}>
+                  {serverState.message}
+                </Alert>
+              )}
+
+              {!recaptchaSiteKey && (
+                <Alert severity="warning">
+                  Contact verification is not configured for this environment. The form cannot be submitted until it is available.
+                </Alert>
+              )}
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <TextField
+                  label="Full name"
+                  value={form.name}
+                  onChange={handleChange('name')}
+                  required
+                  error={Boolean(errors.name)}
+                  helperText={errors.name || ' '}
+                  autoComplete="name"
+                />
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange('email')}
+                  required
+                  error={Boolean(errors.email)}
+                  helperText={errors.email || ' '}
+                  autoComplete="email"
+                />
+                <TextField
+                  label="Phone (optional)"
+                  value={form.phone}
+                  onChange={handleChange('phone')}
+                  helperText=" "
+                  autoComplete="tel"
+                />
+                <TextField
+                  label={subjectPlaceholder}
+                  value={form.subject}
+                  onChange={handleChange('subject')}
+                  required
+                  error={Boolean(errors.subject)}
+                  helperText={errors.subject || ' '}
+                />
+              </Box>
+
+              <TextField
+                label="Message"
+                value={form.message}
+                onChange={handleChange('message')}
+                required
+                multiline
+                minRows={6}
+                fullWidth
+                error={Boolean(errors.message)}
+                helperText={errors.message || 'Tell us enough detail to route your request correctly.'}
+              />
+
+              {recaptchaSiteKey && (
+                <Box sx={{ overflowX: 'auto', py: .5 }}>
+                  <ReCAPTCHA sitekey={recaptchaSiteKey} onChange={setCaptchaValue} />
+                </Box>
+              )}
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="flex-end" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1.5}>
+                <Typography sx={{ mr: 'auto', color: 'text.secondary', fontSize: 12.5 }}>
+                  Required fields are marked with an asterisk.
+                </Typography>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={submitting || !recaptchaSiteKey}
+                  sx={{ minWidth: 150 }}
+                  startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : undefined}
+                >
+                  {submitting ? 'Sending…' : submitLabel}
+                </Button>
+              </Stack>
+            </Stack>
           </Box>
         </Box>
-        <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((prev) => ({ ...prev, open: false }))}>
-          <Alert severity={toast.severity} onClose={() => setToast((prev) => ({ ...prev, open: false }))}>
-            {toast.message}
-          </Alert>
-        </Snackbar>
       </Container>
     </Box>
   );
