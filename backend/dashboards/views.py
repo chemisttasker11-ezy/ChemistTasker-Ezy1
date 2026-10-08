@@ -250,6 +250,8 @@ def _dashboard_shift_action_url(shift, dashboard_role):
         return f"/dashboard/pharmacist/shifts/{shift.id}"
     if role == "otherstaff":
         return f"/dashboard/otherstaff/shifts/{shift.id}"
+    if role == "explorer":
+        return f"/dashboard/explorer/shifts/{shift.id}"
     return f"/dashboard/owner/shifts/{shift.id}"
 
 
@@ -950,10 +952,58 @@ class ExplorerDashboard(APIView):
     permission_classes = [IsAuthenticated, IsExplorer]
 
     def get(self, request):
-        user_serializer = UserProfileSerializer(request.user)
-        data = {
+        user = request.user
+        user_serializer = UserProfileSerializer(user)
+        today = date.today()
+        now = timezone.now().time()
+
+        platform_scope = Shift.objects.filter(
+            visibility="PLATFORM",
+            role_needed__in=_shift_roles_visible_to_user(user),
+        ).filter(_future_shift_filter(today, now)).distinct()
+        public_shifts = _public_platform_shifts(today, now).filter(
+            role_needed__in=_shift_roles_visible_to_user(user)
+        )
+        related_shifts = _worker_related_shifts(user, platform_scope, today, now)
+        confirmed_shifts = _user_confirmed_platform_shifts(user, today, now)
+        recommendation_candidates = public_shifts.exclude(id__in=related_shifts.values("id"))
+        recommended_shifts = find_availability_matched_shifts(
+            user, recommendation_candidates, limit=6
+        )
+        recommended_qs = Shift.objects.filter(
+            id__in=[shift.id for shift in recommended_shifts]
+        )
+
+        extras = _dashboard_payload_extras(
+            shifts_qs=related_shifts,
+            confirmed_qs=confirmed_shifts,
+            community_qs=public_shifts,
+            invoices_qs=Invoice.objects.none(),
+            selected_pharmacy=None,
+            today=today,
+            now=now,
+            open_qs=recommended_qs,
+            all_qs=related_shifts,
+            dashboard_role="explorer",
+            user=user,
+        )
+        return Response({
             "user": user_serializer.data,
-            "message": "Welcome Explorer!",
-            # "available_jobs": [],  # Can be populated later with available jobs
-        }
-        return Response(data)
+            "message": "Explore pharmacy opportunities, availability and your next step.",
+            "upcoming_shifts_count": related_shifts.count(),
+            "confirmed_shifts_count": confirmed_shifts.count(),
+            "community_shifts_count": public_shifts.count(),
+            "shifts": [
+                _dashboard_worker_shift_box(shift, user)
+                for shift in related_shifts[:12]
+            ],
+            "recommended_shifts": [
+                _dashboard_worker_shift_box(shift, user, recommended=True)
+                for shift in recommended_shifts
+            ],
+            "community_shifts": [
+                _dashboard_shift_box(shift)
+                for shift in public_shifts[:12]
+            ],
+            **extras,
+        })
