@@ -88,12 +88,32 @@ export default function LandingPage() {
               <div className="photo-small"><Image src="/assets/pharmacist-david.jpg" alt="Pharmacist in a community pharmacy" fill sizes="(max-width: 880px) 35vw, 19vw"/></div>
             </div>
           </div>
-          <div className="hero-mobile-app">
-            <div className="hero-mobile-app-intro"><span className="hero-mobile-app-icon"><Smartphone size={24}/></span><div><h2>Take ChemistTasker with you</h2><p>Get faster shift updates, easier scheduling and your pharmacy workflow wherever the day takes you.</p></div></div>
-            <div className="hero-mobile-app-links"><a href={mobileAppLinks.googlePlay} target="_blank" rel="noopener noreferrer" aria-label="Download ChemistTasker on Google Play"><img src="/assets/google-play-badge.svg" alt="Get it on Google Play"/></a><a href={mobileAppLinks.appStore} target="_blank" rel="noopener noreferrer" aria-label="Download ChemistTasker on the App Store"><img src="/assets/app-store-badge.svg" alt="Download on the App Store"/></a></div>
-          </div>
         </div>
       <div className="container value-strip"><div><Building2/><span>Pharmacy-first<br/><strong>Built around pharmacy work</strong></span></div><div><Users/><span>One connected workforce<br/><strong>From your team to wider talent</strong></span></div><div><Smartphone/><span>Web &amp; mobile<br/><strong>Wherever work takes you</strong></span></div><div><ShieldCheck/><span>Role-aware access<br/><strong>The right tools for each person</strong></span></div></div></section>
+
+
+      <section className="container public-board-showcase" aria-labelledby="public-board-title">
+        <div className="section-heading">
+          <div><p className="eyebrow">THE MARKETPLACE, BEFORE YOU SIGN IN</p><h2 id="public-board-title">Jobs and talent should be easy to inspect.</h2></div>
+          <p>Two clear public entry points keep discovery simple, while the dashboard handles the operational work behind each match.</p>
+        </div>
+        <div className="public-board-grid">
+          <Link className="public-board-card" href={publicRoutes.publicShifts}>
+            <span className="public-board-label"><BriefcaseBusiness size={18}/> PUBLIC SHIFT BOARD</span>
+            <h3>Find pharmacy work around the life you actually have.</h3>
+            <p>Browse opportunities with the details needed to decide whether a shift is worth opening.</p>
+            <span className="public-filter-row"><span>Location</span><span>Date</span><span>Role</span></span>
+            <span className="text-link">Explore shifts <ArrowRight size={18}/></span>
+          </Link>
+          <Link className="public-board-card" href={publicRoutes.publicTalent}>
+            <span className="public-board-label"><Users size={18}/> PUBLIC TALENT BOARD</span>
+            <h3>Find pharmacy people, not another pile of CVs.</h3>
+            <p>Move from talent discovery into the ChemistTasker workflow without disconnecting the person from the shift.</p>
+            <span className="public-filter-row"><span>Profession</span><span>Location</span><span>Availability</span></span>
+            <span className="text-link">Explore talent <ArrowRight size={18}/></span>
+          </Link>
+        </div>
+      </section>
 
 
       <section id="workspaces" className="section container persona-showcase">
@@ -163,37 +183,23 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="container public-board-showcase" aria-labelledby="public-board-title">
-        <div className="section-heading">
-          <div><p className="eyebrow">THE MARKETPLACE, BEFORE YOU SIGN IN</p><h2 id="public-board-title">Jobs and talent should be easy to inspect.</h2></div>
-          <p>Two clear public entry points keep discovery simple, while the dashboard handles the operational work behind each match.</p>
-        </div>
-        <div className="public-board-grid">
-          <Link className="public-board-card" href={publicRoutes.publicShifts}>
-            <span className="public-board-label"><BriefcaseBusiness size={18}/> PUBLIC SHIFT BOARD</span>
-            <h3>Find pharmacy work around the life you actually have.</h3>
-            <p>Browse opportunities with the details needed to decide whether a shift is worth opening.</p>
-            <span className="public-filter-row"><span>Location</span><span>Date</span><span>Role</span></span>
-            <span className="text-link">Explore shifts <ArrowRight size={18}/></span>
-          </Link>
-          <Link className="public-board-card" href={publicRoutes.publicTalent}>
-            <span className="public-board-label"><Users size={18}/> PUBLIC TALENT BOARD</span>
-            <h3>Find pharmacy people, not another pile of CVs.</h3>
-            <p>Move from talent discovery into the ChemistTasker workflow without disconnecting the person from the shift.</p>
-            <span className="public-filter-row"><span>Profession</span><span>Location</span><span>Availability</span></span>
-            <span className="text-link">Explore talent <ArrowRight size={18}/></span>
-          </Link>
-        </div>
-      </section>
-
       <section id="features" className="section container"><div className="section-heading"><div><p className="eyebrow">LESS JUGGLING. MORE CONNECTION.</p><h2>Everything your workforce needs.<br/><span className="muted-heading">Finally, in one place.</span></h2></div><p>From filling a shift to keeping your team in the loop.<br/>Make room for a more organised working day.</p></div><div className="feature-grid">{features.map(({icon:Icon,title,text,colour})=><article className="feature-card" key={title}><span className={`icon-box ${colour}`}><Icon size={23}/></span><h3>{title}</h3><p>{text}</p></article>)}</div><div className="clinical-utility"><Link className="hero-calculator" href={publicRoutes.calculator} aria-label="Open children's dose calculator"><span className="hero-calculator-icon"><MeasuringCylinder/></span><span className="hero-calculator-copy"><span className="hero-calculator-kicker">CLINICAL UTILITY</span><strong>Children’s dose calculator</strong><span>Oral anti-infectives · Source-linked doses</span></span><ArrowUpRight size={18} aria-hidden="true"/></Link></div><div className="feature-jumps"><a className="text-link" href="#all-features">Explore all capabilities <ArrowRight size={18}/></a><a className="text-link" href="#escalation">Watch the five-tier concept <ArrowRight size={18}/></a></div></section>
       <TierExplainer/>
-      <FeatureCatalogue/>
-      <JournalTeaser/>
 
       <section id="how-it-works" className="workflow-section"><div className="container workflow-grid"><div><p className="eyebrow">A LITTLE MORE ORDER. A LOT MORE EASE.</p><h2>Make space for<br/>a smoother day.</h2><p className="section-description">Keep the plan visible, the team informed and the next step clear. Your pharmacy’s everyday work deserves a place of its own.</p><ul className="check-list"><li><Check/> Plan tasks and events in a shared calendar</li><li><Check/> Stay across availability and coverage</li><li><Check/> Keep updates close to the work</li></ul><Link className="text-link" href={startPath}>Bring your team together <ArrowRight size={18}/></Link></div><div className="calendar-demo" aria-label="Illustrative pharmacy calendar"><div className="demo-top"><div><span className="demo-label">YOUR PHARMACY, AT A GLANCE</span><h3>The day ahead</h3></div><span className="demo-tag">Product preview</span></div><div className="calendar-heading"><strong>Monday, 7 September</strong><CalendarDays size={18}/></div><div className="week-row">{['MON','TUE','WED','THU','FRI'].map((d,i)=><div key={d} className={i===0?'selected':''}><span>{d}</span><strong>{7+i}</strong></div>)}</div><div className="task-row"><span className="task-time">08:30</span><span className="task-line purple-line"/><div><strong>Opening checklist</strong><span>Daily tasks · Pharmacy team</span></div><span className="status done">Done</span></div><div className="task-row"><span className="task-time">10:00</span><span className="task-line cyan-line"/><div><strong>Team handover</strong><span>Keep everyone in the loop</span></div><span className="status">Upcoming</span></div><div className="task-row"><span className="task-time">14:00</span><span className="task-line pink-line"/><div><strong>Stock review</strong><span>A little planning goes a long way</span></div><span className="status">Upcoming</span></div><div className="demo-bottom"><CheckCheck size={17}/> A shared plan. A connected team.</div></div></div></section>
 
+      <FeatureCatalogue/>
+
+      <section className="container mobile-app-placement" aria-labelledby="mobile-app-title">
+        <div className="mobile-app-promo">
+            <div className="mobile-app-promo-intro"><span className="mobile-app-promo-icon"><Smartphone size={24}/></span><div><h2 id="mobile-app-title">Take ChemistTasker with you</h2><p>Get faster shift updates, easier scheduling and your pharmacy workflow wherever the day takes you.</p></div></div>
+            <div className="mobile-app-promo-links"><a href={mobileAppLinks.googlePlay} target="_blank" rel="noopener noreferrer" aria-label="Download ChemistTasker on Google Play"><img src="/assets/google-play-badge.svg" alt="Get it on Google Play"/></a><a href={mobileAppLinks.appStore} target="_blank" rel="noopener noreferrer" aria-label="Download ChemistTasker on the App Store"><img src="/assets/app-store-badge.svg" alt="Download on the App Store"/></a></div>
+          </div>
+      </section>
+
       <section className="community-section"><div className="container community-grid"><div className="community-photos"><img src="/assets/pharmacist-mina.jpg" alt="Pharmacy team member" loading="lazy"/><img src="/assets/pharmacist-rahul.jpg" alt="Pharmacy professional" loading="lazy"/><div className="community-pill"><MessageCircle size={18}/> A real sense of connection.</div></div><div><p className="eyebrow">MORE THAN A ROSTER</p><h2>Good teams stay<br/>in the loop.</h2><p className="section-description">Learn with the wider pharmacy community in six public hubs. Keep your own pharmacy’s updates and internal staff discussions in private team spaces.</p><div className="community-features"><span><MessageCircle/> Team chat</span><span><Bell/> Announcements</span><span><Users/> Community polls</span><span><GraduationCap/> Talent Hub</span></div><Link className="text-link" href={publicRoutes.hubs}>Explore pharmacy communities <ArrowRight size={18}/></Link></div></div></section>
+
+      <JournalTeaser/>
 
       <section className="section container faq-section"><div><p className="eyebrow">A FEW THINGS YOU MIGHT BE WONDERING</p><h2>Let’s clear things up.</h2><p>Getting started should feel simple.</p></div><div className="faq-list">{faqs.map(([q,a])=><details key={q}><summary>{q}<Plus size={19}/></summary><p>{a}</p></details>)}</div></section>
       <section className="container final-cta"><div><p className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</p><h2>A more connected pharmacy.<br/>A better working day.</h2><p>Bring your people and your plans together with ChemistTasker.</p></div><LinkButton path={startPath}>{user?'Open my dashboard':'Explore your workspace'}</LinkButton><div className="cta-circle" aria-hidden="true"/></section>
