@@ -22,7 +22,7 @@ import {
 } from "../../../constants/adminCapabilities";
 
 export default function AdminOverview() {
-  const { user, hasCapability } = useAuth();
+  const { user, hasCapability, unreadCount } = useAuth();
   const { assignment, pharmacyId } = useAdminScope();
   const navigate = useNavigate();
   const adminBasePath = `/dashboard/admin/${pharmacyId}`;
@@ -105,12 +105,18 @@ export default function AdminOverview() {
       ? { label: "Shift Centre", icon: <AccessTimeIcon />, onClick: () => navigate(`${adminBasePath}/shift-center`) }
       : undefined;
 
-  const metrics: DashboardMetric[] = [
-    { label: "Open Shifts", value: dashboardData?.shift_summary?.open_count ?? 0, helper: pharmacyName, icon: <CalendarMonthIcon />, tone: "blue" },
-    { label: "Confirmed Shifts", value: dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <WorkOutlineIcon />, tone: "purple" },
-    { label: "Active Shifts", value: dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? 0, helper: "Current staffing work", icon: <ManageAccountsIcon />, tone: "cyan" },
-    { label: "Today", value: dashboardData?.upcoming_stats?.today ?? 0, helper: "Shifts needing today's attention", icon: <AccessTimeIcon />, tone: "pink" },
-  ];
+  const metrics: DashboardMetric[] = canManageRoster
+    ? [
+        { label: "Open Shifts", value: dashboardData?.shift_summary?.open_count ?? 0, helper: pharmacyName, icon: <CalendarMonthIcon />, tone: "blue" },
+        { label: "Confirmed Shifts", value: dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <WorkOutlineIcon />, tone: "purple" },
+        { label: "Active Shifts", value: dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? 0, helper: "Current staffing work", icon: <ManageAccountsIcon />, tone: "cyan" },
+        { label: "Today", value: dashboardData?.upcoming_stats?.today ?? 0, helper: "Shifts needing today's attention", icon: <AccessTimeIcon />, tone: "pink" },
+      ]
+    : [
+        { label: "Workspace", value: pharmacyName, helper: "Current pharmacy", icon: <StoreIcon />, tone: "blue" },
+        { label: "Admin access", value: assignment.admin_level?.replaceAll("_", " ") ?? "Admin", helper: "Current permission scope", icon: <ManageAccountsIcon />, tone: "purple" },
+        { label: "Unread messages", value: unreadCount, helper: "Conversations needing attention", icon: <ForumIcon />, tone: "pink" },
+      ];
   const activityItems = Array.isArray(dashboardData?.activity)
     ? dashboardData.activity.map((item: any) => ({
         ...item,
@@ -153,10 +159,11 @@ export default function AdminOverview() {
         week: Number(dashboardData?.upcoming_stats?.week ?? dashboardData?.upcoming_shifts_count ?? 0),
         month: Number(dashboardData?.upcoming_stats?.month ?? dashboardData?.upcoming_shifts_count ?? 0),
       }}
+      showUpcoming={canManageRoster}
       activity={activityItems}
       metrics={metrics}
-      onOpenShifts={() => navigate(`${adminBasePath}/shift-center`)}
-      onOpenActivity={() => navigate(`${adminBasePath}/shift-center`)}
+      onOpenShifts={canManageRoster ? () => navigate(`${adminBasePath}/shift-center`) : undefined}
+      onOpenActivity={canManageRoster ? () => navigate(`${adminBasePath}/shift-center`) : undefined}
     />
     </>
   );
