@@ -35,7 +35,7 @@ export default function OrganizationOverviewPage() {
 
   const orgMembership = getOrganizationMembership(user);
   const orgId = orgMembership?.organization_id ?? null;
-  const orgCapabilities = new Set<string>(orgMembership?.capabilities ?? []);
+  const orgCapabilities = new Set((orgMembership?.capabilities ?? []).map((capability) => String(capability)));
   const canManageRoster = orgCapabilities.has("manage_roster");
   const canInviteStaff = orgCapabilities.has("invite_staff");
   const canManagePharmacies =
