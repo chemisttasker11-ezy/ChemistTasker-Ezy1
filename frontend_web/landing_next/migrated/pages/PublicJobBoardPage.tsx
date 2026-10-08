@@ -382,7 +382,7 @@ export default function PublicJobBoardPage() {
                 {loading ? 'Finding current pharmacy opportunities…' : `${totalCount ?? shifts.length} current ${(totalCount ?? shifts.length) === 1 ? 'opportunity' : 'opportunities'}`}
               </Typography>
               <Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}>
-                Filter by role, location, date, work type and shift preferences. You can explore without signing in; applying and counter offers use your ChemistTasker account.
+                Explore by role, location and date. Sign in when you're ready to apply.
               </Typography>
             </Box>
             {!user && (
@@ -396,7 +396,7 @@ export default function PublicJobBoardPage() {
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error} You can retry from the board without losing your filters.
+            {error} Your filters are saved. Use Refresh to try again.
           </Alert>
         )}
 
