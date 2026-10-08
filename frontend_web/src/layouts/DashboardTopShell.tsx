@@ -843,7 +843,8 @@ export default function DashboardTopShell({
           component="main"
           sx={{
             width: "100%",
-            maxWidth: { xs: "100%", lg: "calc(100% - 276px)" },
+            flex: "1 1 0%",
+            maxWidth: "100%",
             minWidth: 0,
             mx: "auto",
             px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
