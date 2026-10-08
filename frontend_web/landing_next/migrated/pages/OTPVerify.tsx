@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link as RouterLink, useLocation } from '@/public/navigation';
 import axios from 'axios';
 import {
@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 import AuthLayout from '../layouts/AuthLayout'; // Import the new layout
-import PublicLogoTopBar from '../components/PublicLogoTopBar';
 
 export default function OTPVerify() {
   const navigate = useNavigate();
@@ -25,6 +24,13 @@ export default function OTPVerify() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +74,7 @@ export default function OTPVerify() {
     try {
       await axios.post(`${API_BASE_URL}${API_ENDPOINTS.resendOtp}`, { email }, { withCredentials: true, headers: { "X-Client-Platform": "web" } });
       setStatus('A new code has been sent to your email.');
+      setResendCooldown(30);
     } catch (err) {
       setError('Could not resend code. Please try again later.');
     } finally {
@@ -76,8 +83,6 @@ export default function OTPVerify() {
   };
 
   return (
-    <>
-      <PublicLogoTopBar />
       <AuthLayout title="Email Verification">
         <Box
           sx={{
@@ -100,18 +105,18 @@ export default function OTPVerify() {
         {status && <Alert severity="success" sx={{ mb: 2 }}>{status}</Alert>}
         <form onSubmit={handleVerify}>
           <Stack spacing={1.5}>
-            <TextField fullWidth margin="normal" label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-            <TextField fullWidth margin="normal" label="Enter OTP Code" value={otp} onChange={e => setOtp(e.target.value)} required />
+            <TextField fullWidth margin="normal" label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+            <TextField fullWidth margin="normal" label="Verification code" value={otp} onChange={e => setOtp(e.target.value)} required autoComplete="one-time-code" inputProps={{ inputMode: 'numeric' }} />
           </Stack>
           <Box mt={3}>
-            <Button fullWidth type="submit" variant="contained" disabled={loading} sx={{ py: 1.5, backgroundColor: '#5222B8', '&:hover': {backgroundColor: '#00877d'} }}>
+            <Button fullWidth type="submit" variant="contained" disabled={loading} sx={{ py: 1.5 }}>
               {loading ? <CircularProgress size={24} color="inherit" /> : 'Verify'}
             </Button>
           </Box>
         </form>
         <Box mt={2} textAlign="center">
-          <Link component="button" onClick={handleResend} disabled={loading} color="#5222B8">
-            Resend Code
+          <Link component="button" onClick={handleResend} disabled={loading || resendCooldown > 0} color="primary.main">
+            {resendCooldown > 0 ? `Resend available in ${resendCooldown}s` : 'Resend code'}
           </Link>
         </Box>
         <Typography variant="body2" mt={3} textAlign="center">
@@ -121,6 +126,5 @@ export default function OTPVerify() {
           </Link>
         </Typography>
       </AuthLayout>
-    </>
   );
 }
