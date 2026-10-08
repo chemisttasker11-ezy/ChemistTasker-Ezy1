@@ -16,7 +16,7 @@ from django.test import TestCase
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
 from notifications.models import Notification
-from onboarding.models import PharmacistOnboarding
+from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Chain
 from shifts.models import Shift, ShiftInterest, ShiftOffer, ShiftSlot
 from talent.models import UserAvailability
@@ -158,6 +158,23 @@ class AvailabilityMatchTests(ShiftPostingFixture):
                                         notify_new_shifts=True)
         return worker
 
+    def other_staff_available_on(self, day, role_type, *, travel_states=("NSW",)):
+        worker = make_user("OTHER_STAFF")
+        OtherStaffOnboarding.objects.create(
+            user=worker,
+            role_type=role_type,
+            open_to_travel=True,
+            travel_states=list(travel_states),
+        )
+        UserAvailability.objects.create(
+            user=worker,
+            date=day,
+            start_time=time(8, 0),
+            end_time=time(12, 0),
+            notify_new_shifts=True,
+        )
+        return worker
+
     def test_platform_shifts_email_matching_available_workers(self):
         match = self.worker_available_on(DAY)
         self.worker_available_on(DAY + timedelta(days=5))
@@ -175,6 +192,33 @@ class AvailabilityMatchTests(ShiftPostingFixture):
         self.worker_available_on(DAY)
         _, sent = self.post_shift(visibility="LOCUM_CASUAL")
         self.assertEqual([e for e in sent if e["template"] == "emails/shift_availability_match.html"], [])
+
+    def test_other_staff_match_notifications_follow_specific_role_policy(self):
+        intern = self.other_staff_available_on(DAY, "INTERN")
+        technician = self.other_staff_available_on(DAY, "TECHNICIAN")
+        assistant = self.other_staff_available_on(DAY, "ASSISTANT")
+        student = self.other_staff_available_on(DAY, "STUDENT")
+
+        cases = {
+            "INTERN": {intern.email},
+            "TECHNICIAN": {technician.email},
+            "STUDENT": {student.email},
+            "ASSISTANT": {intern.email, technician.email, assistant.email, student.email},
+        }
+        for role_needed, expected in cases.items():
+            with self.subTest(role_needed=role_needed):
+                response, sent = self.post_shift(
+                    visibility="PLATFORM",
+                    role_needed=role_needed,
+                    employment_type="CASUAL",
+                )
+                self.assertEqual(response.status_code, 201, response.data)
+                recipients = {
+                    e["to"][0]
+                    for e in sent
+                    if e["template"] == "emails/shift_availability_match.html"
+                }
+                self.assertEqual(recipients, expected)
 
 
 class PostingDefaultsTests(ShiftPostingFixture):
