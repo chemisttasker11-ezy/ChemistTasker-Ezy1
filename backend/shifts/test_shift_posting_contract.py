@@ -106,6 +106,43 @@ class PostedShiftAnnouncementTests(ShiftPostingFixture):
         self.assertEqual(response.status_code, 201)
         self.assertEqual([e for e in sent if e["template"] == "emails/shift_posted.html"], [])
 
+    def test_other_staff_member_announcements_follow_specific_role_policy(self):
+        workers = {}
+        for role_type in ("INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"):
+            worker = make_user("OTHER_STAFF")
+            OtherStaffOnboarding.objects.create(user=worker, role_type=role_type)
+            Membership.objects.create(
+                user=worker,
+                pharmacy=self.pharmacy,
+                role=role_type,
+                employment_type="FULL_TIME",
+                status=Membership.Status.ACCEPTED,
+                is_active=True,
+            )
+            workers[role_type] = worker
+
+        cases = {
+            "INTERN": {workers["INTERN"].email},
+            "TECHNICIAN": {workers["TECHNICIAN"].email},
+            "STUDENT": {workers["STUDENT"].email},
+            "ASSISTANT": {worker.email for worker in workers.values()},
+        }
+        for role_needed, expected in cases.items():
+            with self.subTest(role_needed=role_needed):
+                response, sent = self.post_shift(
+                    role_needed=role_needed,
+                    employment_type="FULL_TIME",
+                    visibility="FULL_PART_TIME",
+                    notify_pharmacy_staff=True,
+                )
+                self.assertEqual(response.status_code, 201, response.data)
+                recipients = {
+                    item["to"][0]
+                    for item in sent
+                    if item["template"] == "emails/shift_posted.html"
+                }
+                self.assertEqual(recipients, expected)
+
     def test_visibility_and_anonymity_limit_who_is_emailed(self):
         staff = self.member("FULL_TIME")
         locum = self.member("LOCUM")
