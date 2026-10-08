@@ -9,10 +9,16 @@ This file is a standing implementation rule for ongoing ChemistTasker frontend w
 4. Figma is the organizing design system for typography, spacing, hierarchy, components, responsive behavior, and states.
 5. External design references are selective inputs only; they do not replace superior current product logic.
 
+## UI/UX Pro Max reference
+Use the repository's local UI/UX Pro Max skill as an implementation guide:
+- Skill: `.agents/skills/ui-ux-pro-max/SKILL.md`
+- Apply its priority order: accessibility, touch/interaction, performance, style consistency, responsive layout, typography/color, motion, feedback, and navigation.
+- For new or substantially redesigned surfaces, use its design-system approach rather than ad-hoc page styling.
+
 ## Impeccable reference
 Use the upstream Impeccable guidance as a standing quality reference:
 - Repository: https://github.com/pbakaus/impeccable
-- Codex skill: https://github.com/pbakaus/impeccable/blob/main/agents/skills/impeccable/SKILL.md
+- Codex skill: https://github.com/pbakaus/impeccable/blob/main/.agents/skills/impeccable/SKILL.md
 
 Apply the principles, not a blind visual copy.
 
