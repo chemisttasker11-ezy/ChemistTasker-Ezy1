@@ -285,6 +285,65 @@ def _user_can_travel_to_shift(pref_row, shift):
     distance = haversine_km(float(user_lat), float(user_lon), float(pharm_lat), float(pharm_lon))
     return distance <= float(radius_km)
 
+def find_availability_matched_shifts(user, shifts_qs, *, limit=6):
+    """Return open shifts that genuinely fit this worker's declared availability and travel preferences.
+
+    This reuses the same availability/location rules used by new-shift notifications so dashboard recommendations
+    cannot drift from notification behaviour. The worker does not need to opt into notifications for the dashboard
+    to use availability they have already declared.
+    """
+    availabilities = list(
+        UserAvailability.objects.filter(user=user).select_related("user")
+    )
+    if not availabilities:
+        return []
+
+    role = str(getattr(user, "role", "") or "").upper()
+    prefs = _load_user_travel_prefs({role: [user.id]})
+    pref_row = prefs.get(user.id)
+    if not pref_row:
+        return []
+
+    today = timezone.localdate()
+    matches = []
+    candidates = (
+        shifts_qs.select_related("pharmacy")
+        .prefetch_related("slots")
+        .order_by("-created_at", "id")
+        .distinct()
+    )
+
+    for shift in candidates[:80]:
+        if not _role_matches_shift(role, shift.role_needed):
+            continue
+        if not _user_can_travel_to_shift(pref_row, shift):
+            continue
+
+        slot_entries = [
+            entry
+            for entry in expand_shift_slots(shift)
+            if entry.get("date") and entry["date"] >= today
+        ]
+        if not slot_entries:
+            continue
+
+        if any(
+            _availability_matches_slot(
+                availability,
+                entry.get("date"),
+                entry.get("start_time"),
+                entry.get("end_time"),
+            )
+            for availability in availabilities
+            for entry in slot_entries
+        ):
+            matches.append(shift)
+            if len(matches) >= limit:
+                break
+
+    return matches
+
+
 def announce_posted_shift(
     shift,
     slots_data,
