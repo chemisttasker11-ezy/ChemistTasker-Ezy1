@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, CircularProgress } from "@mui/material";
-import AppsIcon from "@mui/icons-material/Apps";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
-import HubIcon from "@mui/icons-material/Hub";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import StoreIcon from "@mui/icons-material/Store";
@@ -103,14 +100,10 @@ export default function OrganizationOverviewPage() {
   };
 
   const actions: DashboardAction[] = [
-    { title: "Invite Staff", description: "Add organization members", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite"), tone: "blue" },
-    { title: "Claim Pharmacies", description: "Submit ownership claims", icon: <HowToRegIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies?claim=open"), tone: "purple" },
-    { title: "Manage Pharmacies", description: "Configure stores", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies"), tone: "blue" },
-    { title: "Post Shift", description: "Publish an open shift", icon: <PostAddIcon />, onClick: () => navigate("/dashboard/organization/post-shift"), tone: "pink" },
-    { title: "Shift Centre", description: "Active and confirmed shifts", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center"), tone: "cyan" },
-    { title: "Talent Hub", description: "Review talent activity", icon: <AppsIcon />, onClick: () => navigate("/dashboard/organization/interests"), tone: "blue" },
-    { title: "Chat", description: "Coordinate with teams", icon: <ChatOutlinedIcon />, onClick: () => navigate("/dashboard/organization/chat"), tone: "purple" },
-    { title: "Pharmacy Hub", description: "Community and feeds", icon: <HubIcon />, onClick: () => navigate("/dashboard/organization/pharmacy-hub"), tone: "cyan", wide: true },
+    { title: "Post Shift", description: "Cover an open workforce need", icon: <PostAddIcon />, onClick: () => navigate("/dashboard/organization/post-shift"), tone: "pink" },
+    { title: "Shift Centre", description: "Review active and confirmed work", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center"), tone: "cyan" },
+    { title: "Invite Staff", description: "Add people to the organization", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite"), tone: "blue" },
+    { title: "Manage Pharmacies", description: "Stores, claims and organization coverage", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies"), tone: "purple" },
   ];
 
   const metrics: DashboardMetric[] = [
@@ -131,9 +124,9 @@ export default function OrganizationOverviewPage() {
       <DashboardOverviewTemplate
         title="Organization Dashboard"
         badge={selectedPharmacy ? "Internal workspace" : "Public platform"}
-        subtitle="Manage pharmacies, teams and operations"
+        subtitle="See organization-wide staffing, pharmacy coverage and exceptions"
         heroTitle="Welcome back!"
-        heroSubtitle={`Here's what's happening across ${selectedPharmacy ? scopeName : "your organization"} today.`}
+        heroSubtitle={`Focus on staffing coverage, claims and shift activity across ${selectedPharmacy ? scopeName : "your organization"}.`}
         primaryAction={{ label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/post-shift") }}
         secondaryAction={{ label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }}
         pillSummary={
