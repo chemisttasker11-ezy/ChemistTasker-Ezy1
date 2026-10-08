@@ -1,6 +1,8 @@
-import { ReactNode, useMemo } from "react";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { ReactNode, useMemo, useState } from "react";
+import { Box, Button, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
@@ -18,6 +20,23 @@ export default function DashboardSideNav({
   const nav = useDashboardNavigation();
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return typeof window !== "undefined" && window.localStorage.getItem("ct-dashboard-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem("ct-dashboard-sidebar-collapsed", next ? "1" : "0");
+    } catch {
+      // Navigation remains usable even if browser storage is unavailable.
+    }
+  };
 
   const groups = useMemo<NavGroup[]>(() => {
     const result: NavGroup[] = [];
@@ -68,8 +87,10 @@ export default function DashboardSideNav({
       aria-label="Dashboard navigation"
       sx={{
         display: { xs: "none", lg: "block" },
-        width: 276,
-        flex: "0 0 276px",
+        width: collapsed ? 80 : 276,
+        flex: collapsed ? "0 0 80px" : "0 0 276px",
+        transition: "width 180ms ease, flex-basis 180ms ease",
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
         alignSelf: "stretch",
         borderRight: "1px solid var(--ct-border-color)",
         bgcolor: "var(--ct-surface-bg)",
@@ -82,12 +103,25 @@ export default function DashboardSideNav({
           top: 85,
           height: "calc(100dvh - 85px)",
           overflowY: "auto",
-          px: 1.5,
-          py: 2.25,
+          px: collapsed ? 1 : 1.5,
+          py: 1.5,
           scrollbarWidth: "thin",
         }}
       >
-        <Stack spacing={2.5}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-end", mb: 1.5 }}>
+          <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"} placement="right">
+            <IconButton
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              size="small"
+              sx={{ width: 44, height: 44, border: "1px solid var(--ct-border-color)", color: "var(--ct-text-primary)", "&:focus-visible": { outline: "3px solid #008DDB", outlineOffset: 2 } }}
+            >
+              {collapsed ? <ChevronRightRoundedIcon /> : <ChevronLeftRoundedIcon />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Stack spacing={collapsed ? 1.75 : 2.5}>
           {groups.map((group) => (
             <Box key={group.title}>
               <Typography
@@ -95,6 +129,7 @@ export default function DashboardSideNav({
                 sx={{
                   px: 1.25,
                   mb: 0.75,
+                  display: collapsed ? "none" : "block",
                   color: "var(--ct-text-secondary)",
                   fontSize: 11,
                   lineHeight: 1.4,
@@ -105,24 +140,27 @@ export default function DashboardSideNav({
               >
                 {group.title}
               </Typography>
-              <Stack spacing={0.35}>
+              <Stack spacing={collapsed ? 0.65 : 0.35} role="group" aria-label={group.title}>
                 {group.items.map((item) => {
                   const active =
                     location.pathname === item.path ||
                     location.pathname.startsWith(`${item.path}/`);
 
                   return (
+                    <Tooltip key={`${group.title}-${item.path}-${item.label}`} title={collapsed ? item.label : ""} placement="right" arrow>
                     <Button
-                      key={`${group.title}-${item.path}-${item.label}`}
                       onClick={() => handleNavigate(item.path)}
-                      startIcon={item.icon}
-                      endIcon={item.child ? <ChevronRightRoundedIcon /> : undefined}
+                      startIcon={item.icon ?? <AppsRoundedIcon />}
+                      endIcon={!collapsed && item.child ? <ChevronRightRoundedIcon /> : undefined}
+                      aria-label={collapsed ? item.label : undefined}
                       aria-current={active ? "page" : undefined}
                       sx={{
                         minHeight: 44,
-                        justifyContent: "flex-start",
-                        pl: item.child ? 3.5 : 1.25,
-                        pr: 1.25,
+                        minWidth: 0,
+                        width: "100%",
+                        justifyContent: collapsed ? "center" : "flex-start",
+                        pl: collapsed ? 1 : item.child ? 3.5 : 1.25,
+                        pr: collapsed ? 1 : 1.25,
                         py: 0.9,
                         borderRadius: 2.25,
                         textTransform: "none",
@@ -138,7 +176,8 @@ export default function DashboardSideNav({
                         lineHeight: 1.25,
                         "& .MuiButton-startIcon": {
                           minWidth: 24,
-                          mr: 1,
+                          mr: collapsed ? 0 : 1,
+                          ml: collapsed ? 0 : undefined,
                           color: active
                             ? "var(--ct-dashboard-accent)"
                             : "var(--ct-text-secondary)",
@@ -160,8 +199,9 @@ export default function DashboardSideNav({
                         },
                       }}
                     >
-                      {item.label}
+                      {!collapsed && item.label}
                     </Button>
+                    </Tooltip>
                   );
                 })}
               </Stack>
