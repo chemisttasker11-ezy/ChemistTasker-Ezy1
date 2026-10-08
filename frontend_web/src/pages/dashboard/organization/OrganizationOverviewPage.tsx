@@ -108,9 +108,8 @@ export default function OrganizationOverviewPage() {
 
   const metrics: DashboardMetric[] = [
     { label: "Pending Claims", value: pendingClaims, helper: "Awaiting approval", icon: <HowToRegIcon />, tone: "purple" },
-    { label: "Approved Claims", value: acceptedClaims, helper: "Connected stores", icon: <StoreIcon />, tone: "blue" },
+    { label: "Connected Pharmacies", value: acceptedClaims, helper: "Approved organization stores", icon: <StoreIcon />, tone: "blue" },
     { label: "Open Shifts", value: data?.shift_summary?.open_count ?? 0, helper: selectedPharmacy ? scopeName : "All organization pharmacies", icon: <CalendarMonthIcon />, tone: "cyan" },
-    { label: "Count of Shifts", value: data?.shift_summary?.all_count ?? activeShifts, helper: "Active shift records", icon: <CalendarMonthIcon />, tone: "blue" },
     { label: "Confirmed Shifts", value: data?.shift_summary?.confirmed_count ?? data?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <GroupsIcon />, tone: "pink" },
   ];
   const activityItems = Array.isArray(data?.activity) ? data.activity : [];
