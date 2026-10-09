@@ -32,7 +32,7 @@ const DNA = {
   navy: "#061A3D",
   navy2: "#02122C",
   blue: "#063BDA",
-  violet: "#6D28D9",
+  violet: "#5222B8",
   magenta: "#EA0A8E",
   cyan: "#08BEEA",
   ink: "#06123A",
@@ -576,7 +576,7 @@ export default function DashboardTopShell({
           overflowX: "clip",
           bgcolor: "var(--ct-page-bg)",
           color: "var(--ct-text-primary)",
-          fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
+          fontFamily: "var(--ct-font-body)",
           position: "relative",
           isolation: "isolate",
           "&::before": {
@@ -866,10 +866,10 @@ export default function DashboardTopShell({
               maxWidth: "100%",
             }}
           >
-            <Typography noWrap sx={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: DNA.violet }}>
+            <Typography noWrap sx={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: DNA.violet }}>
               {forceAdminScope ? "Internal Workspace" : workspace === "platform" ? "Public Platform" : "Internal Workspace"}
             </Typography>
-            <Typography noWrap sx={{ fontSize: 18, fontWeight: 950, color: "var(--ct-text-primary)" }}>
+            <Typography component="div" noWrap sx={{ fontFamily: "var(--ct-font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.2, color: "var(--ct-text-primary)" }}>
               {title}
             </Typography>
           </Box>
