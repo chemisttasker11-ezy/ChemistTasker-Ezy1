@@ -205,6 +205,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
     filters,
     onFiltersChange,
     useServerFiltering,
+    preserveServerOrder: publicPresentation,
     activeTab,
     savedShiftIds,
     savedFeatureEnabled,
@@ -692,7 +693,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
             </Stack>
           )}
 
-          {!hideFiltersAndSort && (
+          {!hideFiltersAndSort && !publicPresentation && (
             <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1} sx={{ mb: 2 }}>
               <SwapVertIcon fontSize="small" color="action" />
               <FormControl size="small" sx={{ minWidth: 160 }}>
