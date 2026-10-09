@@ -670,7 +670,7 @@ const handleSubmitLeaveRequest = async () => {
             resource: a
         };
     });
-  }, [allAssignments, roleFilters]);
+  }, [allAssignments, roleFilters, pharmacies, selectedPharmacyId]);
   // --- DYNAMIC EVENT STYLING ---
   const eventStyleGetter = (event: { resource: Assignment }) => {
     const assignment = event.resource;
@@ -767,7 +767,7 @@ const handleSubmitLeaveRequest = async () => {
       </Box>
       {selectedPharmacyId && <Box sx={{ display: { xs: mobileRosterView === 'AGENDA' ? 'block' : 'none', md: 'none' }, mb: 2.5 }}>
         <RosterWorkerAgenda
-          assignments={calendarEvents.map((event) => event.resource as Assignment)}
+          assignments={allAssignments}
           userId={currentUserId}
           calendarDate={calendarDate}
           onNavigate={setCalendarDate}
