@@ -358,6 +358,7 @@ export default function PublicJobBoardPage() {
   };
 
   const handleFiltersChange = (nextFilters: FilterConfig) => {
+    setPage(1);
     setFilters(nextFilters);
   };
 
