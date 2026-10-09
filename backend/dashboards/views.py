@@ -702,6 +702,8 @@ class OwnerDashboard(APIView):
             user=user,
         )
         extras["upcoming_stats"] = _dashboard_upcoming_stats(personal_upcoming_shifts, today, now)
+        extras["workspace_upcoming_stats"] = _dashboard_upcoming_stats(upcoming_shifts, today, now)
+        extras["shift_summary"]["upcoming_confirmed_count"] = confirmed_shifts.filter(_future_shift_filter(today, now)).distinct().count()
 
         data = {
             "user": user_serializer.data,
