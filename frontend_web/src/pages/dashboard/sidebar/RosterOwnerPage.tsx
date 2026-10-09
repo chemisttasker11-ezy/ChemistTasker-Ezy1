@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
+  Alert,
   Tabs,
   Tab,
   Stack,
@@ -22,7 +23,6 @@ import {
   OutlinedInput,
   Snackbar,
   IconButton,
-  Divider,
 } from '@mui/material';
 
 import { Close as CloseIcon, AddRounded as AddRoundedIcon, AccessTimeRounded as AccessTimeRoundedIcon, SettingsOutlined as SettingsOutlinedIcon, FactCheckOutlined as FactCheckOutlinedIcon } from '@mui/icons-material';
@@ -122,6 +122,10 @@ export default function RosterOwnerPage() {
   const [isDialogDataLoading, setIsDialogDataLoading] = useState(false);
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false); // General purpose for dialog actions
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [rosterLoadError, setRosterLoadError] = useState<string | null>(null);
+  const [pageRetryToken, setPageRetryToken] = useState(0);
+  const [coverageRefreshKey, setCoverageRefreshKey] = useState(0);
 
   // --- Calendar State ---
   const [calendarView, setCalendarView] = useState<CalendarViewKey>('week');
@@ -289,6 +293,7 @@ export default function RosterOwnerPage() {
   useEffect(() => {
     const loadInitialData = async () => {
       setIsPageLoading(true);
+      setPageError(null);
       try {
         const loadedPharmacies = await fetchPharmaciesService({});
         // Normalize ids to numbers to mirror old behavior and keep tab selection stable
@@ -300,15 +305,15 @@ export default function RosterOwnerPage() {
           scopedPharmacyId != null
             ? normalizedPharmacies.filter((ph: PharmacySummary) => Number(ph.id) === scopedPharmacyId)
             : [];
-        const availablePharmacies =
-          filteredByScope.length > 0 ? filteredByScope : normalizedPharmacies;
+        // An Admin persona must never fall back to another pharmacy when its own scope is absent.
+        const availablePharmacies = scopedPharmacyId != null ? filteredByScope : normalizedPharmacies;
 
         setPharmacies(availablePharmacies);
 
         const defaultPharmacyId: number | null =
           scopedPharmacyId != null
-            ? scopedPharmacyId
-            : initialPharmacyFromUrl != null
+            ? (filteredByScope.length ? scopedPharmacyId : null)
+            : initialPharmacyFromUrl != null && availablePharmacies.some((ph: PharmacySummary) => Number(ph.id) === initialPharmacyFromUrl)
             ? initialPharmacyFromUrl
             : availablePharmacies.length > 0
             ? Number(availablePharmacies[0].id)
@@ -327,13 +332,14 @@ export default function RosterOwnerPage() {
           setOpenShifts(openShiftData);
         }
       } catch (err) { 
-        console.error("Failed to load initial page data", err); 
+        console.error("Failed to load initial page data", err);
+        setPageError('Your roster could not be loaded. Please try again.'); 
       } finally {
         setIsPageLoading(false);
       }
     };
     loadInitialData();
-  }, [scopedPharmacyId, initialPharmacyFromUrl]);
+  }, [scopedPharmacyId, initialPharmacyFromUrl, pageRetryToken]);
 
   useEffect(() => {
     if (!isPageLoading && selectedPharmacyId) { 
@@ -373,6 +379,7 @@ export default function RosterOwnerPage() {
 
   const loadAssignments = async (pharmacyId: number, startDate?: string, endDate?: string) => {
     setIsAssignmentsLoading(true);
+    setRosterLoadError(null);
     try {
       // Fetch both assignments and staff requests in parallel
       const [assignmentsData, requestsData, openShiftData] = await Promise.all([
@@ -395,7 +402,11 @@ export default function RosterOwnerPage() {
       setAssignments(filteredAssignments);
       setWorkerRequests(filteredRequests);
       setOpenShifts(filteredOpen);
-    } catch (err) { console.error("Failed to load roster assignments", err); }
+      setCoverageRefreshKey((value) => value + 1);
+    } catch (err) {
+      console.error("Failed to load roster assignments", err);
+      setRosterLoadError('Unable to refresh the roster. Existing shifts may be out of date.');
+    }
     finally { setIsAssignmentsLoading(false); }
   };
 
@@ -1064,6 +1075,9 @@ export default function RosterOwnerPage() {
         </Button>
       </Stack>
 
+      {pageError && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => setPageRetryToken((value) => value + 1)} sx={{ minHeight: 44, fontWeight: 800 }}>Retry</Button>}>{pageError}</Alert>}
+      {rosterLoadError && <Alert severity="warning" sx={{ mb: 2 }} action={<Button color="inherit" onClick={reloadAssignments} sx={{ minHeight: 44, fontWeight: 800 }}>Retry</Button>}>{rosterLoadError}</Alert>}
+      {!selectedPharmacyId && !pageError && <Alert severity="info" sx={{ mb: 2 }}>No pharmacy roster is available in your current workspace. Select an accessible pharmacy to continue.</Alert>}
       <RosterManagerOverview
         calendarDate={calendarDate}
         assignments={assignments}
@@ -1087,6 +1101,7 @@ export default function RosterOwnerPage() {
       <RosterCoveragePanel
         pharmacyId={selectedPharmacyId}
         calendarDate={calendarDate}
+        refreshKey={coverageRefreshKey}
       />
       
       {rosterViewMode === 'CALENDAR' && (
