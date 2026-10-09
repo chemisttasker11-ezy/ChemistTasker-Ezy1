@@ -1049,6 +1049,7 @@ export default function HorizontalCalendarGrid({
                           tabIndex={0}
                           aria-label={`${item.workerName}, ${item.role || 'shift'}, ${item.startTimeStr} to ${item.endTimeStr}. Manage shift`}
                           onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) return;
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
                               event.stopPropagation();
