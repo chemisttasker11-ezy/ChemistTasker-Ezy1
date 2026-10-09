@@ -153,7 +153,7 @@ export default function Register() {
             <Button component={RouterLink} to="/login" variant="contained" sx={{ bgcolor: "#5222B8", fontWeight: 800, minHeight: 44, textTransform: "none" }}>Log in</Button>
             <Button component={RouterLink} to="/password-reset" variant="outlined" sx={{ color: "#5222B8", borderColor: "#5222B8", fontWeight: 800, minHeight: 44, textTransform: "none" }}>Reset password</Button>
           </Box>
-        )
+        )}
 
         <form onSubmit={handleRegister}>
         {/* ... (all your TextField, ToggleButtonGroup, and other form elements are unchanged) */}
