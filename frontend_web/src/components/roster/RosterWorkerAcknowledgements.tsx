@@ -10,9 +10,10 @@ type ShiftRow = {
   pharmacy_id: number;
   slot_date: string;
   is_acknowledged: boolean;
+  can_acknowledge: boolean;
 };
 type WorkerRosterResponse = { shifts: ShiftRow[]; total_shifts: number };
-type PeriodSummary = { periodId: number; shiftCount: number; acknowledged: boolean };
+type PeriodSummary = { periodId: number; shiftCount: number; acknowledged: boolean; canAcknowledge: boolean };
 
 export default function RosterWorkerAcknowledgements({
   pharmacyId,
@@ -48,8 +49,9 @@ export default function RosterWorkerAcknowledgements({
         if (existing) {
           existing.shiftCount++;
           existing.acknowledged = existing.acknowledged && row.is_acknowledged;
+          existing.canAcknowledge = existing.canAcknowledge && row.can_acknowledge === true;
         } else {
-          byPeriod.set(row.period_id, { periodId: row.period_id, shiftCount: 1, acknowledged: Boolean(row.is_acknowledged) });
+          byPeriod.set(row.period_id, { periodId: row.period_id, shiftCount: 1, acknowledged: Boolean(row.is_acknowledged), canAcknowledge: row.can_acknowledge === true });
         }
       }
       setPeriods([...byPeriod.values()]);
@@ -68,7 +70,7 @@ export default function RosterWorkerAcknowledgements({
   }, [reload, refreshToken]);
 
   const acknowledge = async (periodId: number) => {
-    if (busyPeriodId !== null) return;
+    if (busyPeriodId !== null || !periods.some((period) => period.periodId === periodId && period.canAcknowledge && !period.acknowledged)) return;
     setBusyPeriodId(periodId);
     setError(null);
     try {
@@ -107,7 +109,7 @@ export default function RosterWorkerAcknowledgements({
             <Typography sx={{ color: '#06123A', fontSize: 14, fontWeight: 750 }}>
               {period.shiftCount} published {period.shiftCount === 1 ? 'shift' : 'shifts'} this week
             </Typography>
-            <Chip size="small" label={period.acknowledged ? 'Acknowledged' : 'Acknowledgement pending'}
+            <Chip size="small" label={period.acknowledged ? 'Acknowledged' : period.canAcknowledge ? 'Acknowledgement pending' : 'Archived roster'}
               sx={{ mt: 0.75, bgcolor: period.acknowledged ? '#E9F8F0' : '#FFF3DF', color: period.acknowledged ? '#075B43' : '#7B4800', fontWeight: 800 }} />
           </Box>
           {period.acknowledged ? (
@@ -115,12 +117,14 @@ export default function RosterWorkerAcknowledgements({
               <CheckCircleOutlineRoundedIcon sx={{ color: '#075B43', fontSize: 19 }} />
               <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: '#075B43' }}>Confirmed received</Typography>
             </Stack>
-          ) : (
+          ) : period.canAcknowledge ? (
             <Button variant="contained" disabled={busyPeriodId !== null}
               onClick={() => void acknowledge(period.periodId)}
               sx={{ minHeight: 44, borderRadius: '9px', fontWeight: 800, bgcolor: '#5222B8', textTransform: 'none', '&:hover': { bgcolor: '#40168F' } }}>
               {busyPeriodId === period.periodId ? 'Acknowledging…' : 'Acknowledge roster'}
             </Button>
+          ) : (
+            <Typography sx={{ color: '#445474', fontSize: 13, fontWeight: 750 }}>Read-only archive</Typography>
           )}
         </Stack>
       ))}
