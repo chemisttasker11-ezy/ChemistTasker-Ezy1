@@ -9,7 +9,6 @@ import {
   CssBaseline,
   createTheme,
 } from '@mui/material';
-import AnimatedBackground from '../components/AnimatedBackground';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -32,40 +31,42 @@ export default function AuthLayout({
       createTheme({
         palette: {
           mode: 'light',
-          background: { default: '#ffffff', paper: '#ffffff' },
-          text: { primary: '#0f172a', secondary: '#475569' },
-          divider: '#e2e8f0',
-          primary: { main: '#00a99d' }, // matches your brand buttons on auth pages
+          background: { default: '#F7F9FC', paper: '#FFFFFF' },
+          text: { primary: '#06123A', secondary: '#5E6B8D' },
+          divider: '#E5ECF7',
+          primary: { main: '#5222B8', dark: '#40168F' },
+          secondary: { main: '#D600C8' },
         },
         shape: { borderRadius: 12 },
         components: {
           MuiCssBaseline: {
             styleOverrides: {
               ':root': { colorScheme: 'light' },
-              html: { backgroundColor: '#ffffff' },
-              body: { backgroundColor: '#ffffff', color: '#0f172a' },
-              '#root': { backgroundColor: '#ffffff' },
+              html: { backgroundColor: '#F7F9FC' },
+              body: { backgroundColor: '#F7F9FC', color: '#06123A' },
+              '#root': { backgroundColor: '#F7F9FC' },
             },
           },
           MuiPaper: {
-            defaultProps: { elevation: 6 },
+            defaultProps: { elevation: 0 },
             styleOverrides: {
               root: {
-                border: 'none',
+                border: '1px solid #E5ECF7',
                 backgroundImage: 'none',
-                borderRadius: 12,
+                borderRadius: 18,
+                boxShadow: '0 14px 42px rgba(6,18,58,.07)',
               },
             },
           },
         },
         typography: {
           fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
-          h1: { fontFamily: 'Outfit, Inter, sans-serif' },
-          h2: { fontFamily: 'Outfit, Inter, sans-serif' },
-          h3: { fontFamily: 'Outfit, Inter, sans-serif' },
-          h4: { fontFamily: 'Outfit, Inter, sans-serif' },
-          h5: { fontFamily: 'Outfit, Inter, sans-serif' },
-          h6: { fontFamily: 'Outfit, Inter, sans-serif' },
+          h1: { fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 600 },
+          h2: { fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 600 },
+          h3: { fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 600 },
+          h4: { fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 600 },
+          h5: { fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 600 },
+          h6: { fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 600 },
         },
       }),
     []
@@ -94,9 +95,10 @@ export default function AuthLayout({
           alignItems: 'center',
           justifyContent: 'center',
           py: { xs: 4, md: 6 },
+          px: { xs: 1, sm: 2 },
+          background: 'radial-gradient(ellipse at 5% 15%, rgba(0,189,210,.07), transparent 38%), radial-gradient(ellipse at 95% 85%, rgba(109,40,217,.07), transparent 40%), #F7F9FC',
         }}
       >
-        <AnimatedBackground />
 
         <Container maxWidth={maxWidth} sx={{ position: 'relative', zIndex: 2 }}>
           {noCard ? (
@@ -106,8 +108,7 @@ export default function AuthLayout({
               sx={{
                 p: { xs: 3, sm: 4 },
                 width: '100%',
-                bgcolor: 'rgba(255,255,255,0.96)',
-                backdropFilter: 'blur(10px)',
+                bgcolor: '#FFFFFF',
               }}
             >
               {showTitle && (
@@ -115,7 +116,7 @@ export default function AuthLayout({
                   variant="h4"
                   textAlign="center"
                   mb={3}
-                  fontWeight={700}
+                  fontWeight={600}
                   sx={{ color: 'text.primary' }}
                 >
                   {title}
