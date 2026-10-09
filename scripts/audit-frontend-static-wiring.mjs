@@ -172,12 +172,27 @@ function requireRepoContains(relativePath, patterns) {
 requireRepoContains('frontend_web/src/main.tsx', [
   ['bundled Inter body face', /@fontsource\/inter\/400\.css/],
   ['bundled Inter semibold', /@fontsource\/inter\/600\.css/],
+  ['bundled Inter bold 800', /@fontsource\/inter\/800\.css/],
+  ['bundled Inter black 900', /@fontsource\/inter\/900\.css/],
   ['bundled Outfit display face', /@fontsource\/outfit\/600\.css/],
+  ['bundled Outfit 800', /@fontsource\/outfit\/800\.css/],
+  ['bundled Outfit 900', /@fontsource\/outfit\/900\.css/],
 ]);
 requireRepoContains('frontend_web/landing_next/app/layout.tsx', [
   ['matching Inter face', /@fontsource\/inter\/400\.css/],
+  ['matching Inter 800 and 900', /@fontsource\/inter\/800\.css[\s\S]*@fontsource\/inter\/900\.css/],
   ['matching Outfit face', /@fontsource\/outfit\/600\.css/],
+  ['matching Outfit 800 and 900', /@fontsource\/outfit\/800\.css[\s\S]*@fontsource\/outfit\/900\.css/],
 ]);
+requireRepoContains('frontend_web/src/layouts/AuthLayout.tsx', [
+  ['legacy auth form uses shared Inter', /fontFamily: 'Inter, "Segoe UI", Arial, sans-serif'/],
+  ['legacy auth headings use Outfit', /h4: \{ fontFamily: 'Outfit, Inter, sans-serif' \}/],
+]);
+for (const file of ['frontend_web/src/layouts/AuthLayout.tsx', 'frontend_web/index.html']) {
+  if (/Bai\s*Jamjuree|Bai\+Jamjuree/.test(readRepoFile(file))) {
+    failures.push(file + ' reintroduced the deprecated Bai Jamjuree web font');
+  }
+}
 requireRepoContains('frontend_web/src/index.css', [
   ['Inter as Vite body face', /--ct-font-body:[^;]*Inter/],
   ['Outfit as Vite display face', /--ct-font-display:[^;]*Outfit/],
