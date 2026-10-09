@@ -57,6 +57,7 @@ import {
 } from './RosterWorkerPage.model';
 import RosterWorkerDialogs from './RosterWorkerDialogs';
 import RosterWorkerAgenda from '../../../components/roster/RosterWorkerAgenda';
+import RosterWorkerAcknowledgements from '../../../components/roster/RosterWorkerAcknowledgements';
 const localizer = momentLocalizer(moment);
 
 // --- Skeleton Component for Unified Loading ---
@@ -757,6 +758,7 @@ const handleSubmitLeaveRequest = async () => {
       {!selectedPharmacyId && (
         <Alert severity="info" sx={{ mb: 2 }}>No pharmacy roster is available for this account. Your assigned shifts will appear here when your membership is active.</Alert>
       )}
+      <RosterWorkerAcknowledgements pharmacyId={selectedPharmacyId} calendarDate={calendarDate} />
       <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2.5 }}>
         <ToggleButtonGroup fullWidth exclusive size="small" value={mobileRosterView} onChange={(_, next: 'AGENDA' | 'CALENDAR' | null) => { if (next) setMobileRosterView(next); }} aria-label="Choose roster view" sx={{ bgcolor: '#F0F3F9', borderRadius: '10px', p: 0.5, '& .MuiToggleButton-root': { flex: 1, minHeight: 44, border: 0, borderRadius: '8px !important', fontWeight: 800, textTransform: 'none', color: '#445474', '&.Mui-selected': { bgcolor: '#FFFFFF', color: '#5222B8', boxShadow: '0 2px 8px rgba(6,18,58,.08)' } } }}>
           <ToggleButton value="AGENDA">My agenda</ToggleButton>
