@@ -88,14 +88,14 @@ export default function RosterWorkerAcknowledgements({
 
   return (
     <Paper component="section" aria-label="Published roster acknowledgements" variant="outlined"
-      sx={{ mb: 2.5, p: { xs: 1.75, sm: 2.25 }, borderColor: '#DCE5F1', borderRadius: '13px', boxShadow: 'none', bgcolor: '#FFFFFF' }}>
+      sx={{ mb: 2.5, p: { xs: 1.75, sm: 2.25 }, borderColor: 'var(--ct-border-color)', borderRadius: '13px', boxShadow: 'none', bgcolor: 'var(--ct-surface-bg)' }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={1.5}>
         <Box sx={{ minWidth: 0 }}>
           <Stack direction="row" alignItems="center" spacing={1}>
-            <FactCheckOutlinedIcon sx={{ fontSize: 21, color: '#5222B8' }} />
-            <Typography component="h2" sx={{ color: '#06123A', fontWeight: 800, fontSize: 16 }}>Published roster acknowledgement</Typography>
+            <FactCheckOutlinedIcon sx={{ fontSize: 21, color: 'var(--ct-dashboard-accent)' }} />
+            <Typography component="h2" sx={{ color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontWeight: 600, letterSpacing: '-0.015em', fontSize: 18 }}>Published roster acknowledgement</Typography>
           </Stack>
-          <Typography sx={{ color: '#445474', fontSize: 13.5, lineHeight: 1.5, mt: 0.5 }}>
+          <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 13.5, lineHeight: 1.55, mt: 0.5 }}>
             Confirm you have seen the published shifts. Leave and cover requests remain separate.
           </Typography>
         </Box>
@@ -104,13 +104,13 @@ export default function RosterWorkerAcknowledgements({
       {periods.map((period) => (
         <Stack key={period.periodId} direction={{ xs: 'column', sm: 'row' }}
           justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1.5}
-          sx={{ pt: 1.5, mt: 1.5, borderTop: '1px solid #E5EBF3' }}>
+          sx={{ pt: 1.5, mt: 1.5, borderTop: '1px solid var(--ct-border-color)' }}>
           <Box>
-            <Typography sx={{ color: '#06123A', fontSize: 14, fontWeight: 750 }}>
+            <Typography sx={{ color: 'var(--ct-text-primary)', fontSize: 14, fontWeight: 700 }}>
               {period.shiftCount} published {period.shiftCount === 1 ? 'shift' : 'shifts'} this week
             </Typography>
             <Chip size="small" label={period.acknowledged ? 'Acknowledged' : period.canAcknowledge ? 'Acknowledgement pending' : 'Archived roster'}
-              sx={{ mt: 0.75, bgcolor: period.acknowledged ? '#E9F8F0' : '#FFF3DF', color: period.acknowledged ? '#075B43' : '#7B4800', fontWeight: 800 }} />
+              sx={{ mt: 0.75, bgcolor: period.acknowledged ? '#E9F8F0' : period.canAcknowledge ? '#FFF3DF' : '#EFF3FA', color: period.acknowledged ? '#075B43' : period.canAcknowledge ? '#7B4800' : '#445474', fontWeight: 700 }} />
           </Box>
           {period.acknowledged ? (
             <Stack direction="row" spacing={0.8} alignItems="center">
@@ -124,7 +124,7 @@ export default function RosterWorkerAcknowledgements({
               {busyPeriodId === period.periodId ? 'Acknowledging…' : 'Acknowledge roster'}
             </Button>
           ) : (
-            <Typography sx={{ color: '#445474', fontSize: 13, fontWeight: 750 }}>Read-only archive</Typography>
+            <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 13, fontWeight: 700 }}>Read-only archive</Typography>
           )}
         </Stack>
       ))}
