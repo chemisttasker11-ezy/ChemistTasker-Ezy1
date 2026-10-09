@@ -321,8 +321,13 @@ export default function RosterOwnerPage() {
             ? Number(availablePharmacies[0].id)
             : null;
 
+        setSelectedPharmacyId(defaultPharmacyId);
+        if (defaultPharmacyId == null) {
+          setAssignments([]);
+          setWorkerRequests([]);
+          setOpenShifts([]);
+        }
         if (defaultPharmacyId != null) {
-          setSelectedPharmacyId(defaultPharmacyId);
           const { start, end } = getDateRangeForView(calendarDate, calendarView);
           const startDate = start.format('YYYY-MM-DD');
           const endDate = end.format('YYYY-MM-DD');
