@@ -38,7 +38,7 @@ import apiClient from '../../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../../constants/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { GOOGLE_LIBRARIES } from './constants';
-import { RatePreference, ShiftsBoardProps, SlotFilterMode, SortKey } from './types';
+import { FilterConfig, RatePreference, ShiftsBoardProps, SlotFilterMode, SortKey } from './types';
 import FiltersSidebar from './components/FiltersSidebar';
 import CounterOfferDialog from './components/CounterOfferDialog';
 import ShiftList from './components/ShiftList';
@@ -543,10 +543,18 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
     });
   };
 
+  // Public listings use server-side results. Every direct text/date/rate change
+  // must notify the parent query state rather than only modifying local filter UI.
+  const updateFilterConfig = (updater: React.SetStateAction<FilterConfig>) => {
+    const next = typeof updater === 'function' ? updater(filterConfig) : updater;
+    setFilterConfig(next);
+    onFiltersChange?.(next);
+  };
+
   const sidebarContent = (
     <FiltersSidebar
       filterConfig={filterConfig}
-      setFilterConfig={setFilterConfig}
+      setFilterConfig={updateFilterConfig}
       hideSearch={publicPresentation}
       roleOptions={roleOptions}
       locationGroups={locationGroups}
@@ -641,7 +649,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
               label='Search shifts'
               placeholder='Role, pharmacy or suburb'
               value={filterConfig.search}
-              onChange={(event) => setFilterConfig((prev) => ({ ...prev, search: event.target.value }))}
+              onChange={(event) => updateFilterConfig((prev) => ({ ...prev, search: event.target.value }))}
               sx={{ width: { xs: '100%', md: 310 }, '& .MuiOutlinedInput-root': { minHeight: 48, bgcolor: '#FFFFFF' } }}
               InputProps={{ startAdornment: <InputAdornment position='start'><SearchIcon sx={{ color: '#52617C' }} /></InputAdornment> }}
             />
