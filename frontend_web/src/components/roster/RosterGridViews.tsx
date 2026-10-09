@@ -431,10 +431,10 @@ export default function RosterGridViews({
                   letterSpacing: '-0.01em',
                 }}
               >
-                Weekly Staff Schedule Matrix
+                {viewMode === 'STACKED' ? 'Daily staffing plan' : 'Weekly staff schedule'}
               </Typography>
               <Typography variant="body2" sx={{ color: BRAND_COLORS.body, fontSize: 13 }}>
-                Drag shifts or use dropdowns to reassign staff and change days across the week.
+                {viewMode === 'STACKED' ? 'Review coverage by day and edit draft shifts.' : 'Drag or use shift actions to reassign and change dates.'}
               </Typography>
             </Box>
 
@@ -453,13 +453,13 @@ export default function RosterGridViews({
             <Chip
               label={`${totalAssignedCount} Assigned`}
               size="small"
-              sx={{ bgcolor: BRAND_COLORS.cyanLight, color: BRAND_COLORS.cyan, fontWeight: 700 }}
+              sx={{ bgcolor: BRAND_COLORS.cyanLight, color: '#075B71', fontWeight: 700 }}
             />
             {vacantSlots.length > 0 && (
               <Chip
                 label={`${vacantSlots.length} Open`}
                 size="small"
-                sx={{ bgcolor: '#FEF3C7', color: '#D97706', fontWeight: 700 }}
+                sx={{ bgcolor: '#FEF3C7', color: '#7B4800', fontWeight: 700 }}
               />
             )}
           </Stack>
