@@ -41,6 +41,8 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ViewWeekIcon from '@mui/icons-material/ViewWeek';
+import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
 import { rosterV2 } from '@chemisttasker/shared-core';
@@ -373,7 +375,15 @@ export default function RosterPlanningToolbar({
           >
             {/* Left: Week Info, Status & Shift Count */}
             <Box>
-              <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Stack direction="row" spacing={0.3} sx={{ mr: 0.5, bgcolor: '#F5F7FC', p: 0.3, borderRadius: '9px', border: '1px solid #DFE6F1' }}>
+                  <IconButton aria-label="Previous roster week" disabled={!onNavigateWeek}
+                    onClick={() => onNavigateWeek?.(moment(calendarDate).subtract(7, 'days').toDate())}
+                    sx={{ width: 44, height: 44, color: '#5222B8' }}><ChevronLeftRoundedIcon /></IconButton>
+                  <IconButton aria-label="Next roster week" disabled={!onNavigateWeek}
+                    onClick={() => onNavigateWeek?.(moment(calendarDate).add(7, 'days').toDate())}
+                    sx={{ width: 44, height: 44, color: '#5222B8' }}><ChevronRightRoundedIcon /></IconButton>
+                </Stack>
                 <Typography
                   variant="h6"
                   sx={{
@@ -385,6 +395,9 @@ export default function RosterPlanningToolbar({
                 >
                   {monday.format('MMM D')} – {sunday.format('MMM D, YYYY')}
                 </Typography>
+
+                <Button size="small" disabled={!onNavigateWeek} onClick={() => onNavigateWeek?.(new Date())}
+                  sx={{ fontSize: 12.5, textTransform: 'none', fontWeight: 800, color: '#5222B8', minHeight: 44 }}>This week</Button>
 
                 {isLoading ? (
                   <CircularProgress size={18} sx={{ color: BRAND_COLORS.purple }} />
