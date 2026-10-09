@@ -8,7 +8,6 @@ import {
     Stack,
     IconButton,
     Button,
-    ThemeProvider,
     Pagination,
     useTheme,
     Dialog,
@@ -62,7 +61,6 @@ import {
 } from './types';
 
 // Theme
-import { customTheme } from './theme';
 
 import {
     ACTIVE_SHIFT_SLOT_SEEN_KEY_PREFIX,
@@ -963,16 +961,16 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     }
 
     return (
-        <ThemeProvider theme={customTheme}>
-            <Container maxWidth="xl" sx={{ py: 4, overflowX: 'hidden' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
+        <>
+            <Container maxWidth={false} disableGutters sx={{ overflowX: 'hidden' }}>
+                <Stack direction="row" alignItems="baseline" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                    <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', letterSpacing: '-0.015em' }}>
                         {title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: 'var(--ct-text-secondary)' }}>
                         Manage and track your live shifts
                     </Typography>
-                </Box>
+                </Stack>
 
                 {shifts.length === 0 ? (
                     <Typography variant="body1" color="text.secondary">
@@ -1147,7 +1145,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     </DialogActions>
                 </Dialog>
             </Container>
-        </ThemeProvider>
+        </>
     );
 };
 

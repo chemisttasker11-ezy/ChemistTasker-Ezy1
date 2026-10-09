@@ -1,6 +1,7 @@
 /// <reference types="@types/google.maps" />
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import PageHeader from "../../../components/ui/PageHeader";
 import {
   Alert,
   Box,
@@ -92,7 +93,6 @@ const HERO_GRADIENT_START = "#143EEA";
 const HERO_GRADIENT = "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)";
 const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
 const DASHBOARD_INK = "#06123A";
-const DASHBOARD_MUTED = "#5E6B8D";
 
 const tabLabels = [
   { label: "Basic", icon: <BusinessRoundedIcon fontSize="small" /> },
@@ -2141,50 +2141,16 @@ export default function PharmacyPage({
       />
 
       {view === "list" && !standalone && (
-        <Box
-          sx={{
-            ...pharmacyPageFrameSx,
-            pt: 3,
-            pb: 1,
-            display: "flex",
-            flexDirection: { xs: "column", sm: "row" },
-            justifyContent: "space-between",
-            alignItems: { xs: "stretch", sm: "center" },
-            gap: 2,
-          }}
-        >
-          <Box>
-            <Typography sx={{ fontSize: { xs: 28, md: 34 }, lineHeight: 1.08, fontWeight: 950, color: DASHBOARD_INK }}>
-              {standalone ? "Set Up Your Pharmacy" : "My Pharmacies"}
-            </Typography>
-            <Typography sx={{ mt: 1, color: DASHBOARD_MUTED, fontSize: { xs: 15, md: 16 }, fontWeight: 800, lineHeight: 1.45 }}>
-              {standalone
-                ? "Add your first pharmacy now. You can keep building the rest of your workspace after this step."
-                : "Manage your locations, staff and admins"}
-            </Typography>
-          </Box>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
-            {standalone && pharmacies.length > 0 && (
-              <Button variant="outlined" onClick={handleContinueLater} disabled={isSaving}>
-                Save & Continue Later
+        <Box sx={{ ...pharmacyPageFrameSx, pt: 1 }}>
+          <PageHeader
+            title="My Pharmacies"
+            subtitle="Manage your locations, staff and admins"
+            actions={
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => openDialog()} sx={{ minHeight: 44, px: 2.5 }}>
+                Add Pharmacy
               </Button>
-            )}
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => openDialog()}
-              sx={{
-                width: { xs: "100%", sm: "auto" },
-                minHeight: 48,
-                px: 2.5,
-                borderRadius: "12px",
-                fontWeight: 900,
-                boxShadow: "0 12px 28px rgba(20, 62, 234, 0.18)",
-              }}
-            >
-              Add Pharmacy
-            </Button>
-          </Stack>
+            }
+          />
         </Box>
       )}
 

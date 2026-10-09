@@ -87,6 +87,31 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
 - The organisation banner now greets by first name like every other persona.
 - Callers' Material icons replaced by Lucide equivalents.
 
+## One theme, one page header (all inner pages)
+
+- **Private themes removed.** Post Shift, Active Shifts (Shift Centre) and the three onboarding layouts each built
+  their own MUI theme (off-brand violets `#6D28D9`, a blue `#2563eb` primary in onboarding, a green secondary,
+  gradient buttons). Active Shifts also injected Google Fonts at runtime (Inter up to 700), against the
+  bundled-fonts rule. All now use the shared theme. Finance keeps a scoped theme for **density only** (small
+  fields, compact table rows, tabular figures); its 5–8px corners are gone.
+  Out of scope, noted: the kiosk (its own app), the legacy Vite landing/pricing pages (Next owns public pages) and
+  the Vite auth layout still carry private themes.
+- **Shared theme overrides** (apply to every page): buttons 600 weight / 12px radius / 40–48px; inputs 12px radius,
+  quiet border, 1.5px brand focus; tabs no-caps with a 3px deep-violet indicator; chips 600; dialogs 20px radius;
+  popovers 14px with a soft shadow; table headers small uppercase on a mist band; alerts 14px; tooltips navy;
+  cards flat 20px. Heading weights 500 (Outfit), buttons 600.
+- **Page headers:** Figma itself mixes a gradient banner (Shift Centre) with plain headings (everything else).
+  Chosen rule: **banners only on overview/home pages; every inner page uses `PageHeader`** (Outfit 32 title,
+  15px line, actions right). Applied to Shift Centre, Post Shift, My Pharmacies, Roster, Invoices & finances.
+- **Section switches** use one `SegmentTabs` component (Figma Shift Centre pills).
+- **Top bar names the page** you are on (the active navigation item); overviews keep the persona dashboard title.
+- **Positive actions** that relied on the old private green secondary (review offer, act on interest) use the
+  theme's `success` green. The "nice to have" skill toggle uses brand magenta.
+- **Cards** in Shift Centre lose their gradient wash and glowing gradient tile; they use the flat card and a
+  violet `IconTile`-style tile like everywhere else.
+- **Page gutters:** pages no longer add their own outer padding/containers; the shell's gutter is the only one,
+  so every page edge lines up.
+
 ## Findings logged while implementing (not visual)
 
 - Fixed: the owner overview requested `pharmacy_id=0` (403) before the scope was known (`25381b6`).

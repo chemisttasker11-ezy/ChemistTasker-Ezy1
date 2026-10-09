@@ -348,7 +348,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                     <Button
                                         size="small"
                                         variant={isRevealLabel ? 'contained' : 'outlined'}
-                                        color="secondary"
+                                        color="success"
                                         sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
                                         onClick={() => onReviewOffer(shift, offer, offerSlotId)}
                                     >
@@ -414,7 +414,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                                     <Button
                                         size="small"
                                         variant={interest.revealed ? 'outlined' : 'contained'}
-                                        color="secondary"
+                                        color="success"
                                         sx={{ flexShrink: 0, minHeight: 36, borderRadius: 1.5, fontWeight: 800 }}
                                         onClick={() => onReveal(shift, interest)}
                                         disabled={revealingInterestId === interest.id}

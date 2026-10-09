@@ -437,7 +437,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
                                                     <Button
                                                         size="small"
                                                         variant="contained"
-                                                        color="secondary"
+                                                        color="success"
                                                         sx={{
                                                             minWidth: 52,
                                                             minHeight: 26,

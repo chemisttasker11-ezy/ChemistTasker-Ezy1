@@ -10,6 +10,7 @@ import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
 import InvoiceStatsCards from '../dashboard/sidebar/Invoices/InvoiceStatsCards';
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
 import type { InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStats';
+import PageHeader from "../../components/ui/PageHeader";
 
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
   | { kind: 'invoice'; value?: FinanceInvoice } | { kind: 'expense'; value?: FinanceExpense }
@@ -123,16 +124,18 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const expenseCsv = () => downloadCsv('workspace-expenses.csv', [['Supplier', 'Description', 'Incurred', 'Paid', 'Gross AUD', 'GST AUD', 'Creditable business use %', 'Estimated GST credit AUD', 'Reference'],
     ...expenses.map(expense => [expense.supplier, expense.description, expense.incurred_on, expense.paid_on || '', expense.amount, expense.gst_amount, expense.business_use_percent, expense.gst_credit, expense.reference])]);
 
-  if (editor?.kind === 'invoice') return <Container maxWidth="xl" sx={{ py: 2 }}><InvoiceComposer key={editor.value?.id ?? 'new'} initial={editor.value} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={refreshAfterSave} /></Container>;
+  if (editor?.kind === 'invoice') return <Container maxWidth={false} disableGutters sx={{ maxWidth: 1600, mx: "auto" }}><InvoiceComposer key={editor.value?.id ?? 'new'} initial={editor.value} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={refreshAfterSave} /></Container>;
 
-  return <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+  return <Container maxWidth={false} disableGutters sx={{ maxWidth: 1600, mx: "auto" }}>
     <Stack spacing={2.5}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        <Box><Typography variant="h4">Invoices & finances</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>Manage invoices, customers and business expenses.</Typography></Box>
-        <Stack direction="row" spacing={1}><Button disabled={busy || loading} onClick={() => void run(load, 'Workspace refreshed.')}>Refresh</Button>
-          {!receivedMode && <Button variant="contained" disabled={loading || busy} onClick={() => { changeTool('invoices'); setEditor({ kind: 'invoice' }); }}>New invoice</Button>}</Stack>
-      </Box>
+      <PageHeader
+        title="Invoices & finances"
+        subtitle="Manage invoices, customers and business expenses."
+        actions={<>
+          <Button variant="outlined" disabled={busy || loading} onClick={() => void run(load, 'Workspace refreshed.')}>Refresh</Button>
+          {!receivedMode && <Button variant="contained" disabled={loading || busy} onClick={() => { changeTool('invoices'); setEditor({ kind: 'invoice' }); }}>New invoice</Button>}
+        </>}
+      />
       {error && <Alert severity="error" onClose={() => setError('')} role="alert">{error}</Alert>}
       {notice && <Alert severity="success" onClose={() => setNotice('')} role="status">{notice}</Alert>}
       <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', borderColor: 'divider', bgcolor: 'background.paper' }}>

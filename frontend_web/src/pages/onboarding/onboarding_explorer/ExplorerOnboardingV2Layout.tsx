@@ -10,78 +10,14 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
 import { getOnboardingDetail } from "@chemisttasker/shared-core";
 import { UnsavedChangesBoundary } from "../../../hooks/useUnsavedChangesGuard";
-import { useColorMode } from "../../../theme/sleekTheme";
 import AccountDeletionSection from "../../../components/AccountDeletionSection";
 
 const BRAND = {
   grad: "linear-gradient(90deg, #7c3aed 0%, #2563eb 100%)",
 };
 
-const createOnboardingTheme = (mode: "light" | "dark") => createTheme({
-  palette: {
-    mode,
-    primary: { main: "#2563eb" },
-    secondary: { main: "#7c3aed" },
-    background: {
-      default: mode === "dark" ? "#07111f" : "#f8fafc",
-      paper: mode === "dark" ? "#101b2f" : "#ffffff",
-    },
-    text: {
-      primary: mode === "dark" ? "#f8fafc" : "#111827",
-      secondary: mode === "dark" ? "#cbd5e1" : "#64748b",
-    },
-    divider: mode === "dark" ? "rgba(148, 163, 184, 0.28)" : "rgba(15, 23, 42, 0.12)",
-  },
-  typography: { fontFamily: `"Inter", system-ui, Arial, sans-serif` },
-  shape: { borderRadius: 12 },
-  components: {
-    MuiPaper: {
-      styleOverrides: {
-        root: { backgroundImage: "none" },
-      },
-    },
-    MuiOutlinedInput: {
-      styleOverrides: {
-        root: ({ theme }) => ({
-          backgroundColor: theme.palette.mode === "dark" ? "rgba(15, 23, 42, 0.82)" : theme.palette.background.paper,
-          color: theme.palette.text.primary,
-          "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: theme.palette.divider,
-          },
-          "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: theme.palette.primary.main,
-          },
-        }),
-        input: ({ theme }) => ({
-          color: theme.palette.text.primary,
-          "&::placeholder": {
-            color: theme.palette.text.secondary,
-            opacity: 0.85,
-          },
-        }),
-      },
-    },
-    MuiInputLabel: {
-      styleOverrides: {
-        root: ({ theme }) => ({ color: theme.palette.text.secondary }),
-      },
-    },
-    MuiFormLabel: {
-      styleOverrides: {
-        root: ({ theme }) => ({ color: theme.palette.text.secondary }),
-      },
-    },
-    MuiSelect: {
-      styleOverrides: {
-        icon: ({ theme }) => ({ color: theme.palette.text.secondary }),
-      },
-    },
-  },
-});
 
 // your tab pages
 import BasicInfoV2 from "./BasicInfoV2";
@@ -101,8 +37,6 @@ const STEPS: Array<{ key: StepKey; label: string }> = [
 ];
 
 export default function ExplorerOnboardingV2Layout() {
-  const { mode } = useColorMode();
-  const theme = React.useMemo(() => createOnboardingTheme(mode), [mode]);
   const [step, setStep] = React.useState<StepKey>("basic");
   const [progress, setProgress] = React.useState<number>(0);
   const idx = STEPS.findIndex(s => s.key === step);
@@ -121,8 +55,6 @@ export default function ExplorerOnboardingV2Layout() {
   }, []);
 
 return (
-  <ThemeProvider theme={theme}>
-    <CssBaseline />
     <UnsavedChangesBoundary>
       {({ confirmIfNeeded }) => {
         const requestStepChange = async (nextStep: StepKey) => {
@@ -299,6 +231,5 @@ return (
         );
       }}
     </UnsavedChangesBoundary>
-  </ThemeProvider>
 );
 }

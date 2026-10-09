@@ -61,15 +61,15 @@ export function createSleekTheme(mode: Mode): Theme {
     typography: {
       // Match the Next public site: Outfit speaks, Inter operates.
       fontFamily: "Inter, Segoe UI, Arial, sans-serif",
-      h1: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1.05 },
-      h2: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.035em", lineHeight: 1.08 },
-      h3: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.13 },
-      h4: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.18 },
-      h5: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.02em" },
+      h1: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: 1.05 },
+      h2: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, letterSpacing: "-0.035em", lineHeight: 1.08 },
+      h3: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, letterSpacing: "-0.03em", lineHeight: 1.13 },
+      h4: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, letterSpacing: "-0.025em", lineHeight: 1.18 },
+      h5: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, letterSpacing: "-0.02em" },
       h6: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
       body1: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", lineHeight: 1.55 },
       body2: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", lineHeight: 1.5 },
-      button: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", fontWeight: 700, textTransform: "none" },
+      button: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", fontWeight: 600, textTransform: "none" },
       caption: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", lineHeight: 1.45 },
     },
     components: {
@@ -243,37 +243,97 @@ export function createSleekTheme(mode: Mode): Theme {
           },
         },
       },
-      // Chips used in your header (“Verified”, etc.)
+      MuiButton: {
+        defaultProps: { disableElevation: true },
+        styleOverrides: {
+          root: { borderRadius: 12, textTransform: "none", fontWeight: 600, letterSpacing: 0 },
+          sizeMedium: { minHeight: 40, paddingLeft: 18, paddingRight: 18 },
+          sizeLarge: { minHeight: 48, paddingLeft: 22, paddingRight: 22, fontSize: 15 },
+          outlined: {
+            borderColor,
+            backgroundColor: "transparent",
+          },
+          text: { "&.MuiButton-colorPrimary": { color: isLight ? "#3C18A8" : primary[300] } },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: { borderRadius: 10, "& svg.lucide": { width: 20, height: 20, strokeWidth: 1.75 } },
+        },
+      },
+      // Dashboard design system: flat cards with hairline borders, 20px radius.
+      MuiCard: {
+        defaultProps: { elevation: 0 },
+        styleOverrides: { root: { borderRadius: 20, boxShadow: "none" } },
+      },
+      MuiCardHeader: {
+        styleOverrides: {
+          root: { borderBottom: `1px solid ${borderColor}` },
+          title: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, fontSize: 18, letterSpacing: "-0.015em" },
+          subheader: { fontSize: 13, color: textSecondary },
+        },
+      },
+      MuiDialogTitle: {
+        styleOverrides: { root: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 500, fontSize: 20, letterSpacing: "-0.015em" } },
+      },
+      MuiTextField: {
+        defaultProps: { variant: "outlined" },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12,
+            backgroundColor: isLight ? "#fff" : "#0C1628",
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: isLight ? "#D9E0EC" : borderColor },
+            "&:hover:not(.Mui-disabled) .MuiOutlinedInput-notchedOutline": { borderColor: isLight ? "#AEB9CC" : alpha("#ffffff", 0.3) },
+            "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: primary[600], borderWidth: 1.5 },
+          },
+        },
+      },
+      MuiInputLabel: {
+        styleOverrides: { root: { fontSize: 14 } },
+      },
       MuiChip: {
         styleOverrides: {
-          root: { borderRadius: 999 },
+          root: { borderRadius: 999, fontWeight: 600, fontSize: 12.5 },
+          sizeSmall: { fontSize: 11.5 },
           outlined: {
             borderColor,
             backgroundColor: isLight ? grey[50] : alpha("#ffffff", 0.04),
           },
         },
       },
-      MuiButton: {
-        defaultProps: { disableElevation: true },
+      MuiTabs: {
         styleOverrides: {
-          root: { borderRadius: 12, textTransform: "none", fontWeight: 700 },
-          outlined: {
-            borderColor,
-            backgroundColor: "transparent",
+          root: { minHeight: 44 },
+          indicator: { height: 3, borderRadius: "3px 3px 0 0", backgroundColor: isLight ? "#3C18A8" : primary[300] },
+        },
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: {
+            minHeight: 44,
+            textTransform: "none",
+            fontWeight: 500,
+            fontSize: 14,
+            color: textSecondary,
+            "&.Mui-selected": { color: isLight ? "#3C18A8" : primary[300], fontWeight: 600 },
           },
         },
       },
-      MuiCardHeader: {
+      MuiToggleButton: {
         styleOverrides: {
-          root: { borderBottom: `1px solid ${borderColor}` },
-          title: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
+          root: { textTransform: "none", fontWeight: 600, borderColor, "&.Mui-selected": { color: isLight ? "#3C18A8" : primary[300], backgroundColor: selectedBg } },
         },
       },
-      MuiDialogTitle: {
-        styleOverrides: { root: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 } },
+      MuiAlert: {
+        styleOverrides: { root: { borderRadius: 14, alignItems: "center" } },
       },
-      MuiTextField: {
-        defaultProps: { variant: "outlined" },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: { backgroundColor: isLight ? "#06214A" : "#26324A", fontSize: 12, fontWeight: 500, borderRadius: 8, padding: "6px 10px" },
+          arrow: { color: isLight ? "#06214A" : "#26324A" },
+        },
       },
       MuiTableContainer: {
         styleOverrides: {
@@ -283,11 +343,33 @@ export function createSleekTheme(mode: Mode): Theme {
           },
         },
       },
+      MuiTableCell: {
+        styleOverrides: {
+          root: { borderColor, fontSize: 13.5 },
+          head: {
+            fontSize: 12,
+            fontWeight: 600,
+            color: textSecondary,
+            textTransform: "uppercase",
+            letterSpacing: ".04em",
+            backgroundColor: isLight ? "#F7F9FC" : alpha("#ffffff", 0.03),
+          },
+        },
+      },
+      MuiAccordion: {
+        defaultProps: { disableGutters: true, elevation: 0 },
+        styleOverrides: { root: { borderRadius: 16, "&::before": { display: "none" } } },
+      },
+      MuiLinearProgress: {
+        styleOverrides: { root: { borderRadius: 999, height: 6 } },
+      },
       MuiDialog: {
         styleOverrides: {
           paper: {
             backgroundColor: elevatedBg,
             color: textPrimary,
+            borderRadius: 20,
+            boxShadow: "0 24px 64px rgba(6, 18, 58, 0.18)",
           },
         },
       },
@@ -296,6 +378,8 @@ export function createSleekTheme(mode: Mode): Theme {
           paper: {
             backgroundColor: elevatedBg,
             color: textPrimary,
+            borderRadius: 14,
+            boxShadow: "0 16px 40px rgba(6, 18, 58, 0.12)",
           },
         },
       },

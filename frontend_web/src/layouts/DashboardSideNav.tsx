@@ -93,6 +93,67 @@ function activeRouteKey(groups: SidebarGroup[], pathname: string, search: string
   return candidates[0]?.path ?? null;
 }
 
+function buildSidebarGroups(navigation: unknown): { groups: SidebarGroup[]; utilities: SidebarItem[] } {
+    const result: SidebarGroup[] = [];
+    const footer: SidebarItem[] = [];
+    let current: SidebarGroup | null = null;
+
+    const makeItem = (item: any, parentPath = ""): SidebarItem => {
+      const path = normalizeDashboardSegment(parentPath, item);
+      return {
+        label: String(item.title),
+        path,
+        icon: item.icon,
+        action: item.action,
+        children: Array.isArray(item.children)
+          ? item.children
+              .filter((child: any) => child?.segment && child?.title)
+              .map((child: any) => makeItem(child, path))
+          : [],
+      };
+    };
+
+    for (const item of navigation as any[]) {
+      if (item?.kind === "header") {
+        current = { id: "section-" + result.length, title: String(item.title || "Workspace"), items: [] };
+        result.push(current);
+        continue;
+      }
+      if (item?.kind === "divider") {
+        current = null;
+        continue;
+      }
+      if (!item?.segment || !item?.title) continue;
+      const mapped = makeItem(item);
+
+      // Preserve the actual logout route, but separate it from everyday tools.
+      if (mapped.label.toLowerCase() === "logout") {
+        footer.push(mapped);
+        continue;
+      }
+      if (!current) {
+        current = { id: "section-" + result.length, title: "Workspace", items: [] };
+        result.push(current);
+      }
+      current.items.push(mapped);
+    }
+
+    return { groups: result.filter((group) => group.items.length > 0), utilities: footer };
+}
+
+/** Label of the navigation item for the current page (the same item the sidebar highlights). */
+export function useActiveDashboardPageLabel(): string | null {
+  const navigation = useDashboardNavigation();
+  const location = useLocation();
+  return useMemo(() => {
+    const { groups } = buildSidebarGroups(navigation);
+    const path = activeRouteKey(groups, location.pathname, location.search);
+    if (!path) return null;
+    const items = groups.flatMap((group) => group.items.flatMap((item) => [item, ...item.children]));
+    return items.find((item) => item.path === path)?.label ?? null;
+  }, [navigation, location.pathname, location.search]);
+}
+
 function NavSymbol({ icon, active, small = false }: { icon?: ReactNode; active: boolean; small?: boolean }) {
   return (
     <Box
@@ -141,53 +202,7 @@ export default function DashboardSideNav({
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
   const [flyout, setFlyout] = useState<{ anchor: HTMLElement; item: SidebarItem } | null>(null);
 
-  const { groups, utilities } = useMemo(() => {
-    const result: SidebarGroup[] = [];
-    const footer: SidebarItem[] = [];
-    let current: SidebarGroup | null = null;
-
-    const makeItem = (item: any, parentPath = ""): SidebarItem => {
-      const path = normalizeDashboardSegment(parentPath, item);
-      return {
-        label: String(item.title),
-        path,
-        icon: item.icon,
-        action: item.action,
-        children: Array.isArray(item.children)
-          ? item.children
-              .filter((child: any) => child?.segment && child?.title)
-              .map((child: any) => makeItem(child, path))
-          : [],
-      };
-    };
-
-    for (const item of navigation as any[]) {
-      if (item?.kind === "header") {
-        current = { id: "section-" + result.length, title: String(item.title || "Workspace"), items: [] };
-        result.push(current);
-        continue;
-      }
-      if (item?.kind === "divider") {
-        current = null;
-        continue;
-      }
-      if (!item?.segment || !item?.title) continue;
-      const mapped = makeItem(item);
-
-      // Preserve the actual logout route, but separate it from everyday tools.
-      if (mapped.label.toLowerCase() === "logout") {
-        footer.push(mapped);
-        continue;
-      }
-      if (!current) {
-        current = { id: "section-" + result.length, title: "Workspace", items: [] };
-        result.push(current);
-      }
-      current.items.push(mapped);
-    }
-
-    return { groups: result.filter((group) => group.items.length > 0), utilities: footer };
-  }, [navigation]);
+  const { groups, utilities } = useMemo(() => buildSidebarGroups(navigation), [navigation]);
 
   const activePath = useMemo(
     () => activeRouteKey(groups, location.pathname, location.search),

@@ -73,6 +73,7 @@ import {
   ROLES,
   ALL_STAFF,
 } from './RosterOwnerPage.model';
+import PageHeader from "../../../components/ui/PageHeader";
 
 const localizer = momentLocalizer(moment);
 
@@ -998,21 +999,17 @@ export default function RosterOwnerPage() {
   // --- Render Method ---
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} sx={{ mb: 2.5 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography component="h1" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, fontFamily: BRAND_FONTS.heading, color: '#06123A', lineHeight: 1.18, letterSpacing: '-0.025em' }}>
-            Workforce roster
-          </Typography>
-          <Typography sx={{ fontSize: { xs: 14, md: 15 }, color: '#445474', mt: 0.6, lineHeight: 1.5 }}>
-            Plan the week, resolve staffing requests and publish shifts when ready.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={!selectedPharmacyId}
-          onClick={() => handleSelectSlot({ start: moment(calendarDate).hour(9).minute(0).second(0).toDate(), end: moment(calendarDate).hour(17).minute(0).second(0).toDate() })}
-          sx={{ minHeight: 46, bgcolor: '#5222B8', borderRadius: '10px', fontWeight: 800, textTransform: 'none', px: 2.5, flexShrink: 0, '&:hover': { bgcolor: '#40168F' } }}>
-          Add shift
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Workforce roster"
+        subtitle="Plan the week, resolve staffing requests and publish shifts when ready."
+        actions={
+          <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={!selectedPharmacyId}
+            onClick={() => handleSelectSlot({ start: moment(calendarDate).hour(9).minute(0).second(0).toDate(), end: moment(calendarDate).hour(17).minute(0).second(0).toDate() })}
+            sx={{ minHeight: 44, px: 2.5 }}>
+            Add shift
+          </Button>
+        }
+      />
 
       <Tabs
         aria-label="Pharmacy roster locations"

@@ -23,7 +23,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import TopBarActions from "./TopBarActions";
-import DashboardSideNav from "./DashboardSideNav";
+import DashboardSideNav, { useActiveDashboardPageLabel } from "./DashboardSideNav";
 import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership, fetchPharmaciesService } from "@chemisttasker/shared-core";
@@ -395,7 +395,13 @@ export default function DashboardTopShell({
   const hidePharmacyScope = forceAdminScope || activePersona === "admin";
   const showPharmacySelector = !hidePharmacyScope && (isOwner || isOrgUser || isWorker) && (pharmacies.length > 0 || canUsePlatformWorkspace);
   const selectedPharmacy = pharmacies.find((item) => item.id === selectedPharmacyId) ?? null;
-  const title = titleOverride ?? dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType);
+  const activePageLabel = useActiveDashboardPageLabel();
+  // Name the page you are on; the overview keeps the persona dashboard title.
+  const title =
+    titleOverride ??
+    (activePageLabel && activePageLabel !== "Overview"
+      ? activePageLabel
+      : dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType));
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
   const dashboardHomePath =
     forceAdminScope && activeAdminPharmacyId

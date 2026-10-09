@@ -444,28 +444,22 @@ export default function ActiveShiftCard({
                     position: 'relative',
                     overflow: 'hidden',
                     maxWidth: '100%',
-                    borderRadius: 6,
-                    border: '1px solid #D9E2F2',
-                    background: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
-                    boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
+                    // Flat dashboard card: hairline border, no gradient wash.
+                    borderRadius: 'var(--ct-card-radius)',
+                    border: '1px solid var(--ct-border-color)',
+                    background: 'var(--ct-surface-bg)',
+                    boxShadow: 'none',
                     cursor: 'pointer',
-                    transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
                     '&:hover': {
-                        transform: 'translateY(-1px)',
-                        borderColor: '#C7D2FE',
-                        boxShadow: '0 28px 66px rgba(15, 23, 42, 0.10)',
+                        borderColor: 'var(--ct-tone-violet-bg)',
+                        boxShadow: '0 10px 28px rgba(6, 18, 58, 0.07)',
                     },
                     '&:focus-visible': {
-                        outline: '3px solid rgba(124,58,237,.28)',
-                        outlineOffset: 3,
+                        outline: '2px solid var(--ct-accent-strong)',
+                        outlineOffset: 2,
                     },
-                    '&:before': {
-                        content: '""',
-                        position: 'absolute',
-                        inset: 0,
-                        pointerEvents: 'none',
-                        background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
-                    },
+                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
                 }}
             >
                 <CardHeader
@@ -476,21 +470,21 @@ export default function ActiveShiftCard({
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.25, sm: 2 }} sx={{ minWidth: 0, width: { xs: '100%', xl: 'auto' }, maxWidth: { xl: '52%' } }}>
                                 <Box
                                     sx={{
-                                        width: { xs: 54, sm: 58 },
-                                        height: { xs: 54, sm: 58 },
+                                        width: 48,
+                                        height: 48,
                                         flexShrink: 0,
                                         display: 'grid',
                                         placeItems: 'center',
-                                        borderRadius: 3.5,
-                                        color: '#fff',
-                                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
-                                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
+                                        borderRadius: '12px',
+                                        color: 'var(--ct-tone-violet-fg)',
+                                        bgcolor: 'var(--ct-tone-violet-bg)',
+                                        '& svg': { fontSize: 24, width: 24, height: 24 },
                                     }}
                                 >
                                     <Building />
                                 </Box>
                                 <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="h6" component="div" sx={{ fontWeight: 900, color: '#111827', fontSize: { xs: 21, sm: 24 }, lineHeight: 1.18, overflowWrap: 'anywhere' }}>
+                                    <Typography variant="h6" component="div" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, color: 'var(--ct-text-primary)', fontSize: { xs: 18, sm: 20 }, lineHeight: 1.25, overflowWrap: 'anywhere' }}>
                                         {(shift as any).pharmacyDetail?.name ?? "Unnamed Pharmacy"}
                                     </Typography>
                                     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
