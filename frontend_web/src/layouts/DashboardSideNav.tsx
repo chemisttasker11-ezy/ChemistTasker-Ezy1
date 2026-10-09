@@ -14,7 +14,6 @@ import {
   useTheme,
 } from "@mui/material";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
-import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import FirstPageRoundedIcon from "@mui/icons-material/FirstPageRounded";
 import LastPageRoundedIcon from "@mui/icons-material/LastPageRounded";
