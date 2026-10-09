@@ -1,35 +1,15 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Button,
-  ButtonBase,
-  Chip,
-  CircularProgress,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import CreditCardIcon from "@mui/icons-material/CreditCard";
-import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import ForumIcon from "@mui/icons-material/Forum";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import StoreIcon from "@mui/icons-material/Store";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import { alpha } from "@mui/material/styles";
+import { Box, ButtonBase, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { ArrowRight, CalendarDays, Heart, Pill } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import RecentActivityDialog from "./RecentActivityDialog";
 import { formatShiftDate, formatShiftTimeRange } from "../../utils/shiftDisplay";
-
-const DNA = {
-  ink: "var(--ct-text-primary)",
-  muted: "var(--ct-text-secondary)",
-  line: "var(--ct-border-color)",
-  blue: "#063BDA",
-  violet: "#6D28D9",
-  magenta: "#EA0A8E",
-};
+import ActivityList from "../ui/ActivityList";
+import BrandBanner from "../ui/BrandBanner";
+import IconTile, { type Tone } from "../ui/IconTile";
+import MetricStrip from "../ui/MetricStrip";
+import SectionCard, { ViewAllLink } from "../ui/SectionCard";
+import StatList from "../ui/StatList";
 
 export type DashboardTone = "blue" | "purple" | "pink" | "cyan";
 
@@ -98,35 +78,48 @@ type DashboardInvoicePanel = {
   onClick: () => void;
 };
 
-const toneStyles: Record<DashboardTone, { bg: string; color: string; link: string }> = {
-  blue: { bg: "#E7F0FF", color: "#063BDA", link: "#063BDA" },
-  purple: { bg: "#EFE7FF", color: "#6D28D9", link: "#4C0DDE" },
-  pink: { bg: "#FDE7F5", color: "#EA0A8E", link: "#EA0A8E" },
-  cyan: { bg: "#DDFBFF", color: "#008EA6", link: "#063BDA" },
-};
+// The public tone names predate the Figma system; map them onto its four tile tones.
+const tone: Record<DashboardTone, Tone> = { blue: "blue", purple: "violet", pink: "magenta", cyan: "cyan" };
 
-function activityIcon(event: DashboardActivity) {
-  if (event.icon) return event.icon;
-  if (event.kind === "hub") return <ForumIcon />;
-  if (event.kind === "reveal") return <VisibilityIcon />;
-  if (event.kind === "confirmed") return <ShieldOutlinedIcon />;
-  if (event.kind === "pharmacy") return <StoreIcon />;
-  if (event.kind === "invoice") return <CreditCardIcon />;
-  return <CalendarMonthIcon />;
+// Figma invoice card: blue -> violet -> navy.
+const invoiceBackground = [
+  "radial-gradient(circle at 96% 4%, rgba(196, 128, 240, 0.36) 0 90px, transparent 91px)",
+  "linear-gradient(140deg, #0A6FD6 0%, #2A2FB8 42%, #2A1590 70%, #02184B 100%)",
+].join(", ");
+
+function ShiftRow({ shift, onOpen, trailing }: { shift: DashboardShiftPreview; onOpen?: () => void; trailing: React.ReactNode }) {
+  return (
+    <ButtonBase
+      onClick={onOpen}
+      sx={{
+        width: "100%", display: "flex", alignItems: "center", gap: 1.5, textAlign: "left", py: 1.4, px: 0.5, borderRadius: "10px",
+        "&:hover": { bgcolor: "var(--ct-hover-bg)" },
+        "&:focus-visible": { outline: "2px solid var(--ct-accent-strong)", outlineOffset: 1 },
+      }}
+    >
+      <IconTile icon={<CalendarDays />} tone="violet" size={36} />
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography noWrap sx={{ color: "var(--ct-text-primary)", fontWeight: 600, fontSize: 14 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
+        <Typography noWrap sx={{ color: "var(--ct-text-muted)", fontSize: 12.5 }}>
+          {[formatShiftDate(shift.date), formatShiftTimeRange(shift.start_time, shift.end_time), shift.suburb].filter(Boolean).join(" · ")}
+        </Typography>
+        {shift.reason && <Typography noWrap sx={{ color: "var(--ct-tone-cyan-fg)", fontWeight: 600, fontSize: 12, mt: 0.25 }}>{shift.reason}</Typography>}
+      </Box>
+      {trailing}
+    </ButtonBase>
+  );
 }
 
-function activityColor(event: DashboardActivity) {
-  if (event.color) return event.color;
-  if (event.kind === "hub") return "#063BDA";
-  if (event.kind === "reveal") return "#EA0A8E";
-  if (event.kind === "confirmed") return "#00C853";
-  if (event.kind === "pharmacy") return "#5B18E8";
-  if (event.kind === "invoice") return "#FF5A00";
-  return "#5B18E8";
+function EmptyNote({ title, detail }: { title: string; detail: string }) {
+  return (
+    <Box sx={{ bgcolor: "var(--ct-page-bg)", borderRadius: "14px", px: 2, py: 2.25 }}>
+      <Typography sx={{ color: "var(--ct-text-primary)", fontWeight: 600, fontSize: 14 }}>{title}</Typography>
+      <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 13, mt: 0.5 }}>{detail}</Typography>
+    </Box>
+  );
 }
 
 export default function DashboardOverviewTemplate({
-  title,
   badge,
   subtitle,
   heroTitle,
@@ -150,6 +143,7 @@ export default function DashboardOverviewTemplate({
   onOpenShifts,
   onOpenActivity,
 }: {
+  /** Page name; the top bar already shows it, so the banner greeting is the page heading. */
   title: string;
   badge: string;
   subtitle: string;
@@ -190,429 +184,219 @@ export default function DashboardOverviewTemplate({
     window.setTimeout(() => setActivityDialogLoading(false), 250);
   };
 
-  return (
-    <Box
-      sx={{
-        width: "100%",
-        mx: "auto",
-        maxWidth: 1660,
-        color: DNA.ink,
-        fontFamily: "var(--ct-font-body)",
-        display: "flex",
-        flexDirection: "column",
-        gap: { xs: 2, md: 3.5 },
-      }}
+  const pillPanel = pillSummary ? (
+    <Stack
+      component={onOpenPills ? ButtonBase : "div"}
+      onClick={onOpenPills}
+      direction="row"
+      spacing={2}
+      alignItems="center"
+      sx={{ width: "100%", textAlign: "left", color: "inherit", borderRadius: "14px", "&:focus-visible": { outline: "2px solid #FFFFFF", outlineOffset: 4 } }}
     >
-      <Box>
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-          <Typography component="h1" sx={{ fontFamily: "var(--ct-font-display)", fontSize: { xs: 26, md: 32 }, lineHeight: 1.13, letterSpacing: "-0.03em", fontWeight: 600, color: DNA.ink, overflowWrap: "anywhere" }}>
-            {title}
-          </Typography>
-          <Chip
-            label={badge}
-            size="small"
-            sx={{
-              bgcolor: "#EAF2FF",
-              color: DNA.blue,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-            }}
-          />
-        </Stack>
-        <Typography sx={{ mt: 1, color: DNA.muted, fontSize: { xs: 15, md: 16 }, fontWeight: 500, lineHeight: 1.55, overflowWrap: "anywhere" }}>
-          {subtitle}
-        </Typography>
+      <Box sx={{ width: 56, height: 56, borderRadius: "16px", bgcolor: "rgba(255,255,255,0.14)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { width: 26, height: 26, strokeWidth: 1.75 } }}>
+        <Pill aria-hidden="true" />
       </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ color: "#D9D0FA", fontSize: 10.5, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase" }}>Pill balance</Typography>
+        <Stack direction="row" spacing={0.75} alignItems="baseline">
+          {pillSummary.loading ? (
+            <CircularProgress size={22} sx={{ color: "#fff" }} />
+          ) : (
+            <Typography sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 40, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{pillSummary.balance}</Typography>
+          )}
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: "#ECE8FC" }}>pills</Typography>
+        </Stack>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+          {pillSummary.shiftPostCost != null && (
+            <Chip size="small" label={`${pillSummary.shiftPostCost} pills per shift post`} sx={{ height: 24, bgcolor: "rgba(255,255,255,0.16)", color: "#fff", fontSize: 11, fontWeight: 600 }} />
+          )}
+          {onOpenPills && <Chip size="small" label="View activity" sx={{ height: 24, bgcolor: "rgba(255,255,255,0.16)", color: "#fff", fontSize: 11, fontWeight: 600 }} />}
+        </Stack>
+      </Box>
+    </Stack>
+  ) : undefined;
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1fr) 388px" },
-          gap: { xs: 2, md: 3 },
-          alignItems: "start",
-          minWidth: 0,
-        }}
-      >
-        <Stack spacing={{ xs: 2, md: 3 }} sx={{ minWidth: 0 }}>
-          <Paper
-            sx={{
-              p: { xs: 2, sm: 2.75, md: 3.25 },
-              minHeight: { xs: "auto", md: 184 },
-              borderRadius: { xs: "18px", md: "22px" },
-              // Same brand panel as the public site's closing call to action.
-              backgroundImage: "linear-gradient(110deg, #281457 0%, #5222B8 65%, #237BAB 100%)",
-              color: "#fff",
-              overflow: "hidden",
-              position: "relative",
-              boxShadow: "0 22px 54px rgba(6, 26, 61, 0.12)",
-            }}
+  return (
+    <Box sx={{ width: "100%", mx: "auto", maxWidth: 1660, display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 }, minWidth: 0 }}>
+      <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1.25}>
+        <Chip
+          label={badge}
+          size="small"
+          sx={{ height: 26, bgcolor: "var(--ct-tone-blue-bg)", color: "var(--ct-tone-blue-fg)", fontSize: 10.5, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase" }}
+        />
+        <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 15, lineHeight: 1.5, overflowWrap: "anywhere" }}>{subtitle}</Typography>
+      </Stack>
+
+      <BrandBanner
+        title={heroTitle}
+        subtitle={heroSubtitle}
+        primary={primaryAction}
+        secondary={secondaryAction}
+        aside={pillPanel}
+      />
+
+      <MetricStrip
+        items={metrics.map((item) => ({ label: item.label, value: item.value, caption: item.helper, icon: item.icon, tone: tone[item.tone] }))}
+      />
+
+      {(workerShifts || recommendedShifts) && (
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "repeat(2, minmax(0, 1fr))" }, gap: 2.5, minWidth: 0 }}>
+          <SectionCard
+            title="My next shifts"
+            icon={<CalendarDays />}
+            subtitle="Only shifts you applied to, showed interest in, committed to, or have confirmed."
           >
-            <Box
-              sx={{
-                position: "absolute",
-                inset: 0,
-                backgroundImage: `radial-gradient(circle at 94% 130%, transparent 0 150px, ${alpha("#ffffff", 0.05)} 151px 220px, transparent 221px)`,
-                pointerEvents: "none",
-              }}
-            />
-            <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 2.25, md: 5 }} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between" sx={{ position: "relative", zIndex: 1, minWidth: 0 }}>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h4" fontWeight={600} gutterBottom sx={{ fontSize: { xs: 26, sm: 30, md: 34 }, lineHeight: 1.1, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>
-                  {heroTitle}
-                </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 500, fontSize: { xs: 14, md: 15 }, lineHeight: 1.55, overflowWrap: "anywhere" }}>
-                  {heroSubtitle}
-                </Typography>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: { xs: 2, md: 3 }, "& > *": { width: { xs: "100%", sm: "auto" } } }}>
-                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: "#5222B8", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 46, md: 48 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
-                    {primaryAction.label}
-                  </Button>
-                  {secondaryAction && (
-                    <Button variant="outlined" color="inherit" startIcon={secondaryAction.icon} onClick={secondaryAction.onClick} sx={{ borderColor: alpha("#ffffff", 0.34), color: "#fff", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center", bgcolor: alpha("#ffffff", 0.08) }}>
-                      {secondaryAction.label}
-                    </Button>
-                  )}
-                </Stack>
-              </Box>
-              {pillSummary && (
-                <Stack
-                  component={onOpenPills ? ButtonBase : "div"}
-                  onClick={onOpenPills}
-                  direction="row"
-                  spacing={1.5}
-                  alignItems="center"
-                  sx={{
-                    width: { xs: "100%", md: "auto" },
-                    minWidth: { xs: 0, md: 320 },
-                    p: { xs: 1.5, md: 2.5 },
-                    borderRadius: { xs: "16px", md: "24px" },
-                    bgcolor: alpha("#ffffff", 0.13),
-                    border: `1px solid ${alpha("#ffffff", 0.26)}`,
-                    boxShadow: `inset 0 1px 0 ${alpha("#ffffff", 0.18)}`,
-                    textAlign: "left",
-                    cursor: onOpenPills ? "pointer" : "default",
-                    transition: "transform 0.18s ease, background-color 0.18s ease",
-                    "&:hover": onOpenPills ? { transform: "translateY(-2px)", bgcolor: alpha("#ffffff", 0.2) } : undefined,
-                  }}
-                >
-                  <Box component="img" src="/images/drugs.png" alt="" sx={{ width: { xs: 58, sm: 78, md: 98 }, height: { xs: 58, sm: 78, md: 98 }, objectFit: "contain", flexShrink: 0, filter: `contrast(1.08) saturate(1.08) drop-shadow(0 14px 22px ${alpha("#111827", 0.26)})` }} />
-                  <Stack spacing={0.75} sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ textTransform: "uppercase", letterSpacing: ".08em", opacity: 0.72, fontSize: { xs: 12, md: 14 } }}>Pill balance</Typography>
-                    <Stack direction="row" spacing={1} alignItems="baseline">
-                      {pillSummary.loading ? <CircularProgress size={22} sx={{ color: "#fff" }} /> : <Typography sx={{ fontSize: { xs: 34, md: 58 }, fontWeight: 950, lineHeight: 1 }}>{pillSummary.balance}</Typography>}
-                      <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 900, fontSize: { xs: 15, md: 18 } }}>pills</Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                      <Chip size="small" label={pillSummary.shiftPostCost != null ? `${pillSummary.shiftPostCost} pills per shift post` : "Custom rates"} sx={{ maxWidth: "100%", bgcolor: alpha("#ffffff", 0.18), color: "#fff", fontWeight: 800, "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }} />
-                      <Chip size="small" label="View activity" sx={{ maxWidth: "100%", bgcolor: alpha("#ffffff", 0.18), color: "#fff", fontWeight: 800 }} />
-                    </Stack>
-                  </Stack>
-                </Stack>
-              )}
-            </Stack>
-          </Paper>
-
-          {(workerShifts || recommendedShifts) && (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", lg: "repeat(2, minmax(0, 1fr))" },
-                gap: { xs: 1.5, md: 2.5 },
-                minWidth: 0,
-              }}
-            >
-              <Paper sx={{ borderRadius: { xs: "16px", md: "20px" }, border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2, md: 2.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 1.5 }}>
-                  <Box>
-                    <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: { xs: 19, md: 21 }, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>My next shifts</Typography>
-                    <Typography sx={{ mt: 0.35, color: DNA.muted, fontSize: 13, fontWeight: 700 }}>
-                      Only shifts you applied to, showed interest in, committed to, or have confirmed.
-                    </Typography>
-                  </Box>
-                  <CalendarMonthIcon sx={{ color: DNA.violet, flexShrink: 0 }} />
-                </Stack>
-                <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-                  {(workerShifts ?? []).length === 0 ? (
-                    <Box sx={{ py: 2 }}>
-                      <Typography sx={{ color: DNA.ink, fontWeight: 900, fontSize: 14 }}>Nothing pending or committed yet.</Typography>
-                      <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5 }}>
-                        Your matched opportunities stay separate so they are never mistaken for booked work.
-                      </Typography>
-                    </Box>
-                  ) : (workerShifts ?? []).slice(0, 4).map((shift) => (
-                    <ButtonBase
+            {(workerShifts ?? []).length === 0 ? (
+              <EmptyNote title="Nothing pending or committed yet." detail="Your matched opportunities stay separate so they are never mistaken for booked work." />
+            ) : (
+              <Stack divider={<Box sx={{ height: "1px", bgcolor: "var(--ct-border-color)" }} />}>
+                {(workerShifts ?? []).slice(0, 4).map((shift) => {
+                  const confirmed = shift.status === "Confirmed";
+                  return (
+                    <ShiftRow
                       key={shift.id}
-                      onClick={() => onOpenWorkerShift?.(shift)}
-                      sx={{ width: "100%", textAlign: "left", borderRadius: 1.5, "&:hover": { bgcolor: alpha(DNA.violet, 0.045) } }}
-                    >
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ width: "100%", py: 1.45, px: 0.5, minWidth: 0 }}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography noWrap sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14.5 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
-                          <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 12.5 }}>
-                            {[formatShiftDate(shift.date), formatShiftTimeRange(shift.start_time, shift.end_time), shift.suburb].filter(Boolean).join(" · ")}
-                          </Typography>
-                        </Box>
+                      shift={shift}
+                      onOpen={() => onOpenWorkerShift?.(shift)}
+                      trailing={(
                         <Chip
                           size="small"
                           label={shift.status || "In progress"}
-                          sx={{ flexShrink: 0, bgcolor: shift.status === "Confirmed" ? "#E8F7EF" : "#EFE7FF", color: shift.status === "Confirmed" ? "#137A43" : DNA.violet, fontWeight: 900 }}
+                          sx={{ flexShrink: 0, height: 24, fontSize: 11.5, fontWeight: 600, bgcolor: confirmed ? "var(--ct-tone-cyan-bg)" : "var(--ct-tone-violet-bg)", color: confirmed ? "var(--ct-tone-cyan-fg)" : "var(--ct-tone-violet-fg)" }}
                         />
-                      </Stack>
-                    </ButtonBase>
-                  ))}
-                </Stack>
-              </Paper>
+                      )}
+                    />
+                  );
+                })}
+              </Stack>
+            )}
+          </SectionCard>
 
-              <Paper sx={{ borderRadius: { xs: "16px", md: "20px" }, border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2, md: 2.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 1.5 }}>
-                  <Box>
-                    <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: { xs: 19, md: 21 }, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>Recommended for you</Typography>
-                    <Typography sx={{ mt: 0.35, color: DNA.muted, fontSize: 13, fontWeight: 700 }}>
-                      Open shifts matching your declared availability and travel area.
-                    </Typography>
-                  </Box>
-                  <FavoriteBorderIcon sx={{ color: DNA.magenta, flexShrink: 0 }} />
-                </Stack>
-                <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-                  {(recommendedShifts ?? []).length === 0 ? (
-                    <Box sx={{ py: 2 }}>
-                      <Typography sx={{ color: DNA.ink, fontWeight: 900, fontSize: 14 }}>No current availability match.</Typography>
-                      <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5 }}>
-                        Keep your availability and travel preferences current for better matches.
-                      </Typography>
-                    </Box>
-                  ) : (recommendedShifts ?? []).slice(0, 4).map((shift) => (
-                    <ButtonBase
-                      key={shift.id}
-                      onClick={() => onOpenWorkerShift?.(shift)}
-                      sx={{ width: "100%", textAlign: "left", borderRadius: 1.5, "&:hover": { bgcolor: alpha(DNA.magenta, 0.04) } }}
-                    >
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ width: "100%", py: 1.45, px: 0.5, minWidth: 0 }}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography noWrap sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14.5 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
-                          <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 12.5 }}>
-                            {[formatShiftDate(shift.date), formatShiftTimeRange(shift.start_time, shift.end_time), shift.suburb].filter(Boolean).join(" · ")}
-                          </Typography>
-                          {shift.reason && <Typography noWrap sx={{ color: "#008EA6", fontWeight: 800, fontSize: 12, mt: 0.25 }}>{shift.reason}</Typography>}
-                        </Box>
-                        <ArrowForwardIcon sx={{ color: DNA.blue, flexShrink: 0 }} />
-                      </Stack>
-                    </ButtonBase>
-                  ))}
-                </Stack>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
-                  {onBrowseRecommendations && (
-                    <Button onClick={onBrowseRecommendations} endIcon={<ArrowForwardIcon />} sx={{ px: 0, justifyContent: "flex-start", color: DNA.blue, fontWeight: 950, textTransform: "none" }}>
-                      Browse matching shifts
-                    </Button>
-                  )}
-                  {onUpdateAvailability && (
-                    <Button onClick={onUpdateAvailability} sx={{ px: { xs: 0, sm: 1.25 }, justifyContent: "flex-start", color: DNA.muted, fontWeight: 900, textTransform: "none" }}>
-                      Update availability
-                    </Button>
-                  )}
-                </Stack>
-              </Paper>
-            </Box>
-          )}
+          <SectionCard
+            title="Recommended for you"
+            icon={<Heart />}
+            subtitle="Open shifts matching your declared availability and travel area."
+          >
+            {(recommendedShifts ?? []).length === 0 ? (
+              <EmptyNote title="No current availability match." detail="Keep your availability and travel preferences current for better matches." />
+            ) : (
+              <Stack divider={<Box sx={{ height: "1px", bgcolor: "var(--ct-border-color)" }} />}>
+                {(recommendedShifts ?? []).slice(0, 4).map((shift) => (
+                  <ShiftRow
+                    key={shift.id}
+                    shift={shift}
+                    onOpen={() => onOpenWorkerShift?.(shift)}
+                    trailing={<Box component="span" aria-hidden="true" sx={{ display: "inline-flex", color: "var(--ct-accent-strong)", "& svg": { width: 18, height: 18 } }}><ArrowRight /></Box>}
+                  />
+                ))}
+              </Stack>
+            )}
+            {(onBrowseRecommendations || onUpdateAvailability) && (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0, sm: 2 }} sx={{ mt: 1 }}>
+                {onBrowseRecommendations && <ViewAllLink onClick={onBrowseRecommendations}>Browse matching shifts</ViewAllLink>}
+                {onUpdateAvailability && (
+                  <ButtonBase
+                    onClick={onUpdateAvailability}
+                    sx={{ minHeight: 44, px: 0.25, borderRadius: "8px", alignSelf: "flex-start", color: "var(--ct-text-secondary)", fontSize: 13, fontWeight: 600, "&:hover": { color: "var(--ct-text-primary)" }, "&:focus-visible": { outline: "2px solid var(--ct-accent-strong)", outlineOffset: 2 } }}
+                  >
+                    Update availability
+                  </ButtonBase>
+                )}
+              </Stack>
+            )}
+          </SectionCard>
+        </Box>
+      )}
 
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: { xs: 1.5, md: 2.5 }, minWidth: 0 }}>
-            {actions.map((action) => {
-              const tone = toneStyles[action.tone];
-              return (
-                <Paper
-                  key={action.title}
-                  component={ButtonBase}
-                  onClick={action.onClick}
-                  sx={{
-                    width: "100%",
-                    minHeight: { xs: 124, md: 148 },
-                    gridColumn: { lg: action.wide ? "span 2" : "span 1" },
-                    borderRadius: { xs: "16px", md: "20px" },
-                    bgcolor: "#FFFFFF",
-                    border: `1px solid ${DNA.line}`,
-                    boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-                    transition: "all 0.2s ease",
-                    cursor: "pointer",
-                    p: { xs: 2, md: 3 },
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    textAlign: "left",
-                    "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" },
-                    "&:focus-visible": { outline: "3px solid #008DDB", outlineOffset: "3px" },
-                  }}
-                >
-                  <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
-                    <Box sx={{ width: { xs: 48, md: 54 }, height: { xs: 48, md: 54 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 26, md: 30 } } }}>
-                      {action.icon}
-                    </Box>
-                    <Stack spacing={{ xs: 0.75, md: 1.15 }} sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography sx={{ color: DNA.ink, fontFamily: "var(--ct-font-display)", fontWeight: 600, fontSize: { xs: 18, md: 19 }, lineHeight: 1.2, overflowWrap: "anywhere" }}>{action.title}</Typography>
-                      <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.32, maxWidth: action.wide ? 360 : { xs: "none", md: 220 }, overflowWrap: "anywhere" }}>{action.description}</Typography>
-                    </Stack>
-                  </Stack>
-                </Paper>
-              );
-            })}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 340px", xl: "minmax(0, 1fr) 380px" }, gap: 2.5, alignItems: "start", minWidth: 0 }}>
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" }, gap: 2, minWidth: 0 }}>
+            {actions.map((action) => (
+              <Paper
+                key={action.title}
+                component={ButtonBase}
+                onClick={action.onClick}
+                variant="outlined"
+                sx={{
+                  width: "100%",
+                  minHeight: 108,
+                  gridColumn: { lg: action.wide ? "span 2" : "span 1" },
+                  borderRadius: "var(--ct-card-radius)",
+                  borderColor: "var(--ct-border-color)",
+                  bgcolor: "var(--ct-surface-bg)",
+                  boxShadow: "none",
+                  p: { xs: 2, md: 2.5 },
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "flex-start",
+                  gap: 1.75,
+                  textAlign: "left",
+                  transition: "border-color 160ms ease, box-shadow 160ms ease",
+                  "&:hover": { borderColor: "var(--ct-tone-violet-bg)", boxShadow: "0 10px 28px rgba(6, 18, 58, 0.07)" },
+                  "&:focus-visible": { outline: "2px solid var(--ct-accent-strong)", outlineOffset: 2 },
+                }}
+              >
+                <IconTile icon={action.icon} tone={tone[action.tone]} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ color: "var(--ct-text-primary)", fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 16, lineHeight: 1.3, overflowWrap: "anywhere" }}>{action.title}</Typography>
+                  <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 12.5, lineHeight: 1.45, mt: 0.5, overflowWrap: "anywhere" }}>{action.description}</Typography>
+                </Box>
+              </Paper>
+            ))}
           </Box>
         </Stack>
 
-        <Stack spacing={{ xs: 2.5, md: 3 }}>
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
           {showUpcoming && (
-            <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-                <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
-                <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>{upcomingTitle}</Typography>
-              </Stack>
-              <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-                {[["Today", upcoming.today], ["This Week", upcoming.week], ["This Month", upcoming.month]].map(([label, value]) => (
-                  <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
-                    <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
-                    <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
-                  </Stack>
-                ))}
-              </Stack>
-              {onOpenShifts && (
-                <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-                  View all shifts
-                </Button>
-              )}
-            </Paper>
+            <SectionCard title={upcomingTitle} icon={<CalendarDays />}>
+              <StatList rows={[{ label: "Today", value: upcoming.today }, { label: "This Week", value: upcoming.week }, { label: "This Month", value: upcoming.month }]} />
+              {onOpenShifts && <Box sx={{ mt: 1 }}><ViewAllLink onClick={onOpenShifts}>View all shifts</ViewAllLink></Box>}
+            </SectionCard>
           )}
 
-          <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
-              <FavoriteBorderIcon sx={{ color: "#5B18E8", fontSize: 30 }} />
-              <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>Recent Activity</Typography>
-            </Stack>
-            <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-              {activity.length === 0 ? (
-                <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 700 }}>
-                  No recent activity yet.
-                </Typography>
-              ) : activity.map((event) => {
-                const actionUrl = event.actionUrl || event.action_url;
-                return (
-                <ButtonBase
-                  key={`${event.kind || "activity"}-${event.targetId || event.target_id || event.title}-${event.time}`}
-                  onClick={() => handleActivityClick(event)}
-                  disabled={!actionUrl}
-                  sx={{
-                    width: "100%",
-                    display: "block",
-                    textAlign: "left",
-                    borderRadius: 1,
-                    cursor: actionUrl ? "pointer" : "default",
-                    "&:hover": actionUrl ? { bgcolor: alpha("#5B18E8", 0.05) } : undefined,
-                  }}
-                >
-                <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ py: 1.8, px: 0.75 }}>
-                  <Box sx={{ color: activityColor(event), width: 24, pt: 0.25, "& svg": { fontSize: 24 } }}>{activityIcon(event)}</Box>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14 }}>{event.title}</Typography>
-                    <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13 }}>{event.description}</Typography>
-                  </Box>
-                  <Typography sx={{ color: "#7A86A3", fontWeight: 800, fontSize: 12, whiteSpace: "nowrap" }}>{event.time}</Typography>
-                </Stack>
-                </ButtonBase>
-              )})}
-            </Stack>
-            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-              View activity details
-            </Button>
-          </Paper>
+          <SectionCard title="Recent Activity" icon={<Heart />}>
+            {activity.length === 0 ? (
+              <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14 }}>No recent activity yet.</Typography>
+            ) : (
+              <ActivityList
+                entries={activity.map((event) => {
+                  const url = event.actionUrl || event.action_url;
+                  return {
+                    title: event.title,
+                    description: event.description,
+                    time: event.time,
+                    kind: event.kind,
+                    onOpen: url ? () => handleActivityClick(event) : null,
+                  };
+                })}
+              />
+            )}
+            <Box sx={{ mt: 1 }}><ViewAllLink onClick={handleOpenActivity}>View all activity</ViewAllLink></Box>
+          </SectionCard>
 
           {invoicePanel && (
-            <Paper
-              sx={{
-                position: "relative",
-                overflow: "hidden",
-                borderRadius: "22px",
-                p: { xs: 2.5, md: 3 },
-                color: "#fff",
-                background: "#06214A",
-                boxShadow: "0 10px 28px rgba(6, 33, 74, 0.16)",
-              }}
-            >
-              <Box
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  backgroundImage: [
-                    `linear-gradient(64deg, ${alpha("#ffffff", 0.12)} 0 22%, transparent 22% 100%)`,
-                    `linear-gradient(118deg, transparent 0 86%, ${alpha("#ffffff", 0.08)} 86% 100%)`,
-                  ].join(", "),
-                  pointerEvents: "none",
-                }}
-              />
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                alignItems={{ xs: "flex-start", sm: "center" }}
-                justifyContent="space-between"
-                spacing={2}
-                sx={{ position: "relative", zIndex: 1 }}
-              >
-                <Box>
-                  <Typography sx={{ textTransform: "uppercase", letterSpacing: ".08em", opacity: 0.72, fontSize: 13, fontWeight: 800, mb: 1 }}>
-                    {invoicePanel.title}
-                  </Typography>
-                  <Typography sx={{ fontSize: { xs: 30, md: 38 }, fontWeight: 950, lineHeight: 1.08 }}>
-                    {invoicePanel.total}
-                  </Typography>
-                  <Typography sx={{ opacity: 0.84, fontSize: 14, fontWeight: 700, mt: 0.5 }}>
-                    {invoicePanel.totalLabel}
-                  </Typography>
-                  <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
-                    <Box sx={{ minWidth: 128, px: 1.5, py: 1.1, borderRadius: "16px", bgcolor: alpha("#ffffff", 0.13), border: `1px solid ${alpha("#ffffff", 0.2)}` }}>
-                      <Typography sx={{ fontSize: 24, fontWeight: 950, lineHeight: 1 }}>{invoicePanel.unpaidCount}</Typography>
-                      <Typography sx={{ fontSize: 12, opacity: 0.76, fontWeight: 700, mt: 0.4 }}>Unpaid invoices</Typography>
-                    </Box>
-                    <Box sx={{ minWidth: 128, px: 1.5, py: 1.1, borderRadius: "16px", bgcolor: alpha("#ffffff", 0.13), border: `1px solid ${alpha("#ffffff", 0.2)}` }}>
-                      <Typography sx={{ fontSize: 24, fontWeight: 950, lineHeight: 1 }}>{invoicePanel.unpaidTotal}</Typography>
-                      <Typography sx={{ fontSize: 12, opacity: 0.76, fontWeight: 700, mt: 0.4 }}>Unpaid total</Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-                <Button
-                  variant="outlined"
-                  onClick={invoicePanel.onClick}
-                  sx={{
-                    alignSelf: { xs: "flex-start", sm: "center" },
-                    borderRadius: "999px",
-                    px: 2.25,
-                    py: 0.8,
-                    color: "#fff",
-                    borderColor: alpha("#ffffff", 0.28),
-                    bgcolor: alpha("#ffffff", 0.12),
-                    fontWeight: 900,
-                    textTransform: "none",
-                  }}
-                >
-                  {invoicePanel.buttonLabel}
-                </Button>
+            <Box component="section" sx={{ position: "relative", overflow: "hidden", borderRadius: "var(--ct-card-radius)", p: { xs: 2.5, md: 3 }, color: "#FFFFFF", background: invoiceBackground }}>
+              <Typography sx={{ textTransform: "uppercase", letterSpacing: ".08em", color: "#D9D0FA", fontSize: 10.5, fontWeight: 600 }}>{invoicePanel.title}</Typography>
+              <Typography sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: { xs: 30, md: 34 }, lineHeight: 1.15, mt: 0.75, fontVariantNumeric: "tabular-nums" }}>{invoicePanel.total}</Typography>
+              <Typography sx={{ color: "#E0DAFA", fontSize: 13 }}>{invoicePanel.totalLabel}</Typography>
+              <Stack direction="row" spacing={1.25} sx={{ mt: 2 }}>
+                {[[invoicePanel.unpaidCount, "Unpaid invoices"], [invoicePanel.unpaidTotal, "Unpaid total"]].map(([value, label]) => (
+                  <Box key={String(label)} sx={{ flex: 1, minWidth: 0, px: 1.5, py: 1.25, borderRadius: "14px", bgcolor: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)" }}>
+                    <Typography sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 22, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{value}</Typography>
+                    <Typography sx={{ color: "#E0DAFA", fontSize: 11.5, mt: 0.4 }}>{label}</Typography>
+                  </Box>
+                ))}
               </Stack>
-            </Paper>
+              <ButtonBase
+                onClick={invoicePanel.onClick}
+                sx={{ mt: 2, minHeight: 40, px: 2, borderRadius: "999px", bgcolor: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.28)", color: "#FFFFFF", fontSize: 13, fontWeight: 600, "&:hover": { bgcolor: "rgba(255,255,255,0.22)" }, "&:focus-visible": { outline: "2px solid #FFFFFF", outlineOffset: 2 } }}
+              >
+                {invoicePanel.buttonLabel}
+              </ButtonBase>
+            </Box>
           )}
         </Stack>
       </Box>
 
-      <Paper sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(4, minmax(0, 1fr))" }, overflow: "hidden", borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-        {metrics.map((item, index) => {
-          const tone = toneStyles[item.tone];
-          return (
-            <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: { xs: 1.5, md: 2.25 }, minHeight: { xs: 104, md: 132 }, px: { xs: 2, md: 4 }, py: { xs: 2, md: 2.5 }, borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` }, borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" } }}>
-              <Box sx={{ width: { xs: 54, md: 66 }, height: { xs: 54, md: 66 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 30, md: 36 } } }}>{item.icon}</Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 14 }}>{item.label}</Typography>
-                <Typography sx={{ color: DNA.ink, fontWeight: 950, fontSize: { xs: 21, md: 24 }, lineHeight: 1.18, overflowWrap: "anywhere" }}>{item.value}</Typography>
-                <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5, overflowWrap: "anywhere" }}>{item.helper}</Typography>
-              </Box>
-            </Box>
-          );
-        })}
-      </Paper>
       <RecentActivityDialog
         open={activityDialogOpen}
         onClose={() => setActivityDialogOpen(false)}

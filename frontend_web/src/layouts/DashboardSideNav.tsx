@@ -1,6 +1,7 @@
 import { ReactNode, useMemo, useState } from "react";
 import {
   Box,
+  ButtonBase,
   Button,
   Collapse,
   Divider,
@@ -15,8 +16,8 @@ import {
 } from "@mui/material";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import FirstPageRoundedIcon from "@mui/icons-material/FirstPageRounded";
-import LastPageRoundedIcon from "@mui/icons-material/LastPageRounded";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
@@ -117,8 +118,11 @@ function NavSymbol({ icon, active, small = false }: { icon?: ReactNode; active: 
 
 export default function DashboardSideNav({
   selectedPharmacyId,
+  homePath,
 }: {
   selectedPharmacyId: number | null;
+  /** Where the sidebar logo leads (the persona's dashboard home). */
+  homePath: string;
 }) {
   const navigation = useDashboardNavigation();
   const navigate = useNavigate();
@@ -428,14 +432,13 @@ export default function DashboardSideNav({
       <Box
         sx={{
           position: "sticky",
-          top: 85,
-          height: "calc(100dvh - 85px)",
+          top: 0,
+          height: "100dvh",
           minHeight: 0,
           width: "100%",
           display: "flex",
           flexDirection: "column",
           bgcolor: "var(--ct-surface-bg)",
-          borderTop: "1px solid var(--ct-border-color)",
         }}
       >
         <Stack
@@ -444,22 +447,24 @@ export default function DashboardSideNav({
           justifyContent={collapsed ? "center" : "space-between"}
           sx={{
             px: collapsed ? 0.75 : 2,
-            py: 1.65,
-            minHeight: 68,
+            py: 1,
+            minHeight: 85,
             borderBottom: "1px solid var(--ct-border-color)",
             flexShrink: 0,
           }}
         >
           {!collapsed && (
-            <Typography sx={{
-              color: "var(--ct-text-primary)",
-              fontFamily: "Outfit, Inter, sans-serif",
-              fontSize: 18,
-              fontWeight: 700,
-              lineHeight: 1.3,
-            }}>
-              Navigation
-            </Typography>
+            <ButtonBase
+              onClick={() => navigate(homePath)}
+              aria-label="ChemistTasker dashboard home"
+              sx={{
+                borderRadius: "10px",
+                "&:hover": { opacity: 0.88 },
+                "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 3 },
+              }}
+            >
+              <Box component="img" src={menuLogo} alt="ChemistTasker" sx={{ display: "block", width: 124, height: "auto" }} />
+            </ButtonBase>
           )}
           <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"} placement="right" arrow>
             <IconButton
@@ -467,9 +472,9 @@ export default function DashboardSideNav({
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!collapsed}
               sx={{
-                width: 42,
-                height: 42,
-                borderRadius: "12px",
+                width: 34,
+                height: 34,
+                borderRadius: "10px",
                 border: "1px solid var(--ct-border-color)",
                 bgcolor: "var(--ct-elevated-bg)",
                 color: "var(--ct-text-secondary)",
@@ -477,7 +482,7 @@ export default function DashboardSideNav({
                 "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 2 },
               }}
             >
-              {collapsed ? <LastPageRoundedIcon sx={{ fontSize: 22 }} /> : <FirstPageRoundedIcon sx={{ fontSize: 22 }} />}
+              {collapsed ? <ChevronsRight size={18} strokeWidth={1.75} /> : <ChevronsLeft size={18} strokeWidth={1.75} />}
             </IconButton>
           </Tooltip>
         </Stack>

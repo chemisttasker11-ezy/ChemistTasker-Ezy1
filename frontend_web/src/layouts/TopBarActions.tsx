@@ -91,8 +91,8 @@ export default function TopBarActions({
   const location = useLocation();
   const dashboardNavigation = useDashboardNavigation();
   const { selectedPharmacyId } = useWorkspace();
-  // Below lg the header cannot fit a readable field next to the actions, so search opens in a dialog.
-  const compactSearch = useMediaQuery(theme.breakpoints.down("lg"));
+  // Below xl the header (beside the full-height sidebar) cannot fit a readable field, so search opens in a dialog.
+  const compactSearch = useMediaQuery(theme.breakpoints.down("xl"));
   const [query, setQuery] = React.useState("");
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
@@ -367,7 +367,7 @@ export default function TopBarActions({
 
   const searchFieldSx = React.useMemo(
     () => ({
-      width: { xs: "100%", lg: 260 },
+      width: { xs: "100%", xl: 260 },
       flexShrink: 0,
       "& .MuiOutlinedInput-root": {
         borderRadius: theme.shape.borderRadius,

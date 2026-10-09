@@ -1,10 +1,5 @@
+import { Briefcase, CalendarDays, Clock, MessageSquareText, Store, UserCog } from "lucide-react";
 import { useEffect, useState } from "react";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
-import StoreIcon from "@mui/icons-material/Store";
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import ForumIcon from "@mui/icons-material/Forum";
 import { useNavigate } from "react-router-dom";
 import DashboardOverviewTemplate, {
   type DashboardAction,
@@ -75,47 +70,47 @@ export default function AdminOverview() {
   const actions: DashboardAction[] = [];
   if (canManageRoster) {
     actions.push(
-      { title: "Post Shift", description: "Fill an immediate staffing gap", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/post-shift`), tone: "pink" },
-      { title: "Internal Roster", description: "Review upcoming pharmacy coverage", icon: <CalendarMonthIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies/roster`), tone: "purple" },
-      { title: "Shift Centre", description: "Resolve active and confirmed shift work", icon: <AccessTimeIcon />, onClick: () => navigate(`${adminBasePath}/shift-center`), tone: "cyan" },
+      { title: "Post Shift", description: "Fill an immediate staffing gap", icon: <Store />, onClick: () => navigate(`${adminBasePath}/post-shift`), tone: "pink" },
+      { title: "Internal Roster", description: "Review upcoming pharmacy coverage", icon: <CalendarDays />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies/roster`), tone: "purple" },
+      { title: "Shift Centre", description: "Resolve active and confirmed shift work", icon: <Clock />, onClick: () => navigate(`${adminBasePath}/shift-center`), tone: "cyan" },
     );
   }
   if (canManageStaff) {
     actions.push(
-      { title: "Manage Pharmacy", description: "Staff, access and pharmacy details", icon: <ManageAccountsIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`), tone: "blue" },
+      { title: "Manage Pharmacy", description: "Staff, access and pharmacy details", icon: <UserCog />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`), tone: "blue" },
     );
   }
   if (canManageCommunications && actions.length < 4) {
     actions.push(
-      { title: "Pharmacy Hub", description: "Open pharmacy communication and updates", icon: <ForumIcon />, onClick: () => navigate("/dashboard/pharmacy-hub"), tone: "blue" },
+      { title: "Pharmacy Hub", description: "Open pharmacy communication and updates", icon: <MessageSquareText />, onClick: () => navigate("/dashboard/pharmacy-hub"), tone: "blue" },
     );
   }
 
   const primaryAction = canManageRoster
-    ? { label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate(`${adminBasePath}/post-shift`) }
+    ? { label: "Post a shift", icon: <CalendarDays />, onClick: () => navigate(`${adminBasePath}/post-shift`) }
     : canManageStaff
-      ? { label: "Manage pharmacy", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`) }
+      ? { label: "Manage pharmacy", icon: <Store />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`) }
       : canManageCommunications
-        ? { label: "Open Pharmacy Hub", icon: <ForumIcon />, onClick: () => navigate("/dashboard/pharmacy-hub") }
-        : { label: "Open chat", icon: <ManageAccountsIcon />, onClick: () => navigate(`${adminBasePath}/chat`) };
+        ? { label: "Open Pharmacy Hub", icon: <MessageSquareText />, onClick: () => navigate("/dashboard/pharmacy-hub") }
+        : { label: "Open chat", icon: <UserCog />, onClick: () => navigate(`${adminBasePath}/chat`) };
 
   const secondaryAction = canManageRoster && canManageStaff
-    ? { label: "Manage pharmacy", icon: <StoreIcon />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`) }
+    ? { label: "Manage pharmacy", icon: <Store />, onClick: () => navigate(`${adminBasePath}/manage-pharmacies`) }
     : canManageRoster
-      ? { label: "Shift Centre", icon: <AccessTimeIcon />, onClick: () => navigate(`${adminBasePath}/shift-center`) }
+      ? { label: "Shift Centre", icon: <Clock />, onClick: () => navigate(`${adminBasePath}/shift-center`) }
       : undefined;
 
   const metrics: DashboardMetric[] = canManageRoster
     ? [
-        { label: "Open Shifts", value: dashboardData?.shift_summary?.open_count ?? 0, helper: pharmacyName, icon: <CalendarMonthIcon />, tone: "blue" },
-        { label: "Confirmed Shifts", value: dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <WorkOutlineIcon />, tone: "purple" },
-        { label: "Active Shifts", value: dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? 0, helper: "Current staffing work", icon: <ManageAccountsIcon />, tone: "cyan" },
-        { label: "Today", value: dashboardData?.upcoming_stats?.today ?? 0, helper: "Shifts needing today's attention", icon: <AccessTimeIcon />, tone: "pink" },
+        { label: "Open Shifts", value: dashboardData?.shift_summary?.open_count ?? 0, helper: pharmacyName, icon: <CalendarDays />, tone: "blue" },
+        { label: "Confirmed Shifts", value: dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <Briefcase />, tone: "purple" },
+        { label: "Active Shifts", value: dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? 0, helper: "Current staffing work", icon: <UserCog />, tone: "cyan" },
+        { label: "Today", value: dashboardData?.upcoming_stats?.today ?? 0, helper: "Shifts needing today's attention", icon: <Clock />, tone: "pink" },
       ]
     : [
-        { label: "Workspace", value: pharmacyName, helper: "Current pharmacy", icon: <StoreIcon />, tone: "blue" },
-        { label: "Admin access", value: assignment.admin_level?.replace(/_/g, " ") ?? "Admin", helper: "Current permission scope", icon: <ManageAccountsIcon />, tone: "purple" },
-        { label: "Unread messages", value: unreadCount, helper: "Conversations needing attention", icon: <ForumIcon />, tone: "pink" },
+        { label: "Workspace", value: pharmacyName, helper: "Current pharmacy", icon: <Store />, tone: "blue" },
+        { label: "Admin access", value: assignment.admin_level?.replace(/_/g, " ") ?? "Admin", helper: "Current permission scope", icon: <UserCog />, tone: "purple" },
+        { label: "Unread messages", value: unreadCount, helper: "Conversations needing attention", icon: <MessageSquareText />, tone: "pink" },
       ];
   const activityItems = Array.isArray(dashboardData?.activity)
     ? dashboardData.activity.map((item: any) => ({

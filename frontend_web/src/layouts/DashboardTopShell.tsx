@@ -604,6 +604,9 @@ export default function DashboardTopShell({
           },
         }}
       >
+      <Box sx={{ display: "flex", width: "100%", minWidth: 0 }}>
+      <DashboardSideNav selectedPharmacyId={selectedPharmacyId} homePath={dashboardHomePath} />
+      <Box sx={{ flex: "1 1 0%", minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box
         component="header"
         sx={{
@@ -639,7 +642,7 @@ export default function DashboardTopShell({
           sx={{
             width: { xs: 112, md: 132 },
             flex: "0 0 auto",
-            display: "flex",
+            display: { xs: "flex", lg: "none" },
             alignItems: "center",
           }}
         >
@@ -709,7 +712,7 @@ export default function DashboardTopShell({
           <Stack
             direction="row"
             alignItems="center"
-            justifyContent={{ xs: "flex-start", md: "flex-end" }}
+            justifyContent={{ xs: "flex-start", md: "flex-end", lg: "flex-start" }}
             spacing={1}
             sx={{
               gridArea: "scope",
@@ -893,7 +896,7 @@ export default function DashboardTopShell({
               minWidth: 0,
               justifySelf: "end",
               display: "flex",
-              width: { xs: "auto", lg: 640, xl: 680 },
+              width: "auto",
               maxWidth: "100%",
             }}
           >
@@ -912,8 +915,6 @@ export default function DashboardTopShell({
         </Stack>
       </Box>
 
-      <Box sx={{ display: "flex", width: "100%", minWidth: 0 }}>
-        <DashboardSideNav selectedPharmacyId={selectedPharmacyId} />
         <Box
           component="main"
           sx={{
@@ -934,6 +935,7 @@ export default function DashboardTopShell({
         >
           {children}
         </Box>
+      </Box>
       </Box>
       </Box>
     </LocalizationProvider>

@@ -1,5 +1,8 @@
 # Dashboard design decisions (Figma → Vite)
 
+**Principle (owner, 2026-10-10): the Figma is a reference, not a bible.** Choose the best treatment per
+element, then apply it uniformly across every page.
+
 Running log of what was taken from the Figma files, what was left out, and why. Newest decisions are appended
 per area. Business logic, routes, permissions and API contracts are never changed for a visual reason; when a
 Figma screen reflects older behaviour, the current product wins and the Figma *styling* is applied to it.
@@ -51,6 +54,14 @@ never pasted as generated markup.
 - **Kept from #155:** header search, the two-row phone header with a reachable pharmacy selector, persona/admin
   switching. Figma has no search; ours is functional and stays.
 
+## Shell (continued)
+
+- **Taken from Figma:** logo at the top of a full-height sidebar with a «/» collapse button; the top bar
+  starts right of the sidebar. The old "Navigation" label row is gone. Below 1200px (no sidebar) the logo stays
+  in the top bar.
+- **Search:** Figma has none. Ours stays, as an icon that opens the search dialog below 1536px and as a 260px
+  field above, so the page title and pharmacy selector keep their room beside the sidebar.
+
 ## Owner overview
 
 - **Taken:** brand welcome banner (navy → violet → blue, sampled from Figma) with *Post a shift* / *Manage
@@ -62,6 +73,19 @@ never pasted as generated markup.
   sidebar; the handbook asks overviews to lead with next actions. Figma's "5 pills per shift post" chip — there
   is no data source for a per-post cost, so it is not invented.
 - The page heading is the banner's "Welcome back, {first name}!" (h1); the top bar already names the page.
+
+## Persona overviews (Pharmacist, Other Staff, Explorer, Admin, Organisation)
+
+All five use `DashboardOverviewTemplate`, now built from the shared components:
+- Order follows Figma: workspace chip row → welcome banner (pill panel with the real per-post cost) → metric
+  strip → content. The metric strip moved up from the bottom of the page.
+- **Kept from #155:** "My next shifts" (only shifts the worker engaged with) and "Recommended for you"
+  (availability match). Figma shows plain counts; our feeds are the approved logic. They sit full width under
+  the metrics.
+- Action cards in Figma's quieter style (44px tinted tile, Outfit 16 title, 12.5 description), three across,
+  beside the right column (shift counts, recent activity, invoice card in Figma's blue → navy gradient).
+- The organisation banner now greets by first name like every other persona.
+- Callers' Material icons replaced by Lucide equivalents.
 
 ## Findings logged while implementing (not visual)
 
