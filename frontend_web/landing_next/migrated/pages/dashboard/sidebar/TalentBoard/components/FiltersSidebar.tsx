@@ -57,6 +57,7 @@ const toggleList = (list: string[], value: string) =>
 export default function FiltersSidebar({
   filters,
   onChange,
+  hideSearch = false,
   roleOptions,
   stateOptions,
   workTypeOptions,
@@ -67,6 +68,7 @@ export default function FiltersSidebar({
 }: {
   filters: TalentFilterState;
   onChange: (next: TalentFilterState) => void;
+  hideSearch?: boolean;
   roleOptions: string[];
   stateOptions: string[];
   workTypeOptions: string[];
@@ -77,10 +79,11 @@ export default function FiltersSidebar({
 }) {
   return (
     <Box sx={{ px: 2.5, py: 2, bgcolor: "background.paper" }}>
-      <TextField
+      {!hideSearch && <TextField
         fullWidth
         size="small"
-        placeholder="Role, City, Ref #..."
+        label="Search talent"
+        placeholder="Role, suburb or skill"
         value={filters.search}
         onChange={(event) => onChange({ ...filters, search: event.target.value })}
         InputProps={{
@@ -91,7 +94,7 @@ export default function FiltersSidebar({
           ),
         }}
         sx={{ mb: 2 }}
-      />
+      />}
 
       <Stack spacing={1.5} sx={{ mb: 2 }}>
         <Box
