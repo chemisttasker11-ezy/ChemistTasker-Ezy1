@@ -223,6 +223,11 @@ test.describe('authenticated route breadth', () => {
     ['Other Staff pharmacy hub', roleUsers.otherstaff, '/dashboard/otherstaff/pharmacy-hub'],
 
     ['Explorer onboarding', roleUsers.explorer, '/dashboard/explorer/onboarding'],
+    ['Explorer public shifts', roleUsers.explorer, '/dashboard/explorer/shifts/public'],
+    ['Explorer community shifts', roleUsers.explorer, '/dashboard/explorer/shifts/community'],
+    ['Explorer confirmed shifts', roleUsers.explorer, '/dashboard/explorer/shifts/confirmed'],
+    ['Explorer history', roleUsers.explorer, '/dashboard/explorer/shifts/history'],
+    ['Explorer availability', roleUsers.explorer, '/dashboard/explorer/availability'],
     ['Explorer talent', roleUsers.explorer, '/dashboard/explorer/interests'],
     ['Explorer learning', roleUsers.explorer, '/dashboard/explorer/learning'],
     ['Explorer calendar', roleUsers.explorer, '/dashboard/explorer/calendar'],
@@ -496,4 +501,113 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
       notes: 'Acknowledged via Worker Attendance Dashboard',
     },
   });
+});
+
+
+test('owner pharmacy selector lists all authorised locations and delegates Admin-only pharmacies', async ({ page }) => {
+  const owner = {
+    ...roleUsers.owner,
+    id: 610,
+    memberships: [
+      { pharmacy_id: 101, pharmacy_name: 'Alpha Owner Pharmacy', role: 'OWNER', status: 'ACCEPTED', is_active: true },
+      { pharmacy_id: 102, pharmacy_name: 'Beta Owner Pharmacy', role: 'OWNER', status: 'ACCEPTED', is_active: true },
+    ],
+    admin_assignments: [
+      { id: 701, pharmacy_id: 101, pharmacy_name: 'Alpha Owner Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities, is_active: true },
+      { id: 702, pharmacy_id: 102, pharmacy_name: 'Beta Owner Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities, is_active: true },
+      { id: 703, pharmacy_id: 103, pharmacy_name: 'Gamma Managed Pharmacy', admin_level: 'FULL_ADMIN', capabilities: baseCapabilities, is_active: true },
+      { id: 704, pharmacy_id: 104, pharmacy_name: 'Delta Managed Pharmacy', admin_level: 'FULL_ADMIN', capabilities: baseCapabilities, is_active: true },
+    ],
+  };
+  await installApiFixture(page, owner);
+  await page.route('**/api/v1/pharmacies/**', (route) => json(route, [
+    { id: 101, name: 'Alpha Owner Pharmacy' },
+    { id: 102, name: 'Beta Owner Pharmacy' },
+    { id: 103, name: 'Gamma Managed Pharmacy' },
+    { id: 104, name: 'Delta Managed Pharmacy' },
+  ]));
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+  const selector = page.getByRole('button', { name: /Select pharmacy workspace/ });
+  await expect(selector).toBeVisible();
+  await selector.click();
+  const menu = page.getByRole('menu', { name: 'Available pharmacy workspaces' });
+  await expect(menu).toContainText('4 pharmacies available');
+  for (const name of ['Alpha Owner Pharmacy', 'Beta Owner Pharmacy', 'Gamma Managed Pharmacy', 'Delta Managed Pharmacy']) {
+    await expect(menu).toContainText(name);
+  }
+  await menu.getByRole('menuitem', { name: /Gamma Managed Pharmacy/ }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/admin/103/overview');
+});
+
+
+test('owner sidebar collapses without losing access to navigation or widening the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview');
+  const sidebar = page.locator('aside[aria-label="Dashboard navigation"]');
+  await expect(sidebar).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  await expect(sidebar.getByRole('button', { name: 'Overview' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
+  await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Manage Pharmacies' })).toBeVisible();
+});
+
+
+test('owner navigation presents nested pharmacy tools on demand without losing the active page', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 850 });
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
+
+  const sidebar = page.locator('aside[aria-label="Dashboard navigation"]');
+  await expect(sidebar.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toHaveCount(0);
+
+  await sidebar.getByRole('button', { name: 'Expand Manage Pharmacies subpages' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Internal Roster' }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/owner/manage-pharmacies/roster');
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toHaveAttribute('aria-current', 'page');
+
+  await sidebar.getByRole('button', { name: 'Collapse Manage Pharmacies subpages' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toHaveCount(0);
+});
+
+test('collapsed owner icon rail keeps all nested routes available through an accessible submenu', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
+
+  const sidebar = page.locator('aside[aria-label="Dashboard navigation"]');
+  await sidebar.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await sidebar.getByRole('button', { name: 'Manage Pharmacies menu' }).click();
+  const flyout = page.getByRole('menu', { name: 'Manage Pharmacies pages' });
+  await expect(flyout.getByRole('menuitem', { name: 'My Pharmacies' })).toBeVisible();
+  await expect(flyout.getByRole('menuitem', { name: 'Internal Roster' })).toBeVisible();
+  await flyout.getByRole('menuitem', { name: 'Internal Roster' }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/owner/manage-pharmacies/roster');
+  await expect(sidebar.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
+});
+
+
+test('authenticated Owner pages render the public type families rather than system fallbacks', async ({ page }) => {
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
+
+  const heading = page.getByRole('heading', { name: 'Owner Dashboard' });
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveCSS('font-family', /Outfit/);
+  await expect(page.locator('body')).toHaveCSS('font-family', /Inter/);
+
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const loaded = Array.from(document.fonts).filter((face) => face.status === 'loaded');
+    return {
+      inter: loaded.some((face) => face.family.replaceAll('"', '') === 'Inter'),
+      outfit: loaded.some((face) => face.family.replaceAll('"', '') === 'Outfit'),
+    };
+  });
+  expect(fonts).toEqual({ inter: true, outfit: true });
 });

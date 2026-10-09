@@ -5,10 +5,10 @@ import { ThemeProvider, CssBaseline, useMediaQuery } from "@mui/material";
 
 type Mode = "light" | "dark";
 
-// Indigo-ish primary that matches your mock
+// Brand violet is shared with the Next.js public theme, not generic indigo.
 const primary = {
-  50:"#eef2ff",100:"#e0e7ff",200:"#c7d2fe",300:"#a5b4fc",400:"#818cf8",
-  500:"#6366f1",600:"#4f46e5",700:"#4338ca",800:"#3730a3",900:"#312e81",
+  50: '#F8F5FE', 100: '#EFE7FF', 200: '#E0D3FC', 300: '#CCB6F5', 400: '#AA81E9',
+  500: '#7D45CB', 600: '#5222B8', 700: '#40168F', 800: '#32116F', 900: '#210B4E',
 };
 
 // Greys
@@ -27,18 +27,23 @@ export function createSleekTheme(mode: Mode): Theme {
   const hoverBg = isLight
     ? alpha(grey[200], 0.50)
     : alpha("#ffffff", 0.06);
-  const pageBg = isLight ? grey[50] : "#08111F";
+  const pageBg = isLight ? "#F7F9FC" : "#08111F";
   const surfaceBg = isLight ? "#fff" : "#101A2D";
   const elevatedBg = isLight ? "#fff" : "#142036";
-  const textPrimary = isLight ? grey[900] : "#EAF1FF";
-  const textSecondary = isLight ? grey[600] : "#A9B8D3";
-  const borderColor = isLight ? grey[200] : "rgba(148,163,184,0.24)";
+  const textPrimary = isLight ? "#06123A" : "#EAF1FF";
+  const textSecondary = isLight ? "#5E6B8D" : "#A9B8D3";
+  const borderColor = isLight ? "#E5ECF7" : "rgba(148,163,184,0.24)";
 
   return createTheme({
     shape: { borderRadius: 14 },
     palette: {
       mode,
-      primary: { main: primary[600] },
+      primary: { main: primary[600], dark: primary[700], light: primary[100], contrastText: "#FFFFFF" },
+      secondary: { main: "#D600C8", dark: "#A60B9C", light: "#FDE7F5" },
+      info: { main: "#008DDB", light: "#E7F0FF" },
+      success: { main: "#138A5B" },
+      warning: { main: "#B86B00" },
+      error: { main: "#C9364A" },
       background: isLight
         ? { default: pageBg, paper: surfaceBg }
         : { default: pageBg, paper: surfaceBg },
@@ -54,10 +59,18 @@ export function createSleekTheme(mode: Mode): Theme {
       },
     },
     typography: {
-      fontFamily: [
-        "Inter", "SF Pro Text", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif",
-      ].join(","),
-      h1: { fontWeight: 800 }, h2: { fontWeight: 800 }, h3: { fontWeight: 700 },
+      // Match the Next public site: Outfit speaks, Inter operates.
+      fontFamily: "Inter, Segoe UI, Arial, sans-serif",
+      h1: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1.05 },
+      h2: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.035em", lineHeight: 1.08 },
+      h3: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.13 },
+      h4: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.18 },
+      h5: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600, letterSpacing: "-0.02em" },
+      h6: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
+      body1: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", lineHeight: 1.55 },
+      body2: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", lineHeight: 1.5 },
+      button: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", fontWeight: 700, textTransform: "none" },
+      caption: { fontFamily: "Inter, Segoe UI, Arial, sans-serif", lineHeight: 1.45 },
     },
     components: {
       MuiCssBaseline: {
@@ -73,11 +86,14 @@ export function createSleekTheme(mode: Mode): Theme {
             "--ct-hover-bg": hoverBg,
             "--ct-soft-primary": isLight ? alpha(primary[600], 0.1) : alpha(primary[400], 0.18),
             "--ct-input-bg": isLight ? "#fff" : "#0C1628",
+            "--ct-font-body": "Inter, Segoe UI, Arial, sans-serif",
+            "--ct-font-display": "Outfit, Inter, sans-serif",
           },
           "html, body, #root": {
             minHeight: "100%",
           },
           body: {
+            fontFamily: "var(--ct-font-body)",
             backgroundColor: pageBg,
             color: textPrimary,
             transition: "background-color 160ms ease, color 160ms ease",
@@ -227,7 +243,7 @@ export function createSleekTheme(mode: Mode): Theme {
       MuiButton: {
         defaultProps: { disableElevation: true },
         styleOverrides: {
-          root: { borderRadius: 12, textTransform: "none", fontWeight: 600 },
+          root: { borderRadius: 12, textTransform: "none", fontWeight: 700 },
           outlined: {
             borderColor,
             backgroundColor: "transparent",
@@ -237,7 +253,11 @@ export function createSleekTheme(mode: Mode): Theme {
       MuiCardHeader: {
         styleOverrides: {
           root: { borderBottom: `1px solid ${borderColor}` },
+          title: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
         },
+      },
+      MuiDialogTitle: {
+        styleOverrides: { root: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 } },
       },
       MuiTextField: {
         defaultProps: { variant: "outlined" },

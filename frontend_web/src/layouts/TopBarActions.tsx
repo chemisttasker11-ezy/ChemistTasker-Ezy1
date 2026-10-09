@@ -26,7 +26,6 @@ import MenuItem from "@mui/material/MenuItem";
 import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { fetchWsTicket } from "../utils/tokenService";
-import apiClient from "../utils/apiClient";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import SearchIcon from "@mui/icons-material/Search";
@@ -40,6 +39,9 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useColorMode } from "../theme/sleekTheme";
 import { useAuth } from "../contexts/AuthContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
+import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
+import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
 import { fetchNotifications, markNotificationsRead, NotificationItem } from "../api/notifications";
 import { fetchRooms, getOnboarding, hasOrganizationAccess } from "@chemisttasker/shared-core";
 import { API_BASE_URL } from "../constants/api";
@@ -53,10 +55,7 @@ import {
   type MessageSummary,
   ADMIN_LEVEL_LABELS,
   ADMIN_STAFF_ROLE_LABELS,
-  ROLE_SEARCH_OPTIONS,
-  CHAT_ROUTES,
   PROFILE_ROUTES,
-  DASHBOARD_ROUTES,
   onboardingRoleForUserRole,
   profilePhotoFromSource,
   isMessageNotification,
@@ -90,6 +89,8 @@ export default function TopBarActions({
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const dashboardNavigation = useDashboardNavigation();
+  const { selectedPharmacyId } = useWorkspace();
   const downSm = useMediaQuery(theme.breakpoints.down("sm"));
   const [query, setQuery] = React.useState("");
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -102,7 +103,6 @@ export default function TopBarActions({
   const [unreadMessages, setUnreadMessages] = React.useState(0);
   const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
   const [onboardingProfile, setOnboardingProfile] = React.useState<any>(null);
-  const [pharmacyCount, setPharmacyCount] = React.useState<number | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
   const otherStaffRoleType =
     onboardingProfile?.role_type ??
@@ -199,8 +199,27 @@ export default function TopBarActions({
     personaOptions.length > 0 && (isAdminUser || personaOptions.length > 1);
 
   const profileRoleKey = React.useMemo(() => String(user?.role || "DEFAULT").toUpperCase(), [user?.role]);
-  const dashboardRoute = DASHBOARD_ROUTES[profileRoleKey] ?? "/dashboard";
-  const profileRoute = PROFILE_ROUTES[profileRoleKey] ?? dashboardRoute;
+  const baseDashboardRoute =
+    profileRoleKey === "OWNER"
+      ? "/dashboard/owner/overview"
+      : profileRoleKey === "PHARMACIST"
+        ? "/dashboard/pharmacist/overview"
+        : profileRoleKey === "OTHER_STAFF"
+          ? "/dashboard/otherstaff/overview"
+          : profileRoleKey === "EXPLORER"
+            ? "/dashboard/explorer/overview"
+            : "/dashboard";
+  const isOrganizationWorkspace = location.pathname.startsWith("/dashboard/organization/");
+  const activeAdminBase =
+    activePersona === "admin" && activeAdminAssignment?.pharmacy_id
+      ? `/dashboard/admin/${activeAdminAssignment.pharmacy_id}`
+      : null;
+  const dashboardRoute = isOrganizationWorkspace
+    ? "/dashboard/organization/overview"
+    : activeAdminBase
+      ? `${activeAdminBase}/overview`
+      : baseDashboardRoute;
+  const profileRoute = PROFILE_ROUTES[profileRoleKey] ?? baseDashboardRoute;
   const displayFirstName = dashboardGreetingName(user);
   const avatarSrc = profilePhotoFromSource(onboardingProfile) || profilePhotoFromSource(user);
   const avatarInitials =
@@ -279,30 +298,6 @@ export default function TopBarActions({
     };
   }, []);
 
-  React.useEffect(() => {
-    const roleKey = (user?.role || "").toUpperCase();
-    if (roleKey === "OWNER" || roleKey === "PHARMACY_ADMIN" || roleKey.startsWith("ORG")) {
-      apiClient
-        .get("/pharmacies/")
-        .then((response) => {
-          let count = 0;
-          if (typeof response.data.count === "number") {
-            count = response.data.count;
-          } else if (Array.isArray(response.data.results)) {
-            count = response.data.results.length;
-          } else if (Array.isArray(response.data)) {
-            count = response.data.length;
-          }
-          setPharmacyCount(count);
-        })
-        .catch(() => {
-          setPharmacyCount(0);
-        });
-    } else {
-      setPharmacyCount(null);
-    }
-  }, [user?.id, user?.role]);
-
   const handleCloseProfileMenu = React.useCallback(() => {
     setProfileAnchor(null);
   }, []);
@@ -342,59 +337,32 @@ export default function TopBarActions({
     if(await logout())window.location.replace("/login");
   }, [handleCloseProfileMenu, logout, navigate]);
 
-  const options = React.useMemo(() => {
-    const roleKey = (user?.role || "DEFAULT").toUpperCase();
-    let baseOptions = ROLE_SEARCH_OPTIONS[roleKey] ?? ROLE_SEARCH_OPTIONS.DEFAULT;
+  const options = React.useMemo<SearchOption[]>(() => {
+    const collected: SearchOption[] = [];
 
-    if (pharmacyCount !== null && pharmacyCount <= 1) {
-      if (roleKey === "OWNER" || roleKey === "PHARMACY_ADMIN") {
-        baseOptions = ROLE_SEARCH_OPTIONS.OWNER.map((opt: SearchOption) => {
-          if (opt.path === "/dashboard/owner/manage-pharmacies") {
-            return { ...opt, label: "Manage Pharmacy" };
-          }
-          if (opt.path === "/dashboard/owner/manage-pharmacies/my-chain") {
-            return { ...opt, label: "My Pharmacy" };
-          }
-          return opt;
+    const visit = (items: any[], parentPath = "") => {
+      items.forEach((item) => {
+        if (!item || item.kind === "header" || item.kind === "divider" || !item.segment || !item.title) {
+          return;
+        }
+        const path = normalizeDashboardSegment(parentPath, item);
+        collected.push({
+          label: String(item.title),
+          path: addDashboardScopeParams(path, selectedPharmacyId),
+          keywords: [String(item.title), "dashboard"],
         });
-      } else if (roleKey.startsWith("ORG")) {
-        baseOptions = (ROLE_SEARCH_OPTIONS[roleKey] ?? ROLE_SEARCH_OPTIONS.ORGANIZATION).map((opt: SearchOption) => {
-          if (opt.path === "/dashboard/organization/manage-pharmacies") {
-            return { ...opt, label: "Manage Pharmacy" };
-          }
-          if (opt.path === "/dashboard/organization/manage-pharmacies/my-pharmacies") {
-            return { ...opt, label: "My Pharmacy" };
-          }
-          return opt;
-        });
-      }
-    }
+        if (Array.isArray(item.children)) {
+          visit(item.children, path);
+        }
+      });
+    };
 
-    if (
-      activePersona === "admin" &&
-      activeAdminAssignment?.pharmacy_id
-    ) {
-      const adminBase = `/dashboard/admin/${activeAdminAssignment.pharmacy_id}`;
-      const remapPath = (path: string) => {
-        if (path.startsWith("/dashboard/owner")) {
-          return path.replace("/dashboard/owner", adminBase);
-        }
-        if (path.startsWith("/dashboard/admin/")) {
-          return path;
-        }
-        if (path.startsWith("/")) {
-          return `${adminBase}${path}`;
-        }
-        return `${adminBase}/${path}`;
-      };
-      baseOptions = baseOptions.map((option) => ({
-        ...option,
-        path: remapPath(option.path),
-      }));
-    }
+    visit(dashboardNavigation as any[]);
 
-    return baseOptions;
-  }, [user?.role, activePersona, activeAdminAssignment?.pharmacy_id, pharmacyCount]);
+    return Array.from(
+      new Map(collected.map((option) => [option.path, option])).values()
+    );
+  }, [dashboardNavigation, selectedPharmacyId]);
 
   const searchFieldSx = React.useMemo(
     () => ({
@@ -458,9 +426,13 @@ export default function TopBarActions({
   );
 
   const chatRoute = React.useMemo(() => {
-    const roleKey = (user?.role || "OWNER").toUpperCase();
-    return CHAT_ROUTES[roleKey] ?? "/dashboard/owner/chat";
-  }, [user?.role]);
+    if (isOrganizationWorkspace) return "/dashboard/organization/chat";
+    if (activeAdminBase) return `${activeAdminBase}/chat`;
+    if (profileRoleKey === "PHARMACIST") return "/dashboard/pharmacist/chat";
+    if (profileRoleKey === "OTHER_STAFF") return "/dashboard/otherstaff/chat";
+    if (profileRoleKey === "EXPLORER") return "/dashboard/explorer/chat";
+    return "/dashboard/owner/chat";
+  }, [activeAdminBase, isOrganizationWorkspace, profileRoleKey]);
 
   const unreadMessageEntries = React.useMemo(
     () => Object.values(messageSummaries).filter((entry) => entry.unread > 0),

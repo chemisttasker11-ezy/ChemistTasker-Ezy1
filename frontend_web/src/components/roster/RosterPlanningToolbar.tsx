@@ -41,10 +41,12 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ViewWeekIcon from '@mui/icons-material/ViewWeek';
+import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
 import { rosterV2 } from '@chemisttasker/shared-core';
-import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
+import { BRAND_COLORS, BRAND_FONTS } from '../../constants/brandTheme';
 import RosterGridViews, { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
 import RosterSafePublishButton from '../../features/workforce/RosterSafePublishButton';
 
@@ -358,10 +360,14 @@ export default function RosterPlanningToolbar({
       <Card
         elevation={0}
         sx={{
-          borderRadius: '16px',
+          borderRadius: '14px',
           border: `1px solid ${BRAND_COLORS.border}`,
           bgcolor: BRAND_COLORS.white,
-          boxShadow: BRAND_SHADOWS.card,
+          boxShadow: 'none',
+          '& .MuiButton-root': { minHeight: 44 },
+          '& .MuiButton-root:focus-visible, & .MuiIconButton-root:focus-visible': {
+            outline: '3px solid #008DDB', outlineOffset: 2,
+          },
         }}
       >
         <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -373,7 +379,15 @@ export default function RosterPlanningToolbar({
           >
             {/* Left: Week Info, Status & Shift Count */}
             <Box>
-              <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Stack direction="row" spacing={0.3} sx={{ mr: 0.5, bgcolor: '#F5F7FC', p: 0.3, borderRadius: '9px', border: '1px solid #DFE6F1' }}>
+                  <IconButton aria-label="Previous roster week" disabled={!onNavigateWeek}
+                    onClick={() => onNavigateWeek?.(moment(calendarDate).subtract(7, 'days').toDate())}
+                    sx={{ width: 44, height: 44, color: '#5222B8' }}><ChevronLeftRoundedIcon /></IconButton>
+                  <IconButton aria-label="Next roster week" disabled={!onNavigateWeek}
+                    onClick={() => onNavigateWeek?.(moment(calendarDate).add(7, 'days').toDate())}
+                    sx={{ width: 44, height: 44, color: '#5222B8' }}><ChevronRightRoundedIcon /></IconButton>
+                </Stack>
                 <Typography
                   variant="h6"
                   sx={{
@@ -385,6 +399,9 @@ export default function RosterPlanningToolbar({
                 >
                   {monday.format('MMM D')} – {sunday.format('MMM D, YYYY')}
                 </Typography>
+
+                <Button size="small" disabled={!onNavigateWeek} onClick={() => onNavigateWeek?.(new Date())}
+                  sx={{ fontSize: 12.5, textTransform: 'none', fontWeight: 800, color: '#5222B8', minHeight: 44 }}>This week</Button>
 
                 {isLoading ? (
                   <CircularProgress size={18} sx={{ color: BRAND_COLORS.purple }} />
@@ -412,7 +429,7 @@ export default function RosterPlanningToolbar({
                         fontWeight: 700,
                         letterSpacing: 0.5,
                         bgcolor: BRAND_COLORS.warningLight,
-                        color: BRAND_COLORS.warning,
+                        color: '#7B4800',
                         borderRadius: '8px',
                         fontSize: 11,
                       }}
@@ -438,8 +455,11 @@ export default function RosterPlanningToolbar({
             {/* Middle: View Mode Switcher (Calendar, Staff, Stacked) */}
             <Stack
               direction="row"
-              spacing={0.5}
+              flexWrap="wrap"
+              useFlexGap
+              gap={0.5}
               sx={{
+                width: { xs: "100%", lg: "auto" },
                 bgcolor: BRAND_COLORS.mist,
                 p: 0.5,
                 borderRadius: '10px',
@@ -464,7 +484,7 @@ export default function RosterPlanningToolbar({
                   },
                 }}
               >
-                Staff Matrix (Weekly)
+                Week by staff
               </Button>
               <Button
                 size="small"
@@ -484,7 +504,7 @@ export default function RosterPlanningToolbar({
                   },
                 }}
               >
-                Calendar View
+                Calendar
               </Button>
               <Button
                 size="small"
@@ -504,7 +524,7 @@ export default function RosterPlanningToolbar({
                   },
                 }}
               >
-                Daily View
+                Day by day
               </Button>
             </Stack>
 
@@ -561,11 +581,11 @@ export default function RosterPlanningToolbar({
                   onClick={handleViewAcknowledgements}
                   disabled={actionLoading}
                   sx={{
-                    borderColor: BRAND_COLORS.cyan,
-                    color: BRAND_COLORS.cyan,
+                    borderColor: '#B9DDE5',
+                    color: '#075B71',
                     fontWeight: 600,
                     borderRadius: '8px',
-                    '&:hover': { bgcolor: BRAND_COLORS.cyanLight },
+                    '&:hover': { bgcolor: '#EAF7FA' },
                   }}
                 >
                   Staff Status
