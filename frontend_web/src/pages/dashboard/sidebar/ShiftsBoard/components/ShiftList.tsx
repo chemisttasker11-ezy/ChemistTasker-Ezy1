@@ -21,7 +21,6 @@ import {
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
   Favorite as FavoriteIcon,
-  FilterList as FilterListIcon,
   Flight as FlightIcon,
   Hotel as HotelIcon,
   Layers as LayersIcon,
@@ -31,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import { Shift, ShiftCounterOfferPayload } from '@chemisttasker/shared-core';
+import DashboardContentState from '../../../../../components/dashboard/DashboardContentState';
 import { CounterOfferTrack, RatePreference, ShiftSlot, SlotFilterMode } from '../types';
 import { formatDateLong, formatDateShort, formatTime } from '../utils/date';
 import { getRateSummary, getSlotRate } from '../utils/rates';
@@ -155,22 +155,17 @@ const ShiftList: React.FC<ShiftListProps> = ({
   disableActionGuards,
 }) => (
   <Stack spacing={2}>
-    {loading && (
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, borderColor: 'grey.200' }}>
-        <Typography>Loading shifts...</Typography>
-      </Paper>
+    {loading && processedShifts.length === 0 && (
+      <DashboardContentState kind="loading" title="Loading available shifts" />
     )}
     {!loading && processedShifts.length === 0 && (
-      <Paper variant="outlined" sx={{ p: 4, borderRadius: 3, textAlign: 'center', borderColor: 'grey.200' }}>
-        <FilterListIcon sx={{ fontSize: 48, color: 'grey.300' }} />
-        <Typography variant="h6" sx={{ mt: 1 }}>No jobs found</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          We couldn't find any positions matching your criteria.
-        </Typography>
-        <Button variant="contained" sx={{ mt: 2 }} onClick={clearAllFilters}>
-          Reset filters
-        </Button>
-      </Paper>
+      <DashboardContentState
+        kind="empty"
+        title="No shifts match your search"
+        description="Try another location, role, date or rate to discover more opportunities."
+        actionLabel="Reset filters"
+        onAction={clearAllFilters}
+      />
     )}
 
     {processedShifts.map((shift) => {

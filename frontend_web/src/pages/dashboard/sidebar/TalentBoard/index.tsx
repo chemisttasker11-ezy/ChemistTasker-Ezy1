@@ -11,6 +11,7 @@ import { useTalentFilters } from "./hooks/useTalentFilters";
 import PitchDialog, { PitchFormState } from "./components/PitchDialog";
 import AvailabilitySidebar from "./components/AvailabilitySidebar";
 import TalentCardV2 from "./components/TalentCardV2";
+import DashboardContentState from "../../../../components/dashboard/DashboardContentState";
 import FiltersSidebar, { TalentFilterState } from "./components/FiltersSidebar";
 import PostShiftPage from "../PostShiftPage";
 import { Candidate } from "./types";
@@ -869,6 +870,50 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     }
   };
 
+  const renderCandidateList = () => {
+    if (pagedCandidates.length > 0) {
+      return pagedCandidates.map((candidate) => (
+        <TalentCardV2
+          key={candidate.id}
+          candidate={candidate}
+          onViewCalendar={handleViewCalendar}
+          onToggleLike={handleToggleLike}
+          onRequestBooking={handleBookTalent}
+          canViewAvailability={!publicMode}
+          canRequestBooking={canRequestBooking}
+        />
+      ));
+    }
+    if (loading) {
+      return <DashboardContentState kind="loading" title="Loading talent profiles" />;
+    }
+    if (error) {
+      return (
+        <DashboardContentState
+          kind="error"
+          title="Unable to load talent"
+          description={error}
+          actionLabel={publicMode ? undefined : "Try again"}
+          onAction={publicMode ? undefined : () => { void reload(); }}
+        />
+      );
+    }
+    const filtered = activeFilterCount > 0;
+    return (
+      <DashboardContentState
+        kind="empty"
+        title={filtered ? "No candidates match your filters" : "No published talent yet"}
+        description={
+          filtered
+            ? "Adjust your role, location, skills or availability filters."
+            : "Verified talent profiles will appear here once published."
+        }
+        actionLabel={filtered ? "Reset filters" : undefined}
+        onAction={filtered ? clearAllFilters : undefined}
+      />
+    );
+  };
+
   return (
     <Box sx={{ width: "100%", bgcolor: "background.default", color: "text.primary" }}>
       {selectedCalendarCandidate && (
@@ -888,11 +933,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             <Button onClick={() => navigate(`/dashboard/${isPharmacist ? "pharmacist" : "otherstaff"}/onboarding`)}>Open public profile</Button>
           </Paper>
         )}
-        {error && (
-          <Typography color="error" variant="body2" sx={{ mb: 2 }}>
-            {error}
-          </Typography>
-        )}
+        {error && pagedCandidates.length > 0 && <Typography role="alert" color="error" variant="body2" sx={{ mb: 2 }}>{error}</Typography>}
 
         <Stack
           direction={{ xs: "column", md: "row" }}
@@ -1012,39 +1053,14 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
               </Stack>
             )}
 
-            <Stack spacing={2} sx={{ pb: 3 }}>
-              {pagedCandidates.length > 0 ? (
-                pagedCandidates.map((candidate) => (
-                <TalentCardV2
-                  key={candidate.id}
-                  candidate={candidate}
-                  onViewCalendar={handleViewCalendar}
-                  onToggleLike={handleToggleLike}
-                  onRequestBooking={handleBookTalent}
-                  canViewAvailability={!publicMode}
-                  canRequestBooking={canRequestBooking}
-                />
-              ))
-              ) : (
-                !loading && (
-                  <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
-                    <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-                      No candidates found
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      We couldn't find any staff profiles matching your specific criteria.
-                    </Typography>
-                    <Button variant="outlined" onClick={clearAllFilters}>
-                      Reset Filters
-                    </Button>
-                  </Paper>
-                )
-              )}
+            <Stack spacing={2} sx={{ pb: 3 }} aria-live="polite">
+              {renderCandidateList()}
             </Stack>
-
-            <Stack alignItems="center" sx={{ mt: 2 }}>
-              <Pagination count={pageCount} page={page} onChange={(_, value) => setPage(value)} />
-            </Stack>
+            {pageCount > 1 && (
+              <Stack alignItems="center" sx={{ mt: 2 }}>
+                <Pagination count={pageCount} page={page} onChange={(_, value) => setPage(value)} />
+              </Stack>
+            )}
           </Box>
         </Stack>
       </Box>
@@ -1054,6 +1070,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           <IconButton
             color="primary"
             sx={{ width: 56, height: 56, bgcolor: "primary.main", color: "white", boxShadow: 3 }}
+            aria-label="Publish your availability"
             onClick={() => setPitchOpen(true)}
           >
             <AddIcon />
