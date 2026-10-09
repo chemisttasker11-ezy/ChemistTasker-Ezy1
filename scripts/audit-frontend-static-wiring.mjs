@@ -169,21 +169,19 @@ function requireRepoContains(relativePath, patterns) {
     if (!pattern.test(source)) failures.push(relativePath + ' lost shared visual system: ' + label);
   }
 }
-requireRepoContains('frontend_web/src/main.tsx', [
-  ['bundled Inter body face', /@fontsource\/inter\/400\.css/],
-  ['bundled Inter semibold', /@fontsource\/inter\/600\.css/],
-  ['bundled Inter bold 800', /@fontsource\/inter\/800\.css/],
-  ['bundled Inter black 900', /@fontsource\/inter\/900\.css/],
-  ['bundled Outfit display face', /@fontsource\/outfit\/600\.css/],
-  ['bundled Outfit 800', /@fontsource\/outfit\/800\.css/],
-  ['bundled Outfit 900', /@fontsource\/outfit\/900\.css/],
-]);
-requireRepoContains('frontend_web/landing_next/app/layout.tsx', [
-  ['matching Inter face', /@fontsource\/inter\/400\.css/],
-  ['matching Inter 800 and 900', /@fontsource\/inter\/800\.css[\s\S]*@fontsource\/inter\/900\.css/],
-  ['matching Outfit face', /@fontsource\/outfit\/600\.css/],
-  ['matching Outfit 800 and 900', /@fontsource\/outfit\/800\.css[\s\S]*@fontsource\/outfit\/900\.css/],
-]);
+// Both apps load exactly the faces main's Next site uses (owner decision 2026-10-09):
+// Inter 400/500/600 and Outfit 500/600. Heavier requested weights resolve to 600.
+const approvedFontFaces = ['inter/400', 'inter/500', 'inter/600', 'outfit/500', 'outfit/600'];
+for (const relativePath of ['frontend_web/src/main.tsx', 'frontend_web/landing_next/app/layout.tsx']) {
+  const source = readRepoFile(relativePath);
+  const loaded = [...source.matchAll(/@fontsource\/(inter|outfit)\/(\d00)\.css/g)].map((match) => match[1] + '/' + match[2]);
+  for (const face of approvedFontFaces) {
+    if (!loaded.includes(face)) failures.push(relativePath + ' lost shared visual system: bundled ' + face);
+  }
+  for (const face of loaded) {
+    if (!approvedFontFaces.includes(face)) failures.push(relativePath + ' loads unapproved font face ' + face);
+  }
+}
 requireRepoContains('frontend_web/src/layouts/AuthLayout.tsx', [
   ['legacy auth form uses shared Inter', /fontFamily: 'Inter, "Segoe UI", Arial, sans-serif'/],
   ['legacy auth headings use Outfit', /h4: \{ fontFamily: 'Outfit, Inter, sans-serif'/],
