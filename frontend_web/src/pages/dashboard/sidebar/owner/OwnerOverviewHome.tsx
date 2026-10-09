@@ -307,7 +307,9 @@ export default function OwnerOverviewHome({
             </Stack>
           </Box>
           <Stack
-            role="button"
+            component="button"
+            type="button"
+            aria-label="Open pill balance and activity"
             onClick={onOpenPills}
             direction="row"
             spacing={2}
@@ -320,6 +322,10 @@ export default function OwnerOverviewHome({
               p: { xs: 1.5, md: 2.5 },
               borderRadius: { xs: "16px", md: "24px" },
               cursor: "pointer",
+              color: "inherit",
+              font: "inherit",
+              textAlign: "left",
+              "&:focus-visible": { outline: "3px solid #fff", outlineOffset: 3 },
               bgcolor: alpha("#ffffff", 0.13),
               border: `1px solid ${alpha("#ffffff", 0.26)}`,
               boxShadow: `inset 0 1px 0 ${alpha("#ffffff", 0.18)}`,
