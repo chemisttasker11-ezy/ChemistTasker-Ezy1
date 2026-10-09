@@ -230,6 +230,7 @@ jobs:
           python -m unittest attendance_tests.test_pharmacy_pin_scope
           python -m unittest attendance_tests.test_worker_pin_setup
           python -m unittest attendance_tests.test_security_boundaries
+          python -m unittest attendance_tests.test_roster_worker_actions.RosterWorkerActionsTests.test_acknowledgement_action_available_only_on_published_week
       - name: Workforce and finance contracts
         run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
       - name: Isolated finance API contracts
