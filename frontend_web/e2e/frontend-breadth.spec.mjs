@@ -538,3 +538,18 @@ test('owner pharmacy selector lists all authorised locations and delegates Admin
   await menu.getByRole('menuitem', { name: /Gamma Managed Pharmacy/ }).click();
   await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/admin/103/overview');
 });
+
+
+test('owner sidebar collapses without losing access to navigation or widening the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview');
+  const sidebar = page.locator('aside[aria-label="Dashboard navigation"]');
+  await expect(sidebar).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  await expect(sidebar.getByRole('button', { name: 'Overview' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
+  await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Manage Pharmacies' })).toBeVisible();
+});
