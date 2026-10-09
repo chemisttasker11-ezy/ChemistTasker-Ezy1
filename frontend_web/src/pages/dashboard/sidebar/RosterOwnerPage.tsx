@@ -36,6 +36,7 @@ import { calendarViews, calendarMessages, getDateRangeForView, CalendarViewKey }
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
+import { rosterEventForeground } from '../../../utils/rosterEventAppearance';
 import { BRAND_COLORS, BRAND_FONTS } from '../../../constants/brandTheme';
 import RosterPlanningToolbar from '../../../components/roster/RosterPlanningToolbar';
 import RosterCoveragePanel from '../../../features/workforce/RosterCoveragePanel';
@@ -952,13 +953,13 @@ export default function RosterOwnerPage() {
     // NEW: Style for open shifts
     if (assignment.isOpenShift) {
       return { // Ensure this style is applied
-        style: { backgroundColor: ROSTER_COLORS.OPEN_SHIFT, borderRadius: '5px', opacity: 0.9, color: 'white', border: '1px dashed #fff', display: 'block' }
+        style: { backgroundColor: ROSTER_COLORS.OPEN_SHIFT, borderRadius: '5px', opacity: 1, color: rosterEventForeground(ROSTER_COLORS.OPEN_SHIFT), border: '1px dashed #637A66', display: 'block' }
       };
     }
     // NEW: Style for cover requests
     if (assignment.isCoverRequest) {
       return {
-        style: { backgroundColor: ROSTER_COLORS.SWAP_PENDING, borderRadius: '5px', opacity: 0.9, color: 'white', border: '0px', display: 'block' }
+        style: { backgroundColor: ROSTER_COLORS.SWAP_PENDING, borderRadius: '5px', opacity: 1, color: rosterEventForeground(ROSTER_COLORS.SWAP_PENDING), border: '0px', display: 'block' }
       };
     }
 
@@ -976,8 +977,8 @@ export default function RosterOwnerPage() {
     const style = {
         backgroundColor,
         borderRadius: '5px',
-        opacity: 0.8,
-        color: 'white',
+        opacity: 1,
+        color: rosterEventForeground(backgroundColor),
         border: '0px',
         display: 'block'
     };
