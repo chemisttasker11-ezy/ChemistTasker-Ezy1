@@ -113,3 +113,11 @@ Implement the relevant Figma React/web dashboard designs into the **existing** V
 2. Add Playwright state coverage for loading/empty/error/filtered and real-dialog paths using existing `frontend_web/e2e` fixtures. Do not assert screenshot parity until actual browser screenshots have been compared to the design.
 3. Work feature-by-feature through the `FIGMA_REACT_VITE_SCREEN_DECISIONS.md` ledger, marking **implemented, verified, and deferred** separately. Do not treat simply inventoried frames as delivered.
 4. Reconcile changed shared dashboards with PR #155 before final merge and rerun visual checks against rebased code.
+
+### 2026-10-09 — Session 4: unblocking browser execution
+- Confirmed direct local git clone fails with DNS resolution for github.com; GitHub connector read/write and GitHub-hosted runners work.
+- Confirmed PR #155 remains open and overlaps #156 in DashboardOverviewTemplate, OwnerOverviewHome, TalentBoard, workflow and theme. It is unsafe to claim zero conflict until the two heads are reconciled.
+- Confirmed GitHub Actions shared-core checks already execute Vite TypeScript and Vite build; prior typecheck error fixed in commit 45c39bf. Newer check results remain to be reviewed at milestone only.
+- Updated `.github/workflows/frontend_e2e_manual.yml` to **also run on pull_request changes in React src or e2e tests**, rather than solely workflow_dispatch, and to upload Playwright artefacts even when the suite passes. This uses GitHub's hosted Chromium for genuine functional acceptance without relying on local clone.
+- The existing browser breadth suite already exercises 45+ routes across Owner, Admin, Organisation, Pharmacist, Other Staff and Explorer, including form submission and attendance states. Screenshot-by-screen Figma comparison is still not provided by that suite and remains outstanding.
+- STATUS: browser gate enabled, but do not claim green or production readiness. Continue with in-page state tests, implementation mapping, head-to-head PR #155 integration, visual screenshot review and remaining UX work.
