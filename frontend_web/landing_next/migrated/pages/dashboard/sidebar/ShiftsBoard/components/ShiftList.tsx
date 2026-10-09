@@ -74,6 +74,7 @@ const openMapWindow = (address: string) => {
 
 type ShiftListProps = {
   loading?: boolean;
+  publicPresentation?: boolean;
   processedShifts: Shift[];
   clearAllFilters: () => void;
   hideCounterOffer?: boolean;
@@ -116,6 +117,7 @@ type ShiftListProps = {
 
 const ShiftList: React.FC<ShiftListProps> = ({
   loading,
+  publicPresentation = false,
   processedShifts,
   clearAllFilters,
   hideCounterOffer,
@@ -300,13 +302,16 @@ const ShiftList: React.FC<ShiftListProps> = ({
           key={shift.id}
           variant="outlined"
           sx={{
-            p: 2.5,
-            borderRadius: 3,
-            borderColor: urgent ? 'warning.main' : 'grey.200',
-            borderLeftWidth: urgent ? 4 : 1,
+            p: { xs: 2, md: publicPresentation ? 3 : 2.5 },
+            borderRadius: publicPresentation ? '16px' : 3,
+            borderColor: urgent ? '#B76A12' : publicPresentation ? '#DEE5EF' : 'grey.200',
+            borderLeftWidth: urgent && !publicPresentation ? 4 : 1,
             position: 'relative',
             bgcolor: 'background.paper',
-            boxShadow: urgent ? 4 : 2,
+            boxShadow: publicPresentation ? '0 5px 20px rgba(6,18,58,.035)' : urgent ? 4 : 2,
+            transition: publicPresentation ? 'border-color 180ms ease, box-shadow 180ms ease' : undefined,
+            '&:hover': publicPresentation ? { borderColor: '#B8A8DE', boxShadow: '0 12px 32px rgba(6,18,58,.085)' } : undefined,
+            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
           }}
         >
           {urgent && (
@@ -336,7 +341,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
               <Box sx={{ flex: 1 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                   <Box>
-                    <Typography variant="h6" sx={{ cursor: 'pointer' }} onClick={() => toggleExpandedCard(shift.id)}>
+                    <Typography variant="h6" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: publicPresentation ? 23 : undefined, cursor: publicPresentation ? 'default' : 'pointer' }} onClick={publicPresentation ? undefined : () => toggleExpandedCard(shift.id)}>
                       {getShiftPharmacyName(shift)}
                     </Typography>
                     {ratingSummary && ratingSummary.count > 0 && (
@@ -348,7 +353,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                       </Stack>
                     )}
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-                      <Chip icon={<WorkOutlineIcon />} label={getShiftRoleLabel(shift)} size="small" />
+                      <Chip icon={<WorkOutlineIcon />} label={getShiftRoleLabel(shift)} size="small" sx={publicPresentation ? { bgcolor: '#EFEAF9', color: '#5222B8', fontWeight: 800, borderRadius: '8px' } : undefined} />
                       {(shift.mustHave || []).map(skill => <Chip key={`required-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Required: ${skillLabel(skill)}`} size="small" />)}
                       {(shift.niceToHave || []).map(skill => <Chip key={`preferred-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Preferred: ${skillLabel(skill)}`} size="small" variant="outlined" />)}
                       {(shift.hasTravel || shift.hasAccommodation) && (
@@ -423,11 +428,11 @@ const ShiftList: React.FC<ShiftListProps> = ({
                 </Stack>
               </Box>
 
-              <Box sx={{ minWidth: 180, textAlign: { xs: 'left', md: 'right' } }}>
+              <Box sx={{ minWidth: { xs: 0, md: 180 }, textAlign: { xs: 'left', md: 'right' }, borderTop: { xs: publicPresentation ? '1px solid #E4E9F2' : 'none', md: 'none' }, pt: { xs: publicPresentation ? 2 : 0, md: 0 } }}>
                 <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <AttachMoneyIcon fontSize="small" color="success" />
-                    <Typography variant="h6">
+                    <Typography variant="h6" sx={publicPresentation ? { color: '#06123A', fontSize: 24, fontWeight: 800 } : undefined}>
                       {rateSummary.display}
                       <Typography component="span" variant="caption" color="text.secondary">
                         {rateSummary.unitLabel}
@@ -455,6 +460,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                   <Stack spacing={1} sx={{ mt: 1 }}>
                     <Button
                       variant="contained"
+                      sx={publicPresentation ? { minHeight: 44, bgcolor: '#5222B8', borderRadius: '10px', fontWeight: 800, '&:hover': { bgcolor: '#40168F' } } : undefined}
                       disabled={shiftActionsDisabled || (!shift.singleUserOnly && hasRejectedSlots) || (isOffersMode && (!hasPendingOffer || hasAwaitingPaymentSlots))}
                       onClick={() => handleApplyAll(shift)}
                     >
@@ -505,6 +511,11 @@ const ShiftList: React.FC<ShiftListProps> = ({
               </Box>
             </Stack>
 
+            {publicPresentation && (
+              <Button variant='text' onClick={() => toggleExpandedCard(shift.id)} endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />} aria-expanded={isExpanded} aria-label={(isExpanded ? 'Hide details for ' : 'Show details for ') + getShiftPharmacyName(shift)} sx={{ alignSelf: 'flex-start', px: 0, color: '#5222B8', textTransform: 'none', fontWeight: 800, minHeight: 44 }}>
+                {isExpanded ? 'Fewer details' : 'View shift details'}
+              </Button>
+            )}
             {isExpanded && (
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: 'grey.100' }}>
                 <Grid container spacing={2}>
