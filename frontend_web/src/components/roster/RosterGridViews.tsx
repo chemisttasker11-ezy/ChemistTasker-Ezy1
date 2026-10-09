@@ -49,10 +49,13 @@ import moment from 'moment';
 import apiClient from '../../utils/apiClient';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import { type RosterGridViewsProps, getRoleStyle } from './RosterGridViews.model';
+import RosterStackedDayView from './RosterStackedDayView';
 export type { StaffShiftItem, StaffMemberSummary, StackedShiftItem, DayStackedBucket, RosterGridViewsProps } from './RosterGridViews.model';
 
 export default function RosterGridViews({
+  viewMode,
   staffViewData,
+  stackedViewData,
   weekStart,
   periodId,
   pharmacyId,
@@ -511,7 +514,7 @@ export default function RosterGridViews({
 
       {/* A day-by-day manager planner replaces the wide weekly matrix on small screens.
           Mutations continue through the same validated draft-only handlers as desktop. */}
-      <Box component="section" aria-label="Mobile weekly roster" sx={{ display: { xs: 'block', md: 'none' }, mt: 1.5 }}>
+      <Box component="section" aria-label="Mobile weekly roster" sx={{ display: viewMode === 'STAFF' ? { xs: 'block', lg: 'none' } : 'none', mt: 1.5 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography component="h3" sx={{ color: '#06123A', fontSize: 18, fontWeight: 800 }}>Daily schedule</Typography>
@@ -593,6 +596,18 @@ export default function RosterGridViews({
         </Stack>
       </Box>
 
+      {viewMode === 'STACKED' && (
+        <RosterStackedDayView
+          weekStart={weekStart}
+          days={stackedViewData}
+          isPublished={isPublished}
+          pharmacyId={pharmacyId ?? null}
+          canEditSlot={canEditSlot}
+          onAdd={(date) => openQuickAdd(date)}
+          onEdit={handleOpenMenu}
+        />
+      )}
+
       {/* 2. Horizontal 7-Day Matrix Table (Tanda / Roubler / RosterElf Standard) */}
       <TableContainer
         component={Paper}
@@ -603,7 +618,7 @@ export default function RosterGridViews({
           boxShadow: BRAND_SHADOWS.card,
           maxWidth: '100%',
           overflowX: 'auto',
-          display: { xs: 'none', md: 'block' },
+          display: viewMode === 'STAFF' ? { xs: 'none', lg: 'block' } : 'none',
           bgcolor: BRAND_COLORS.white,
         }}
       >
