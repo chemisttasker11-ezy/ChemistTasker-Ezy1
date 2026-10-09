@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent,
+import { Alert, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent,
   DialogTitle, Menu, MenuItem, Paper, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { CustomerEditor, ItemEditor, ExpenseEditor, PaymentEditor } from './Edit
 import InvoiceComposer from './InvoiceComposer';
 import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
 import InvoiceStatsCards from '../dashboard/sidebar/Invoices/InvoiceStatsCards';
+import DashboardContentState from '../../components/dashboard/DashboardContentState';
 import type { InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStats';
 
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
@@ -17,7 +18,7 @@ const workerTools = ['invoices', 'customers', 'items', 'expenses', 'bas'] as con
 const ownerTools = ['received'] as const;
 const labels: Record<string, string> = { invoices: 'Invoices', received: 'Received invoices', customers: 'Customers & stores', items: 'Saved items', expenses: 'Expenses & receipts', bas: 'GST / BAS workspace' };
 function Empty({ title, detail }: { title: string; detail: string }) {
-  return <Box sx={{ py: 6, textAlign: 'center' }}><Typography variant="h6">{title}</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>{detail}</Typography></Box>;
+  return <DashboardContentState kind="empty" title={title} description={detail} compact />;
 }
 
 export default function FinanceWorkspace({ receivedMode = false }: { receivedMode?: boolean }) {
@@ -134,7 +135,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
       </Box>
       {error && <Alert severity="error" onClose={() => setError('')} role="alert">{error}</Alert>}
       {notice && <Alert severity="success" onClose={() => setNotice('')} role="status">{notice}</Alert>}
-      <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', borderColor: 'divider', bgcolor: 'background.paper' }}>
         <Tabs value={tool} variant="scrollable" scrollButtons="auto" onChange={(_, value: string) => changeTool(value)} aria-label="Finance tools">
           {availableTools.map(value => <Tab key={value} value={value} label={labels[value]} id={`finance-tab-${value}`} aria-controls={`finance-panel-${value}`} />)}
         </Tabs>
@@ -147,7 +148,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               {[['all', 'All invoices'], ['saved', 'Saved'], ['sent', 'Sent / approved'], ['revision', 'Revision requested'], ['overdue', 'Overdue'], ['paid', 'Paid']].map(([key, label]) => <Tab key={key} value={key} label={label} />)}
             </Tabs>
           </>}
-          {loading ? <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress aria-label="Loading finance records" /></Box> : <>
+          {loading ? <DashboardContentState kind="loading" title="Loading finance records" compact /> : <>
             {['invoices', 'customers', 'items', 'expenses'].includes(tool) && <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
               <TextField size="small" label="Search" placeholder={tool === 'invoices' ? 'Invoice number, customer or reference' : 'Search records'} value={search} onChange={event => setSearch(event.target.value)} sx={{ flexGrow: 1, width: 'auto', minWidth: 180 }} />
               {tool === 'customers' && <Button variant="outlined" onClick={() => setEditor({ kind: 'customer' })}>Add customer</Button>}
@@ -189,6 +190,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
                   </TableRow>;
                 })}</TableBody>
               </Table></TableContainer>
+              {receivedInvoices.length > 0 && !visibleReceived.length && <DashboardContentState kind="empty" title="No matching received invoices" description="Try another search term." actionLabel="Clear search" onAction={() => setSearch('')} compact />}
               {!receivedInvoices.length && <Empty title="No received invoices yet" detail="Internal invoices will appear here after the contractor sends them to the pharmacy." />}
             </>}
             {tool === 'invoices' && !invoices.length && <Empty title="Start with your first external invoice" detail="Save a customer and reusable items, then draft an invoice. Nothing is emailed until you confirm sending." />}
