@@ -343,7 +343,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
               <Box sx={{ flex: 1 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                   <Box>
-                    <Typography component={publicPresentation ? 'h3' : 'div'} variant="h6" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: publicPresentation ? { xs: 21, md: 23 } : undefined, lineHeight: 1.25, cursor: publicPresentation ? 'default' : 'pointer' }} onClick={publicPresentation ? undefined : () => toggleExpandedCard(shift.id)}>
+                    <Typography component={publicPresentation ? 'h3' : 'h6'} variant="h6" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: publicPresentation ? { xs: 21, md: 23 } : undefined, lineHeight: 1.25, cursor: publicPresentation ? 'default' : 'pointer' }} onClick={publicPresentation ? undefined : () => toggleExpandedCard(shift.id)}>
                       {getShiftPharmacyName(shift)}
                     </Typography>
                     {ratingSummary && ratingSummary.count > 0 && (
@@ -419,6 +419,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                       <IconButton
                         size="small"
                         onClick={() => openMapWindow(mapAddress)}
+                        aria-label={`Show map for ${getShiftCity(shift)}`}
                         sx={{ ml: -0.5 }}
                       >
                         <PlaceIcon fontSize="small" color="action" />
@@ -528,7 +529,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
             </Stack>
 
             {publicPresentation && (
-              <Button variant='text' onClick={() => toggleExpandedCard(shift.id)} endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />} aria-expanded={isExpanded} aria-label={(isExpanded ? 'Hide details for ' : 'Show details for ') + getShiftPharmacyName(shift)} sx={{ alignSelf: 'flex-start', px: 0, color: '#5222B8', textTransform: 'none', fontWeight: 800, minHeight: 44 }}>
+              <Button variant='text' onClick={() => toggleExpandedCard(shift.id)} endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />} aria-expanded={isExpanded} aria-controls={`shift-detail-${shift.id}`} aria-label={(isExpanded ? 'Hide details for ' : 'Show details for ') + getShiftPharmacyName(shift)} sx={{ alignSelf: 'flex-start', px: 0, color: '#5222B8', textTransform: 'none', fontWeight: 800, minHeight: 44 }}>
                 {isExpanded ? 'Hide details' : 'View details and dates'}
               </Button>
             )}
@@ -729,7 +730,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           <Typography variant="caption" color="text.secondary">Must have</Typography>
                           <Stack direction="row" spacing={0.5} flexWrap="wrap">
                             {shift.mustHave.map((item, idx) => (
-                              <Chip key={idx} label={item} size="small" />
+                              <Chip key={idx} label={skillLabel(item)} size="small" />
                             ))}
                           </Stack>
                         </Stack>
@@ -739,7 +740,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           <Typography variant="caption" color="text.secondary">Nice to have</Typography>
                           <Stack direction="row" spacing={0.5} flexWrap="wrap">
                             {shift.niceToHave.map((item, idx) => (
-                              <Chip key={idx} label={item} size="small" variant="outlined" />
+                              <Chip key={idx} label={skillLabel(item)} size="small" variant="outlined" />
                             ))}
                           </Stack>
                         </Stack>
