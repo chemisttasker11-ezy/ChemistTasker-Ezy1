@@ -39,6 +39,7 @@ type UseFilterSortParams = {
   filters?: FilterConfig;
   onFiltersChange?: (filters: FilterConfig) => void;
   useServerFiltering?: boolean;
+  preserveServerOrder?: boolean;
   activeTab: 'browse' | 'saved';
   savedShiftIds: Set<number>;
   savedFeatureEnabled: boolean;
@@ -51,6 +52,7 @@ export const useFilterSort = ({
   filters,
   onFiltersChange,
   useServerFiltering,
+  preserveServerOrder = false,
   activeTab,
   savedShiftIds,
   savedFeatureEnabled,
@@ -289,7 +291,7 @@ export const useFilterSort = ({
           return Number.isFinite(maxRate) && maxRate >= filterConfig.minRate;
         });
       }
-      return applySort(serverResult);
+      return preserveServerOrder ? serverResult : applySort(serverResult);
     }
 
     let result = [...shifts];
@@ -378,6 +380,7 @@ export const useFilterSort = ({
     sortConfig,
     pharmacistRatePref,
     useServerFiltering,
+    preserveServerOrder,
     savedFeatureEnabled,
     normalizedSelectedRoles,
   ]);

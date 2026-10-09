@@ -51,6 +51,7 @@ export type FilterConfig = {
 
 export type ShiftsBoardProps = {
   title: string;
+  publicPresentation?: boolean;
   shifts: Shift[];
   loading?: boolean;
   onApplyAll: (shift: Shift) => Promise<void> | void;

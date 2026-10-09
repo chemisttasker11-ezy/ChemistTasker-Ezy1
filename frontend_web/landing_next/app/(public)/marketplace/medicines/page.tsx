@@ -2,7 +2,7 @@ import type {Metadata} from 'next';
 import Link from 'next/link';
 import {ArrowRight, Building2, ClipboardCheck, LockKeyhole, ShieldCheck} from 'lucide-react';
 
-export const metadata:Metadata={title:'Private ethical exchange | ChemistTasker',description:'Learn how eligible Australian pharmacies access ChemistTasker\'s permission-gated ethical stock exchange.',alternates:{canonical:'/marketplace/medicines'}};
+export const metadata:Metadata={title:'Private ethical exchange | ChemistTasker',description:'Learn how eligible Australian pharmacies access ChemistTasker\'s permission-gated ethical stock exchange.',alternates:{canonical:'/marketplace/medicines'},robots:{index:false,follow:false}};
 
 export default function MedicinesEntryPage(){return <div className="marketplace-page ethical-entry">
  <section className="ethical-entry-hero"><div className="container"><p className="marketplace-eyebrow">PRIVATE ETHICAL EXCHANGE</p><LockKeyhole size={34}/><h1>Protected stock. Accountable exchange.</h1><p>Medicine inventory is available only to admitted pharmacies and authorised people acting within a verified pharmacy context.</p><div className="marketplace-actions"><Link className="button primary" href="/marketplace/ethical/access">Check secure access <ArrowRight size={17}/></Link><Link className="marketplace-text-link" href="/marketplace">Browse public goods</Link></div></div></section>
