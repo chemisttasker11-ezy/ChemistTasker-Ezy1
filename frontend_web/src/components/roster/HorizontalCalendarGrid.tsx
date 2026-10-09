@@ -1045,6 +1045,16 @@ export default function HorizontalCalendarGrid({
                       >
                         <Box
                           className="roster-shift-card"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${item.workerName}, ${item.role || 'shift'}, ${item.startTimeStr} to ${item.endTimeStr}. Manage shift`}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onSelectEvent(item.event);
+                            }
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             onSelectEvent(item.event);
@@ -1070,6 +1080,12 @@ export default function HorizontalCalendarGrid({
                               boxShadow: '0 6px 16px rgba(6, 33, 74, 0.12)',
                               zIndex: 10,
                             },
+                            '&:focus-visible': {
+                              outline: '3px solid #008DDB',
+                              outlineOffset: 2,
+                              zIndex: 20,
+                            },
+                            '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover': { transform: 'none' } },
                           }}
                         >
                           {/* Left role accent bar */}
@@ -1119,8 +1135,8 @@ export default function HorizontalCalendarGrid({
                                     label={item.role.substring(0, 3)}
                                     size="small"
                                     sx={{
-                                      height: 16,
-                                      fontSize: 9,
+                                      height: 21,
+                                      fontSize: 11,
                                       fontWeight: 700,
                                       bgcolor: 'white',
                                       color: cardTextColor,
@@ -1140,8 +1156,11 @@ export default function HorizontalCalendarGrid({
                                       e.stopPropagation();
                                       onDuplicateShift(item.event);
                                     }}
+                                    aria-label={'Duplicate shift for ' + item.workerName + ', ' + item.startTimeStr}
                                     sx={{
-                                      p: 0.25,
+                                      p: 0.5,
+                                      minWidth: 28,
+                                      minHeight: 28,
                                       ml: 0.5,
                                       color: BRAND_COLORS.purple,
                                       bgcolor: 'white',
