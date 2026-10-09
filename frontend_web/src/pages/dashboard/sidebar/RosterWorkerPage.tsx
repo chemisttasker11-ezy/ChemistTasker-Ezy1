@@ -29,6 +29,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { calendarViews, calendarMessages, getDateRangeForView, CalendarViewKey } from './calendarViews';
 import { useAuth } from '../../../contexts/AuthContext'; // Using the corrected path
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
+import { rosterEventForeground } from '../../../utils/rosterEventAppearance';
 import {
   fetchRosterWorkerPharmaciesService,
   fetchRosterWorkerAssignments,
@@ -692,8 +693,8 @@ const handleSubmitLeaveRequest = async () => {
     const style = {
         backgroundColor,
         borderRadius: '5px',
-        opacity: assignment.isOpenShift ? 0.9 : (isMyShift ? 0.8 : 0.5),
-        color: 'white', // Ensure text is white for better contrast on colored backgrounds
+        opacity: 1,
+        color: rosterEventForeground(backgroundColor),
         border: borderStyle,
         display: 'block',
         cursor: (isMyShift || assignment.isOpenShift) ? 'pointer' : 'not-allowed', // Allow clicking open shifts
@@ -894,7 +895,7 @@ const handleSubmitLeaveRequest = async () => {
                 <Box sx={{ px: 0.5, py: 0.3 }}>
                   <Typography
                     variant="caption"
-                    sx={{ fontWeight: 600, color: "white", lineHeight: 1 }}
+                    sx={{ fontWeight: 750, color: 'inherit', lineHeight: 1.2 }}
                   >
                     {event.title}
                   </Typography>
@@ -903,8 +904,8 @@ const handleSubmitLeaveRequest = async () => {
                       variant="caption"
                       sx={{
                         display: "block",
-                        color: "#fff",
-                        fontWeight: 500,
+                        color: 'inherit',
+                        fontWeight: 650,
                         fontSize: "0.7rem",
                         mt: 0.3,
                       }}
@@ -917,8 +918,8 @@ const handleSubmitLeaveRequest = async () => {
                       variant="caption"
                       sx={{
                         display: "block",
-                        color: "#fff",
-                        fontWeight: 500,
+                        color: 'inherit',
+                        fontWeight: 650,
                         fontSize: "0.7rem",
                         mt: 0.3,
                       }}
