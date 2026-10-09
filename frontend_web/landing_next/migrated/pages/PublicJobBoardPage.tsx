@@ -408,7 +408,7 @@ export default function PublicJobBoardPage() {
           </Alert>
         )}
 
-        <Box sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <Box sx={{ minWidth: 0, width: '100%' }}>
           <ShiftsBoard
             title="Public Job Board"
             publicPresentation
