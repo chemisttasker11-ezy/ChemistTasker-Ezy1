@@ -71,7 +71,7 @@ export default function RosterManagerOverview({
     }}>
       <Box sx={{ mb: 1.75 }}>
         <Typography component="h2" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontSize: 20, fontWeight: 700 }}>
-          This week at a glance
+          Selected week at a glance
         </Typography>
         <Typography sx={{ color: '#445474', fontSize: 13.5, mt: 0.25 }}>
           {moment(calendarDate).startOf('isoWeek').format('D MMM')} – {moment(calendarDate).endOf('isoWeek').format('D MMM YYYY')}
