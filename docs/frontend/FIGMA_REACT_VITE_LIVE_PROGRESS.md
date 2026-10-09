@@ -46,10 +46,10 @@ Implement the relevant Figma React/web dashboard designs into the **existing** V
 | Phase | Status | Evidence and notes |
 | --- | --- | --- |
 | 0. Access, Figma inspection, current-main audit | DONE | Main SHA, file layout, node IDs and PR #155 overlap verified |
-| 1. Branch + persistent handover + draft PR | IN PROGRESS | Branch created; create this file and draft PR |
-| 2. Extract genuinely duplicated overview presentation into shared typed React component(s) | PENDING | Preserve owner and multi-persona callbacks/routes; use accessible button semantics |
-| 3. Correct responsive quick-action composition from Figma | PENDING | Prevent text overlap, retain mobile/touch/keyboard behaviour |
-| 4. Add focused repeatable regression/architecture checks | PENDING | Validate shared adoption, semantics, no synthetic routes, current module exports |
+| 1. Branch + persistent handover + draft PR | DONE | PR #156 draft open, ledger committed |
+| 2. Extract genuinely duplicated overview presentation into shared typed React component(s) | DONE — implementation | Shared DashboardOverviewPrimitives.tsx; adopted in owner and multi-persona overview. Awaiting typecheck/browser evidence |
+| 3. Correct responsive quick-action composition from Figma | DONE — implementation | Responsive 1/2/3-column grids, flexible text, keyboard focus, touch semantics and reduced motion; browser visual verification pending |
+| 4. Add focused repeatable regression/architecture checks | IN PROGRESS | Added frontend_web/scripts/audit-dashboard-overview-primitives.mjs; not yet executed in repository runtime |
 | 5. Remaining Vite React page families | PENDING | Inventory and execute by feature family, not blanket regeneration |
 | 6. Visual review with actual render screenshots | PENDING | Figma vs browser at desktop/tablet/mobile, real data and state variants |
 | 7. Tests/CI, reconcile PR #155, final production verdict | PENDING | Don't imply 100% readiness before evidence |
@@ -70,3 +70,13 @@ Implement the relevant Figma React/web dashboard designs into the **existing** V
 - Detected significant overlap with open PR #155; plan intentionally limits changes to reusable React presentation and avoids overwriting PR #155's shell/route changes.
 - Created branch `feat/figma-react-vite-design-system` from current main.
 - Up next: commit initial handover, open draft PR, implement shared owner/multi-persona action cards with responsive layout and keyboard semantics, then update this document.
+
+### 2026-10-09 — Session 1, implementation checkpoint
+- Draft PR **#156** created: https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/156
+- Added `frontend_web/src/components/dashboard/DashboardOverviewPrimitives.tsx` — centralises presentation-only tone palette, responsive quick-action grid, upcoming shifts, recent activity and metrics; typed callback/data contracts, accessible `ButtonBase`, focus-visible styling, reduced-motion support, and non-overlapping card text.
+- Refactored `DashboardOverviewTemplate.tsx` (455 → 300 lines) and `owner/OwnerOverviewHome.tsx` (631 → 402 lines) to use shared React primitives, preserving their established data sourcing and navigation callback wiring. Their Figma alignment deliberately corrects text overlap rather than replicating broken fixed geometry.
+- Added `frontend_web/scripts/audit-dashboard-overview-primitives.mjs` to reject duplicated presentation patterns and missing callback/keyboard contracts.
+- No backend, Next public, Expo, navigation or API files changed.
+- **Tests:** not run. Local git clone failed due to DNS resolution; do not mistake code inspection for typecheck, Vite build or browser validation. The first follow-up with local execution access MUST run `node scripts/audit-dashboard-overview-primitives.mjs`, `npx tsc --noEmit -p tsconfig.app.json`, Vite build, then targeted browser visual/functional acceptance.
+- PR #155 overlaps owner/template and will require reconciliation before eventual merge.
+- **Next:** validate exact PR head and fix compile/runtime issues; then inventory and implement additional Vite React page families incrementally. Compare screenshot to Figma with responsive states and multiple personas. Keep PR draft until gates and visual review are complete.
