@@ -218,7 +218,16 @@ export default function DashboardSideNav({
 
     return (
       <Box key={item.path} sx={{ minWidth: 0 }}>
-        <Stack direction="row" alignItems="center" sx={{ position: "relative", gap: 0.25, minWidth: 0 }}>
+        <Stack direction="row" alignItems="center" sx={{
+          position: "relative", gap: 0.25, minWidth: 0, borderRadius: "11px",
+          bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "transparent",
+          "&::before": {
+            content: '""', display: sectionActive ? "block" : "none",
+            position: "absolute", top: 11, bottom: 11, left: 0, width: 3,
+            borderRadius: "0 4px 4px 0", bgcolor: "var(--ct-sidebar-accent)",
+            pointerEvents: "none", zIndex: 1,
+          },
+        }}>
           <Tooltip title={collapsed ? item.label : ""} placement="right" arrow disableInteractive>
             <Button
               onClick={(event) => {
@@ -246,22 +255,11 @@ export default function DashboardSideNav({
                 textTransform: "none",
                 borderRadius: "11px",
                 color: sectionActive ? "var(--ct-sidebar-accent)" : "var(--ct-text-primary)",
-                bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "transparent",
+                bgcolor: "transparent",
                 fontSize: 14,
                 fontWeight: sectionActive ? 800 : 650,
                 letterSpacing: "-.01em",
                 lineHeight: 1.35,
-                "&::before": {
-                  content: '""',
-                  display: sectionActive ? "block" : "none",
-                  position: "absolute",
-                  top: 11,
-                  bottom: 11,
-                  left: 0,
-                  width: 3,
-                  borderRadius: "0 4px 4px 0",
-                  bgcolor: "var(--ct-sidebar-accent)",
-                },
                 "&:hover": {
                   bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "var(--ct-hover-bg)",
                 },
@@ -423,8 +421,7 @@ export default function DashboardSideNav({
         flexDirection: "column",
         width: collapsed ? RAIL_WIDTH : EXPANDED_WIDTH,
         flex: collapsed ? "0 0 " + RAIL_WIDTH + "px" : "0 0 " + EXPANDED_WIDTH + "px",
-        minWidth: collapsed ? RAIL_WIDTH : EXPANDED_WIDTH,
-        maxWidth: collapsed ? RAIL_WIDTH : EXPANDED_WIDTH,
+        minWidth: 0,
         transition: reduceMotion ? "none" : "width 170ms ease, flex-basis 170ms ease",
         alignSelf: "stretch",
         bgcolor: "var(--ct-surface-bg)",
