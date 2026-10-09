@@ -143,6 +143,7 @@ function MegaMenu({
   const nav = useDashboardNavigation();
   const navigate = useNavigate();
   const location = useLocation();
+  const isDark = useTheme().palette.mode === "dark";
 
   const groups = useMemo(() => {
     const result: Array<{ title: string; items: Array<{ label: string; icon?: ReactNode; path: string; child?: boolean }> }> = [];
@@ -190,6 +191,9 @@ function MegaMenu({
       slotProps={{
         paper: {
           sx: {
+            // Portals do not inherit CSS variables from the dashboard shell.
+            "--ct-dashboard-accent": isDark ? "#C8B5FF" : "#4A16B8",
+            "--ct-dashboard-soft": isDark ? "rgba(130,102,232,.24)" : "#EFE7FF",
             mt: { xs: 0.5, md: 1 },
             width: { xs: "calc(100vw - 16px)", md: "min(1460px, calc(100vw - 24px))" },
             maxWidth: "none",
@@ -218,7 +222,7 @@ function MegaMenu({
       >
         {groups.map((group) => (
           <Box key={group.title} sx={{ border: "1px solid var(--ct-border-color)", bgcolor: "var(--ct-page-bg)", borderRadius: { xs: 2.5, md: 3 }, p: { xs: 1, md: 1.5 } }}>
-            <Typography sx={{ px: 1, pb: 1, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ct-text-secondary)", textTransform: "uppercase" }}>
+            <Typography sx={{ px: 1, pb: 1, fontSize: 12, fontWeight: 700, letterSpacing: "0.07em", color: "var(--ct-text-secondary)", textTransform: "uppercase" }}>
               {group.title}
             </Typography>
             <Stack direction="row" flexWrap="wrap" gap={1}>
@@ -239,16 +243,15 @@ function MegaMenu({
                       py: 1,
                       textTransform: "none",
                       fontSize: { xs: 12.5, md: 13 },
-                      fontWeight: 900,
-                      lineHeight: 1.2,
+                      fontWeight: 700,
+                      lineHeight: 1.35,
                       color: active ? "var(--ct-dashboard-accent)" : item.child ? "var(--ct-text-secondary)" : "var(--ct-text-primary)",
                       bgcolor: active ? "var(--ct-dashboard-soft)" : item.child ? "var(--ct-hover-bg)" : "var(--ct-surface-bg)",
-                      border: `1px solid ${active ? "#C4B5FD" : "transparent"}`,
+                      border: `1px solid ${active ? (isDark ? "#7D69BD" : "#C4B5FD") : "transparent"}`,
                       boxShadow: item.child ? "none" : "0 4px 14px rgba(6,18,58,0.05)",
                       "&:hover": {
                         bgcolor: active ? "var(--ct-dashboard-soft)" : "var(--ct-surface-bg)",
                         borderColor: "var(--ct-border-color)",
-                        transform: "translateY(-1px)",
                       },
                       "& .MuiButton-startIcon": { color: active ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)", mr: 0.75 },
                     }}
@@ -263,7 +266,7 @@ function MegaMenu({
       </Box>
       <Divider />
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2.5, py: 1.5 }}>
-        <Button size="small" onClick={onClose} sx={{ textTransform: "none", fontWeight: 900, color: DNA.muted }}>
+        <Button size="small" onClick={onClose} sx={{ minHeight: 44, textTransform: "none", fontWeight: 700, color: "var(--ct-text-secondary)" }}>
           Collapse menu
         </Button>
       </Stack>
