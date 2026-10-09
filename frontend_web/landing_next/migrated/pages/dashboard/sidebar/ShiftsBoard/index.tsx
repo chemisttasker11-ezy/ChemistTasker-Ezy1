@@ -661,9 +661,31 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
       )}
 
       <Box sx={{ display: 'flex', gap: publicPresentation ? 2.5 : 3 }}>
-        {!isMobile && !hideFiltersAndSort && !publicPresentation && (
-          <Paper variant="outlined" sx={{ width: publicPresentation ? 286 : 320, flexShrink: 0, borderRadius: publicPresentation ? '14px' : 3, borderColor: publicPresentation ? '#DEE5EF' : 'grey.200', boxShadow: 'none', alignSelf: 'flex-start', position: publicPresentation ? 'sticky' : 'static', top: publicPresentation ? 104 : undefined, maxHeight: publicPresentation ? 'calc(100dvh - 124px)' : undefined, overflowY: publicPresentation ? 'auto' : 'visible' }}>
-            {publicPresentation && <Typography component='h3' sx={{ fontSize: 16, fontWeight: 800, pt: 2, px: 2.5, color: '#06123A' }}>Refine results</Typography>}
+        {!isMobile && !hideFiltersAndSort && (
+          <Paper
+            component="aside"
+            aria-label="Shift filters"
+            variant="outlined"
+            sx={{
+              width: 320,
+              flex: '0 0 320px',
+              minWidth: 0,
+              borderRadius: publicPresentation ? '14px' : 3,
+              borderColor: publicPresentation ? '#DEE5EF' : 'grey.200',
+              boxShadow: 'none',
+              alignSelf: 'flex-start',
+              // Natural height: scrolling the page reveals all filters without a nested scrollbar.
+              position: 'relative',
+              maxHeight: 'none',
+              overflow: 'visible',
+            }}
+          >
+            {publicPresentation && (
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.25, pt: 2, pb: 0.25, gap: 1 }}>
+                <Typography component="h3" sx={{ fontSize: 16, fontWeight: 850, color: '#06123A' }}>Refine results</Typography>
+                {activeFilterCount > 0 && <Button type="button" onClick={clearAllFilters} size="small" sx={{ minHeight: 36, px: 0.5, fontSize: 12.5, fontWeight: 800, color: '#5222B8', whiteSpace: 'nowrap' }}>Clear all</Button>}
+              </Stack>
+            )}
             {sidebarContent}
           </Paper>
         )}
