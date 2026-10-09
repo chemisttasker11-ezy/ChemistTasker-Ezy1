@@ -685,19 +685,23 @@ export default function DashboardTopShell({
             minWidth: 0,
             flex: 1,
             display: "grid",
+            // Phones and small tablets: icons on the first row, menu + pharmacy selector on a full-width second
+            // row, so the selector never collapses to nothing beside the actions.
             gridTemplateColumns: {
-              xs: "minmax(0, 1fr) auto",
+              xs: "minmax(0, 1fr)",
               md: "minmax(0, 1fr) auto",
               lg: "minmax(210px, 300px) minmax(0, 1fr) minmax(0, auto)",
               xl: "minmax(280px, 360px) minmax(0, 1fr) minmax(0, auto)",
             },
             gridTemplateAreas: {
-              xs: '"scope actions"',
+              xs: '"actions" "scope"',
               md: '"scope actions"',
               lg: '"scope title actions"',
             },
             alignItems: "center",
             columnGap: { xs: 0.75, md: 1.25, xl: 2 },
+            rowGap: { xs: 0.75, md: 0 },
+            py: { xs: 0.75, md: 0 },
             px: { xs: 0.75, md: 1.5, xl: 2.5 },
             minHeight: { xs: 72, md: 85 },
           }}
@@ -889,7 +893,7 @@ export default function DashboardTopShell({
               minWidth: 0,
               justifySelf: "end",
               display: "flex",
-              width: { xs: "auto", md: 390, lg: 520, xl: 560 },
+              width: { xs: "auto", lg: 640, xl: 680 },
               maxWidth: "100%",
             }}
           >

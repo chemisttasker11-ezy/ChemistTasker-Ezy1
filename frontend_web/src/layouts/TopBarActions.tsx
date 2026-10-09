@@ -91,7 +91,8 @@ export default function TopBarActions({
   const location = useLocation();
   const dashboardNavigation = useDashboardNavigation();
   const { selectedPharmacyId } = useWorkspace();
-  const downSm = useMediaQuery(theme.breakpoints.down("sm"));
+  // Below lg the header cannot fit a readable field next to the actions, so search opens in a dialog.
+  const compactSearch = useMediaQuery(theme.breakpoints.down("lg"));
   const [query, setQuery] = React.useState("");
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
@@ -366,7 +367,8 @@ export default function TopBarActions({
 
   const searchFieldSx = React.useMemo(
     () => ({
-      width: { xs: "100%", sm: 280 },
+      width: { xs: "100%", lg: 260 },
+      flexShrink: 0,
       "& .MuiOutlinedInput-root": {
         borderRadius: theme.shape.borderRadius,
         backgroundColor: alpha(theme.palette.common.white, 0.04),
@@ -402,11 +404,11 @@ export default function TopBarActions({
       if (!option) return;
       navigate(option.path);
       setQuery("");
-      if (downSm) {
+      if (compactSearch) {
         closeMobile();
       }
     },
-    [navigate, downSm, closeMobile]
+    [navigate, compactSearch, closeMobile]
   );
 
   const handleEnterSubmit = React.useCallback(
@@ -925,10 +927,10 @@ export default function TopBarActions({
         width: "100%",
       }}
     >
-      {!hideSearch && (downSm ? (
+      {!hideSearch && (compactSearch ? (
         <>
           <Tooltip title="Search">
-            <IconButton color="inherit" size="small" aria-label="open search" onClick={() => setMobileOpen(true)}>
+            <IconButton color="inherit" size="small" aria-label="open search" onClick={() => setMobileOpen(true)} sx={iconSx}>
               <SearchIcon fontSize="small" />
             </IconButton>
           </Tooltip>
