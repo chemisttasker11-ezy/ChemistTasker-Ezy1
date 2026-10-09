@@ -1,0 +1,72 @@
+# ChemistTasker React / Vite — Figma Implementation & Frontend Architecture Progress
+
+> **Live handover.** Read this file FIRST when resuming. Update it at each implementation milestone, before ending a work session, and after resolving any blocker. Do not mark a phase complete until evidence is recorded.
+
+## Mission and guardrails
+
+Implement the relevant Figma React/web dashboard designs into the **existing** Vite React frontend under `frontend_web/src/`, without rebuilding it, introducing a second design system, or changing application business authority. Modernise the user experience, eliminate genuine presentation duplication, and retain the established data, navigation, authentication, persona, pharmacy selection, permissions, API, theme, and error/loading behaviours.
+
+- Authoritative codebase: `chemisttasker11-ezy/ChemistTasker-Ezy1`
+- Base: `main` at `a4fb05bd5caa3a68a639544729c419eea868015a` (verified 2026-10-09)
+- Working branch: `feat/figma-react-vite-design-system`
+- Figma: `https://www.figma.com/design/t32C9hNvsDdQ4wzUKVJx9O`
+- Scope: `12 — Web · Authenticated` plus other Vite React web screen families and the shared `01 — Components` / `00 — Foundations` references. **Not** Next.js public landing or Expo in this PR.
+- PR #155 (`feat/ui01-public-landing-refresh`) is concurrently changing the Vite dashboard shell, owner/role first-look screens and public Next; avoid parallel rewrites of its navigation/business logic. Before eventual merge, reconcile exact-head changes and rebase safely.
+- Figma is authoritative for visual direction *where it does not contradict* current product behaviour, current responsive accessibility rules, or the established Next public visual baseline.
+- Preserve current fonts by default; any typography switch requires an explicit documented decision.
+- Preserve active backend APIs and route contracts. No backend changes or migrations.
+- Never paste generated absolute-position Figma markup or temporary Figma asset URLs into app code.
+- CI: run targeted local/static checks when feasible; launch the PR checks but **do not repeatedly monitor pending workflow jobs**. Revisit results at a milestone or future session; record exact results.
+- **Do not merge** until implementation, functional tests, visual comparisons, and integration with PR #155 are verified.
+
+## Figma discovery — completed
+
+- Live Figma read confirmed 18 organised pages: foundations, component library, public web, authenticated web, auth/onboarding, management, finance, workflow, responsive public web, Expo personas.
+- Figma handoff reports 455 source-aligned screens + 77 **proposed**, not implemented, Expo gaps. Do not infer code routes from proposed frames.
+- Shared component library has 18 Figma COMPONENTs (buttons, auth metric/card, roster shift, form input, status chip, navigation row, table row, dialog, mobile card etc.).
+- Public Shifts & Talent section has 54 nested frames but no Auto Layout or component instances; direct JSX output is highly absolute-positioned. Owner overview is the same class of static mockup.
+- Owner reference screen: node `15:3049` under `12 — Web · Authenticated`; public Find Shifts `15:1789`, Find Talent `15:1865`, mobile public `15:27387` and `15:27419` for reference only.
+- Owner Figma screenshot reveals overlapping action labels/descriptions. Resolve this at implementation rather than copying the defect. Its intended composition is left navigation, slim top header, gradient welcome banner, 3-by-2 quick actions, upcoming shifts and recent activity, 4-metric strip.
+- Figma Code Connect is unavailable under the connected Figma plan/seat, but ordinary context and screenshots work.
+- Fonts observed in Figma: Inter, Outfit and DM Sans. Current Vite dashboards already use DM Sans in screen-level typography, while current MUI theme uses Inter; avoid an uncontrolled global font change.
+- No static image/asset should be inserted unless its corresponding design slot, source and local file are verified.
+
+## Baseline repository audit — completed
+
+- Main stack: React 19, React Router 7, MUI 7, Emotion, Vite, `@chemisttasker/shared-core`.
+- Current active MUI theme: `frontend_web/src/theme/sleekTheme.tsx`; older `theme/theme.ts` is not assumed authoritative.
+- Existing shared dashboard layout `frontend_web/src/components/dashboard/DashboardOverviewTemplate.tsx` serves multiple personas.
+- Owner overview `frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewHome.tsx` reproduces significant duplicated card/metric/activity visual composition from the shared template; opportunity for safe, presentation-only consolidation.
+- `frontend_web/src/layouts/DashboardTopShell.tsx` owns persona/pharmacy and top-bar interactions and is currently also part of PR #155 scope: **do not replace**.
+- Main already has large, domain-specific screens and working state. Preserve their state and API calls.
+- Environment limitation: direct `git clone` is unavailable in this session because shell DNS cannot reach github.com; GitHub connector reads/writes work. Do not claim a local Vite build has passed unless an actual build run provides evidence.
+
+## Delivery milestones
+
+| Phase | Status | Evidence and notes |
+| --- | --- | --- |
+| 0. Access, Figma inspection, current-main audit | DONE | Main SHA, file layout, node IDs and PR #155 overlap verified |
+| 1. Branch + persistent handover + draft PR | IN PROGRESS | Branch created; create this file and draft PR |
+| 2. Extract genuinely duplicated overview presentation into shared typed React component(s) | PENDING | Preserve owner and multi-persona callbacks/routes; use accessible button semantics |
+| 3. Correct responsive quick-action composition from Figma | PENDING | Prevent text overlap, retain mobile/touch/keyboard behaviour |
+| 4. Add focused repeatable regression/architecture checks | PENDING | Validate shared adoption, semantics, no synthetic routes, current module exports |
+| 5. Remaining Vite React page families | PENDING | Inventory and execute by feature family, not blanket regeneration |
+| 6. Visual review with actual render screenshots | PENDING | Figma vs browser at desktop/tablet/mobile, real data and state variants |
+| 7. Tests/CI, reconcile PR #155, final production verdict | PENDING | Don't imply 100% readiness before evidence |
+
+## Resume checklist
+
+1. Read this file and the latest PR commits. Record the latest branch head.
+2. Check if PR #155 landed or changed; keep business wiring authoritative.
+3. Continue with the earliest PENDING/IN PROGRESS milestone, commit scope-limited work, and update this file.
+4. For each page, document Figma node, actual route/source, differences, accessibility, responsive/interaction states, tests, and any blockers.
+5. Do not silently mark tests passed. Do not merge automatically.
+
+## Session journal
+
+### 2026-10-09 — Session 1, initial checkpoint
+- Verified real Figma live access; inspected primary React web owner dashboard.
+- Verified main `a4fb05bd5caa3a68a639544729c419eea868015a`; GitHub push permission available.
+- Detected significant overlap with open PR #155; plan intentionally limits changes to reusable React presentation and avoids overwriting PR #155's shell/route changes.
+- Created branch `feat/figma-react-vite-design-system` from current main.
+- Up next: commit initial handover, open draft PR, implement shared owner/multi-persona action cards with responsive layout and keyboard semantics, then update this document.
