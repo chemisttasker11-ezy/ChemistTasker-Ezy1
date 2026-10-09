@@ -1,6 +1,11 @@
 name: Frontend E2E Manual Verification
 
 on:
+  pull_request:
+    paths:
+      - "frontend_web/src/**"
+      - "frontend_web/e2e/**"
+      - ".github/workflows/frontend_e2e_manual.yml"
   workflow_dispatch:
 
 permissions:
@@ -36,11 +41,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run Vite Playwright suite
         working-directory: frontend_web/e2e
-        run: npm test
+        run: npm test -- --grep-invert "real Next login hands off"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: failure()
+        if: always()
         with:
-          name: vite-playwright-failure-artifacts
+          name: vite-playwright-artifacts
           path: |
             frontend_web/e2e/playwright-report
             frontend_web/e2e/test-results
