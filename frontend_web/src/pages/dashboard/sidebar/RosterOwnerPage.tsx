@@ -22,9 +22,10 @@ import {
   OutlinedInput,
   Snackbar,
   IconButton,
+  Divider,
 } from '@mui/material';
 
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, AddRounded as AddRoundedIcon, AccessTimeRounded as AccessTimeRoundedIcon, SettingsOutlined as SettingsOutlinedIcon, FactCheckOutlined as FactCheckOutlinedIcon } from '@mui/icons-material';
 import RosterOwnerDialogs from './RosterOwnerDialogs';
 
 // Calendar Imports
@@ -38,6 +39,7 @@ import { ROSTER_COLORS } from '../../../constants/rosterColors';
 import { BRAND_COLORS, BRAND_FONTS } from '../../../constants/brandTheme';
 import RosterPlanningToolbar from '../../../components/roster/RosterPlanningToolbar';
 import RosterCoveragePanel from '../../../features/workforce/RosterCoveragePanel';
+import RosterManagerOverview from '../../../components/roster/RosterManagerOverview';
 import HorizontalCalendarGrid from '../../../components/roster/HorizontalCalendarGrid';
 import {
   PharmacySummary,
@@ -978,29 +980,34 @@ export default function RosterOwnerPage() {
   // --- Render Method ---
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography
-        variant="h4"
-        gutterBottom
-        sx={{
-          fontSize: { xs: 26, md: 32 },
-          fontWeight: 700,
-          fontFamily: BRAND_FONTS.heading,
-          color: BRAND_COLORS.navy,
-          letterSpacing: '-0.02em',
-        }}
-      >
-        Internal Roster
-      </Typography>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} sx={{ mb: 2.5 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, fontFamily: BRAND_FONTS.heading, color: '#06123A', lineHeight: 1.18, letterSpacing: '-0.025em' }}>
+            Workforce roster
+          </Typography>
+          <Typography sx={{ fontSize: { xs: 14, md: 15 }, color: '#445474', mt: 0.6, lineHeight: 1.5 }}>
+            Plan the week, resolve staffing requests and publish shifts when ready.
+          </Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={!selectedPharmacyId}
+          onClick={() => handleSelectSlot({ start: moment(calendarDate).hour(9).minute(0).second(0).toDate(), end: moment(calendarDate).hour(17).minute(0).second(0).toDate() })}
+          sx={{ minHeight: 46, bgcolor: '#5222B8', borderRadius: '10px', fontWeight: 800, textTransform: 'none', px: 2.5, flexShrink: 0, '&:hover': { bgcolor: '#40168F' } }}>
+          Add shift
+        </Button>
+      </Stack>
 
       <Tabs
+        aria-label="Pharmacy roster locations"
         value={selectedPharmacyId ?? false}
         onChange={handleTabChange}
         sx={{
-          mb: { xs: 2, md: 3 },
+          mb: { xs: 2, md: 2.5 },
+          borderBottom: '1px solid #E3E9F2',
           maxWidth: '100%',
           '& .MuiTabs-scroller': { overflowX: 'auto !important' },
           '& .MuiTab-root': {
-            minWidth: { xs: 170, md: 220 },
+            minHeight: 48,
+            minWidth: { xs: 154, md: 195 },
             maxWidth: { xs: 220, md: 320 },
             px: { xs: 1.5, md: 2 },
             fontFamily: BRAND_FONTS.body,
@@ -1027,9 +1034,11 @@ export default function RosterOwnerPage() {
         ))}
       </Tabs>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" sx={{ mb: 2.5 }}>
         <Button
           variant="outlined"
+          startIcon={<AccessTimeRoundedIcon />}
+          sx={{ minHeight: 44, borderColor: '#D8E1EF', color: '#344563', textTransform: 'none', fontWeight: 750 }}
           disabled={!selectedPharmacyId}
           onClick={() => navigate(`/dashboard/workforce/timesheets?pharmacy_id=${selectedPharmacyId ?? ''}`)}
         >
@@ -1038,6 +1047,8 @@ export default function RosterOwnerPage() {
         <Button
           variant="outlined"
           disabled={!selectedPharmacyId}
+          startIcon={<SettingsOutlinedIcon />}
+          sx={{ minHeight: 44, borderColor: '#D8E1EF', color: '#344563', textTransform: 'none', fontWeight: 750 }}
           onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${selectedPharmacyId ?? ''}`)}
         >
           Workforce settings
@@ -1045,11 +1056,23 @@ export default function RosterOwnerPage() {
         <Button
           variant="text"
           disabled={!selectedPharmacyId}
+          startIcon={<FactCheckOutlinedIcon />}
+          sx={{ minHeight: 44, color: '#5222B8', textTransform: 'none', fontWeight: 750 }}
           onClick={() => navigate(`/dashboard/attendance/reviews?pharmacy_id=${selectedPharmacyId ?? ''}`)}
         >
           Attendance review
         </Button>
       </Stack>
+
+      <RosterManagerOverview
+        calendarDate={calendarDate}
+        assignments={assignments}
+        openShifts={openShifts}
+        workerRequests={workerRequests}
+        loading={isAssignmentsLoading}
+        onReviewLeave={(assignment) => handleSelectEvent({ resource: assignment })}
+        onReviewCover={(request) => handleSelectEvent({ resource: { isCoverRequest: true, originalRequest: request } })}
+      />
 
       {/* Roster V2 Weekly Planning, Draft/Publish, Validation & Templates Toolbar */}
       <RosterPlanningToolbar
