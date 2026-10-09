@@ -69,6 +69,27 @@ class RecaptchaPrivacyTests(TestCase):
         self.assertIn("error_type=RequestException", logged)
 
 
+class RegistrationDuplicateEmailTests(TestCase):
+    def test_duplicate_email_explains_existing_account_and_next_actions(self):
+        User.objects.create_user(email="already@example.test", password="ExistingPassword123!", role="OWNER")
+        with mock.patch("users.api_auth.verify_recaptcha", return_value=True):
+            response, _ = post(APIClient(), "register/", {
+                "email": "ALREADY@example.test",
+                "password": "DifferentPassword123!",
+                "confirm_password": "DifferentPassword123!",
+                "role": "OWNER",
+                "accepted_terms": True,
+                "captcha_token": "test-token",
+            })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.data)
+        message = response.data["email"][0]
+        self.assertIn("already exists", message)
+        self.assertIn("log in", message)
+        self.assertIn("reset your password", message)
+        self.assertEqual(User.objects.filter(email__iexact="already@example.test").count(), 1)
+
+
 class EmailOtpTests(TestCase):
     def otp_user(self, code="123456", created_at=None, **extra):
         return make_user("PHARMACIST", is_otp_verified=False, otp_code=make_password(code),
