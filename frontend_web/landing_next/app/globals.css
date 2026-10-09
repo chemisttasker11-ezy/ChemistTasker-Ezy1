@@ -103,7 +103,7 @@
 .persona-board[data-accent="other-staff"]::after{background:radial-gradient(circle,#d600c815 0,transparent 66%)}
 .persona-kicker{font-size:9px!important;font-weight:800;letter-spacing:1.5px;color:var(--navy)!important;margin-bottom:13px!important}
 .persona-board[data-accent="pharmacist"] .persona-kicker{color:var(--purple)!important}
-.persona-board[data-accent="explorer"] .persona-kicker{color:#009eaf!important}
+.persona-board[data-accent="explorer"] .persona-kicker{color:#006b82!important}
 .persona-board[data-accent="other-staff"] .persona-kicker{color:#bb1cae!important}
 .persona-copy,.persona-demo{animation:personaReveal .5s ease both}
 .persona-demo{animation-delay:.05s}
@@ -116,8 +116,8 @@
 .persona-board[data-accent="other-staff"] .persona-mark{background:#fde9fa;color:#b521a5}
 .persona-demo .workspace-welcome{background:linear-gradient(120deg,#04142e,#06214a 62%,#0d3f78)}
 .persona-board[data-accent="pharmacist"] .workspace-welcome{background:linear-gradient(120deg,#281457,#5222b8 63%,#6f49d9)}
-.persona-board[data-accent="explorer"] .workspace-welcome{background:linear-gradient(120deg,#073d5b,#007b96 58%,#00bdd2)}
-.persona-board[data-accent="other-staff"] .workspace-welcome{background:linear-gradient(120deg,#401454,#8e2cc3 55%,#d600c8)}
+.persona-board[data-accent="explorer"] .workspace-welcome{background:linear-gradient(120deg,#073d5b,#007b96 58%,#006b82)}
+.persona-board[data-accent="other-staff"] .workspace-welcome{background:linear-gradient(120deg,#401454,#8e2cc3 55%,#a40095)}
 .persona-steps>div{padding:12px 11px}
 .workspace-index{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#edf2f8;color:var(--navy);font-size:8px;font-weight:800;letter-spacing:.4px}
 .persona-board[data-accent="pharmacist"] .workspace-index{background:#f5f1fc;color:var(--purple)}
