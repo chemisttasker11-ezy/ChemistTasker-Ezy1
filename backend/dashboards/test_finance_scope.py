@@ -1,3 +1,4 @@
+from datetime import date, time, timedelta
 from decimal import Decimal
 
 from django.test import TestCase
@@ -5,6 +6,7 @@ from django.test import TestCase
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from invoicing.models import Invoice
 from organizations.models import Organization, PharmacyAdmin
+from shifts.models import Shift, ShiftSlot
 from users.models import OrganizationMembership
 
 
@@ -110,3 +112,25 @@ class DelegatedPharmacyDashboardFinanceScopeTests(TestCase):
         self.assertEqual(data["invoice_summary"]["total_count"], 0)
         self.assertEqual(data["invoice_summary"]["total_billed"], "$0.00")
         self.assertFalse(any(item.get("kind") == "invoice" for item in data["activity"]))
+
+
+class OwnerDashboardOperationalScopeTests(TestCase):
+    def test_workspace_calendar_includes_shifts_posted_by_another_user(self):
+        owner, pharmacy = make_owner_with_pharmacy("Shared roster reporting")
+        staff = make_user("PHARMACIST")
+        future = date.today() + timedelta(days=4)
+        for creator in (owner, staff):
+            shift = Shift.objects.create(
+                pharmacy=pharmacy,
+                created_by=creator,
+                role_needed="PHARMACIST",
+                employment_type="LOCUM",
+                visibility="PLATFORM",
+                rate_type="FLEXIBLE",
+            )
+            ShiftSlot.objects.create(shift=shift, date=future, start_time=time(9), end_time=time(17))
+        response = client_for(owner).get("/api/v1/dashboard/owner/", {"workspace": "internal", "pharmacy_id": pharmacy.id})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["upcoming_stats"]["week"], 1)
+        self.assertEqual(response.data["workspace_upcoming_stats"]["week"], 2)
+        self.assertEqual(response.data["shift_summary"]["upcoming_confirmed_count"], 0)
