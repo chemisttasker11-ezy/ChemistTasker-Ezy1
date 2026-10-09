@@ -41,9 +41,11 @@ type OwnerData = {
   shift_summary?: {
     open_count?: number;
     confirmed_count?: number;
+    upcoming_confirmed_count?: number;
     all_count?: number;
   };
   upcoming_stats?: { today?: number; week?: number; month?: number };
+  workspace_upcoming_stats?: { today?: number; week?: number; month?: number };
   invoice_summary?: {
     unpaid_count?: number;
     unpaid_total?: string;
@@ -139,7 +141,7 @@ export default function OwnerOverviewHome({
   );
   const scopeName = selectedPharmacy?.name || (workspace === "platform" ? "Public platform" : "All pharmacies");
   const shiftSummary = dashboardData?.shift_summary;
-  const upcoming = dashboardData?.upcoming_stats;
+  const upcoming = workspace === "internal" ? dashboardData?.workspace_upcoming_stats ?? dashboardData?.upcoming_stats : dashboardData?.upcoming_stats;
   const invoiceSummary = dashboardData?.invoice_summary;
   const upcomingShifts = Array.isArray(dashboardData?.shifts) ? dashboardData.shifts.slice(0, 5) : [];
   const activity = Array.isArray(dashboardData?.activity) ? dashboardData.activity.slice(0, 5) : [];
@@ -155,9 +157,9 @@ export default function OwnerOverviewHome({
       accent: "#5222B8",
     },
     {
-      label: "Confirmed shifts",
-      value: shiftSummary?.confirmed_count,
-      description: "View staffing commitments",
+      label: "Confirmed cover",
+      value: workspace === "internal" ? shiftSummary?.upcoming_confirmed_count : shiftSummary?.confirmed_count,
+      description: "Upcoming confirmed shifts",
       icon: <ShieldOutlinedIcon />,
       action: onOpenShifts,
       accent: "#036D82",
