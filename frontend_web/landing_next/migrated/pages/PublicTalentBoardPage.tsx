@@ -118,24 +118,24 @@ export default function PublicTalentBoardPage() {
 
   return (
     <AuthLayout title="Find Talent" maxWidth={false} noCard showTitle={false}>
-      <Box sx={{ py: { xs: 1.5, md: 2.5 } }}>
+      <Box sx={{ py: { xs: 1, md: 2.5 } }}>
         <Box
           sx={{
-            mb: 2,
-            p: { xs: 2, md: 2.5 },
-            border: '1px solid #E5ECF7',
-            borderRadius: 3,
-            bgcolor: '#fff',
-            boxShadow: '0 10px 28px rgba(6,18,58,.045)',
+            mb: 3,
+            p: { xs: 2, md: 3 },
+            border: '1px solid #E0E7F1',
+            borderRadius: '14px',
+            bgcolor: '#FFFFFF',
+            boxShadow: 'none',
           }}
         >
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
             <Box>
-              <Typography sx={{ fontWeight: 900, color: 'text.primary' }}>
-                {loading && !user ? 'Finding pharmacy talent…' : user ? 'Explore available pharmacy talent' : `${posts.length} public ${posts.length === 1 ? 'profile' : 'profiles'} available`}
+              <Typography sx={{ fontWeight: 850, fontSize: 17, color: '#06123A' }}>
+                Browse before you connect
               </Typography>
-              <Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}>
-                Find the right pharmacy professionals by role, location, skills and availability.
+              <Typography sx={{ mt: .4, color: '#445474', fontSize: 14, lineHeight: 1.55 }}>
+                Compare published roles, skills and locations. Sign in when you are ready to connect.
               </Typography>
             </Box>
             {!user && (
@@ -149,6 +149,7 @@ export default function PublicTalentBoardPage() {
         {error && !user && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => void load()}>Retry</Button>}>{error}</Alert>}
         <TalentBoard
           publicMode={!user}
+          publicPresentation
           externalPosts={user?undefined:posts}
           externalLoading={user?undefined:loading}
           externalError={user?undefined:error}
