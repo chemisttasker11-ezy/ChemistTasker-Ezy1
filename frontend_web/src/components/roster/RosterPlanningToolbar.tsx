@@ -46,7 +46,7 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import moment from 'moment';
 import apiClient from '../../utils/apiClient';
 import { rosterV2 } from '@chemisttasker/shared-core';
-import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
+import { BRAND_COLORS, BRAND_FONTS } from '../../constants/brandTheme';
 import RosterGridViews, { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
 import RosterSafePublishButton from '../../features/workforce/RosterSafePublishButton';
 
