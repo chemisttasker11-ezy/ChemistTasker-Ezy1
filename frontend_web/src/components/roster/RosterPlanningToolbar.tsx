@@ -412,7 +412,7 @@ export default function RosterPlanningToolbar({
                         fontWeight: 700,
                         letterSpacing: 0.5,
                         bgcolor: BRAND_COLORS.warningLight,
-                        color: BRAND_COLORS.warning,
+                        color: '#7B4800',
                         borderRadius: '8px',
                         fontSize: 11,
                       }}
@@ -561,11 +561,11 @@ export default function RosterPlanningToolbar({
                   onClick={handleViewAcknowledgements}
                   disabled={actionLoading}
                   sx={{
-                    borderColor: BRAND_COLORS.cyan,
-                    color: BRAND_COLORS.cyan,
+                    borderColor: '#B9DDE5',
+                    color: '#075B71',
                     fontWeight: 600,
                     borderRadius: '8px',
-                    '&:hover': { bgcolor: BRAND_COLORS.cyanLight },
+                    '&:hover': { bgcolor: '#EAF7FA' },
                   }}
                 >
                   Staff Status
