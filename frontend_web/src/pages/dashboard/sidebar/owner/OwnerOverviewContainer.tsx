@@ -151,11 +151,15 @@ export default function OwnerOverviewContainer() {
           ? "billing"
           : "overview";
   const activePharmacyId = view === "pharmacy" && rawPharmacyId ? rawPharmacyId : null;
-  const urlScopePharmacyId = Number(
+  // A missing id must stay missing: Number(null) is 0, which the API rejects with 403.
+  const rawUrlScopePharmacyId = Number(
     searchParams.get("pharmacy_id") ??
     searchParams.get("pharmacy") ??
-    searchParams.get("pharmacyId")
+    searchParams.get("pharmacyId") ??
+    NaN
   );
+  const urlScopePharmacyId =
+    Number.isInteger(rawUrlScopePharmacyId) && rawUrlScopePharmacyId > 0 ? rawUrlScopePharmacyId : NaN;
 
   const activePharmacy = useMemo(
     () => pharmacies.find((p) => p.id === activePharmacyId) || null,
