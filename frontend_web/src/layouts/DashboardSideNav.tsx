@@ -453,33 +453,21 @@ export default function DashboardSideNav({
           sx={{
             px: collapsed ? 0.75 : 2,
             py: 1.65,
-            minHeight: 76,
+            minHeight: 68,
             borderBottom: "1px solid var(--ct-border-color)",
             flexShrink: 0,
           }}
         >
           {!collapsed && (
-            <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{
-                color: "var(--ct-text-secondary)",
-                fontSize: 11.5,
-                fontWeight: 800,
-                letterSpacing: ".09em",
-                textTransform: "uppercase",
-                lineHeight: 1.5,
-              }}>
-                Your workspace
-              </Typography>
-              <Typography sx={{
-                color: "var(--ct-text-primary)",
-                fontFamily: "Outfit, Inter, sans-serif",
-                fontSize: 19,
-                fontWeight: 700,
-                lineHeight: 1.3,
-              }}>
-                Navigation
-              </Typography>
-            </Box>
+            <Typography sx={{
+              color: "var(--ct-text-primary)",
+              fontFamily: "Outfit, Inter, sans-serif",
+              fontSize: 18,
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}>
+              Navigation
+            </Typography>
           )}
           <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"} placement="right" arrow>
             <IconButton
