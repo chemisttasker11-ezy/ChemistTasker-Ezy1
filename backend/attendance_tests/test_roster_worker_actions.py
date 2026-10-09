@@ -494,8 +494,9 @@ class RosterWorkerActionsTests(unittest.TestCase):
         period = RosterPeriod.objects.create(
             pharmacy=self.pharmacy,
             week_start=self.monday,
-            status=RosterPeriod.Status.PUBLISHED,
+            status=RosterPeriod.Status.DRAFT,
         )
+        RosterPeriod.objects.filter(pk=period.id).update(status=RosterPeriod.Status.PUBLISHED)
         client = APIClient()
         client.force_authenticate(user=self.worker_a)
         query = {
