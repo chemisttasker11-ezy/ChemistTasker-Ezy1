@@ -132,3 +132,38 @@ test('public shift cards group qualifications instead of repeating Required on e
   assert.match(cards, /!publicPresentation && \(shift\.mustHave \|\| \[\]\)\.map/);
   assert.match(cards, /\{!publicPresentation && <Button\s+onClick=\{\(\) => toggleExpandedCard\(shift\.id\)\}/);
 });
+
+
+test('public shift filters occupy natural page height without a nested desktop scrollbar', () => {
+  const board = read('migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx');
+  const page = read('migrated/pages/PublicJobBoardPage.tsx');
+  assert.match(board, /!isMobile && !hideFiltersAndSort && \(/);
+  assert.match(board, /component="aside"/);
+  assert.match(board, /maxHeight: 'none'/);
+  assert.match(board, /overflow: 'visible'/);
+  assert.doesNotMatch(board, /calc\(100dvh - 124px\)/);
+  assert.doesNotMatch(page, /borderRadius: 3, overflow: 'hidden'/);
+});
+
+test('filter controls use legible icons, real checkbox states and responsive time labels', () => {
+  const filters = read('migrated/pages/dashboard/sidebar/ShiftsBoard/components/FiltersSidebar.tsx');
+  assert.match(filters, /aria-pressed=\{active\}/);
+  assert.match(filters, /flexDirection: 'column'/);
+  assert.match(filters, /minWidth: 0, minHeight: 68/);
+  assert.match(filters, /CommuteOutlined as CommuteIcon/);
+  assert.match(filters, /AccessTimeOutlined as AccessTimeIcon/);
+  assert.match(filters, /EventRepeat as EventRepeatIcon/);
+  assert.match(filters, /min=\{0\}/);
+  assert.match(filters, /aria-label="Minimum hourly rate"/);
+  assert.match(filters, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
+  assert.doesNotMatch(filters, /checkedIcon=\{<BoltIcon/);
+  assert.doesNotMatch(filters, /type="range"/);
+});
+
+test('job-card chip outlines do not clip the labels or icons', () => {
+  const cards = read('migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx');
+  assert.match(cards, /'& \.MuiChip-root': \{ maxWidth: '100%', minHeight: 28, height: 'auto'/);
+  assert.match(cards, /whiteSpace: 'normal', overflow: 'visible'/);
+  assert.match(cards, /overflowWrap: 'anywhere'/);
+  assert.match(cards, /CommuteOutlined as CommuteIcon/);
+});
