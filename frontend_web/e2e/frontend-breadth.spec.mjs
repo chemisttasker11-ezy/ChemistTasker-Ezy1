@@ -590,3 +590,24 @@ test('collapsed owner icon rail keeps all nested routes available through an acc
   await expect(sidebar.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
 });
+
+
+test('authenticated Owner pages render the public type families rather than system fallbacks', async ({ page }) => {
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
+
+  const heading = page.getByRole('heading', { name: 'Owner Dashboard' });
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveCSS('font-family', /Outfit/);
+  await expect(page.locator('body')).toHaveCSS('font-family', /Inter/);
+
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const loaded = Array.from(document.fonts).filter((face) => face.status === 'loaded');
+    return {
+      inter: loaded.some((face) => face.family.replaceAll('"', '') === 'Inter'),
+      outfit: loaded.some((face) => face.family.replaceAll('"', '') === 'Outfit'),
+    };
+  });
+  expect(fonts).toEqual({ inter: true, outfit: true });
+});
