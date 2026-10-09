@@ -167,3 +167,19 @@ test('job-card chip outlines do not clip the labels or icons', () => {
   assert.match(cards, /overflowWrap: 'anywhere'/);
   assert.match(cards, /CommuteOutlined as CommuteIcon/);
 });
+
+
+test('public talent filters use the same natural-height collapsible sidebar pattern as the shift board', () => {
+  const board = read('migrated/pages/dashboard/sidebar/TalentBoard/index.tsx');
+  const filters = read('migrated/pages/dashboard/sidebar/TalentBoard/components/FiltersSidebar.tsx');
+  assert.match(board, /component="aside"/);
+  assert.match(board, /aria-label="Talent filters"/);
+  assert.match(board, /maxHeight: "none"/);
+  assert.match(board, /overflow: "visible"/);
+  assert.doesNotMatch(board, /calc\(100dvh - 124px\)/);
+  assert.match(filters, /const \[isOpen, setIsOpen\] = useState\(true\)/);
+  assert.match(filters, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
+  assert.match(filters, /CommuteOutlined as CommuteIcon/);
+  assert.match(filters, /SchoolOutlined as SchoolIcon/);
+  assert.match(filters, /Students & interns seeking placements/);
+});
