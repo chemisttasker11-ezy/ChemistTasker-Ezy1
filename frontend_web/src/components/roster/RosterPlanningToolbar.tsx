@@ -451,8 +451,11 @@ export default function RosterPlanningToolbar({
             {/* Middle: View Mode Switcher (Calendar, Staff, Stacked) */}
             <Stack
               direction="row"
-              spacing={0.5}
+              flexWrap="wrap"
+              useFlexGap
+              gap={0.5}
               sx={{
+                width: { xs: "100%", lg: "auto" },
                 bgcolor: BRAND_COLORS.mist,
                 p: 0.5,
                 borderRadius: '10px',
@@ -477,7 +480,7 @@ export default function RosterPlanningToolbar({
                   },
                 }}
               >
-                Staff Matrix (Weekly)
+                Week by staff
               </Button>
               <Button
                 size="small"
@@ -497,7 +500,7 @@ export default function RosterPlanningToolbar({
                   },
                 }}
               >
-                Calendar View
+                Calendar
               </Button>
               <Button
                 size="small"
@@ -517,7 +520,7 @@ export default function RosterPlanningToolbar({
                   },
                 }}
               >
-                Daily View
+                Day by day
               </Button>
             </Stack>
 
