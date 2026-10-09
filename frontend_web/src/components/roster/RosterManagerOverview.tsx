@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Paper, Stack, Typography, useTheme } from '@mui/material';
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined';
 import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
@@ -30,6 +30,7 @@ export default function RosterManagerOverview({
   calendarDate, assignments, openShifts, workerRequests, loading,
   onReviewLeave, onReviewCover,
 }: Props) {
+  const isDark = useTheme().palette.mode === 'dark';
   const start = moment(calendarDate).startOf('isoWeek').format('YYYY-MM-DD');
   const end = moment(calendarDate).endOf('isoWeek').format('YYYY-MM-DD');
   const inWeek = (day?: string | null) => Boolean(day && day >= start && day <= end);
@@ -59,21 +60,21 @@ export default function RosterManagerOverview({
   }, [assignments, openShifts, workerRequests, start, end, onReviewLeave, onReviewCover]);
 
   const metrics = [
-    { label: 'Assigned shifts', value: summary.assigned, icon: <EventAvailableOutlinedIcon />, color: '#5222B8' },
-    { label: 'Open shift slots', value: summary.open, icon: <EventBusyOutlinedIcon />, color: '#9A5A08' },
-    { label: 'Requests to review', value: summary.requests.length, icon: <PendingActionsOutlinedIcon />, color: '#075B71' },
+    { label: 'Assigned shifts', value: summary.assigned, icon: <EventAvailableOutlinedIcon />, color: isDark ? '#C8B5FF' : '#5222B8' },
+    { label: 'Open shift slots', value: summary.open, icon: <EventBusyOutlinedIcon />, color: isDark ? '#F3B45C' : '#9A5A08' },
+    { label: 'Requests to review', value: summary.requests.length, icon: <PendingActionsOutlinedIcon />, color: isDark ? '#76D7E5' : '#075B71' },
   ];
 
   return (
     <Paper component="section" aria-label="Weekly roster snapshot" variant="outlined" sx={{
-      mb: 2, p: { xs: 2, md: 2.5 }, border: '1px solid #DCE4EF', bgcolor: '#FFFFFF',
+      mb: 2, p: { xs: 2, md: 2.5 }, border: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)',
       borderRadius: '14px', boxShadow: 'none',
     }}>
       <Box sx={{ mb: 1.75 }}>
-        <Typography component="h2" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontSize: 20, fontWeight: 700 }}>
+        <Typography component="h2" sx={{ color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em' }}>
           Selected week at a glance
         </Typography>
-        <Typography sx={{ color: '#445474', fontSize: 13.5, mt: 0.25 }}>
+        <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 13.5, mt: 0.25, lineHeight: 1.55 }}>
           {moment(calendarDate).startOf('isoWeek').format('D MMM')} – {moment(calendarDate).endOf('isoWeek').format('D MMM YYYY')}
           {' · '}Review requests before publishing changes.
         </Typography>
@@ -81,15 +82,15 @@ export default function RosterManagerOverview({
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, minmax(0,1fr))' }, gap: { xs: 1, md: 1.5 } }}>
         {metrics.map((metric) => (
-          <Box key={metric.label} sx={{ border: '1px solid #E3E9F2', borderRadius: 2, bgcolor: '#FAFBFE', p: { xs: 1.25, md: 2 }, minWidth: 0 }}>
+          <Box key={metric.label} sx={{ border: '1px solid var(--ct-border-color)', borderRadius: 2, bgcolor: 'var(--ct-elevated-bg)', p: { xs: 1.25, md: 2 }, minWidth: 0 }}>
             <Stack direction="row" spacing={0.75} alignItems="center">
               <Box sx={{ color: metric.color, display: 'flex', '& svg': { fontSize: { xs: 17, md: 20 } } }}>{metric.icon}</Box>
-              <Typography sx={{ color: '#445474', fontSize: { xs: 11.5, md: 13 }, fontWeight: 750, lineHeight: 1.3 }}>
+              <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: { xs: 12.5, md: 13 }, fontWeight: 700, lineHeight: 1.35 }}>
                 {metric.label}
               </Typography>
             </Stack>
             <Typography aria-label={metric.label + ': ' + (loading ? 'loading' : metric.value)} sx={{
-              color: '#06123A', fontSize: { xs: 26, md: 34 }, fontWeight: 800,
+              color: 'var(--ct-text-primary)', fontSize: { xs: 26, md: 34 }, fontWeight: 700,
               fontVariantNumeric: 'tabular-nums', mt: 0.6, lineHeight: 1.2,
             }}>
               {loading ? '—' : metric.value}
@@ -99,37 +100,37 @@ export default function RosterManagerOverview({
       </Box>
 
       {!loading && summary.requests.length > 0 && (
-        <Box sx={{ borderTop: '1px solid #E3E9F2', mt: 2.25, pt: 1.75 }}>
+        <Box sx={{ borderTop: '1px solid var(--ct-border-color)', mt: 2.25, pt: 1.75 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mb: 0.5 }}>
-            <Typography component="h3" sx={{ fontWeight: 800, color: '#06123A', fontSize: 15 }}>
+            <Typography component="h3" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 600, color: 'var(--ct-text-primary)', fontSize: 17 }}>
               Needs your decision
             </Typography>
-            <Typography sx={{ color: '#445474', fontSize: 12.5 }}>{summary.requests.length} pending</Typography>
+            <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>{summary.requests.length} pending</Typography>
           </Stack>
           {summary.requests.slice(0, 4).map((item) => (
             <Stack key={item.id} direction="row" alignItems="center" justifyContent="space-between" gap={1.5}
-              sx={{ py: 1, borderBottom: '1px solid #EEF1F6' }}>
+              sx={{ py: 1, borderBottom: '1px solid var(--ct-border-color)' }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ color: '#06123A', fontWeight: 750, fontSize: 14, overflowWrap: 'anywhere' }}>{item.title}</Typography>
-                <Typography sx={{ color: '#445474', fontSize: 12.5 }}>
+                <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 700, fontSize: 14, overflowWrap: 'anywhere' }}>{item.title}</Typography>
+                <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>
                   {item.detail} · {moment(item.date).format('ddd D MMM')}
                 </Typography>
               </Box>
               <Button onClick={item.onReview} size="small" endIcon={<ArrowForwardRoundedIcon />}
-                sx={{ minHeight: 44, flexShrink: 0, fontWeight: 800, textTransform: 'none', color: '#5222B8' }}>
+                sx={{ minHeight: 44, flexShrink: 0, fontWeight: 700, textTransform: 'none', color: isDark ? '#C8B5FF' : '#5222B8' }}>
                 Review
               </Button>
             </Stack>
           ))}
           {summary.requests.length > 4 && (
-            <Typography sx={{ fontSize: 12.5, color: '#445474', mt: 1 }}>
+            <Typography sx={{ fontSize: 12.5, color: 'var(--ct-text-secondary)', mt: 1 }}>
               More pending requests are available on the roster calendar.
             </Typography>
           )}
         </Box>
       )}
       {!loading && summary.assigned === 0 && summary.open === 0 && summary.requests.length === 0 && (
-        <Typography sx={{ mt: 1.5, fontSize: 13.5, color: '#445474' }}>
+        <Typography sx={{ mt: 1.5, fontSize: 13.5, color: 'var(--ct-text-secondary)' }}>
           Nothing scheduled in this week. Use the planner to add or copy shifts.
         </Typography>
       )}
