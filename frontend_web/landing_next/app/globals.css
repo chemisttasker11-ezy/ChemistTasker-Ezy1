@@ -79,7 +79,7 @@
 
 /* Shared public navigation across landing, boards and community. */
 .desktop-nav [aria-current="page"],.mobile-nav [aria-current="page"]{color:#5222B8;text-decoration:underline;text-underline-offset:6px}
-.ct-resources{position:relative;color:#06214A;font-size:14px}.ct-resources summary{cursor:pointer;white-space:nowrap}.ct-resources nav{position:absolute;right:0;top:calc(100% + 16px);min-width:180px;padding:12px;background:#fff;border:1px solid #E6EAF2;border-radius:14px;box-shadow:0 12px 32px #06214a18;display:grid;gap:14px;z-index:60}
+.ct-resources{position:relative;color:#06214A;font-size:14px}.ct-resources summary{cursor:pointer;white-space:nowrap;list-style:none}.ct-resources summary::-webkit-details-marker{display:none}.ct-resources nav{position:absolute;right:0;top:calc(100% + 16px);min-width:180px;padding:12px;background:#fff;border:1px solid #E6EAF2;border-radius:14px;box-shadow:0 12px 32px #06214a18;display:grid;gap:14px;z-index:60}
 @media(min-width:901px) and (max-width:1250px){.site-header .desktop-nav{display:none}.site-header .menu-toggle{display:flex}}
 
 
