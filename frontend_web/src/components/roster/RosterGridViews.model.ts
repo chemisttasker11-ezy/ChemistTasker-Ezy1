@@ -56,8 +56,8 @@ export interface RosterGridViewsProps {
 
 const ROLE_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   PHARMACIST: { bg: BRAND_COLORS.purpleLight, text: BRAND_COLORS.purple, border: BRAND_COLORS.purple },
-  INTERN: { bg: BRAND_COLORS.cyanLight, text: '#008ba3', border: BRAND_COLORS.cyan },
-  TECHNICIAN: { bg: BRAND_COLORS.blueLight, text: BRAND_COLORS.blue, border: BRAND_COLORS.blue },
+  INTERN: { bg: BRAND_COLORS.cyanLight, text: '#006B82', border: BRAND_COLORS.cyan },
+  TECHNICIAN: { bg: BRAND_COLORS.blueLight, text: '#1855B0', border: BRAND_COLORS.blue },
   ASSISTANT: { bg: '#FFFBEB', text: '#B45309', border: '#F59E0B' },
   DEFAULT: { bg: '#F1F5F9', text: '#475569', border: '#94A3B8' },
 };
