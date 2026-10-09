@@ -1,9 +1,10 @@
 import SkillIcon from '@/public/skill-icon';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "@/public/navigation";
-import { Box, Button, Chip, Drawer, IconButton, InputAdornment, Paper, Stack, Pagination, TextField, Typography, Dialog } from "@mui/material";
+import { Box, Button, Chip, Divider, Drawer, IconButton, InputAdornment, Paper, Stack, Pagination, TextField, Typography, Dialog } from "@mui/material";
 import {
   Add as AddIcon,
+  Close as CloseIcon,
   Tune as TuneIcon,
   Search as SearchIcon,
 } from "@mui/icons-material";
@@ -959,8 +960,14 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             onClose={() => setIsSidebarOpen(false)}
             sx={{ display: { lg: "none" } }}
           >
-            <Box sx={{ width: publicPresentation ? { xs: "min(100vw, 360px)", sm: 360 } : 320, maxWidth: "100vw", pb: 2 }}>
-              {publicPresentation && <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 1.5, borderBottom: "1px solid #E2E8F2" }}><Typography sx={{ fontWeight: 800, color: "#06123A", fontSize: 17 }}>Refine talent</Typography><Button onClick={() => setIsSidebarOpen(false)} sx={{ minHeight: 44, fontWeight: 800 }}>Show results</Button></Stack>}
+            <Box sx={{ width: publicPresentation ? { xs: "min(100vw, 360px)", sm: 360 } : 320, maxWidth: "100vw" }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>Filters</Typography>
+                <IconButton onClick={() => setIsSidebarOpen(false)} aria-label="Close talent filters">
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+              <Divider />
               <FiltersSidebar
                 filters={filters}
                 onChange={setFilters}
@@ -973,26 +980,45 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                 expandedRoleSkills={expandedRoleSkills}
                 onToggleRoleSkillExpand={toggleRoleSkillExpand}
               />
+              {publicPresentation && (
+                <Box sx={{ px: 2.5, py: 1.75, borderTop: "1px solid", borderColor: "divider" }}>
+                  <Button variant="contained" fullWidth onClick={() => setIsSidebarOpen(false)} sx={{ minHeight: 46, textTransform: "none", fontWeight: 800 }}>
+                    Show results
+                  </Button>
+                </Box>
+              )}
             </Box>
           </Drawer>
 
           <Paper
+            component="aside"
+            aria-label="Talent filters"
             variant="outlined"
             sx={{
-              width: publicPresentation ? 286 : 320,
-              flexShrink: 0,
+              width: 320,
+              flex: "0 0 320px",
+              minWidth: 0,
               display: { xs: "none", lg: "block" },
-              position: "sticky",
-              top: 104,
               borderRadius: publicPresentation ? "14px" : 3,
               bgcolor: "background.paper",
-              borderColor: publicPresentation ? "#E0E7F1" : "divider",
+              borderColor: publicPresentation ? "#DEE5EF" : "divider",
               boxShadow: "none",
-              maxHeight: "calc(100dvh - 124px)",
-              overflowY: "auto",
+              alignSelf: "flex-start",
+              position: "relative",
+              maxHeight: "none",
+              overflow: "visible",
             }}
           >
-            {publicPresentation && <Typography component="h3" sx={{ px: 2.5, pt: 2, color: "#06123A", fontSize: 16, fontWeight: 800 }}>Refine results</Typography>}
+            {publicPresentation && (
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.25, pt: 2, pb: 0.25, gap: 1 }}>
+                <Typography component="h3" sx={{ color: "#06123A", fontSize: 16, fontWeight: 800 }}>Refine results</Typography>
+                {activeFilterCount > 0 && (
+                  <Button type="button" onClick={clearAllFilters} size="small" sx={{ minHeight: 36, px: 0.5, fontSize: 12.5, fontWeight: 800, color: "#5222B8", whiteSpace: "nowrap" }}>
+                    Clear all
+                  </Button>
+                )}
+              </Stack>
+            )}
             <FiltersSidebar
               hideSearch={publicPresentation}
               filters={filters}
