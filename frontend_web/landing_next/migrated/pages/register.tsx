@@ -100,6 +100,8 @@ export default function Register() {
           ? responseData?.email?.[0]
           : (responseData as any)?.email;
       const emailMsgLower = typeof emailMsg === "string" ? emailMsg.toLowerCase() : "";
+      const genericDetail = typeof (responseData as any)?.non_field_errors?.[0] === "string" ? (responseData as any).non_field_errors[0] : "";
+      const genericLegacyDuplicate = genericDetail === "Registration could not be completed with the provided details.";
       const messageFromError = typeof err?.message === "string" ? err.message : "";
       const messageLower = messageFromError.toLowerCase();
 
@@ -107,6 +109,8 @@ export default function Register() {
         emailMsgLower.includes("unique") ||
         emailMsgLower.includes("already") ||
         emailMsgLower.includes("registered") ||
+        emailMsgLower.includes("account already exists") ||
+        genericLegacyDuplicate ||
         messageLower.includes("already") ||
         messageLower.includes("registered")
       ) {
@@ -145,17 +149,10 @@ export default function Register() {
           </Alert>
         )}
         {isDuplicateEmail && (
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Try{" "}
-            <Link component={RouterLink} to="/login" fontWeight="bold" color="#5222B8">
-              logging in
-            </Link>{" "}
-            or{" "}
-            <Link component={RouterLink} to="/password-reset" fontWeight="bold" color="#5222B8">
-              resetting your password
-            </Link>
-            .
-          </Typography>
+          <Box sx={{ display: "flex", gap: 1.25, flexWrap: "wrap", mb: 2 }}>
+            <Button component={RouterLink} to="/login" variant="contained" sx={{ bgcolor: "#5222B8", fontWeight: 800, minHeight: 44, textTransform: "none" }}>Log in</Button>
+            <Button component={RouterLink} to="/password-reset" variant="outlined" sx={{ color: "#5222B8", borderColor: "#5222B8", fontWeight: 800, minHeight: 44, textTransform: "none" }}>Reset password</Button>
+          </Box>
         )}
 
         <form onSubmit={handleRegister}>

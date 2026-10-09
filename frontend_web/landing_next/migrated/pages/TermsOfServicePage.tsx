@@ -1,33 +1,25 @@
 import { useEffect } from "react";
-import { Container, Paper, Typography, Box } from "@mui/material";
-import PublicLogoTopBar from "../components/PublicLogoTopBar";
+import { Box, Divider, Typography } from "@mui/material";
+import LegalDocumentShell from "../components/LegalDocumentShell";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
 export default function TermsOfServicePage() {
   useEffect(() => {
     const title = "Terms of Service | ChemistTasker";
-    const description =
-      "Read the ChemistTasker terms of service for using our pharmacy workforce platform.";
+    const description = "Read the ChemistTasker terms of service for using our pharmacy workforce platform.";
     const origin = window.location.origin;
     const url = `${origin}/terms-of-service`;
-    const image = `${origin}/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png`;
     setPageMeta(title, description);
     setCanonical(url);
-    setSocialMeta({ title, description, url, image, type: "website" });
+    setSocialMeta({ title, description, url, type: "website" });
   }, []);
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <Container maxWidth="md" sx={{ mt: 8, mb: 8 }}>
-        <Paper elevation={3} sx={{ p: { xs: 2, sm: 5 }, borderRadius: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
-          Terms of Service
-        </Typography>
-        <Typography variant="subtitle2" color="text.secondary" align="center" gutterBottom>
-          Effective Date: 15 June 2025
-        </Typography>
-        <Box sx={{ mt: 4 }}>
+    <LegalDocumentShell
+      title="Terms of Service"
+      effectiveDate="Effective Date: 15 June 2025"
+    >
+      <Box sx={{ mt: 4 }}>
           <Typography variant="h5" gutterBottom>1. Acceptance of Terms</Typography>
           <Typography paragraph>
             By registering an account or using ChemistTasker (“the Service”), you acknowledge that you have read, understood, and agree to be bound by these Terms of Service, our Privacy Policy, and all applicable Australian laws and regulations. If you do not agree to these terms, please do not register or use this platform.
@@ -93,13 +85,6 @@ export default function TermsOfServicePage() {
             For questions, concerns, or support regarding these Terms or your data privacy, please contact us at: <a href="mailto:info@chemisttasker.com">info@chemisttasker.com</a>
           </Typography>
         </Box>
-        <Box sx={{ mt: 6, textAlign: "center" }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            &copy; {new Date().getFullYear()} CHEMISTTASKER PTY LTD. All rights reserved.
-          </Typography>
-        </Box>
-        </Paper>
-      </Container>
-    </>
+    </LegalDocumentShell>
   );
 }

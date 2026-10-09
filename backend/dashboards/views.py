@@ -20,6 +20,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from organizations.access import pharmacies_user_admins
 from users.serializers import UserProfileSerializer
 from django.db.models import Q, Sum
+from billing.utils import user_can_manage_billing_for_pharmacy
 from django.utils import timezone
 from users.role_labels import other_staff_role_label
 from datetime import date
@@ -29,6 +30,7 @@ from urllib.parse import urlencode
 from users.org_roles import membership_visible_pharmacy_ids
 from shifts.access import _shift_roles_visible_to_user
 from shifts.escalation import COMMUNITY_LEVELS
+from shifts.announcements import find_availability_matched_shifts
 
 
 # Dashboards
@@ -174,12 +176,10 @@ def _worker_visible_pharmacy_shifts(user, pharmacy_ids):
     if not eligible_filter:
         return Shift.objects.none()
 
-    role = str(getattr(user, "role", "") or "").upper()
-    qs = Shift.objects.filter(eligible_filter)
-    if role == "PHARMACIST":
-        qs = qs.filter(role_needed="PHARMACIST")
-    elif role == "OTHER_STAFF":
-        qs = qs.exclude(role_needed="PHARMACIST")
+    qs = Shift.objects.filter(
+        eligible_filter,
+        role_needed__in=_shift_roles_visible_to_user(user),
+    )
     return qs.distinct()
 
 
@@ -189,6 +189,47 @@ def _dashboard_shift_box(shift):
         "id": shift.id,
         "pharmacy_name": shift.pharmacy.name if shift.pharmacy else "",
         "date": slot.date if slot else None,
+    }
+
+
+def _worker_related_shifts(user, shifts_qs, today, now):
+    """Future shifts this worker has actually acted on or committed to."""
+    return shifts_qs.filter(_future_shift_filter(today, now)).filter(
+        Q(slot_assignments__user=user)
+        | Q(interests__user=user)
+        | Q(counter_offers__user=user, counter_offers__status__in=["PENDING", "ACCEPTED"])
+        | Q(offers__user=user, offers__status__in=["PENDING", "ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"])
+        | Q(dedicated_user=user)
+    ).distinct()
+
+
+def _worker_shift_status(shift, user):
+    if shift.slot_assignments.filter(user=user).exists():
+        return "Confirmed"
+    if shift.offers.filter(user=user, status__in=["ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"]).exists():
+        return "Committed"
+    if shift.counter_offers.filter(user=user, status="ACCEPTED").exists():
+        return "Committed"
+    if shift.offers.filter(user=user, status="PENDING").exists() or shift.dedicated_user_id == user.id:
+        return "Offer"
+    if shift.counter_offers.filter(user=user, status="PENDING").exists():
+        return "Applied"
+    if shift.interests.filter(user=user).exists():
+        return "Interested"
+    return "In progress"
+
+
+def _dashboard_worker_shift_box(shift, user, *, recommended=False):
+    slot = shift.slots.order_by("date", "start_time").first()
+    return {
+        "id": shift.id,
+        "pharmacy_name": shift.pharmacy.name if shift.pharmacy else "",
+        "suburb": getattr(shift.pharmacy, "suburb", None) if shift.pharmacy else None,
+        "date": slot.date if slot else None,
+        "start_time": slot.start_time if slot else None,
+        "end_time": slot.end_time if slot else None,
+        "status": "Recommended" if recommended else _worker_shift_status(shift, user),
+        "reason": "Matches your availability and travel area" if recommended else None,
     }
 
 
@@ -207,6 +248,8 @@ def _dashboard_shift_action_url(shift, dashboard_role):
         return f"/dashboard/pharmacist/shifts/{shift.id}"
     if role == "otherstaff":
         return f"/dashboard/otherstaff/shifts/{shift.id}"
+    if role == "explorer":
+        return f"/dashboard/explorer/shifts/{shift.id}"
     return f"/dashboard/owner/shifts/{shift.id}"
 
 
@@ -499,9 +542,18 @@ class OrganizationDashboardView(APIView):
         now = timezone.now().time()
         future_shifts = shifts_qs.filter(_future_shift_filter(today, now)).distinct()
         confirmed_shifts = _user_confirmed_platform_shifts(request.user, today, now) if workspace == "platform" else shifts_qs.filter(slot_assignments__isnull=False).distinct()
-        invoices_qs = Invoice.objects.filter(user=request.user, pharmacy__isnull=True) if workspace == "platform" else Invoice.objects.filter(pharmacy__organization=org)
-        if workspace != "platform" and requested_pharmacy_id is not None:
-            invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
+        if workspace == "platform":
+            invoices_qs = Invoice.objects.filter(user=request.user, pharmacy__isnull=True)
+        elif membership.role == "ORG_ADMIN":
+            # Subscription/billing authority is intentionally narrower than
+            # organization-wide operational authority. Chief and Region Admins
+            # can operate shifts within their scope but do not receive finance
+            # totals merely because they can open the organization dashboard.
+            invoices_qs = Invoice.objects.filter(pharmacy__organization=org)
+            if requested_pharmacy_id is not None:
+                invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
+        else:
+            invoices_qs = Invoice.objects.none()
         open_shifts = _open_active_shifts(shifts_qs, today, now)
         all_active_shifts = _all_active_shifts(shifts_qs, today, now)
         extras = _dashboard_payload_extras(
@@ -631,7 +683,12 @@ class OwnerDashboard(APIView):
                 'date': shift_date,
             })
 
-        invoices_qs = Invoice.objects.filter(pharmacy__in=pharmacies)
+        billing_pharmacy_ids = [
+            pharmacy.id
+            for pharmacy in pharmacies.select_related("owner__user", "organization")
+            if user_can_manage_billing_for_pharmacy(user, pharmacy)
+        ]
+        invoices_qs = Invoice.objects.filter(pharmacy_id__in=billing_pharmacy_ids)
         extras = _dashboard_payload_extras(
             shifts_qs=upcoming_shifts,
             confirmed_qs=confirmed_shifts,
@@ -645,6 +702,8 @@ class OwnerDashboard(APIView):
             user=user,
         )
         extras["upcoming_stats"] = _dashboard_upcoming_stats(personal_upcoming_shifts, today, now)
+        extras["workspace_upcoming_stats"] = _dashboard_upcoming_stats(upcoming_shifts, today, now)
+        extras["shift_summary"]["upcoming_confirmed_count"] = confirmed_shifts.filter(_future_shift_filter(today, now)).distinct().count()
 
         data = {
             "user": user_serializer.data,
@@ -670,27 +729,38 @@ class PharmacistDashboard(APIView):
             user=user, is_active=True
         ).values_list('pharmacy_id', flat=True))
         if workspace == "platform":
+            platform_scope = Shift.objects.filter(
+                visibility="PLATFORM",
+                role_needed__in=_shift_roles_visible_to_user(user),
+            ).filter(_future_shift_filter(today, now)).distinct()
             public_shifts = _public_platform_shifts(today, now).filter(role_needed__in=_shift_roles_visible_to_user(user))
+            related_shifts = _worker_related_shifts(user, platform_scope, today, now)
             confirmed_shifts = _user_confirmed_platform_shifts(user, today, now)
+            recommendation_candidates = public_shifts.exclude(id__in=related_shifts.values("id"))
+            recommended_shifts = find_availability_matched_shifts(user, recommendation_candidates, limit=6)
+            recommended_qs = Shift.objects.filter(id__in=[shift.id for shift in recommended_shifts])
             invoices_qs = Invoice.objects.filter(user=user, pharmacy__isnull=True)
             extras = _dashboard_payload_extras(
-                shifts_qs=public_shifts,
+                shifts_qs=related_shifts,
                 confirmed_qs=confirmed_shifts,
                 community_qs=public_shifts,
                 invoices_qs=invoices_qs,
                 selected_pharmacy=None,
                 today=today,
                 now=now,
+                open_qs=recommended_qs,
+                all_qs=related_shifts,
                 dashboard_role="pharmacist",
                 user=user,
             )
             data = {
                 "user": user_serializer.data,
                 "message": "Welcome Pharmacist!",
-                "upcoming_shifts_count": public_shifts.count(),
+                "upcoming_shifts_count": related_shifts.count(),
                 "confirmed_shifts_count": confirmed_shifts.count(),
                 "community_shifts_count": public_shifts.count(),
-                "shifts": [_dashboard_shift_box(shift) for shift in public_shifts[:12]],
+                "shifts": [_dashboard_worker_shift_box(shift, user) for shift in related_shifts[:12]],
+                "recommended_shifts": [_dashboard_worker_shift_box(shift, user, recommended=True) for shift in recommended_shifts],
                 "community_shifts": [_dashboard_shift_box(shift) for shift in public_shifts[:12]],
                 **extras,
             }
@@ -704,9 +774,10 @@ class PharmacistDashboard(APIView):
         # Internal workspace: selected pharmacy behaves like that pharmacy's home page,
         # scoped to the worker's membership type and current escalation level.
         visible_shifts = _worker_visible_pharmacy_shifts(user, member_pharmacy_ids)
-        upcoming_shifts = visible_shifts.filter(_future_shift_filter(today, now)).distinct()
-        open_shifts = _open_active_shifts(visible_shifts, today, now)
-        all_active_shifts = _all_active_shifts(visible_shifts, today, now)
+        related_shifts = _worker_related_shifts(user, visible_shifts, today, now)
+        open_shifts = _open_active_shifts(visible_shifts, today, now).exclude(id__in=related_shifts.values("id"))
+        recommended_shifts = find_availability_matched_shifts(user, open_shifts, limit=6)
+        recommended_qs = Shift.objects.filter(id__in=[shift.id for shift in recommended_shifts])
 
         confirmed_shifts = _pharmacy_confirmed_shifts(member_pharmacy_ids).filter(slot_assignments__user=user).distinct()
 
@@ -720,16 +791,7 @@ class PharmacistDashboard(APIView):
         ).distinct()
 
 
-        shifts_data = []
-        for shift in upcoming_shifts:
-            pharmacy_name = shift.pharmacy.name if shift.pharmacy else "Community"
-            slot = shift.slots.order_by('date').first()
-            shift_date = slot.date if slot else None
-            shifts_data.append({
-                'id': shift.id,
-                'pharmacy_name': pharmacy_name,
-                'date': shift_date,
-            })
+        shifts_data = [_dashboard_worker_shift_box(shift, user) for shift in related_shifts[:12]]
 
         community_shifts_data = []
         for shift in community_shifts:
@@ -745,15 +807,15 @@ class PharmacistDashboard(APIView):
         if requested_pharmacy_id is not None:
             invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
         extras = _dashboard_payload_extras(
-            shifts_qs=upcoming_shifts,
+            shifts_qs=related_shifts,
             confirmed_qs=confirmed_shifts,
             community_qs=community_shifts,
             invoices_qs=invoices_qs,
             selected_pharmacy=selected_pharmacy,
             today=today,
             now=now,
-            open_qs=open_shifts,
-            all_qs=all_active_shifts,
+            open_qs=recommended_qs,
+            all_qs=related_shifts,
             dashboard_role="pharmacist",
             user=user,
         )
@@ -761,10 +823,11 @@ class PharmacistDashboard(APIView):
         data = {
             "user": user_serializer.data,
             "message": "Welcome Pharmacist!",
-            "upcoming_shifts_count": upcoming_shifts.count(),
+            "upcoming_shifts_count": related_shifts.count(),
             "confirmed_shifts_count": confirmed_shifts.count(),
             "community_shifts_count": community_shifts.count(),
             "shifts": shifts_data,
+            "recommended_shifts": [_dashboard_worker_shift_box(shift, user, recommended=True) for shift in recommended_shifts],
             "community_shifts": community_shifts_data,
             **extras,
         }
@@ -785,27 +848,38 @@ class OtherStaffDashboard(APIView):
             user=user, is_active=True
         ).values_list('pharmacy_id', flat=True))
         if workspace == "platform":
+            platform_scope = Shift.objects.filter(
+                visibility="PLATFORM",
+                role_needed__in=_shift_roles_visible_to_user(user),
+            ).filter(_future_shift_filter(today, now)).distinct()
             public_shifts = _public_platform_shifts(today, now).filter(role_needed__in=_shift_roles_visible_to_user(user))
+            related_shifts = _worker_related_shifts(user, platform_scope, today, now)
             confirmed_shifts = _user_confirmed_platform_shifts(user, today, now)
+            recommendation_candidates = public_shifts.exclude(id__in=related_shifts.values("id"))
+            recommended_shifts = find_availability_matched_shifts(user, recommendation_candidates, limit=6)
+            recommended_qs = Shift.objects.filter(id__in=[shift.id for shift in recommended_shifts])
             invoices_qs = Invoice.objects.filter(user=user, pharmacy__isnull=True)
             extras = _dashboard_payload_extras(
-                shifts_qs=public_shifts,
+                shifts_qs=related_shifts,
                 confirmed_qs=confirmed_shifts,
                 community_qs=public_shifts,
                 invoices_qs=invoices_qs,
                 selected_pharmacy=None,
                 today=today,
                 now=now,
+                open_qs=recommended_qs,
+                all_qs=related_shifts,
                 dashboard_role="otherstaff",
                 user=user,
             )
             data = {
                 "user": user_serializer.data,
                 "message": f"Welcome {other_staff_role_label(getattr(getattr(user, 'otherstaffonboarding', None), 'role_type', None))}!",
-                "upcoming_shifts_count": public_shifts.count(),
+                "upcoming_shifts_count": related_shifts.count(),
                 "confirmed_shifts_count": confirmed_shifts.count(),
                 "community_shifts_count": public_shifts.count(),
-                "shifts": [_dashboard_shift_box(shift) for shift in public_shifts[:12]],
+                "shifts": [_dashboard_worker_shift_box(shift, user) for shift in related_shifts[:12]],
+                "recommended_shifts": [_dashboard_worker_shift_box(shift, user, recommended=True) for shift in recommended_shifts],
                 "community_shifts": [_dashboard_shift_box(shift) for shift in public_shifts[:12]],
                 **extras,
             }
@@ -817,9 +891,10 @@ class OtherStaffDashboard(APIView):
         selected_pharmacy = Pharmacy.objects.filter(id=requested_pharmacy_id).first() if requested_pharmacy_id else None
 
         visible_shifts = _worker_visible_pharmacy_shifts(user, member_pharmacy_ids)
-        upcoming_shifts = visible_shifts.filter(_future_shift_filter(today, now)).distinct()
-        open_shifts = _open_active_shifts(visible_shifts, today, now)
-        all_active_shifts = _all_active_shifts(visible_shifts, today, now)
+        related_shifts = _worker_related_shifts(user, visible_shifts, today, now)
+        open_shifts = _open_active_shifts(visible_shifts, today, now).exclude(id__in=related_shifts.values("id"))
+        recommended_shifts = find_availability_matched_shifts(user, open_shifts, limit=6)
+        recommended_qs = Shift.objects.filter(id__in=[shift.id for shift in recommended_shifts])
         confirmed_shifts = _pharmacy_confirmed_shifts(member_pharmacy_ids).filter(slot_assignments__user=user).distinct()
 
         community_shifts = Shift.objects.filter(
@@ -830,16 +905,7 @@ class OtherStaffDashboard(APIView):
             slots__assignments__user=user # Exclude shifts they are already assigned to
         ).distinct()
 
-        shifts_data = []
-        for shift in upcoming_shifts:
-            pharmacy_name = shift.pharmacy.name if shift.pharmacy else "Community"
-            slot = shift.slots.order_by('date').first()
-            shift_date = slot.date if slot else None
-            shifts_data.append({
-                'id': shift.id,
-                'pharmacy_name': pharmacy_name,
-                'date': shift_date,
-            })
+        shifts_data = [_dashboard_worker_shift_box(shift, user) for shift in related_shifts[:12]]
 
         community_shifts_data = []
         for shift in community_shifts:
@@ -855,15 +921,15 @@ class OtherStaffDashboard(APIView):
         if requested_pharmacy_id is not None:
             invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
         extras = _dashboard_payload_extras(
-            shifts_qs=upcoming_shifts,
+            shifts_qs=related_shifts,
             confirmed_qs=confirmed_shifts,
             community_qs=community_shifts,
             invoices_qs=invoices_qs,
             selected_pharmacy=selected_pharmacy,
             today=today,
             now=now,
-            open_qs=open_shifts,
-            all_qs=all_active_shifts,
+            open_qs=recommended_qs,
+            all_qs=related_shifts,
             dashboard_role="otherstaff",
             user=user,
         )
@@ -871,10 +937,11 @@ class OtherStaffDashboard(APIView):
         data = {
             "user": user_serializer.data,
             "message": f"Welcome {other_staff_role_label(getattr(getattr(user, 'otherstaffonboarding', None), 'role_type', None))}!",
-            "upcoming_shifts_count": upcoming_shifts.count(),
+            "upcoming_shifts_count": related_shifts.count(),
             "confirmed_shifts_count": confirmed_shifts.count(),
             "community_shifts_count": community_shifts.count(),
             "shifts": shifts_data,
+            "recommended_shifts": [_dashboard_worker_shift_box(shift, user, recommended=True) for shift in recommended_shifts],
             "community_shifts": community_shifts_data,
             **extras,
         }
@@ -885,10 +952,58 @@ class ExplorerDashboard(APIView):
     permission_classes = [IsAuthenticated, IsExplorer]
 
     def get(self, request):
-        user_serializer = UserProfileSerializer(request.user)
-        data = {
+        user = request.user
+        user_serializer = UserProfileSerializer(user)
+        today = date.today()
+        now = timezone.now().time()
+
+        platform_scope = Shift.objects.filter(
+            visibility="PLATFORM",
+            role_needed__in=_shift_roles_visible_to_user(user),
+        ).filter(_future_shift_filter(today, now)).distinct()
+        public_shifts = _public_platform_shifts(today, now).filter(
+            role_needed__in=_shift_roles_visible_to_user(user)
+        )
+        related_shifts = _worker_related_shifts(user, platform_scope, today, now)
+        confirmed_shifts = _user_confirmed_platform_shifts(user, today, now)
+        recommendation_candidates = public_shifts.exclude(id__in=related_shifts.values("id"))
+        recommended_shifts = find_availability_matched_shifts(
+            user, recommendation_candidates, limit=6
+        )
+        recommended_qs = Shift.objects.filter(
+            id__in=[shift.id for shift in recommended_shifts]
+        )
+
+        extras = _dashboard_payload_extras(
+            shifts_qs=related_shifts,
+            confirmed_qs=confirmed_shifts,
+            community_qs=public_shifts,
+            invoices_qs=Invoice.objects.none(),
+            selected_pharmacy=None,
+            today=today,
+            now=now,
+            open_qs=recommended_qs,
+            all_qs=related_shifts,
+            dashboard_role="explorer",
+            user=user,
+        )
+        return Response({
             "user": user_serializer.data,
-            "message": "Welcome Explorer!",
-            # "available_jobs": [],  # Can be populated later with available jobs
-        }
-        return Response(data)
+            "message": "Explore pharmacy opportunities, availability and your next step.",
+            "upcoming_shifts_count": related_shifts.count(),
+            "confirmed_shifts_count": confirmed_shifts.count(),
+            "community_shifts_count": public_shifts.count(),
+            "shifts": [
+                _dashboard_worker_shift_box(shift, user)
+                for shift in related_shifts[:12]
+            ],
+            "recommended_shifts": [
+                _dashboard_worker_shift_box(shift, user, recommended=True)
+                for shift in recommended_shifts
+            ],
+            "community_shifts": [
+                _dashboard_shift_box(shift)
+                for shift in public_shifts[:12]
+            ],
+            **extras,
+        })

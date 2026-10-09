@@ -1,8 +1,9 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Box, Button, Chip, Drawer, IconButton, Paper, Stack, Pagination, Typography, Dialog } from "@mui/material";
+import { Box, Button, Chip, Divider, Drawer, IconButton, Paper, Stack, Pagination, Typography, Dialog } from "@mui/material";
 import {
   Add as AddIcon,
+  Close as CloseIcon,
   Tune as TuneIcon,
 } from "@mui/icons-material";
 import { useTalentFeed } from "./hooks/useTalentFeed";
@@ -924,7 +925,14 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             onClose={() => setIsSidebarOpen(false)}
             sx={{ display: { lg: "none" } }}
           >
-            <Box sx={{ width: 320 }}>
+            <Box sx={{ width: { xs: "min(100vw, 360px)", sm: 360 }, maxWidth: "100vw" }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>Filters</Typography>
+                <IconButton onClick={() => setIsSidebarOpen(false)} aria-label="Close talent filters">
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+              <Divider />
               <FiltersSidebar
                 filters={filters}
                 onChange={setFilters}
@@ -940,15 +948,22 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           </Drawer>
 
           <Paper
+            component="aside"
+            aria-label="Talent filters"
             variant="outlined"
             sx={{
               width: 320,
+              flex: "0 0 320px",
+              minWidth: 0,
               display: { xs: "none", lg: "block" },
-              position: "sticky",
-              top: 96,
               borderRadius: 3,
               bgcolor: "background.paper",
               borderColor: "divider",
+              boxShadow: "none",
+              alignSelf: "flex-start",
+              position: "relative",
+              maxHeight: "none",
+              overflow: "visible",
             }}
           >
             <FiltersSidebar

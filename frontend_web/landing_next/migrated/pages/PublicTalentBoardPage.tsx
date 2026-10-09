@@ -5,11 +5,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Alert,
+  Box,
   Button,
+  Stack,
   Typography,
 } from "@mui/material";
 import AuthLayout from "../layouts/AuthLayout";
-import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import {useAuth} from "../contexts/AuthContext";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
 import { API_BASE_URL } from "../constants/api";
@@ -115,16 +117,45 @@ export default function PublicTalentBoardPage() {
         : "You need an account to contact talent, view profiles, or save preferences.";
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <AuthLayout title="Find Talent" maxWidth={false} noCard showTitle={false}>
+    <AuthLayout title="Find Talent" maxWidth={false} noCard showTitle={false}>
+      <Box sx={{ py: { xs: 1, md: 2.5 } }}>
+        <Box
+          sx={{
+            mb: 3,
+            p: { xs: 2, md: 3 },
+            border: '1px solid #E0E7F1',
+            borderRadius: '14px',
+            bgcolor: '#FFFFFF',
+            boxShadow: 'none',
+          }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
+            <Box>
+              <Typography sx={{ fontWeight: 850, fontSize: 17, color: '#06123A' }}>
+                Browse before you connect
+              </Typography>
+              <Typography sx={{ mt: .4, color: '#445474', fontSize: 14, lineHeight: 1.55 }}>
+                Compare published roles, skills and locations. Sign in when you are ready to connect.
+              </Typography>
+            </Box>
+            {!user && (
+              <Stack direction="row" spacing={1}>
+                <Button component={RouterLink} to="/register?next=%2Ftalent%2Fpublic-board" variant="outlined">Create account</Button>
+                <Button component={RouterLink} to="/login?next=%2Ftalent%2Fpublic-board" variant="contained">Log in</Button>
+              </Stack>
+            )}
+          </Stack>
+        </Box>
+        {error && !user && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => void load()}>Retry</Button>}>{error}</Alert>}
         <TalentBoard
           publicMode={!user}
+          publicPresentation
           externalPosts={user?undefined:posts}
           externalLoading={user?undefined:loading}
           externalError={user?undefined:error}
           onRequireLogin={openLoginDialog}
         />
+      </Box>
 
         <Dialog open={loginDialogOpen} onClose={closeLoginDialog}>
           <DialogTitle>{dialogTitle}</DialogTitle>
@@ -144,6 +175,5 @@ export default function PublicTalentBoardPage() {
           </DialogActions>
         </Dialog>
       </AuthLayout>
-    </>
   );
 }

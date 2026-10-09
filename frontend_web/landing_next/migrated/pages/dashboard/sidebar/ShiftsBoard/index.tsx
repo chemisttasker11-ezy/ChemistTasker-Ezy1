@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import {
   Box,
   Button,
+  InputAdornment,
+  TextField,
   Chip,
   Divider,
   Drawer,
@@ -21,6 +23,7 @@ import {
   Close as CloseIcon,
   Favorite as FavoriteIcon,
   SwapVert as SwapVertIcon,
+  Search as SearchIcon,
   Tune as TuneIcon,
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
@@ -35,7 +38,7 @@ import apiClient from '../../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../../constants/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { GOOGLE_LIBRARIES } from './constants';
-import { RatePreference, ShiftsBoardProps, SlotFilterMode, SortKey } from './types';
+import { FilterConfig, RatePreference, ShiftsBoardProps, SlotFilterMode, SortKey } from './types';
 import FiltersSidebar from './components/FiltersSidebar';
 import CounterOfferDialog from './components/CounterOfferDialog';
 import ShiftList from './components/ShiftList';
@@ -48,6 +51,7 @@ import { getUpcomingSlotsForDisplay, getShiftPharmacyId } from './utils/shift';
 const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
   title,
   shifts,
+  publicPresentation = false,
   loading,
   onApplyAll,
   onApplySlot,
@@ -201,6 +205,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
     filters,
     onFiltersChange,
     useServerFiltering,
+    preserveServerOrder: publicPresentation,
     activeTab,
     savedShiftIds,
     savedFeatureEnabled,
@@ -538,10 +543,19 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
     });
   };
 
+  // Public listings use server-side results. Every direct text/date/rate change
+  // must notify the parent query state rather than only modifying local filter UI.
+  const updateFilterConfig = (updater: React.SetStateAction<FilterConfig>) => {
+    const next = typeof updater === 'function' ? updater(filterConfig) : updater;
+    setFilterConfig(next);
+    onFiltersChange?.(next);
+  };
+
   const sidebarContent = (
     <FiltersSidebar
       filterConfig={filterConfig}
-      setFilterConfig={setFilterConfig}
+      setFilterConfig={updateFilterConfig}
+      hideSearch={publicPresentation}
       roleOptions={roleOptions}
       locationGroups={locationGroups}
       expandedStates={expandedStates}
@@ -553,7 +567,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
   );
 
   return (
-    <Box sx={{ px: { xs: 0, lg: 2 }, py: 2 }}>
+    <Box sx={{ px: publicPresentation ? 0 : { xs: 0, lg: 2 }, py: publicPresentation ? 0 : 2, maxWidth: publicPresentation ? 1240 : undefined, mx: publicPresentation ? "auto" : undefined, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
       <GlobalStyles styles={{ '.pac-container': { zIndex: 1400 } }} />
       <CounterOfferDialog
         open={counterOfferOpen}
@@ -585,7 +599,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
         shifts={shifts}
       />
 
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
+      {!publicPresentation && <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>{title}</Typography>
           <Typography variant="body2" color="text.secondary">
@@ -620,11 +634,58 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
             )}
           </Stack>
         )}
-      </Box>
+      </Box>}
+      {publicPresentation && !hideFiltersAndSort && (
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent='space-between' alignItems={{ lg: 'flex-end' }} spacing={2} sx={{ mb: 2.5, width: '100%', minWidth: 0 }}>
+          <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
+            <Typography component='h2' sx={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: { xs: 25, md: 29 }, color: '#06123A', lineHeight: 1.2, overflowWrap: 'break-word' }}>Find your next pharmacy shift</Typography>
+            <Typography aria-live='polite' sx={{ mt: 0.45, fontSize: 14, color: '#445474' }}>
+              {loading ? 'Finding current opportunities…' : `${typeof totalCount === 'number' ? totalCount : displayShifts.length} ${typeof totalCount === 'number' ? totalCount === 1 ? 'opportunity' : 'opportunities' : displayShifts.length === 1 ? 'opportunity' : 'opportunities'} available`}
+            </Typography>
+          </Box>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', lg: 'auto' }, minWidth: 0, flexShrink: 0 }}>
+            <TextField
+              size='small'
+              label='Search shifts'
+              placeholder='Role, pharmacy or suburb'
+              value={filterConfig.search}
+              onChange={(event) => updateFilterConfig((prev) => ({ ...prev, search: event.target.value }))}
+              sx={{ width: { xs: '100%', sm: 315 }, maxWidth: '100%', '& .MuiOutlinedInput-root': { minHeight: 48, bgcolor: '#FFFFFF' } }}
+              InputProps={{ startAdornment: <InputAdornment position='start'><SearchIcon sx={{ color: '#52617C' }} /></InputAdornment> }}
+            />
+            <Button variant='outlined' startIcon={<TuneIcon />} onClick={() => setIsSidebarOpen(true)} sx={{ display: isMobile ? 'inline-flex' : 'none', minHeight: 48, fontWeight: 800, textTransform: 'none', color: '#5222B8', borderColor: '#C8B8E5', flexShrink: 0 }}>
+              Filters{activeFilterCount > 0 ? ' (' + activeFilterCount + ')' : ''}
+            </Button>
+          </Stack>
+        </Stack>
+      )}
 
-      <Box sx={{ display: 'flex', gap: 3 }}>
+      <Box sx={{ display: 'flex', gap: publicPresentation ? 2.5 : 3, width: '100%', minWidth: 0, alignItems: 'flex-start' }}>
         {!isMobile && !hideFiltersAndSort && (
-          <Paper variant="outlined" sx={{ width: 320, flexShrink: 0, borderRadius: 3, borderColor: 'grey.200' }}>
+          <Paper
+            component="aside"
+            aria-label="Shift filters"
+            variant="outlined"
+            sx={{
+              width: 320,
+              flex: '0 0 320px',
+              minWidth: 0,
+              borderRadius: publicPresentation ? '14px' : 3,
+              borderColor: publicPresentation ? '#DEE5EF' : 'grey.200',
+              boxShadow: 'none',
+              alignSelf: 'flex-start',
+              // Natural height: scrolling the page reveals all filters without a nested scrollbar.
+              position: 'relative',
+              maxHeight: 'none',
+              overflow: 'visible',
+            }}
+          >
+            {publicPresentation && (
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.25, pt: 2, pb: 0.25, gap: 1 }}>
+                <Typography component="h3" sx={{ fontSize: 16, fontWeight: 850, color: '#06123A' }}>Refine results</Typography>
+                {activeFilterCount > 0 && <Button type="button" onClick={clearAllFilters} size="small" sx={{ minHeight: 36, px: 0.5, fontSize: 12.5, fontWeight: 800, color: '#5222B8', whiteSpace: 'nowrap' }}>Clear all</Button>}
+              </Stack>
+            )}
             {sidebarContent}
           </Paper>
         )}
@@ -662,7 +723,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
             </Stack>
           )}
 
-          {!hideFiltersAndSort && (
+          {!hideFiltersAndSort && !publicPresentation && (
             <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1} sx={{ mb: 2 }}>
               <SwapVertIcon fontSize="small" color="action" />
               <FormControl size="small" sx={{ minWidth: 160 }}>
@@ -697,7 +758,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
           )}
 
           {useServerFiltering && slotFilterMode === 'all' && typeof totalCount === 'number' && pageSize && onPageChange && (
-            <Stack alignItems="center" sx={{ mt: 2, mb: 2 }}>
+            <Stack alignItems="center" sx={{ mt: 2, mb: 2, display: publicPresentation ? 'none' : 'flex' }}>
               <Pagination
                 count={Math.max(1, Math.ceil(totalCount / pageSize))}
                 page={page ?? 1}
@@ -707,6 +768,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
           )}
 
           <ShiftList
+            publicPresentation={publicPresentation}
             loading={loading}
             processedShifts={displayShifts}
             clearAllFilters={clearAllFilters}
@@ -747,24 +809,28 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
             disableSlotActions={disableSlotActions}
             disableActionGuards={disableActionGuards}
           />
+          {publicPresentation && useServerFiltering && slotFilterMode === 'all' && typeof totalCount === 'number' && pageSize && onPageChange && totalCount > pageSize && (
+            <Stack alignItems='center' sx={{ mt: 2.5, mb: 1 }}><Pagination count={Math.ceil(totalCount / pageSize)} page={page ?? 1} onChange={(_: React.ChangeEvent<unknown>, value: number) => onPageChange(value)} aria-label='Shift result pages' /></Stack>
+          )}
         </Box>
       </Box>
 
       {!hideFiltersAndSort && (
         <Drawer
-          anchor="left"
+          anchor={publicPresentation ? 'right' : 'left'}
           open={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         >
-          <Box sx={{ width: 320 }}>
+          <Box sx={{ width: publicPresentation ? { xs: 'min(100vw, 360px)', sm: 360 } : 320, maxWidth: '100vw' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
               <Typography variant="h6">Filters</Typography>
-              <IconButton onClick={() => setIsSidebarOpen(false)}>
+              <IconButton onClick={() => setIsSidebarOpen(false)} aria-label="Close shift filters">
                 <CloseIcon />
               </IconButton>
             </Box>
             <Divider />
             {sidebarContent}
+            {publicPresentation && <Box sx={{ px: 2.5, py: 1.75, borderTop: '1px solid #E3EAF2' }}><Button variant='contained' fullWidth onClick={() => setIsSidebarOpen(false)} sx={{ minHeight: 46, textTransform: 'none', bgcolor: '#5222B8', '&:hover': { bgcolor: '#40168F' } }}>Show results</Button></Box>}
           </Box>
         </Drawer>
       )}

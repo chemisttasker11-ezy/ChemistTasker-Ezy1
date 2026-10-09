@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Grid, Skeleton } from "@mui/material";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
-import AppsIcon from "@mui/icons-material/Apps";
-import SchoolIcon from "@mui/icons-material/School";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
@@ -21,6 +18,7 @@ import { dashboardTitleForRole } from "../../../utils/roleLabels";
 import DashboardOverviewTemplate, {
   type DashboardAction,
   type DashboardMetric,
+  type DashboardShiftPreview,
 } from "../../../components/dashboard/DashboardOverviewTemplate";
 
 type User = {
@@ -47,6 +45,8 @@ type DashboardData = {
     all_count?: number;
   };
   invoice_summary?: { unpaid_count?: number; unpaid_total?: string; total_billed?: string };
+  shifts?: DashboardShiftPreview[];
+  recommended_shifts?: DashboardShiftPreview[];
   activity?: any[];
 };
 
@@ -199,28 +199,41 @@ export default function OverviewPageStaff() {
 
   const actions: DashboardAction[] = isExplorer
     ? [
-        { title: "Public Shifts", description: "Browse open roles near you", icon: <WorkOutlineIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/public`), tone: "blue" },
-        { title: "Community Shifts", description: "Explore platform opportunities", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/community`), tone: "purple" },
-        { title: "Profile", description: "Complete your onboarding", icon: <PersonIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/onboarding`), tone: "pink" },
-        { title: "Talent Hub", description: "Discover learning paths", icon: <AppsIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/interests`), tone: "cyan" },
+        { title: "Find Opportunities", description: "Browse current pharmacy opportunities", icon: <WorkOutlineIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/public`), tone: "blue" },
+        { title: "Set Availability", description: "Show when you are available for suitable opportunities", icon: <AccessTimeIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/availability`), tone: "pink" },
+        { title: "Complete Profile", description: "Keep your entry-level profile ready for pharmacies", icon: <PersonIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/onboarding`), tone: "purple" },
+        { title: "Talent Hub", description: "Publish interests and explore the pharmacy community", icon: <FavoriteBorderIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/interests`), tone: "cyan" },
       ]
     : [
         { title: openShiftActionTitle, description: openShiftActionDescription, icon: <WorkOutlineIcon />, onClick: () => navigate(openShiftPath), tone: "blue" },
-        { title: "Publish Availability", description: "Post your available times", icon: <AccessTimeIcon />, onClick: () => navigate(publishAvailabilityPath), tone: "pink" },
-        { title: "My Roster", description: "Review internal assignments", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/roster`), tone: "purple" },
-        { title: "Confirmed Shifts", description: "Track your booked work", icon: <ShieldOutlinedIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/confirmed`), tone: "cyan" },
-        { title: "Availability", description: "Update your working times", icon: <AccessTimeIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/availability`), tone: "pink" },
-        { title: "Invoices", description: "Manage and create invoices", icon: <CreditCardIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/invoice`), tone: "cyan" },
-        { title: "Shift History", description: "Review past shifts", icon: <HistoryIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/history`), tone: "purple" },
-        { title: "Profile", description: "Documents and preferences", icon: <PersonIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/onboarding`), tone: "pink" },
-        { title: "Learning Materials", description: "Training and resources", icon: <SchoolIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/learning`), tone: "blue", wide: true },
+        { title: "Publish Availability", description: "Make your next available times visible", icon: <AccessTimeIcon />, onClick: () => navigate(publishAvailabilityPath), tone: "pink" },
+        { title: "My Roster", description: "See the shifts your pharmacy expects you on", icon: <CalendarMonthIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/roster`), tone: "purple" },
+        { title: "Confirmed Shifts", description: "Review work that is locked in", icon: <ShieldOutlinedIcon />, onClick: () => navigate(`/dashboard/${roleSegment}/shifts/confirmed`), tone: "cyan" },
       ];
 
   const metrics: DashboardMetric[] = [
-    { label: "Open Shifts", value: data?.shift_summary?.open_count ?? 0, helper: effectivePharmacyId ? selectedPharmacyName : "Public platform", icon: <CalendarMonthIcon />, tone: "blue" },
+    {
+      label: "Recommended Shifts",
+      value: data?.shift_summary?.open_count ?? 0,
+      helper: "Matches your availability",
+      icon: <CalendarMonthIcon />,
+      tone: "blue",
+    },
     { label: "Confirmed Shifts", value: data?.shift_summary?.confirmed_count ?? data?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <ShieldOutlinedIcon />, tone: "purple" },
-    { label: "Count of Shifts", value: data?.shift_summary?.all_count ?? data?.shift_summary?.upcoming_count ?? data?.upcoming_shifts_count ?? 0, helper: "Active shift records", icon: <WorkOutlineIcon />, tone: "cyan" },
-    { label: isExplorer ? "Saved Interests" : "Unpaid Invoices", value: isExplorer ? "No saves yet" : data?.invoice_summary?.unpaid_count ?? 0, helper: isExplorer ? "Start saving topics" : data?.invoice_summary?.unpaid_total ?? "$0.00", icon: isExplorer ? <FavoriteBorderIcon /> : <CreditCardIcon />, tone: "pink" },
+    {
+      label: "My Active Shifts",
+      value: data?.shift_summary?.all_count ?? data?.shift_summary?.upcoming_count ?? data?.upcoming_shifts_count ?? 0,
+      helper: "Applied, interested or committed",
+      icon: <WorkOutlineIcon />,
+      tone: "cyan",
+    },
+    {
+      label: isExplorer ? "Public Opportunities" : "Unpaid Invoices",
+      value: isExplorer ? data?.community_shifts_count ?? data?.shift_summary?.community_count ?? 0 : data?.invoice_summary?.unpaid_count ?? 0,
+      helper: isExplorer ? "Explorer opportunities on the platform" : data?.invoice_summary?.unpaid_total ?? "$0.00",
+      icon: isExplorer ? <FavoriteBorderIcon /> : <CreditCardIcon />,
+      tone: "pink",
+    },
   ];
   const activityItems = Array.isArray(data?.activity) ? data.activity : [];
 
@@ -230,12 +243,17 @@ export default function OverviewPageStaff() {
       badge={effectivePharmacyId ? "Internal workspace" : "Public platform"}
       subtitle={dashboardSubtitle}
       heroTitle={`Welcome back, ${displayName}!`}
-      heroSubtitle={isExplorer ? data?.message || "Discover open roles and finish onboarding to unlock personalised matches." : "Review your upcoming shifts, update availability, and keep an eye on community opportunities."}
-      primaryAction={{ label: isExplorer ? "Browse community shifts" : `View ${openShiftActionTitle.toLowerCase()}`, icon: <WorkOutlineIcon />, onClick: () => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath) }}
-      secondaryAction={{ label: isExplorer ? "Complete profile" : "Publish Availability", icon: <CalendarMonthIcon />, onClick: () => navigate(isExplorer ? `/dashboard/${roleSegment}/onboarding` : publishAvailabilityPath) }}
+      heroSubtitle={isExplorer ? data?.message || "Start with the opportunities and profile details that move you closer to suitable pharmacy work." : "Start with what needs attention now: upcoming work, availability and confirmed commitments."}
+      primaryAction={{ label: isExplorer ? "Browse opportunities" : `View ${openShiftActionTitle.toLowerCase()}`, icon: <WorkOutlineIcon />, onClick: () => navigate(openShiftPath) }}
+      secondaryAction={{ label: isExplorer ? "Set availability" : "Publish Availability", icon: <CalendarMonthIcon />, onClick: () => navigate(isExplorer ? `/dashboard/${roleSegment}/availability` : publishAvailabilityPath) }}
       actions={actions}
+      workerShifts={data?.shifts ?? []}
+      recommendedShifts={data?.recommended_shifts ?? []}
+      onOpenWorkerShift={(shift) => navigate(`/dashboard/${roleSegment}/shifts/${shift.id}`)}
+      onBrowseRecommendations={() => navigate(openShiftPath)}
+      onUpdateAvailability={() => navigate(`/dashboard/${roleSegment}/availability`)}
       upcoming={upcoming}
-      upcomingTitle={isExplorer ? "Job Snapshot" : "My Shifts"}
+      upcomingTitle="My Shift Commitments"
       activity={activityItems}
       metrics={metrics}
       invoicePanel={isExplorer || activePersona === "admin" ? undefined : {
@@ -247,8 +265,8 @@ export default function OverviewPageStaff() {
         buttonLabel: "Invoices",
         onClick: () => navigate(`/dashboard/${roleSegment}/invoice`),
       }}
-      onOpenShifts={() => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath)}
-      onOpenActivity={() => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/community` : openShiftPath)}
+      onOpenShifts={() => navigate(`/dashboard/${roleSegment}/shifts/confirmed`)}
+      onOpenActivity={() => navigate(openShiftPath)}
     />
   );
 }

@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Container,
   Typography,
+  Button,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Skeleton,
   Box,
   FormControl,
@@ -25,6 +29,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { calendarViews, calendarMessages, getDateRangeForView, CalendarViewKey } from './calendarViews';
 import { useAuth } from '../../../contexts/AuthContext'; // Using the corrected path
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
+import { rosterEventForeground } from '../../../utils/rosterEventAppearance';
 import {
   fetchRosterWorkerPharmaciesService,
   fetchRosterWorkerAssignments,
@@ -51,6 +56,8 @@ import {
   ALL_STAFF,
 } from './RosterWorkerPage.model';
 import RosterWorkerDialogs from './RosterWorkerDialogs';
+import RosterWorkerAgenda from '../../../components/roster/RosterWorkerAgenda';
+import RosterWorkerAcknowledgements from '../../../components/roster/RosterWorkerAcknowledgements';
 const localizer = momentLocalizer(moment);
 
 // --- Skeleton Component for Unified Loading ---
@@ -88,9 +95,12 @@ export default function RosterWorkerPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const rosterRequestSequence = useRef(0);
   // --- Calendar State ---
   const [calendarView, setCalendarView] = useState<CalendarViewKey>('week'); // Align with shared calendar configuration
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  const [mobileRosterView, setMobileRosterView] = useState<'AGENDA' | 'CALENDAR'>('AGENDA');
   
   // --- Dialogs and Forms State ---
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
@@ -188,14 +198,17 @@ export default function RosterWorkerPage() {
   // --- DATA LOADING ---
   useEffect(() => {
     const loadInitialData = async () => {
-      if (!currentUserId) return;
+      if (!currentUserId) {
+        setIsPageLoading(false);
+        return;
+      }
       setIsPageLoading(true);
       try {
         const loadedPharmacies = await fetchRosterWorkerPharmaciesService();
         const mapped = loadedPharmacies.map(mapPharmacySummaryToView);
         setPharmacies(mapped);
         if (mapped.length > 0) {
-          const initialId = initialPharmacyFromUrl ?? mapped[0].id;
+          const initialId = initialPharmacyFromUrl != null && mapped.some((p) => p.id === initialPharmacyFromUrl) ? initialPharmacyFromUrl : mapped[0].id;
           setSelectedPharmacyId(initialId);
         }
       } catch (err: any) { 
@@ -206,14 +219,17 @@ export default function RosterWorkerPage() {
     };
     
     loadInitialData();
-  }, [currentUserId, calendarDate, calendarView, initialPharmacyFromUrl]);
+  }, [currentUserId, initialPharmacyFromUrl]);
   useEffect(() => {
     if (!isPageLoading && selectedPharmacyId) {
-      reloadAssignments();
+      void reloadAssignments();
     }
-  }, [selectedPharmacyId, calendarDate, calendarView]);
+    return () => { rosterRequestSequence.current += 1; };
+  }, [selectedPharmacyId, calendarDate, calendarView, isPageLoading]);
 const reloadAssignments = async () => {
   if (!selectedPharmacyId) return;
+  const requestNumber = ++rosterRequestSequence.current;
+  setRosterError(null);
   const shouldShowSkeleton = isPageLoading;
   if (!shouldShowSkeleton) {
     setIsAssignmentsLoading(true);
@@ -227,6 +243,7 @@ const reloadAssignments = async () => {
       fetchCommunityShifts({ pharmacyId: selectedPharmacyId, startDate, endDate, unassigned: true }),
       fetchWorkerShiftRequestsService({ pharmacyId: selectedPharmacyId, startDate, endDate }),
     ]);
+    if (requestNumber !== rosterRequestSequence.current) return;
     const assignments = assignmentsRes.map(mapAssignmentToView);
     const openShiftResults = Array.isArray(openShiftsRes) ? openShiftsRes : openShiftsRes?.results ?? [];
     const openShifts = openShiftResults.map(mapOpenShiftToView);
@@ -336,13 +353,14 @@ const reloadAssignments = async () => {
 
     setAllAssignments(filteredAssignments);
   } catch (err: any) {
-    console.error("Failed to load roster assignments or cover requests", err);
-  } finally {
-    if (!shouldShowSkeleton) {
-      setIsAssignmentsLoading(false);
+    if (requestNumber === rosterRequestSequence.current) {
+      console.error("Failed to load roster assignments or cover requests", err);
+      setRosterError('Your current roster could not be refreshed. Please retry before acting on these shifts.');
     }
-    if (shouldShowSkeleton) {
-      setIsPageLoading(false);
+  } finally {
+    if (requestNumber === rosterRequestSequence.current) {
+      if (!shouldShowSkeleton) setIsAssignmentsLoading(false);
+      if (shouldShowSkeleton) setIsPageLoading(false);
     }
   }
 };
@@ -351,7 +369,6 @@ const reloadAssignments = async () => {
     if (!selectedAssignment || !selectedAssignment.isOpenShift || !selectedAssignment.originalShiftId) return;
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await claimShiftService({
         shiftId: selectedAssignment.originalShiftId,
         slotId: selectedAssignment.slot_detail.id,
@@ -429,7 +446,6 @@ const handleSubmitLeaveRequest = async () => {
   }
   setIsSubmitting(true);
   try {
-    setIsPageLoading(true);
     if (isUpdate && existingLeave?.id) {
       await updateLeaveRequestService(existingLeave.id, {
         leave_type: leaveType,
@@ -466,7 +482,6 @@ const handleSubmitLeaveRequest = async () => {
     }
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await deleteLeaveRequestService(existingLeave.id);
       setSnackbar({ open: true, message: "Leave request cancelled.", severity: "success" });
       setIsLeaveDialogOpen(false);
@@ -514,7 +529,6 @@ const handleSubmitLeaveRequest = async () => {
     const targetPharmacy = existingSwap?.pharmacy || selectedPharmacyId;
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       const payload = {
         pharmacy: targetPharmacy,
         role: roleNeeded,
@@ -553,7 +567,6 @@ const handleSubmitLeaveRequest = async () => {
     }
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await deleteWorkerShiftRequestService(existingSwap.id);
       setSnackbar({ open: true, message: "Cover request cancelled.", severity: "success" });
       setIsSwapDialogOpen(false);
@@ -657,7 +670,7 @@ const handleSubmitLeaveRequest = async () => {
             resource: a
         };
     });
-  }, [allAssignments, roleFilters]);
+  }, [allAssignments, roleFilters, pharmacies, selectedPharmacyId]);
   // --- DYNAMIC EVENT STYLING ---
   const eventStyleGetter = (event: { resource: Assignment }) => {
     const assignment = event.resource;
@@ -686,8 +699,8 @@ const handleSubmitLeaveRequest = async () => {
     const style = {
         backgroundColor,
         borderRadius: '5px',
-        opacity: assignment.isOpenShift ? 0.9 : (isMyShift ? 0.8 : 0.5),
-        color: 'white', // Ensure text is white for better contrast on colored backgrounds
+        opacity: 1,
+        color: rosterEventForeground(backgroundColor),
         border: borderStyle,
         display: 'block',
         cursor: (isMyShift || assignment.isOpenShift) ? 'pointer' : 'not-allowed', // Allow clicking open shifts
@@ -704,21 +717,32 @@ const handleSubmitLeaveRequest = async () => {
   }
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: 26, md: 34 }, fontWeight: 800 }}>
-        My Roster
-      </Typography>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5} sx={{ mb: 2.5 }}>
+        <Box>
+          <Typography component="h1" sx={{ fontSize: { xs: 28, md: 34 }, fontFamily: 'Outfit, sans-serif', lineHeight: 1.18, fontWeight: 750, color: '#06123A' }}>
+            My roster
+          </Typography>
+          <Typography sx={{ mt: 0.6, color: '#445474', fontSize: 14.5, lineHeight: 1.55 }}>
+            See your next shifts, manage requests and find available team cover.
+          </Typography>
+        </Box>
+      </Stack>
+      {rosterError && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => void reloadAssignments()} sx={{ minHeight: 44, fontWeight: 800 }}>Retry</Button>}>{rosterError}</Alert>}
       <Tabs
-        value={selectedPharmacyId}
+        aria-label="My roster pharmacy locations"
+        value={selectedPharmacyId ?? false}
         onChange={(_, val) => {
           setAllAssignments([]);
           setSelectedPharmacyId(val as number);
         }}
         sx={{
-          mb: { xs: 2, md: 3 },
+          mb: { xs: 2, md: 2.5 },
           maxWidth: '100%',
+          borderBottom: '1px solid #E1E8F2',
           '& .MuiTabs-scroller': { overflowX: 'auto !important' },
           '& .MuiTab-root': {
-            minWidth: { xs: 170, md: 220 },
+            minHeight: 48,
+            minWidth: { xs: 150, md: 200 },
             maxWidth: { xs: 220, md: 320 },
             px: { xs: 1.5, md: 2 },
           },
@@ -731,8 +755,28 @@ const handleSubmitLeaveRequest = async () => {
       >
         {pharmacies.map(p => <Tab key={p.id} label={p.name} value={p.id} />)}
       </Tabs>
+      {!selectedPharmacyId && (
+        <Alert severity="info" sx={{ mb: 2 }}>No pharmacy roster is available for this account. Your assigned shifts will appear here when your membership is active.</Alert>
+      )}
+      <RosterWorkerAcknowledgements pharmacyId={selectedPharmacyId} calendarDate={calendarDate} />
+      <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2.5 }}>
+        <ToggleButtonGroup fullWidth exclusive size="small" value={mobileRosterView} onChange={(_, next: 'AGENDA' | 'CALENDAR' | null) => { if (next) setMobileRosterView(next); }} aria-label="Choose roster view" sx={{ bgcolor: '#F0F3F9', borderRadius: '10px', p: 0.5, '& .MuiToggleButton-root': { flex: 1, minHeight: 44, border: 0, borderRadius: '8px !important', fontWeight: 800, textTransform: 'none', color: '#445474', '&.Mui-selected': { bgcolor: '#FFFFFF', color: '#5222B8', boxShadow: '0 2px 8px rgba(6,18,58,.08)' } } }}>
+          <ToggleButton value="AGENDA">My agenda</ToggleButton>
+          <ToggleButton value="CALENDAR">Calendar</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+      {selectedPharmacyId && <Box sx={{ display: { xs: mobileRosterView === 'AGENDA' ? 'block' : 'none', md: 'none' }, mb: 2.5 }}>
+        <RosterWorkerAgenda
+          assignments={allAssignments}
+          userId={currentUserId}
+          calendarDate={calendarDate}
+          onNavigate={setCalendarDate}
+          onSelect={(assignment) => handleSelectEvent({ resource: assignment })}
+          loading={isAssignmentsLoading}
+        />
+      </Box>}
       <Box sx={{
-        display: 'flex',
+        display: { xs: mobileRosterView === 'CALENDAR' ? 'flex' : 'none', md: 'flex' },
         justifyContent: 'space-between',
         alignItems: { xs: 'stretch', md: 'center' },
         flexDirection: { xs: 'column', md: 'row' },
@@ -762,8 +806,9 @@ const handleSubmitLeaveRequest = async () => {
               </Select>
           </FormControl>
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>This calendar shows all shifts at the selected pharmacy. You can interact with your own shifts to request leave or cover, and claim open shifts.</Typography>
+      <Typography variant="body2" sx={{ mb: 2, display: { xs: mobileRosterView === 'CALENDAR' ? 'block' : 'none', md: 'block' }, color: '#445474', lineHeight: 1.6 }}>This pharmacy calendar shows published shifts. Select your assignment to request leave or cover, or choose an open shift to claim.</Typography>
       <Box sx={{
+        display: { xs: mobileRosterView === 'CALENDAR' ? 'block' : 'none', md: 'block' },
         position: 'relative',
         width: '100%',
         minWidth: 0,
@@ -858,7 +903,7 @@ const handleSubmitLeaveRequest = async () => {
                 <Box sx={{ px: 0.5, py: 0.3 }}>
                   <Typography
                     variant="caption"
-                    sx={{ fontWeight: 600, color: "white", lineHeight: 1 }}
+                    sx={{ fontWeight: 750, color: 'inherit', lineHeight: 1.2 }}
                   >
                     {event.title}
                   </Typography>
@@ -867,8 +912,8 @@ const handleSubmitLeaveRequest = async () => {
                       variant="caption"
                       sx={{
                         display: "block",
-                        color: "#fff",
-                        fontWeight: 500,
+                        color: 'inherit',
+                        fontWeight: 650,
                         fontSize: "0.7rem",
                         mt: 0.3,
                       }}
@@ -881,8 +926,8 @@ const handleSubmitLeaveRequest = async () => {
                       variant="caption"
                       sx={{
                         display: "block",
-                        color: "#fff",
-                        fontWeight: 500,
+                        color: 'inherit',
+                        fontWeight: 650,
                         fontSize: "0.7rem",
                         mt: 0.3,
                       }}

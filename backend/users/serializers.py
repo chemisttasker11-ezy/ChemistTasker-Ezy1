@@ -133,7 +133,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['email'] = validated_data['email'].strip().lower()
         if User.objects.filter(email__iexact=validated_data['email']).exists():
-            raise serializers.ValidationError("Registration could not be completed with the provided details.")
+            raise serializers.ValidationError({
+                "email": ["An account already exists with this email. Please log in or reset your password."]
+            })
         accepted_terms = validated_data.pop('accepted_terms')
         referral_code = validated_data.pop('referral_code', '')
         referral_shift_id = validated_data.pop('referral_shift_id', None)

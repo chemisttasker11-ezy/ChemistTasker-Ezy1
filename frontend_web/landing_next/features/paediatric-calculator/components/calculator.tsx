@@ -98,7 +98,7 @@ export default function Calculator(){
 
  <a className="skip" href="#workspace">Skip to calculator</a>
 
- <div className="calculator-toolbar"><div className="header-inner"><span className="header-label">Clinical tools</span><span className="private-badge"><LockKeyhole size={13}/> Clinical validation pending</span></div></div>
+ <div className="calculator-toolbar"><div className="header-inner"><span className="header-label">Clinical tools</span><span className="private-badge" role="status" aria-label="Clinical validation status: pending"><LockKeyhole size={13}/> Clinical validation pending</span></div></div>
 
  <main id="workspace" className="shell"><button className="calculator-back" type="button" onClick={()=>{if(window.history.length>1)window.history.back();else window.location.assign('/');}}>← Back</button>
 

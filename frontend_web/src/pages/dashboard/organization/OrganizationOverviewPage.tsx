@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, CircularProgress } from "@mui/material";
-import AppsIcon from "@mui/icons-material/Apps";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
-import HubIcon from "@mui/icons-material/Hub";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import StoreIcon from "@mui/icons-material/Store";
+import ForumIcon from "@mui/icons-material/Forum";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getOrganizationDashboard, getOrganizationMembership } from "@chemisttasker/shared-core";
 import DashboardOverviewTemplate, {
@@ -37,6 +35,15 @@ export default function OrganizationOverviewPage() {
 
   const orgMembership = getOrganizationMembership(user);
   const orgId = orgMembership?.organization_id ?? null;
+  const orgCapabilities = new Set((orgMembership?.capabilities ?? []).map((capability) => String(capability)));
+  const canManageRoster = orgCapabilities.has("manage_roster");
+  const canInviteStaff = orgCapabilities.has("invite_staff");
+  const canManagePharmacies =
+    orgCapabilities.has("manage_staff") ||
+    orgCapabilities.has("view_all_pharmacies") ||
+    orgCapabilities.has("assign_pharmacies");
+  const canManageCommunications = orgCapabilities.has("manage_communications");
+  const canManageBilling = orgMembership?.role === "ORG_ADMIN";
 
   useEffect(() => {
     if (!orgId) return;
@@ -102,22 +109,47 @@ export default function OrganizationOverviewPage() {
     month: Number(data?.upcoming_stats?.month ?? activeShifts),
   };
 
-  const actions: DashboardAction[] = [
-    { title: "Invite Staff", description: "Add organization members", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite"), tone: "blue" },
-    { title: "Claim Pharmacies", description: "Submit ownership claims", icon: <HowToRegIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies?claim=open"), tone: "purple" },
-    { title: "Manage Pharmacies", description: "Configure stores", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies"), tone: "blue" },
-    { title: "Post Shift", description: "Publish an open shift", icon: <PostAddIcon />, onClick: () => navigate("/dashboard/organization/post-shift"), tone: "pink" },
-    { title: "Shift Centre", description: "Active and confirmed shifts", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center"), tone: "cyan" },
-    { title: "Talent Hub", description: "Review talent activity", icon: <AppsIcon />, onClick: () => navigate("/dashboard/organization/interests"), tone: "blue" },
-    { title: "Chat", description: "Coordinate with teams", icon: <ChatOutlinedIcon />, onClick: () => navigate("/dashboard/organization/chat"), tone: "purple" },
-    { title: "Pharmacy Hub", description: "Community and feeds", icon: <HubIcon />, onClick: () => navigate("/dashboard/organization/pharmacy-hub"), tone: "cyan", wide: true },
-  ];
+  const actions: DashboardAction[] = [];
+  if (canManageRoster) {
+    actions.push(
+      { title: "Post Shift", description: "Cover an open workforce need", icon: <PostAddIcon />, onClick: () => navigate("/dashboard/organization/post-shift"), tone: "pink" },
+      { title: "Shift Centre", description: "Review active and confirmed work", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center"), tone: "cyan" },
+    );
+  }
+  if (canInviteStaff) {
+    actions.push(
+      { title: "Invite Staff", description: "Add people within your organization authority", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite"), tone: "blue" },
+    );
+  }
+  if (canManagePharmacies) {
+    actions.push(
+      { title: "Manage Pharmacies", description: "Stores, claims and organization coverage", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies"), tone: "purple" },
+    );
+  }
+  if (canManageCommunications && actions.length < 4) {
+    actions.push(
+      { title: "Pharmacy Hub", description: "Open organization communication and updates", icon: <ForumIcon />, onClick: () => navigate("/dashboard/pharmacy-hub"), tone: "blue" },
+    );
+  }
+
+  const primaryAction = canManageRoster
+    ? { label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/post-shift") }
+    : canManagePharmacies
+      ? { label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }
+      : canInviteStaff
+        ? { label: "Invite staff", icon: <PersonAddIcon />, onClick: () => navigate("/dashboard/organization/invite") }
+        : { label: "Open Pharmacy Hub", icon: <ForumIcon />, onClick: () => navigate("/dashboard/pharmacy-hub") };
+
+  const secondaryAction = canManageRoster && canManagePharmacies
+    ? { label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }
+    : canManageRoster
+      ? { label: "Shift Centre", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/shift-center") }
+      : undefined;
 
   const metrics: DashboardMetric[] = [
     { label: "Pending Claims", value: pendingClaims, helper: "Awaiting approval", icon: <HowToRegIcon />, tone: "purple" },
-    { label: "Approved Claims", value: acceptedClaims, helper: "Connected stores", icon: <StoreIcon />, tone: "blue" },
-    { label: "Open Shifts", value: data?.shift_summary?.open_count ?? 0, helper: selectedPharmacy ? scopeName : "Public platform", icon: <CalendarMonthIcon />, tone: "cyan" },
-    { label: "Count of Shifts", value: data?.shift_summary?.all_count ?? activeShifts, helper: "Active shift records", icon: <CalendarMonthIcon />, tone: "blue" },
+    { label: "Connected Pharmacies", value: acceptedClaims, helper: "Approved organization stores", icon: <StoreIcon />, tone: "blue" },
+    { label: "Open Shifts", value: data?.shift_summary?.open_count ?? 0, helper: selectedPharmacy ? scopeName : "All organization pharmacies", icon: <CalendarMonthIcon />, tone: "cyan" },
     { label: "Confirmed Shifts", value: data?.shift_summary?.confirmed_count ?? data?.confirmed_shifts_count ?? 0, helper: "Booked work", icon: <GroupsIcon />, tone: "pink" },
   ];
   const activityItems = Array.isArray(data?.activity) ? data.activity : [];
@@ -130,12 +162,16 @@ export default function OrganizationOverviewPage() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <DashboardOverviewTemplate
         title="Organization Dashboard"
-        badge={selectedPharmacy ? "Internal workspace" : "Public platform"}
-        subtitle="Manage pharmacies, teams and operations"
+        badge={selectedPharmacy ? "Internal pharmacy" : "Organization workspace"}
+        subtitle="See organization-wide staffing, pharmacy coverage and exceptions"
         heroTitle="Welcome back!"
-        heroSubtitle={`Here's what's happening across ${selectedPharmacy ? scopeName : "your organization"} today.`}
-        primaryAction={{ label: "Post a shift", icon: <CalendarMonthIcon />, onClick: () => navigate("/dashboard/organization/post-shift") }}
-        secondaryAction={{ label: "Manage pharmacies", icon: <StoreIcon />, onClick: () => navigate("/dashboard/organization/manage-pharmacies") }}
+        heroSubtitle={
+          canManageRoster
+            ? `Focus on staffing coverage, claims and shift activity across ${selectedPharmacy ? scopeName : "your organization"}.`
+            : `Focus on the organization tools and pharmacy scope available to your role across ${selectedPharmacy ? scopeName : "your organization"}.`
+        }
+        primaryAction={primaryAction}
+        secondaryAction={secondaryAction}
         pillSummary={
           pillSummary
             ? { balance: pillSummary.balance, shiftPostCost: pillSummary.shift_post_cost }
@@ -143,10 +179,24 @@ export default function OrganizationOverviewPage() {
         }
         actions={actions}
         upcoming={upcoming}
+        showUpcoming={canManageRoster}
         activity={activityItems}
         metrics={metrics}
-        onOpenShifts={() => navigate("/dashboard/organization/shift-center")}
-        onOpenActivity={() => navigate("/dashboard/organization/shift-center")}
+        invoicePanel={
+          canManageBilling
+            ? {
+                title: "Invoices",
+                total: data?.invoice_summary?.total_billed ?? data?.bills_summary?.total_billed ?? "$0.00",
+                totalLabel: selectedPharmacy ? `Invoice value for ${scopeName}` : "Invoice value across the organization",
+                unpaidCount: data?.invoice_summary?.unpaid_count ?? 0,
+                unpaidTotal: data?.invoice_summary?.unpaid_total ?? "$0.00",
+                buttonLabel: "Review invoices",
+                onClick: () => navigate("/dashboard/organization/invoice"),
+              }
+            : undefined
+        }
+        onOpenShifts={canManageRoster ? () => navigate("/dashboard/organization/shift-center") : undefined}
+        onOpenActivity={canManageRoster ? () => navigate("/dashboard/organization/shift-center") : undefined}
       />
       {!data && !error && <CircularProgress size={24} />}
       {error && <Alert severity="error">{error}</Alert>}
