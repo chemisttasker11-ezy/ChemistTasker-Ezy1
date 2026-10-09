@@ -1,16 +1,18 @@
 import SkillIcon from '@/public/skill-icon';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "@/public/navigation";
-import { Box, Button, Chip, Drawer, IconButton, Paper, Stack, Pagination, Typography, Dialog } from "@mui/material";
+import { Box, Button, Chip, Drawer, IconButton, InputAdornment, Paper, Stack, Pagination, TextField, Typography, Dialog } from "@mui/material";
 import {
   Add as AddIcon,
   Tune as TuneIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import { useTalentFeed } from "./hooks/useTalentFeed";
 import { useTalentFilters } from "./hooks/useTalentFilters";
 import PitchDialog, { PitchFormState } from "./components/PitchDialog";
 import AvailabilitySidebar from "./components/AvailabilitySidebar";
 import TalentCardV2 from "./components/TalentCardV2";
+import PublicTalentCard from "./components/PublicTalentCard";
 import FiltersSidebar, { TalentFilterState } from "./components/FiltersSidebar";
 import PostShiftPage from "../PostShiftPage";
 import { Candidate } from "./types";
@@ -145,6 +147,7 @@ const { codeToLabel, codeToCategory } = buildSkillMaps();
 
 type TalentBoardProps = {
   publicMode?: boolean;
+  publicPresentation?: boolean;
   externalPosts?: Record<string, any>[];
   externalLoading?: boolean;
   externalError?: string | null;
@@ -153,6 +156,7 @@ type TalentBoardProps = {
 
 const TalentBoard: React.FC<TalentBoardProps> = ({
   publicMode = false,
+  publicPresentation = false,
   externalPosts,
   externalLoading,
   externalError,
@@ -870,7 +874,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   };
 
   return (
-    <Box sx={{ width: "100%", bgcolor: "background.default", color: "text.primary" }}>
+    <Box sx={{ width: "100%", bgcolor: publicPresentation ? "transparent" : "background.default", color: "text.primary" }}>
       {selectedCalendarCandidate && (
         <AvailabilitySidebar
           candidate={selectedCalendarCandidate}
@@ -881,7 +885,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         />
       )}
 
-      <Box sx={{ px: { xs: 0, lg: 2 }, py: 2, width: "100%" }}>
+      <Box sx={{ px: publicPresentation ? 0 : { xs: 0, lg: 2 }, py: publicPresentation ? 0 : 2, width: "100%" }}>
         {!publicMode && (isPharmacist || isOtherStaff) && !staffPublicAccess && (
           <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
             <Typography variant="body2">Your pharmacy invitation gives you internal team access. Verify your public-platform profile before publishing availability in Talent Hub.</Typography>
@@ -894,7 +898,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           </Typography>
         )}
 
-        <Stack
+        {!publicPresentation ? <Stack
           direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
           alignItems={{ xs: "flex-start", md: "center" }}
@@ -916,19 +920,51 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           >
             <TuneIcon fontSize="small" />
           </IconButton>
-        </Stack>
+        </Stack> : (
+          <Box sx={{ mb: 2.5 }}>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ md: "flex-end" }}>
+              <Box>
+                <Typography component="h2" sx={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: { xs: 26, md: 30 }, color: "#06123A", lineHeight: 1.2 }}>Browse pharmacy talent</Typography>
+                <Typography aria-live="polite" sx={{ mt: 0.5, fontSize: 14, color: "#445474" }}>
+                  {loading ? "Finding published profiles…" : processedCandidates.length === 1 ? "1 profile matches your search" : processedCandidates.length + " profiles match your search"}
+                </Typography>
+              </Box>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" }, minWidth: 0 }}>
+                <TextField
+                  label="Search talent"
+                  placeholder="Role, suburb or skill"
+                  value={filters.search}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+                  size="small"
+                  sx={{ width: { xs: "100%", md: 330 }, "& .MuiOutlinedInput-root": { minHeight: 48, bgcolor: "#FFFFFF" } }}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon aria-hidden="true" sx={{ color: "#52617C" }} /></InputAdornment> }}
+                />
+                <Button
+                  startIcon={<TuneIcon />}
+                  onClick={() => setIsSidebarOpen(true)}
+                  variant="outlined"
+                  sx={{ display: { xs: "inline-flex", lg: "none" }, px: 2.25, minHeight: 48, color: "#5222B8", borderColor: "#C8B8E5", fontWeight: 800, textTransform: "none" }}
+                >
+                  Filters{activeFilterCount > 0 ? " (" + activeFilterCount + ")" : ""}
+                </Button>
+              </Stack>
+            </Stack>
+          </Box>
+        )}
 
-        <Stack direction={{ xs: "column", lg: "row" }} spacing={3} alignItems="flex-start" sx={{ width: "100%" }}>
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={publicPresentation ? 2.5 : 3} alignItems="flex-start" sx={{ width: "100%" }}>
           <Drawer
-            anchor="left"
+            anchor={publicPresentation ? "right" : "left"}
             open={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
             sx={{ display: { lg: "none" } }}
           >
-            <Box sx={{ width: 320 }}>
+            <Box sx={{ width: publicPresentation ? { xs: "min(100vw, 360px)", sm: 360 } : 320, maxWidth: "100vw", pb: 2 }}>
+              {publicPresentation && <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 1.5, borderBottom: "1px solid #E2E8F2" }}><Typography sx={{ fontWeight: 800, color: "#06123A", fontSize: 17 }}>Refine talent</Typography><Button onClick={() => setIsSidebarOpen(false)} sx={{ minHeight: 44, fontWeight: 800 }}>Show results</Button></Stack>}
               <FiltersSidebar
                 filters={filters}
                 onChange={setFilters}
+                hideSearch={publicPresentation}
                 roleOptions={roleOptions}
                 stateOptions={stateOptions}
                 workTypeOptions={allWorkTypes}
@@ -943,16 +979,22 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           <Paper
             variant="outlined"
             sx={{
-              width: 320,
+              width: publicPresentation ? 286 : 320,
+              flexShrink: 0,
               display: { xs: "none", lg: "block" },
               position: "sticky",
-              top: 96,
-              borderRadius: 3,
+              top: 104,
+              borderRadius: publicPresentation ? "14px" : 3,
               bgcolor: "background.paper",
-              borderColor: "divider",
+              borderColor: publicPresentation ? "#E0E7F1" : "divider",
+              boxShadow: "none",
+              maxHeight: "calc(100dvh - 124px)",
+              overflowY: "auto",
             }}
           >
+            {publicPresentation && <Typography component="h3" sx={{ px: 2.5, pt: 2, color: "#06123A", fontSize: 16, fontWeight: 800 }}>Refine results</Typography>}
             <FiltersSidebar
+              hideSearch={publicPresentation}
               filters={filters}
               onChange={setFilters}
               roleOptions={roleOptions}
@@ -1001,7 +1043,15 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             <Stack spacing={2} sx={{ pb: 3 }}>
               {pagedCandidates.length > 0 ? (
                 pagedCandidates.map((candidate) => (
-                <TalentCardV2
+                publicPresentation ? <PublicTalentCard
+                  key={candidate.id}
+                  candidate={candidate}
+                  onViewCalendar={handleViewCalendar}
+                  onToggleLike={handleToggleLike}
+                  onRequestBooking={handleBookTalent}
+                  canViewAvailability={!publicMode}
+                  canRequestBooking={canRequestBooking}
+                /> : <TalentCardV2
                   key={candidate.id}
                   candidate={candidate}
                   onViewCalendar={handleViewCalendar}
@@ -1015,10 +1065,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                 !loading && (
                   <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
                     <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-                      No candidates found
+                      {publicPresentation && candidates.length === 0 && activeFilterCount === 0 ? "No profiles published yet" : "No candidates found"}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      We couldn't find any staff profiles matching your specific criteria.
+                      {publicPresentation && candidates.length === 0 && activeFilterCount === 0 ? "Check back for new profiles or explore other opportunities." : "Try a broader search or clear your filters to see more profiles."}
                     </Typography>
                     <Button variant="outlined" onClick={clearAllFilters}>
                       Reset Filters
@@ -1028,9 +1078,9 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
               )}
             </Stack>
 
-            <Stack alignItems="center" sx={{ mt: 2 }}>
-              <Pagination count={pageCount} page={page} onChange={(_, value) => setPage(value)} />
-            </Stack>
+            {(!publicPresentation || pageCount > 1) && <Stack alignItems="center" sx={{ mt: 2 }}>
+              <Pagination count={pageCount} page={page} onChange={(_, value) => setPage(value)} aria-label="Talent results pages" />
+            </Stack>}
           </Box>
         </Stack>
       </Box>
