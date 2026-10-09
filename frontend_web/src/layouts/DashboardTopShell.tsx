@@ -11,6 +11,7 @@ import {
   MenuItem,
   Stack,
   Typography,
+  useTheme,
 } from "@mui/material";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
@@ -298,6 +299,7 @@ export default function DashboardTopShell({
   } = useWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
+  const isDark = useTheme().palette.mode === "dark";
   const [searchParams, setSearchParams] = useSearchParams();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [workspaceAnchor, setWorkspaceAnchor] = useState<HTMLElement | null>(null);
@@ -560,15 +562,15 @@ export default function DashboardTopShell({
       <Box
         sx={{
           "--ct-dashboard-gradient": accent.gradient,
-          "--ct-dashboard-soft": accent.soft,
-          "--ct-dashboard-accent": accent.text,
-          "--ct-dashboard-card-bg": "#FFFFFF",
-          "--ct-dashboard-card-border": "#E5ECF7",
+          "--ct-dashboard-soft": isDark ? "rgba(130,102,232,.24)" : accent.soft,
+          "--ct-dashboard-accent": isDark ? "#C8B5FF" : accent.text,
+          "--ct-dashboard-card-bg": "var(--ct-surface-bg)",
+          "--ct-dashboard-card-border": "var(--ct-border-color)",
           "--ct-dashboard-card-shadow": "0 8px 24px rgba(6, 18, 58, 0.04)",
           "--ct-dashboard-card-shadow-hover": "0 18px 42px rgba(6, 18, 58, 0.10)",
-          "--ct-dashboard-icon-bg": "#EFE7FF",
-          "--ct-dashboard-title": DNA.ink,
-          "--ct-dashboard-muted": DNA.muted,
+          "--ct-dashboard-icon-bg": isDark ? "rgba(130,102,232,.18)" : "#EFE7FF",
+          "--ct-dashboard-title": "var(--ct-text-primary)",
+          "--ct-dashboard-muted": "var(--ct-text-secondary)",
           minHeight: "100vh",
           width: "100%",
           minWidth: 0,
@@ -774,7 +776,7 @@ export default function DashboardTopShell({
                 </MenuItem>}
                 {canUsePlatformWorkspace && canUseInternal && (
                   <MenuItem onClick={handleSelectPlatform}>
-                    <PublicIcon sx={{ mr: 1.5, color: DNA.violet }} /> ChemistTasker Platform
+                    <PublicIcon sx={{ mr: 1.5, color: isDark ? "#C8B5FF" : DNA.violet }} /> ChemistTasker Platform
                   </MenuItem>
                 )}
                 <Box component="li" role="presentation" sx={{ listStyle: "none", px: 2, pt: 1.25, pb: 0.5 }}>
@@ -812,7 +814,7 @@ export default function DashboardTopShell({
                   textTransform: "none",
                   fontSize: { xs: 11, md: 12 },
                   fontWeight: 900,
-                  color: activePersona === "admin" ? "var(--ct-text-secondary)" : DNA.violet,
+                  color: activePersona === "admin" ? "var(--ct-text-secondary)" : "var(--ct-dashboard-accent)",
                   bgcolor: activePersona === "admin" ? "transparent" : "var(--ct-soft-primary)",
                 }}
               >
@@ -827,7 +829,7 @@ export default function DashboardTopShell({
                   textTransform: "none",
                   fontSize: { xs: 11, md: 12 },
                   fontWeight: 900,
-                  color: activePersona === "admin" ? DNA.violet : "var(--ct-text-secondary)",
+                  color: activePersona === "admin" ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)",
                   bgcolor: activePersona === "admin" ? "var(--ct-soft-primary)" : "transparent",
                 }}
               >
@@ -866,7 +868,7 @@ export default function DashboardTopShell({
               maxWidth: "100%",
             }}
           >
-            <Typography noWrap sx={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: DNA.violet }}>
+            <Typography noWrap sx={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ct-dashboard-accent)" }}>
               {forceAdminScope ? "Internal Workspace" : workspace === "platform" ? "Public Platform" : "Internal Workspace"}
             </Typography>
             <Typography component="div" noWrap sx={{ fontFamily: "var(--ct-font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.2, color: "var(--ct-text-primary)" }}>
@@ -895,7 +897,7 @@ export default function DashboardTopShell({
                 bgcolor: "var(--ct-surface-bg)",
                 color: "var(--ct-text-secondary)",
                 boxShadow: "0 3px 12px rgba(6,18,58,0.05)",
-                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: DNA.violet },
+                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-dashboard-accent)" },
               }}
             />
           </Stack>
