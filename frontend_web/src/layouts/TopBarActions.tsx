@@ -1132,7 +1132,7 @@ export default function TopBarActions({
             height: { xs: 34, md: 40 },
             fontSize: { xs: 12, md: 14 },
             fontWeight: 900,
-            background: "linear-gradient(135deg, #6D28D9, #063BDA)",
+            background: "linear-gradient(135deg, #5222B8, #3C18A8)",
           }}
         >
           {avatarInitials}
@@ -1168,7 +1168,7 @@ export default function TopBarActions({
         >
           <Avatar
             src={avatarSrc || undefined}
-            sx={{ width: 30, height: 30, fontSize: 11, fontWeight: 900, background: "linear-gradient(135deg, #6D28D9, #063BDA)" }}
+            sx={{ width: 30, height: 30, fontSize: 11, fontWeight: 900, background: "linear-gradient(135deg, #5222B8, #3C18A8)" }}
           >
             {avatarInitials}
           </Avatar>
@@ -1196,7 +1196,7 @@ export default function TopBarActions({
         <Box sx={{ px: 2, py: 1.75, display: "flex", alignItems: "center", gap: 1.5 }}>
           <Avatar
             src={avatarSrc || undefined}
-            sx={{ width: 46, height: 46, fontWeight: 900, background: "linear-gradient(135deg, #6D28D9, #063BDA)" }}
+            sx={{ width: 46, height: 46, fontWeight: 900, background: "linear-gradient(135deg, #5222B8, #3C18A8)" }}
           >
             {avatarInitials}
           </Avatar>

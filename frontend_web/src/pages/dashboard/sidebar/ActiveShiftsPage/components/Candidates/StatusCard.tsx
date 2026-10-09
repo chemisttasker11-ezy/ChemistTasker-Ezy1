@@ -73,7 +73,7 @@ const StatusIllustration = ({ title, color }: { title: string; color: StatusCard
                             width: 38,
                             height: 38,
                             bgcolor: '#EEF2FF',
-                            color: '#7C3AED',
+                            color: '#5222B8',
                             boxShadow: '0 12px 24px rgba(124,58,237,.22)',
                         }}
                     >
@@ -93,7 +93,7 @@ const StatusIllustration = ({ title, color }: { title: string; color: StatusCard
                             height: 56,
                             borderRadius: 2,
                             bgcolor: '#fff',
-                            color: isAssigned ? '#2563EB' : '#64748B',
+                            color: isAssigned ? '#3C18A8' : '#64748B',
                             display: 'grid',
                             placeItems: 'center',
                             boxShadow: '0 12px 24px rgba(15,23,42,.14)',

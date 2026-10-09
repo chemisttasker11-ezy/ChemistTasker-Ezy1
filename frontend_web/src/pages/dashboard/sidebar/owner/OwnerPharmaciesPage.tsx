@@ -72,7 +72,7 @@ export default function OwnerPharmaciesPage({
                     height: { xs: 52, md: 60 },
                     borderRadius: { xs: "14px", md: "18px" },
                     bgcolor: "#E7F0FF",
-                    color: "#063BDA",
+                    color: "#3C18A8",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -116,12 +116,12 @@ export default function OwnerPharmaciesPage({
                       minHeight: 38,
                       px: 1.75,
                       borderRadius: 999,
-                      borderColor: alpha("#063BDA", 0.2),
-                      color: "#063BDA",
+                      borderColor: alpha("#3C18A8", 0.2),
+                      color: "#3C18A8",
                       fontWeight: 900,
                       "&:hover": {
-                        borderColor: "#063BDA",
-                        bgcolor: alpha("#063BDA", 0.04),
+                        borderColor: "#3C18A8",
+                        bgcolor: alpha("#3C18A8", 0.04),
                       },
                     }}
                   >
@@ -136,12 +136,12 @@ export default function OwnerPharmaciesPage({
                         minHeight: 38,
                         px: 1.75,
                         borderRadius: 999,
-                        borderColor: alpha("#6D28D9", 0.2),
-                        color: "#6D28D9",
+                        borderColor: alpha("#5222B8", 0.2),
+                        color: "#5222B8",
                         fontWeight: 900,
                         "&:hover": {
-                          borderColor: "#6D28D9",
-                          bgcolor: alpha("#6D28D9", 0.04),
+                          borderColor: "#5222B8",
+                          bgcolor: alpha("#5222B8", 0.04),
                         },
                       }}
                     >

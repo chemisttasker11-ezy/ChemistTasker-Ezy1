@@ -35,6 +35,7 @@ import { UnsavedChangesBoundary, useUnsavedChangesGuard } from '../../hooks/useU
 import { AHPRA_CONSENT_TEXT } from '../../constants/ahpraConsent';
 import AccountDeletionSection from '../../components/AccountDeletionSection';
 import IdentityV2 from './onboarding_pharmacist/IdentityV2';
+import { brandPanelBackground } from "../../components/ui/BrandBanner";
 
 interface FormData {
   username: string;
@@ -67,9 +68,7 @@ const GENDER_OPTIONS = [
 const LIGHT_PAGE_BG = '#F4F7FB';
 const LIGHT_SURFACE = '#FFFFFF';
 const LIGHT_BORDER = '#D9E2F2';
-const HERO_GRADIENT_START = '#143EEA';
-// const HERO_GRADIENT_END = '#D20DAE';
-const HERO_GRADIENT = 'linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)';
+const ACCENT = "#3C18A8"; // dashboard deep violet (was the old Figma blue #3C18A8)
 
 type OwnerOnboardingProps = {
   standalone?: boolean;
@@ -164,7 +163,7 @@ function OwnerOnboardingContent({
         borderColor: '#B8C4DB',
       },
       '&.Mui-focused fieldset': {
-        borderColor: HERO_GRADIENT_START,
+        borderColor: ACCENT,
         borderWidth: 1,
       },
       '&.Mui-disabled': {
@@ -175,7 +174,7 @@ function OwnerOnboardingContent({
       color: '#64748B',
     },
     '& .MuiInputLabel-root.Mui-focused': {
-      color: HERO_GRADIENT_START,
+      color: ACCENT,
     },
     '& .MuiFormHelperText-root': {
       color: '#64748B',
@@ -408,7 +407,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           borderRadius: { xs: 3, md: 4 },
           overflow: 'hidden',
           mb: 2,
-          backgroundImage: HERO_GRADIENT,
+          background: brandPanelBackground,
           color: '#FFFFFF',
           minHeight: { xs: 250, md: 300 },
           position: 'relative',
@@ -421,12 +420,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           sx={{
             position: 'absolute',
             inset: 0,
-            backgroundImage: [
-              `radial-gradient(circle at 64% 98%, ${alpha('#8FE8FF', 0.14)} 0 110px, transparent 111px)`,
-              `radial-gradient(circle at 72% 96%, ${alpha('#6FE7DD', 0.16)} 0 190px, transparent 191px)`,
-              `radial-gradient(circle at 66% 96%, ${alpha('#FFFFFF', 0.12)} 0 275px, transparent 276px)`,
-              `linear-gradient(100deg, transparent 0 78%, ${alpha('#D20DAE', 0.75)} 78% 100%)`,
-            ].join(', '),
+            backgroundImage: 'none',
             pointerEvents: 'none',
           }}
         />
@@ -455,7 +449,6 @@ const handleSubmit = async (e: React.FormEvent) => {
               variant="h3"
               sx={{
                 fontSize: { xs: 34, md: 56 },
-                fontWeight: 900,
                 lineHeight: 1.04,
                 overflowWrap: 'anywhere',
               }}
@@ -480,7 +473,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 label={roleLabel}
                 sx={{
                   bgcolor: '#FFFFFF',
-                  color: '#063BDA',
+                  color: '#3C18A8',
                   fontWeight: 900,
                   '& .MuiChip-label': { px: 1.75 },
                 }}

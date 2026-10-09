@@ -336,7 +336,7 @@ export default function PharmacyAdmins({
                         </Box>
                         <Box sx={{ flexShrink: 0, display: "flex", gap: 0.5 }}>
                           <Tooltip title={formatCapabilityTooltip(admin.capabilities)}>
-                            <IconButton size="small" sx={{ border: `1px solid ${alpha("#063BDA", 0.16)}` }}>
+                            <IconButton size="small" sx={{ border: `1px solid ${alpha("#3C18A8", 0.16)}` }}>
                               <SecurityIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>

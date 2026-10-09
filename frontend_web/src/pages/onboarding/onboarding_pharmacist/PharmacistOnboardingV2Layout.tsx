@@ -17,7 +17,7 @@ import AccountDeletionSection from "../../../components/AccountDeletionSection";
 
 
 const BRAND = {
-  grad: "linear-gradient(90deg, #7c3aed 0%, #2563eb 100%)",
+  grad: "linear-gradient(90deg, #5222B8 0%, #3C18A8 100%)",
 };
 
 

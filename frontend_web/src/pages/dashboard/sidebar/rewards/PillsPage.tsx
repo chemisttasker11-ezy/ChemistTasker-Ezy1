@@ -14,6 +14,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import { useParams } from "react-router-dom";
 import apiClient from "../../../../utils/apiClient";
+import { brandPanelBackground } from "../../../../components/ui/BrandBanner";
 
 type PillBalance = {
   balance: number;
@@ -55,7 +56,6 @@ const ACTIVITY_PAGE_SIZE = 10;
 export default function PillsPage() {
   const theme = useTheme();
   const { pharmacyId } = useParams<{ pharmacyId?: string }>();
-  const primary = theme.palette.primary.main;
   const [balance, setBalance] = useState<PillBalance | null>(null);
   const [entries, setEntries] = useState<PillLedgerEntry[]>([]);
   const [referrals, setReferrals] = useState<PillReferralEvent[]>([]);
@@ -184,7 +184,7 @@ export default function PillsPage() {
           minHeight: { xs: 280, md: 255 },
           borderRadius: 4,
           color: "#fff",
-          background: `linear-gradient(135deg, ${alpha(primary, 0.98)}, ${alpha("#2563eb", 0.92)} 48%, ${alpha("#0ea5e9", 0.88)})`,
+          background: brandPanelBackground,
           overflow: "hidden",
           position: "relative",
           display: "flex",

@@ -11,6 +11,7 @@ import {
   Rating,
   Skeleton,
   Snackbar,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
@@ -28,11 +29,11 @@ import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
 
 const gradientButtonSx = {
   borderRadius: 999,
-  background: 'linear-gradient(135deg, #8B5CF6 0%, #2563EB 100%)',
+  background: '#5222B8',
   color: '#fff',
   fontWeight: 800,
   textTransform: 'none',
-  '&:hover': { background: 'linear-gradient(135deg, #7C3AED 0%, #1D4ED8 100%)' },
+  '&:hover': { background: '#40168F' },
 };
 
 export default function HistoryShiftsPage() {
@@ -116,15 +117,15 @@ export default function HistoryShiftsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
+    <Container maxWidth={false} disableGutters>
+      <Stack direction="row" alignItems="baseline" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', letterSpacing: '-0.015em' }}>
           Shift History
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
+        <Typography variant="body2" sx={{ color: 'var(--ct-text-secondary)' }}>
           Review completed shifts and rate assigned team members
         </Typography>
-      </Box>
+      </Stack>
 
       <OwnerAssignedShiftBoard
         title="Shift History"

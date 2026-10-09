@@ -158,15 +158,15 @@ export default function ConfirmedShiftsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
+    <Container maxWidth={false} disableGutters>
+      <Stack direction="row" alignItems="baseline" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', letterSpacing: '-0.015em' }}>
           Confirmed Shifts
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
+        <Typography variant="body2" sx={{ color: 'var(--ct-text-secondary)' }}>
           Review booked shifts and assigned chemists
         </Typography>
-      </Box>
+      </Stack>
 
       {deferredPayrollOffers.length > 0 && (
         <Stack spacing={1.5} sx={{ mb: 3 }}>

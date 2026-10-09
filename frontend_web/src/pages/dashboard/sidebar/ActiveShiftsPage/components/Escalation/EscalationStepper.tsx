@@ -124,7 +124,7 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                         maxWidth: { xs: 'calc(100% - 36px)', sm: 'calc(100% - 50px)', md: 'calc(100% - 156px)' },
                         height: { xs: 4, md: 5 },
                         borderRadius: 999,
-                        background: 'linear-gradient(90deg,#8B5CF6 0%,#7C3AED 38%,#3B82F6 72%,#22D3EE 100%)',
+                        background: 'linear-gradient(90deg,#8B5CF6 0%,#5222B8 38%,#3B82F6 72%,#22D3EE 100%)',
                         boxShadow: '0 0 18px rgba(124,58,237,.35)',
                     }}
                 />
@@ -168,7 +168,7 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                                             inset: { xs: 4, md: 7 },
                                             borderRadius: '50%',
                                             background: step.reached
-                                                ? 'radial-gradient(circle at 30% 20%, rgba(255,255,255,.88), transparent 34%), linear-gradient(135deg,#7C3AED,#9333EA 48%,#38BDF8)'
+                                                ? 'radial-gradient(circle at 30% 20%, rgba(255,255,255,.88), transparent 34%), linear-gradient(135deg,#5222B8,#9333EA 48%,#38BDF8)'
                                                 : 'linear-gradient(135deg,#E5E7EB,#CBD5E1)',
                                             opacity: step.selectable || step.reached ? 1 : 0.7,
                                         }}
@@ -198,8 +198,8 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                                             height: { xs: 11, md: 16 },
                                             borderRadius: '50%',
                                             bgcolor: 'isPlatform' in step && step.isPlatform
-                                                ? (platformEscalated ? '#7C3AED' : '#CBD5E1')
-                                                : step.reached ? '#7C3AED' : '#CBD5E1',
+                                                ? (platformEscalated ? '#5222B8' : '#CBD5E1')
+                                                : step.reached ? '#5222B8' : '#CBD5E1',
                                             border: { xs: '2px solid #fff', md: '3px solid #fff' },
                                         }}
                                     />
@@ -211,7 +211,7 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                                         lineHeight: { xs: 1, md: 1.15 },
                                         color: 'isPlatform' in step && step.isPlatform
                                             ? platformEscalated ? '#111827' : '#94A3B8'
-                                            : step.active ? '#7C3AED' : step.reached ? '#111827' : '#94A3B8',
+                                            : step.active ? '#5222B8' : step.reached ? '#111827' : '#94A3B8',
                                         textAlign: 'center',
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
@@ -257,7 +257,7 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                         }}
                     >
                         <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
-                            <Box sx={{ width: 56, height: 56, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', background: 'linear-gradient(135deg,#A855F7,#2563EB)', boxShadow: '0 12px 24px rgba(124,58,237,.28)' }}>
+                            <Box sx={{ width: 56, height: 56, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', background: 'linear-gradient(135deg,#A855F7,#3C18A8)', boxShadow: '0 12px 24px rgba(124,58,237,.28)' }}>
                                 {loading ? <CircularProgress size={22} color="inherit" /> : <TrendingUp />}
                             </Box>
                             <Box sx={{ minWidth: 0 }}>

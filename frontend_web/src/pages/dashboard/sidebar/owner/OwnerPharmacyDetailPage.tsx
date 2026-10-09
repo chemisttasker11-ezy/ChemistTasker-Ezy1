@@ -47,7 +47,7 @@ function IconButtonCard({
           ? {
               transform: { xs: "none", md: "translateY(-4px)" },
               boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
-              borderColor: alpha("#063BDA", 0.18),
+              borderColor: alpha("#3C18A8", 0.18),
             }
           : undefined,
       }}
@@ -216,12 +216,12 @@ export default function OwnerPharmacyDetailPage({
               minHeight: 44,
               px: 2.25,
               borderRadius: "12px",
-              borderColor: alpha("#063BDA", 0.16),
-              color: "#4C0DDE",
+              borderColor: alpha("#3C18A8", 0.16),
+              color: "#5222B8",
               fontWeight: 900,
               "&:hover": {
-                borderColor: "#063BDA",
-                bgcolor: alpha("#063BDA", 0.04),
+                borderColor: "#3C18A8",
+                bgcolor: alpha("#3C18A8", 0.04),
               },
             }}
           >

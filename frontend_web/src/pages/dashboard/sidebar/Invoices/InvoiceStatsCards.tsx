@@ -131,7 +131,7 @@ export default function InvoiceStatsCards({
               border: '1px solid',
               borderColor: 'divider',
               background:
-                'linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(246,248,252,0.94) 100%)',
+                'var(--ct-surface-bg)',
             }}
           >
             <Typography variant={compact ? 'caption' : 'body2'} color="text.secondary" mb={compact ? .5 : 1} display="block">

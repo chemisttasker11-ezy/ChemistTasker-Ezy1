@@ -27,6 +27,8 @@ import {
   fetchRatingsSummaryService,
   fetchRatingsPageService,
 } from '@chemisttasker/shared-core';
+import PageHeader from "../../../components/ui/PageHeader";
+import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 
 const curvedPaperSx = {
   borderRadius: 3,
@@ -35,9 +37,9 @@ const curvedPaperSx = {
 
 const gradientButtonSx = {
   borderRadius: 2,
-  background: 'linear-gradient(90deg, #8B5CF6 0%, #6D28D9 100%)',
+  background: '#5222B8',
   color: '#fff',
-  '&:hover': { background: 'linear-gradient(90deg, #A78BFA 0%, #8B5CF6 100%)' },
+  '&:hover': { background: '#40168F' },
 };
 
 const buildFullAddress = (pharmacy?: Shift['pharmacyDetail'] | null) => {
@@ -179,17 +181,16 @@ export default function MyConfirmedShiftsPage() {
 
   if (!shifts.length) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Typography>No upcoming confirmed shifts.</Typography>
+      <Container maxWidth={false} disableGutters>
+        <PageHeader title="My Confirmed Shifts" subtitle="Shifts you are booked for, with pharmacy details and your rates." />
+        <DashboardContentState kind="empty" title="No upcoming confirmed shifts" description="Shifts appear here once a pharmacy confirms you for them." />
       </Container>
     );
   }
 
   return (
-    <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        My Confirmed Shifts
-      </Typography>
+    <Container maxWidth={false} disableGutters>
+      <PageHeader title="My Confirmed Shifts" subtitle="Shifts you are booked for, with pharmacy details and your rates." />
 
       {displayed.map(shift => {
         const isPharmacist = shift.roleNeeded === 'PHARMACIST';

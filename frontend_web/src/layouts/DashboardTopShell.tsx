@@ -32,7 +32,7 @@ import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
 const DNA = {
   navy: "#061A3D",
   navy2: "#02122C",
-  blue: "#063BDA",
+  blue: "#3C18A8",
   violet: "#5222B8",
   magenta: "#EA0A8E",
   cyan: "#08BEEA",

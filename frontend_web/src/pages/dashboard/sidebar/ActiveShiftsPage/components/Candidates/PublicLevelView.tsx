@@ -39,13 +39,13 @@ interface PublicLevelViewProps {
 
 const publicCardPalettes = {
     offer: {
-        bg: 'linear-gradient(180deg,#F7F0FF 0%,#EFE6FF 100%)',
-        fg: '#6D28D9',
+        bg: '#F3EEFE',
+        fg: '#5222B8',
         border: '#C4B5FD',
         shadow: 'rgba(109,40,217,.14)',
     },
     match: {
-        bg: 'linear-gradient(180deg,#E8FCFF 0%,#DDF8FF 100%)',
+        bg: '#E3FAFF',
         fg: '#008EA6',
         border: '#A5F3FC',
         shadow: 'rgba(8,190,234,.16)',

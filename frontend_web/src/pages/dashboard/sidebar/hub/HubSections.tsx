@@ -31,6 +31,7 @@ import type {
 } from '../../../../types/hub';
 import { ScopeFeed } from './HubFeed';
 import { formatMemberLabel, getMemberDisplayName } from './hubUtils';
+import { brandPanelBackground } from "../../../../components/ui/BrandBanner";
 
 const STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
 const filterPharmacyStaffMembers = (members: HubGroupMemberOption[]) =>
@@ -104,7 +105,7 @@ export function HomePageContent({
               pointerEvents: 'none',
             }}
           >
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            <Typography variant="h4" >
               {details.name}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
@@ -113,7 +114,7 @@ export function HomePageContent({
           </Box>
         </Box>
         <CardContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Typography variant="h4" component="h1" sx={{ color: 'text.primary' }}>
             {details.name}
           </Typography>
           <Typography variant="h5" component="h2" sx={{ fontWeight: 'semibold', color: 'text.secondary' }}>
@@ -326,7 +327,7 @@ export function OrgHomePageContent({
               pointerEvents: 'none',
             }}
           >
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            <Typography variant="h4" >
               {details.name}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
@@ -335,7 +336,7 @@ export function OrgHomePageContent({
           </Box>
         </Box>
         <CardContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h3" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
             {details.name}
           </Typography>
           <Typography variant="h5" component="h2" sx={{ fontWeight: 'semibold', color: 'text.secondary' }}>
@@ -400,7 +401,7 @@ export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPost
             sx={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(135deg, #111827 0%, #1d4ed8 55%, #0f766e 100%)',
+              background: brandPanelBackground,
             }}
           />
           <Box
@@ -422,7 +423,7 @@ export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPost
               color: 'common.white',
             }}
           >
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            <Typography variant="h4" >
               {hub.label}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
@@ -431,7 +432,7 @@ export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPost
           </Box>
         </Box>
         <CardContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Typography variant="h4" component="h1" sx={{ color: 'text.primary' }}>
             {hub.label}
           </Typography>
           <Typography variant="body1" sx={{ lineHeight: 1.75, color: 'text.secondary' }}>
@@ -480,11 +481,11 @@ export function GroupContent({ pharmacy, group, scope, onEditGroup, onDeleteGrou
 
   return (
     <Stack sx={{ width: '100%' }} spacing={3}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, background: 'linear-gradient(to right, #6D28D9, #4C1D95)', color: 'white', p: 3 }}>
+      <Card sx={{ borderRadius: 'var(--ct-card-radius)', boxShadow: 'none', border: 'none', background: brandPanelBackground, color: 'white', p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <TagIcon sx={{ fontSize: 32, opacity: 0.8 }} />
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>{group.name}</Typography>
+            <Typography variant="h4" component="h1" >{group.name}</Typography>
             {group.isCreator && (
               <Chip
                 label="Created by you"
@@ -559,11 +560,11 @@ export function OrgGroupContent({ group, scope, onEditGroup, onDeleteGroup, targ
 
   return (
     <Stack sx={{ width: '100%' }} spacing={3}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, background: 'linear-gradient(to right, #1976D2, #0D47A1)', color: 'white', p: 3 }}>
+      <Card sx={{ borderRadius: 'var(--ct-card-radius)', boxShadow: 'none', border: 'none', background: brandPanelBackground, color: 'white', p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <TagIcon sx={{ fontSize: 32, opacity: 0.8 }} />
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>{group.name} </Typography>
+            <Typography variant="h4" component="h1" >{group.name} </Typography>
             {group.isCreator && (
               <Chip
                 label="Created by you"

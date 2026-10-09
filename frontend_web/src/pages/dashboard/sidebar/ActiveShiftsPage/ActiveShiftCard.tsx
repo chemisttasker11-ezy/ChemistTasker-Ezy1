@@ -364,7 +364,7 @@ export default function ActiveShiftCard({
                                 border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
                                 '&:hover': {
                                     bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
-                                    color: isDarkMode ? '#FFFFFF' : '#6D28D9',
+                                    color: isDarkMode ? '#FFFFFF' : '#5222B8',
                                 },
                                 '&.Mui-disabled': {
                                     color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
@@ -389,7 +389,7 @@ export default function ActiveShiftCard({
                             border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
                             '&:hover': {
                                 bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
-                                color: isDarkMode ? '#FFFFFF' : '#6D28D9',
+                                color: isDarkMode ? '#FFFFFF' : '#5222B8',
                             },
                         }}
                         onClick={e => {
@@ -525,9 +525,9 @@ export default function ActiveShiftCard({
                                         <Box
                                             key={item.label}
                                             sx={{
-                                                borderRadius: 3,
-                                                border: `1px solid ${isDarkMode ? alpha('#FFFFFF', 0.14) : '#D9E2F2'}`,
-                                                background: isDarkMode ? alpha('#FFFFFF', 0.075) : '#FFFFFFCC',
+                                                borderRadius: '14px',
+                                                border: '1px solid var(--ct-border-color)',
+                                                background: 'var(--ct-surface-bg)',
                                                 minWidth: 0,
                                                 width: '100%',
                                                 px: { xs: 1.25, sm: 2 },
@@ -547,7 +547,7 @@ export default function ActiveShiftCard({
                                                     height: { xs: 30, sm: 36 },
                                                     borderRadius: '50%',
                                                     bgcolor: isDarkMode ? alpha('#A78BFA', 0.18) : '#F3E8FF',
-                                                    color: isDarkMode ? '#C4B5FD' : '#7C3AED',
+                                                    color: isDarkMode ? '#C4B5FD' : '#5222B8',
                                                     display: 'grid',
                                                     placeItems: 'center',
                                                     flexShrink: 0,

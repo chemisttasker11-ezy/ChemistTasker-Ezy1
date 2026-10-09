@@ -261,7 +261,6 @@ export default function ManagerAttendanceReviewPage() {
             variant="h4"
             sx={{
               fontFamily: BRAND_FONTS.heading,
-              fontWeight: 700,
               color: BRAND_COLORS.navy,
               fontSize: { xs: 26, md: 32 },
               letterSpacing: "-0.02em",
@@ -565,7 +564,7 @@ export default function ManagerAttendanceReviewPage() {
                         <Typography
                           variant="body2"
                           fontWeight={ev.is_corrected ? 700 : 400}
-                          sx={{ color: ev.is_corrected ? "#7c3aed" : "inherit" }}
+                          sx={{ color: ev.is_corrected ? "#5222B8" : "inherit" }}
                         >
                           {new Date(ev.effective_timestamp).toLocaleTimeString([], {
                             hour: "2-digit",
@@ -607,7 +606,7 @@ export default function ManagerAttendanceReviewPage() {
               {/* Sub-form for editing an event timestamp */}
               {editingEventId && (
                 <Paper sx={{ p: 2.5, bgcolor: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 2 }}>
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#6d28d9", mb: 1.5 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#5222B8", mb: 1.5 }}>
                     Append Manual Correction to Event #{editingEventId}
                   </Typography>
                   <Grid container spacing={2}>
@@ -644,7 +643,7 @@ export default function ManagerAttendanceReviewPage() {
                       color="secondary"
                       onClick={handleSubmitCorrection}
                       disabled={submittingCorrection || !correctionReason.trim()}
-                      sx={{ bgcolor: "#7c3aed" }}
+                      sx={{ bgcolor: "#5222B8" }}
                     >
                       {submittingCorrection ? <CircularProgress size={20} color="inherit" /> : "Save Correction"}
                     </Button>

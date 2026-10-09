@@ -601,7 +601,7 @@ export default function PharmacyCalendarPage() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: 2,
-                                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                                background: theme.palette.primary.main,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -654,10 +654,10 @@ export default function PharmacyCalendarPage() {
                                 fontWeight: 600,
                                 fontFamily: '"Inter", sans-serif',
                                 px: 2.5,
-                                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                                background: theme.palette.primary.main,
                                 boxShadow: `0 4px 14px 0 ${alpha(theme.palette.primary.main, 0.4)}`,
                                 "&:hover": {
-                                    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                                    background: theme.palette.primary.dark,
                                 },
                             }}
                         >

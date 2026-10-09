@@ -5,7 +5,7 @@ export type BannerAction = { label: string; icon?: ReactNode; onClick: () => voi
 
 // Colours sampled from the dashboard Figma welcome panel: navy -> violet -> blue,
 // with one soft violet circle top-right and one blue circle along the bottom.
-const bannerBackground = [
+export const brandPanelBackground = [
   "radial-gradient(circle at 92% 12%, rgba(196, 128, 240, 0.42) 0 150px, transparent 151px)",
   "radial-gradient(circle at 60% 122%, rgba(18, 104, 214, 0.78) 0 132px, transparent 133px)",
   "linear-gradient(104deg, #02184B 0%, #1F1777 38%, #3A1BA6 66%, #4A33C2 82%, #0280D6 100%)",
@@ -32,7 +32,7 @@ export default function BrandBanner({
         position: "relative",
         overflow: "hidden",
         borderRadius: { xs: "18px", md: "24px" },
-        background: bannerBackground,
+        background: brandPanelBackground,
         color: "#FFFFFF",
         px: { xs: 2.5, sm: 3.5, md: 4.25 },
         py: { xs: 3, md: 4.5 },

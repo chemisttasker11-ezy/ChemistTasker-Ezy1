@@ -28,6 +28,8 @@ import {
   fetchMyRatingForTargetService,
   createRatingService,
 } from '@chemisttasker/shared-core';
+import PageHeader from "../../../components/ui/PageHeader";
+import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 
 const curvedPaperSx = {
   borderRadius: 3,
@@ -36,9 +38,9 @@ const curvedPaperSx = {
 
 const gradientButtonSx = {
   borderRadius: 2,
-  background: 'linear-gradient(90deg, #8B5CF6 0%, #6D28D9 100%)',
+  background: '#5222B8',
   color: '#fff',
-  '&:hover': { background: 'linear-gradient(90deg, #A78BFA 0%, #8B5CF6 100%)' },
+  '&:hover': { background: '#40168F' },
 };
 
 const buildFullAddress = (pharmacy?: Shift['pharmacyDetail'] | null) => {
@@ -209,17 +211,16 @@ export default function MyHistoryShiftsPage() {
 
   if (!shifts.length) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Typography>No past shifts to rate.</Typography>
+      <Container maxWidth={false} disableGutters>
+        <PageHeader title="My Shift History" subtitle="Past shifts you worked, with the option to rate the pharmacy." />
+        <DashboardContentState kind="empty" title="No past shifts to rate" description="Completed shifts appear here so you can rate the pharmacy." />
       </Container>
     );
   }
 
   return (
-    <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        My Shift History
-      </Typography>
+    <Container maxWidth={false} disableGutters>
+      <PageHeader title="My Shift History" subtitle="Past shifts you worked, with the option to rate the pharmacy." />
 
       {displayed.map(shift => {
         const slots = shift.slots ?? [];

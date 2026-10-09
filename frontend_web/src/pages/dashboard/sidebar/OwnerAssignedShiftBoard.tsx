@@ -35,11 +35,11 @@ type Props = {
 
 const palette = {
   surface: '#FFFFFF',
-  page: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
-  border: '#D9E2F2',
-  text: '#0F172A',
-  muted: '#64748B',
-  violet: '#7C3AED',
+  page: 'var(--ct-surface-bg)',
+  border: 'var(--ct-border-color)',
+  text: 'var(--ct-text-primary)',
+  muted: 'var(--ct-text-secondary)',
+  violet: '#5222B8',
   violetSoft: '#F3E8FF',
   cyan: '#06B6D4',
   cyanSoft: '#ECFEFF',
@@ -50,9 +50,9 @@ const palette = {
 };
 
 const statCardSx = {
-  borderRadius: 3,
+  borderRadius: '14px',
   border: `1px solid ${palette.border}`,
-  background: '#FFFFFFCC',
+  background: 'var(--ct-surface-bg)',
   minWidth: 0,
   width: '100%',
   px: { xs: 1.25, sm: 2 },
@@ -66,24 +66,24 @@ const statCardSx = {
 const actionButtonSx = {
   borderRadius: 999,
   textTransform: 'none',
-  fontWeight: 700,
+  fontWeight: 600,
   px: 1.75,
 };
 
 const primaryButtonSx = {
   ...actionButtonSx,
   color: '#fff',
-  background: 'linear-gradient(135deg, #8B5CF6 0%, #2563EB 100%)',
+  background: '#5222B8',
   '&:hover': {
-    background: 'linear-gradient(135deg, #7C3AED 0%, #1D4ED8 100%)',
+    background: '#40168F',
   },
 };
 
 const secondaryButtonSx = {
   ...actionButtonSx,
-  borderColor: '#BAE6FD',
-  color: '#0F172A',
-  backgroundColor: '#fff',
+  borderColor: 'var(--ct-border-color)',
+  color: 'var(--ct-text-primary)',
+  backgroundColor: 'var(--ct-surface-bg)',
 };
 
 const getAssignmentSlotId = (assignment: AssignmentLike): number | null =>
@@ -281,12 +281,13 @@ export default function OwnerAssignedShiftBoard({
         sx={{
           p: 5,
           textAlign: 'center',
-          borderRadius: 5,
+          borderRadius: 'var(--ct-card-radius)',
           border: `1px solid ${palette.border}`,
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+          background: 'var(--ct-surface-bg)',
+          boxShadow: 'none',
         }}
       >
-        <Typography variant="h5" sx={{ fontWeight: 800, color: palette.text, mb: 1 }}>
+        <Typography variant="h5" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: palette.text, mb: 1 }}>
           {title}
         </Typography>
         <Typography sx={{ color: palette.muted }}>{emptyText}</Typography>
@@ -324,33 +325,26 @@ export default function OwnerAssignedShiftBoard({
             }}
             sx={{
               p: { xs: 2, md: 3 },
-              borderRadius: 6,
+              // Same flat card as Active Shifts.
+              borderRadius: 'var(--ct-card-radius)',
               border: `1px solid ${palette.border}`,
               background: palette.page,
+              boxShadow: 'none',
               overflow: 'hidden',
               position: 'relative',
               cursor: 'pointer',
-              transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
+              transition: 'box-shadow 160ms ease, border-color 160ms ease',
               '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: '0 18px 42px rgba(15,23,42,.08)',
-                borderColor: '#C7D2FE',
+                boxShadow: '0 10px 28px rgba(6, 18, 58, 0.07)',
+                borderColor: 'var(--ct-tone-violet-bg)',
               },
               '&:focus-visible': {
-                outline: '3px solid rgba(124,58,237,.28)',
-                outlineOffset: 3,
+                outline: '2px solid var(--ct-accent-strong)',
+                outlineOffset: 2,
               },
+              '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
             }}
           >
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                pointerEvents: 'none',
-                background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
-              }}
-            />
-
             <Stack spacing={2} sx={{ position: 'relative' }}>
               <Stack
                 direction={{ xs: 'column', xl: 'row' }}
@@ -363,17 +357,17 @@ export default function OwnerAssignedShiftBoard({
                     <Avatar
                       variant="rounded"
                       sx={{
-                        width: 58,
-                        height: 58,
-                        borderRadius: 3.5,
-                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
-                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
+                        width: 48,
+                        height: 48,
+                        borderRadius: '12px',
+                        color: 'var(--ct-tone-violet-fg)',
+                        bgcolor: 'var(--ct-tone-violet-bg)',
                       }}
                     >
                       <AssignmentIndRoundedIcon />
                     </Avatar>
                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 900, color: palette.text, lineHeight: 1.05 }}>
+                      <Typography variant="h5" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: { xs: 18, sm: 20 }, color: palette.text, lineHeight: 1.25 }}>
                         {shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}
                       </Typography>
                       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
@@ -464,19 +458,16 @@ export default function OwnerAssignedShiftBoard({
                           elevation={0}
                           sx={{
                             p: 2,
-                            borderRadius: 4,
-                            border: `1px solid ${assigned ? (mode === 'history' ? '#FDE68A' : '#C7D2FE') : palette.border}`,
+                            borderRadius: '14px',
+                            border: `1px solid ${assigned ? 'transparent' : palette.border}`,
                             background: assigned
-                              ? (mode === 'history'
-                                ? 'linear-gradient(180deg, #FFFFFF 0%, #FFFBEB 100%)'
-                                : 'linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%)')
-                              : 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+                              ? (mode === 'history' ? 'var(--ct-tone-magenta-bg)' : 'var(--ct-tone-violet-bg)')
+                              : 'var(--ct-surface-bg)',
                             cursor: assigned ? 'pointer' : 'default',
-                            transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
+                            transition: 'box-shadow 160ms ease, border-color 160ms ease',
                             '&:hover': assigned ? {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 16px 30px rgba(15,23,42,.10)',
-                              borderColor: mode === 'history' ? '#F59E0B' : '#6366F1',
+                              boxShadow: '0 8px 22px rgba(6, 18, 58, 0.08)',
+                              borderColor: mode === 'history' ? 'var(--ct-tone-magenta-fg)' : 'var(--ct-accent-strong)',
                             } : undefined,
                           }}
                           onClick={assigned ? () => onViewAssigned(shift.id, slot?.id ?? null, userId as number) : undefined}

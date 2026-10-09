@@ -87,7 +87,7 @@ export const SlotSelector: React.FC<SlotSelectorProps> = ({
                                     <>
                                         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>{parts.day}</Typography>
                                         <Typography sx={{ color: '#111827', fontWeight: 900, lineHeight: 1.15, fontSize: { xs: 13, sm: 16 } }}>{parts.date}</Typography>
-                                        <Box component="span" sx={{ mt: 1, px: { xs: 0.6, sm: 1 }, py: 0.25, borderRadius: 999, bgcolor: '#F3E8FF', color: '#7C3AED', fontSize: { xs: 9.5, sm: 12 }, fontWeight: 800, maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.2 }}>
+                                        <Box component="span" sx={{ mt: 1, px: { xs: 0.6, sm: 1 }, py: 0.25, borderRadius: 999, bgcolor: '#F3E8FF', color: '#5222B8', fontSize: { xs: 9.5, sm: 12 }, fontWeight: 800, maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.2 }}>
                                             {parts.time}
                                         </Box>
                                         <Typography variant="caption" sx={{ mt: 0.75, color: '#475569', fontWeight: 700 }}>

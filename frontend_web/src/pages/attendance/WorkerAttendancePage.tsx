@@ -279,7 +279,6 @@ export default function WorkerAttendancePage() {
           variant="h4"
           sx={{
             fontFamily: BRAND_FONTS.heading,
-            fontWeight: 700,
             color: BRAND_COLORS.navy,
             fontSize: { xs: 26, md: 32 },
             letterSpacing: "-0.02em",

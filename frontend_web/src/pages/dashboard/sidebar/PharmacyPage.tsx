@@ -84,13 +84,12 @@ import {
   prettifyOptionLabel,
   PHARMACY_CACHE_KEY,
 } from "./PharmacyPage.model";
+import { brandPanelBackground } from "../../../components/ui/BrandBanner";
 
 const GOOGLE_LIBRARIES = ["places"] as Array<"places">;
 const LIGHT_SURFACE = "#FFFFFF";
 const LIGHT_BORDER = "#D9E2F2";
-const HERO_GRADIENT_START = "#143EEA";
-// const HERO_GRADIENT_END = "#D20DAE";
-const HERO_GRADIENT = "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)";
+const ACCENT = "#3C18A8"; // dashboard deep violet (was the old Figma blue #3C18A8)
 const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
 const DASHBOARD_INK = "#06123A";
 
@@ -121,7 +120,7 @@ const pharmacyFormLightSx = {
     textTransform: "none",
   },
   "& .MuiTab-root.Mui-selected": {
-    color: HERO_GRADIENT_START,
+    color: ACCENT,
   },
   "& .MuiOutlinedInput-root": {
     bgcolor: LIGHT_SURFACE,
@@ -141,7 +140,7 @@ const pharmacyFormLightSx = {
       borderColor: "#B8C4DB",
     },
     "&.Mui-focused fieldset": {
-      borderColor: HERO_GRADIENT_START,
+      borderColor: ACCENT,
       borderWidth: 1,
     },
   },
@@ -149,7 +148,7 @@ const pharmacyFormLightSx = {
     color: "#64748B",
   },
   "& .MuiInputLabel-root.Mui-focused": {
-    color: HERO_GRADIENT_START,
+    color: ACCENT,
   },
   "& .MuiFormHelperText-root": {
     color: "#64748B",
@@ -164,7 +163,7 @@ const pharmacyFormLightSx = {
     color: "#111827",
   },
   "& .MuiCheckbox-root.Mui-checked": {
-    color: HERO_GRADIENT_START,
+    color: ACCENT,
   },
 } as const;
 
@@ -592,20 +591,20 @@ export default function PharmacyPage({
               "& .MuiTab-iconWrapper": {
                 mb: "0 !important",
                 mr: 0.9,
-                color: "#6D28D9",
+                color: "#5222B8",
               },
               "&.Mui-selected": {
-                color: "#143EEA",
-                bgcolor: alpha(HERO_GRADIENT_START, 0.1),
-                borderColor: alpha(HERO_GRADIENT_START, 0.28),
+                color: "#3C18A8",
+                bgcolor: alpha(ACCENT, 0.1),
+                borderColor: alpha(ACCENT, 0.28),
                 boxShadow: "0 14px 30px rgba(20, 62, 234, 0.12)",
                 "& .MuiTab-iconWrapper": {
-                  color: "#143EEA",
+                  color: "#3C18A8",
                 },
               },
               "&:hover": {
                 transform: "translateY(-1px)",
-                borderColor: alpha(HERO_GRADIENT_START, 0.22),
+                borderColor: alpha(ACCENT, 0.22),
                 bgcolor: alpha("#FFFFFF", 0.98),
               },
             }}
@@ -810,12 +809,12 @@ export default function PharmacyPage({
                       gap: 1.25,
                       p: 1.5,
                       borderRadius: 2.5,
-                      border: `1px solid ${employmentTypes.includes(option) ? alpha(HERO_GRADIENT_START, 0.34) : LIGHT_BORDER}`,
-                      bgcolor: employmentTypes.includes(option) ? alpha(HERO_GRADIENT_START, 0.08) : LIGHT_SURFACE,
+                      border: `1px solid ${employmentTypes.includes(option) ? alpha(ACCENT, 0.34) : LIGHT_BORDER}`,
+                      bgcolor: employmentTypes.includes(option) ? alpha(ACCENT, 0.08) : LIGHT_SURFACE,
                       cursor: "pointer",
                       transition: "background-color 120ms ease, border-color 120ms ease, transform 120ms ease",
                       "&:hover": {
-                        borderColor: alpha(HERO_GRADIENT_START, 0.28),
+                        borderColor: alpha(ACCENT, 0.28),
                         transform: "translateY(-1px)",
                       },
                     }}
@@ -863,12 +862,12 @@ export default function PharmacyPage({
                       p: 1.5,
                       minHeight: 78,
                       borderRadius: 2.5,
-                      border: `1px solid ${rolesNeeded.includes(option) ? alpha(HERO_GRADIENT_START, 0.34) : LIGHT_BORDER}`,
-                      bgcolor: rolesNeeded.includes(option) ? alpha(HERO_GRADIENT_START, 0.08) : "#FBFCFE",
+                      border: `1px solid ${rolesNeeded.includes(option) ? alpha(ACCENT, 0.34) : LIGHT_BORDER}`,
+                      bgcolor: rolesNeeded.includes(option) ? alpha(ACCENT, 0.08) : "#FBFCFE",
                       cursor: "pointer",
                       transition: "background-color 120ms ease, border-color 120ms ease, transform 120ms ease",
                       "&:hover": {
-                        borderColor: alpha(HERO_GRADIENT_START, 0.28),
+                        borderColor: alpha(ACCENT, 0.28),
                         transform: "translateY(-1px)",
                       },
                     }}
@@ -998,7 +997,7 @@ export default function PharmacyPage({
               mb: 2,
               p: 2,
               borderRadius: 3,
-              border: `1px solid ${alpha(HERO_GRADIENT_START, 0.12)}`,
+              border: `1px solid ${alpha(ACCENT, 0.12)}`,
               bgcolor: "#F7F9FF",
               boxShadow: "0 10px 24px rgba(20, 62, 234, 0.06)",
               textDecoration: "none",
@@ -1007,7 +1006,7 @@ export default function PharmacyPage({
             <Typography
               variant="caption"
               sx={{
-                color: "#6D28D9",
+                color: "#5222B8",
                 fontWeight: 900,
                 textTransform: "uppercase",
                 letterSpacing: ".08em",
@@ -1021,7 +1020,7 @@ export default function PharmacyPage({
             <Typography sx={{ mt: 0.5, color: "#64748B", fontSize: 13, lineHeight: 1.6 }}>
               The rate details below apply to the locum Pharmacist rates for this pharmacy.
             </Typography>
-            <Typography sx={{ mt: 1, color: HERO_GRADIENT_START, fontSize: 13, fontWeight: 800 }}>
+            <Typography sx={{ mt: 1, color: ACCENT, fontSize: 13, fontWeight: 800 }}>
               View Fair Work award guide
             </Typography>
             <Typography sx={{ mt: 0.25, color: "#64748B", fontSize: 12 }}>
@@ -2161,7 +2160,7 @@ export default function PharmacyPage({
               borderRadius: { xs: 3, md: 4 },
               overflow: "hidden",
               mb: 2,
-              backgroundImage: HERO_GRADIENT,
+              background: brandPanelBackground,
               color: "#FFFFFF",
               minHeight: { xs: 250, md: 300 },
               position: "relative",
@@ -2174,12 +2173,7 @@ export default function PharmacyPage({
               sx={{
                 position: "absolute",
                 inset: 0,
-                backgroundImage: [
-                  `radial-gradient(circle at 64% 98%, ${alpha("#8FE8FF", 0.14)} 0 110px, transparent 111px)`,
-                  `radial-gradient(circle at 72% 96%, ${alpha("#6FE7DD", 0.16)} 0 190px, transparent 191px)`,
-                  `radial-gradient(circle at 66% 96%, ${alpha("#FFFFFF", 0.12)} 0 275px, transparent 276px)`,
-                  `linear-gradient(100deg, transparent 0 78%, ${alpha("#D20DAE", 0.75)} 78% 100%)`,
-                ].join(", "),
+                backgroundImage: "none",
                 pointerEvents: "none",
               }}
             />
@@ -2208,7 +2202,6 @@ export default function PharmacyPage({
                   variant="h3"
                   sx={{
                     fontSize: { xs: 34, md: 56 },
-                    fontWeight: 900,
                     lineHeight: 1.04,
                     color: "#FFFFFF",
                     overflowWrap: "anywhere",
@@ -2234,7 +2227,7 @@ export default function PharmacyPage({
                     label="Basic details first"
                     sx={{
                       bgcolor: "#FFFFFF",
-                      color: "#063BDA",
+                      color: "#3C18A8",
                       fontWeight: 900,
                       "& .MuiChip-label": { px: 1.75 },
                     }}

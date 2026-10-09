@@ -203,7 +203,7 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
                 <TopBar onBack={onBack} breadcrumb={['Billing & Subscription']} />
 
                 <Box sx={{ maxWidth: 1000, mx: 'auto', mt: 4 }}>
-                    <Typography variant="h4" fontWeight={800} gutterBottom textAlign="center">
+                    <Typography variant="h4" gutterBottom textAlign="center">
                         Choose Your Plan
                     </Typography>
                     <Typography variant="body1" color="text.secondary" paragraph textAlign="center" sx={{ mb: 6 }}>
@@ -327,7 +327,7 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
                 <TopBar onBack={() => setView('plans')} breadcrumb={['Billing & Subscription', 'Setup']} />
 
                 <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
-                    <Typography variant="h4" fontWeight={800} gutterBottom>
+                    <Typography variant="h4" gutterBottom>
                         Setup Subscription
                     </Typography>
                 <Typography variant="body1" color="text.secondary" paragraph>
@@ -422,7 +422,7 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
             <TopBar onBack={onBack} breadcrumb={['Billing & Subscription']} />
 
             <Box sx={{ maxWidth: 900, mx: 'auto', mt: 4 }}>
-                <Typography variant="h4" fontWeight={800} gutterBottom>
+                <Typography variant="h4" gutterBottom>
                     Manage Subscription
                 </Typography>
                 <Typography variant="body1" color="text.secondary" paragraph>

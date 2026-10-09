@@ -55,8 +55,8 @@ const DNA = {
   ink: '#06123A',
   muted: '#5E6B8D',
   line: '#E5ECF7',
-  blue: '#063BDA',
-  violet: '#6D28D9',
+  blue: '#3C18A8',
+  violet: '#5222B8',
   magenta: '#EA0A8E',
   cyan: '#08BEEA',
   mint: '#00A878',
@@ -82,7 +82,7 @@ const cardSx = {
   mb: 4,
   borderRadius: '24px',
   border: `1px solid ${alpha(DNA.blue, 0.08)}`,
-  background: `linear-gradient(180deg, ${DNA.surface} 0%, ${DNA.soft} 100%)`,
+  background: DNA.surface,
   boxShadow: '0 24px 56px rgba(6, 18, 58, 0.08)',
   animation: `${fadeUp} 420ms ease`,
 };
@@ -414,7 +414,6 @@ export default function SetAvailabilityPage() {
         variant="h4"
         gutterBottom
         sx={{
-          fontWeight: 950,
           color: DNA.ink,
           letterSpacing: '-0.03em',
           animation: `${fadeUp} 360ms ease`,
@@ -428,7 +427,7 @@ export default function SetAvailabilityPage() {
           ...cardSx,
           mb: 3,
           p: 2.5,
-          background: `linear-gradient(180deg, ${alpha(DNA.mint, 0.10)} 0%, ${DNA.surface} 100%)`,
+          background: DNA.surface,
         }}
       >
         <FormControlLabel
@@ -502,7 +501,7 @@ export default function SetAvailabilityPage() {
                       options={{
                         fillColor: '#08BEEA',
                         fillOpacity: 0.16,
-                        strokeColor: '#063BDA',
+                        strokeColor: '#3C18A8',
                         strokeOpacity: 0.55,
                         strokeWeight: 2,
                       }}
@@ -598,7 +597,7 @@ export default function SetAvailabilityPage() {
               minHeight: 48,
               borderRadius: '14px',
               fontWeight: 900,
-              backgroundImage: 'linear-gradient(90deg, #063BDA 0%, #6D28D9 100%)',
+              backgroundImage: 'none',
               boxShadow: '0 16px 30px rgba(6, 59, 218, 0.20)',
               '&:hover': {
                 boxShadow: '0 20px 34px rgba(6, 59, 218, 0.26)',
@@ -846,7 +845,7 @@ export default function SetAvailabilityPage() {
               minHeight: 48,
               borderRadius: '14px',
               fontWeight: 900,
-              backgroundImage: 'linear-gradient(90deg, #063BDA 0%, #6D28D9 100%)',
+              backgroundImage: 'none',
               boxShadow: '0 16px 30px rgba(6, 59, 218, 0.20)',
               '&:hover': {
                 boxShadow: '0 20px 34px rgba(6, 59, 218, 0.26)',
@@ -875,7 +874,7 @@ export default function SetAvailabilityPage() {
               mb: 2,
               borderRadius: '20px',
               border: `1px solid ${alpha(DNA.blue, 0.08)}`,
-              background: `linear-gradient(180deg, ${DNA.surface} 0%, ${DNA.soft} 100%)`,
+              background: DNA.surface,
               boxShadow: '0 18px 42px rgba(6, 18, 58, 0.06)',
               animation: `${fadeUp} ${420 + index * 60}ms ease`,
               transition: 'transform 180ms ease, box-shadow 180ms ease',

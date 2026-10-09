@@ -67,7 +67,7 @@ const StepIconRoot = styled('div')<{ ownerState: { active?: boolean; completed?:
       ? theme.palette.common.white
       : theme.palette.text.secondary,
     background: ownerState.completed || ownerState.active
-      ? 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)'
+      ? '#5222B8'
       : theme.palette.grey[200],
     boxShadow: ownerState.active
       ? '0 12px 24px rgba(109, 40, 217, 0.25)'

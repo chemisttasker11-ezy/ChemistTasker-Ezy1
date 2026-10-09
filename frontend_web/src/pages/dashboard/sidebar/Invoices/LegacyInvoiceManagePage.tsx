@@ -279,7 +279,7 @@ export default function InvoiceManagePage() {
           gap={2}
         >
           <Box>
-            <Typography variant="h4" fontWeight={800}>
+            <Typography variant="h4">
               Invoices
             </Typography>
             <Typography color="text.secondary">

@@ -587,7 +587,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>{title}</Typography>
+          <Typography variant="h4">{title}</Typography>
           <Typography variant="body2" color="text.secondary">
             {activeTab === 'saved'
               ? `${displayShifts.length} saved items`

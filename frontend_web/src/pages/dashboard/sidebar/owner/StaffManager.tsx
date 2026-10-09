@@ -553,9 +553,9 @@ export default function StaffManager({
           onClick={() => setSortBy("role")}
           sx={{
             ...actionButtonSx,
-            borderColor: alpha("#063BDA", 0.16),
-            color: "#4C0DDE",
-            "&:hover": { borderColor: "#063BDA", bgcolor: alpha("#063BDA", 0.04) },
+            borderColor: alpha("#3C18A8", 0.16),
+            color: "#5222B8",
+            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
           }}
         >
           Sort: Role
@@ -566,9 +566,9 @@ export default function StaffManager({
           onClick={() => setSortBy("workType")}
           sx={{
             ...actionButtonSx,
-            borderColor: alpha("#063BDA", 0.16),
-            color: "#4C0DDE",
-            "&:hover": { borderColor: "#063BDA", bgcolor: alpha("#063BDA", 0.04) },
+            borderColor: alpha("#3C18A8", 0.16),
+            color: "#5222B8",
+            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
           }}
         >
           Sort: Work Type
@@ -619,9 +619,9 @@ export default function StaffManager({
           onClick={openLinkDialog}
           sx={{
             ...actionButtonSx,
-            borderColor: alpha("#063BDA", 0.16),
-            color: "#4C0DDE",
-            "&:hover": { borderColor: "#063BDA", bgcolor: alpha("#063BDA", 0.04) },
+            borderColor: alpha("#3C18A8", 0.16),
+            color: "#5222B8",
+            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
           }}
         >
           Generate Link
@@ -674,7 +674,7 @@ export default function StaffManager({
                         {item.name}
                       </Typography>
                       {item.jobTitle && (
-                        <Typography sx={{ mt: 0.5, color: "#4C0DDE", fontWeight: 800, fontSize: 14, overflowWrap: "anywhere" }}>
+                        <Typography sx={{ mt: 0.5, color: "#5222B8", fontWeight: 800, fontSize: 14, overflowWrap: "anywhere" }}>
                           {item.jobTitle}
                         </Typography>
                       )}

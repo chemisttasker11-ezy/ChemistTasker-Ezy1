@@ -515,9 +515,9 @@ export default function LocumManager({
           onClick={() => setSortBy("name")}
           sx={{
             ...actionButtonSx,
-            borderColor: alpha("#063BDA", 0.16),
-            color: "#4C0DDE",
-            "&:hover": { borderColor: "#063BDA", bgcolor: alpha("#063BDA", 0.04) },
+            borderColor: alpha("#3C18A8", 0.16),
+            color: "#5222B8",
+            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
           }}
         >
           Sort: Name
@@ -528,9 +528,9 @@ export default function LocumManager({
           onClick={() => setSortBy("workType")}
           sx={{
             ...actionButtonSx,
-            borderColor: alpha("#063BDA", 0.16),
-            color: "#4C0DDE",
-            "&:hover": { borderColor: "#063BDA", bgcolor: alpha("#063BDA", 0.04) },
+            borderColor: alpha("#3C18A8", 0.16),
+            color: "#5222B8",
+            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
           }}
         >
           Sort: Work Type
@@ -581,9 +581,9 @@ export default function LocumManager({
           onClick={openLinkDialog}
           sx={{
             ...actionButtonSx,
-            borderColor: alpha("#063BDA", 0.16),
-            color: "#4C0DDE",
-            "&:hover": { borderColor: "#063BDA", bgcolor: alpha("#063BDA", 0.04) },
+            borderColor: alpha("#3C18A8", 0.16),
+            color: "#5222B8",
+            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
           }}
         >
           Generate Link

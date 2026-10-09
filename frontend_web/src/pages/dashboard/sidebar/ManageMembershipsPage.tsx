@@ -138,7 +138,7 @@ export default function ManageMembershipsPage() {
   return (
     <Box sx={{ display: "grid", gap: 2.5 }}>
       <Box>
-        <Typography variant="h4" sx={{ fontWeight: 950, color: "var(--ct-dashboard-title)" }}>
+        <Typography variant="h4" sx={{ color: "var(--ct-dashboard-title)" }}>
           Manage Memberships
         </Typography>
         <Typography sx={{ mt: 0.5, color: "var(--ct-dashboard-muted)", fontWeight: 700 }}>

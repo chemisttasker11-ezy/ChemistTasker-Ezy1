@@ -11,16 +11,16 @@ export default function NotFoundPage() {
           variant="h1" 
           component="div" 
           sx={{ 
-            fontWeight: 800, 
+            fontFamily: 'var(--ct-font-display)',
+            fontWeight: 500,
             fontSize: { xs: '6rem', md: '8rem' },
-            color: 'primary.main', // Uses the theme's teal color
+            color: 'primary.main',
             lineHeight: 1,
-            textShadow: '2px 2px 8px rgba(0,0,0,0.1)'
           }}
         >
           404
         </Typography>
-        <Typography variant="h5" sx={{ my: 2, fontWeight: 600 }}>
+        <Typography variant="h5" sx={{ my: 2 }}>
           Page Not Found
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 4 }}>
@@ -30,14 +30,7 @@ export default function NotFoundPage() {
           component={RouterLink}
           to="/" // Links to the homepage. Change to "/login" if you prefer.
           variant="contained"
-          sx={{ 
-            py: 1.5, 
-            px: 5,
-            backgroundColor: '#00a99d',
-            '&:hover': {
-                backgroundColor: '#00877d'
-            }
-          }}
+          sx={{ py: 1.5, px: 5 }}
         >
           Go Home
         </Button>
