@@ -23,7 +23,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Favorite as FavoriteIcon,
   FilterList as FilterListIcon,
-  Flight as FlightIcon,
+  CommuteOutlined as CommuteIcon,
   Hotel as HotelIcon,
   Layers as LayersIcon,
   Paid as PaidIcon,
@@ -310,7 +310,14 @@ const ShiftList: React.FC<ShiftListProps> = ({
             borderLeftWidth: urgent && !publicPresentation ? 4 : 1,
             position: 'relative',
             bgcolor: 'background.paper',
+            minWidth: 0,
+            maxWidth: '100%',
             boxShadow: publicPresentation ? 'none' : urgent ? 4 : 2,
+            ...(publicPresentation ? {
+              '& .MuiChip-root': { maxWidth: '100%', minHeight: 28, height: 'auto', borderRadius: '8px', flexShrink: 0 },
+              '& .MuiChip-label': { display: 'block', whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', overflowWrap: 'anywhere', lineHeight: 1.35, fontSize: 12, py: '4px', px: '9px' },
+              '& .MuiChip-icon': { fontSize: 17, ml: '7px', mr: '-3px', flexShrink: 0 },
+            } : {}),
             transition: publicPresentation ? 'border-color 180ms ease, box-shadow 180ms ease' : undefined,
             '&:hover': publicPresentation ? { borderColor: '#B8A8DE', boxShadow: '0 12px 32px rgba(6,18,58,.085)' } : undefined,
             '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
@@ -340,10 +347,10 @@ const ShiftList: React.FC<ShiftListProps> = ({
           )}
           <Stack spacing={publicPresentation ? 1.25 : 2}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={publicPresentation ? 2.5 : 2} justifyContent="space-between">
-              <Box sx={{ flex: 1 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography component={publicPresentation ? 'h3' : 'h6'} variant="h6" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: publicPresentation ? { xs: 21, md: 23 } : undefined, lineHeight: 1.25, cursor: publicPresentation ? 'default' : 'pointer' }} onClick={publicPresentation ? undefined : () => toggleExpandedCard(shift.id)}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ minWidth: 0 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography component={publicPresentation ? 'h3' : 'h6'} variant="h6" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: publicPresentation ? { xs: 21, md: 23 } : undefined, lineHeight: 1.3, overflowWrap: 'anywhere', cursor: publicPresentation ? 'default' : 'pointer' }} onClick={publicPresentation ? undefined : () => toggleExpandedCard(shift.id)}>
                       {getShiftPharmacyName(shift)}
                     </Typography>
                     {ratingSummary && ratingSummary.count > 0 && (
@@ -360,9 +367,9 @@ const ShiftList: React.FC<ShiftListProps> = ({
                       {!publicPresentation && (shift.mustHave || []).map(skill => <Chip key={`required-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Required: ${skillLabel(skill)}`} size="small" />)}
                       {!publicPresentation && (shift.niceToHave || []).map(skill => <Chip key={`preferred-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Preferred: ${skillLabel(skill)}`} size="small" variant="outlined" />)}
                       {(shift.hasTravel || shift.hasAccommodation) && (
-                        <Stack direction="row" spacing={0.5}>
-                          {shift.hasTravel && <Chip icon={<FlightIcon />} label="Travel" size="small" />}
-                          {shift.hasAccommodation && <Chip icon={<HotelIcon />} label="Accomm." size="small" />}
+                        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ minWidth: 0 }}>
+                          {shift.hasTravel && <Chip icon={<CommuteIcon />} label={publicPresentation ? 'Travel covered' : 'Travel'} size="small" />}
+                          {shift.hasAccommodation && <Chip icon={<HotelIcon />} label={publicPresentation ? 'Accommodation' : 'Accomm.'} size="small" />}
                         </Stack>
                       )}
                       {paymentType && !publicPresentation && (
@@ -387,7 +394,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                     )}
                   </Box>
                   {savedFeatureEnabled && !hideSaveToggle && (
-                    <IconButton onClick={() => toggleSaveShift(shift.id)}>
+                    <IconButton onClick={() => toggleSaveShift(shift.id)} aria-label={isSaved ? 'Remove saved shift' : 'Save shift'}>
                       <FavoriteIcon color={isSaved ? 'error' : 'disabled'} />
                     </IconButton>
                   )}
@@ -427,7 +434,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                     ) : (
                       <PlaceIcon fontSize="small" color="action" />
                     )}
-                    <Typography variant="body2">{getShiftCity(shift)} ({getShiftState(shift)})</Typography>
+                    <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>{getShiftCity(shift)} ({getShiftState(shift)})</Typography>
                   </Stack>
                 </Stack>
                 {publicPresentation && (requiredLabels.length > 0 || preferredLabels.length > 0) && (
@@ -444,7 +451,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                 )}
               </Box>
 
-              <Box sx={{ minWidth: { xs: 0, md: 180 }, textAlign: { xs: 'left', md: 'right' }, borderTop: { xs: publicPresentation ? '1px solid #E4E9F2' : 'none', md: 'none' }, pt: { xs: publicPresentation ? 2 : 0, md: 0 } }}>
+              <Box sx={{ minWidth: { xs: 0, md: 175 }, maxWidth: { xs: '100%', md: 190 }, flexShrink: 0, textAlign: { xs: 'left', md: 'right' }, borderTop: { xs: publicPresentation ? '1px solid #E4E9F2' : 'none', md: 'none' }, pt: { xs: publicPresentation ? 2 : 0, md: 0 } }}>
                 <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <AttachMoneyIcon fontSize="small" color="success" />
