@@ -567,7 +567,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
   );
 
   return (
-    <Box sx={{ px: publicPresentation ? 0 : { xs: 0, lg: 2 }, py: publicPresentation ? 0 : 2, maxWidth: publicPresentation ? 1160 : undefined, mx: publicPresentation ? "auto" : undefined, width: "100%" }}>
+    <Box sx={{ px: publicPresentation ? 0 : { xs: 0, lg: 2 }, py: publicPresentation ? 0 : 2, maxWidth: publicPresentation ? 1240 : undefined, mx: publicPresentation ? "auto" : undefined, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
       <GlobalStyles styles={{ '.pac-container': { zIndex: 1400 } }} />
       <CounterOfferDialog
         open={counterOfferOpen}
@@ -636,31 +636,31 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
         )}
       </Box>}
       {publicPresentation && !hideFiltersAndSort && (
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent='space-between' alignItems={{ md: 'flex-end' }} spacing={2} sx={{ mb: 2.5 }}>
-          <Box>
-            <Typography component='h2' sx={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: { xs: 26, md: 30 }, color: '#06123A', lineHeight: 1.2 }}>Find your next pharmacy shift</Typography>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent='space-between' alignItems={{ lg: 'flex-end' }} spacing={2} sx={{ mb: 2.5, width: '100%', minWidth: 0 }}>
+          <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
+            <Typography component='h2' sx={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: { xs: 25, md: 29 }, color: '#06123A', lineHeight: 1.2, overflowWrap: 'break-word' }}>Find your next pharmacy shift</Typography>
             <Typography aria-live='polite' sx={{ mt: 0.45, fontSize: 14, color: '#445474' }}>
               {loading ? 'Finding current opportunities…' : `${typeof totalCount === 'number' ? totalCount : displayShifts.length} ${typeof totalCount === 'number' ? totalCount === 1 ? 'opportunity' : 'opportunities' : displayShifts.length === 1 ? 'opportunity' : 'opportunities'} available`}
             </Typography>
           </Box>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', md: 'auto' } }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', lg: 'auto' }, minWidth: 0, flexShrink: 0 }}>
             <TextField
               size='small'
               label='Search shifts'
               placeholder='Role, pharmacy or suburb'
               value={filterConfig.search}
               onChange={(event) => updateFilterConfig((prev) => ({ ...prev, search: event.target.value }))}
-              sx={{ width: { xs: '100%', md: 310 }, '& .MuiOutlinedInput-root': { minHeight: 48, bgcolor: '#FFFFFF' } }}
+              sx={{ width: { xs: '100%', sm: 315 }, maxWidth: '100%', '& .MuiOutlinedInput-root': { minHeight: 48, bgcolor: '#FFFFFF' } }}
               InputProps={{ startAdornment: <InputAdornment position='start'><SearchIcon sx={{ color: '#52617C' }} /></InputAdornment> }}
             />
-            <Button variant='outlined' startIcon={<TuneIcon />} onClick={() => setIsSidebarOpen(true)} sx={{ display: publicPresentation ? 'inline-flex' : { xs: 'inline-flex', lg: 'none' }, minHeight: 48, fontWeight: 800, textTransform: 'none', color: '#5222B8', borderColor: '#C8B8E5' }}>
+            <Button variant='outlined' startIcon={<TuneIcon />} onClick={() => setIsSidebarOpen(true)} sx={{ display: isMobile ? 'inline-flex' : 'none', minHeight: 48, fontWeight: 800, textTransform: 'none', color: '#5222B8', borderColor: '#C8B8E5', flexShrink: 0 }}>
               Filters{activeFilterCount > 0 ? ' (' + activeFilterCount + ')' : ''}
             </Button>
           </Stack>
         </Stack>
       )}
 
-      <Box sx={{ display: 'flex', gap: publicPresentation ? 2.5 : 3 }}>
+      <Box sx={{ display: 'flex', gap: publicPresentation ? 2.5 : 3, width: '100%', minWidth: 0, alignItems: 'flex-start' }}>
         {!isMobile && !hideFiltersAndSort && (
           <Paper
             component="aside"
