@@ -24,7 +24,7 @@ from billing.utils import user_can_manage_billing_for_pharmacy
 from django.utils import timezone
 from users.role_labels import other_staff_role_label
 from datetime import date
-from datetime import timedelta
+from datetime import time, timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 from users.org_roles import membership_visible_pharmacy_ids
@@ -672,16 +672,24 @@ class OwnerDashboard(APIView):
             payment_status__in=['PAID', 'NOT_REQUIRED'],
         ).distinct()
 
-        # Build shift summary boxes
+        # Build shift summary boxes, soonest first, dated by each shift's next upcoming slot
+        # (a multi-slot shift whose first slot has passed shows when it next happens).
         shift_boxes = []
-        for shift in upcoming_shifts:
-            slot = shift.slots.order_by('date').first()
-            shift_date = slot.date if slot else None
+        for shift in upcoming_shifts.select_related('pharmacy').prefetch_related('slots'):
+            slots = sorted(shift.slots.all(), key=lambda s: (s.date, s.start_time))
+            next_slot = next(
+                (s for s in slots if s.date > today or (s.date == today and s.end_time > now)),
+                None,
+            )
             shift_boxes.append({
                 'id': shift.id,
                 'pharmacy_name': shift.pharmacy.name if shift.pharmacy else '',
-                'date': shift_date,
+                'date': next_slot.date if next_slot else None,
+                'start_time': next_slot.start_time if next_slot else None,
             })
+        shift_boxes.sort(key=lambda box: (box['date'] is None, box['date'] or date.max, box['start_time'] or time.max, box['id']))
+        for box in shift_boxes:
+            box.pop('start_time')
 
         billing_pharmacy_ids = [
             pharmacy.id
