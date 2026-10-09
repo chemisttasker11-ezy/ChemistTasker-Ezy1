@@ -214,6 +214,7 @@ export default function DashboardSideNav({
     const hasChildren = item.children.length > 0;
     const childrenOpen = expandedParents[item.path] ?? activeChild;
     const menuOpen = flyout?.item.path === item.path;
+    const submenuId = "dashboard-submenu-" + item.path.replace(/[^a-z0-9]/gi, "-");
 
     return (
       <Box key={item.path} sx={{ minWidth: 0 }}>
@@ -246,7 +247,7 @@ export default function DashboardSideNav({
                 borderRadius: "11px",
                 color: sectionActive ? "var(--ct-sidebar-accent)" : "var(--ct-text-primary)",
                 bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "transparent",
-                fontSize: 13.5,
+                fontSize: 14,
                 fontWeight: sectionActive ? 800 : 650,
                 letterSpacing: "-.01em",
                 lineHeight: 1.35,
@@ -303,6 +304,7 @@ export default function DashboardSideNav({
                 onClick={() => setExpandedParents((prev) => ({ ...prev, [item.path]: !childrenOpen }))}
                 aria-label={(childrenOpen ? "Collapse " : "Expand ") + item.label + " subpages"}
                 aria-expanded={childrenOpen}
+                aria-controls={submenuId}
                 size="small"
                 sx={{
                   flex: "0 0 34px",
@@ -322,7 +324,7 @@ export default function DashboardSideNav({
         </Stack>
 
         {hasChildren && !collapsed && (
-          <Collapse in={childrenOpen} timeout={reduceMotion ? 0 : 150} unmountOnExit>
+          <Collapse id={submenuId} in={childrenOpen} timeout={reduceMotion ? 0 : 150} unmountOnExit>
             <Stack
               spacing={0.1}
               role="group"
@@ -463,9 +465,9 @@ export default function DashboardSideNav({
             <Box sx={{ minWidth: 0 }}>
               <Typography sx={{
                 color: "var(--ct-text-secondary)",
-                fontSize: 10.5,
+                fontSize: 11.5,
                 fontWeight: 800,
-                letterSpacing: ".13em",
+                letterSpacing: ".09em",
                 textTransform: "uppercase",
                 lineHeight: 1.5,
               }}>
@@ -536,6 +538,7 @@ export default function DashboardSideNav({
                     <Button
                       onClick={() => setClosedGroups((prev) => ({ ...prev, [group.id]: isOpen }))}
                       aria-expanded={isOpen}
+                      aria-controls={"dashboard-nav-" + group.id}
                       aria-label={(isOpen ? "Collapse " : "Expand ") + displayGroupTitle(group.title) + " group"}
                       endIcon={<ExpandMoreRoundedIcon sx={{
                         fontSize: "18px !important",
@@ -554,8 +557,8 @@ export default function DashboardSideNav({
                         color: "var(--ct-text-secondary)",
                         textTransform: "uppercase",
                         textAlign: "left",
-                        letterSpacing: ".095em",
-                        fontSize: 10.5,
+                        letterSpacing: ".065em",
+                        fontSize: 11.5,
                         fontWeight: 850,
                         "& .MuiButton-endIcon": { ml: 0.5, color: "var(--ct-text-secondary)" },
                         "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-text-primary)" },
@@ -565,7 +568,7 @@ export default function DashboardSideNav({
                       {displayGroupTitle(group.title)}
                     </Button>
                   )}
-                  <Collapse in={collapsed || isOpen} timeout={reduceMotion ? 0 : 150} unmountOnExit>
+                  <Collapse id={"dashboard-nav-" + group.id} in={collapsed || isOpen} timeout={reduceMotion ? 0 : 150} unmountOnExit>
                     <Stack spacing={0.35} role="group" aria-label={group.title}>
                       {group.items.map(renderItem)}
                     </Stack>
