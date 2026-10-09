@@ -1015,7 +1015,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                 pagedCandidates.length === 0 ? <DashboardContentState kind="empty" title={activeFilterCount > 0 ? "No candidates match your filters" : "No published talent yet"} description={activeFilterCount > 0 ? "Adjust your role, location, skills or availability filters." : "Verified talent profiles will appear here once published."} actionLabel={activeFilterCount > 0 ? "Reset filters" : undefined} onAction={activeFilterCount > 0 ? clearAllFilters : undefined} /> :
                 pagedCandidates.map(candidate => <TalentCardV2 key={candidate.id} candidate={candidate} onViewCalendar={handleViewCalendar} onToggleLike={handleToggleLike} onRequestBooking={handleBookTalent} canViewAvailability={!publicMode} canRequestBooking={canRequestBooking} />)}
             </Stack>
-            {pageCount > 1 && <Stack alignItems="center" sx={{ mt: 2 }}><Pagination count={pageCount} page={page} onChange={(_, value) => setPage(value)} /></Stack>
+            {pageCount > 1 && <Stack alignItems="center" sx={{ mt: 2 }}><Pagination count={pageCount} page={page} onChange={(_, value) => setPage(value)} /></Stack>}
           </Box>
         </Stack>
       </Box>
