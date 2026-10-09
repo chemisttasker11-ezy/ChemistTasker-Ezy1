@@ -63,9 +63,9 @@ type Metric = {
   accent: string;
 };
 
-const ink = "#06123A";
-const muted = "#445474";
-const line = "#DFE6F1";
+const ink = "var(--ct-text-primary)";
+const muted = "var(--ct-text-secondary)";
+const line = "var(--ct-border-color)";
 
 function readableCount(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("en-AU") : "—";
@@ -209,7 +209,7 @@ export default function OwnerOverviewHome({
         spacing={2}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Typography component="h1" sx={{ color: ink, fontSize: { xs: 27, md: 32 }, fontWeight: 850, lineHeight: 1.18 }}>
+          <Typography component="h1" sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontSize: { xs: 28, md: 32 }, fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.13 }}>
             Owner Dashboard
           </Typography>
           <Typography sx={{ color: muted, fontSize: 15, lineHeight: 1.55, mt: 0.6 }}>
@@ -288,7 +288,7 @@ export default function OwnerOverviewHome({
           <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5} sx={{ mb: 2.25 }}>
               <Box>
-                <Typography component="h2" sx={{ color: ink, fontSize: 21, fontWeight: 800 }}>Upcoming shifts</Typography>
+                <Typography component="h2" sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em" }}>Upcoming shifts</Typography>
                 <Typography sx={{ color: muted, fontSize: 13.5 }}>The next commitments in your selected workspace.</Typography>
               </Box>
               <Button onClick={onOpenShifts} endIcon={<ArrowForwardRoundedIcon />} sx={{ color: "#5222B8", flexShrink: 0, fontWeight: 800 }}>View all</Button>
@@ -313,7 +313,7 @@ export default function OwnerOverviewHome({
           </Paper>
 
           <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
-            <Typography component="h2" sx={{ color: ink, fontSize: 21, fontWeight: 800, mb: 1.5 }}>Recent Activity</Typography>
+            <Typography component="h2" sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", mb: 1.5 }}>Recent Activity</Typography>
             {dashboardLoading && <Stack spacing={1.2}>{[1,2].map((n) => <Skeleton key={n} height={55} />)}</Stack>}
             {!dashboardLoading && !ready && <Typography sx={{ color: muted, fontSize: 14 }}>Activity could not be loaded.</Typography>}
             {ready && activity.length === 0 && <Typography sx={{ color: muted, fontSize: 14 }}>No recent activity to show in this workspace.</Typography>}
@@ -343,7 +343,7 @@ export default function OwnerOverviewHome({
           <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
               <CalendarMonthIcon sx={{ color: "#5222B8" }} />
-              <Typography component="h2" sx={{ color: ink, fontSize: 20, fontWeight: 800 }}>Shift calendar snapshot</Typography>
+              <Typography component="h2" sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em" }}>Shift calendar snapshot</Typography>
             </Stack>
             {[
               ["Today", upcoming?.today],
@@ -364,7 +364,7 @@ export default function OwnerOverviewHome({
             <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 2.75 }, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.75 }}>
                 <CreditCardIcon sx={{ color: "#5222B8" }} />
-                <Typography component="h2" sx={{ color: ink, fontSize: 20, fontWeight: 800 }}>Invoices</Typography>
+                <Typography component="h2" sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em" }}>Invoices</Typography>
               </Stack>
               <Typography sx={{ color: muted, fontSize: 13 }}>Outstanding total</Typography>
               <Typography sx={{ color: ink, fontWeight: 850, fontSize: 27, fontVariantNumeric: "tabular-nums", mb: 1 }}>
@@ -395,7 +395,7 @@ export default function OwnerOverviewHome({
 
       <Paper component="section" variant="outlined" sx={{ px: { xs: 2, md: 2.75 }, py: 2, borderRadius: 3, borderColor: line, boxShadow: "none" }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1.5}>
-          <Typography component="h2" sx={{ color: ink, fontSize: 16, fontWeight: 800 }}>Workspace tools</Typography>
+          <Typography component="h2" sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.015em" }}>Workspace tools</Typography>
           <Stack direction="row" flexWrap="wrap" useFlexGap gap={1}>
             {shortcuts.map((link) => (
               <Button key={link.label} size="small" variant="outlined" onClick={link.action} startIcon={link.icon} sx={{ minHeight: 44, textTransform: "none", color: "#32246B", borderColor: "#D2D9E6", fontWeight: 700 }}>
