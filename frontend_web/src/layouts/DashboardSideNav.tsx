@@ -11,6 +11,7 @@ import {
   Tooltip,
   Typography,
   useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
@@ -105,8 +106,8 @@ function NavSymbol({ icon, active, small = false }: { icon?: ReactNode; active: 
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: active ? "var(--ct-soft-primary)" : "transparent",
-        color: active ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)",
+        bgcolor: active ? "var(--ct-sidebar-icon)" : "transparent",
+        color: active ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
         "& svg": { fontSize: small ? 17 : 19 },
       }}
     >
@@ -124,6 +125,7 @@ export default function DashboardSideNav({
   const navigate = useNavigate();
   const location = useLocation();
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const isDark = useTheme().palette.mode === "dark";
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return typeof window !== "undefined" &&
@@ -242,8 +244,8 @@ export default function DashboardSideNav({
                 textAlign: "left",
                 textTransform: "none",
                 borderRadius: "11px",
-                color: sectionActive ? "var(--ct-dashboard-accent)" : "var(--ct-text-primary)",
-                bgcolor: sectionActive ? "var(--ct-dashboard-soft)" : "transparent",
+                color: sectionActive ? "var(--ct-sidebar-accent)" : "var(--ct-text-primary)",
+                bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "transparent",
                 fontSize: 13.5,
                 fontWeight: sectionActive ? 800 : 650,
                 letterSpacing: "-.01em",
@@ -257,13 +259,13 @@ export default function DashboardSideNav({
                   left: 0,
                   width: 3,
                   borderRadius: "0 4px 4px 0",
-                  bgcolor: "var(--ct-dashboard-accent)",
+                  bgcolor: "var(--ct-sidebar-accent)",
                 },
                 "&:hover": {
-                  bgcolor: sectionActive ? "var(--ct-dashboard-soft)" : "var(--ct-hover-bg)",
+                  bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "var(--ct-hover-bg)",
                 },
                 "&:focus-visible": {
-                  outline: "2px solid var(--ct-dashboard-accent)",
+                  outline: "2px solid var(--ct-sidebar-accent)",
                   outlineOffset: 2,
                 },
               }}
@@ -308,9 +310,9 @@ export default function DashboardSideNav({
                   height: 42,
                   ml: 0.1,
                   borderRadius: "9px",
-                  color: sectionActive ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)",
+                  color: sectionActive ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
                   "&:hover": { bgcolor: "var(--ct-hover-bg)" },
-                  "&:focus-visible": { outline: "2px solid var(--ct-dashboard-accent)", outlineOffset: 1 },
+                  "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 1 },
                 }}
               >
                 <ExpandMoreRoundedIcon sx={{ fontSize: 20, transform: childrenOpen ? "rotate(180deg)" : "none", transition: reduceMotion ? "none" : "transform 150ms ease" }} />
@@ -353,10 +355,10 @@ export default function DashboardSideNav({
                       fontSize: 12.8,
                       lineHeight: 1.4,
                       fontWeight: selected ? 800 : 600,
-                      color: selected ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)",
-                      bgcolor: selected ? "var(--ct-dashboard-soft)" : "transparent",
-                      "&:hover": { bgcolor: selected ? "var(--ct-dashboard-soft)" : "var(--ct-hover-bg)" },
-                      "&:focus-visible": { outline: "2px solid var(--ct-dashboard-accent)", outlineOffset: 1 },
+                      color: selected ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
+                      bgcolor: selected ? "var(--ct-sidebar-selected)" : "transparent",
+                      "&:hover": { bgcolor: selected ? "var(--ct-sidebar-selected)" : "var(--ct-hover-bg)" },
+                      "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 1 },
                     }}
                   >
                     <Box component="span" aria-hidden="true" sx={{
@@ -364,7 +366,7 @@ export default function DashboardSideNav({
                       height: selected ? 8 : 5,
                       borderRadius: "50%",
                       flexShrink: 0,
-                      bgcolor: selected ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)",
+                      bgcolor: selected ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
                       opacity: selected ? 1 : 0.65,
                     }} />
                     <Box component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>{child.label}</Box>
@@ -400,7 +402,7 @@ export default function DashboardSideNav({
             fontWeight: 700,
             color: "var(--ct-text-secondary)",
             "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-text-primary)" },
-            "&:focus-visible": { outline: "2px solid var(--ct-dashboard-accent)", outlineOffset: 2 },
+            "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 2 },
           }}
         >
           <NavSymbol icon={item.icon} active={active} />
@@ -424,6 +426,9 @@ export default function DashboardSideNav({
         transition: reduceMotion ? "none" : "width 170ms ease, flex-basis 170ms ease",
         alignSelf: "stretch",
         bgcolor: "var(--ct-surface-bg)",
+        "--ct-sidebar-accent": isDark ? "#C8B5FF" : "var(--ct-dashboard-accent)",
+        "--ct-sidebar-selected": isDark ? "rgba(130, 102, 232, .24)" : "var(--ct-dashboard-soft)",
+        "--ct-sidebar-icon": isDark ? "rgba(130, 102, 232, .18)" : "var(--ct-soft-primary)",
         borderRight: "1px solid var(--ct-border-color)",
         boxSizing: "border-box",
         overflow: "visible",
@@ -489,8 +494,8 @@ export default function DashboardSideNav({
                 border: "1px solid var(--ct-border-color)",
                 bgcolor: "var(--ct-elevated-bg)",
                 color: "var(--ct-text-secondary)",
-                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-dashboard-accent)" },
-                "&:focus-visible": { outline: "2px solid var(--ct-dashboard-accent)", outlineOffset: 2 },
+                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-sidebar-accent)" },
+                "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 2 },
               }}
             >
               {collapsed ? <LastPageRoundedIcon sx={{ fontSize: 22 }} /> : <FirstPageRoundedIcon sx={{ fontSize: 22 }} />}
@@ -554,7 +559,7 @@ export default function DashboardSideNav({
                         fontWeight: 850,
                         "& .MuiButton-endIcon": { ml: 0.5, color: "var(--ct-text-secondary)" },
                         "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-text-primary)" },
-                        "&:focus-visible": { outline: "2px solid var(--ct-dashboard-accent)", outlineOffset: 1 },
+                        "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 1 },
                       }}
                     >
                       {displayGroupTitle(group.title)}
@@ -601,6 +606,9 @@ export default function DashboardSideNav({
               color: "var(--ct-text-primary)",
               borderRadius: "14px",
               boxShadow: "0 18px 48px rgba(6,18,58,.16)",
+              "--ct-sidebar-accent": isDark ? "#C8B5FF" : "var(--ct-dashboard-accent)",
+              "--ct-sidebar-selected": isDark ? "rgba(130, 102, 232, .24)" : "var(--ct-dashboard-soft)",
+              "--ct-sidebar-icon": isDark ? "rgba(130, 102, 232, .18)" : "var(--ct-soft-primary)",
             },
           },
           list: { "aria-label": flyout?.item.label + " pages", sx: { p: 1 } },
@@ -619,8 +627,8 @@ export default function DashboardSideNav({
               borderRadius: "9px",
               gap: 1,
               my: 0.15,
-              color: item.path === activePath ? "var(--ct-dashboard-accent)" : "var(--ct-text-primary)",
-              "&.Mui-selected": { bgcolor: "var(--ct-dashboard-soft)" },
+              color: item.path === activePath ? "var(--ct-sidebar-accent)" : "var(--ct-text-primary)",
+              "&.Mui-selected": { bgcolor: "var(--ct-sidebar-selected)" },
               "&:hover": { bgcolor: "var(--ct-hover-bg)" },
             }}
           >
