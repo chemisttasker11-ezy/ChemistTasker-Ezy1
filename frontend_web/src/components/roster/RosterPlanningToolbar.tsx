@@ -360,10 +360,14 @@ export default function RosterPlanningToolbar({
       <Card
         elevation={0}
         sx={{
-          borderRadius: '16px',
+          borderRadius: '14px',
           border: `1px solid ${BRAND_COLORS.border}`,
           bgcolor: BRAND_COLORS.white,
-          boxShadow: BRAND_SHADOWS.card,
+          boxShadow: 'none',
+          '& .MuiButton-root': { minHeight: 44 },
+          '& .MuiButton-root:focus-visible, & .MuiIconButton-root:focus-visible': {
+            outline: '3px solid #008DDB', outlineOffset: 2,
+          },
         }}
       >
         <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
