@@ -172,7 +172,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
                 <TableCell><Chip label={financeStatus(invoice)} color={invoice.status === 'paid' ? 'success' : invoice.review_status === 'REVISION_REQUESTED' ? 'warning' : 'default'} size="small" />{invoice.delivery_status && <Typography variant="caption" display="block">Latest email: {invoice.delivery_status}</Typography>}</TableCell>
                 <TableCell><Stack direction="row" spacing={.5}><Button size="small" onClick={() => openHistory(invoice)}>History</Button><Button aria-label={`Actions for ${invoice.number}`} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, invoice })}>Actions</Button></Stack></TableCell>
               </TableRow>)}</TableBody></Table></TableContainer>}
-            {tool === 'invoices' && invoices.length > 0 && !visibleInvoices.length && <Empty title="No matching documents" detail="Adjust the status, customer, dates or search to see your invoices." />}
+            {tool === 'invoices' && invoices.length > 0 && !visibleInvoices.length && <DashboardContentState kind="empty" title="No matching invoices" description="Adjust the status, customer, dates or search to see your invoices." actionLabel="Reset filters" onAction={() => { setInvoiceStatus("all"); setCustomerFilter("all"); setFromDate(""); setToDate(""); setSearch(""); }} compact />}
             {tool === 'received' && <>
               <Alert severity="info" sx={{ mb: 2 }}>
                 Internal invoices are created from ChemistTasker ABN shifts. Review the current revision, request corrections when actual hours/rates differ, approve it for payment, or mark it paid. Earlier revisions remain in the audit trail.
