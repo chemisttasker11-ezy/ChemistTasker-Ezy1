@@ -94,6 +94,9 @@ jobs:
       - name: Typecheck Vite application
         run: npx tsc -p tsconfig.app.json --noEmit
         working-directory: frontend_web
+      - name: In-page Figma state contracts
+        working-directory: frontend_web
+        run: node scripts/audit-dashboard-visual-states.mjs
       - name: Cross-frontend auth flow tests
         run: node --test scripts/auth-flow.test.mjs
         working-directory: frontend_web
