@@ -209,8 +209,12 @@ requireRepoContains('frontend_web/src/layouts/DashboardTopShell.tsx', [
   ['authenticated heading uses display face', /fontFamily: "var\(--ct-font-display\)"/],
   ['dark workspace accent stays legible', /--ct-dashboard-accent": isDark \? "#C8B5FF"/],
 ]);
+// The owner overview's page heading is the shared Figma welcome banner.
+requireRepoContains('frontend_web/src/components/ui/BrandBanner.tsx', [
+  ['banner heading uses display face', /component="h1"[\s\S]{0,105}fontFamily: "var\(--ct-font-display\)"/],
+]);
 requireRepoContains('frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewHome.tsx', [
-  ['owner heading uses display face', /component="h1"[\s\S]{0,105}fontFamily: "var\(--ct-font-display\)"/],
+  ['owner heading uses the shared banner', /<BrandBanner[\s\S]{0,40}title=\{`Welcome back/],
 ]);
 const vitePackage = JSON.parse(readRepoFile('frontend_web/package.json'));
 const viteLock = JSON.parse(readRepoFile('frontend_web/package-lock.json'));

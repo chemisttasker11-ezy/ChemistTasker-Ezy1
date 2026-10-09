@@ -105,9 +105,9 @@ function NavSymbol({ icon, active, small = false }: { icon?: ReactNode; active: 
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: active ? "var(--ct-sidebar-icon)" : "transparent",
+        bgcolor: "transparent",
         color: active ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
-        "& svg": { fontSize: small ? 17 : 19 },
+        "& svg": { width: small ? 16 : 18, height: small ? 16 : 18, fontSize: small ? 16 : 18, strokeWidth: 1.75 },
       }}
     >
       {icon ?? <AppsRoundedIcon />}
@@ -221,7 +221,7 @@ export default function DashboardSideNav({
           position: "relative", gap: 0.25, minWidth: 0, borderRadius: "11px",
           bgcolor: sectionActive ? "var(--ct-sidebar-selected)" : "transparent",
           "&::before": {
-            content: '""', display: sectionActive ? "block" : "none",
+            content: '""', display: "none",
             position: "absolute", top: 11, bottom: 11, left: 0, width: 3,
             borderRadius: "0 4px 4px 0", bgcolor: "var(--ct-sidebar-accent)",
             pointerEvents: "none", zIndex: 1,
@@ -253,10 +253,10 @@ export default function DashboardSideNav({
                 textAlign: "left",
                 textTransform: "none",
                 borderRadius: "11px",
-                color: sectionActive ? "var(--ct-sidebar-accent)" : "var(--ct-text-primary)",
+                color: sectionActive ? "var(--ct-sidebar-accent)" : childrenOpen && hasChildren ? "var(--ct-text-primary)" : "var(--ct-text-secondary)",
                 bgcolor: "transparent",
-                fontSize: 14,
-                fontWeight: sectionActive ? 800 : 650,
+                fontSize: 13,
+                fontWeight: sectionActive || (childrenOpen && hasChildren) ? 600 : 400,
                 letterSpacing: "-.01em",
                 lineHeight: 1.35,
                 "&:hover": {
@@ -351,23 +351,16 @@ export default function DashboardSideNav({
                       justifyContent: "flex-start",
                       textTransform: "none",
                       textAlign: "left",
-                      fontSize: 12.8,
+                      fontSize: 12.5,
                       lineHeight: 1.4,
-                      fontWeight: selected ? 800 : 600,
+                      fontWeight: selected ? 600 : 400,
                       color: selected ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
                       bgcolor: selected ? "var(--ct-sidebar-selected)" : "transparent",
                       "&:hover": { bgcolor: selected ? "var(--ct-sidebar-selected)" : "var(--ct-hover-bg)" },
                       "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 1 },
                     }}
                   >
-                    <Box component="span" aria-hidden="true" sx={{
-                      width: selected ? 8 : 5,
-                      height: selected ? 8 : 5,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      bgcolor: selected ? "var(--ct-sidebar-accent)" : "var(--ct-text-secondary)",
-                      opacity: selected ? 1 : 0.65,
-                    }} />
+                    <NavSymbol icon={child.icon} active={selected} small />
                     <Box component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>{child.label}</Box>
                   </Button>
                 );
@@ -397,8 +390,8 @@ export default function DashboardSideNav({
             px: collapsed ? 0 : 1,
             borderRadius: "11px",
             textTransform: "none",
-            fontSize: 13.5,
-            fontWeight: 700,
+            fontSize: 13,
+            fontWeight: 400,
             color: "var(--ct-text-secondary)",
             "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-text-primary)" },
             "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 2 },
@@ -541,9 +534,9 @@ export default function DashboardSideNav({
                         color: "var(--ct-text-secondary)",
                         textTransform: "uppercase",
                         textAlign: "left",
-                        letterSpacing: ".065em",
-                        fontSize: 11.5,
-                        fontWeight: 850,
+                        letterSpacing: ".06em",
+                        fontSize: 10.5,
+                        fontWeight: 600,
                         "& .MuiButton-endIcon": { ml: 0.5, color: "var(--ct-text-secondary)" },
                         "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-text-primary)" },
                         "&:focus-visible": { outline: "2px solid var(--ct-sidebar-accent)", outlineOffset: 1 },

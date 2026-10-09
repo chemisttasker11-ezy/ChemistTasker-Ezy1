@@ -596,7 +596,7 @@ test('authenticated Owner pages render the public type families rather than syst
   await installApiFixture(page, roleUsers.owner);
   await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
 
-  const heading = page.getByRole('heading', { name: 'Owner Dashboard' });
+  const heading = page.getByRole('heading', { level: 1, name: /Welcome back/ });
   await expect(heading).toBeVisible();
   await expect(heading).toHaveCSS('font-family', /Outfit/);
   await expect(page.locator('body')).toHaveCSS('font-family', /Inter/);

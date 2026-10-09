@@ -88,6 +88,19 @@ export function createSleekTheme(mode: Mode): Theme {
             "--ct-input-bg": isLight ? "#fff" : "#0C1628",
             "--ct-font-body": "Inter, Segoe UI, Arial, sans-serif",
             "--ct-font-display": "Outfit, Inter, sans-serif",
+            // Dashboard Figma system (ChemistTasker-Dashboard): text tiers, the deep
+            // violet used for active items/figures, and the four tinted icon-tile tones.
+            "--ct-text-muted": isLight ? "#7886A3" : "#8E9BB5",
+            "--ct-accent-strong": isLight ? "#3C18A8" : "#B9A5F5",
+            "--ct-card-radius": "20px",
+            "--ct-tone-violet-bg": isLight ? "#EFE9FD" : alpha("#8B6CF0", 0.18),
+            "--ct-tone-violet-fg": isLight ? "#3C18A8" : "#C6B6F7",
+            "--ct-tone-blue-bg": isLight ? "#E6F1FC" : alpha("#3F9BE8", 0.18),
+            "--ct-tone-blue-fg": isLight ? "#0063A8" : "#8CC6F5",
+            "--ct-tone-cyan-bg": isLight ? "#DFF7F9" : alpha("#22B8C9", 0.18),
+            "--ct-tone-cyan-fg": isLight ? "#007486" : "#7FDCE6",
+            "--ct-tone-magenta-bg": isLight ? "#FCE6F8" : alpha("#D63BC4", 0.18),
+            "--ct-tone-magenta-fg": isLight ? "#A3008F" : "#F09BE4",
           },
           "html, body, #root": {
             minHeight: "100%",
