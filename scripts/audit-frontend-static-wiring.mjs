@@ -186,7 +186,7 @@ requireRepoContains('frontend_web/landing_next/app/layout.tsx', [
 ]);
 requireRepoContains('frontend_web/src/layouts/AuthLayout.tsx', [
   ['legacy auth form uses shared Inter', /fontFamily: 'Inter, "Segoe UI", Arial, sans-serif'/],
-  ['legacy auth headings use Outfit', /h4: \{ fontFamily: 'Outfit, Inter, sans-serif' \}/],
+  ['legacy auth headings use Outfit', /h4: \{ fontFamily: 'Outfit, Inter, sans-serif'/],
 ]);
 for (const file of ['frontend_web/src/layouts/AuthLayout.tsx', 'frontend_web/index.html']) {
   if (/Bai\s*Jamjuree|Bai\+Jamjuree/.test(readRepoFile(file))) {
