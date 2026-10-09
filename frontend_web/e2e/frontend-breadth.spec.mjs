@@ -488,7 +488,7 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
   });
 
   await page.goto('/dashboard/pharmacist/attendance');
-  await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Smoke Pharmacy' })).toBeVisible();
   await page.getByRole('button', { name: 'Acknowledge Shifts' }).click();
 
   await expect(page.getByText('ACKNOWLEDGED', { exact: true })).toBeVisible();
@@ -551,7 +551,7 @@ test('owner sidebar collapses without losing access to navigation or widening th
   await expect(sidebar.getByRole('button', { name: 'Overview' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
   await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
-  await expect(sidebar.getByRole('button', { name: 'Manage Pharmacies' })).toBeVisible();
+  await expect(sidebar.getByRole('button', { name: 'Manage Pharmacies', exact: true })).toBeVisible();
 });
 
 
