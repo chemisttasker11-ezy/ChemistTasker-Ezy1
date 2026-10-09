@@ -367,10 +367,10 @@ export default function PublicJobBoardPage() {
   return (
     <AuthLayout title="Public Job Board" maxWidth={false} noCard showTitle={false}>
       <Box sx={{ px: { xs: 0, md: 1 }, py: { xs: 1.5, md: 2.5 } }}>
-        <Box
+        {!user && <Box
           sx={{
             mb: 2,
-            p: { xs: 2, md: 2.5 },
+            p: { xs: 1.5, md: 2 },
             border: '1px solid #E5ECF7',
             borderRadius: '14px',
             bgcolor: '#fff',
@@ -380,10 +380,10 @@ export default function PublicJobBoardPage() {
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
             <Box>
               <Typography sx={{ fontWeight: 850, color: '#06123A', fontSize: 17 }}>
-                Browse shifts without signing in
+                Browse first. Apply when ready.
               </Typography>
               <Typography sx={{ mt: .4, color: '#445474', fontSize: 14, lineHeight: 1.55 }}>
-                Explore real pharmacy opportunities by role, location and date. Sign in when you're ready to apply.
+                Compare dates, location and rates before signing in.
               </Typography>
             </Box>
             {!user && (
@@ -393,7 +393,7 @@ export default function PublicJobBoardPage() {
               </Stack>
             )}
           </Stack>
-        </Box>
+        </Box>}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
