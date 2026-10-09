@@ -502,3 +502,39 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
     },
   });
 });
+
+
+test('owner pharmacy selector lists all authorised locations and delegates Admin-only pharmacies', async ({ page }) => {
+  const owner = {
+    ...roleUsers.owner,
+    id: 610,
+    memberships: [
+      { pharmacy_id: 101, pharmacy_name: 'Alpha Owner Pharmacy', role: 'OWNER', status: 'ACCEPTED', is_active: true },
+      { pharmacy_id: 102, pharmacy_name: 'Beta Owner Pharmacy', role: 'OWNER', status: 'ACCEPTED', is_active: true },
+    ],
+    admin_assignments: [
+      { id: 701, pharmacy_id: 101, pharmacy_name: 'Alpha Owner Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities, is_active: true },
+      { id: 702, pharmacy_id: 102, pharmacy_name: 'Beta Owner Pharmacy', admin_level: 'OWNER', capabilities: baseCapabilities, is_active: true },
+      { id: 703, pharmacy_id: 103, pharmacy_name: 'Gamma Managed Pharmacy', admin_level: 'FULL_ADMIN', capabilities: baseCapabilities, is_active: true },
+      { id: 704, pharmacy_id: 104, pharmacy_name: 'Delta Managed Pharmacy', admin_level: 'FULL_ADMIN', capabilities: baseCapabilities, is_active: true },
+    ],
+  };
+  await installApiFixture(page, owner);
+  await page.route('**/api/v1/pharmacies/**', (route) => json(route, [
+    { id: 101, name: 'Alpha Owner Pharmacy' },
+    { id: 102, name: 'Beta Owner Pharmacy' },
+    { id: 103, name: 'Gamma Managed Pharmacy' },
+    { id: 104, name: 'Delta Managed Pharmacy' },
+  ]));
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+  const selector = page.getByRole('button', { name: /Select pharmacy workspace/ });
+  await expect(selector).toBeVisible();
+  await selector.click();
+  const menu = page.getByRole('menu', { name: 'Available pharmacy workspaces' });
+  await expect(menu).toContainText('4 pharmacies available');
+  for (const name of ['Alpha Owner Pharmacy', 'Beta Owner Pharmacy', 'Gamma Managed Pharmacy', 'Delta Managed Pharmacy']) {
+    await expect(menu).toContainText(name);
+  }
+  await menu.getByRole('menuitem', { name: /Gamma Managed Pharmacy/ }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/admin/103/overview');
+});
