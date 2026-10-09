@@ -41,7 +41,10 @@ export default function PublicTalentCard({
   const software = [...new Set(candidate.dispenseSoftware || [])].filter(Boolean).slice(0, 3);
   const roleLabel = candidate.role || "Pharmacy professional";
   const hasRating = Number.isFinite(candidate.ratingAverage) && candidate.ratingCount > 0;
-  const canBook = canRequestBooking && (isOpenToWork || datesPublished > 0);
+  const canBook = canRequestBooking && !isOpenToWork && datesPublished > 0;
+  const hasCalendarDates = !isOpenToWork && datesPublished > 0;
+  const primaryAction = isOpenToWork && canRequestBooking ? () => onRequestBooking(candidate) : hasCalendarDates ? () => onViewCalendar(candidate) : () => onToggleLike(candidate);
+  const primaryLabel = isOpenToWork && canRequestBooking ? "Propose shift" : hasCalendarDates ? (canViewAvailability ? "View availability" : "Sign in to view dates") : (canViewAvailability ? "Save profile" : "Sign in to save profile");
 
   return (
     <Paper
@@ -187,14 +190,14 @@ export default function PublicTalentCard({
             variant="contained"
             fullWidth
             endIcon={<ArrowForwardRoundedIcon />}
-            onClick={() => onViewCalendar(candidate)}
+            onClick={primaryAction}
             sx={{
               mt: 2, minHeight: 46, fontSize: 13, borderRadius: "10px",
               bgcolor: PURPLE, color: "#FFFFFF", textTransform: "none", fontWeight: 800,
               "&:hover": { bgcolor: "#40168F" },
             }}
           >
-            {canViewAvailability ? "View availability" : "Sign in to connect"}
+            {primaryLabel}
           </Button>
           {canBook ? (
             <Button onClick={() => onRequestBooking(candidate)} variant="text" sx={{ minHeight: 44, mt: 0.5, fontSize: 12.5, fontWeight: 750, textTransform: "none" }}>
