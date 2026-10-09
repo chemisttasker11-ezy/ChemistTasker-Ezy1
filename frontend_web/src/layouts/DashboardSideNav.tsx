@@ -2,6 +2,8 @@ import { ReactNode, useMemo, useState } from "react";
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import KeyboardArrowRightRoundedIcon from "@mui/icons-material/KeyboardArrowRightRounded";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
@@ -27,6 +29,9 @@ export default function DashboardSideNav({
       return false;
     }
   });
+
+  const [closedGroups, setClosedGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (title: string) => setClosedGroups((prev) => ({ ...prev, [title]: !prev[title] }));
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -77,6 +82,10 @@ export default function DashboardSideNav({
     return result.filter((group) => group.items.length > 0);
   }, [nav]);
 
+  const activePath = useMemo(() => groups.flatMap((group) => group.items)
+    .filter((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
+    .sort((a, b) => b.path.length - a.path.length)[0]?.path ?? null, [groups, location.pathname]);
+
   const handleNavigate = (path: string) => {
     navigate(addDashboardScopeParams(path, selectedPharmacyId));
   };
@@ -87,8 +96,10 @@ export default function DashboardSideNav({
       aria-label="Dashboard navigation"
       sx={{
         display: { xs: "none", lg: "block" },
-        width: collapsed ? 80 : 276,
-        flex: collapsed ? "0 0 80px" : "0 0 276px",
+        width: collapsed ? 72 : 264,
+        flex: collapsed ? "0 0 72px" : "0 0 264px",
+        minWidth: collapsed ? 72 : 264,
+        maxWidth: collapsed ? 72 : 264,
         transition: "width 180ms ease, flex-basis 180ms ease",
         "@media (prefers-reduced-motion: reduce)": { transition: "none" },
         alignSelf: "stretch",
@@ -103,8 +114,9 @@ export default function DashboardSideNav({
           top: 85,
           height: "calc(100dvh - 85px)",
           overflowY: "auto",
-          px: collapsed ? 1 : 1.5,
+          px: collapsed ? 0.75 : 1.5,
           py: 1.5,
+          overscrollBehavior: "contain",
           scrollbarWidth: "thin",
         }}
       >
@@ -121,30 +133,20 @@ export default function DashboardSideNav({
             </IconButton>
           </Tooltip>
         </Box>
-        <Stack spacing={collapsed ? 1.75 : 2.5}>
+        <Stack spacing={collapsed ? 1.25 : 1.75}>
           {groups.map((group) => (
             <Box key={group.title}>
-              <Typography
-                component="h2"
-                sx={{
-                  px: 1.25,
-                  mb: 0.75,
-                  display: collapsed ? "none" : "block",
-                  color: "var(--ct-text-secondary)",
-                  fontSize: 11,
-                  lineHeight: 1.4,
-                  fontWeight: 800,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {group.title}
-              </Typography>
-              <Stack spacing={collapsed ? 0.65 : 0.35} role="group" aria-label={group.title}>
+              {collapsed ? (
+                <Tooltip title={group.title} placement="right"><Box role="separator" aria-label={group.title} sx={{ borderTop: "1px solid var(--ct-border-color)", mx: 1, mt: 0.5, mb: 1.2 }} /></Tooltip>
+              ) : (
+                <Button onClick={() => toggleGroup(group.title)} aria-expanded={!closedGroups[group.title]} aria-label={`${closedGroups[group.title] ? "Expand" : "Collapse"} ${group.title}`} endIcon={closedGroups[group.title] ? <KeyboardArrowRightRoundedIcon /> : <KeyboardArrowDownRoundedIcon />}
+                  sx={{ width: "100%", minHeight: 40, justifyContent: "space-between", px: 1.25, my: 0.25, color: "#445474", textTransform: "uppercase", textAlign: "left", fontSize: 11.5, lineHeight: 1.4, fontWeight: 850, letterSpacing: ".045em", "& .MuiButton-endIcon": { ml: 0, "& svg": { fontSize: 17 } } }}>
+                  {group.title}
+                </Button>
+              )}
+              {(collapsed || !closedGroups[group.title]) && <Stack spacing={collapsed ? 0.5 : 0.25} role="group" aria-label={group.title}>
                 {group.items.map((item) => {
-                  const active =
-                    location.pathname === item.path ||
-                    location.pathname.startsWith(`${item.path}/`);
+                  const active = item.path === activePath;
 
                   return (
                     <Tooltip key={`${group.title}-${item.path}-${item.label}`} title={collapsed ? item.label : ""} placement="right" arrow>
@@ -159,10 +161,11 @@ export default function DashboardSideNav({
                         minWidth: 0,
                         width: "100%",
                         justifyContent: collapsed ? "center" : "flex-start",
-                        pl: collapsed ? 1 : item.child ? 3.5 : 1.25,
-                        pr: collapsed ? 1 : 1.25,
-                        py: 0.9,
-                        borderRadius: 2.25,
+                        pl: collapsed ? 0 : item.child ? 2.6 : 1.35,
+                        pr: collapsed ? 0 : 1.25,
+                        py: collapsed ? 0.75 : 1,
+                        mx: collapsed ? 0.25 : 0,
+                        borderRadius: 2,
                         textTransform: "none",
                         textAlign: "left",
                         color: active
@@ -172,10 +175,13 @@ export default function DashboardSideNav({
                             : "var(--ct-text-primary)",
                         bgcolor: active ? "var(--ct-dashboard-soft)" : "transparent",
                         fontSize: 13.5,
-                        fontWeight: active ? 800 : item.child ? 600 : 700,
-                        lineHeight: 1.25,
+                        fontWeight: active ? 850 : item.child ? 600 : 700,
+                        lineHeight: 1.35,
+                        whiteSpace: "normal",
+                        overflowWrap: "anywhere",
                         "& .MuiButton-startIcon": {
-                          minWidth: 24,
+                          minWidth: collapsed ? 24 : 22,
+                          margin: collapsed ? "0 !important" : undefined,
                           mr: collapsed ? 0 : 1,
                           ml: collapsed ? 0 : undefined,
                           color: active
@@ -204,7 +210,7 @@ export default function DashboardSideNav({
                     </Tooltip>
                   );
                 })}
-              </Stack>
+              </Stack>}
             </Box>
           ))}
         </Stack>
