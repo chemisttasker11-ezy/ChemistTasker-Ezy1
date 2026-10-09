@@ -553,3 +553,40 @@ test('owner sidebar collapses without losing access to navigation or widening th
   await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
   await expect(sidebar.getByRole('button', { name: 'Manage Pharmacies' })).toBeVisible();
 });
+
+
+test('owner navigation presents nested pharmacy tools on demand without losing the active page', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 850 });
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
+
+  const sidebar = page.locator('aside[aria-label="Dashboard navigation"]');
+  await expect(sidebar.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toHaveCount(0);
+
+  await sidebar.getByRole('button', { name: 'Expand Manage Pharmacies subpages' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Internal Roster' }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/owner/manage-pharmacies/roster');
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toHaveAttribute('aria-current', 'page');
+
+  await sidebar.getByRole('button', { name: 'Collapse Manage Pharmacies subpages' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Internal Roster' })).toHaveCount(0);
+});
+
+test('collapsed owner icon rail keeps all nested routes available through an accessible submenu', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await installApiFixture(page, roleUsers.owner);
+  await page.goto('/dashboard/owner/overview?workspace=internal&pharmacy_id=101');
+
+  const sidebar = page.locator('aside[aria-label="Dashboard navigation"]');
+  await sidebar.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await sidebar.getByRole('button', { name: 'Manage Pharmacies menu' }).click();
+  const flyout = page.getByRole('menu', { name: 'Manage Pharmacies pages' });
+  await expect(flyout.getByRole('menuitem', { name: 'My Pharmacies' })).toBeVisible();
+  await expect(flyout.getByRole('menuitem', { name: 'Internal Roster' })).toBeVisible();
+  await flyout.getByRole('menuitem', { name: 'Internal Roster' }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/owner/manage-pharmacies/roster');
+  await expect(sidebar.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
+});
