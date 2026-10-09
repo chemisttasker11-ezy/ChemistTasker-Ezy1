@@ -24,6 +24,7 @@ import apiClient from "../../../../utils/apiClient";
 import { dashboardGreetingName } from "../../../../utils/displayName";
 import type { PharmacyDTO } from "./types";
 
+import { formatShiftDate } from "../../../../utils/shiftDisplay";
 type ShiftRecord = {
   id: number;
   pharmacy_name?: string | null;
@@ -72,11 +73,7 @@ function readableCount(value: number | undefined): string {
 }
 
 function readableDate(raw?: string | null): string {
-  if (!raw) return "Date not provided";
-  const parsed = new Date(raw.slice(0, 10) + "T12:00:00");
-  return Number.isNaN(parsed.getTime())
-    ? raw
-    : parsed.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+  return formatShiftDate(raw) ?? "Date not provided";
 }
 
 function safeActivityUrl(record: ActivityRecord): string | null {

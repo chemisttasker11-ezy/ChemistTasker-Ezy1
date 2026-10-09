@@ -20,6 +20,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import { alpha } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import RecentActivityDialog from "./RecentActivityDialog";
+import { formatShiftDate, formatShiftTimeRange } from "../../utils/shiftDisplay";
 
 const DNA = {
   ink: "var(--ct-text-primary)",
@@ -237,9 +238,10 @@ export default function DashboardOverviewTemplate({
           <Paper
             sx={{
               p: { xs: 2, sm: 2.75, md: 3.25 },
-              minHeight: { xs: "auto", md: 224 },
+              minHeight: { xs: "auto", md: 184 },
               borderRadius: { xs: "18px", md: "22px" },
-              backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
+              // Same brand panel as the public site's closing call to action.
+              backgroundImage: "linear-gradient(110deg, #281457 0%, #5222B8 65%, #237BAB 100%)",
               color: "#fff",
               overflow: "hidden",
               position: "relative",
@@ -250,25 +252,20 @@ export default function DashboardOverviewTemplate({
               sx={{
                 position: "absolute",
                 inset: 0,
-                backgroundImage: [
-                  `radial-gradient(circle at 64% 98%, ${alpha("#8FE8FF", 0.14)} 0 110px, transparent 111px)`,
-                  `radial-gradient(circle at 72% 96%, ${alpha("#6FE7DD", 0.16)} 0 190px, transparent 191px)`,
-                  `radial-gradient(circle at 66% 96%, ${alpha("#ffffff", 0.12)} 0 275px, transparent 276px)`,
-                  `linear-gradient(100deg, transparent 0 78%, ${alpha("#D20DAE", 0.75)} 78% 100%)`,
-                ].join(", "),
+                backgroundImage: `radial-gradient(circle at 94% 130%, transparent 0 150px, ${alpha("#ffffff", 0.05)} 151px 220px, transparent 221px)`,
                 pointerEvents: "none",
               }}
             />
             <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 2.25, md: 5 }} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between" sx={{ position: "relative", zIndex: 1, minWidth: 0 }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h4" fontWeight={600} gutterBottom sx={{ fontSize: { xs: 28, sm: 34, md: 40 }, lineHeight: 1.1, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>
+                <Typography variant="h4" fontWeight={600} gutterBottom sx={{ fontSize: { xs: 26, sm: 30, md: 34 }, lineHeight: 1.1, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>
                   {heroTitle}
                 </Typography>
                 <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 500, fontSize: { xs: 14, md: 15 }, lineHeight: 1.55, overflowWrap: "anywhere" }}>
                   {heroSubtitle}
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: { xs: 2, md: 3 }, "& > *": { width: { xs: "100%", sm: "auto" } } }}>
-                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: DNA.blue, borderRadius: "12px", fontWeight: 950, minHeight: { xs: 46, md: 48 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
+                  <Button variant="contained" color="inherit" startIcon={primaryAction.icon} onClick={primaryAction.onClick} sx={{ color: "#5222B8", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 46, md: 48 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}>
                     {primaryAction.label}
                   </Button>
                   {secondaryAction && (
@@ -353,7 +350,7 @@ export default function DashboardOverviewTemplate({
                         <Box sx={{ minWidth: 0 }}>
                           <Typography noWrap sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14.5 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
                           <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 12.5 }}>
-                            {[shift.date, shift.start_time && shift.end_time ? `${shift.start_time}–${shift.end_time}` : null, shift.suburb].filter(Boolean).join(" · ")}
+                            {[formatShiftDate(shift.date), formatShiftTimeRange(shift.start_time, shift.end_time), shift.suburb].filter(Boolean).join(" · ")}
                           </Typography>
                         </Box>
                         <Chip
@@ -395,7 +392,7 @@ export default function DashboardOverviewTemplate({
                         <Box sx={{ minWidth: 0 }}>
                           <Typography noWrap sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14.5 }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
                           <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 12.5 }}>
-                            {[shift.date, shift.start_time && shift.end_time ? `${shift.start_time}–${shift.end_time}` : null, shift.suburb].filter(Boolean).join(" · ")}
+                            {[formatShiftDate(shift.date), formatShiftTimeRange(shift.start_time, shift.end_time), shift.suburb].filter(Boolean).join(" · ")}
                           </Typography>
                           {shift.reason && <Typography noWrap sx={{ color: "#008EA6", fontWeight: 800, fontSize: 12, mt: 0.25 }}>{shift.reason}</Typography>}
                         </Box>
@@ -535,8 +532,8 @@ export default function DashboardOverviewTemplate({
                 borderRadius: "22px",
                 p: { xs: 2.5, md: 3 },
                 color: "#fff",
-                background: "linear-gradient(100deg, #267DB8 0%, #433894 58%, #9A087D 100%)",
-                boxShadow: "0 10px 28px rgba(37, 99, 235, 0.18)",
+                background: "#06214A",
+                boxShadow: "0 10px 28px rgba(6, 33, 74, 0.16)",
               }}
             >
               <Box
