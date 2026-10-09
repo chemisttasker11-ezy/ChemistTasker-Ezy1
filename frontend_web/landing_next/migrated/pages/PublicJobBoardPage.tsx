@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link as RouterLink, useSearchParams } from '@/public/navigation';
 import {
   Alert,
@@ -87,6 +87,7 @@ export default function PublicJobBoardPage() {
   const [appliedShiftIds, setAppliedShiftIds] = useState<number[]>([]);
   const [appliedSlotIds, setAppliedSlotIds] = useState<number[]>([]);
   const [isVerified, setIsVerified] = useState(false);
+  const latestResultsRequest = useRef(0);
 
   const coerceVerified = (value: any) => {
     if (value === true || value === 'true' || value === 'True') return true;
@@ -179,6 +180,7 @@ export default function PublicJobBoardPage() {
 
   const loadShifts = useCallback(
     async (activeFilters: FilterConfig, activePage: number) => {
+      const requestId = ++latestResultsRequest.current;
       setLoading(true);
       setError(null);
       try {
@@ -212,6 +214,8 @@ export default function PublicJobBoardPage() {
           getPublicJobBoard(payload),
           user?.id ? fetchShiftInterests({ userId: user.id }) : Promise.resolve([]),
         ]);
+        // Only the latest search/page request may replace the visible list.
+        if (requestId !== latestResultsRequest.current) return;
         const list = Array.isArray(publicShifts?.results)
           ? publicShifts.results
           : Array.isArray(publicShifts)
@@ -232,10 +236,12 @@ export default function PublicJobBoardPage() {
         setAppliedShiftIds(Array.from(nextShiftIds));
         setAppliedSlotIds(Array.from(nextSlotIds));
       } catch (err) {
-        console.error('Failed to load public shifts', err);
-        showError('Failed to load public shifts.');
+        if (requestId === latestResultsRequest.current) {
+          console.error('Failed to load public shifts', err);
+          showError('Failed to load public shifts.');
+        }
       } finally {
-        setLoading(false);
+        if (requestId === latestResultsRequest.current) setLoading(false);
       }
     },
     [searchParams, user?.id]
@@ -247,7 +253,8 @@ export default function PublicJobBoardPage() {
   }, [filters]);
 
   useEffect(() => {
-    loadShifts(debouncedFilters, page);
+    void loadShifts(debouncedFilters, page);
+    return () => { latestResultsRequest.current += 1; };
   }, [debouncedFilters, page, loadShifts]);
 
   const requireLogin = () => setLoginDialogOpen(true);
