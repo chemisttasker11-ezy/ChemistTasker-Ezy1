@@ -135,3 +135,9 @@ Implement the relevant Figma React/web dashboard designs into the **existing** V
 - CI evidence from integrated head `08106ef`: `web-vite` failed TS1005 in `TalentBoard/index.tsx:1019`; E2E runner failed during Vite build for adjacent JSX elements at the same location. **Fix before further visual iterations.**
 - Handover includes protected business contracts, exact file-by-file state implementation, full design frame register, typography authority correction (#155's Outfit/Inter supersedes early DM Sans instruction), staged Figma MCP + Claude Code worktree workflow, acceptance matrix and first prompt.
 - No production-readiness claim or merge. Next developer should run typecheck, fix structural JSX and verify gates/screenshots.
+
+### 2026-10-09 — P0 JSX compiler blocker correction (PR #157)
+- **Exact root cause confirmed from repository text:** `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx` rendered `{pageCount > 1 && <Stack ...>...</Stack>` **without the expression's closing `}`**. The independent earlier #155 version was balanced. This explains TypeScript TS1005 at 1019 and Playwright's preflight Vite build reporting adjacent JSX elements.
+- Applied the minimal **one-character correction**, adding `}` after `</Stack>` in the pagination expression. Commit: `2098a579ec26fc84e49aebf2588c0a5a6aca6378`.
+- This preserves all #155's sidebar/mobile drawer/candidate listing, filters, pagination handlers and data/API behaviour. No changes to role scope, URL routing or Figma visual states.
+- **Verification:** GitHub Shared Core `web-vite` TypeScript + Vite build and Frontend E2E are the authoritative gates. Confirm results on the **post-fix current head** and log their outcome. Do not equate a committed syntax fix with passed gates or 100% design completion.
