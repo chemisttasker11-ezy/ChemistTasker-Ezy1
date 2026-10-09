@@ -94,6 +94,8 @@ export default function RosterWorkerPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const rosterRequestSequence = useRef(0);
   // --- Calendar State ---
   const [calendarView, setCalendarView] = useState<CalendarViewKey>('week'); // Align with shared calendar configuration
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
@@ -195,14 +197,17 @@ export default function RosterWorkerPage() {
   // --- DATA LOADING ---
   useEffect(() => {
     const loadInitialData = async () => {
-      if (!currentUserId) return;
+      if (!currentUserId) {
+        setIsPageLoading(false);
+        return;
+      }
       setIsPageLoading(true);
       try {
         const loadedPharmacies = await fetchRosterWorkerPharmaciesService();
         const mapped = loadedPharmacies.map(mapPharmacySummaryToView);
         setPharmacies(mapped);
         if (mapped.length > 0) {
-          const initialId = initialPharmacyFromUrl ?? mapped[0].id;
+          const initialId = initialPharmacyFromUrl != null && mapped.some((p) => p.id === initialPharmacyFromUrl) ? initialPharmacyFromUrl : mapped[0].id;
           setSelectedPharmacyId(initialId);
         }
       } catch (err: any) { 
@@ -213,14 +218,17 @@ export default function RosterWorkerPage() {
     };
     
     loadInitialData();
-  }, [currentUserId, calendarDate, calendarView, initialPharmacyFromUrl]);
+  }, [currentUserId, initialPharmacyFromUrl]);
   useEffect(() => {
     if (!isPageLoading && selectedPharmacyId) {
-      reloadAssignments();
+      void reloadAssignments();
     }
-  }, [selectedPharmacyId, calendarDate, calendarView]);
+    return () => { rosterRequestSequence.current += 1; };
+  }, [selectedPharmacyId, calendarDate, calendarView, isPageLoading]);
 const reloadAssignments = async () => {
   if (!selectedPharmacyId) return;
+  const requestNumber = ++rosterRequestSequence.current;
+  setRosterError(null);
   const shouldShowSkeleton = isPageLoading;
   if (!shouldShowSkeleton) {
     setIsAssignmentsLoading(true);
@@ -234,6 +242,7 @@ const reloadAssignments = async () => {
       fetchCommunityShifts({ pharmacyId: selectedPharmacyId, startDate, endDate, unassigned: true }),
       fetchWorkerShiftRequestsService({ pharmacyId: selectedPharmacyId, startDate, endDate }),
     ]);
+    if (requestNumber !== rosterRequestSequence.current) return;
     const assignments = assignmentsRes.map(mapAssignmentToView);
     const openShiftResults = Array.isArray(openShiftsRes) ? openShiftsRes : openShiftsRes?.results ?? [];
     const openShifts = openShiftResults.map(mapOpenShiftToView);
@@ -343,13 +352,14 @@ const reloadAssignments = async () => {
 
     setAllAssignments(filteredAssignments);
   } catch (err: any) {
-    console.error("Failed to load roster assignments or cover requests", err);
-  } finally {
-    if (!shouldShowSkeleton) {
-      setIsAssignmentsLoading(false);
+    if (requestNumber === rosterRequestSequence.current) {
+      console.error("Failed to load roster assignments or cover requests", err);
+      setRosterError('Your current roster could not be refreshed. Please retry before acting on these shifts.');
     }
-    if (shouldShowSkeleton) {
-      setIsPageLoading(false);
+  } finally {
+    if (requestNumber === rosterRequestSequence.current) {
+      if (!shouldShowSkeleton) setIsAssignmentsLoading(false);
+      if (shouldShowSkeleton) setIsPageLoading(false);
     }
   }
 };
@@ -358,7 +368,6 @@ const reloadAssignments = async () => {
     if (!selectedAssignment || !selectedAssignment.isOpenShift || !selectedAssignment.originalShiftId) return;
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await claimShiftService({
         shiftId: selectedAssignment.originalShiftId,
         slotId: selectedAssignment.slot_detail.id,
@@ -436,7 +445,6 @@ const handleSubmitLeaveRequest = async () => {
   }
   setIsSubmitting(true);
   try {
-    setIsPageLoading(true);
     if (isUpdate && existingLeave?.id) {
       await updateLeaveRequestService(existingLeave.id, {
         leave_type: leaveType,
@@ -473,7 +481,6 @@ const handleSubmitLeaveRequest = async () => {
     }
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await deleteLeaveRequestService(existingLeave.id);
       setSnackbar({ open: true, message: "Leave request cancelled.", severity: "success" });
       setIsLeaveDialogOpen(false);
@@ -521,7 +528,6 @@ const handleSubmitLeaveRequest = async () => {
     const targetPharmacy = existingSwap?.pharmacy || selectedPharmacyId;
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       const payload = {
         pharmacy: targetPharmacy,
         role: roleNeeded,
@@ -560,7 +566,6 @@ const handleSubmitLeaveRequest = async () => {
     }
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await deleteWorkerShiftRequestService(existingSwap.id);
       setSnackbar({ open: true, message: "Cover request cancelled.", severity: "success" });
       setIsSwapDialogOpen(false);
@@ -721,6 +726,7 @@ const handleSubmitLeaveRequest = async () => {
           </Typography>
         </Box>
       </Stack>
+      {rosterError && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => void reloadAssignments()} sx={{ minHeight: 44, fontWeight: 800 }}>Retry</Button>}>{rosterError}</Alert>}
       <Tabs
         aria-label="My roster pharmacy locations"
         value={selectedPharmacyId ?? false}
