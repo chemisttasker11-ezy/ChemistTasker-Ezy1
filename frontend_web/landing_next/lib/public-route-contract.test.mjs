@@ -112,3 +112,23 @@ test('public landing does not inherit unapproved comparison-copy claims', () => 
     assert.equal(landing.toLowerCase().includes(unsupported.toLowerCase()), false, unsupported);
   }
 });
+
+
+test('public shift search and advanced filters update the server query contract', () => {
+  const board = read('migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx');
+  const page = read('migrated/pages/PublicJobBoardPage.tsx');
+  assert.match(board, /const updateFilterConfig = /);
+  assert.match(board, /onFiltersChange\?\.\(next\);/);
+  assert.match(board, /setFilterConfig=\{updateFilterConfig\}/);
+  assert.match(board, /onChange=\{\(event\) => updateFilterConfig\(/);
+  assert.match(page, /const handleFiltersChange = \(nextFilters: FilterConfig\) => \{\s*setPage\(1\);\s*setFilters\(nextFilters\);/);
+  assert.match(page, /loadShifts\(debouncedFilters, page\)/);
+});
+
+test('public shift cards group qualifications instead of repeating Required on every skill', () => {
+  const cards = read('migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx');
+  assert.match(cards, /requiredLabels\.join\('  ·  '\)/);
+  assert.match(cards, /preferredLabels\.join\('  ·  '\)/);
+  assert.match(cards, /!publicPresentation && \(shift\.mustHave \|\| \[\]\)\.map/);
+  assert.match(cards, /\{!publicPresentation && <Button\s+onClick=\{\(\) => toggleExpandedCard\(shift\.id\)\}/);
+});
