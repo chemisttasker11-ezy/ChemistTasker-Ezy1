@@ -570,6 +570,10 @@ export default function DashboardTopShell({
           "--ct-dashboard-title": DNA.ink,
           "--ct-dashboard-muted": DNA.muted,
           minHeight: "100vh",
+          width: "100%",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflowX: "clip",
           bgcolor: "var(--ct-page-bg)",
           color: "var(--ct-text-primary)",
           fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
@@ -604,12 +608,13 @@ export default function DashboardTopShell({
           display: "flex",
           justifyContent: "center",
           alignItems: "stretch",
+          minWidth: 0,
+          maxWidth: "100%",
           minHeight: { xs: 72, md: 85 },
           background: "rgba(255,255,255,0.93)",
           backdropFilter: "blur(15px)",
           borderBottom: "1px solid #EDF0F5",
           boxShadow: "0 6px 18px rgba(6,18,58,0.035)",
-          overflow: "hidden",
         }}
       >
         <Stack
@@ -619,9 +624,10 @@ export default function DashboardTopShell({
           sx={{
             width: "100%",
             maxWidth: 1660,
+            minWidth: 0,
+            boxSizing: "border-box",
             minHeight: { xs: 72, md: 85 },
-            px: { xs: 2.25, md: 3, xl: 4 },
-            overflow: "hidden",
+            px: { xs: 1.5, sm: 2.25, md: 2.5, xl: 4 },
           }}
         >
         <Box
@@ -677,8 +683,8 @@ export default function DashboardTopShell({
             gridTemplateColumns: {
               xs: "minmax(0, 1fr) auto",
               md: "minmax(0, 1fr) auto",
-              lg: "minmax(260px, 420px) minmax(210px, 1fr) auto",
-              xl: "minmax(320px, 460px) minmax(240px, 1fr) auto",
+              lg: "minmax(210px, 300px) minmax(0, 1fr) minmax(0, auto)",
+              xl: "minmax(280px, 360px) minmax(0, 1fr) minmax(0, auto)",
             },
             gridTemplateAreas: {
               xs: '"scope actions"',
@@ -689,7 +695,6 @@ export default function DashboardTopShell({
             columnGap: { xs: 0.75, md: 1.25, xl: 2 },
             px: { xs: 0.75, md: 1.5, xl: 2.5 },
             minHeight: { xs: 72, md: 85 },
-            overflow: "hidden",
           }}
         >
           <Stack
