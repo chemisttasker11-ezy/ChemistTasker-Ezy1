@@ -22,9 +22,9 @@ import { useNavigate } from "react-router-dom";
 import RecentActivityDialog from "./RecentActivityDialog";
 
 const DNA = {
-  ink: "#06123A",
-  muted: "#5E6B8D",
-  line: "#E5ECF7",
+  ink: "var(--ct-text-primary)",
+  muted: "var(--ct-text-secondary)",
+  line: "var(--ct-border-color)",
   blue: "#063BDA",
   violet: "#6D28D9",
   magenta: "#EA0A8E",
@@ -196,7 +196,7 @@ export default function DashboardOverviewTemplate({
         mx: "auto",
         maxWidth: 1660,
         color: DNA.ink,
-        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
+        fontFamily: "var(--ct-font-body)",
         display: "flex",
         flexDirection: "column",
         gap: { xs: 2, md: 3.5 },
@@ -204,7 +204,7 @@ export default function DashboardOverviewTemplate({
     >
       <Box>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-          <Typography sx={{ fontSize: { xs: 25, md: 32 }, lineHeight: 1.08, fontWeight: 950, color: DNA.ink, overflowWrap: "anywhere" }}>
+          <Typography component="h1" sx={{ fontFamily: "var(--ct-font-display)", fontSize: { xs: 26, md: 32 }, lineHeight: 1.13, letterSpacing: "-0.03em", fontWeight: 600, color: DNA.ink, overflowWrap: "anywhere" }}>
             {title}
           </Typography>
           <Chip
@@ -213,13 +213,13 @@ export default function DashboardOverviewTemplate({
             sx={{
               bgcolor: "#EAF2FF",
               color: DNA.blue,
-              fontWeight: 950,
+              fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: ".05em",
             }}
           />
         </Stack>
-        <Typography sx={{ mt: 1.25, color: DNA.muted, fontSize: { xs: 15, md: 17 }, fontWeight: 700, lineHeight: 1.45, overflowWrap: "anywhere" }}>
+        <Typography sx={{ mt: 1, color: DNA.muted, fontSize: { xs: 15, md: 16 }, fontWeight: 500, lineHeight: 1.55, overflowWrap: "anywhere" }}>
           {subtitle}
         </Typography>
       </Box>
@@ -261,10 +261,10 @@ export default function DashboardOverviewTemplate({
             />
             <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 2.25, md: 5 }} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between" sx={{ position: "relative", zIndex: 1, minWidth: 0 }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h4" fontWeight={950} gutterBottom sx={{ fontSize: { xs: 28, sm: 34, md: 40 }, lineHeight: 1.08, overflowWrap: "anywhere" }}>
+                <Typography variant="h4" fontWeight={600} gutterBottom sx={{ fontSize: { xs: 28, sm: 34, md: 40 }, lineHeight: 1.1, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>
                   {heroTitle}
                 </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 800, fontSize: { xs: 14, md: 14.5 }, lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 500, fontSize: { xs: 14, md: 15 }, lineHeight: 1.55, overflowWrap: "anywhere" }}>
                   {heroSubtitle}
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: { xs: 2, md: 3 }, "& > *": { width: { xs: "100%", sm: "auto" } } }}>
@@ -328,7 +328,7 @@ export default function DashboardOverviewTemplate({
               <Paper sx={{ borderRadius: { xs: "16px", md: "20px" }, border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2, md: 2.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 1.5 }}>
                   <Box>
-                    <Typography sx={{ fontSize: { xs: 19, md: 21 }, fontWeight: 950, color: DNA.ink }}>My next shifts</Typography>
+                    <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: { xs: 19, md: 21 }, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>My next shifts</Typography>
                     <Typography sx={{ mt: 0.35, color: DNA.muted, fontSize: 13, fontWeight: 700 }}>
                       Only shifts you applied to, showed interest in, committed to, or have confirmed.
                     </Typography>
@@ -370,7 +370,7 @@ export default function DashboardOverviewTemplate({
               <Paper sx={{ borderRadius: { xs: "16px", md: "20px" }, border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2, md: 2.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 1.5 }}>
                   <Box>
-                    <Typography sx={{ fontSize: { xs: 19, md: 21 }, fontWeight: 950, color: DNA.ink }}>Recommended for you</Typography>
+                    <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: { xs: 19, md: 21 }, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>Recommended for you</Typography>
                     <Typography sx={{ mt: 0.35, color: DNA.muted, fontSize: 13, fontWeight: 700 }}>
                       Open shifts matching your declared availability and travel area.
                     </Typography>
@@ -452,7 +452,7 @@ export default function DashboardOverviewTemplate({
                       {action.icon}
                     </Box>
                     <Stack spacing={{ xs: 0.75, md: 1.15 }} sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography fontWeight={950} color={DNA.ink} sx={{ fontSize: { xs: 18, md: 19 }, lineHeight: 1.12, overflowWrap: "anywhere" }}>{action.title}</Typography>
+                      <Typography sx={{ color: DNA.ink, fontFamily: "var(--ct-font-display)", fontWeight: 600, fontSize: { xs: 18, md: 19 }, lineHeight: 1.2, overflowWrap: "anywhere" }}>{action.title}</Typography>
                       <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.32, maxWidth: action.wide ? 360 : { xs: "none", md: 220 }, overflowWrap: "anywhere" }}>{action.description}</Typography>
                     </Stack>
                   </Stack>
@@ -467,7 +467,7 @@ export default function DashboardOverviewTemplate({
             <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
               <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
                 <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
-                <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>{upcomingTitle}</Typography>
+                <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>{upcomingTitle}</Typography>
               </Stack>
               <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
                 {[["Today", upcoming.today], ["This Week", upcoming.week], ["This Month", upcoming.month]].map(([label, value]) => (
@@ -488,7 +488,7 @@ export default function DashboardOverviewTemplate({
           <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
               <FavoriteBorderIcon sx={{ color: "#5B18E8", fontSize: 30 }} />
-              <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Recent Activity</Typography>
+              <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: DNA.ink }}>Recent Activity</Typography>
             </Stack>
             <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
               {activity.length === 0 ? (
