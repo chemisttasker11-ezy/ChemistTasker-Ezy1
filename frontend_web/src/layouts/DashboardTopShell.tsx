@@ -25,7 +25,7 @@ import TopBarActions from "./TopBarActions";
 import DashboardSideNav from "./DashboardSideNav";
 import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership, fetchPharmaciesService } from "@chemisttasker/shared-core";
 import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
 
 const DNA = {
@@ -309,6 +309,7 @@ export default function DashboardTopShell({
   });
 
   const [organizationPharmacies, setOrganizationPharmacies] = useState<PharmacyOption[]>([]);
+  const [authorizedOwnerPharmacies, setAuthorizedOwnerPharmacies] = useState<PharmacyOption[] | null>(null);
   const organizationId = getOrganizationMembership(user)?.organization_id;
   useEffect(() => {
     if (!organizationId) {
@@ -322,22 +323,59 @@ export default function DashboardTopShell({
       .catch(() => { if (active) setOrganizationPharmacies([]); });
     return () => { active = false; };
   }, [organizationId]);
+  // The pharmacy API is the source of truth for accessible locations. OWNER admin rows are
+  // a subset of that list on some older accounts and must not silently hide legitimate locations.
+  useEffect(() => {
+    if (String(user?.role || "").toUpperCase() !== "OWNER") {
+      setAuthorizedOwnerPharmacies(null);
+      return;
+    }
+    let active = true;
+    setAuthorizedOwnerPharmacies(null);
+    fetchPharmaciesService({})
+      .then((items) => {
+        if (!active) return;
+        setAuthorizedOwnerPharmacies((items || [])
+          .map((item: any) => ({ id: Number(item.id), name: String(item.name || "").trim() }))
+          .filter((item) => Number.isFinite(item.id) && item.id > 0 && Boolean(item.name)));
+      })
+      .catch(() => { if (active) setAuthorizedOwnerPharmacies(null); });
+    return () => { active = false; };
+  }, [user?.id, user?.role]);
+
+  const ownedPharmacyIds = useMemo(() => {
+    const ids = new Set<number>();
+    const add = (id: unknown) => { const number = Number(id); if (Number.isFinite(number) && number > 0) ids.add(number); };
+    (user?.memberships ?? []).forEach((membership: any) => {
+      if (["OWNER", "PHARMACY_OWNER"].includes(String(membership?.role || "").toUpperCase()) || membership?.is_pharmacy_owner === true) {
+        add(membership.pharmacy_id ?? membership.pharmacyId ?? membership.pharmacy?.id);
+      }
+    });
+    adminAssignments.filter((assignment) => String(assignment.admin_level || "").toUpperCase() === "OWNER")
+      .forEach((assignment) => add(assignment.pharmacy_id));
+    for (const key of ["owned_pharmacies", "owner_pharmacies"]) {
+      const list = (user as any)?.[key];
+      if (Array.isArray(list)) list.forEach((item: any) => add(item?.id));
+    }
+    return ids;
+  }, [user, adminAssignments]);
+
   const pharmacies = useMemo(() => {
     const byId = new Map(collectPharmacies(user, adminAssignments).map((item) => [item.id, item]));
     organizationPharmacies.forEach((item) => byId.set(item.id, { ...item, helper: "Organization pharmacy" }));
-    let options = [...byId.values()];
-    // The Owner workspace is scoped to pharmacies the owner owns. A pharmacy they only manage for someone else is
-    // reached through the Admin switch, not listed as one of their own stores.
-    if (String(user?.role || "").toUpperCase() === "OWNER") {
-      const ownedIds = new Set(
-        adminAssignments
-          .filter((assignment) => String(assignment?.admin_level ?? "").toUpperCase() === "OWNER")
-          .map((assignment) => Number(assignment.pharmacy_id)),
-      );
-      if (ownedIds.size) options = options.filter((item) => ownedIds.has(item.id) || item.helper === "Organization pharmacy");
+    // The server-authorised list includes all owned and delegated pharmacies. Keep delegated
+    // assignments visible but route their selection through the existing Admin persona.
+    if (String(user?.role || "").toUpperCase() === "OWNER" && authorizedOwnerPharmacies !== null) {
+      const authorised = new Set(authorizedOwnerPharmacies.map((item) => item.id));
+      return authorizedOwnerPharmacies.map((item) => ({
+        ...item,
+        helper: ownedPharmacyIds.has(item.id) ? "Owner" :
+          adminAssignments.some((assignment) => Number(assignment.pharmacy_id) === item.id && isAdminPersonaAssignment(assignment))
+            ? "Admin access" : byId.get(item.id)?.helper ?? "Accessible pharmacy",
+      })).filter((item) => authorised.has(item.id)).sort((a, b) => a.name.localeCompare(b.name));
     }
-    return options.sort((a, b) => a.name.localeCompare(b.name));
-  }, [user, adminAssignments, organizationPharmacies]);
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [user, adminAssignments, organizationPharmacies, authorizedOwnerPharmacies, ownedPharmacyIds]);
   const isOrgUser = hasOrganizationAccess(user);
   const isOwner = String(user?.role || "").toUpperCase() === "OWNER";
   const isWorker = ["PHARMACIST", "OTHER_STAFF"].includes(String(user?.role || "").toUpperCase());
@@ -484,6 +522,18 @@ export default function DashboardTopShell({
   };
 
   const handleSelectPharmacy = (id: number) => {
+    if (!pharmacies.some((pharmacy) => pharmacy.id === id)) return;
+    // A delegated assignment has its own capability-gated Admin workspace. Do not
+    // silently treat it as Owner authority when selecting from the combined list.
+    if (isOwner && !ownedPharmacyIds.has(id)) {
+      const assignment = delegatedAdminAssignments.find((row) => Number(row.pharmacy_id) === id && row.id != null);
+      if (assignment?.id != null) {
+        selectAdminPersona(assignment.id);
+        setWorkspaceAnchor(null);
+        navigate(`/dashboard/admin/${id}/overview`);
+        return;
+      }
+    }
     setWorkspace("internal");
     setSelectedPharmacyId(id);
     setWorkspacePharmacyId(id);
@@ -682,6 +732,9 @@ export default function DashboardTopShell({
             <>
               <Button
                 onClick={(event) => setWorkspaceAnchor(event.currentTarget)}
+                aria-label={`Select pharmacy workspace. ${selectedPharmacy?.name ?? "No pharmacy selected"}. ${pharmacies.length} locations available`}
+                aria-expanded={Boolean(workspaceAnchor)}
+                aria-haspopup="menu"
                 startIcon={selectedPharmacy ? <StoreIcon /> : <PublicIcon />}
                 endIcon={<KeyboardArrowDownIcon />}
                 sx={{
@@ -700,7 +753,7 @@ export default function DashboardTopShell({
                 }}
               >
                 <Box sx={{ minWidth: 0, textAlign: "left" }}>
-                  <Typography noWrap sx={{ fontSize: { xs: 12, md: 14 }, fontWeight: 900, color: "var(--ct-text-primary)" }}>
+                  <Typography noWrap title={selectedPharmacy?.name ?? undefined} sx={{ fontSize: { xs: 12, md: 14 }, fontWeight: 900, color: "var(--ct-text-primary)" }}>
                     {selectedPharmacy?.name ?? (isOrgUser && workspace === "internal" ? "All organization pharmacies" : "ChemistTasker Platform")}
                   </Typography>
                   <Typography noWrap sx={{ fontSize: { xs: 10, md: 12 }, fontWeight: 700, color: "var(--ct-text-secondary)" }}>
@@ -708,7 +761,9 @@ export default function DashboardTopShell({
                   </Typography>
                 </Box>
               </Button>
-              <Menu anchorEl={workspaceAnchor} open={Boolean(workspaceAnchor)} onClose={() => setWorkspaceAnchor(null)}>
+              <Menu anchorEl={workspaceAnchor} open={Boolean(workspaceAnchor)} onClose={() => setWorkspaceAnchor(null)}
+                MenuListProps={{ "aria-label": "Available pharmacy workspaces" }}
+                slotProps={{ paper: { sx: { width: { xs: "min(94vw, 390px)", sm: 410 }, maxWidth: "94vw", maxHeight: "min(66dvh, 520px)", borderRadius: 2.5, boxShadow: "0 16px 40px rgba(6,18,58,.14)" } } }}>
                 {isOrgUser && <MenuItem onClick={handleSelectAllOrganizationPharmacies}>
                   <StoreIcon sx={{ mr: 1.5, color: DNA.blue }} /> All organization pharmacies
                 </MenuItem>}
@@ -717,12 +772,18 @@ export default function DashboardTopShell({
                     <PublicIcon sx={{ mr: 1.5, color: DNA.violet }} /> ChemistTasker Platform
                   </MenuItem>
                 )}
+                <Box component="li" role="presentation" sx={{ listStyle: "none", px: 2, pt: 1.25, pb: 0.5 }}>
+                  <Typography sx={{ color: "#445474", fontWeight: 850, fontSize: 12, letterSpacing: ".04em" }}>
+                    {pharmacies.length} {pharmacies.length === 1 ? "pharmacy" : "pharmacies"} available
+                  </Typography>
+                </Box>
                 {pharmacies.map((pharmacy) => (
-                  <MenuItem key={pharmacy.id} onClick={() => handleSelectPharmacy(pharmacy.id)}>
-                    <StoreIcon sx={{ mr: 1.5, color: DNA.blue }} />
-                    <Box>
-                      <Typography sx={{ fontWeight: 800 }}>{pharmacy.name}</Typography>
-                      {pharmacy.helper && <Typography sx={{ fontSize: 12, color: DNA.muted }}>{pharmacy.helper}</Typography>}
+                  <MenuItem key={pharmacy.id} selected={selectedPharmacyId === pharmacy.id} onClick={() => handleSelectPharmacy(pharmacy.id)}
+                    sx={{ gap: 1.5, py: 1.25, px: 2, whiteSpace: "normal", alignItems: "flex-start", borderRadius: 1, mx: 0.75, "&.Mui-selected": { bgcolor: "#F0ECFC" } }}>
+                    <StoreIcon sx={{ flexShrink: 0, mt: 0.35, color: "#5222B8" }} />
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography sx={{ fontWeight: 800, color: "#06123A", fontSize: 14, overflowWrap: "anywhere" }}>{pharmacy.name}</Typography>
+                      <Typography sx={{ fontSize: 12.5, color: "#445474" }}>{pharmacy.helper ?? "Accessible pharmacy"}</Typography>
                     </Box>
                   </MenuItem>
                 ))}
