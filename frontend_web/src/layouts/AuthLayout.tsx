@@ -59,7 +59,13 @@ export default function AuthLayout({
           },
         },
         typography: {
-          fontFamily: '"Bai Jamjuree","Inter","Helvetica","Arial",sans-serif',
+          fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
+          h1: { fontFamily: 'Outfit, Inter, sans-serif' },
+          h2: { fontFamily: 'Outfit, Inter, sans-serif' },
+          h3: { fontFamily: 'Outfit, Inter, sans-serif' },
+          h4: { fontFamily: 'Outfit, Inter, sans-serif' },
+          h5: { fontFamily: 'Outfit, Inter, sans-serif' },
+          h6: { fontFamily: 'Outfit, Inter, sans-serif' },
         },
       }),
     []
