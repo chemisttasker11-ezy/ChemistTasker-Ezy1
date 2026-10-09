@@ -9,60 +9,24 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import CreditCardIcon from "@mui/icons-material/CreditCard";
-import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import ForumIcon from "@mui/icons-material/Forum";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import StoreIcon from "@mui/icons-material/Store";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import { alpha } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import RecentActivityDialog from "./RecentActivityDialog";
+import {
+  DashboardQuickActionGrid,
+  DashboardUpcomingShiftsCard,
+  DashboardRecentActivityCard,
+  DashboardMetricsGrid,
+  dashboardColors as DNA,
+} from "./DashboardOverviewPrimitives";
+import type {
+  DashboardAction,
+  DashboardActivity,
+  DashboardMetric,
+  DashboardUpcomingStat,
+} from "./DashboardOverviewPrimitives";
+export type { DashboardAction, DashboardActivity, DashboardMetric, DashboardTone } from "./DashboardOverviewPrimitives";
 
-const DNA = {
-  ink: "#06123A",
-  muted: "#5E6B8D",
-  line: "#E5ECF7",
-  blue: "#063BDA",
-  violet: "#6D28D9",
-  magenta: "#EA0A8E",
-};
-
-export type DashboardTone = "blue" | "purple" | "pink" | "cyan";
-
-export type DashboardAction = {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-  tone: DashboardTone;
-  wide?: boolean;
-};
-
-export type DashboardMetric = {
-  label: string;
-  value: string | number;
-  helper: string;
-  icon: React.ReactNode;
-  tone: DashboardTone;
-};
-
-export type DashboardActivity = {
-  title: string;
-  description: string;
-  time: string;
-  icon?: React.ReactNode;
-  color?: string;
-  kind?: "shift" | "hub" | "reveal" | "confirmed" | "pharmacy" | "invoice" | string;
-  target_id?: number | string;
-  targetId?: number | string;
-  target_type?: string;
-  targetType?: string;
-  action_url?: string;
-  actionUrl?: string;
-};
 
 type PillSummary = {
   balance: number;
@@ -70,11 +34,7 @@ type PillSummary = {
   loading?: boolean;
 };
 
-type UpcomingStat = {
-  today: number;
-  week: number;
-  month: number;
-};
+type UpcomingStat = DashboardUpcomingStat;
 
 type DashboardInvoicePanel = {
   title: string;
@@ -85,33 +45,6 @@ type DashboardInvoicePanel = {
   buttonLabel: string;
   onClick: () => void;
 };
-
-const toneStyles: Record<DashboardTone, { bg: string; color: string; link: string }> = {
-  blue: { bg: "#E7F0FF", color: "#063BDA", link: "#063BDA" },
-  purple: { bg: "#EFE7FF", color: "#6D28D9", link: "#4C0DDE" },
-  pink: { bg: "#FDE7F5", color: "#EA0A8E", link: "#EA0A8E" },
-  cyan: { bg: "#DDFBFF", color: "#008EA6", link: "#063BDA" },
-};
-
-function activityIcon(event: DashboardActivity) {
-  if (event.icon) return event.icon;
-  if (event.kind === "hub") return <ForumIcon />;
-  if (event.kind === "reveal") return <VisibilityIcon />;
-  if (event.kind === "confirmed") return <ShieldOutlinedIcon />;
-  if (event.kind === "pharmacy") return <StoreIcon />;
-  if (event.kind === "invoice") return <CreditCardIcon />;
-  return <CalendarMonthIcon />;
-}
-
-function activityColor(event: DashboardActivity) {
-  if (event.color) return event.color;
-  if (event.kind === "hub") return "#063BDA";
-  if (event.kind === "reveal") return "#EA0A8E";
-  if (event.kind === "confirmed") return "#00C853";
-  if (event.kind === "pharmacy") return "#5B18E8";
-  if (event.kind === "invoice") return "#FF5A00";
-  return "#5B18E8";
-}
 
 export default function DashboardOverviewTemplate({
   title,
@@ -272,86 +205,12 @@ export default function DashboardOverviewTemplate({
             </Stack>
           </Paper>
 
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: { xs: 1.5, md: 2.5 }, minWidth: 0 }}>
-            {actions.map((action) => {
-              const tone = toneStyles[action.tone];
-              return (
-                <Paper key={action.title} role="button" onClick={action.onClick} sx={{ minHeight: { xs: 132, md: 196 }, gridColumn: { lg: action.wide ? "span 2" : "span 1" }, borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)", transition: "all 0.2s ease", cursor: "pointer", p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", justifyContent: "center", "&:hover": { transform: { xs: "none", md: "translateY(-4px)" }, boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)" } }}>
-                  <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
-                    <Box sx={{ width: { xs: 52, md: 64 }, height: { xs: 52, md: 64 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 28, md: 34 } } }}>
-                      {action.icon}
-                    </Box>
-                    <Stack spacing={{ xs: 0.75, md: 1.15 }} sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography fontWeight={950} color={DNA.ink} sx={{ fontSize: { xs: 20, md: 22 }, lineHeight: 1.12, overflowWrap: "anywhere" }}>{action.title}</Typography>
-                      <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.32, maxWidth: action.wide ? 360 : { xs: "none", md: 220 }, overflowWrap: "anywhere" }}>{action.description}</Typography>
-                    </Stack>
-                  </Stack>
-                </Paper>
-              );
-            })}
-          </Box>
+          <DashboardQuickActionGrid actions={actions} />
         </Stack>
 
         <Stack spacing={{ xs: 2.5, md: 3 }}>
-          <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
-              <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>{upcomingTitle}</Typography>
-            </Stack>
-            <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-              {[["Today", upcoming.today], ["This Week", upcoming.week], ["This Month", upcoming.month]].map(([label, value]) => (
-                <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
-                  <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
-                  <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-              View all shifts
-            </Button>
-          </Paper>
-
-          <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
-              <FavoriteBorderIcon sx={{ color: "#5B18E8", fontSize: 30 }} />
-              <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Recent Activity</Typography>
-            </Stack>
-            <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-              {activity.length === 0 ? (
-                <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 700 }}>
-                  No recent activity yet.
-                </Typography>
-              ) : activity.map((event) => {
-                const actionUrl = event.actionUrl || event.action_url;
-                return (
-                <ButtonBase
-                  key={`${event.kind || "activity"}-${event.targetId || event.target_id || event.title}-${event.time}`}
-                  onClick={() => handleActivityClick(event)}
-                  disabled={!actionUrl}
-                  sx={{
-                    width: "100%",
-                    display: "block",
-                    textAlign: "left",
-                    borderRadius: 1,
-                    cursor: actionUrl ? "pointer" : "default",
-                    "&:hover": actionUrl ? { bgcolor: alpha("#5B18E8", 0.05) } : undefined,
-                  }}
-                >
-                <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ py: 1.8, px: 0.75 }}>
-                  <Box sx={{ color: activityColor(event), width: 24, pt: 0.25, "& svg": { fontSize: 24 } }}>{activityIcon(event)}</Box>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14 }}>{event.title}</Typography>
-                    <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13 }}>{event.description}</Typography>
-                  </Box>
-                  <Typography sx={{ color: "#7A86A3", fontWeight: 800, fontSize: 12, whiteSpace: "nowrap" }}>{event.time}</Typography>
-                </Stack>
-                </ButtonBase>
-              )})}
-            </Stack>
-            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-              View all activity
-            </Button>
-          </Paper>
+          <DashboardUpcomingShiftsCard counts={upcoming} title={upcomingTitle} onViewShifts={onOpenShifts} />
+          <DashboardRecentActivityCard activity={activity} onActivityClick={handleActivityClick} onViewAll={handleOpenActivity} />
 
           {invoicePanel && (
             <Paper
@@ -427,21 +286,7 @@ export default function DashboardOverviewTemplate({
         </Stack>
       </Box>
 
-      <Paper sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(4, minmax(0, 1fr))" }, overflow: "hidden", borderRadius: { xs: "16px", md: "20px" }, bgcolor: "#FFFFFF", border: `1px solid ${DNA.line}`, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-        {metrics.map((item, index) => {
-          const tone = toneStyles[item.tone];
-          return (
-            <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: { xs: 1.5, md: 2.25 }, minHeight: { xs: 104, md: 132 }, px: { xs: 2, md: 4 }, py: { xs: 2, md: 2.5 }, borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` }, borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" } }}>
-              <Box sx={{ width: { xs: 54, md: 66 }, height: { xs: 54, md: 66 }, borderRadius: { xs: "15px", md: "18px" }, bgcolor: tone.bg, color: tone.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { fontSize: { xs: 30, md: 36 } } }}>{item.icon}</Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 14 }}>{item.label}</Typography>
-                <Typography sx={{ color: DNA.ink, fontWeight: 950, fontSize: { xs: 21, md: 24 }, lineHeight: 1.18, overflowWrap: "anywhere" }}>{item.value}</Typography>
-                <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5, overflowWrap: "anywhere" }}>{item.helper}</Typography>
-              </Box>
-            </Box>
-          );
-        })}
-      </Paper>
+      <DashboardMetricsGrid metrics={metrics} />
       <RecentActivityDialog
         open={activityDialogOpen}
         onClose={() => setActivityDialogOpen(false)}
