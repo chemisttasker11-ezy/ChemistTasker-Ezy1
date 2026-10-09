@@ -559,7 +559,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
   );
 
   return (
-    <Box sx={{ px: publicPresentation ? 0 : { xs: 0, lg: 2 }, py: publicPresentation ? 0 : 2 }}>
+    <Box sx={{ px: publicPresentation ? 0 : { xs: 0, lg: 2 }, py: publicPresentation ? 0 : 2, maxWidth: publicPresentation ? 1160 : undefined, mx: publicPresentation ? "auto" : undefined, width: "100%" }}>
       <GlobalStyles styles={{ '.pac-container': { zIndex: 1400 } }} />
       <CounterOfferDialog
         open={counterOfferOpen}
@@ -645,7 +645,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
               sx={{ width: { xs: '100%', md: 310 }, '& .MuiOutlinedInput-root': { minHeight: 48, bgcolor: '#FFFFFF' } }}
               InputProps={{ startAdornment: <InputAdornment position='start'><SearchIcon sx={{ color: '#52617C' }} /></InputAdornment> }}
             />
-            <Button variant='outlined' startIcon={<TuneIcon />} onClick={() => setIsSidebarOpen(true)} sx={{ display: { xs: 'inline-flex', lg: 'none' }, minHeight: 48, fontWeight: 800, textTransform: 'none', color: '#5222B8', borderColor: '#C8B8E5' }}>
+            <Button variant='outlined' startIcon={<TuneIcon />} onClick={() => setIsSidebarOpen(true)} sx={{ display: publicPresentation ? 'inline-flex' : { xs: 'inline-flex', lg: 'none' }, minHeight: 48, fontWeight: 800, textTransform: 'none', color: '#5222B8', borderColor: '#C8B8E5' }}>
               Filters{activeFilterCount > 0 ? ' (' + activeFilterCount + ')' : ''}
             </Button>
           </Stack>
@@ -653,7 +653,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
       )}
 
       <Box sx={{ display: 'flex', gap: publicPresentation ? 2.5 : 3 }}>
-        {!isMobile && !hideFiltersAndSort && (
+        {!isMobile && !hideFiltersAndSort && !publicPresentation && (
           <Paper variant="outlined" sx={{ width: publicPresentation ? 286 : 320, flexShrink: 0, borderRadius: publicPresentation ? '14px' : 3, borderColor: publicPresentation ? '#DEE5EF' : 'grey.200', boxShadow: 'none', alignSelf: 'flex-start', position: publicPresentation ? 'sticky' : 'static', top: publicPresentation ? 104 : undefined, maxHeight: publicPresentation ? 'calc(100dvh - 124px)' : undefined, overflowY: publicPresentation ? 'auto' : 'visible' }}>
             {publicPresentation && <Typography component='h3' sx={{ fontSize: 16, fontWeight: 800, pt: 2, px: 2.5, color: '#06123A' }}>Refine results</Typography>}
             {sidebarContent}
@@ -794,12 +794,13 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
           <Box sx={{ width: publicPresentation ? { xs: 'min(100vw, 360px)', sm: 360 } : 320, maxWidth: '100vw' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
               <Typography variant="h6">Filters</Typography>
-              <IconButton onClick={() => setIsSidebarOpen(false)}>
+              <IconButton onClick={() => setIsSidebarOpen(false)} aria-label="Close shift filters">
                 <CloseIcon />
               </IconButton>
             </Box>
             <Divider />
             {sidebarContent}
+            {publicPresentation && <Box sx={{ px: 2.5, py: 1.75, borderTop: '1px solid #E3EAF2' }}><Button variant='contained' fullWidth onClick={() => setIsSidebarOpen(false)} sx={{ minHeight: 46, textTransform: 'none', bgcolor: '#5222B8', '&:hover': { bgcolor: '#40168F' } }}>Show results</Button></Box>}
           </Box>
         </Drawer>
       )}
