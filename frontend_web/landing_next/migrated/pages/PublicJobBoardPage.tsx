@@ -371,18 +371,18 @@ export default function PublicJobBoardPage() {
             mb: 2,
             p: { xs: 2, md: 2.5 },
             border: '1px solid #E5ECF7',
-            borderRadius: 3,
+            borderRadius: '14px',
             bgcolor: '#fff',
-            boxShadow: '0 10px 28px rgba(6,18,58,.045)',
+            boxShadow: 'none',
           }}
         >
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
             <Box>
-              <Typography sx={{ fontWeight: 900, color: 'text.primary' }}>
-                {loading ? 'Finding current pharmacy opportunities…' : `${totalCount ?? shifts.length} current ${(totalCount ?? shifts.length) === 1 ? 'opportunity' : 'opportunities'}`}
+              <Typography sx={{ fontWeight: 850, color: '#06123A', fontSize: 17 }}>
+                Browse shifts without signing in
               </Typography>
-              <Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}>
-                Explore by role, location and date. Sign in when you're ready to apply.
+              <Typography sx={{ mt: .4, color: '#445474', fontSize: 14, lineHeight: 1.55 }}>
+                Explore real pharmacy opportunities by role, location and date. Sign in when you're ready to apply.
               </Typography>
             </Box>
             {!user && (
@@ -403,6 +403,7 @@ export default function PublicJobBoardPage() {
         <Box sx={{ borderRadius: 3, overflow: 'hidden' }}>
           <ShiftsBoard
             title="Public Job Board"
+            publicPresentation
             shifts={shifts}
             loading={loading}
             useServerFiltering
