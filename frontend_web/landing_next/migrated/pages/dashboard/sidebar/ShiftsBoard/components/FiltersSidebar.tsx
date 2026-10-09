@@ -30,6 +30,7 @@ import { FilterConfig } from '../types';
 
 type FiltersSidebarProps = {
   filterConfig: FilterConfig;
+  hideSearch?: boolean;
   setFilterConfig: React.Dispatch<React.SetStateAction<FilterConfig>>;
   roleOptions: string[];
   locationGroups: Record<string, Set<string>>;
@@ -42,6 +43,7 @@ type FiltersSidebarProps = {
 
 const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
   filterConfig,
+  hideSearch = false,
   setFilterConfig,
   roleOptions,
   locationGroups,
@@ -79,10 +81,11 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
 
   return (
     <Box sx={{ px: 2.5, py: 2 }}>
-      <TextField
+      {!hideSearch && <TextField
         fullWidth
         size="small"
-        placeholder="Search pharmacy, role..."
+        label="Search shifts"
+        placeholder="Role, pharmacy or suburb"
         value={filterConfig.search}
         onChange={(event) => setFilterConfig((prev) => ({ ...prev, search: event.target.value }))}
         InputProps={{
@@ -93,7 +96,7 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
           ),
         }}
         sx={{ mb: 2 }}
-      />
+      />}
 
       <Box sx={{ mb: 2 }}>
         <FormControlLabel
