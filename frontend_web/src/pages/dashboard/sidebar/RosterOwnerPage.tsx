@@ -170,10 +170,11 @@ export default function RosterOwnerPage() {
   const [filteredMembers, setFilteredMembers] = useState<RosterPharmacyMember[]>([]);
   const [escalationLevel, setEscalationLevel] = useState<string>('');
   const handleTabChange = useCallback((_: SyntheticEvent, val: number | boolean) => {
-    if (scopedPharmacyId != null) {
-      return;
-    }
+    if (scopedPharmacyId != null) return;
     if (typeof val === 'number') {
+      setAssignments([]);
+      setOpenShifts([]);
+      setWorkerRequests([]);
       setSelectedPharmacyId(val);
     }
   }, [scopedPharmacyId]);
@@ -1288,12 +1289,12 @@ export default function RosterOwnerPage() {
                           {event.title}
                         </Typography>
                         {settlement && (
-                          <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .95, fontSize: 9, lineHeight: 1.15 }}>
+                          <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .95, fontSize: 12, lineHeight: 1.2 }}>
                             {settlement}{workforce?.agreedRate ? ` · ${workforce.agreedRate}/hr` : ''}
                           </Typography>
                         )}
                         {workforce?.timesheet && (
-                          <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .9, fontSize: 9, lineHeight: 1.15 }}>
+                          <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .9, fontSize: 12, lineHeight: 1.2 }}>
                             {workforce.timesheet.status.replaceAll('_', ' ')} · reviewed {(workforce.timesheet.reviewedMinutes / 60).toFixed(2)}h
                           </Typography>
                         )}
