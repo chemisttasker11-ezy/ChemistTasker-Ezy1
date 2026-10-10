@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { finance, financeStatus, type FinanceCustomer, type FinanceItem, type FinanceInvoice, type FinanceExpense, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import { CustomerEditor, ItemEditor, ExpenseEditor, PaymentEditor } from './Editors';
 import InvoiceComposer from './InvoiceComposer';
+import { takeFinanceHandoff } from './handoff';
 import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
 import InvoiceStatsCards from '../dashboard/sidebar/Invoices/InvoiceStatsCards';
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
@@ -13,7 +14,7 @@ import type { InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStat
 import PageHeader from "../../components/ui/PageHeader";
 
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
-  | { kind: 'invoice'; value?: FinanceInvoice } | { kind: 'expense'; value?: FinanceExpense }
+  | { kind: 'invoice'; value?: FinanceInvoice; prefillShiftId?: number } | { kind: 'expense'; value?: FinanceExpense }
   | { kind: 'payment'; value: FinanceInvoice };
 const workerTools = ['invoices', 'customers', 'items', 'expenses', 'bas'] as const;
 const ownerTools = ['received'] as const;
@@ -77,6 +78,35 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
     setNotice('Saved to your account.');
     try { await load(); } catch (failure) { setError(`Saved successfully, but the list could not refresh. Use Refresh. ${errorMessage(failure)}`); }
   };
+  // Deep links: ?invoice=<id> opens that invoice (composer for the issuer, history for the recipient),
+  // ?shift=<id> starts a new invoice prefilled from that accepted shift, ?new=1 starts a blank one.
+  const handledLink = useRef(false);
+  useEffect(() => {
+    if (loading || handledLink.current) return;
+    const handoff = takeFinanceHandoff();
+    const invoiceId = params.get('invoice') ?? handoff?.invoice ?? null;
+    const shiftId = params.get('shift') ?? params.get('shiftId') ?? handoff?.shift ?? null;
+    const fresh = params.get('new') ?? (handoff?.new ? '1' : null);
+    if (!invoiceId && !shiftId && !fresh) return;
+    handledLink.current = true;
+    const next = new URLSearchParams(params);
+    ['invoice', 'shift', 'shiftId', 'pharmacyId', 'new'].forEach(key => next.delete(key));
+    setParams(next, { replace: true });
+    const matches = (invoice: FinanceInvoice) => String(invoice.id) === invoiceId || String(invoice.invoice_id) === invoiceId;
+    if (invoiceId && receivedMode) {
+      const found = receivedInvoices.find(matches);
+      if (found) openHistory(found);
+      else setError(`Invoice ${invoiceId} isn't in your received invoices. It may have been replaced by a newer revision.`);
+    } else if (invoiceId) {
+      const found = invoices.find(matches);
+      if (found) setEditor({ kind: 'invoice', value: found });
+      else void finance.invoice(invoiceId).then(value => setEditor({ kind: 'invoice', value })).catch(() => setError(`Invoice ${invoiceId} couldn't be opened. It may have been removed.`));
+    } else if (!receivedMode) {
+      setEditor({ kind: 'invoice', prefillShiftId: shiftId ? Number(shiftId) : undefined });
+    }
+    // Runs once, after the first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
   const changeTool = (value: string) => { const next = new URLSearchParams(params); next.set('tool', value); setParams(next); setSearch(''); };
   const ask = (title: string, body: string, action: () => Promise<unknown>) => { setError(''); setMenu(null); setConfirmation({ title, body, action }); };
   const openHistory = (invoice: FinanceInvoice) => { setHistoryInvoice(invoice); setHistoryDocument(null); setMenu(null); };
@@ -124,7 +154,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const expenseCsv = () => downloadCsv('workspace-expenses.csv', [['Supplier', 'Description', 'Incurred', 'Paid', 'Gross AUD', 'GST AUD', 'Creditable business use %', 'Estimated GST credit AUD', 'Reference'],
     ...expenses.map(expense => [expense.supplier, expense.description, expense.incurred_on, expense.paid_on || '', expense.amount, expense.gst_amount, expense.business_use_percent, expense.gst_credit, expense.reference])]);
 
-  if (editor?.kind === 'invoice') return <Container maxWidth={false} disableGutters sx={{ maxWidth: 1600, mx: "auto" }}><InvoiceComposer key={editor.value?.id ?? 'new'} initial={editor.value} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={refreshAfterSave} /></Container>;
+  if (editor?.kind === 'invoice') return <Container maxWidth={false} disableGutters sx={{ maxWidth: 1600, mx: "auto" }}><InvoiceComposer key={editor.value?.id ?? 'new'} initial={editor.value} prefillShiftId={editor.prefillShiftId} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={refreshAfterSave} /></Container>;
 
   return <Container maxWidth={false} disableGutters sx={{ maxWidth: 1600, mx: "auto" }}>
     <Stack spacing={2.5}>

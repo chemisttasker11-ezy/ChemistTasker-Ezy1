@@ -10,6 +10,7 @@ import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { isIssuerWorkspace } from '../../../utils/invoiceIssuer';
+import { setFinanceHandoff } from '../../finance/handoff';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
@@ -109,6 +110,15 @@ export default function InvoiceGeneratePage() {
     const navigate = useNavigate();
     const [search] = useSearchParams();
     const prefillShiftId = search.get('shiftId');
+
+    // New invoices are created in Invoices (the finance workspace), which handles both ChemistTasker shifts
+    // and work outside ChemistTasker. A shift link opens a draft prefilled from that shift.
+    useEffect(() => {
+      if (!issuerWorkspace) return;
+      const base = pathname.replace(/\/new\/?$/, '');
+      setFinanceHandoff(prefillShiftId ? { shift: prefillShiftId } : { new: true });
+      navigate(`${base}?${prefillShiftId ? `shift=${encodeURIComponent(prefillShiftId)}` : 'new=1'}`, { replace: true });
+    }, [issuerWorkspace, pathname, prefillShiftId, navigate]);
 
     // --- Mode & Dates ---
     const [mode, setMode] = useState<'internal'|'external'>('internal');
@@ -530,6 +540,10 @@ const handleGenerate = () => {
     .finally(() => setSubmitting(false));
 };
 
+
+  if (issuerWorkspace) {
+    return <Box role="status" sx={{ p: 4, color: 'var(--ct-text-secondary)' }}>Opening Invoices…</Box>;
+  }
 
   if (user && !issuerWorkspace) {
     return (

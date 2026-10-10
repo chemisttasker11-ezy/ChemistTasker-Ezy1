@@ -11,8 +11,8 @@ import { dollars, errorMessage } from './helpers';
 const grid = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 };
 const taxLabels: Record<FinanceTaxCode, string> = { GST: 'GST 10%', GST_FREE: 'GST-free', INPUT_TAXED: 'Input taxed', OUT_OF_SCOPE: 'N-T / not taxable' };
 
-export default function InvoiceComposer({ initial, previous, customers, items, onClose, onSaved }: {
-  initial?: FinanceInvoice; previous?: FinanceInvoice; customers: FinanceCustomer[]; items: FinanceItem[]; onClose: () => void; onSaved: () => Promise<void>;
+export default function InvoiceComposer({ initial, prefillShiftId, previous, customers, items, onClose, onSaved }: {
+  initial?: FinanceInvoice; prefillShiftId?: number; previous?: FinanceInvoice; customers: FinanceCustomer[]; items: FinanceItem[]; onClose: () => void; onSaved: () => Promise<void>;
 }) {
   const [value, setValue] = useState<FinanceDraft>(() => initial ? { ...initial.payload, version: initial.version, request_key: initial.request_key } : createFinanceDraft(crypto.randomUUID(), previous));
   const original = useRef(JSON.stringify(value));
@@ -58,6 +58,12 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
     Promise.all([finance.invoiceDefaults(), finance.internalSources()]).then(([defaults, sources]) => {
       if (!active) return;
       setInternalSources(sources);
+      if (prefillShiftId) {
+        // Opened from a shift (e.g. Shift history → Create invoice): start from that accepted shift.
+        const source = sources.find(item => item.shift_id === prefillShiftId);
+        if (source) void applyInternalSource(source);
+        else setError("That shift can't be invoiced from here yet: it needs an accepted ABN booking that hasn't been invoiced. You can still create the invoice below.");
+      }
       setValue(current => ({
         ...current,
         issuer_name: current.issuer_name || defaults.issuer_name,
@@ -175,17 +181,17 @@ export default function InvoiceComposer({ initial, previous, customers, items, o
         <Button startIcon={<AddIcon />} onClick={() => change('lines', [...value.lines, { item_id: null, description: '', category_code: 'Miscellaneous', unit: 'Item', quantity: '1.00', unit_price: '0.00', discount: '0.00', tax_code: 'OUT_OF_SCOPE', super_eligible: false, worked_on: null }])}>Blank row</Button>
         <Button startIcon={<AddIcon />} onClick={() => setInline('item')}>Add new saved item</Button>
       </Stack>
-      <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(180px, 2.2fr) 1.1fr .7fr 1fr 1fr .8fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit', 'Unit price', 'Discount %', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
+      <Box sx={{ display: { xs: 'none', lg: 'grid' }, gridTemplateColumns: 'minmax(200px, 2.4fr) 150px .7fr 1fr 1fr 1.1fr 1fr 40px', gap: 1, p: 1.5, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>{['Description', 'Work date', 'Qty', 'Unit', 'Unit price', 'Tax code', 'Amount', ''].map((label, i) => <Typography key={i} variant="caption" fontWeight={700}>{label}</Typography>)}</Box>
       {!value.lines.length && <Box sx={{ textAlign: 'center', py: 5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}><Typography fontWeight={600}>Add the work you’re billing for</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Choose a saved item, or add a free-entry row without saving a catalogue item.</Typography></Box>}
       {value.lines.map((line, index) => <Box key={`${index}-${line.source_assignment_id ?? line.item_id ?? 'adhoc'}`} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
         {line.source_assignment_id && <Chip size="small" label="From ChemistTasker shift · source link preserved · values editable" sx={{ mb: 1 }} />}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'minmax(180px, 2.2fr) 1.1fr .7fr 1fr 1fr .8fr 1.1fr 1fr 40px' }, gap: 1, alignItems: 'start', '& .MuiInputBase-root': { fontSize: 13 } }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'minmax(200px, 2.4fr) 150px .7fr 1fr 1fr 1.1fr 1fr 40px' }, gap: 1, alignItems: 'start', '& .MuiInputBase-root': { fontSize: 13 } }}>
           <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} onChange={e => changeLine(index, { description: e.target.value })} multiline />
           <TextField type="date" label="Work date" value={line.worked_on || ''} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
           <TextField label={line.unit || 'Quantity'} value={line.quantity} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
           <TextField label="Unit" value={line.unit || ''} onChange={e => changeLine(index, { unit: e.target.value })} />
           <TextField label="Unit price" value={line.unit_price} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
-          <TextField label="Discount %" value={line.discount} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { discount: e.target.value })} />
+          {/* Discount stays in the data model (and the backend maths) for the marketplace; workers don't set it here. */}
           <TextField select label="Tax code" value={line.tax_code || 'OUT_OF_SCOPE'} onChange={e => changeLine(index, { tax_code: e.target.value as FinanceTaxCode })}>{Object.entries(taxLabels).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
           <Typography sx={{ py: 1, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{preview?.lines[index] ? dollars(preview.lines[index].gross) : 'Pending'}</Typography>
           <IconButton aria-label={`Remove item ${index + 1}`} disabled={Boolean(line.source_assignment_id)} title={line.source_assignment_id ? 'Internal source rows stay attached; edit their values instead.' : 'Remove row'} onClick={() => change('lines', value.lines.filter((_, i) => i !== index))}><DeleteOutlineIcon fontSize="small" /></IconButton>

@@ -17,7 +17,9 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { getInvoiceDetail, reportInvoiceIssue, updateInvoice } from '@chemisttasker/shared-core';
+import { finance, getInvoiceDetail, reportInvoiceIssue, updateInvoice } from '@chemisttasker/shared-core';
+import { isIssuerWorkspace } from '../../../utils/invoiceIssuer';
+import { setFinanceHandoff } from '../../finance/handoff';
 import apiClient from '../../../utils/apiClient';
 
 dayjs.extend(utc);
@@ -150,6 +152,25 @@ export default function InvoiceDetailPage() {
     if (!id) return;
     setLoading(true);
     setInvoice(null);
+    let cancelled = false;
+    // Invoices managed by the finance workspace open there (issuer: composer, recipient: review history);
+    // this page stays for legacy invoices the workspace doesn't manage.
+    const listBase = location.pathname.replace(/\/[^/]+\/?$/, '');
+    const managed = isIssuerWorkspace(location.pathname, user?.role) ? finance.invoice(Number(id)) : finance.receivedInvoice(Number(id));
+    managed
+      .then(() => {
+        if (cancelled) return;
+        setFinanceHandoff({ invoice: String(id) });
+        navigate(`${listBase}?invoice=${id}`, { replace: true });
+      })
+      .catch(() => {
+        if (!cancelled) loadLegacy();
+      });
+    return () => {
+      cancelled = true;
+    };
+
+    function loadLegacy() {
     getInvoiceDetail(Number(id))
       .then((data: any) => {
         setInvoice(data);
@@ -200,6 +221,9 @@ export default function InvoiceDetailPage() {
         setInvoice(null);
       })
       .finally(() => setLoading(false));
+    }
+    // location and user only steer the one-time hand-off.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, loadAttempt]);
 
   // --- Totals ---
