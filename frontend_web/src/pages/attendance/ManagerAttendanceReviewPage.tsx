@@ -3,8 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -28,12 +26,21 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import CancelIcon from "@mui/icons-material/Cancel";
-import HistoryIcon from "@mui/icons-material/History";
-import EditCalendarIcon from "@mui/icons-material/EditCalendar";
+import { Check, ClipboardCheck, History, PencilLine, RefreshCw, X } from "lucide-react";
 import { attendance, fetchPharmaciesService } from "@chemisttasker/shared-core";
-import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from "../../constants/brandTheme";
+import PageHeader from "../../components/ui/PageHeader";
+import DashboardContentState from "../../components/dashboard/DashboardContentState";
+import { InitialsAvatar, Pill, type ShiftTone } from "../dashboard/shiftCenter/ShiftCentreParts";
+import { humanizeEnum } from "../dashboard/sidebar/ActiveShiftsPage/utils/audience";
+
+const COVER_TYPES: Record<string, { label: string; tone: ShiftTone; hint: string }> = {
+  UNROSTERED_LOCAL: { label: "Not on the roster", tone: "blue", hint: "Worked at this pharmacy without a rostered shift." },
+  CROSS_SITE_CHAIN: { label: "Cover from a sister store", tone: "violet", hint: "Usually works at another pharmacy in your chain." },
+  CROSS_SITE_ORG: { label: "Cover from your organisation", tone: "amber", hint: "Usually works at another pharmacy in your organisation." },
+};
+
+const EVENT_TONES: Record<string, ShiftTone> = { CLOCK_IN: "green", CLOCK_OUT: "navy" };
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 type PendingReview = {
   provisional_id: number;
@@ -93,6 +100,10 @@ export default function ManagerAttendanceReviewPage() {
   const [timelineSessionId, setTimelineSessionId] = useState<number | null>(null);
   const [timelineData, setTimelineData] = useState<SessionTimelineData | null>(null);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
+  const [timelineFailed, setTimelineFailed] = useState(false);
+  const [pharmaciesLoading, setPharmaciesLoading] = useState(true);
+  const [pharmaciesFailed, setPharmaciesFailed] = useState(false);
+  const [reviewsFailed, setReviewsFailed] = useState(false);
 
   // Manual Correction sub-state
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
@@ -101,20 +112,25 @@ export default function ManagerAttendanceReviewPage() {
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   // Fetch pharmacies managed by this user
-  useEffect(() => {
-    const loadPharmacies = async () => {
-      try {
-        const list = await fetchPharmaciesService({}) as Array<{ id: number; name: string }>;
-        setPharmacies(list);
-        if (list.length > 0) {
-          setSelectedPharmacyId(list[0].id);
-        }
-      } catch (err) {
-        // Fallback: try user memberships/onboarding if direct list fails
+  const loadPharmacies = useCallback(async () => {
+    setPharmaciesLoading(true);
+    setPharmaciesFailed(false);
+    try {
+      const list = await fetchPharmaciesService({}) as Array<{ id: number; name: string }>;
+      setPharmacies(list);
+      if (list.length > 0) {
+        setSelectedPharmacyId(list[0].id);
       }
-    };
-    loadPharmacies();
+    } catch (err) {
+      setPharmaciesFailed(true);
+    } finally {
+      setPharmaciesLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadPharmacies();
+  }, [loadPharmacies]);
 
   // Fetch pending provisional attendances for the selected pharmacy
   const fetchPending = useCallback(async (clearAlert = true) => {
@@ -126,7 +142,9 @@ export default function ManagerAttendanceReviewPage() {
       }
       const rows = await attendance.getManagerPending(Number(selectedPharmacyId));
       setPendingReviews(rows as PendingReview[]);
+      setReviewsFailed(false);
     } catch (err: any) {
+      setReviewsFailed(true);
       setAlertMsg({
         type: "error",
         text: err?.message || "Failed to load pending attendance reviews.",
@@ -195,14 +213,13 @@ export default function ManagerAttendanceReviewPage() {
   const openTimeline = async (sessionId: number) => {
     setTimelineSessionId(sessionId);
     setLoadingTimeline(true);
+    setTimelineFailed(false);
+    setTimelineData(null);
     try {
       const data = await attendance.getManagerTimeline(sessionId);
       setTimelineData(data as SessionTimelineData);
     } catch (err: any) {
-      setAlertMsg({
-        type: "error",
-        text: err?.message || "Failed to load session timeline.",
-      });
+      setTimelineFailed(true);
     } finally {
       setLoadingTimeline(false);
     }
@@ -239,216 +256,167 @@ export default function ManagerAttendanceReviewPage() {
     }
   };
 
-  const getTierLabel = (tier: string) => {
-    switch (tier) {
-      case "UNROSTERED_LOCAL":
-        return <Chip label="Local Unscheduled" color="info" size="small" />;
-      case "CROSS_SITE_CHAIN":
-        return <Chip label="Cross-Site (Sister Store)" color="secondary" size="small" />;
-      case "CROSS_SITE_ORG":
-        return <Chip label="Cross-Site (Organization)" color="warning" size="small" />;
-      default:
-        return <Chip label={tier} size="small" />;
-    }
-  };
+  const pharmacyPicker = pharmacies.length > 1 ? (
+    <FormControl sx={{ minWidth: 240 }} size="small">
+      <InputLabel>Pharmacy</InputLabel>
+      <Select value={selectedPharmacyId} label="Pharmacy" onChange={(e) => setSelectedPharmacyId(Number(e.target.value))}>
+        {pharmacies.map((p) => (
+          <MenuItem key={p.id} value={p.id}>
+            {p.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  ) : undefined;
+
+  const actionsFor = (row: PendingReview) => (
+    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+      <Button size="small" variant="outlined" startIcon={<History size={16} />} onClick={() => openTimeline(row.session_id)} sx={{ minHeight: 40 }}>
+        Clock times
+      </Button>
+      <Button size="small" variant="contained" color="success" startIcon={<Check size={16} />} onClick={() => setApprovingItem(row)} sx={{ minHeight: 40 }}>
+        Approve
+      </Button>
+      <Button size="small" variant="outlined" color="error" startIcon={<X size={16} />} onClick={() => setRejectingItem(row)} sx={{ minHeight: 40 }}>
+        Reject
+      </Button>
+    </Stack>
+  );
+
+  let body;
+  if (pharmaciesLoading || (loadingReviews && pendingReviews.length === 0)) {
+    body = <DashboardContentState kind="loading" title="Loading attendance to approve…" />;
+  } else if (pharmaciesFailed) {
+    body = (
+      <DashboardContentState
+        kind="error"
+        title="We couldn't load your pharmacies"
+        description="Check your connection and try again."
+        actionLabel="Try again"
+        onAction={() => void loadPharmacies()}
+      />
+    );
+  } else if (!selectedPharmacyId) {
+    body = (
+      <DashboardContentState
+        kind="empty"
+        icon={<ClipboardCheck size={26} />}
+        title="No pharmacies to review"
+        description="Attendance approvals appear here for pharmacies you manage."
+      />
+    );
+  } else if (reviewsFailed && pendingReviews.length === 0) {
+    body = (
+      <DashboardContentState
+        kind="error"
+        title="We couldn't load attendance to approve"
+        description="Check your connection and try again."
+        actionLabel="Try again"
+        onAction={() => void fetchPending()}
+      />
+    );
+  } else if (pendingReviews.length === 0) {
+    body = (
+      <DashboardContentState
+        kind="empty"
+        icon={<ClipboardCheck size={26} />}
+        title="Nothing to approve"
+        description="Hours worked off the roster or by cover from another site appear here for you to approve."
+      />
+    );
+  } else {
+    body = (
+      <Stack spacing={1.25} aria-busy={loadingReviews}>
+        {pendingReviews.map((row) => {
+          const startTime = new Date(row.started_at);
+          const endTime = row.ended_at ? new Date(row.ended_at) : null;
+          const hours = endTime ? (endTime.getTime() - startTime.getTime()) / (1000 * 3600) : null;
+          const cover = COVER_TYPES[row.cover_type] ?? { label: humanizeEnum(row.cover_type), tone: "neutral" as ShiftTone, hint: "" };
+          const time = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+          return (
+            <Paper
+              key={row.provisional_id}
+              variant="outlined"
+              sx={{ p: { xs: 1.75, md: 2 }, borderRadius: "var(--ct-card-radius)", borderColor: "var(--ct-border-color)", display: "flex", alignItems: { md: "center" }, flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", gap: 1.5 }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
+                <InitialsAvatar name={row.worker_name} size={40} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography component="h3" sx={{ fontWeight: 600, fontSize: 16, color: "var(--ct-text-primary)", overflowWrap: "anywhere" }}>
+                      {row.worker_name}
+                    </Typography>
+                    <Pill tone={cover.tone} label={cover.label} title={cover.hint || undefined} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                    {row.worker_email}
+                    {row.source_pharmacy_name ? ` · usually at ${row.source_pharmacy_name}` : ""}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5, color: "var(--ct-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                    {startTime.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} · {time(startTime)} – {endTime ? time(endTime) : "still clocked in"}
+                    {" · "}
+                    <strong>{hours === null ? "In progress" : `${hours.toFixed(1)} h`}</strong>
+                  </Typography>
+                </Box>
+              </Stack>
+              {actionsFor(row)}
+            </Paper>
+          );
+        })}
+      </Stack>
+    );
+  }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 4 } }}>
-      {/* Header */}
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-        <Box>
-          <Typography
-            variant="h4"
-            sx={{
-              fontFamily: BRAND_FONTS.heading,
-              color: BRAND_COLORS.navy,
-              fontSize: { xs: 26, md: 32 },
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Attendance Review & Corrections
-          </Typography>
-          <Typography variant="body2" sx={{ color: BRAND_COLORS.body, mt: 0.5, fontFamily: BRAND_FONTS.body }}>
-            Review unrostered or cross-site shifts, backfill completed rosters, and adjust audit corrections.
-          </Typography>
-        </Box>
-
-        {/* Pharmacy Dropdown */}
-        {pharmacies.length > 1 && (
-          <FormControl sx={{ minWidth: 240, mt: { xs: 2, sm: 0 } }} size="small">
-            <InputLabel>Destination Pharmacy</InputLabel>
-            <Select
-              value={selectedPharmacyId}
-              label="Destination Pharmacy"
-              onChange={(e) => setSelectedPharmacyId(Number(e.target.value))}
-            >
-              {pharmacies.map((p) => (
-                <MenuItem key={p.id} value={p.id}>
-                  {p.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
-      </Stack>
+    <Box>
+      <PageHeader
+        title="Attendance approvals"
+        subtitle="Approve hours worked off the roster or by cover from another site, and correct clock times."
+        actions={pharmacyPicker}
+      />
 
       {/* Feedback Alerts */}
-      {alertMsg && (
-        <Alert severity={alertMsg.type} sx={{ mb: 3 }} onClose={() => setAlertMsg(null)}>
+      {alertMsg && !(reviewsFailed && pendingReviews.length === 0) && (
+        <Alert severity={alertMsg.type} sx={{ mb: 2 }} onClose={() => setAlertMsg(null)}>
           {alertMsg.text}
         </Alert>
       )}
 
-      {/* Pending Reviews Table */}
-      <Card
-        sx={{
-          borderRadius: 3,
-          boxShadow: BRAND_SHADOWS.card,
-          border: `1px solid ${BRAND_COLORS.border}`,
-          overflow: "hidden",
-        }}
-      >
-        <Box
-          sx={{
-            p: 2.5,
-            bgcolor: BRAND_COLORS.mist,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            borderBottom: `1px solid ${BRAND_COLORS.border}`,
-          }}
-        >
-          <Typography variant="h6" sx={{ fontFamily: BRAND_FONTS.heading, fontWeight: 700, color: BRAND_COLORS.navy }}>
-            Pending Provisional Shifts ({pendingReviews.length})
-          </Typography>
+      {selectedPharmacyId && !pharmaciesLoading && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" sx={{ mb: 1.5, gap: 1.5 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 22, color: "var(--ct-text-primary)" }}>
+              Waiting for approval
+            </Typography>
+            {pendingReviews.length > 0 && <Pill tone="amber" label={`${pendingReviews.length} to review`} />}
+          </Stack>
           <Button
             size="small"
+            variant="outlined"
             onClick={() => void fetchPending()}
             disabled={loadingReviews}
-            sx={{
-              color: BRAND_COLORS.purple,
-              fontWeight: 600,
-              "&:hover": { bgcolor: BRAND_COLORS.purpleLight },
-            }}
+            startIcon={loadingReviews ? <CircularProgress size={14} color="inherit" /> : <RefreshCw size={16} />}
+            sx={{ minHeight: 40 }}
           >
             Refresh
           </Button>
-        </Box>
+        </Stack>
+      )}
 
-        {loadingReviews ? (
-          <Box sx={{ p: 5, textAlign: "center" }}>
-            <CircularProgress size={32} />
-          </Box>
-        ) : pendingReviews.length === 0 ? (
-          <Box sx={{ p: 5, textAlign: "center" }}>
-            <Typography variant="body1" color="text.secondary">
-              No pending provisional shifts to review for this pharmacy.
-            </Typography>
-          </Box>
-        ) : (
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Worker</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Cover Type</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Home Pharmacy</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Clock In / Out</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Recorded Time</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {pendingReviews.map((row) => {
-                  const startTime = new Date(row.started_at);
-                  const endTime = row.ended_at ? new Date(row.ended_at) : null;
-                  const durationHours = endTime
-                    ? ((endTime.getTime() - startTime.getTime()) / (1000 * 3600)).toFixed(1)
-                    : "In Progress";
-
-                  return (
-                    <TableRow key={row.provisional_id} hover>
-                      <TableCell>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          {row.worker_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {row.worker_email}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{getTierLabel(row.cover_type)}</TableCell>
-                      <TableCell>{row.source_pharmacy_name || "—"}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {startTime.toLocaleDateString([], { month: "short", day: "numeric" })}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {startTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          {" — "}
-                          {endTime
-                            ? endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                            : "Ongoing"}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {durationHours} {typeof durationHours === "string" && durationHours !== "In Progress" ? "hrs" : ""}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Tooltip title="View Timeline / Corrections">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => openTimeline(row.session_id)}
-                            >
-                              <HistoryIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            startIcon={<CheckCircleIcon />}
-                            onClick={() => setApprovingItem(row)}
-                            sx={{ fontWeight: 700 }}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            startIcon={<CancelIcon />}
-                            onClick={() => setRejectingItem(row)}
-                          >
-                            Reject
-                          </Button>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Card>
+      {body}
 
       {/* Approval Confirmation Dialog */}
-      <Dialog open={!!approvingItem} onClose={() => setApprovingItem(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Approve Provisional Shift</DialogTitle>
+      <Dialog open={!!approvingItem} onClose={isApproving ? undefined : () => setApprovingItem(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Approve {approvingItem?.worker_name}'s hours?</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            You are approving the provisional shift worked by <strong>{approvingItem?.worker_name}</strong>.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This adds the shift to the roster as completed. Cover from another site does
+            <strong> not</strong> become a member of this pharmacy.
           </Typography>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            This action will backfill a completed Shift and Slot Assignment. Cross-site workers will <strong>not</strong> be granted permanent membership at this store.
-          </Alert>
           <TextField
-            label="Manager Approval Note (Optional)"
-            placeholder="e.g. Confirmed cover by phone with area manager."
+            label="Note (optional)"
+            placeholder="e.g. Confirmed cover by phone with the area manager."
             value={approvalReason}
             onChange={(e) => setApprovalReason(e.target.value)}
             fullWidth
@@ -457,30 +425,32 @@ export default function ManagerAttendanceReviewPage() {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setApprovingItem(null)}>Cancel</Button>
+          <Button onClick={() => setApprovingItem(null)} disabled={isApproving}>Cancel</Button>
           <Button
             variant="contained"
             color="success"
             onClick={handleConfirmApproval}
             disabled={isApproving}
+            startIcon={isApproving ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
-            {isApproving ? <CircularProgress size={24} color="inherit" /> : "Approve & Backfill"}
+            Approve hours
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Rejection Confirmation Dialog */}
-      <Dialog open={!!rejectingItem} onClose={() => setRejectingItem(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: "error.main" }}>Reject Provisional Attendance</DialogTitle>
+      <Dialog open={!!rejectingItem} onClose={isRejecting ? undefined : () => setRejectingItem(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Reject {rejectingItem?.worker_name}'s hours?</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Reject provisional attendance for <strong>{rejectingItem?.worker_name}</strong>. The raw scan events will be retained for audit and dispute evidence.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            The hours won't be added to the roster. The original clock records are kept for audit and disputes.
           </Typography>
           <TextField
-            label="Rejection Reason (Required)"
-            placeholder="e.g. Unscheduled attendance not authorized by store manager."
+            label="Reason"
+            placeholder="e.g. Not authorised by the store manager."
             value={rejectionReason}
             onChange={(e) => setRejectionReason(e.target.value)}
+            helperText="Required."
             fullWidth
             required
             multiline
@@ -488,131 +458,107 @@ export default function ManagerAttendanceReviewPage() {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setRejectingItem(null)}>Cancel</Button>
+          <Button onClick={() => setRejectingItem(null)} disabled={isRejecting}>Cancel</Button>
           <Button
             variant="contained"
             color="error"
             onClick={handleConfirmRejection}
             disabled={isRejecting || !rejectionReason.trim()}
+            startIcon={isRejecting ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
-            {isRejecting ? <CircularProgress size={24} color="inherit" /> : "Confirm Rejection"}
+            Reject hours
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Timeline and Corrections Modal */}
       <Dialog open={!!timelineSessionId} onClose={() => setTimelineSessionId(null)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Session Chronology & Manual Corrections</span>
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <span>Clock times</span>
           {timelineData && (
-            <Chip
-              label={timelineData.is_provisional ? "Provisional Session" : "Rostered Session"}
-              color={timelineData.is_provisional ? "warning" : "success"}
-              size="small"
+            <Pill
+              tone={timelineData.is_provisional ? "amber" : "green"}
+              label={timelineData.is_provisional ? "Off the roster" : "Rostered"}
             />
           )}
         </DialogTitle>
         <DialogContent dividers>
           {loadingTimeline ? (
-            <Box sx={{ p: 4, textAlign: "center" }}>
-              <CircularProgress size={32} />
-            </Box>
-          ) : !timelineData ? (
-            <Typography>No timeline data available.</Typography>
+            <DashboardContentState compact kind="loading" title="Loading clock times…" />
+          ) : timelineFailed || !timelineData ? (
+            <DashboardContentState
+              compact
+              kind="error"
+              title="We couldn't load the clock times"
+              description="Try again in a moment."
+              actionLabel="Try again"
+              onAction={() => timelineSessionId && void openTimeline(timelineSessionId)}
+            />
           ) : (
-            <Stack spacing={3}>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Worker: <strong>{timelineData.worker_name}</strong> | Pharmacy: <strong>{timelineData.pharmacy_name}</strong>
-                </Typography>
-              </Box>
+            <Stack spacing={2.5}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{timelineData.worker_name}</strong> at <strong>{timelineData.pharmacy_name}</strong>. Corrections are added
+                on top of the original records, which are never changed.
+              </Typography>
 
-              <Table size="small">
-                <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Event</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Original Timestamp</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Effective Timestamp</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>Correct</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {timelineData.timeline.map((ev) => (
-                    <TableRow key={ev.event_id}>
-                      <TableCell>
-                        <Chip
-                          label={ev.event_type}
-                          size="small"
-                          color={
-                            ev.event_type === "CLOCK_IN"
-                              ? "success"
-                              : ev.event_type === "CLOCK_OUT"
-                              ? "error"
-                              : "warning"
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {new Date(ev.original_timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          fontWeight={ev.is_corrected ? 700 : 400}
-                          sx={{ color: ev.is_corrected ? "#5222B8" : "inherit" }}
-                        >
-                          {new Date(ev.effective_timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {ev.is_corrected ? (
-                          <Tooltip title={ev.correction_reason || ""}>
-                            <Chip label="Corrected" size="small" color="secondary" />
-                          </Tooltip>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            Original
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setEditingEventId(ev.event_id);
-                            setCorrectedTimestamp(
-                              new Date(ev.effective_timestamp).toISOString().slice(0, 16)
-                            );
-                            setCorrectionReason("");
-                          }}
-                        >
-                          <EditCalendarIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
+              <TableContainer sx={{ border: "1px solid var(--ct-border-color)", borderRadius: "14px" }}>
+                <Table size="small" sx={{ "& .MuiTableCell-root": { px: { xs: 1, sm: 2 } } }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Event</TableCell>
+                      <TableCell>Recorded</TableCell>
+                      <TableCell>Counts as</TableCell>
+                      <TableCell align="right"><Box component="span" sx={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Correct</Box></TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {timelineData.timeline.map((ev) => (
+                      <TableRow key={ev.event_id}>
+                        <TableCell>
+                          <Pill tone={EVENT_TONES[ev.event_type] ?? "amber"} label={humanizeEnum(ev.event_type)} />
+                        </TableCell>
+                        <TableCell sx={{ fontVariantNumeric: "tabular-nums" }}>{timeOf(ev.original_timestamp)}</TableCell>
+                        <TableCell sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {ev.is_corrected ? (
+                            <Stack spacing={0.5} alignItems="flex-start">
+                              <Box component="span" sx={{ fontWeight: 600, color: "var(--ct-accent-strong)" }}>{timeOf(ev.effective_timestamp)}</Box>
+                              <Pill tone="violet" label="Corrected" title={ev.correction_reason || undefined} />
+                            </Stack>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">Same</Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Correct this time">
+                            <IconButton
+                              aria-label={`Correct ${humanizeEnum(ev.event_type).toLowerCase()} time`}
+                              onClick={() => {
+                                setEditingEventId(ev.event_id);
+                                setCorrectedTimestamp(new Date(ev.effective_timestamp).toISOString().slice(0, 16));
+                                setCorrectionReason("");
+                              }}
+                              sx={{ width: 40, height: 40 }}
+                            >
+                              <PencilLine size={18} />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
               {/* Sub-form for editing an event timestamp */}
               {editingEventId && (
-                <Paper sx={{ p: 2.5, bgcolor: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 2 }}>
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#5222B8", mb: 1.5 }}>
-                    Append Manual Correction to Event #{editingEventId}
+                <Paper variant="outlined" sx={{ p: 2.5, bgcolor: "var(--ct-tone-violet-bg)", borderColor: "var(--ct-border-color)", borderRadius: "14px" }}>
+                  <Typography sx={{ fontWeight: 600, color: "var(--ct-text-primary)", mb: 1.5 }}>
+                    Correct the {humanizeEnum(timelineData.timeline.find((ev) => ev.event_id === editingEventId)?.event_type).toLowerCase() || "event"} time
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
-                        label="Corrected Date & Time"
+                        label="Correct date and time"
                         type="datetime-local"
                         value={correctedTimestamp}
                         onChange={(e) => setCorrectedTimestamp(e.target.value)}
@@ -623,8 +569,8 @@ export default function ManagerAttendanceReviewPage() {
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
-                        label="Reason for Adjustment"
-                        placeholder="e.g. CCTV verified arrival at 8:55 AM"
+                        label="Reason"
+                        placeholder="e.g. CCTV shows arrival at 8:55 AM"
                         value={correctionReason}
                         onChange={(e) => setCorrectionReason(e.target.value)}
                         fullWidth
@@ -634,18 +580,17 @@ export default function ManagerAttendanceReviewPage() {
                     </Grid>
                   </Grid>
                   <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
-                    <Button size="small" onClick={() => setEditingEventId(null)}>
+                    <Button size="small" onClick={() => setEditingEventId(null)} disabled={submittingCorrection}>
                       Cancel
                     </Button>
                     <Button
                       size="small"
                       variant="contained"
-                      color="secondary"
                       onClick={handleSubmitCorrection}
                       disabled={submittingCorrection || !correctionReason.trim()}
-                      sx={{ bgcolor: "#5222B8" }}
+                      startIcon={submittingCorrection ? <CircularProgress size={14} color="inherit" /> : undefined}
                     >
-                      {submittingCorrection ? <CircularProgress size={20} color="inherit" /> : "Save Correction"}
+                      Save correction
                     </Button>
                   </Stack>
                 </Paper>

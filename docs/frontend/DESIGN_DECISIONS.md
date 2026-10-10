@@ -235,3 +235,22 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
 - Copy in sentence case: *Scan pharmacy QR*, *Clock in* / *Clock out*, *Kiosk PIN*, *Change PIN*.
 - Checked: 1440 and 390 (not clocked in, mocked clocked in + shifts, mocked errors); AA sweep 0 failures; breadth
   tests (QR clock-in success/failure, roster acknowledgement) updated to the new copy and passing.
+
+## Attendance approvals — manager (2026-10-10)
+
+- `PageHeader` *Attendance approvals* (matches the menu); pharmacy picker moved into the header actions and
+  renamed *Pharmacy* (was *Destination Pharmacy*); private 1200px centred box removed.
+- The six-column table becomes one row card per worker (works at 1440 and 390): initials, name, cover type as a
+  plain-words `Pill` with a hint (*Not on the roster*, *Cover from a sister store*, *Cover from your organisation*;
+  were raw coloured chips), email · *usually at {home pharmacy}*, date · times · **hours** (or *still clocked in*
+  / *In progress*). Actions are labelled: *Clock times* (was an unlabelled 34px icon), *Approve*, *Reject*.
+- Section *Waiting for approval* with an *N to review* pill and a *Refresh* button that shows it is working.
+- States: loading; **pharmacies error** with retry (a failure was silently swallowed); no pharmacies; **reviews
+  error** with retry (a failure showed an alert *and* "No pending shifts"); empty *Nothing to approve*.
+- Dialogs: *Approve {name}'s hours?* / *Reject {name}'s hours?*, buttons *Approve hours* / *Reject hours*, spinners
+  and locked while saving; the reason field says it is required. *Clock times* dialog: loading and error with retry
+  inside the dialog (it used to show the previous worker's data or "No timeline data"), event pills in words,
+  *Recorded* vs *Counts as* with a *Corrected* pill (hint = reason) folded into one column so it fits at 390,
+  labelled 40px correct buttons, correction form on theme tokens (was hex violets).
+- Checked: 1440 and 390 (empty, mocked list, clock-times dialog, error); AA sweep 0 failures; smoke tests
+  *Attendance approvals* route and *attendance approval uses existing … contracts* updated and passing.

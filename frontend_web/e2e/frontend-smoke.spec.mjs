@@ -582,8 +582,8 @@ test('attendance approval uses existing pharmacy-scoped pending and approve cont
   await expect(page.getByText('Smoke Pharmacist')).toBeVisible();
 
   await page.getByRole('button', { name: 'Approve' }).click();
-  await expect(page.getByText('Approve Provisional Shift')).toBeVisible();
-  await page.getByRole('button', { name: 'Approve & Backfill' }).click();
+  await expect(page.getByText("Approve Smoke Pharmacist's hours?")).toBeVisible();
+  await page.getByRole('button', { name: 'Approve hours' }).click();
 
   await expect(page.getByRole('alert')).toContainText(
     'Successfully approved shift for Smoke Pharmacist',
