@@ -139,6 +139,39 @@ export function TotalsBreakdown({ totals, gstRegistered }: { totals: Totals; gst
 
 /* ---------- line items ---------- */
 
+export type LineItemField = Field;
+
+/** Reads the date and times at the start of a description ("2026-10-09 08:30–17:30 …"). Accepts - or –. */
+export function splitDescription(description?: string | null) {
+  const match = String(description || '').match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})/);
+  if (match) return { date: match[1], start_time: `${match[2]}:00`, end_time: `${match[3]}:00` };
+  return { date: '', start_time: '', end_time: '' };
+}
+
+/** The date-and-time text a professional-services line starts with. */
+export const autoDescription = (li: LineItemRow) =>
+  li.category_code === 'ProfessionalServices' && li.date
+    ? `${li.date} ${String(li.start_time || '00:00').slice(0, 5)}–${String(li.end_time || '00:00').slice(0, 5)}`
+    : '';
+
+/**
+ * Keeps the description in step with the date and times: the automatic part at the start is
+ * refreshed and anything the worker typed after it is kept. A fully rewritten description is left alone.
+ */
+export function syncDescription(prev: LineItemRow, next: LineItemRow) {
+  const after = autoDescription(next);
+  const current = String(prev.description || '');
+  if (!current.trim()) return after;
+  const prefix = current.match(AUTO_PREFIX)?.[0];
+  if (prefix) return after ? `${after}${current.slice(prefix.length)}` : current.slice(prefix.length).replace(/^\s*[·,-]\s*/, '');
+  return current;
+}
+
+const AUTO_PREFIX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}\s*[–-]\s*\d{2}:\d{2}/;
+
+/** The backend needs a description on every line. */
+export const descriptionForSave = (li: LineItemRow) => (String(li.description || '').trim() || autoDescription(li) || categoryLabel(li.category_code)).slice(0, 255);
+
 export type LineItemRow = {
   id?: string | number;
   category_code?: string;
@@ -153,10 +186,16 @@ export type LineItemRow = {
   description?: string;
 };
 
-type Field = 'category_code' | 'date' | 'start_time' | 'end_time' | 'unit' | 'quantity' | 'unit_price';
+type Field = 'category_code' | 'date' | 'start_time' | 'end_time' | 'unit' | 'quantity' | 'unit_price' | 'description';
 
 const inputSx = { '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--ct-surface-bg)' }, '& .MuiOutlinedInput-input': { px: 1.25, fontVariantNumeric: 'tabular-nums' } } as const;
 const toTime = (raw: string) => (raw ? `${raw}:00` : '00:00:00');
+// Time inputs at their smallest usable width: tight padding, compact picker icon.
+const timeSx = {
+  ...inputSx,
+  '& .MuiOutlinedInput-input': { px: 0.75, fontSize: 13, fontVariantNumeric: 'tabular-nums' },
+  '& input::-webkit-calendar-picker-indicator': { ml: 0.25, width: 14, height: 14, opacity: 0.7 },
+} as const;
 
 
 /** Editable line items: a table on desktop, one card per item on phones. */
@@ -166,15 +205,18 @@ export function LineItemsEditor({
   onAdd,
   onRemove,
   canEdit = true,
+  isPriceLocked,
 }: {
   items: LineItemRow[];
   onChange: (idx: number, field: Field, value: string | number) => void;
   onAdd?: () => void;
   onRemove?: (idx: number) => void;
   canEdit?: boolean;
+  /** Rows whose price comes from the shift itself (the agreed rate) and can't be changed. */
+  isPriceLocked?: (li: LineItemRow, idx: number) => boolean;
 }) {
   const theme = useTheme();
-  const desktop = useMediaQuery(theme.breakpoints.up(1400));
+  const desktop = useMediaQuery(theme.breakpoints.up(1360));
 
   const fields = (li: LineItemRow, idx: number) => {
     const isSuper = li.category_code === 'Superannuation';
@@ -186,8 +228,8 @@ export function LineItemsEditor({
         </TextField>
       ),
       date: timed ? <TextField size="small" type="date" fullWidth label={desktop ? undefined : 'Date'} InputLabelProps={{ shrink: true }} value={li.date || ''} onChange={(e) => onChange(idx, 'date', e.target.value)} disabled={!canEdit} sx={inputSx} inputProps={{ 'aria-label': 'Date' }} /> : null,
-      start: timed ? <TextField size="small" type="time" fullWidth label={desktop ? undefined : 'Start'} InputLabelProps={{ shrink: true }} value={li.start_time?.slice(0, 5) || '00:00'} onChange={(e) => onChange(idx, 'start_time', toTime(e.target.value))} disabled={!canEdit} sx={inputSx} inputProps={{ 'aria-label': 'Start time' }} /> : null,
-      end: timed ? <TextField size="small" type="time" fullWidth label={desktop ? undefined : 'End'} InputLabelProps={{ shrink: true }} value={li.end_time?.slice(0, 5) || '00:00'} onChange={(e) => onChange(idx, 'end_time', toTime(e.target.value))} disabled={!canEdit} sx={inputSx} inputProps={{ 'aria-label': 'End time' }} /> : null,
+      start: timed ? <TextField size="small" type="time" fullWidth label={desktop ? undefined : 'Start'} InputLabelProps={{ shrink: true }} value={li.start_time?.slice(0, 5) || '00:00'} onChange={(e) => onChange(idx, 'start_time', toTime(e.target.value))} disabled={!canEdit} sx={timeSx} inputProps={{ 'aria-label': 'Start time' }} /> : null,
+      end: timed ? <TextField size="small" type="time" fullWidth label={desktop ? undefined : 'End'} InputLabelProps={{ shrink: true }} value={li.end_time?.slice(0, 5) || '00:00'} onChange={(e) => onChange(idx, 'end_time', toTime(e.target.value))} disabled={!canEdit} sx={timeSx} inputProps={{ 'aria-label': 'End time' }} /> : null,
       unit: (
         <TextField select size="small" fullWidth label={desktop ? undefined : 'Unit'} value={li.unit || ''} onChange={(e) => onChange(idx, 'unit', e.target.value)} disabled={!canEdit} sx={inputSx} inputProps={{ 'aria-label': 'Unit' }}>
           {UNIT_CHOICES.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
@@ -208,7 +250,21 @@ export function LineItemsEditor({
           />
         </Tooltip>
       ),
-      price: <TextField size="small" type="number" fullWidth label={desktop ? undefined : 'Price ($)'} inputProps={{ step: 0.01, min: 0, 'aria-label': 'Price' }} value={li.unit_price ?? 0} onChange={(e) => onChange(idx, 'unit_price', +e.target.value)} disabled={!canEdit || isSuper} sx={inputSx} />,
+      price: <TextField size="small" type="number" fullWidth label={desktop ? undefined : 'Price ($)'} inputProps={{ step: 0.01, min: 0, 'aria-label': 'Price' }} value={li.unit_price ?? 0} onChange={(e) => onChange(idx, 'unit_price', +e.target.value)} disabled={!canEdit || isSuper || Boolean(isPriceLocked?.(li, idx))} sx={inputSx} />,
+      note: (
+        <TextField
+          size="small"
+          fullWidth
+          label={desktop ? undefined : 'Description'}
+          placeholder="Description shown on the invoice"
+          value={li.description || ''}
+          onChange={(e) => onChange(idx, 'description', e.target.value)}
+          disabled={!canEdit || isSuper}
+          inputProps={{ maxLength: 255, 'aria-label': 'Description' }}
+          helperText={timed && !desktop ? 'Filled from the date and times. Add to it or change it.' : undefined}
+          sx={inputSx}
+        />
+      ),
       remove:
         canEdit && onRemove ? (
           <Tooltip title="Remove line">
@@ -237,12 +293,12 @@ export function LineItemsEditor({
   }
 
   if (desktop) {
-    const cols = 'minmax(160px, 1.3fr) 150px 264px 106px 80px 96px 92px 36px';
+    const cols = 'minmax(160px, 1.4fr) 146px 218px 104px 80px 92px 92px 36px';
     const head = ['Category', 'Date', 'Time', 'Unit', 'Quantity', 'Price', 'Amount', ''];
     return (
       <Stack spacing={1.5}>
         <Box role="table" aria-label="Line items" sx={{ overflowX: 'auto' }}>
-          <Box role="row" sx={{ display: 'grid', gridTemplateColumns: cols, gap: 1, px: 1, py: 1, borderRadius: '10px', bgcolor: 'var(--ct-subtle-bg)', minWidth: 1040 }}>
+          <Box role="row" sx={{ display: 'grid', gridTemplateColumns: cols, gap: 1, px: 1, py: 1, borderRadius: '10px', bgcolor: 'var(--ct-subtle-bg)', minWidth: 990 }}>
             {head.map((h, i) => (
               <Typography key={i} role="columnheader" sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5, fontWeight: 600, textAlign: i === 6 ? 'right' : 'left' }}>{h}</Typography>
             ))}
@@ -250,7 +306,7 @@ export function LineItemsEditor({
           {items.map((li, idx) => {
             const f = fields(li, idx);
             return (
-              <Box role="row" key={li.id ?? idx} sx={{ display: 'grid', gridTemplateColumns: cols, gap: 1, alignItems: 'center', px: 1, py: 1, borderBottom: '1px solid var(--ct-border-color)', minWidth: 1040 }}>
+              <Box role="row" key={li.id ?? idx} sx={{ display: 'grid', gridTemplateColumns: cols, gap: 1, alignItems: 'center', px: 1, py: 1, borderBottom: '1px solid var(--ct-border-color)', minWidth: 990 }}>
                 <Box role="cell">{f.category}</Box>
                 <Box role="cell">{f.date}</Box>
                 <Stack role="cell" direction="row" spacing={0.75}>{f.start}{f.end}</Stack>
@@ -261,6 +317,7 @@ export function LineItemsEditor({
                   <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>{money(li.total)}</Typography>
                 </Box>
                 <Box role="cell" sx={{ textAlign: 'right' }}>{f.remove}</Box>
+                <Box role="cell" sx={{ gridColumn: '1 / -2' }}>{f.note}</Box>
               </Box>
             );
           })}
@@ -292,6 +349,7 @@ export function LineItemsEditor({
               {f.unit}
               {f.quantity}
               <Box sx={{ gridColumn: '1 / -1' }}>{f.price}</Box>
+              <Box sx={{ gridColumn: '1 / -1' }}>{f.note}</Box>
             </Box>
           </Box>
         );
@@ -310,6 +368,10 @@ export function LineItemsReadOnly({ items }: { items: LineItemRow[] }) {
       {items.map((li, idx) => {
         const timed = li.category_code === 'ProfessionalServices' && li.date;
         const when = timed ? `${formatDay(li.date)} · ${li.start_time?.slice(0, 5) || ''}–${li.end_time?.slice(0, 5) || ''}` : '';
+        // Show what the worker added beyond the automatic date and time text.
+        const desc = String(li.description || '').trim();
+        const prefix = desc.match(AUTO_PREFIX)?.[0];
+        const extra = prefix ? desc.slice(prefix.length).replace(/^\s*[·,-]\s*/, '').trim() : desc !== categoryLabel(li.category_code) ? desc : '';
         const qty = li.unit === 'Hours' ? `${Number(li.quantity || 0).toFixed(2)} h × ${money(li.unit_price)}` : li.unit === 'Lump Sum' ? `Lump sum ${money(li.unit_price)}` : '';
         return (
           <Stack
@@ -326,6 +388,7 @@ export function LineItemsReadOnly({ items }: { items: LineItemRow[] }) {
               <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 13.5 }}>
                 {[when, qty].filter(Boolean).join(' · ')}
               </Typography>
+              {extra ? <Typography sx={{ color: 'var(--ct-text-primary)', fontSize: 13.5, mt: 0.25 }}>{extra}</Typography> : null}
             </Box>
             <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 600, fontSize: 14.5, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{money(li.total)}</Typography>
           </Stack>

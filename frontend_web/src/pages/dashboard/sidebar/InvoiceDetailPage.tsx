@@ -10,7 +10,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import DashboardContentState from '../../../components/dashboard/DashboardContentState';
 import {
-  Facts, InvoiceSection, LineItemsEditor, LineItemsReadOnly, StatusPill, TotalsBreakdown, formatDay, invoiceStatus, money, type Totals,
+  Facts, InvoiceSection, LineItemsEditor, LineItemsReadOnly, StatusPill, TotalsBreakdown, descriptionForSave, formatDay, invoiceStatus, money, splitDescription, syncDescription, type Totals,
 } from './Invoices/invoiceParts';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -180,26 +180,14 @@ export default function InvoiceDetailPage() {
         setCustomBillToName(data.custom_bill_to_name || '');
         setCustomBillToAddress(data.custom_bill_to_address || '');
 
-        // --- Parse dates/times from description if needed ---
-        function parseDateTimeFromDescription(description: string) {
-            // Ex: "2025-06-01 07:00–12:00"
-            const match = description.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})–(\d{2}:\d{2})/);
-            if (match) {
-            return {
-                date: match[1],
-                start_time: match[2] + ':00',
-                end_time: match[3] + ':00',
-            };
-            }
-            return { date: '', start_time: '', end_time: '' };
-        }
-
         setLineItems(
           (data.line_items || []).map((li: any) => {
-            const times = parseDateTimeFromDescription(li.description || '');
+            const parsed = splitDescription(li.description || '');
             return {
               ...li,
-              ...times,
+              date: parsed.date,
+              start_time: parsed.start_time,
+              end_time: parsed.end_time,
               quantity: Number(li.quantity || 0),
               unit_price: Number(li.unit_price || 0),
               discount: Number(li.discount || 0),
@@ -255,7 +243,11 @@ export default function InvoiceDetailPage() {
     value: any
   ) => {
     const c = [...lineItems];
+    const before = { ...c[idx] };
     c[idx][field] = value;
+    if (field === 'date' || field === 'start_time' || field === 'end_time' || field === 'category_code') {
+      c[idx].description = syncDescription(before, c[idx]);
+    }
     // Start and end are for information only: paid hours (quantity) are entered directly,
     // because an unpaid break can sit between them.
     if (field === 'category_code' && ['Transportation', 'Accommodation'].includes(value)) {
@@ -324,6 +316,7 @@ export default function InvoiceDetailPage() {
       custom_bill_to_address: customBillToAddress,
       line_items: lineItems.map(li => ({
         ...li,
+        description: descriptionForSave(li),
         quantity: Number(li.quantity),
         unit_price: Number(li.unit_price),
         discount: Number(li.discount),
