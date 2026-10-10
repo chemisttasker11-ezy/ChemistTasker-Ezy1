@@ -4,6 +4,8 @@ import { reviewApi } from './support/reviewFixture.mjs';
 
 // Browser/font rasterization differs by operating system; CI compares these Windows baselines in its Windows job.
 test.skip(process.platform !== 'win32', 'Run the appearance suite on Windows against the captured Windows baselines.');
+// The approved baselines use Australian date fields and AEST. GitHub's Windows runner otherwise defaults to US date placeholders and UTC clock formatting.
+test.use({ locale: 'en-AU', timezoneId: 'Australia/Brisbane' });
 
 // Baselines are captured from the branch before the architecture extraction (3df951b), never approved from a changed view.
 const views = [
