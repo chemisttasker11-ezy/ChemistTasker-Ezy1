@@ -77,6 +77,7 @@ const AdminPosterShiftDetailPage = React.lazy(() => import('./pages/dashboard/ad
 const AdminDashboardWrapper = React.lazy(() => import('./layouts/adminDashboard'));
 const PharmacistDashboardWrapper = React.lazy(() => import('./layouts/pharmacistDashboard'));
 const HubDashboardWrapper = React.lazy(() => import('./layouts/HubDashboardWrapper'));
+const SharedDashboardWrapper = React.lazy(() => import('./layouts/SharedDashboardWrapper'));
 const OtherstaffDashboardWrapper = React.lazy(() => import('./layouts/otherStaffDashboard'));
 const ExplorerDashboardWrapper = React.lazy(() => import('./layouts/explorerDashboard'));
 const OwnerShiftCenterPage = React.lazy(() => import('./pages/dashboard/shiftCenter/ShiftCenterPage').then((module) => ({ default: module.OwnerShiftCenterPage })));
@@ -183,45 +184,55 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // Workforce pages reached by direct URL: same dashboard shell, own guards
       {
-        path: 'dashboard/workforce/timesheets',
-        element: (
-          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
-            <TimesheetsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'dashboard/workforce/leave',
-        element: (
-          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
-            <ManagerLeavePage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'dashboard/workforce/settings',
-        element: (
-          <ProtectedRoute requiredAnyCapabilities={["MANAGE_STAFF", "MANAGE_ROSTER"]}>
-            <WorkforceSettingsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'dashboard/my-hours',
-        element: (
+        Component: () => (
           <ProtectedRoute>
-            <MyHoursPage />
+            <SharedDashboardWrapper />
           </ProtectedRoute>
         ),
-      },
-      {
-        path: 'dashboard/my-leave',
-        element: (
-          <ProtectedRoute>
-            <MyLeavePage />
-          </ProtectedRoute>
-        ),
+        children: [
+          {
+            path: 'dashboard/workforce/timesheets',
+            element: (
+              <ProtectedRoute requiredCapability="MANAGE_ROSTER">
+                <TimesheetsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/workforce/leave',
+            element: (
+              <ProtectedRoute requiredCapability="MANAGE_ROSTER">
+                <ManagerLeavePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/workforce/settings',
+            element: (
+              <ProtectedRoute requiredAnyCapabilities={["MANAGE_STAFF", "MANAGE_ROSTER"]}>
+                <WorkforceSettingsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/my-hours',
+            element: (
+              <ProtectedRoute>
+                <MyHoursPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/my-leave',
+            element: (
+              <ProtectedRoute>
+                <MyLeavePage />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
 
       // Orgnization
