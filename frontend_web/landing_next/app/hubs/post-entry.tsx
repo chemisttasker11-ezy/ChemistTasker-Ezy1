@@ -7,6 +7,7 @@ import RichContent from '@/components/rich-content';
 import {chemistTaskerApi} from '@/lib/chemisttasker-api';
 import type {PublicPost} from './community-client';
 import {safeHubAttachmentUrl} from '@/lib/safe-hub-attachment';
+import {fullDate,initials,relativeTime,richText} from './social-format';
 
 export default function PostEntry({post,feed=false,onChange}:{post:PublicPost;feed?:boolean;onChange?:()=>Promise<void>}) {
  const session=useSession();
@@ -16,8 +17,8 @@ export default function PostEntry({post,feed=false,onChange}:{post:PublicPost;fe
  async function like(){setBusy(true);setMessage('');try{await chemistTaskerApi.client.post(`/hub/posts/${post.id}/reactions/`,{reaction_type:'LIKE'});await onChange?.();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
  async function share(){try{await navigator.clipboard.writeText(`${window.location.origin}/hubs/posts/${post.id}`);setMessage('Post link copied.');}catch{setMessage('Open the conversation and copy its address to share.');}}
  return <>
-  <header className="ct-author"><span className="ct-avatar" aria-hidden="true">{post.author_name.split(/\s+/).filter(Boolean).slice(0,2).map(n=>n[0]).join('')}</span><div><strong>{post.author_name}</strong><div className="ct-post-meta"><time dateTime={post.created_at}>{new Date(post.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</time><span aria-hidden="true">·</span><Globe size={12}/><span>Public</span></div></div>{post.is_pinned&&<span className="ct-pinned"><Pin size={14}/>Pinned</span>}{post.editorial&&<span className="ct-status">Editorial</span>}</header>
-  {post.editorial?<article className="ct-preview"><h2>{post.editorial.title}</h2><RichContent document={post.editorial.body_document}/></article>:<p className="ct-post-body">{post.body}</p>}
+  <header className="ct-author"><span className="ct-avatar" aria-hidden="true">{initials(post.author_name)}</span><div><strong>{post.author_name}</strong><div className="ct-post-meta"><time dateTime={post.created_at} title={fullDate(post.created_at)}>{relativeTime(post.created_at)}</time><span aria-hidden="true">·</span><Globe size={12}/><span>Public</span></div></div>{post.is_pinned&&<span className="ct-pinned"><Pin size={14}/>Pinned</span>}{post.editorial&&<span className="ct-status">Editorial</span>}</header>
+  {post.editorial?<article className="ct-preview"><h2>{post.editorial.title}</h2><RichContent document={post.editorial.body_document}/></article>:<p className="ct-post-body">{richText(post.body)}</p>}
   {!!post.attachments.length&&<div className="ct-post-media" data-multiple={post.attachments.length>1}>{post.attachments.map(a=>{
    const kind=a.kind.toLowerCase(),type=a.content_type||'';
    const url=safeHubAttachmentUrl(a.url,a.id);

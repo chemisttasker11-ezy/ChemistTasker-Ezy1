@@ -437,3 +437,23 @@ layout (cover → About → members → large composer), so they were not follow
 - **Fixed (code):** the two group views called a React hook after an early return.
 - Checked: 1440 and 390 (home, composer, About, members, group members with admins, phone menu); AA sweep 0
   failures; five hub route checks and the visual-states audit pass.
+
+## Public community hubs, Next (2026-10-10, same groups layout)
+
+- **Checked first:** the Next hubs (`landing_next/app/hubs`, from PR #155) already had a group cover, a tab row and
+  social post cards. Kept: post cards, media layout, access notice, drafts in session storage, all API calls.
+- **Header** matches the Vite hub: brand cover band, overlapping community symbol, *ChemistTasker community*
+  eyebrow, name, *Public group* line. **Real tabs** (*Discussion · About · Discover hubs*); *About* was an anchor to
+  a card that sat beside the feed on desktop and above it on phones. Search moved into the tab row behind an icon
+  (it sat between the composer and the feed).
+- **About** has its own tab (who it is for, public visibility, posting access); wide screens show a 4-line About
+  rail with *More about this group*; it disappears below 1100px where the tab covers it. Feed and rail are centred
+  as a pair.
+- **Composer collapsed** (*Write something to {hub}…* + *Photo or file*), expands in place with the author line,
+  visibility note, paste/drop files with thumbnails, *Cancel* / *Post*; a failed post keeps the text.
+- **Posts and comments:** relative times with the full date on hover, clickable links and highlighted @mentions,
+  poll options with vote bars, comments as chat-style bubbles with replies indented; replying says *Replying to
+  {name}* (it said "Replying to comment 123"); removing a post or comment asks inline (was `window.confirm`).
+- Names only, as in Vite. Public hubs have no members API, so no member count is shown there.
+- Checked: 1440 and 390 against a mock backend (discussion, composer, About, post with comments); AA sweep 0
+  failures; Next typecheck, contract tests (14) and production build pass.
