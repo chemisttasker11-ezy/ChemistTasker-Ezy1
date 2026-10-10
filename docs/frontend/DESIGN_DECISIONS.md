@@ -456,3 +456,11 @@ layout (cover → About → members → large composer), so they were not follow
 - Names only, as in Vite. Public hubs have no members API, so no member count is shown there.
 - Checked: 1440 and 390 against a mock backend (discussion, composer, About, post with comments); AA sweep 0
   failures; Next typecheck, contract tests (14) and production build pass.
+
+## Learning materials (Vite, all personas)
+
+- The page was a title-only placeholder. It now reads the same source as the public `/learning` hub: `publicContent.listArticles({ topic: 'learning' })`, with the role pathway from `marketplace.getListingOptions()`. No new endpoint and no route change.
+- Figma (15:13945) shows topic chips such as "Clinical practice". Articles carry one topic (`learning`), so those chips would filter nothing. We kept the better option: a search over title, excerpt and author, plus type chips (All / Articles / News) with counts, shown only when more than one type is present.
+- The first featured resource gets a wide card. Every card opens the public article in a new tab (the label says so). A failed or non-http cover falls back to a shorter tinted band, so text-only resources don't carry empty space.
+- States: skeleton cards while loading; an error with Try again ("connection problem, not an empty library"); an empty library pointing to the community hubs; no search match with Clear filters; "Show more resources" when the API pages, with an inline error if that fails.
+- Screenshots at 1440 and 390 (list, no match, empty, error). The AA sweep on `main` found no failures.
