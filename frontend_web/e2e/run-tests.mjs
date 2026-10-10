@@ -14,6 +14,9 @@ const env = {
   PLAYWRIGHT_PORT: String(port),
   VITE_API_URL: 'http://127.0.0.1:8000',
   VITE_API_BASE_URL: 'http://127.0.0.1:8000',
+  // Exercise the actual cross-origin Next/Vite URL builder, not same-origin fallback.
+  VITE_PUBLIC_SITE_URL: process.env.VITE_PUBLIC_SITE_URL || 'http://127.0.0.1:3000',
+  EXPECTED_NEXT_ORIGIN: process.env.EXPECTED_NEXT_ORIGIN || process.env.VITE_PUBLIC_SITE_URL || 'http://127.0.0.1:3000',
 };
 
 const build = spawnSync(process.execPath, [viteBin, 'build'], {
