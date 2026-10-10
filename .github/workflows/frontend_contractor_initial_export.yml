@@ -1,9 +1,16 @@
 name: Frontend Contractor Initial Export
 
-# Owner-only one-time transfer. The target private repository must be README-only.
+# Owner-only one-time transfer. Private by default; public only with explicit workflow consent.
+# The target must be README-only with clean history. Never exports Django, native signing or owner Git history.
 # Only the original private owner repository has access to FRONTEND_DEST_WRITE_TOKEN.
 on:
   workflow_dispatch:
+    inputs:
+      allow_public_frontend:
+        description: 'I approve publishing frontend source to a public repository'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -24,6 +31,16 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Require destination-only write token
+        env:
+          DEST_TOKEN: ${{ secrets.FRONTEND_DEST_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -z "$DEST_TOKEN" ]]; then
+            echo '::error::FRONTEND_DEST_WRITE_TOKEN is missing. Add a temporary fine-grained token for ChemistTasker_Front (Contents read/write).'
+            exit 1
+          fi
+
       - name: Checkout destination through restricted token
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -34,16 +51,24 @@ jobs:
           token: ${{ secrets.FRONTEND_DEST_WRITE_TOKEN }}
           persist-credentials: true
 
-      - name: Verify destination is PRIVATE and empty apart from README
+      - name: Verify approved destination visibility and README-only history
         env:
           DEST_TOKEN: ${{ secrets.FRONTEND_DEST_WRITE_TOKEN }}
+          ALLOW_PUBLIC_FRONTEND: ${{ inputs.allow_public_frontend }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "$DEST_TOKEN" ]]; then echo '::error::FRONTEND_DEST_WRITE_TOKEN is missing.'; exit 1; fi
           private="$(curl -fsS -H "Authorization: Bearer $DEST_TOKEN" -H 'Accept: application/vnd.github+json' \
             https://api.github.com/repos/chemisttasker11-ezy/ChemistTasker_Front | jq -r '.private')"
-          if [[ "$private" != 'true' ]]; then echo '::error::Contractor repo must be PRIVATE.'; exit 1; fi
+          if [[ "$private" != 'true' ]]; then
+            if [[ "$private" != 'false' || "$ALLOW_PUBLIC_FRONTEND" != 'true' ]]; then
+              echo '::error::Destination is not PRIVATE. Set allow_public_frontend=true ONLY if you explicitly accept permanent exposure of copied frontend source.'
+              exit 1
+            fi
+            echo '::warning::Public destination approved. Anyone can clone/copy the exported frontend source and shared API contracts. Making it private later cannot retract copies.'
+            echo '> WARNING: PUBLIC destination explicitly approved. Frontend code and shared client contracts become permanently copyable.' >> "$GITHUB_STEP_SUMMARY"
+          fi
           unexpected="$(git -C destination ls-files | grep -Ev '^(README.md|\.gitignore)$' || true)"
           if [[ -n "$unexpected" ]]; then echo '::error::Destination contains source already; refusing initial bootstrap.'; exit 1; fi
           unexpected_history="$(git -C destination log --all --name-only --pretty=format: | \
@@ -76,7 +101,7 @@ jobs:
           printf 'Destination files: `%s`\n\n' "$(git -C destination ls-files | wc -l)" >> "$GITHUB_STEP_SUMMARY"
           printf 'React/Vite, Next.js, Expo mobile and shared-core only. No backend source.\n' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Push checked snapshot to PRIVATE destination
+      - name: Push checked snapshot to approved destination
         shell: bash
         run: |
           set -euo pipefail
