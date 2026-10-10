@@ -26,7 +26,7 @@ import {
     Users,
 } from 'lucide-react';
 import IconTile, { type Tone } from '../../../../components/ui/IconTile';
-import { Hint, NewActivityBadge, Pill } from './components/ShiftCentreParts';
+import { Hint, NewActivityBadge, Pill, PlatformMark } from '../../shiftCenter/ShiftCentreParts';
 import { getAudienceLevel, humanizeEnum } from './utils/audience';
 import type {
     Shift,
@@ -439,7 +439,7 @@ export default function ActiveShiftCard({
                                 </Box>
                             </Stack>
                             <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-                                {roleNeeded && <Pill tone="navy" label={String(roleNeeded).replace(/_/g, ' ')} />}
+                                {roleNeeded && <Pill tone="navy" label={humanizeEnum(roleNeeded)} />}
                                 {employmentType && <Pill outlined label={humanizeEnum(employmentType)} />}
                                 {isUrgent && <Pill tone="red" label="Urgent" />}
                                 {summaryText && <Pill outlined icon={<CalendarDays />} label={summaryText} />}
@@ -499,7 +499,7 @@ export default function ActiveShiftCard({
                                 <Box component="span" tabIndex={0} onClick={(event) => event.stopPropagation()} sx={{ display: 'inline-flex', borderRadius: '999px', '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: 2 } }}>
                                     <Pill
                                         tone={audience?.scope === 'platform' ? 'cyan' : 'violet'}
-                                        icon={AudienceIcon ? <AudienceIcon /> : undefined}
+                                        icon={audience?.scope === 'platform' ? <PlatformMark size={15} /> : AudienceIcon ? <AudienceIcon /> : undefined}
                                         label={`${audience?.scope === 'platform' ? 'Platform' : 'Internal'} · ${audienceLabel}`}
                                     />
                                 </Box>

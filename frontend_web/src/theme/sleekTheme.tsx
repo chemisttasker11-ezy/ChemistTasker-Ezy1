@@ -35,14 +35,17 @@ export function createSleekTheme(mode: Mode): Theme {
   const borderColor = isLight ? "#E5ECF7" : "rgba(148,163,184,0.24)";
 
   return createTheme({
-    shape: { borderRadius: 14 },
+    // MUI default scale (4px) so sx numbers mean what authors expect: 2 = 8px, 3 = 12px.
+    // Component corners are set explicitly below (cards 20, papers/popovers 14, inputs/buttons 12).
+    shape: { borderRadius: 4 },
     palette: {
       mode,
       primary: { main: primary[600], dark: primary[700], light: primary[100], contrastText: "#FFFFFF" },
-      secondary: { main: "#D600C8", dark: "#A60B9C", light: "#FDE7F5" },
-      info: { main: "#008DDB", light: "#E7F0FF" },
-      success: { main: "#138A5B" },
-      warning: { main: "#B86B00" },
+      // Brand magenta #D600C8 is 4.47:1 on white; #C000B4 keeps the hue and passes AA as text and under white labels.
+      secondary: { main: "#C000B4", dark: "#A60B9C", light: "#FDE7F5" },
+      info: { main: "#0369A1", light: "#E7F0FF" },
+      success: { main: "#117A50" },
+      warning: { main: "#A15C07" },
       error: { main: "#C9364A" },
       background: isLight
         ? { default: pageBg, paper: surfaceBg }
@@ -90,7 +93,7 @@ export function createSleekTheme(mode: Mode): Theme {
             "--ct-font-display": "Outfit, Inter, sans-serif",
             // Dashboard Figma system (ChemistTasker-Dashboard): text tiers, the deep
             // violet used for active items/figures, and the four tinted icon-tile tones.
-            "--ct-text-muted": isLight ? "#7886A3" : "#8E9BB5",
+            "--ct-text-muted": isLight ? "#63708C" : "#8E9BB5",
             "--ct-accent-strong": isLight ? "#3C18A8" : "#B9A5F5",
             "--ct-card-radius": "20px",
             "--ct-tone-violet-bg": isLight ? "#EFE9FD" : alpha("#8B6CF0", 0.18),
@@ -261,8 +264,12 @@ export function createSleekTheme(mode: Mode): Theme {
             borderColor,
             backgroundColor: "transparent",
           },
-          text: { "&.MuiButton-colorPrimary": { color: isLight ? "#3C18A8" : primary[300] } },
         },
+        // A variant rule (not a nested selector) so a button's own sx colour always wins:
+        // the nested selector out-ranked sx and painted labels the colour of their background.
+        variants: [
+          { props: { variant: "text", color: "primary" }, style: { color: isLight ? "#3C18A8" : primary[300] } },
+        ],
       },
       MuiIconButton: {
         styleOverrides: {
@@ -270,6 +277,12 @@ export function createSleekTheme(mode: Mode): Theme {
         },
       },
       // Dashboard design system: flat cards with hairline borders, 20px radius.
+      // Letter avatars: MUI's grey (#9E9E9E) with white text is 2.7:1; use the violet tile tone.
+      MuiAvatar: {
+        styleOverrides: {
+          colorDefault: { backgroundColor: "var(--ct-tone-violet-bg)", color: "var(--ct-tone-violet-fg)", fontWeight: 600 },
+        },
+      },
       MuiCard: {
         defaultProps: { elevation: 0 },
         styleOverrides: { root: { borderRadius: 20, boxShadow: "none" } },

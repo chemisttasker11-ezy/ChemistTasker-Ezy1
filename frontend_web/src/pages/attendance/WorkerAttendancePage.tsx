@@ -652,7 +652,7 @@ export default function WorkerAttendancePage() {
                               fontSize: 11,
                               fontWeight: 700,
                               bgcolor: BRAND_COLORS.blueLight,
-                              color: BRAND_COLORS.blue,
+                              color: BRAND_COLORS.blueText,
                             }}
                           />
                         </Stack>

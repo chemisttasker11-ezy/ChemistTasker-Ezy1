@@ -3,7 +3,7 @@ import { Box, Button, ButtonBase, CircularProgress, Stack, Typography } from '@m
 import { ArrowRight, Lock, TrendingUp } from 'lucide-react';
 import { Shift, EscalationLevelKey } from '@chemisttasker/shared-core';
 import { AUDIENCE_LEVELS, type AudienceScope } from '../../utils/audience';
-import { Hint, InfoHint, Pill } from '../ShiftCentreParts';
+import { Hint, InfoHint, Pill, PlatformMark } from '../../../../shiftCenter/ShiftCentreParts';
 
 interface EscalationStepperProps {
     shift: Shift;
@@ -110,6 +110,7 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                 {currentStep && (
                     <Pill
                         tone={currentStep.scope === 'platform' ? 'cyan' : 'violet'}
+                        icon={currentStep.scope === 'platform' ? <PlatformMark size={15} /> : undefined}
                         label={`Now visible to ${currentStep.label}`}
                     />
                 )}
@@ -163,7 +164,14 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                 <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${stepCount}, minmax(0, 1fr))`, columnGap: 1 }}>
                     {visualSteps.map((step) => {
                         const Icon = step.icon;
-                        const circleSx = step.reached
+                        const isPlatform = step.scope === 'platform';
+                        const circleSx = isPlatform
+                            // The bottle keeps its own colours: white disc, ring shows the state.
+                            ? {
+                                bgcolor: 'var(--ct-surface-bg)',
+                                border: step.reached ? '2px solid var(--ct-accent-strong)' : step.selectable ? '2px dashed var(--ct-accent-strong)' : '2px solid var(--ct-border-color)',
+                            }
+                            : step.reached
                             ? { bgcolor: 'var(--ct-accent-strong)', color: '#FFFFFF', border: '2px solid var(--ct-accent-strong)' }
                             : step.selectable
                                 ? { bgcolor: 'var(--ct-surface-bg)', color: 'var(--ct-accent-strong)', border: '2px dashed var(--ct-accent-strong)' }
@@ -183,7 +191,7 @@ export const EscalationStepper: React.FC<EscalationStepperProps> = ({
                                         ...circleSx,
                                     }}
                                 >
-                                    <Icon />
+                                    {isPlatform ? <PlatformMark size={28} muted={!step.reached} /> : <Icon />}
                                 </Box>
                                 <Typography
                                     sx={{

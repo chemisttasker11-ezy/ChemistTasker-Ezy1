@@ -386,7 +386,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                         : isFullOrPartTime
                           ? getEmploymentLabel(shift)
                           : 'No dates provided'}
-                      {isMulti && <span style={{ color: '#94A3B8', marginLeft: 6 }}>+ {slots.length - 1} more</span>}
+                      {isMulti && <span style={{ color: 'var(--ct-text-muted)', marginLeft: 6 }}>+ {slots.length - 1} more</span>}
                     </Typography>
                   </Stack>
                   {shouldShowTimeRow && (

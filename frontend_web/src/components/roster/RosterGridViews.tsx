@@ -448,7 +448,7 @@ export default function RosterGridViews({
               icon={<AccessTimeIcon sx={{ fontSize: 15 }} />}
               label={`${grandTotalWeeklyHours.toFixed(1)}h Total`}
               size="small"
-              sx={{ bgcolor: BRAND_COLORS.blueLight, color: BRAND_COLORS.blue, fontWeight: 700 }}
+              sx={{ bgcolor: BRAND_COLORS.blueLight, color: BRAND_COLORS.blueText, fontWeight: 700 }}
             />
             <Chip
               label={`${totalAssignedCount} Assigned`}
@@ -745,7 +745,7 @@ export default function RosterGridViews({
                       width: 32,
                       height: 32,
                       bgcolor: '#FEF3C7',
-                      color: '#D97706',
+                      color: '#A15C07',
                       fontSize: 13,
                       fontWeight: 700,
                     }}
@@ -759,7 +759,7 @@ export default function RosterGridViews({
                     >
                       Open / Vacant Shifts
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 600 }}>
+                    <Typography variant="caption" sx={{ color: '#A15C07', fontWeight: 600 }}>
                       {vacantSlots.length} Unassigned
                     </Typography>
                   </Box>
@@ -788,7 +788,7 @@ export default function RosterGridViews({
                   >
                     {dayVacancies.length === 0 ? (
                       <Box sx={{ minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography variant="caption" sx={{ color: '#CBD5E1', fontSize: 11 }}>
+                        <Typography variant="caption" aria-label="No open shifts" sx={{ color: 'var(--ct-text-muted)', fontSize: 11 }}>
                           —
                         </Typography>
                       </Box>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, ButtonBase, Stack, Typography } from '@mui/material';
 import { Clock, Users } from 'lucide-react';
-import { Hint, InfoHint, NewActivityBadge, toneColors, type ShiftTone } from '../ShiftCentreParts';
+import { Hint, InfoHint, NewActivityBadge, toneColors, type ShiftTone } from '../../../../shiftCenter/ShiftCentreParts';
 
 type SlotStatusCounts = {
     interested: number;

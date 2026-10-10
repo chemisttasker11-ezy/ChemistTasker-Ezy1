@@ -1,9 +1,9 @@
 import React from 'react';
 import { Box, Stack } from '@mui/material';
-import { Sparkles, Tag, UserCheck } from 'lucide-react';
+import { Tag, UserCheck } from 'lucide-react';
 import { Shift, ShiftInterest } from '@chemisttasker/shared-core';
 import { SlotSelector } from './SlotSelector';
-import { CandidateColumn, CandidateRow, Pill, RowAction, SourceSection } from '../ShiftCentreParts';
+import { CandidateColumn, CandidateRow, Pill, PlatformMark, RowAction, SourceSection } from '../../../../shiftCenter/ShiftCentreParts';
 import { getInterestDisplayName } from '../../utils/candidateHelpers';
 
 interface PublicLevelViewProps {
@@ -117,7 +117,7 @@ export const PublicLevelView: React.FC<PublicLevelViewProps> = ({
                 title="ChemistTasker platform"
                 subtitle="Public applicants from outside your network. Names stay hidden until you reveal them."
                 tone="cyan"
-                icon={<Sparkles />}
+                icon={<PlatformMark size={26} />}
                 count={total}
                 hint={{
                     title: 'Platform candidates',

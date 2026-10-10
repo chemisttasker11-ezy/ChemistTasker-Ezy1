@@ -117,3 +117,57 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
 - Fixed: the owner overview requested `pharmacy_id=0` (403) before the scope was known (`25381b6`).
 - Open: one owner overview load requests `/dashboard/owner/` four times and `/pharmacies/` four times; worth a
   data-flow pass later.
+
+## Shift Centre (Active, Confirmed, History)
+
+- **Card = summary + status bar + details.** Summary: pharmacy, role (navy pill), type, urgency, date, address, three
+  metric tiles with hover explanations. Status bar: who can see the shift (*Internal · Favourites* or *Platform ·
+  ChemistTasker*), what needs attention (*N waiting for review*, *Payment required*, *New activity*), and an explicit
+  *Manage candidates* toggle (`aria-expanded`). The whole card is no longer a `role=button` wrapping other buttons.
+- **Audience stepper** grouped under *Your network* and *Platform*; every step says on hover whom it reaches; the
+  escalation banner names who will be notified. The ChemistTasker bottle marks the platform everywhere (step, section,
+  pills) — owner decision; Figma's sparkle icon not used.
+- **Dates (slots):** the unexplained red dot and *Int/Asg/Rej/No* chips are replaced by readable counts
+  (*1 interested · 3 no reply*) with hover meanings, *Open/Assigned* state, and a labelled *New activity* marker
+  (same rule as before: candidate activity changed since the date was last opened; selecting it clears the marker).
+- **Candidates grouped by source:** *ChemistTasker platform* (counter offers, interested; names hidden until revealed)
+  and *Your network* (interested, assigned, no reply, rejected). Columns are neutral with a tinted header and a
+  one-line meaning; each person shows initials, type and *via {audience}*. Columns size to the card (container
+  queries), not the window.
+- **States:** skeleton loading, error with *Try again* (the data hook no longer hides failures as "no shifts"), empty
+  with *Post a shift*, skeleton while candidates load, escalating state in the banner.
+- **Confirmed/History** use the same card; date tiles are flat with the booked person as a row (no box-in-pill).
+- Figma left out: the gold gradient *Buzz* (now a soft amber reminder button), coloured full-bleed status columns.
+
+## Contrast (whole app)
+
+- Theme radius scale back to MUI's 4px: sx `borderRadius: 3` had become 42px, which produced pill-inside-box shapes.
+- Text-button colour moved to a theme variant; the old nested selector out-ranked component styles and hid labels.
+- AA values: muted text `#63708C`, success `#117A50`, warning `#A15C07`, info `#0369A1`, magenta `#C000B4`,
+  status tones `--ct-status-{green,amber,red}`; brand text variants `blueText`, `successText`, `mintText`.
+- Invoices rendered in MUI's default blue/orange: the finance density theme re-derived the palette. It now layers
+  density onto the dashboard theme with a function theme.
+- Default letter avatars use the violet tile tone (grey + white was 2.7:1).
+- Sweep: every owner and pharmacist page passes AA text contrast except the calendar's dimmed other-month days
+  (inactive, exempt).
+
+## Standard process for every page (owner decision 2026-10-10)
+
+1. Read the page's logic and flows; list what the user must understand and do.
+2. Compare with the Figma frames for the page and its states; keep what is better, fix what reflects old logic.
+3. Make status, source and the next action obvious; readable counts, no codes; short hover hints (guide, don't explain).
+4. All states: loading skeleton, empty with the next action, error with retry, busy/disabled, dialogs.
+5. Shared parts only (`ShiftCentreParts`, `IconTile`, `PageHeader`, `DashboardContentState`); AA checked by sweep.
+6. Screenshots at 1440 and 390; log decisions here.
+
+## Revision plan (pages already styled, to bring to the standard)
+
+| Order | Area | Known gaps |
+| --- | --- | --- |
+| 1 | Post Shift (5 steps) | header offset, clipped field label, step states, review summary before posting |
+| 2 | Internal roster / timesheets / attendance | cryptic chips (0.0H, codes), draft/publish states, empty week |
+| 3 | Worker shift boards (public/community/roster) | card parity with Shift Centre, interest/offer states |
+| 4 | My Pharmacies / My Chain / Memberships | card details, empty/error states, invite flows |
+| 5 | Invoices list/detail/editor | status pills, empty/error, review actions |
+| 6 | Overviews (all personas) | attention items, empty feeds |
+| 7 | Chat, Pharmacy Hub, Talent Hub, Calendar, Availability, Onboarding | page headers, states, contrast leftovers |

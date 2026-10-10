@@ -60,6 +60,7 @@ const DNA = {
   magenta: '#EA0A8E',
   cyan: '#08BEEA',
   mint: '#00A878',
+  mintText: '#007A57', // AA on white; the mint accent itself is 3:1
   surface: '#FFFFFF',
   soft: '#F7F9FF',
 };
@@ -717,7 +718,7 @@ export default function SetAvailabilityPage() {
                           : saved
                             ? alpha(DNA.violet, 0.10)
                             : undefined,
-                      color: !selected && recurringPreview ? DNA.mint : !selected && saved ? DNA.violet : undefined,
+                      color: !selected && recurringPreview ? DNA.mintText : !selected && saved ? DNA.violet : undefined,
                       fontWeight: recurringPreview || saved ? 900 : 700,
                     }}
                   >
@@ -895,7 +896,7 @@ export default function SetAvailabilityPage() {
                 </Typography>
               )}
               {e.notifyNewShifts && (
-                <Typography variant="caption" sx={{ display: 'block', color: DNA.mint, fontWeight: 800 }}>
+                <Typography variant="caption" sx={{ display: 'block', color: DNA.mintText, fontWeight: 600 }}>
                   Notifications on for matching public shifts
                 </Typography>
               )}

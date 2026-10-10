@@ -370,7 +370,7 @@ export default function TopBarActions({
       width: { xs: "100%", xl: 260 },
       flexShrink: 0,
       "& .MuiOutlinedInput-root": {
-        borderRadius: theme.shape.borderRadius,
+        borderRadius: "12px",
         backgroundColor: alpha(theme.palette.common.white, 0.04),
         transition: theme.transitions.create(["background-color", "box-shadow", "border-color"]),
         "&:hover": {

@@ -1037,7 +1037,7 @@ export default function HorizontalCalendarGrid({
                                 Cover Request Pending
                               </Typography>
                             )}
-                            <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: 'var(--ct-text-muted)', display: 'block', mt: 0.5 }}>
                               Click to manage shift
                             </Typography>
                           </Box>

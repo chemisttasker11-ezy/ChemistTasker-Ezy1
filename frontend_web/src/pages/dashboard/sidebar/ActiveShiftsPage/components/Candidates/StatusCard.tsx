@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShiftMemberStatus } from '@chemisttasker/shared-core';
-import { CandidateColumn, CandidateRow, Pill, RowAction, type ShiftTone } from '../ShiftCentreParts';
+import { CandidateColumn, CandidateRow, Pill, RowAction, type ShiftTone } from '../../../../shiftCenter/ShiftCentreParts';
 import { getAudienceLevel, humanizeEnum } from '../../utils/audience';
 
 interface StatusCardProps {

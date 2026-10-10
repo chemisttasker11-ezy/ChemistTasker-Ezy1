@@ -4,7 +4,7 @@ import { CircleCheck, Clock, UserCheck, UserX, Users } from 'lucide-react';
 import { Shift, ShiftMemberStatus } from '@chemisttasker/shared-core';
 import { StatusCard } from './StatusCard';
 import { SlotSelector } from './SlotSelector';
-import { SourceSection } from '../ShiftCentreParts';
+import { SourceSection } from '../../../../shiftCenter/ShiftCentreParts';
 import { dedupeMembers, findOfferForMemberInShift } from '../../utils/candidateHelpers';
 
 interface CommunityLevelViewProps {

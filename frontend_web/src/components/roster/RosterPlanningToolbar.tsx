@@ -414,7 +414,7 @@ export default function RosterPlanningToolbar({
                       fontWeight: 700,
                       letterSpacing: 0.5,
                       bgcolor: BRAND_COLORS.successLight,
-                      color: BRAND_COLORS.success,
+                      color: BRAND_COLORS.successText,
                       borderRadius: '8px',
                       fontSize: 11,
                     }}

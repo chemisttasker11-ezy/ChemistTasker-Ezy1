@@ -399,3 +399,25 @@ export function SourceSection({ title, subtitle, tone, icon, count, hint, childr
         </Box>
     );
 }
+
+const PLATFORM_MARK_SRC = '/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png';
+
+/** The ChemistTasker bottle: marks anything that comes from, or goes out to, the public platform. */
+export function PlatformMark({ size = 20, muted = false }: { size?: number; muted?: boolean }) {
+    return (
+        <Box
+            component="img"
+            src={PLATFORM_MARK_SRC}
+            alt=""
+            aria-hidden="true"
+            sx={{
+                width: size,
+                height: size,
+                objectFit: 'contain',
+                flexShrink: 0,
+                filter: muted ? 'grayscale(1)' : 'none',
+                opacity: muted ? 0.5 : 1,
+            }}
+        />
+    );
+}

@@ -23,6 +23,8 @@ export const BRAND_COLORS = {
   // Focus & Secondary Accents
   blue: '#008DDB',
   blueLight: '#EEF8FD',
+  // Text on light surfaces: the accent blue is 3.3:1, this one is AA (5.5:1 on blueLight).
+  blueText: '#0369A1',
 
   // Backgrounds & Surfaces
   mist: '#F5F8FC',
@@ -35,6 +37,7 @@ export const BRAND_COLORS = {
 
   // Semantic Status
   success: '#10B981',
+  successText: '#117A50',
   successLight: '#ECFDF5',
   warning: '#F59E0B',
   warningLight: '#FFFBEB',
