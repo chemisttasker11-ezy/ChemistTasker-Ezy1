@@ -200,3 +200,20 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
   replaced by the 500/600 scale.
 - Checked: 1440 and 390 (active, mocked pending/active/left, error, leave dialog); AA sweep 0 failures; smoke test
   *owner CONTACT membership never offers the quit action* updated to the new label and passing.
+
+## Worker roster (2026-10-10)
+
+- Hand-made header (hex colours, weight 750) → `PageHeader` *My roster*, also shown above the loading skeleton.
+- No pharmacy: shared empty state pointing to Memberships, and the empty calendar, filter and tabs are no longer
+  shown under an info alert.
+- *Roster Calendar* → *Pharmacy calendar* (section heading, display font); *Filter by Role* → *Show roles*. The help
+  line becomes *No published shifts in this period. Use Next to look ahead.* when the period is empty.
+- Error banner copy names the risk (*may be out of date*); *Retry* → *Try again*, kept on one line.
+- Hex colours in the tabs and mobile agenda/calendar switch → theme tokens; weights 800 → 600.
+- Tried and dropped: opening the calendar at 7 AM — the calendar is a fixed 1600px tall and the page scrolls, so
+  `scrollToTime` has no effect.
+- Checked: 1440 and 390 (filled, mocked empty, mocked error); AA sweep 0 failures.
+- **Finding (not fixed, routing):** the top bar says *Shift Centre* on the worker roster when it is opened from the
+  platform workspace (e.g. the overview's *My Roster* shortcut). *My Roster* only exists in the internal workspace
+  menu, so the shell falls back to the parent item. Fix = switch to the internal workspace when opening the roster
+  (owner decision: routes unchanged for now).
