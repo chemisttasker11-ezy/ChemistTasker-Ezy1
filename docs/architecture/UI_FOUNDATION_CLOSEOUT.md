@@ -126,3 +126,13 @@ To reproduce the wiring inventory, run `node scripts/audit-wiring-diff.mjs a4fb0
 ## Engineering judgment
 
 The branch has real component reuse and sensible domain boundaries, but also mixed data shapes, large orchestration files, duplicated app presentation and insufficient behavior coverage for the redesign. Those are concrete maintainability/regression risks; source code cannot establish whether AI authored them. The fixes and tests in this pass improve the architecture without a visual rewrite. Merge readiness depends on the recorded contract results and the outstanding policy/release decisions, not an “AI spaghetti” label.
+
+## PR #160 publication update
+
+The user subsequently requested publication to existing PR #160. Its head branch is `ui-foundation-complete-20261010`, not `feat/ui-foundation`. Remote head `ad0ae37` contained additional cross-origin navigation tests, Australian visual-test configuration and CI jobs. Those commits were preserved with a conflict-free merge, producing test commit `c4a971cc7e5b6ab55bde4172eaeed0e8c7d8bd75`. Application, backend, shared-core, Next and mobile source trees are identical to the reviewed `13844e6` trees.
+
+On the combined commit, the maintained suite passed **154 tests**, with the live-Next test skipped in that run. It then passed separately against a temporary real Next server on port 3101 (**one passed**); this uses synthetic dashboard API data and verifies actual cross-origin logo navigation, not the seeded login/API flow. Vite types and both UI structural gates passed again. Logs: `ui-pr160-merged-browser.log`, `ui-pr160-live-next.log`, `ui-pr160-next-server.log` and `ui-pr160-wiring.json` in workspace `playground/`.
+
+The remote visual tests retain approved screenshots but allow previously inspected native date-placeholder variance at desktop invoice/filter views (900/1,100 pixel limits respectively), with zero tolerance on other views. The earlier strict zero-difference result above remains evidence for the local refactor; the newer tolerance is a limitation of the hosted comparison, not permission to change appearance.
+
+The prior remote head had successful security, CodeQL, frontend static/mobile lint, backend finalization, serializer, shared-core and frontend E2E workflows; iOS repair acceptance was skipped. New hosted checks must run on the newly published head. Publishing this reviewed work to the requested PR does not merge it or resolve the recorded backend policy/staging decisions. This publication note changes documentation only.
