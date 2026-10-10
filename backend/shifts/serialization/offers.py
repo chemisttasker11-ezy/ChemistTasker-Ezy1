@@ -192,6 +192,12 @@ class ShiftCounterOfferSerializer(serializers.ModelSerializer):
             return None
         if not self._can_view_user_detail(obj):
             return None
+        if obj.shift.visibility == 'PLATFORM':
+            from shifts.candidates import revealed_profile
+            request = self.context.get('request')
+            return revealed_profile(
+                user, build_absolute_uri=request.build_absolute_uri if request else (lambda url: url)
+            )
         return {
             'id': user.id,
             'first_name': user.first_name,

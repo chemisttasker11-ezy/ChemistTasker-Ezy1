@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApiFixture, roleUsers } from './support/apiFixture.mjs';
+import { assertAppearanceOutsideDateText } from './support/appearanceComparison.mjs';
 import { reviewApi } from './support/reviewFixture.mjs';
 
 // Browser/font rasterization differs by operating system; CI compares these Windows baselines in its Windows job.
@@ -26,15 +27,14 @@ for (const width of [390, 1440]) for (const mode of ['light', 'dark']) for (cons
     await page.goto(url);
     const readyText = name === 'shift-filters' && width === 390 ? 'No shifts match your search' : ready;
     await expect(page.getByText(readyText, { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    if (name === 'shift-filters') await expect(page.getByText('No shifts match your search', { exact: true })).toBeVisible();
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => document.fonts.ready);
-    // On the Windows hosted runner Chromium renders native date-input placeholders
-    // in mm/dd/yyyy even with en-AU locale; approved en-AU baselines show
-    // dd/mm/yyyy. The inspected diff is strictly inside native date controls:
-    // 825-829 pixels on invoices and 1,018 on shift filters at desktop width.
-    // Everything else stays pixel-exact. Do NOT regenerate approved snapshots.
-    const nativeDateLocaleTolerance = width === 1440 && name === 'invoices' ? 900
-      : width === 1440 && name === 'shift-filters' ? 1100 : 0;
-    await expect(page).toHaveScreenshot(`${name}-${mode}-${width}.png`, { animations: 'disabled', caret: 'hide', maxDiffPixels: nativeDateLocaleTolerance });
+    const snapshotName = `${name}-${mode}-${width}.png`;
+    if (width === 1440 && (name === 'invoices' || name === 'shift-filters')) {
+      await assertAppearanceOutsideDateText(page, test.info(), snapshotName, name);
+    } else {
+      await expect(page).toHaveScreenshot(snapshotName, { animations: 'disabled', caret: 'hide', maxDiffPixels: 0 });
+    }
   });
 }

@@ -447,7 +447,7 @@ export default function LocumManager({
       const token = res.token;
       const url = `${window.location.origin}/membership/apply/${token}`;
       setLinkValue(url);
-      
+
     } catch (error: any) {
       setToast({ message: error?.response?.data?.detail || "Failed to generate link.", severity: "error" });
     } finally {

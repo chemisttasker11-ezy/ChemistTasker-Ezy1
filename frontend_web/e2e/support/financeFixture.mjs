@@ -36,4 +36,3 @@ export function financeApi({ failFirstLoad = false } = {}) {
     return json(route, page1([]));
   };
 }
-

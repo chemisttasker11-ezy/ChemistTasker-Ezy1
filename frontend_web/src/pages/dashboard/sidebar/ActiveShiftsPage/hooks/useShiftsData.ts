@@ -2,11 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Shift, fetchActiveShifts, fetchPosterShiftDetailService } from '@chemisttasker/shared-core';
 
 interface UseShiftsDataParams {
-    selectedPharmacyId: number | null;
     shiftId?: number | null;
 }
 
-export function useShiftsData({ selectedPharmacyId: _selectedPharmacyId, shiftId }: UseShiftsDataParams) {
+export function useShiftsData({ shiftId }: UseShiftsDataParams) {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { SyntheticEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -39,6 +39,7 @@ import { ROSTER_COLORS } from '../../../constants/rosterColors';
 import { rosterEventForeground } from '../../../utils/rosterEventAppearance';
 import { BRAND_COLORS, BRAND_FONTS } from '../../../constants/brandTheme';
 import RosterPlanningToolbar from '../../../components/roster/RosterPlanningToolbar';
+import { useCalendarDragScroll } from '../../../components/roster/useCalendarDragScroll';
 import RosterCoveragePanel from '../../../features/workforce/RosterCoveragePanel';
 import RosterManagerOverview from '../../../components/roster/RosterManagerOverview';
 import HorizontalCalendarGrid from '../../../components/roster/HorizontalCalendarGrid';
@@ -96,9 +97,7 @@ export default function RosterOwnerPage() {
   const { activePersona, activeAdminPharmacyId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const calendarDragScrollFrameRef = useRef<number | null>(null);
-  const calendarDragPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
-  const isCalendarDragScrollingRef = useRef(false);
+  const startCalendarDragScroll = useCalendarDragScroll();
   const scopedPharmacyId =
     activePersona === 'admin' && typeof activeAdminPharmacyId === 'number'
       ? activeAdminPharmacyId
@@ -117,7 +116,7 @@ export default function RosterOwnerPage() {
   const [openShifts, setOpenShifts] = useState<OpenShiftViewModel[]>([]); // NEW: State for open shifts
   const [workerRequests, setWorkerRequests] = useState<WorkerShiftRequest[]>([]); // NEW: State for cover requests
   const [pharmacyMembers, setPharmacyMembers] = useState<RosterPharmacyMember[]>([]);
-  
+
   // --- Loading States ---
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
@@ -134,7 +133,7 @@ export default function RosterOwnerPage() {
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
   const [calendarSubView, setCalendarSubView] = useState<'TIMELINE' | 'CLASSIC'>('TIMELINE');
   const [rosterViewMode, setRosterViewMode] = useState<'CALENDAR' | 'STAFF' | 'STACKED'>('STAFF');
-  
+
   // --- Dialogs and Forms State (Updated) ---
   const [isAddAssignmentDialogOpen, setIsAddAssignmentDialogOpen] = useState(false);
   const [dialogShiftStartTime, setDialogShiftStartTime] = useState<string | null>(null);
@@ -144,7 +143,7 @@ export default function RosterOwnerPage() {
   const [editIsOpenShift, setEditIsOpenShift] = useState(false);
   const [editOpenShiftVisibility, setEditOpenShiftVisibility] = useState<string>('LOCUM_CASUAL');
   const [pendingDeletionShiftId, setPendingDeletionShiftId] = useState<number | null>(null);
-  
+
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentViewModel | null>(null);
   const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<number | null>(null);
   const [isOptionsDialogOpen, setIsOptionsDialogOpen] = useState(false);
@@ -153,7 +152,7 @@ export default function RosterOwnerPage() {
   const [isPostShiftModalOpen, setIsPostShiftModalOpen] = useState(false);
   const [previousSearch, setPreviousSearch] = useState<string>(location.search);
   const [shiftToEdit, setShiftToEdit] = useState<ShiftForEdit | null>(null);
-  
+
   // --- Duplicate Shift State ---
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [duplicateTargetDates, setDuplicateTargetDates] = useState<string[]>([]);
@@ -210,7 +209,7 @@ export default function RosterOwnerPage() {
       prev && selectableEscalationLevels.includes(prev) ? prev : selectableEscalationLevels[0]
     );
   }, [isEscalateDialogOpen, selectableEscalationLevels]);
-  
+
   const [isCoverRequestDialogOpen, setIsCoverRequestDialogOpen] = useState(false); // NEW: Dialog for cover requests
   const [postAsOpenShift, setPostAsOpenShift] = useState(false);
   const [openShiftVisibility, setOpenShiftVisibility] = useState<string>('LOCUM_CASUAL');
@@ -219,78 +218,11 @@ export default function RosterOwnerPage() {
   // --- Snackbar ---
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
-  const stopCalendarDragScroll = useCallback(() => {
-    isCalendarDragScrollingRef.current = false;
-    calendarDragPointerRef.current = null;
-    if (calendarDragScrollFrameRef.current != null) {
-      window.cancelAnimationFrame(calendarDragScrollFrameRef.current);
-      calendarDragScrollFrameRef.current = null;
-    }
-  }, []);
-  const runCalendarDragScroll = useCallback(() => {
-    if (!isCalendarDragScrollingRef.current) {
-      calendarDragScrollFrameRef.current = null;
-      return;
-    }
-
-    const pointer = calendarDragPointerRef.current;
-    if (pointer) {
-      const edgeSize = 120;
-      const maxStep = 28;
-      const viewportHeight = window.innerHeight;
-      let deltaY = 0;
-
-      if (pointer.clientY < edgeSize) {
-        deltaY = -Math.ceil(((edgeSize - pointer.clientY) / edgeSize) * maxStep);
-      } else if (pointer.clientY > viewportHeight - edgeSize) {
-        deltaY = Math.ceil(((pointer.clientY - (viewportHeight - edgeSize)) / edgeSize) * maxStep);
-      }
-
-      if (deltaY !== 0) {
-        window.scrollBy({ top: deltaY, behavior: 'auto' });
-        document.dispatchEvent(new MouseEvent('mousemove', {
-          bubbles: true,
-          cancelable: true,
-          clientX: pointer.clientX,
-          clientY: pointer.clientY,
-          buttons: 1,
-        }));
-      }
-    }
-
-    calendarDragScrollFrameRef.current = window.requestAnimationFrame(runCalendarDragScroll);
-  }, []);
-  const startCalendarDragScroll = useCallback((target: EventTarget | null, clientX: number, clientY: number) => {
-    if (!(target instanceof Element) || !target.closest('.rbc-time-content')) {
-      return;
-    }
-    calendarDragPointerRef.current = { clientX, clientY };
-    isCalendarDragScrollingRef.current = true;
-    if (calendarDragScrollFrameRef.current == null) {
-      calendarDragScrollFrameRef.current = window.requestAnimationFrame(runCalendarDragScroll);
-    }
-  }, [runCalendarDragScroll]);
-  const updateCalendarDragPointer = useCallback((event: MouseEvent) => {
-    if (!isCalendarDragScrollingRef.current) {
-      return;
-    }
-    calendarDragPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
-  }, []);
   const showSnackbar = (msg: string) => {
     setSnackbarMsg(msg);
     setSnackbarOpen(true);
   };
   const closeSnackbar = () => setSnackbarOpen(false);
-
-  useEffect(() => {
-    window.addEventListener('mousemove', updateCalendarDragPointer);
-    window.addEventListener('mouseup', stopCalendarDragScroll);
-    return () => {
-      window.removeEventListener('mousemove', updateCalendarDragPointer);
-      window.removeEventListener('mouseup', stopCalendarDragScroll);
-      stopCalendarDragScroll();
-    };
-  }, [stopCalendarDragScroll, updateCalendarDragPointer]);
 
   // --- DATA LOADING ---
   useEffect(() => {
@@ -339,9 +271,9 @@ export default function RosterOwnerPage() {
           setWorkerRequests(requestsData);
           setOpenShifts(openShiftData);
         }
-      } catch (err) { 
+      } catch (err) {
         console.error("Failed to load initial page data", err);
-        setPageError('Your roster could not be loaded. Please try again.'); 
+        setPageError('Your roster could not be loaded. Please try again.');
       } finally {
         setIsPageLoading(false);
       }
@@ -350,8 +282,8 @@ export default function RosterOwnerPage() {
   }, [scopedPharmacyId, initialPharmacyFromUrl, pageRetryToken]);
 
   useEffect(() => {
-    if (!isPageLoading && selectedPharmacyId) { 
-      reloadAssignments(); 
+    if (!isPageLoading && selectedPharmacyId) {
+      reloadAssignments();
     }
   }, [selectedPharmacyId, calendarDate, calendarView]);
 
@@ -444,13 +376,13 @@ export default function RosterOwnerPage() {
       showSnackbar("Shift created and assigned successfully!");
       setIsAddAssignmentDialogOpen(false);
       reloadAssignments();
-    } catch (err: any) { 
-        showSnackbar(`Failed to create shift: ${err.response?.data?.detail || err.message}`); 
+    } catch (err: any) {
+        showSnackbar(`Failed to create shift: ${err.response?.data?.detail || err.message}`);
     } finally {
         setIsCreatingShift(false);
     }
   };
-  
+
   const handleDeleteAssignment = async () => {
     if (!selectedAssignment) return;
     if (!window.confirm("Are you sure you want to remove this assignment?")) return;
@@ -616,7 +548,7 @@ export default function RosterOwnerPage() {
           setIsActionLoading(false);
       }
   };
-  
+
   // NEW: Handle posting an open shift
   const handleCreateOpenShift = () => {
     if (!selectedPharmacyId || !newShiftRoleNeeded || !dialogShiftDate || !dialogShiftStartTime || !dialogShiftEndTime) {
@@ -848,7 +780,7 @@ export default function RosterOwnerPage() {
         setIsCoverRequestDialogOpen(false);
     }
   };
-  
+
   const handleNewShiftRoleChange = (event: SelectChangeEvent<string>) => {
     setNewShiftRoleNeeded(event.target.value);
   };
@@ -1107,7 +1039,7 @@ export default function RosterOwnerPage() {
         calendarDate={calendarDate}
         refreshKey={coverageRefreshKey}
       />
-      
+
       {rosterViewMode === 'CALENDAR' && (
         <>
           <Box sx={{
@@ -1181,7 +1113,7 @@ export default function RosterOwnerPage() {
                   </Select>
               </FormControl>
           </Box>
-          
+
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontFamily: BRAND_FONTS.body }}>
             Click an empty time slot to create a new shift, or click an existing assignment to manage it. Assignments with pending leave requests are highlighted in grey.
           </Typography>
@@ -1200,7 +1132,7 @@ export default function RosterOwnerPage() {
               pharmacy={pharmacies.find((p) => Number(p.id) === Number(selectedPharmacyId))}
             />
           ) : (
-            <Box sx={{ 
+            <Box sx={{
               position: 'relative',
               width: '100%',
               minWidth: 0,
@@ -1431,14 +1363,7 @@ export default function RosterOwnerPage() {
                 </IconButton>
               }
             />
-      
+
     </Box>
   );
 }
-
-
-
-
-
-
-

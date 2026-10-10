@@ -30,4 +30,3 @@ export function receivedKey(invoice: FinanceInvoice): Exclude<ReceivedKey, 'all'
   return 'review';
 }
 export const receivedOrder: Record<Exclude<ReceivedKey, 'all'>, number> = { review: 0, approved: 1, waiting: 2, paid: 3 };
-

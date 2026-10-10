@@ -151,13 +151,6 @@ export function createSleekTheme(mode: Mode): Theme {
           "[data-ct-theme='dark'] .MuiOutlinedInput-notchedOutline": {
             borderColor: `${borderColor} !important`,
           },
-          "[data-ct-theme='dark'] .MuiTableCell-root": {
-            color: `${textPrimary} !important`,
-            borderColor: `${borderColor} !important`,
-          },
-          "[data-ct-theme='dark'] .MuiDivider-root": {
-            borderColor: `${borderColor} !important`,
-          },
           "[data-ct-theme='dark'] .MuiListItemButton-root:hover, [data-ct-theme='dark'] .MuiMenuItem-root:hover": {
             backgroundColor: `${hoverBg} !important`,
           },
@@ -395,9 +388,17 @@ export function createSleekTheme(mode: Mode): Theme {
           },
         },
       },
+      MuiDivider: {
+        styleOverrides: { root: { "&&&": isLight ? {} : { borderColor } } },
+      },
       MuiTableCell: {
         styleOverrides: {
-          root: { borderColor, fontSize: 13.5 },
+          root: {
+            // Owned component rule replaces the former global important override.
+            "&&&": isLight ? {} : { color: textPrimary, borderColor },
+              borderColor,
+              fontSize: 13.5,
+            },
           head: {
             fontSize: 12,
             fontWeight: 600,

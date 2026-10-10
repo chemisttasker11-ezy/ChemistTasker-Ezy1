@@ -152,4 +152,3 @@ export function TabLabel({ label, count, attention }: { label: string; count?: n
     </Stack>
   );
 }
-

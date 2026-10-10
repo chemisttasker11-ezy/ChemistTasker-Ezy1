@@ -109,9 +109,13 @@ function requireWebAbsent(relativePath, patterns) {
 requireWebContains('layouts/DashboardTopShell.tsx', [
   ['shared sidebar', /<DashboardSideNav\b/],
   ['pharmacy or workspace selector', /showPharmacySelector/],
-  ['persona and admin switching', /selectAdminPersona/],
+  ['scoped persona switching owner', /useDashboardWorkspaceScope\(forceAdminScope\)/],
+  ['persona presentation', /<DashboardPersonaSwitcher\b/],
   ['top-bar actions', /<TopBarActions\b/],
   ['mobile dashboard menu trigger', /Open dashboard navigation/],
+]);
+requireWebContains('layouts/dashboardShell/useDashboardWorkspaceScope.ts', [
+  ['persona and admin switching', /selectAdminPersona/],
 ]);
 requireWebAbsent('layouts/DashboardTopShell.tsx', [
   ['dashboard search hidden', /<TopBarActions[\s\S]{0,180}\bhideSearch\b/],

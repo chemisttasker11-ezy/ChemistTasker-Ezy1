@@ -87,6 +87,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const latestSlotSignaturesRef = React.useRef<Record<string, string>>({});
     const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
     const reviewLoadingId: number | null = null;
+    const candidateReviewRequest = React.useRef(0);
+    useEffect(() => () => { candidateReviewRequest.current += 1; }, []);
 
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<DeleteConfirmDialogState>({
         open: false,
@@ -250,12 +252,14 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const handleRevealInterest = useCallback(async (shift: Shift, interest: ShiftInterest) => {
         const levelKey = selectedLevelByShift[shift.id] ?? PUBLIC_LEVEL_KEY;
 
+        const request = ++candidateReviewRequest.current;
         resetWorkerRatings();
         let revealedUser: any = null;
 
         if (!interest.revealed) {
             try {
                 revealedUser = await revealInterest(shift, interest, levelKey);
+                    if (!revealedUser || request !== candidateReviewRequest.current) return;
 
                 const offers = counterOffersByShift[shift.id] || [];
                 const matchingOffer = offers.find((o: any) => {
@@ -273,14 +277,14 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 return;
             }
         } else {
-            revealedUser = interest.user || (interest as any).user_detail;
+            revealedUser = (interest as any).userDetail || (interest as any).user_detail || interest.user;
         }
 
         const userObj = (typeof revealedUser === 'object' && revealedUser)
             ? revealedUser
             : (typeof interest.user === 'object' && interest.user)
                 ? interest.user
-                : (interest as any).user_detail;
+                : (interest as any).userDetail || (interest as any).user_detail;
 
         const interestAny = interest as any;
         const candidate = {
@@ -316,6 +320,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             }
         }
 
+        if (request !== candidateReviewRequest.current) return;
         setReviewOfferDialog({
             open: true,
             shiftId: shift.id,
@@ -336,6 +341,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
     const handleReviewOffer = useCallback(
         async (shift: Shift, offer: any, tabDataState: any, slotId: number | null) => {
+            const request = ++candidateReviewRequest.current;
             resetWorkerRatings();
 
             const interest = findInterestForOffer(offer, tabDataState, slotId);
@@ -346,6 +352,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 try {
                     const levelKey = selectedLevelByShift[shift.id] ?? PUBLIC_LEVEL_KEY;
                     revealedUser = await revealInterest(shift, interest, levelKey);
+                    if (!revealedUser || request !== candidateReviewRequest.current) return;
 
                     if (revealedUser) {
                         updateOfferCache(shift.id, offer.id, revealedUser);
@@ -354,11 +361,14 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     await loadCounterOffers(shift.id);
                 } catch (error) {
                     console.error('Failed to reveal offer candidate', error);
+                    return;
                 }
             }
 
             const userObj =
                 revealedUser ||
+                (interest as any)?.userDetail ||
+                (interest as any)?.user_detail ||
                 offer.userDetail ||
                 offer.user_detail ||
                 (typeof offer.user === 'object' ? offer.user : null);
@@ -403,6 +413,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
             const mappedSlots = mapOfferSlotsWithShift(offer, shift, resolvedSlotId);
 
+            if (request !== candidateReviewRequest.current) return;
             setReviewOfferDialog({
                 open: true,
                 shiftId: shift.id,
@@ -424,6 +435,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
     const handleReviewCandidate = useCallback(
         async (shift: Shift, member: ShiftMemberStatus, offer: any | null, slotId: number | null) => {
+            const request = ++candidateReviewRequest.current;
             resetWorkerRatings();
             const levelKey = selectedLevelByShift[shift.id] ?? getCurrentLevelKey(shift);
             const currentTabData = tabData[getTabKey(shift.id, levelKey)] || {};
@@ -433,9 +445,11 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             if (interest && !(interest as any).revealed) {
                 try {
                     revealedUser = await revealInterest(shift, interest, levelKey);
+                    if (!revealedUser || request !== candidateReviewRequest.current) return;
                     await loadTabDataForShift(shift, levelKey);
                 } catch (error) {
                     console.error('Failed to reveal reviewed candidate', error);
+                    return;
                 }
             }
 
@@ -500,6 +514,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 ? { ...awaitingPaymentCounterOffer, _mappedSlots: mapOfferSlotsWithShift(awaitingPaymentCounterOffer, shift, resolvedSlotId) }
                 : null;
 
+            if (request !== candidateReviewRequest.current) return;
             setReviewOfferDialog({
                 open: true,
                 shiftId: shift.id,
@@ -907,7 +922,11 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 workerCommentsPage={workerCommentsPage}
                 workerCommentsPageCount={workerCommentsPageCount}
                 counterActionLoading={counterActionLoading}
-                onDismiss={() => setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null })}
+                onDismiss={() => {
+                    candidateReviewRequest.current += 1;
+                    resetWorkerRatings();
+                    setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null });
+                }}
                 onAccept={(offer) => handleAcceptOffer(offer, reviewOfferDialog.shiftId, reviewOfferDialog.slotId)}
                 onReject={(offer) => handleRejectOffer(offer, reviewOfferDialog.shiftId)}
                 onAssign={(userId, slotId) => handleAssignCandidate(userId, reviewOfferDialog.shiftId, slotId)}

@@ -95,3 +95,46 @@ test('a slow earlier candidate review cannot replace the candidate selected afte
   await expect(dialog.getByText('First Candidate', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText('First review', { exact: true })).toHaveCount(0);
 });
+
+for (const initiallyRevealed of [true, false]) {
+  test(`counteroffer review keeps the full interest profile after ${initiallyRevealed ? 'reload' : 'a failed reveal and retry'}`, async ({ page }) => {
+    const profile = { id: 81, first_name: 'Review', last_name: 'Candidate', role_label: 'Student',
+      short_bio: 'Full work biography', verified: true, gov_id_verified: true,
+      skills: ['COUNTEROFFER_SKILL'], years_experience: 3, suburb: 'Bendigo', state: 'VIC' };
+    let reveals = 0;
+    await installApiFixture(page, roleUsers.owner, async (route, { path }) => {
+      if (path.endsWith('/shifts/active/')) return json(route, [{ id: 51, pharmacy: 101,
+        pharmacy_detail: { id: 101, name: 'Review Pharmacy' }, visibility: 'PLATFORM',
+        allowed_escalation_levels: ['PLATFORM'], role_needed: 'PHARMACIST', employment_type: 'LOCUM',
+        single_user_only: false, slots: [{ id: 61, date: '2026-10-31', start_time: '09:00:00', end_time: '15:00:00' }] }]);
+      if (path.endsWith('/shift-interests/')) return json(route, [{ id: 71, shift: 51, slot_id: 61,
+        user_id: 81, revealed: initiallyRevealed, user: initiallyRevealed ? 'Review Candidate' : 'Anonymous Interest User',
+        user_detail: initiallyRevealed ? profile : null }]);
+      const offer = { id: 91, shift: 51, user: 81, status: 'PENDING', user_detail: initiallyRevealed
+        ? { id: 81, first_name: 'Review', last_name: 'Candidate', short_bio: 'Basic offer biography' } : null,
+        slots: [{ id: 92, slot_id: 61, slot_date: '2026-10-31', proposed_start_time: '09:00:00', proposed_end_time: '15:00:00', proposed_rate: '70.00' }] };
+      if (path.endsWith('/shifts/counter-offers-batch/')) return json(route, { 51: [offer] });
+      if (path.includes('/counter-offers')) return json(route, [offer]);
+      if (path.endsWith('/shifts/51/reveal_profile/')) {
+        reveals += 1;
+        expect(route.request().postDataJSON()).toEqual({ user_id: 81, slot_id: 61 });
+        return reveals === 1 ? json(route, { detail: 'Temporary failure' }, 500) : json(route, profile);
+      }
+    });
+    await page.goto('/dashboard/owner/shift-center/active');
+    await page.getByRole('button', { name: 'Manage candidates', exact: true }).click();
+    const review = page.getByRole('button', { name: initiallyRevealed ? 'Review offer' : 'Reveal offer', exact: true });
+    await review.click();
+    if (!initiallyRevealed) {
+      await expect(page.getByText('Failed to reveal candidate.', { exact: true })).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await review.click();
+    }
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Student', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('COUNTEROFFER_SKILL', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Full work biography', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Profile verified', { exact: true })).toBeVisible();
+    expect(reveals).toBe(initiallyRevealed ? 0 : 2);
+  });
+}

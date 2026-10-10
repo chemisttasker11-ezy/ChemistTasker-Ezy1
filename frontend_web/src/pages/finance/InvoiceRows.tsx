@@ -99,4 +99,3 @@ export function ReceivedInvoiceRow({ invoice, busy, openHistory, onPdf }: {
       </Stack>
     </Box>;
   }
-

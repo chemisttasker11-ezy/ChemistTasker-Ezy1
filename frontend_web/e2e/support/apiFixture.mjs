@@ -143,4 +143,3 @@ export async function installApiFixture(page, user, extra) {
     return json(route, { ok: true, id: 999 });
   });
 }
-

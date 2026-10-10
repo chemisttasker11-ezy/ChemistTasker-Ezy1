@@ -184,3 +184,9 @@ export const getCandidateUserId = (record: any): number | null => {
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
 };
+
+export function getOfferSlotIds(offer: any): number[] {
+    const slots = offer?.slots || offer?.offer_slots || [];
+    return slots.map((slot: any) => slot.slot_id ?? slot.slotId ?? slot.slot?.id ?? null)
+        .filter((id: any) => id != null);
+}

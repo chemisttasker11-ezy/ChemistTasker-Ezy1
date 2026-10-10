@@ -217,6 +217,37 @@ class RevealProfileTests(ShiftActionFixture):
         self.assertIn("skills", detail)
         self.assertFalse({"email", "phone_number", "resume"} & set(detail))
 
+    def test_platform_counteroffer_uses_revealed_work_profile_and_keeps_anonymity(self):
+        worker = self.worker()
+        shift = self.shift(visibility="PLATFORM")
+        offer = ShiftCounterOffer.objects.create(shift=shift, user=worker)
+        ShiftCounterOfferSlot.objects.create(offer=offer, slot=shift.slots.first(), proposed_start_time=time(9), proposed_end_time=time(17))
+        interest = ShiftInterest.objects.create(shift=shift, user=worker, revealed=False)
+        endpoint = f"{API}shifts/{shift.id}/counter-offers/"
+        response = client_for(self.owner).get(endpoint)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNone(response.data[0]["user_detail"])
+
+        revealed, _ = self.post(self.owner, f"shifts/{shift.id}/reveal_profile/", {"user_id": worker.id})
+        self.assertEqual(revealed.status_code, 200, revealed.data)
+        listed = client_for(self.owner).get(endpoint)
+        detail = listed.data[0]["user_detail"]
+        interest.refresh_from_db()
+        from shifts.serializers import ShiftInterestSerializer
+        self.assertEqual(detail, ShiftInterestSerializer(interest).data["user_detail"])
+        self.assertEqual(detail["role_label"], "Pharmacist")
+        self.assertTrue({"skills", "verified", "rate_preference"} <= set(detail))
+        self.assertFalse({"email", "phone_number", "resume"} & set(detail))
+        batch = client_for(self.owner).get(f"{API}shifts/counter-offers-batch/?shift_ids={shift.id}")
+        self.assertEqual(batch.data[str(shift.id)][0]["user_detail"], detail)
+
+        # Network contracts are preserved; this change is bounded to PLATFORM reviews.
+        network = self.shift()
+        network_offer = ShiftCounterOffer.objects.create(shift=network, user=worker)
+        ShiftCounterOfferSlot.objects.create(offer=network_offer, slot=network.slots.first(), proposed_start_time=time(9), proposed_end_time=time(17))
+        network_detail = client_for(self.owner).get(f"{API}shifts/{network.id}/counter-offers/").data[0]["user_detail"]
+        self.assertEqual(network_detail["email"], worker.email)
+
     def test_reveal_refusals(self):
         worker = self.worker()
         single = self.shift()
