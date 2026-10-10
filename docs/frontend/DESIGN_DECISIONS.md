@@ -289,3 +289,25 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
   page and drawer; Recalculate contract and the five workforce route checks passing.
 - **Finding (not changed):** the drawer offers *Resolve*/*Waive* on checks in worker mode (My Hours) too; the server
   decides whether a worker may do this. Worth hiding for workers once the rule is confirmed.
+
+## Owner billing (2026-10-10)
+
+- No Figma frames exist for billing; built from the system. `PageHeader` per step (*Billing & subscription*, *Set up
+  your subscription*, *Staff seats* in seats-only mode) with labelled back buttons; the sticky centred "Back" bar,
+  hover-lift shadow cards, off-brand teal `#00a99d` border, all-caps *RECOMMENDED* badge and weights 700–800 removed.
+- Plans: two flat cards; *Current plan* is a pill (was a disabled button); the subscription card has the deep-violet
+  edge and a *Recommended* pill; prices in the display face; features as a list with check icons. Prices, fees and
+  allowances are unchanged word for word in meaning.
+- Setup: payment method as two selectable cards (card / invoice, keyboard focus ring), monthly total, and a button
+  that says what happens next (*Continue to card payment* / *Subscribe by invoice*) with a spinner beside the label.
+- Manage: status pill, *Staff seats 7 (5 included + 2 extra)*, *Renews*, *Monthly total*; the Stripe ID is a small
+  *Reference for support* line. Extra seats use a −/+ stepper (44px) with a live total (*$30 base + 3 × $5 · 8 seats
+  in total*); the button names the change (*Change to 3 extra seats*) and is disabled until the number changes (it
+  used to toast "No seat change detected"). *Refresh* keeps the page on screen and shows a spinner.
+- States: loading; **load error** with *Try again* (a failed load used to toast and show the plans as if the owner
+  had no subscription); a failed refresh keeps the last details with a dismissible error; the developer-facing
+  "make sure your webhook listener is running" warning is now *Your payment details are saved, but the subscription
+  isn't active yet* with *Check again*.
+- Checked: 1440 and 390 (plans with pending activation, setup, manage, error); AA sweep 0 failures.
+- **Finding (not changed):** the top bar reads *Owner Dashboard* on billing because billing is a view of the overview
+  route, not a menu item.
