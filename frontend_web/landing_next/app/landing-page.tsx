@@ -7,12 +7,11 @@ import { staffPersonas } from './persona-data';
 import { mobileAppLinks, publicRoutes } from '@/public/routes';
 import {useSession} from '@/shared/session-provider';
 import AccountControls from '@/shared/account-controls';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MeasuringCylinder } from '@/features/paediatric-calculator/components/measuring-cylinder';
 import TierExplainer from './tier-explainer';
 import FeatureCatalogue from './feature-catalogue';
 import JournalTeaser from './journal-teaser';
-import PersonaOrbit from './persona-orbit';
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCheck, Clock3, Building2, Users, MessageCircle, FileText, GraduationCap, Smartphone, ShieldCheck, Plus, BriefcaseBusiness, Bell } from 'lucide-react';
 
 const features = [
@@ -38,12 +37,15 @@ export default function LandingPage() {
   const {user,status}=useSession();
   const startPath=status==='anonymous'?publicRoutes.register:publicRoutes.dashboard;
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [staffRole, setStaffRole] = useState(0);
+  const [staffRole, setStaffRole] = useState(4);
   const [staffAuto, setStaffAuto] = useState(true);
-  const [staffHold, setStaffHold] = useState(false);
+  const staffRailRef = useRef<HTMLDivElement>(null);
   const activeStaff = staffPersonas[staffRole];
-  const chooseStaff = (index: number) => { setStaffRole(index); setStaffAuto(false); };
-  const chooseGroup = (group: string) => chooseStaff(staffPersonas.findIndex((persona) => persona.group === group));
+  const orderedStaff = staffPersonas.map((_, position) => {
+    const offset = position - Math.floor(staffPersonas.length / 2);
+    const index = (staffRole + offset + staffPersonas.length) % staffPersonas.length;
+    return { persona: staffPersonas[index], index, distance: Math.abs(offset), active: offset === 0 };
+  });
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -54,10 +56,20 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    if (!staffAuto || reduceMotion || staffHold) return;
-    const timer = window.setTimeout(() => setStaffRole(current => (current + 1) % staffPersonas.length), 6000);
+    if (!staffAuto || reduceMotion) return;
+    const timer = window.setTimeout(() => setStaffRole(current => (current + 1) % staffPersonas.length), 7500);
     return () => window.clearTimeout(timer);
-  }, [staffRole, staffAuto, reduceMotion, staffHold]);
+  }, [staffRole, staffAuto, reduceMotion]);
+
+  useEffect(() => {
+    const rail = staffRailRef.current;
+    const selected = rail?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!rail || !selected || rail.scrollWidth <= rail.clientWidth) return;
+    rail.scrollTo({
+      left: selected.offsetLeft - (rail.clientWidth - selected.offsetWidth) / 2,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  }, [staffRole, reduceMotion]);
 
   return <>
     <PublicHeader skipTarget="main"/>
@@ -66,20 +78,15 @@ export default function LandingPage() {
         <div className="container hero-shell">
           <div className="hero-grid">
             <div className="hero-copy">
-              <h1>Your pharmacy workforce.<br/><span>Better together.</span></h1>
+              <h1>Locum shifts.<br/>Pharmacy teams.<br/><span>Better together.</span></h1>
               <p className="hero-description">Find pharmacy work, discover talent and keep availability, teams and everyday workforce admin connected in one pharmacy-focused platform.</p>
               <div className="button-row"><LinkButton path={publicRoutes.publicShifts}>Find a Shift</LinkButton><LinkButton path={publicRoutes.publicTalent} secondary>Find Talent</LinkButton></div>
-              <div className="hero-personas" role="group" aria-label="Show a ChemistTasker workspace">{([['owner','Owner'],['pharmacist','Pharmacist'],['other-staff','Other staff'],['explorer','Explorer']] as const).map(([group,label])=><button key={group} type="button" data-persona={group} aria-pressed={activeStaff.group===group} onClick={()=>chooseGroup(group)}><i/>{label}</button>)}</div>
+              <div className="hero-personas" aria-label="Explore ChemistTasker workspaces"><a href="#workspaces" data-persona="owner" onClick={()=>{setStaffRole(0);setStaffAuto(false)}}><i/>Owner</a><a href="#workspaces" data-persona="pharmacist" onClick={()=>{setStaffRole(2);setStaffAuto(false)}}><i/>Pharmacist</a><a href="#workspaces" data-persona="other-staff" onClick={()=>{setStaffRole(4);setStaffAuto(false)}}><i/>Other staff</a><a href="#workspaces" data-persona="explorer" onClick={()=>{setStaffRole(6);setStaffAuto(false)}}><i/>Explorer</a></div>
             </div>
-            <PersonaOrbit
-              personas={staffPersonas}
-              active={staffRole}
-              playing={staffAuto && !reduceMotion}
-              reduceMotion={reduceMotion}
-              onSelect={chooseStaff}
-              onTogglePlay={() => setStaffAuto((current) => !current)}
-              onHoldChange={setStaffHold}
-            />
+            <div className="hero-visual">
+              <div className="photo-main"><Image src="/assets/pharmacist-priya.jpg" alt="Pharmacy professional in a bright community pharmacy" fill priority sizes="(max-width: 880px) 86vw, 44vw"/><span className="photo-caption"><span className="tiny-dot"/> People at the heart of pharmacy.</span></div>
+              <div className="photo-small"><Image src="/assets/pharmacist-david.jpg" alt="Pharmacist in a community pharmacy" fill sizes="(max-width: 880px) 35vw, 19vw"/></div>
+            </div>
           </div>
         </div>
       <div className="container value-strip"><div><Building2/><span>Pharmacy-first<br/><strong>Built around pharmacy work</strong></span></div><div><Users/><span>One connected workforce<br/><strong>From your team to wider talent</strong></span></div><div><Smartphone/><span>Web &amp; mobile<br/><strong>Wherever work takes you</strong></span></div><div><ShieldCheck/><span>Role-aware access<br/><strong>The right tools for each person</strong></span></div></div></section>
@@ -110,13 +117,45 @@ export default function LandingPage() {
 
 
       <section id="workspaces" className="section container persona-showcase">
+        <div className="pharmacy-team-portrait">
+          <img src="/assets/personas/pharmacy-team.png" alt="A pharmacy team together in their workplace" loading="lazy" />
+        </div>
         <div className="center-heading persona-heading">
           <h2>See what ChemistTasker adds to your working day.</h2>
         </div>
+        <div className="staff-persona-showcase" aria-label="Explore ChemistTasker for each pharmacy role">
+          <div ref={staffRailRef} className="staff-persona-rail" role="group" aria-label="Choose a pharmacy role">
+            {orderedStaff.map(({ persona, index, distance, active }) => (
+              <button
+                key={persona.label}
+                type="button"
+                className="staff-persona"
+                style={{ '--staff-accent': persona.accent } as React.CSSProperties}
+                data-active={active}
+                data-distance={distance}
+                aria-pressed={active}
+                aria-label={`Show ${persona.label} benefits`}
+                onClick={() => { setStaffRole(index); setStaffAuto(false); }}
+              >
+                <span className="staff-persona-figure">
+                  <img className="staff-persona-image" src={persona.image} alt="" aria-hidden="true" loading={distance < 2 ? 'eager' : 'lazy'} />
+                </span>
+                <span className="staff-persona-role">{persona.label}</span>
+                <span className="staff-persona-summary">{persona.short}</span>
+              </button>
+            ))}
+          </div>
+          <div className="staff-persona-detail" aria-live="polite" style={{ '--staff-accent': activeStaff.accent } as React.CSSProperties}>
+            <strong>{activeStaff.heading}</strong>
+            <p>{activeStaff.detail}</p>
+            <div className="staff-persona-tools" aria-label={`${activeStaff.label} ChemistTasker tools`}>
+              {activeStaff.tools.map(tool => <span key={tool}>{tool}</span>)}
+            </div>
+          </div>
+        </div>
         <div className="role-panel persona-board" data-accent={activeStaff.group} style={{ '--staff-accent': activeStaff.accent } as React.CSSProperties}>
           <div className="role-copy persona-copy" key={`copy-${staffRole}`}>
-            <h3>{activeStaff.heading}</h3>
-            <p>{activeStaff.detail}</p>
+            <h3>Made for your role.</h3>
             <ul className="check-list">{activeStaff.benefits.map(benefit => <li key={benefit}><Check/>{benefit}</li>)}</ul>
             <div className="persona-actions">
               <LinkButton path={startPath}>{user ? 'Open my workspace' : `Explore the ${activeStaff.label.toLowerCase()} workspace`}</LinkButton>
